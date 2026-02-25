@@ -110,9 +110,9 @@ class OverworldState(BaseState):
                 self.move_cooldown = 0
 
     def draw(self, renderer):
-        """Draw the overworld."""
-        renderer.draw_map(self.game.tile_map, self.game.camera)
-        renderer.draw_party(self.game.party, self.game.camera)
-        renderer.draw_hud(self.game.party, self.game.tile_map)
-        if self.message:
-            renderer.draw_message(self.message)
+        """Draw the overworld in Ultima III style."""
+        renderer.draw_overworld_u3(
+            self.game.party,
+            self.game.tile_map,
+            message=self.message,
+        )

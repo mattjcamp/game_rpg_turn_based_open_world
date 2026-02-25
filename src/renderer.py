@@ -479,6 +479,338 @@ class Renderer:
             self.screen.blit(text_surface, text_rect)
 
     # ========================================================
+    # OVERWORLD  –  Ultima III retro style
+    # ========================================================
+
+    # Map viewport for the U3 split-screen layout
+    _U3_OW_COLS = 15       # tiles visible horizontally
+    _U3_OW_ROWS = 18       # tiles visible vertically
+    _U3_OW_TS   = 32       # tile size (same as global TILE_SIZE)
+    _U3_OW_MAP_W = _U3_OW_COLS * _U3_OW_TS   # 480
+    _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 576
+
+    def draw_overworld_u3(self, party, tile_map, message=""):
+        """
+        Full Ultima III-style overworld screen.
+
+        ┌────────────────┬──────────────────┐
+        │                │ 1 ROLAND  FIG    │
+        │  15×18 tile    │ HP:0030 AC:12    │
+        │  map           ├──────────────────┤
+        │                │ 2 MIRA    CLE    │
+        │  (black bg,    │ HP:0022 AC:10    │
+        │   green dots,  ├──────────────────┤
+        │   colored      │ 3 THERON  MAG    │
+        │   terrain)     │ HP:0016 AC:10    │
+        │                ├──────────────────┤
+        │                │ 4 SABLE   THI    │
+        │                │ HP:0020 AC:14    │
+        │                ├──────────────────┤
+        │                │ GOLD: 0100       │
+        │                │ TERRAIN: GRASS   │
+        ├────────────────┴──────────────────┤
+        │ [ARROWS/WASD] MOVE   [ESC] QUIT  │
+        └───────────────────────────────────┘
+        """
+        self.screen.fill((0, 0, 0))
+
+        ts = self._U3_OW_TS
+        cols = self._U3_OW_COLS
+        rows = self._U3_OW_ROWS
+
+        # ── compute camera offset for the reduced viewport ──
+        off_c = party.col - cols // 2
+        off_r = party.row - rows // 2
+        off_c = max(0, min(off_c, tile_map.width - cols))
+        off_r = max(0, min(off_r, tile_map.height - rows))
+
+        # ── 1. draw map tiles ──
+        from src.settings import (
+            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
+        )
+
+        for sr in range(rows):
+            for sc in range(cols):
+                wc = sc + off_c
+                wr = sr + off_r
+                tid = tile_map.get_tile(wc, wr)
+                px = sc * ts
+                py = sr * ts
+                self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr)
+
+        # ── 2. party sprite ──
+        psc = party.col - off_c
+        psr = party.row - off_r
+        if 0 <= psc < cols and 0 <= psr < rows:
+            cx = psc * ts + ts // 2
+            cy = psr * ts + ts // 2
+            self._u3_draw_overworld_party(cx, cy)
+
+        # ── 3. blue border around map ──
+        pygame.draw.rect(self.screen, (68, 68, 255),
+                         pygame.Rect(0, 0, self._U3_OW_MAP_W, self._U3_OW_MAP_H), 2)
+
+        # ── 4. right panel ──
+        rx = self._U3_OW_MAP_W + 4
+        rw = SCREEN_WIDTH - rx
+        self._u3_overworld_right_panel(party, tile_map, rx, 0, rw)
+
+        # ── 5. bottom status bar ──
+        bar_y = SCREEN_HEIGHT - 24
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        self._u3_text("[ARROWS/WASD] MOVE    [ESC] QUIT",
+                      8, bar_y + 5, (68, 68, 255))
+
+        # ── 6. floating message ──
+        if message:
+            surf = self.font.render(message.upper(), True, (255, 170, 85))
+            rect = surf.get_rect(center=(self._U3_OW_MAP_W // 2, 16))
+            bg = rect.inflate(20, 8)
+            pygame.draw.rect(self.screen, (0, 0, 0), bg)
+            pygame.draw.rect(self.screen, (68, 68, 255), bg, 2)
+            self.screen.blit(surf, rect)
+
+    # ── overworld tile rendering ─────────────────────────────
+
+    def _u3_draw_overworld_tile(self, tile_id, px, py, ts, wc, wr):
+        """Draw a single overworld tile in Ultima III style with good contrast."""
+        from src.settings import (
+            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
+        )
+
+        BLACK = (0, 0, 0)
+        GREEN = (0, 170, 0)
+        DKGRN = (0, 102, 0)
+        BLUE  = (30, 60, 170)
+        LTBLU = (60, 100, 200)
+        WHITE = (255, 255, 255)
+        GRAY  = (136, 136, 136)
+        BROWN = (140, 100, 50)
+        SAND  = (180, 160, 80)
+        ORANGE = (255, 170, 85)
+
+        rect = pygame.Rect(px, py, ts, ts)
+        cx = px + ts // 2
+        cy = py + ts // 2
+        seed = wc * 31 + wr * 17  # deterministic pseudo-random
+
+        if tile_id == TILE_WATER:
+            # Dark blue base with brighter wave lines for clear water look
+            pygame.draw.rect(self.screen, (0, 0, 60), rect)
+            # Multiple wave lines across the tile
+            for i in range(3):
+                s = seed + i * 23
+                dy = 5 + (s * 7) % (ts - 10)
+                dx_off = (s * 3) % 6
+                wave_color = LTBLU if s % 2 else BLUE
+                # Small horizontal wave dashes
+                pygame.draw.line(self.screen, wave_color,
+                                 (px + dx_off + 2, py + dy),
+                                 (px + dx_off + 8, py + dy), 1)
+            # Extra bright accent dot
+            if seed % 3 < 2:
+                dx = (seed * 11) % (ts - 8) + 4
+                dy = (seed * 5) % (ts - 8) + 4
+                pygame.draw.rect(self.screen, (80, 130, 220),
+                                 pygame.Rect(px + dx, py + dy, 2, 1))
+
+        elif tile_id == TILE_GRASS:
+            # Black base with scattered green crosses and dots
+            pygame.draw.rect(self.screen, BLACK, rect)
+            # More crosses for denser ground coverage
+            for i in range(2):
+                s = seed + i * 43
+                if (s + i) % 4 < 3:  # ~75% chance each
+                    dx = (s * 7) % (ts - 8) + 4
+                    dy = (s * 13) % (ts - 8) + 4
+                    c = GREEN if s % 3 else DKGRN
+                    x, y = px + dx, py + dy
+                    pygame.draw.line(self.screen, c, (x - 2, y), (x + 2, y), 1)
+                    pygame.draw.line(self.screen, c, (x, y - 2), (x, y + 2), 1)
+            # Extra dots
+            if (seed + 3) % 5 < 3:
+                dx2 = ((seed + 5) * 11) % (ts - 8) + 4
+                dy2 = ((seed + 5) * 3) % (ts - 8) + 4
+                pygame.draw.rect(self.screen, DKGRN,
+                                 pygame.Rect(px + dx2, py + dy2, 2, 2))
+
+        elif tile_id == TILE_FOREST:
+            # Dark green tinted base — clearly different from plain grass
+            pygame.draw.rect(self.screen, (0, 20, 0), rect)
+            # Dense green crosses in background
+            for i in range(4):
+                s = seed + i * 37
+                dx = (s * 7) % (ts - 6) + 3
+                dy = (s * 13) % (ts - 6) + 3
+                c = GREEN if s % 2 else DKGRN
+                x, y = px + dx, py + dy
+                pygame.draw.line(self.screen, c, (x - 2, y), (x + 2, y), 1)
+                pygame.draw.line(self.screen, c, (x, y - 2), (x, y + 2), 1)
+            # Prominent triangle tree in center
+            pts = [(cx, cy - 8), (cx - 6, cy + 4), (cx + 6, cy + 4)]
+            pygame.draw.polygon(self.screen, GREEN, pts)
+            # Smaller darker inner tree
+            pts2 = [(cx, cy - 5), (cx - 3, cy + 2), (cx + 3, cy + 2)]
+            pygame.draw.polygon(self.screen, DKGRN, pts2)
+            # Trunk
+            pygame.draw.line(self.screen, BROWN, (cx, cy + 4), (cx, cy + 7), 2)
+
+        elif tile_id == TILE_MOUNTAIN:
+            # Dark gray base tint to distinguish from black ground
+            pygame.draw.rect(self.screen, (20, 15, 10), rect)
+            # Larger, more prominent mountain with layered look
+            # Base/foothills
+            base_pts = [(cx - 10, cy + 8), (cx - 2, cy - 2), (cx + 6, cy + 8)]
+            pygame.draw.polygon(self.screen, (100, 90, 80), base_pts)
+            # Main peak
+            pts = [(cx, cy - 10), (cx - 9, cy + 7), (cx + 9, cy + 7)]
+            pygame.draw.polygon(self.screen, GRAY, pts)
+            # Snow cap — bigger and brighter
+            snow = [(cx, cy - 10), (cx - 4, cy - 4), (cx + 4, cy - 4)]
+            pygame.draw.polygon(self.screen, WHITE, snow)
+            # Ridge lines for depth
+            pygame.draw.line(self.screen, (100, 100, 100),
+                             (cx, cy - 10), (cx - 9, cy + 7), 1)
+            pygame.draw.line(self.screen, (100, 100, 100),
+                             (cx, cy - 10), (cx + 9, cy + 7), 1)
+
+        elif tile_id == TILE_TOWN:
+            # Grass-tinted base so towns look like they're on ground
+            pygame.draw.rect(self.screen, BLACK, rect)
+            if seed % 3 < 2:
+                c = GREEN if seed % 2 else DKGRN
+                x, y = px + 4, py + 4
+                pygame.draw.line(self.screen, c, (x - 2, y), (x + 2, y), 1)
+                pygame.draw.line(self.screen, c, (x, y - 2), (x, y + 2), 1)
+            # White house shape
+            roof = [(cx, cy - 7), (cx - 6, cy - 1), (cx + 6, cy - 1)]
+            pygame.draw.polygon(self.screen, WHITE, roof)
+            walls = pygame.Rect(cx - 5, cy - 1, 10, 8)
+            pygame.draw.rect(self.screen, WHITE, walls, 1)
+            # Door
+            pygame.draw.rect(self.screen, ORANGE,
+                             pygame.Rect(cx - 1, cy + 2, 3, 5))
+
+        elif tile_id == TILE_DUNGEON:
+            # Dark ground base
+            pygame.draw.rect(self.screen, BLACK, rect)
+            # Dark cave entrance — purple/red circle with "!" marker
+            pygame.draw.circle(self.screen, (102, 51, 85), (cx, cy), 8)
+            pygame.draw.circle(self.screen, (68, 34, 68), (cx, cy), 5)
+            t = self.font_small.render("!", True, ORANGE)
+            self.screen.blit(t, (cx - 3, cy - 5))
+
+        elif tile_id == TILE_PATH:
+            # Slightly warm-tinted base so paths are visible
+            pygame.draw.rect(self.screen, (15, 10, 5), rect)
+            # More tan/brown dots for denser path texture
+            for i in range(3):
+                s = seed + i * 29
+                dx = (s * 7) % (ts - 6) + 3
+                dy = (s * 13) % (ts - 6) + 3
+                c = BROWN if s % 2 else (100, 80, 50)
+                pygame.draw.rect(self.screen, c,
+                                 pygame.Rect(px + dx, py + dy, 3, 2))
+
+        elif tile_id == TILE_SAND:
+            # Warm dark yellow base — distinct from both grass and path
+            pygame.draw.rect(self.screen, (25, 20, 5), rect)
+            # Dense sand speckles
+            for i in range(4):
+                s = seed + i * 19
+                dx = (s * 7) % (ts - 6) + 3
+                dy = (s * 13) % (ts - 6) + 3
+                c = SAND if s % 2 else (150, 130, 60)
+                pygame.draw.rect(self.screen, c,
+                                 pygame.Rect(px + dx, py + dy, 2, 2))
+
+        elif tile_id == TILE_BRIDGE:
+            # Water base + brown planks
+            pygame.draw.rect(self.screen, (0, 0, 60), rect)
+            for i in range(3):
+                plank = pygame.Rect(px + 2, py + 6 + i * 10, ts - 4, 5)
+                pygame.draw.rect(self.screen, BROWN, plank)
+                pygame.draw.rect(self.screen, (80, 60, 30), plank, 1)
+
+        else:
+            # Fallback: black
+            pygame.draw.rect(self.screen, BLACK, rect)
+
+    def _u3_draw_overworld_party(self, cx, cy):
+        """White stick-figure party sprite on the overworld."""
+        W = (255, 255, 255)
+        BLU = (120, 120, 255)
+        # Head
+        pygame.draw.circle(self.screen, W, (cx, cy - 9), 4)
+        # Body
+        pygame.draw.line(self.screen, W, (cx, cy - 5), (cx, cy + 4), 2)
+        # Arms
+        pygame.draw.line(self.screen, W, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
+        # Legs
+        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx - 5, cy + 12), 2)
+        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx + 5, cy + 12), 2)
+        # Sword
+        pygame.draw.line(self.screen, BLU, (cx + 6, cy - 8), (cx + 6, cy + 2), 2)
+        # Shield
+        pygame.draw.rect(self.screen, BLU,
+                         pygame.Rect(cx - 10, cy - 5, 4, 7))
+
+    # ── overworld right panel ────────────────────────────────
+
+    def _u3_overworld_right_panel(self, party, tile_map, x, y, w):
+        """Draw the right-hand stat panel for the overworld."""
+        # Each party member gets a block
+        block_h = 130
+        for i, member in enumerate(party.members):
+            by = y + i * block_h
+            self._u3_panel(x, by, w, block_h)
+            tx = x + 8
+            ty = by + 6
+
+            # Number + Name + Class (abbreviated)
+            cls_short = member.char_class[:3].upper()
+            alive_color = (255, 170, 85) if member.is_alive() else (200, 60, 60)
+            self._u3_text(f"{i+1}", tx, ty, (68, 68, 255), self.font)
+            self._u3_text(member.name, tx + 20, ty, alive_color, self.font)
+            self._u3_text(cls_short, tx + 180, ty, (68, 68, 255))
+
+            ty += 20
+            self._u3_text(
+                f"HP:{member.hp:04d}/{member.max_hp:04d}  AC:{member.get_ac():02d}",
+                tx, ty)
+
+            ty += 16
+            self._u3_text(
+                f"STR:{member.strength:02d}  DEX:{member.dexterity:02d}  INT:{member.intelligence:02d}",
+                tx, ty, (136, 136, 136))
+
+            ty += 16
+            self._u3_text(
+                f"LVL:{member.level:02d}  EXP:{member.exp:04d}",
+                tx, ty, (136, 136, 136))
+
+            ty += 16
+            self._u3_text(f"WPN: {member.weapon}", tx, ty, (136, 136, 136))
+
+        # Bottom info block (below party members)
+        info_y = y + 4 * block_h
+        info_h = SCREEN_HEIGHT - info_y - 24  # above status bar
+        self._u3_panel(x, info_y, w, info_h)
+        tx = x + 8
+        ty = info_y + 6
+
+        self._u3_text(f"GOLD: {party.gold:05d}", tx, ty, (255, 255, 0))
+
+        ty += 18
+        tile_name = tile_map.get_tile_name(party.col, party.row)
+        self._u3_text(f"TERRAIN: {tile_name}", tx, ty, (68, 68, 255))
+
+        ty += 18
+        self._u3_text(f"POS: ({party.col},{party.row})", tx, ty, (136, 136, 136))
+
+    # ========================================================
     # COMBAT ARENA  –  Ultima III retro style
     # ========================================================
 
