@@ -680,7 +680,10 @@ class CombatState(BaseState):
             self.phase = PHASE_PLAYER_ACT
             self.phase_timer = 400
         else:
-            # Next fighter's turn
+            # Next fighter's turn — always reset to PHASE_PLAYER
+            # (critical: phase may still be PHASE_MELEE_ANIM or PHASE_PROJECTILE
+            #  from the previous fighter's attack animation)
+            self.phase = PHASE_PLAYER
             self.selected_action = 0
             self._announce_turn()
 
