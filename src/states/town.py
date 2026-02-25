@@ -22,6 +22,7 @@ class TownState(BaseState):
         self.move_cooldown = 0
         self.npc_dialogue_active = False
         self.npc_speaking = None
+        self.showing_party = False
 
         # We'll save the overworld position so we can restore it on exit
         self.overworld_col = 0
@@ -58,7 +59,14 @@ class TownState(BaseState):
         """Handle movement and NPC interaction."""
         for event in events:
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+                    if not self.npc_dialogue_active:
+                        self.showing_party = not self.showing_party
+                        return
                 if event.key == pygame.K_ESCAPE:
+                    if self.showing_party:
+                        self.showing_party = False
+                        return
                     if self.npc_dialogue_active:
                         # Dismiss dialogue
                         self.npc_dialogue_active = False
@@ -77,7 +85,9 @@ class TownState(BaseState):
                         self._advance_dialogue()
                         return
 
-        # If dialogue is active, don't allow movement
+        # If showing party screen or dialogue, block movement
+        if self.showing_party:
+            return
         if self.npc_dialogue_active:
             return
 
@@ -178,6 +188,9 @@ class TownState(BaseState):
 
     def draw(self, renderer):
         """Draw the town."""
+        if self.showing_party:
+            renderer.draw_party_screen_u3(self.game.party)
+            return
         renderer.draw_map(self.town_data.tile_map, self.game.camera)
         renderer.draw_npcs(self.town_data.npcs, self.game.camera)
         renderer.draw_party(self.game.party, self.game.camera)

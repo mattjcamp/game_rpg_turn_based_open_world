@@ -1,8 +1,9 @@
 """
 Combat state - tactical top-down combat on a small arena grid.
 
-The player moves around the arena with WASD and must be adjacent to the
-monster to attack (bump-to-attack or menu).  The monster chases the player
+All 4 party members are placed on the arena and take turns individually.
+Each can move with WASD and must be adjacent to the monster to melee attack
+(bump-to-attack or menu).  The monster chases the closest party member
 and attacks when adjacent.
 """
 
@@ -41,26 +42,27 @@ class CombatState(BaseState):
 
     def __init__(self, game):
         super().__init__(game)
-        self.fighter = None
         self.monster = None
         self.phase = PHASE_INIT
         self.selected_action = 0
         self.combat_log = []
         self.phase_timer = 0
-        self.defending = False
-        self.player_goes_first = True
 
-        # Arena positions
-        self.player_col = 3
-        self.player_row = ARENA_ROWS // 2
+        # Active fighter index (which party member's turn it is)
+        self.active_idx = 0
+        self.fighters = []        # list of alive PartyMembers in combat
+        self.fighter_positions = {}  # member -> (col, row)
+        self.defending = {}       # member -> bool
+
+        # Monster arena position
         self.monster_col = ARENA_COLS - 4
         self.monster_row = ARENA_ROWS // 2
 
-        # Temporary combat message (e.g. "Too far!")
+        # Temporary combat message
         self.combat_message = ""
         self.combat_msg_timer = 0
 
-        # Callback info for returning to dungeon
+        # Callback info for returning to source state
         self.source_state = "dungeon"
         self.monster_ref = None
 
@@ -71,65 +73,98 @@ class CombatState(BaseState):
         """True if the tile is part of the arena perimeter wall."""
         return col <= 0 or col >= ARENA_COLS - 1 or row <= 0 or row >= ARENA_ROWS - 1
 
-    def _is_adjacent(self):
-        """True if the player is adjacent to the monster (Chebyshev dist 1)."""
-        dx = abs(self.player_col - self.monster_col)
-        dy = abs(self.player_row - self.monster_row)
+    def _is_adjacent_to_monster(self, col, row):
+        """True if (col, row) is adjacent to the monster (Chebyshev dist 1)."""
+        dx = abs(col - self.monster_col)
+        dy = abs(row - self.monster_row)
         return max(dx, dy) == 1
+
+    def _is_occupied_by_ally(self, col, row, exclude=None):
+        """True if another party member is standing on (col, row)."""
+        for member, (mc, mr) in self.fighter_positions.items():
+            if member is exclude:
+                continue
+            if mc == col and mr == row and member.is_alive():
+                return True
+        return False
+
+    @property
+    def active_fighter(self):
+        """The party member whose turn it is."""
+        if 0 <= self.active_idx < len(self.fighters):
+            return self.fighters[self.active_idx]
+        return None
+
+    @property
+    def active_col(self):
+        f = self.active_fighter
+        if f and f in self.fighter_positions:
+            return self.fighter_positions[f][0]
+        return 3
+
+    @property
+    def active_row(self):
+        f = self.active_fighter
+        if f and f in self.fighter_positions:
+            return self.fighter_positions[f][1]
+        return ARENA_ROWS // 2
+
+    def _is_adjacent(self):
+        """True if the active fighter is adjacent to the monster."""
+        return self._is_adjacent_to_monster(self.active_col, self.active_row)
 
     # ── Setup ────────────────────────────────────────────────────
 
     def start_combat(self, fighter, monster, source_state="dungeon"):
-        self.fighter = fighter
+        """Start combat. fighter param kept for compatibility but we use full party."""
         self.monster = monster
         self.source_state = source_state
         self.monster_ref = monster
         self.combat_log = []
         self.phase = PHASE_INIT
         self.selected_action = 0
-        self.defending = False
         self.phase_timer = 0
-
-        # Place combatants on the arena
-        self.player_col = 3
-        self.player_row = ARENA_ROWS // 2
-        self.monster_col = ARENA_COLS - 4
-        self.monster_row = ARENA_ROWS // 2
-
         self.combat_message = ""
         self.combat_msg_timer = 0
 
+        # Gather alive party members
+        self.fighters = [m for m in self.game.party.members if m.is_alive()]
+        self.active_idx = 0
+        self.defending = {m: False for m in self.fighters}
+
+        # Place party members on left side of arena, spaced out
+        self.fighter_positions = {}
+        start_rows = [2, 4, 6, 8]
+        for i, member in enumerate(self.fighters):
+            row = start_rows[i] if i < len(start_rows) else 2 + i
+            self.fighter_positions[member] = (2, row)
+
+        # Monster on the right
+        self.monster_col = ARENA_COLS - 4
+        self.monster_row = ARENA_ROWS // 2
+
+        # Keep a reference to the first fighter for backward compat
+        self.fighter = fighter
+
     def enter(self):
-        player_init, player_roll = roll_initiative(self.fighter.dex_mod)
-        monster_init, monster_roll = roll_initiative(
-            self.monster.attack_bonus // 2
-        )
-
         self.combat_log.append(
-            f"--- {self.fighter.name} vs {self.monster.name}! ---"
+            f"--- Party vs {self.monster.name}! ---"
         )
         self.combat_log.append(
-            f"Initiative: {self.fighter.name} rolls {player_roll} "
-            f"({format_modifier(self.fighter.dex_mod)}) = {player_init}"
+            f"{len(self.fighters)} party members engage!"
         )
-        self.combat_log.append(
-            f"Initiative: {self.monster.name} rolls {monster_roll} = {monster_init}"
-        )
-
-        self.player_goes_first = player_init >= monster_init
-        if self.player_goes_first:
-            self.combat_log.append(f"{self.fighter.name} acts first!")
-        else:
-            self.combat_log.append(f"{self.monster.name} acts first!")
-
-        if self.player_goes_first:
-            self.phase = PHASE_PLAYER
-        else:
-            self.phase = PHASE_MONSTER
-            self.phase_timer = 1200
+        self.phase = PHASE_PLAYER
+        self.active_idx = 0
+        self._announce_turn()
 
     def exit(self):
         pass
+
+    def _announce_turn(self):
+        """Add a log entry for whose turn it is."""
+        f = self.active_fighter
+        if f:
+            self.combat_log.append(f"-- {f.name}'s turn --")
 
     # ── Input ────────────────────────────────────────────────────
 
@@ -165,21 +200,29 @@ class CombatState(BaseState):
     # ── Player actions ───────────────────────────────────────────
 
     def _try_arena_move(self, dcol, drow):
-        """Move the player in the arena. Bump-attacks the monster."""
-        new_col = self.player_col + dcol
-        new_row = self.player_row + drow
+        """Move the active fighter in the arena. Bump-attacks the monster."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        col, row = self.fighter_positions[f]
+        new_col = col + dcol
+        new_row = row + drow
 
         # Bump attack: moving into the monster's tile
         if new_col == self.monster_col and new_row == self.monster_row:
             self._player_attack()
             return
 
+        # Can't walk onto another ally
+        if self._is_occupied_by_ally(new_col, new_row, exclude=f):
+            return
+
         # Normal movement
         if not self._is_arena_wall(new_col, new_row):
-            self.player_col = new_col
-            self.player_row = new_row
-            self.phase = PHASE_PLAYER_ACT
-            self.phase_timer = 250
+            self.fighter_positions[f] = (new_col, new_row)
+            # Moving ends this fighter's turn
+            self._end_fighter_turn()
 
     def _execute_player_action(self):
         action = self.selected_action
@@ -195,32 +238,35 @@ class CombatState(BaseState):
             self._player_flee()
 
     def _player_attack(self):
-        self.defending = False
-        atk_bonus = self.fighter.get_attack_bonus()
+        f = self.active_fighter
+        if not f:
+            return
+
+        self.defending[f] = False
+        atk_bonus = f.get_attack_bonus()
         hit, roll, total, crit = roll_attack(atk_bonus, self.monster.ac)
 
         if crit:
             self.combat_log.append(
-                f"{self.fighter.name} rolls {roll} — CRITICAL HIT!"
+                f"{f.name} rolls {roll} — CRITICAL HIT!"
             )
         elif hit:
             self.combat_log.append(
-                f"{self.fighter.name} rolls {roll} ({format_modifier(atk_bonus)}) "
+                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
                 f"= {total} vs AC {self.monster.ac} — Hit!"
             )
         else:
             self.combat_log.append(
-                f"{self.fighter.name} rolls {roll} ({format_modifier(atk_bonus)}) "
+                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
                 f"= {total} vs AC {self.monster.ac} — Miss!"
             )
 
         if hit:
-            dice_count, dice_sides, dmg_bonus = self.fighter.get_damage_dice()
+            dice_count, dice_sides, dmg_bonus = f.get_damage_dice()
             damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
             self.monster.hp = max(0, self.monster.hp - damage)
-            weapon = self.fighter.weapon
             self.combat_log.append(
-                f"{self.fighter.name} deals {damage} damage with {weapon}!"
+                f"{f.name} deals {damage} damage with {f.weapon}!"
             )
 
         if not self.monster.is_alive():
@@ -228,63 +274,115 @@ class CombatState(BaseState):
             self.phase_timer = 2500
             xp = self.monster.xp_reward
             gold = self.monster.gold_reward
-            self.fighter.exp += xp
+            # Distribute XP to all alive fighters
+            for m in self.fighters:
+                if m.is_alive():
+                    m.exp += xp
             self.game.party.gold += gold
             self.combat_log.append(
-                f"{self.monster.name} is defeated! +{xp} XP, +{gold} gold!"
+                f"{self.monster.name} is defeated! +{xp} XP each, +{gold} gold!"
             )
         else:
-            self.phase = PHASE_PLAYER_ACT
-            self.phase_timer = 800
+            self._end_fighter_turn()
 
     def _player_defend(self):
-        self.defending = True
+        f = self.active_fighter
+        if not f:
+            return
+        self.defending[f] = True
         self.combat_log.append(
-            f"{self.fighter.name} takes a defensive stance! (+2 AC)"
+            f"{f.name} takes a defensive stance! (+2 AC)"
         )
-        self.phase = PHASE_PLAYER_ACT
-        self.phase_timer = 600
+        self._end_fighter_turn()
 
     def _player_flee(self):
-        self.defending = False
+        f = self.active_fighter
+        if not f:
+            return
+        self.defending[f] = False
         roll = roll_d20()
-        total = roll + self.fighter.dex_mod
+        total = roll + f.dex_mod
         dc = 10
 
         if total >= dc:
             self.combat_log.append(
-                f"{self.fighter.name} rolls {roll} "
-                f"({format_modifier(self.fighter.dex_mod)}) = {total} — Escaped!"
+                f"{f.name} rolls {roll} "
+                f"({format_modifier(f.dex_mod)}) = {total} — Escaped!"
             )
             self.phase = PHASE_VICTORY
             self.phase_timer = 1500
-            self.combat_log.append("You flee the battle!")
+            self.combat_log.append("Your party flees the battle!")
         else:
             self.combat_log.append(
-                f"{self.fighter.name} rolls {roll} "
-                f"({format_modifier(self.fighter.dex_mod)}) = {total} vs DC {dc} — Failed!"
+                f"{f.name} rolls {roll} "
+                f"({format_modifier(f.dex_mod)}) = {total} vs DC {dc} — Failed!"
             )
+            self._end_fighter_turn()
+
+    def _end_fighter_turn(self):
+        """Advance to next alive fighter, or to monster turn if all have acted."""
+        self.active_idx += 1
+
+        # Skip dead fighters
+        while (self.active_idx < len(self.fighters)
+               and not self.fighters[self.active_idx].is_alive()):
+            self.active_idx += 1
+
+        if self.active_idx >= len(self.fighters):
+            # All fighters have acted — monster's turn
             self.phase = PHASE_PLAYER_ACT
-            self.phase_timer = 600
+            self.phase_timer = 400
+        else:
+            # Next fighter's turn
+            self.selected_action = 0
+            self._announce_turn()
 
     # ── Monster actions ──────────────────────────────────────────
 
     def _monster_turn(self):
-        """Monster AI: attack if adjacent, otherwise move toward player."""
-        if self._is_adjacent():
-            self._monster_attack_player()
+        """Monster AI: attack if adjacent to any fighter, otherwise move toward closest."""
+        # Find the closest alive fighter
+        best_dist = 999
+        best_target = None
+        for member in self.fighters:
+            if not member.is_alive():
+                continue
+            col, row = self.fighter_positions[member]
+            dist = max(abs(col - self.monster_col), abs(row - self.monster_row))
+            if dist < best_dist:
+                best_dist = dist
+                best_target = member
+
+        if not best_target:
+            # No alive targets
+            self.phase = PHASE_VICTORY
+            self.phase_timer = 1500
+            return
+
+        # Check adjacency to any alive fighter — attack them
+        adjacent_targets = []
+        for member in self.fighters:
+            if not member.is_alive():
+                continue
+            col, row = self.fighter_positions[member]
+            if self._is_adjacent_to_monster(col, row):
+                adjacent_targets.append(member)
+
+        if adjacent_targets:
+            target = random.choice(adjacent_targets)
+            self._monster_attack_player(target)
         else:
-            self._monster_move_toward_player()
+            self._monster_move_toward(best_target)
             self.combat_log.append(f"{self.monster.name} moves closer...")
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 500
 
-    def _monster_move_toward_player(self):
-        """Step 1 tile toward the player (Chebyshev)."""
+    def _monster_move_toward(self, target):
+        """Step 1 tile toward the target (Chebyshev)."""
         mc, mr = self.monster_col, self.monster_row
-        pc, pr = self.player_col, self.player_row
+        tc, tr = self.fighter_positions[target]
 
-        best_dist = max(abs(mc - pc), abs(mr - pr))
+        best_dist = max(abs(mc - tc), abs(mr - tr))
         candidates = []
 
         for dcol, drow in [
@@ -292,11 +390,17 @@ class CombatState(BaseState):
             (-1, -1), (-1, 1), (1, -1), (1, 1),
         ]:
             nc, nr = mc + dcol, mr + drow
-            if nc == pc and nr == pr:
-                continue  # don't walk onto the player
+            # Don't walk onto players
+            occupied = False
+            for m in self.fighters:
+                if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
+                    occupied = True
+                    break
+            if occupied:
+                continue
             if self._is_arena_wall(nc, nr):
                 continue
-            dist = max(abs(nc - pc), abs(nr - pr))
+            dist = max(abs(nc - tc), abs(nr - tr))
             if dist < best_dist:
                 candidates = [(nc, nr)]
                 best_dist = dist
@@ -308,10 +412,10 @@ class CombatState(BaseState):
             self.monster_col = nc
             self.monster_row = nr
 
-    def _monster_attack_player(self):
-        """The monster attacks the player."""
-        player_ac = self.fighter.get_ac()
-        if self.defending:
+    def _monster_attack_player(self, target):
+        """The monster attacks a specific party member."""
+        player_ac = target.get_ac()
+        if self.defending.get(target, False):
             player_ac += 2
 
         hit, roll, total, crit = roll_attack(
@@ -319,22 +423,22 @@ class CombatState(BaseState):
         )
 
         ac_display = f"AC {player_ac}"
-        if self.defending:
-            ac_display += " (defending)"
+        if self.defending.get(target, False):
+            ac_display += " (def)"
 
         if crit:
             self.combat_log.append(
-                f"{self.monster.name} rolls {roll} — CRITICAL HIT!"
+                f"{self.monster.name} → {target.name}: rolls {roll} — CRITICAL HIT!"
             )
         elif hit:
             self.combat_log.append(
-                f"{self.monster.name} rolls {roll} "
+                f"{self.monster.name} → {target.name}: rolls {roll} "
                 f"({format_modifier(self.monster.attack_bonus)}) "
                 f"= {total} vs {ac_display} — Hit!"
             )
         else:
             self.combat_log.append(
-                f"{self.monster.name} rolls {roll} "
+                f"{self.monster.name} → {target.name}: rolls {roll} "
                 f"({format_modifier(self.monster.attack_bonus)}) "
                 f"= {total} vs {ac_display} — Miss!"
             )
@@ -346,15 +450,19 @@ class CombatState(BaseState):
                 self.monster.damage_bonus,
                 critical=crit,
             )
-            self.fighter.hp = max(0, self.fighter.hp - damage)
+            target.hp = max(0, target.hp - damage)
             self.combat_log.append(
-                f"{self.monster.name} deals {damage} damage!"
+                f"{self.monster.name} deals {damage} damage to {target.name}!"
             )
 
-        if not self.fighter.is_alive():
+        if not target.is_alive():
+            self.combat_log.append(f"{target.name} has fallen!")
+
+        # Check if all party members are dead
+        if not any(m.is_alive() for m in self.fighters):
             self.phase = PHASE_DEFEAT
             self.phase_timer = 2500
-            self.combat_log.append(f"{self.fighter.name} has fallen!")
+            self.combat_log.append("The party has been defeated!")
         else:
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 800
@@ -384,8 +492,21 @@ class CombatState(BaseState):
         elif self.phase == PHASE_MONSTER:
             self._monster_turn()
         elif self.phase == PHASE_MONSTER_ACT:
-            self.defending = False
-            self.phase = PHASE_PLAYER
+            # Reset defending for all fighters, start new round
+            for m in self.fighters:
+                self.defending[m] = False
+            self.active_idx = 0
+            # Skip dead fighters at start
+            while (self.active_idx < len(self.fighters)
+                   and not self.fighters[self.active_idx].is_alive()):
+                self.active_idx += 1
+            if self.active_idx >= len(self.fighters):
+                self.phase = PHASE_DEFEAT
+                self.phase_timer = 2500
+            else:
+                self.phase = PHASE_PLAYER
+                self.selected_action = 0
+                self._announce_turn()
         elif self.phase == PHASE_VICTORY:
             self._end_combat(won=True)
         elif self.phase == PHASE_DEFEAT:
@@ -400,7 +521,10 @@ class CombatState(BaseState):
                     monsters.remove(self.monster_ref)
 
         if not won:
-            self.fighter.hp = 1
+            # Revive all dead members with 1 HP
+            for m in self.game.party.members:
+                if not m.is_alive():
+                    m.hp = 1
 
         self.game.change_state(self.source_state)
 
@@ -408,16 +532,21 @@ class CombatState(BaseState):
 
     def draw(self, renderer):
         renderer.draw_combat_arena(
-            fighter=self.fighter,
+            fighter=self.active_fighter or self.fighters[0],
             monster=self.monster,
             combat_log=self.combat_log,
             phase=self.phase,
             selected_action=self.selected_action,
-            defending=self.defending,
-            player_col=self.player_col,
-            player_row=self.player_row,
+            defending=self.defending.get(self.active_fighter, False) if self.active_fighter else False,
+            player_col=self.active_col,
+            player_row=self.active_row,
             monster_col=self.monster_col,
             monster_row=self.monster_row,
             is_adjacent=self._is_adjacent(),
             combat_message=self.combat_message,
+            # New: pass all fighter data for multi-character rendering
+            fighters=self.fighters,
+            fighter_positions=self.fighter_positions,
+            active_fighter=self.active_fighter,
+            defending_map=self.defending,
         )

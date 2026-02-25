@@ -23,6 +23,7 @@ class OverworldState(BaseState):
         self.message = ""
         self.message_timer = 0  # ms remaining to show message
         self.move_cooldown = 0  # ms until next move allowed
+        self.showing_party = False
 
     def enter(self):
         self.message = "Welcome, adventurers! Use arrow keys to explore."
@@ -30,11 +31,21 @@ class OverworldState(BaseState):
 
     def handle_input(self, events, keys_pressed):
         """Handle arrow key movement with repeat delay."""
-        # Check for quit or escape in events
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    if self.showing_party:
+                        self.showing_party = False
+                        return
                     self.game.running = False
+                    return
+                if event.key == pygame.K_p:
+                    self.showing_party = not self.showing_party
+                    return
+
+        # If showing party screen, block all other input
+        if self.showing_party:
+            return
 
         # Movement only if cooldown has elapsed
         if self.move_cooldown > 0:
@@ -111,6 +122,9 @@ class OverworldState(BaseState):
 
     def draw(self, renderer):
         """Draw the overworld in Ultima III style."""
+        if self.showing_party:
+            renderer.draw_party_screen_u3(self.game.party)
+            return
         renderer.draw_overworld_u3(
             self.game.party,
             self.game.tile_map,

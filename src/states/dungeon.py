@@ -24,6 +24,7 @@ class DungeonState(BaseState):
         self.message = ""
         self.message_timer = 0
         self.move_cooldown = 0
+        self.showing_party = False
 
         # Save overworld position for when we leave
         self.overworld_col = 0
@@ -60,7 +61,13 @@ class DungeonState(BaseState):
         """Handle movement and interactions."""
         for event in events:
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+                    self.showing_party = not self.showing_party
+                    return
                 if event.key == pygame.K_ESCAPE:
+                    if self.showing_party:
+                        self.showing_party = False
+                        return
                     # Only allow escape if standing on stairs
                     tile_id = self.dungeon_data.tile_map.get_tile(
                         self.game.party.col, self.game.party.row
@@ -72,6 +79,10 @@ class DungeonState(BaseState):
                             "Find the stairs to escape!", 1500
                         )
                     return
+
+        # If showing party screen, block movement
+        if self.showing_party:
+            return
 
         # Movement
         if self.move_cooldown > 0:
@@ -203,13 +214,12 @@ class DungeonState(BaseState):
                 self.move_cooldown = 0
 
     def draw(self, renderer):
-        """Draw the dungeon with limited visibility."""
-        renderer.draw_map(self.dungeon_data.tile_map, self.game.camera)
-        # Draw monsters (only alive ones will be visible)
-        renderer.draw_monsters(self.dungeon_data.monsters, self.game.camera)
-        renderer.draw_party(self.game.party, self.game.camera)
-        # Fog of war — can only see 4 tiles in each direction
-        renderer.draw_fog_of_war(self.game.party, self.game.camera, light_radius=4)
-        renderer.draw_hud_dungeon(self.game.party, self.dungeon_data)
-        if self.message:
-            renderer.draw_message(self.message)
+        """Draw the dungeon in Ultima III style."""
+        if self.showing_party:
+            renderer.draw_party_screen_u3(self.game.party)
+            return
+        renderer.draw_dungeon_u3(
+            self.game.party,
+            self.dungeon_data,
+            message=self.message,
+        )

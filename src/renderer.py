@@ -184,79 +184,27 @@ class Renderer:
             pygame.draw.circle(self.screen, (70, 25, 25), (cx, cy), 3, 1)
 
     def draw_party(self, party, camera):
-        """Draw the party as a knight with a sword."""
+        """Draw the party as a simple white stick-figure (Ultima III style)."""
         screen_col, screen_row = camera.world_to_screen(party.col, party.row)
         cx = screen_col * TILE_SIZE + TILE_SIZE // 2
         cy = screen_row * TILE_SIZE + TILE_SIZE // 2
+        W = (255, 255, 255)
+        BLU = (120, 120, 255)
 
-        # --- Sword (behind knight, on the right side) ---
-        # Blade
-        pygame.draw.line(self.screen, (200, 210, 220),
-                         (cx + 6, cy - 12), (cx + 6, cy + 4), 2)
-        # Crossguard
-        pygame.draw.line(self.screen, (180, 160, 50),
-                         (cx + 2, cy - 4), (cx + 10, cy - 4), 2)
-        # Grip
-        pygame.draw.line(self.screen, (100, 70, 40),
-                         (cx + 6, cy - 4), (cx + 6, cy + 2), 2)
-        # Pommel
-        pygame.draw.circle(self.screen, (180, 160, 50), (cx + 6, cy + 3), 2)
-
-        # --- Shield (left side) ---
-        shield_points = [
-            (cx - 9, cy - 4),
-            (cx - 4, cy - 5),
-            (cx - 4, cy + 3),
-            (cx - 7, cy + 5),
-            (cx - 10, cy + 3),
-        ]
-        pygame.draw.polygon(self.screen, (60, 80, 160), shield_points)
-        pygame.draw.polygon(self.screen, (80, 100, 200), shield_points, 1)
-        # Shield emblem (small cross)
-        pygame.draw.line(self.screen, COLOR_YELLOW, (cx - 7, cy - 2), (cx - 7, cy + 2), 1)
-        pygame.draw.line(self.screen, COLOR_YELLOW, (cx - 9, cy), (cx - 5, cy), 1)
-
-        # --- Helmet ---
-        # Main helm (slightly taller than a circle for that bucket-helm look)
-        pygame.draw.rect(self.screen, (160, 165, 170),
-                         pygame.Rect(cx - 5, cy - 13, 10, 10))
-        # Rounded top
-        pygame.draw.circle(self.screen, (160, 165, 170), (cx, cy - 13), 5)
-        # Visor slit
-        pygame.draw.line(self.screen, (40, 40, 50),
-                         (cx - 3, cy - 8), (cx + 3, cy - 8), 1)
-        # Helm outline
-        pygame.draw.rect(self.screen, (100, 105, 110),
-                         pygame.Rect(cx - 5, cy - 13, 10, 10), 1)
-        # Plume on top
-        pygame.draw.line(self.screen, (200, 40, 40),
-                         (cx, cy - 18), (cx + 4, cy - 15), 2)
-        pygame.draw.line(self.screen, (200, 40, 40),
-                         (cx, cy - 18), (cx - 2, cy - 15), 2)
-
-        # --- Body / armor ---
-        body_rect = pygame.Rect(cx - 5, cy - 3, 10, 10)
-        pygame.draw.rect(self.screen, (140, 145, 150), body_rect)
-        pygame.draw.rect(self.screen, (100, 105, 110), body_rect, 1)
-        # Belt
-        pygame.draw.line(self.screen, (100, 70, 40),
-                         (cx - 5, cy + 2), (cx + 5, cy + 2), 2)
-        # Belt buckle
-        pygame.draw.rect(self.screen, COLOR_YELLOW,
-                         pygame.Rect(cx - 1, cy + 1, 3, 3))
-
-        # --- Legs / boots ---
-        # Left leg
-        pygame.draw.rect(self.screen, (120, 125, 130),
-                         pygame.Rect(cx - 4, cy + 7, 3, 6))
-        # Right leg
-        pygame.draw.rect(self.screen, (120, 125, 130),
-                         pygame.Rect(cx + 1, cy + 7, 3, 6))
-        # Boots
-        pygame.draw.rect(self.screen, (80, 55, 30),
-                         pygame.Rect(cx - 5, cy + 11, 4, 3))
-        pygame.draw.rect(self.screen, (80, 55, 30),
-                         pygame.Rect(cx + 1, cy + 11, 4, 3))
+        # Head
+        pygame.draw.circle(self.screen, W, (cx, cy - 9), 4)
+        # Body
+        pygame.draw.line(self.screen, W, (cx, cy - 5), (cx, cy + 4), 2)
+        # Arms
+        pygame.draw.line(self.screen, W, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
+        # Legs
+        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx - 5, cy + 12), 2)
+        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx + 5, cy + 12), 2)
+        # Sword (right hand)
+        pygame.draw.line(self.screen, BLU, (cx + 6, cy - 8), (cx + 6, cy + 2), 2)
+        # Shield (left hand)
+        pygame.draw.rect(self.screen, BLU,
+                         pygame.Rect(cx - 10, cy - 5, 4, 7))
 
     def draw_hud(self, party, tile_map):
         """Draw a simple HUD at the bottom of the screen."""
@@ -281,7 +229,7 @@ class Renderer:
             self.screen.blit(text_surface, (x_offset, hud_y + 30 + i * 14))
 
     def draw_npcs(self, npcs, camera):
-        """Draw NPC sprites on the map."""
+        """Draw NPC sprites on the map (Ultima III stick-figure style)."""
         for npc in npcs:
             screen_col, screen_row = camera.world_to_screen(npc.col, npc.row)
             if 0 <= screen_col < VIEWPORT_COLS and 0 <= screen_row < VIEWPORT_ROWS:
@@ -297,16 +245,21 @@ class Renderer:
                 }
                 color = npc_colors.get(npc.npc_type, (100, 180, 100))
 
+                # Simple stick-figure, same proportions as the player
                 # Head
-                pygame.draw.circle(self.screen, (220, 185, 155), (cx, cy - 6), 5)
+                pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)
                 # Body
-                body_rect = pygame.Rect(cx - 5, cy - 1, 10, 10)
-                pygame.draw.rect(self.screen, color, body_rect)
-                # Name tag (small)
-                name_surf = self.font_small.render(npc.name, True, COLOR_WHITE)
-                name_rect = name_surf.get_rect(center=(cx, cy - 14))
+                pygame.draw.line(self.screen, color, (cx, cy - 5), (cx, cy + 4), 2)
+                # Arms
+                pygame.draw.line(self.screen, color, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
+                # Legs
+                pygame.draw.line(self.screen, color, (cx, cy + 4), (cx - 5, cy + 12), 2)
+                pygame.draw.line(self.screen, color, (cx, cy + 4), (cx + 5, cy + 12), 2)
+                # Name tag (small, uppercase)
+                name_surf = self.font_small.render(npc.name.upper(), True, COLOR_WHITE)
+                name_rect = name_surf.get_rect(center=(cx, cy - 16))
                 bg = name_rect.inflate(4, 2)
-                pygame.draw.rect(self.screen, (0, 0, 0, 180), bg)
+                pygame.draw.rect(self.screen, (0, 0, 0), bg)
                 self.screen.blit(name_surf, name_rect)
 
     def draw_hud_town(self, party, town_data):
@@ -442,7 +395,8 @@ class Renderer:
         self.screen.blit(hint_surface, (box_x + 12, box_y + 36))
 
     def draw_monsters(self, monsters, camera):
-        """Draw monster sprites on the dungeon map."""
+        """Draw monster sprites on the dungeon map (Ultima III style)."""
+        W = (255, 255, 255)
         for monster in monsters:
             if not monster.is_alive():
                 continue
@@ -450,20 +404,27 @@ class Renderer:
             if 0 <= screen_col < VIEWPORT_COLS and 0 <= screen_row < VIEWPORT_ROWS:
                 cx = screen_col * TILE_SIZE + TILE_SIZE // 2
                 cy = screen_row * TILE_SIZE + TILE_SIZE // 2
-                color = monster.color
+                mc = monster.color
 
-                # Body (larger than NPC)
-                body = pygame.Rect(cx - 7, cy - 4, 14, 12)
-                pygame.draw.rect(self.screen, color, body)
-                pygame.draw.rect(self.screen, (min(255, color[0]+40),
-                                               min(255, color[1]+40),
-                                               min(255, color[2]+40)), body, 1)
-                # Eyes (menacing red dots)
-                pygame.draw.circle(self.screen, (255, 40, 40), (cx - 3, cy - 1), 2)
-                pygame.draw.circle(self.screen, (255, 40, 40), (cx + 3, cy - 1), 2)
-                # Name tag
-                name_surf = self.font_small.render(monster.name, True, (255, 100, 100))
-                name_rect = name_surf.get_rect(center=(cx, cy - 12))
+                # Same blocky monster as combat: body + head + eyes
+                # Body
+                body = pygame.Rect(cx - 8, cy - 6, 16, 14)
+                pygame.draw.rect(self.screen, mc, body)
+                # Head
+                pygame.draw.rect(self.screen, mc,
+                                 pygame.Rect(cx - 5, cy - 12, 10, 7))
+                # Eyes — white with red pupils
+                pygame.draw.rect(self.screen, W,
+                                 pygame.Rect(cx - 4, cy - 10, 3, 3))
+                pygame.draw.rect(self.screen, W,
+                                 pygame.Rect(cx + 1, cy - 10, 3, 3))
+                pygame.draw.rect(self.screen, (255, 0, 0),
+                                 pygame.Rect(cx - 3, cy - 9, 1, 1))
+                pygame.draw.rect(self.screen, (255, 0, 0),
+                                 pygame.Rect(cx + 2, cy - 9, 1, 1))
+                # Name tag (uppercase)
+                name_surf = self.font_small.render(monster.name.upper(), True, (255, 100, 100))
+                name_rect = name_surf.get_rect(center=(cx, cy - 16))
                 bg = name_rect.inflate(4, 2)
                 pygame.draw.rect(self.screen, (0, 0, 0), bg)
                 self.screen.blit(name_surf, name_rect)
@@ -783,7 +744,7 @@ class Renderer:
 
             ty += 16
             self._u3_text(
-                f"STR:{member.strength:02d}  DEX:{member.dexterity:02d}  INT:{member.intelligence:02d}",
+                f"S:{member.strength:02d} D:{member.dexterity:02d} I:{member.intelligence:02d} W:{member.wisdom:02d}",
                 tx, ty, (136, 136, 136))
 
             ty += 16
@@ -809,6 +770,340 @@ class Renderer:
 
         ty += 18
         self._u3_text(f"POS: ({party.col},{party.row})", tx, ty, (136, 136, 136))
+
+    # ========================================================
+    # DUNGEON  –  Ultima III retro style
+    # ========================================================
+
+    # Dungeon viewport: same split-screen as overworld
+    _U3_DG_COLS = 15
+    _U3_DG_ROWS = 18
+    _U3_DG_TS   = 32
+    _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 480
+    _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 576
+
+    def draw_dungeon_u3(self, party, dungeon_data, message=""):
+        """
+        Full Ultima III-style dungeon screen.
+
+        Layout matches the overworld: map on left, stat panels on right,
+        status bar at bottom. Fog of war limits visibility.
+        """
+        self.screen.fill((0, 0, 0))
+
+        ts = self._U3_DG_TS
+        cols = self._U3_DG_COLS
+        rows = self._U3_DG_ROWS
+
+        tile_map = dungeon_data.tile_map
+
+        # ── compute camera offset ──
+        off_c = party.col - cols // 2
+        off_r = party.row - rows // 2
+        off_c = max(0, min(off_c, tile_map.width - cols))
+        off_r = max(0, min(off_r, tile_map.height - rows))
+
+        # ── 1. draw map tiles ──
+        for sr in range(rows):
+            for sc in range(cols):
+                wc = sc + off_c
+                wr = sr + off_r
+                tid = tile_map.get_tile(wc, wr)
+                px = sc * ts
+                py = sr * ts
+                self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr)
+
+        # ── 2. monster sprites ──
+        for monster in dungeon_data.monsters:
+            if not monster.is_alive():
+                continue
+            msc = monster.col - off_c
+            msr = monster.row - off_r
+            if 0 <= msc < cols and 0 <= msr < rows:
+                mx = msc * ts + ts // 2
+                my = msr * ts + ts // 2
+                self._u3_draw_dungeon_monster(monster, mx, my)
+
+        # ── 3. party sprite ──
+        psc = party.col - off_c
+        psr = party.row - off_r
+        if 0 <= psc < cols and 0 <= psr < rows:
+            cx = psc * ts + ts // 2
+            cy = psr * ts + ts // 2
+            self._u3_draw_overworld_party(cx, cy)
+
+        # ── 4. fog of war ──
+        self._u3_dungeon_fog(psc, psr, cols, rows, ts, light_radius=4)
+
+        # ── 5. blue border around map ──
+        pygame.draw.rect(self.screen, (68, 68, 255),
+                         pygame.Rect(0, 0, self._U3_DG_MAP_W, self._U3_DG_MAP_H), 2)
+
+        # ── 6. right panel ──
+        rx = self._U3_DG_MAP_W + 4
+        rw = SCREEN_WIDTH - rx
+        self._u3_dungeon_right_panel(party, dungeon_data, rx, 0, rw)
+
+        # ── 7. bottom status bar ──
+        bar_y = SCREEN_HEIGHT - 24
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        self._u3_text("[ARROWS/WASD] MOVE    [ESC] STAIRS",
+                      8, bar_y + 5, (68, 68, 255))
+
+        # ── 8. floating message ──
+        if message:
+            surf = self.font.render(message.upper(), True, (255, 170, 85))
+            rect = surf.get_rect(center=(self._U3_DG_MAP_W // 2, 16))
+            bg = rect.inflate(20, 8)
+            pygame.draw.rect(self.screen, (0, 0, 0), bg)
+            pygame.draw.rect(self.screen, (68, 68, 255), bg, 2)
+            self.screen.blit(surf, rect)
+
+    # ── dungeon tile rendering ─────────────────────────────
+
+    def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr):
+        """Draw a single dungeon tile in Ultima III style."""
+        BLACK  = (0, 0, 0)
+        WHITE  = (255, 255, 255)
+        BLUE   = (68, 68, 255)
+        GRAY   = (136, 136, 136)
+        DKGRAY = (60, 55, 65)
+        PURPLE = (102, 51, 85)
+        DKPUR  = (68, 34, 68)
+        BROWN  = (140, 100, 50)
+        ORANGE = (255, 170, 85)
+        YELLOW = (255, 255, 0)
+
+        rect = pygame.Rect(px, py, ts, ts)
+        cx = px + ts // 2
+        cy = py + ts // 2
+        seed = wc * 31 + wr * 17
+
+        if tile_id == TILE_DWALL:
+            # Ornate gray-blue stone blocks (matches example_dungeon)
+            pygame.draw.rect(self.screen, (30, 28, 40), rect)
+            # Brick pattern with slight color variation
+            for iy in range(0, ts, 8):
+                offset = 5 if (iy // 8) % 2 else 0
+                for ix in range(offset, ts, 11):
+                    s = (wc * 7 + wr * 13 + ix + iy) % 5
+                    # Vary brick colors for stone texture
+                    if s < 2:
+                        bc = (75, 70, 90)
+                    elif s < 4:
+                        bc = (60, 58, 78)
+                    else:
+                        bc = (85, 80, 100)
+                    brick = pygame.Rect(px + ix, py + iy, 9, 6)
+                    pygame.draw.rect(self.screen, bc, brick)
+                    pygame.draw.rect(self.screen, (40, 38, 55), brick, 1)
+
+        elif tile_id == TILE_DFLOOR:
+            # Black floor with subtle stone-crack dots
+            pygame.draw.rect(self.screen, BLACK, rect)
+            # Sparse gray dots for stone floor texture
+            for i in range(2):
+                s = seed + i * 41
+                if s % 4 < 2:
+                    dx = (s * 7) % (ts - 6) + 3
+                    dy = (s * 13) % (ts - 6) + 3
+                    pygame.draw.rect(self.screen, (30, 28, 35),
+                                     pygame.Rect(px + dx, py + dy, 2, 1))
+
+        elif tile_id == TILE_WALL:
+            # Town-interior walls reused in dungeon — same stone style
+            pygame.draw.rect(self.screen, (30, 28, 40), rect)
+            for iy in range(0, ts, 8):
+                offset = 5 if (iy // 8) % 2 else 0
+                for ix in range(offset, ts, 11):
+                    s = (wc * 7 + wr * 13 + ix + iy) % 5
+                    bc = (75, 70, 90) if s < 2 else (60, 58, 78)
+                    brick = pygame.Rect(px + ix, py + iy, 9, 6)
+                    pygame.draw.rect(self.screen, bc, brick)
+                    pygame.draw.rect(self.screen, (40, 38, 55), brick, 1)
+
+        elif tile_id == TILE_FLOOR:
+            # Town-interior floor — same as dungeon floor
+            pygame.draw.rect(self.screen, BLACK, rect)
+            if seed % 5 < 2:
+                dx = (seed * 7) % (ts - 6) + 3
+                dy = (seed * 13) % (ts - 6) + 3
+                pygame.draw.rect(self.screen, (30, 28, 35),
+                                 pygame.Rect(px + dx, py + dy, 2, 1))
+
+        elif tile_id == TILE_STAIRS:
+            # Stairs up — stone steps with blue-white highlight
+            pygame.draw.rect(self.screen, BLACK, rect)
+            for i in range(4):
+                step_y = py + 4 + i * 7
+                step_w = ts - 8 - i * 3
+                step_x = px + 4 + i
+                sc = 90 + i * 15  # gradually lighter
+                step_rect = pygame.Rect(step_x, step_y, step_w, 5)
+                pygame.draw.rect(self.screen, (sc, sc, sc + 20), step_rect)
+                pygame.draw.rect(self.screen, (50, 50, 60), step_rect, 1)
+            # Up arrow
+            arrow = [(cx, py + 2), (cx - 4, py + 6), (cx + 4, py + 6)]
+            pygame.draw.polygon(self.screen, BLUE, arrow)
+
+        elif tile_id == TILE_CHEST:
+            # Treasure chest on black floor
+            pygame.draw.rect(self.screen, BLACK, rect)
+            # Chest body
+            body = pygame.Rect(cx - 7, cy - 2, 14, 9)
+            pygame.draw.rect(self.screen, BROWN, body)
+            pygame.draw.rect(self.screen, (100, 70, 30), body, 1)
+            # Lid
+            lid = pygame.Rect(cx - 7, cy - 6, 14, 5)
+            pygame.draw.rect(self.screen, (160, 115, 40), lid)
+            pygame.draw.rect(self.screen, (100, 70, 30), lid, 1)
+            # Lock
+            pygame.draw.circle(self.screen, YELLOW, (cx, cy), 2)
+
+        elif tile_id == TILE_TRAP:
+            # Trap — looks like floor but with faint red X
+            pygame.draw.rect(self.screen, BLACK, rect)
+            pygame.draw.line(self.screen, (60, 20, 20),
+                             (cx - 5, cy - 5), (cx + 5, cy + 5), 1)
+            pygame.draw.line(self.screen, (60, 20, 20),
+                             (cx + 5, cy - 5), (cx - 5, cy + 5), 1)
+
+        elif tile_id == TILE_COUNTER:
+            # Counter/table
+            pygame.draw.rect(self.screen, BLACK, rect)
+            top = pygame.Rect(px + 3, py + 8, ts - 6, ts - 14)
+            pygame.draw.rect(self.screen, BROWN, top)
+            pygame.draw.rect(self.screen, (100, 70, 30), top, 1)
+            pygame.draw.circle(self.screen, YELLOW, (cx, cy), 3)
+
+        elif tile_id == TILE_DOOR:
+            # Wooden door
+            pygame.draw.rect(self.screen, BLACK, rect)
+            door_rect = pygame.Rect(px + 7, py + 2, ts - 14, ts - 4)
+            pygame.draw.rect(self.screen, (100, 65, 30), door_rect)
+            pygame.draw.rect(self.screen, (60, 40, 15), door_rect, 1)
+            pygame.draw.circle(self.screen, YELLOW, (cx + 3, cy), 2)
+
+        elif tile_id == TILE_EXIT:
+            # Exit marker — green arrow on black
+            pygame.draw.rect(self.screen, BLACK, rect)
+            arrow = [(cx, cy + 8), (cx - 6, cy - 2), (cx + 6, cy - 2)]
+            pygame.draw.polygon(self.screen, (0, 170, 0), arrow)
+
+        else:
+            # Fallback: black
+            pygame.draw.rect(self.screen, BLACK, rect)
+
+    # ── dungeon monster sprite ─────────────────────────────
+
+    def _u3_draw_dungeon_monster(self, monster, cx, cy):
+        """Draw a monster in the dungeon using the same U3 blocky style as combat."""
+        mc = monster.color
+        W = (255, 255, 255)
+
+        # Body block
+        body = pygame.Rect(cx - 8, cy - 6, 16, 14)
+        pygame.draw.rect(self.screen, mc, body)
+        # Head block
+        pygame.draw.rect(self.screen, mc,
+                         pygame.Rect(cx - 5, cy - 12, 10, 7))
+        # Eyes — white with red pupils
+        pygame.draw.rect(self.screen, W,
+                         pygame.Rect(cx - 4, cy - 10, 3, 3))
+        pygame.draw.rect(self.screen, W,
+                         pygame.Rect(cx + 1, cy - 10, 3, 3))
+        pygame.draw.rect(self.screen, (255, 0, 0),
+                         pygame.Rect(cx - 3, cy - 9, 1, 1))
+        pygame.draw.rect(self.screen, (255, 0, 0),
+                         pygame.Rect(cx + 2, cy - 9, 1, 1))
+
+    # ── dungeon fog of war ─────────────────────────────────
+
+    def _u3_dungeon_fog(self, party_sc, party_sr, cols, rows, ts, light_radius=4):
+        """Draw fog of war over the U3 dungeon map area."""
+        import math
+
+        fog = pygame.Surface((self._U3_DG_MAP_W, self._U3_DG_MAP_H), pygame.SRCALPHA)
+
+        fade_start = light_radius
+        fade_end = light_radius + 1.5
+
+        for sr in range(rows):
+            for sc in range(cols):
+                dx = sc - party_sc
+                dy = sr - party_sr
+                dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist <= fade_start:
+                    continue
+                elif dist >= fade_end:
+                    alpha = 255
+                else:
+                    t = (dist - fade_start) / (fade_end - fade_start)
+                    alpha = int(255 * t)
+
+                rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
+                fog.fill((0, 0, 0, alpha), rect)
+
+        self.screen.blit(fog, (0, 0))
+
+    # ── dungeon right panel ────────────────────────────────
+
+    def _u3_dungeon_right_panel(self, party, dungeon_data, x, y, w):
+        """Draw the right-hand stat panel for the dungeon."""
+        block_h = 130
+        for i, member in enumerate(party.members):
+            by = y + i * block_h
+            self._u3_panel(x, by, w, block_h)
+            tx = x + 8
+            ty = by + 6
+
+            cls_short = member.char_class[:3].upper()
+            alive_color = (255, 170, 85) if member.is_alive() else (200, 60, 60)
+            self._u3_text(f"{i+1}", tx, ty, (68, 68, 255), self.font)
+            self._u3_text(member.name, tx + 20, ty, alive_color, self.font)
+            self._u3_text(cls_short, tx + 180, ty, (68, 68, 255))
+
+            ty += 20
+            self._u3_text(
+                f"HP:{member.hp:04d}/{member.max_hp:04d}  AC:{member.get_ac():02d}",
+                tx, ty)
+
+            ty += 16
+            self._u3_text(
+                f"S:{member.strength:02d} D:{member.dexterity:02d} I:{member.intelligence:02d} W:{member.wisdom:02d}",
+                tx, ty, (136, 136, 136))
+
+            ty += 16
+            self._u3_text(
+                f"LVL:{member.level:02d}  EXP:{member.exp:04d}",
+                tx, ty, (136, 136, 136))
+
+            ty += 16
+            self._u3_text(f"WPN: {member.weapon}", tx, ty, (136, 136, 136))
+
+        # Bottom info block
+        info_y = y + 4 * block_h
+        info_h = SCREEN_HEIGHT - info_y - 24
+        self._u3_panel(x, info_y, w, info_h)
+        tx = x + 8
+        ty = info_y + 6
+
+        self._u3_text(f"GOLD: {party.gold:05d}", tx, ty, (255, 255, 0))
+
+        ty += 18
+        self._u3_text(f"DUNGEON: {dungeon_data.name}", tx, ty, (200, 60, 60))
+
+        ty += 18
+        tile_name = dungeon_data.tile_map.get_tile_name(party.col, party.row)
+        self._u3_text(f"TILE: {tile_name}", tx, ty, (68, 68, 255))
+
+        ty += 18
+        self._u3_text(f"POS: ({party.col},{party.row})", tx, ty, (136, 136, 136))
+
+        ty += 18
+        chests = len(dungeon_data.opened_chests)
+        self._u3_text(f"CHESTS: {chests:02d}", tx, ty, (255, 170, 85))
 
     # ========================================================
     # COMBAT ARENA  –  Ultima III retro style
@@ -858,23 +1153,11 @@ class Renderer:
                           selected_action, defending,
                           player_col, player_row,
                           monster_col, monster_row,
-                          is_adjacent, combat_message):
+                          is_adjacent, combat_message,
+                          fighters=None, fighter_positions=None,
+                          active_fighter=None, defending_map=None):
         """
-        Draw the Ultima III-style combat screen.
-
-        Layout:
-        ┌────────────────────┬──────────────┐
-        │                    │ FIGHTER      │
-        │   15×10 arena      │ MONSTER      │
-        │   (dark + green    ├──────────────┤
-        │    dots, brick     │ > ATTACK     │
-        │    walls)          │   DEFEND     │
-        ├────────────────────│   FLEE       │
-        │   COMBAT LOG       ├──────────────┤
-        │   (scrolling)      │  LOG (cont)  │
-        ├────────────────────┴──────────────┤
-        │  [WASD] MOVE        ENTER: ACT    │
-        └───────────────────────────────────┘
+        Draw the Ultima III-style combat screen with all party members.
         """
         self.screen.fill(self._U3_BLACK)
 
@@ -897,7 +1180,19 @@ class Renderer:
         if monster.is_alive():
             self._u3_draw_monster_sprite(monster, mx, my, ts,
                                          monster_col, monster_row)
-        self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
+
+        # Draw ALL party members on the arena
+        if fighters and fighter_positions:
+            for member in fighters:
+                if not member.is_alive():
+                    continue
+                col, row = fighter_positions.get(member, (3, 5))
+                is_active = (member is active_fighter)
+                self._u3_draw_party_member_sprite(
+                    mx, my, ts, col, row, member, is_active)
+        else:
+            # Fallback: single player sprite
+            self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
 
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
@@ -908,11 +1203,18 @@ class Renderer:
         rx = self._RPANEL_X
         rw = self._RPANEL_W
 
-        self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138)
-        self._u3_monster_panel(monster, rx, 146, rw, 100)
+        # Party roster panel (shows all 4 members compactly)
+        if fighters:
+            self._u3_party_combat_panel(fighters, active_fighter,
+                                        defending_map or {},
+                                        rx, 4, rw, 180)
+        else:
+            self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138)
+
+        self._u3_monster_panel(monster, rx, 188, rw, 100)
         self._u3_action_panel(phase, selected_action, is_adjacent,
-                              rx, 250, rw, 148)
-        self._u3_log_panel(combat_log, rx, 402, rw, 194)
+                              rx, 292, rw, 110)
+        self._u3_log_panel(combat_log, rx, 406, rw, 190)
 
         # ── 5. left-side combat log (below arena) ──
         log_y = my + self._MAP_H + 4
@@ -1030,9 +1332,101 @@ class Renderer:
         pygame.draw.line(self.screen, mc,
                          (cx + 4, cy + 8), (cx + 6, cy + 14), 2)
 
+    # ── Per-class colour for party member sprites ──
+    _CLASS_COLORS = {
+        "fighter":     (255, 255, 255),   # white
+        "cleric":      (120, 200, 255),   # light blue
+        "wizard":      (200, 120, 255),   # purple
+        "thief":       (255, 200, 80),    # gold
+        "paladin":     (255, 255, 200),   # pale gold
+        "barbarian":   (255, 180, 120),   # tan
+        "lark":        (180, 255, 180),   # light green
+        "ranger":      (120, 255, 120),   # green
+        "druid":       (180, 220, 180),   # sage
+        "illusionist": (255, 180, 220),   # pink
+        "alchemist":   (200, 200, 120),   # olive
+    }
+
+    def _u3_draw_party_member_sprite(self, ax, ay, ts, col, row,
+                                      member, is_active):
+        """Draw a party member on the combat arena.
+        Active member gets a highlight ring. Color based on class."""
+        cx = ax + col * ts + ts // 2
+        cy = ay + row * ts + ts // 2
+
+        color = self._CLASS_COLORS.get(member.char_class.lower(),
+                                        self._U3_WHITE)
+        BLU = (120, 120, 255)
+
+        # Active-turn highlight ring
+        if is_active:
+            pygame.draw.circle(self.screen, self._U3_ORANGE,
+                               (cx, cy), 15, 1)
+
+        # Head
+        pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)
+        # Body
+        pygame.draw.line(self.screen, color, (cx, cy - 5), (cx, cy + 4), 2)
+        # Arms
+        pygame.draw.line(self.screen, color, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
+        # Legs
+        pygame.draw.line(self.screen, color, (cx, cy + 4), (cx - 5, cy + 12), 2)
+        pygame.draw.line(self.screen, color, (cx, cy + 4), (cx + 5, cy + 12), 2)
+        # Sword (right hand)
+        pygame.draw.line(self.screen, BLU, (cx + 6, cy - 8), (cx + 6, cy + 2), 2)
+        # Shield (left hand)
+        pygame.draw.rect(self.screen, BLU,
+                         pygame.Rect(cx - 10, cy - 5, 4, 7))
+
+        # Name label below
+        name_surf = self.font_small.render(member.name[0].upper(), True, color)
+        self.screen.blit(name_surf, (cx - 3, cy + 14))
+
     # ==============================================================
     #  RIGHT-HAND PANELS
     # ==============================================================
+
+    def _u3_party_combat_panel(self, fighters, active_fighter,
+                                defending_map, x, y, w, h):
+        """Compact party roster for combat — all 4 members in one panel."""
+        self._u3_panel(x, y, w, h)
+        tx = x + 8
+        ty = y + 6
+
+        self._u3_text("PARTY", tx, ty, self._U3_ORANGE, self.font)
+        ty += 20
+
+        for i, member in enumerate(fighters):
+            is_active = (member is active_fighter)
+            is_def = defending_map.get(member, False)
+
+            # Prefix: arrow for active, space otherwise
+            prefix = "> " if is_active else "  "
+
+            # Name + class
+            if not member.is_alive():
+                name_color = self._U3_RED
+                status = "DEAD"
+            elif is_active:
+                name_color = self._U3_ORANGE
+                status = ""
+            else:
+                name_color = self._U3_WHITE
+                status = ""
+
+            cls_short = member.char_class[:3].upper()
+            self._u3_text(f"{prefix}{member.name}", tx, ty, name_color)
+            self._u3_text(cls_short, tx + 160, ty, self._U3_BLUE)
+
+            ty += 14
+            hp_text = f"  HP:{member.hp:04d}/{member.max_hp:04d}"
+            if is_def:
+                hp_text += " DEF"
+            if status:
+                hp_text += f" {status}"
+            self._u3_text(hp_text, tx, ty, self._U3_GRAY)
+
+            ty += 18
 
     def _u3_fighter_panel(self, fighter, defending, x, y, w, h):
         """Player stats in Ultima III format."""
@@ -1051,7 +1445,7 @@ class Renderer:
             self._u3_text("DEF", tx + 220, ty, self._U3_ORANGE)
 
         ty += 16
-        self._u3_text(f"STR:{fighter.strength:02d}  DEX:{fighter.dexterity:02d}  INT:{fighter.intelligence:02d}",
+        self._u3_text(f"S:{fighter.strength:02d} D:{fighter.dexterity:02d} I:{fighter.intelligence:02d} W:{fighter.wisdom:02d}",
                       tx, ty)
 
         ty += 16
@@ -1172,3 +1566,126 @@ class Renderer:
                 color = self._U3_BLUE
 
             self._u3_text(line, x + 6, y + 5 + i * line_h, color)
+
+    # ========================================================
+    # PARTY SCREEN  –  Ultima III retro style (P key overlay)
+    # ========================================================
+
+    def draw_party_screen_u3(self, party):
+        """
+        Full-screen party status overlay in Ultima III style.
+
+        Shows detailed stats for all 4 members plus party-wide info.
+        """
+        from src.party import WEAPONS, ARMORS
+
+        self.screen.fill(self._U3_BLACK)
+
+        # Title bar
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        self._u3_text("PARTY STATUS", SCREEN_WIDTH // 2 - 60, 8,
+                       self._U3_ORANGE, self.font)
+
+        # Four character cards, 2x2 grid
+        card_w = SCREEN_WIDTH // 2 - 8
+        card_h = 240
+        positions = [
+            (4, 36),
+            (SCREEN_WIDTH // 2 + 4, 36),
+            (4, 36 + card_h + 4),
+            (SCREEN_WIDTH // 2 + 4, 36 + card_h + 4),
+        ]
+
+        for i, member in enumerate(party.members):
+            cx, cy = positions[i]
+            self._u3_panel(cx, cy, card_w, card_h)
+            tx = cx + 10
+            ty = cy + 8
+
+            # Number, name, class
+            alive_color = self._U3_ORANGE if member.is_alive() else self._U3_RED
+            self._u3_text(f"{i+1}", tx, ty, self._U3_BLUE, self.font)
+            self._u3_text(member.name, tx + 22, ty, alive_color, self.font)
+            cls_label = f"{member.char_class}"
+            self._u3_text(cls_label, tx + 190, ty, self._U3_BLUE, self.font)
+
+            # Race
+            ty += 22
+            self._u3_text(f"RACE: {member.race}", tx, ty, self._U3_GRAY)
+
+            # HP / MP
+            ty += 18
+            self._u3_text(
+                f"HP: {member.hp:04d}/{member.max_hp:04d}    "
+                f"MP: {member.mp:04d}",
+                tx, ty, self._U3_WHITE)
+
+            # Stats
+            ty += 18
+            self._u3_text(
+                f"STR:{member.strength:02d}  DEX:{member.dexterity:02d}  "
+                f"INT:{member.intelligence:02d}  WIS:{member.wisdom:02d}",
+                tx, ty, self._U3_WHITE)
+
+            # Level / EXP
+            ty += 18
+            self._u3_text(
+                f"LVL:{member.level:02d}  EXP:{member.exp:04d}  AC:{member.get_ac():02d}",
+                tx, ty, self._U3_WHITE)
+
+            # Weapon info
+            ty += 22
+            wp = WEAPONS.get(member.weapon, {"power": 0, "ranged": False})
+            rng = "RANGED" if wp["ranged"] else "MELEE"
+            self._u3_text(
+                f"WPN: {member.weapon}  (PWR:{wp['power']:02d} {rng})",
+                tx, ty, self._U3_GRAY)
+
+            # Armor info
+            ty += 18
+            arm = ARMORS.get(member.armor, {"evasion": 50})
+            self._u3_text(
+                f"ARM: {member.armor}  (EVD:{arm['evasion']}%)",
+                tx, ty, self._U3_GRAY)
+
+            # Magic type
+            ty += 18
+            magic_types = []
+            if member.can_cast_priest():
+                magic_types.append("PRIEST")
+            if member.can_cast_sorcerer():
+                magic_types.append("SORCERER")
+            if magic_types:
+                self._u3_text(
+                    f"MAGIC: {' + '.join(magic_types)}",
+                    tx, ty, (120, 120, 255))
+            else:
+                self._u3_text("MAGIC: NONE", tx, ty, (80, 80, 80))
+
+            # Damage estimate
+            ty += 18
+            dmg = member.get_damage()
+            self._u3_text(f"EST DMG: {dmg:02d}", tx, ty, self._U3_GRAY)
+
+            # Status
+            ty += 18
+            status = "ALIVE" if member.is_alive() else "DEAD"
+            sc = self._U3_GREEN if member.is_alive() else self._U3_RED
+            self._u3_text(f"STATUS: {status}", tx, ty, sc)
+
+        # Bottom info bar
+        info_y = 36 + card_h * 2 + 12
+        info_h = SCREEN_HEIGHT - info_y - 28
+        if info_h > 10:
+            self._u3_panel(4, info_y, SCREEN_WIDTH - 8, info_h)
+            self._u3_text(f"GOLD: {party.gold:05d}", 14, info_y + 6,
+                          (255, 255, 0))
+            alive = len(party.alive_members())
+            self._u3_text(f"ALIVE: {alive}/4", 200, info_y + 6,
+                          self._U3_WHITE)
+
+        # Bottom status bar
+        bar_y = SCREEN_HEIGHT - 24
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        self._u3_text("[P] CLOSE    [ESC] CLOSE",
+                      8, bar_y + 5, self._U3_BLUE)
