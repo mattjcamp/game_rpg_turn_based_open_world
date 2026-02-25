@@ -3,11 +3,13 @@ Combat state - tactical top-down combat on a small arena grid.
 
 All 4 party members are placed on the arena and take turns individually.
 Each can move with WASD and must be adjacent to the monster to melee attack
-(bump-to-attack or menu).  The monster chases the closest party member
-and attacks when adjacent.
+(bump-to-attack or menu).  Arrow keys fire ranged attacks when the active
+character has a ranged weapon equipped.  The monster chases the closest
+party member and attacks when adjacent.
 """
 
 import random
+import math
 import pygame
 
 from src.states.base_state import BaseState
@@ -25,6 +27,8 @@ ARENA_ROWS = 10
 PHASE_INIT        = "init"
 PHASE_PLAYER      = "player"
 PHASE_PLAYER_ACT  = "player_act"
+PHASE_PROJECTILE  = "projectile"      # projectile in flight
+PHASE_MELEE_ANIM  = "melee_anim"      # melee slash animation
 PHASE_MONSTER     = "monster"
 PHASE_MONSTER_ACT = "monster_act"
 PHASE_VICTORY     = "victory"
@@ -35,6 +39,99 @@ ACTION_ATTACK = 0
 ACTION_DEFEND = 1
 ACTION_FLEE   = 2
 ACTION_NAMES  = ["Attack", "Defend", "Flee"]
+
+# ── Projectile speed (pixels per second) ─────────────────────────
+PROJECTILE_SPEED = 480
+
+
+class Projectile:
+    """A projectile traveling across the arena."""
+
+    def __init__(self, start_col, start_row, end_col, end_row,
+                 color=(255, 255, 255), symbol="*"):
+        self.start_col = start_col
+        self.start_row = start_row
+        self.end_col = end_col
+        self.end_row = end_row
+        self.color = color
+        self.symbol = symbol
+        self.progress = 0.0  # 0 = start, 1 = arrived
+        self.alive = True
+
+    def update(self, dt):
+        """Advance the projectile. dt in seconds."""
+        # Calculate total travel distance in tiles
+        dx = self.end_col - self.start_col
+        dy = self.end_row - self.start_row
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist < 0.01:
+            self.progress = 1.0
+            self.alive = False
+            return
+
+        # Speed in tiles per second (PROJECTILE_SPEED px / 32 px per tile)
+        tiles_per_sec = PROJECTILE_SPEED / 32.0
+        self.progress += (tiles_per_sec / dist) * dt
+
+        if self.progress >= 1.0:
+            self.progress = 1.0
+            self.alive = False
+
+    @property
+    def current_col(self):
+        return self.start_col + (self.end_col - self.start_col) * self.progress
+
+    @property
+    def current_row(self):
+        return self.start_row + (self.end_row - self.start_row) * self.progress
+
+
+class MeleeEffect:
+    """A short-lived slash animation at a target tile."""
+
+    DURATION = 0.35  # seconds
+
+    def __init__(self, col, row, direction, color=(255, 255, 255)):
+        self.col = col
+        self.row = row
+        self.direction = direction  # (dcol, drow)
+        self.color = color
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        """0 = start, 1 = done."""
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class HitEffect:
+    """A flash/shake on a target when they take damage."""
+
+    DURATION = 0.3  # seconds
+
+    def __init__(self, col, row, damage=0):
+        self.col = col
+        self.row = row
+        self.damage = damage
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
 
 
 class CombatState(BaseState):
@@ -62,9 +159,20 @@ class CombatState(BaseState):
         self.combat_message = ""
         self.combat_msg_timer = 0
 
+        # Projectile animation
+        self.projectiles = []     # active Projectile objects
+        self._pending_ranged = None  # deferred attack resolution after anim
+
+        # Melee / hit effects
+        self.melee_effects = []   # active MeleeEffect objects
+        self.hit_effects = []     # active HitEffect objects
+        self._pending_melee = None  # deferred melee resolution after anim
+
         # Callback info for returning to source state
         self.source_state = "dungeon"
         self.monster_ref = None
+        self.monster_map_col = 0    # monster's position on dungeon map
+        self.monster_map_row = 0
 
     # ── Arena helpers ────────────────────────────────────────────
 
@@ -120,12 +228,20 @@ class CombatState(BaseState):
         self.monster = monster
         self.source_state = source_state
         self.monster_ref = monster
+        # Remember where the monster was on the dungeon/overworld map
+        self.monster_map_col = monster.col
+        self.monster_map_row = monster.row
         self.combat_log = []
         self.phase = PHASE_INIT
         self.selected_action = 0
         self.phase_timer = 0
         self.combat_message = ""
         self.combat_msg_timer = 0
+        self.projectiles = []
+        self._pending_ranged = None
+        self.melee_effects = []
+        self.hit_effects = []
+        self._pending_melee = None
 
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
@@ -164,11 +280,16 @@ class CombatState(BaseState):
         """Add a log entry for whose turn it is."""
         f = self.active_fighter
         if f:
-            self.combat_log.append(f"-- {f.name}'s turn --")
+            ranged_hint = " [RANGED]" if f.is_ranged() else ""
+            self.combat_log.append(f"-- {f.name}'s turn --{ranged_hint}")
 
     # ── Input ────────────────────────────────────────────────────
 
     def handle_input(self, events, keys_pressed):
+        # During animation phases, no input
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM):
+            return
+
         if self.phase != PHASE_PLAYER:
             for event in events:
                 if event.type == pygame.KEYDOWN:
@@ -179,11 +300,32 @@ class CombatState(BaseState):
 
         for event in events:
             if event.type == pygame.KEYDOWN:
-                # ── Menu navigation (arrow keys) ──
+                # ── Arrow key attacks ──
                 if event.key == pygame.K_UP:
-                    self.selected_action = (self.selected_action - 1) % len(ACTION_NAMES)
+                    f = self.active_fighter
+                    if f and f.is_ranged():
+                        self._fire_ranged(0, -1)
+                    elif f and not f.is_ranged():
+                        self._try_melee_directional(0, -1)
                 elif event.key == pygame.K_DOWN:
-                    self.selected_action = (self.selected_action + 1) % len(ACTION_NAMES)
+                    f = self.active_fighter
+                    if f and f.is_ranged():
+                        self._fire_ranged(0, 1)
+                    elif f and not f.is_ranged():
+                        self._try_melee_directional(0, 1)
+                elif event.key == pygame.K_LEFT:
+                    f = self.active_fighter
+                    if f and f.is_ranged():
+                        self._fire_ranged(-1, 0)
+                    elif f and not f.is_ranged():
+                        self._try_melee_directional(-1, 0)
+                elif event.key == pygame.K_RIGHT:
+                    f = self.active_fighter
+                    if f and f.is_ranged():
+                        self._fire_ranged(1, 0)
+                    elif f and not f.is_ranged():
+                        self._try_melee_directional(1, 0)
+
                 elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     self._execute_player_action()
 
@@ -227,7 +369,11 @@ class CombatState(BaseState):
     def _execute_player_action(self):
         action = self.selected_action
         if action == ACTION_ATTACK:
-            if self._is_adjacent():
+            f = self.active_fighter
+            if f and f.is_ranged():
+                # For ranged fighters, menu Attack fires toward monster
+                self._fire_ranged_at_monster()
+            elif self._is_adjacent():
                 self._player_attack()
             else:
                 self.combat_message = "Too far! Move next to the enemy."
@@ -237,11 +383,104 @@ class CombatState(BaseState):
         elif action == ACTION_FLEE:
             self._player_flee()
 
-    def _player_attack(self):
+    # ── Ranged attack ────────────────────────────────────────────
+
+    def _fire_ranged(self, dcol, drow):
+        """Fire a ranged attack in the given direction."""
+        f = self.active_fighter
+        if not f or not f.is_ranged():
+            return
+
+        col, row = self.fighter_positions[f]
+
+        # Trace a ray from the fighter in direction (dcol, drow)
+        # to find the monster or hit a wall
+        tc, tr = col + dcol, row + drow
+        hit_monster = False
+        end_col, end_row = col, row
+
+        while not self._is_arena_wall(tc, tr):
+            if tc == self.monster_col and tr == self.monster_row:
+                hit_monster = True
+                end_col, end_row = tc, tr
+                break
+            tc += dcol
+            tr += drow
+
+        if not hit_monster:
+            # Arrow flies to wall edge
+            # Step back to last non-wall tile
+            end_col = tc - dcol
+            end_row = tr - drow
+            if end_col == col and end_row == row:
+                end_col = tc
+                end_row = tr
+
+        # Determine projectile color based on weapon
+        proj_color = (255, 200, 80)  # default gold arrow
+        if "bow" in f.weapon.lower():
+            proj_color = (255, 255, 200)  # pale arrow
+        elif "sling" in f.weapon.lower():
+            proj_color = (180, 180, 180)  # gray stone
+        elif "dagger" in f.weapon.lower():
+            proj_color = (200, 220, 240)  # silver
+
+        proj = Projectile(col, row, end_col, end_row,
+                          color=proj_color, symbol=">" if dcol > 0 else
+                          "<" if dcol < 0 else "v" if drow > 0 else "^")
+        self.projectiles.append(proj)
+
+        # Defer attack resolution until projectile arrives
+        self._pending_ranged = {
+            "fighter": f,
+            "hit_monster": hit_monster,
+        }
+
+        self.phase = PHASE_PROJECTILE
+        self.combat_log.append(
+            f"{f.name} fires {f.weapon}!"
+        )
+
+    def _fire_ranged_at_monster(self):
+        """Fire toward the monster directly (from menu Attack)."""
         f = self.active_fighter
         if not f:
             return
 
+        col, row = self.fighter_positions[f]
+        mc, mr = self.monster_col, self.monster_row
+
+        # Determine dominant direction to monster
+        dx = mc - col
+        dy = mr - row
+
+        if abs(dx) >= abs(dy):
+            dcol = 1 if dx > 0 else -1
+            drow = 0
+        else:
+            dcol = 0
+            drow = 1 if dy > 0 else -1
+
+        self._fire_ranged(dcol, drow)
+
+    def _resolve_ranged(self):
+        """Called when the projectile arrives. Resolve hit/miss."""
+        info = self._pending_ranged
+        self._pending_ranged = None
+
+        if not info:
+            self._end_fighter_turn()
+            return
+
+        f = info["fighter"]
+        hit_monster = info["hit_monster"]
+
+        if not hit_monster:
+            self.combat_log.append(f"{f.name}'s shot misses the target!")
+            self._end_fighter_turn()
+            return
+
+        # Roll attack
         self.defending[f] = False
         atk_bonus = f.get_attack_bonus()
         hit, roll, total, crit = roll_attack(atk_bonus, self.monster.ac)
@@ -268,13 +507,121 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{f.name} deals {damage} damage with {f.weapon}!"
             )
+            # Spawn a hit flash on the monster
+            self.hit_effects.append(
+                HitEffect(self.monster_col, self.monster_row, damage))
 
         if not self.monster.is_alive():
             self.phase = PHASE_VICTORY
             self.phase_timer = 2500
             xp = self.monster.xp_reward
             gold = self.monster.gold_reward
-            # Distribute XP to all alive fighters
+            for m in self.fighters:
+                if m.is_alive():
+                    m.exp += xp
+            self.game.party.gold += gold
+            self.combat_log.append(
+                f"{self.monster.name} is defeated! +{xp} XP each, +{gold} gold!"
+            )
+        else:
+            self._end_fighter_turn()
+
+    # ── Melee attack ─────────────────────────────────────────────
+
+    def _try_melee_directional(self, dcol, drow):
+        """Arrow key melee: attack the monster if it's in the given direction."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        col, row = self.fighter_positions[f]
+        target_col = col + dcol
+        target_row = row + drow
+
+        # Check if monster is in that direction (adjacent)
+        if target_col == self.monster_col and target_row == self.monster_row:
+            self._player_attack_animated(dcol, drow)
+        else:
+            # Nothing in that direction — show a quick slash anyway?
+            # No, only attack when there's a target
+            pass
+
+    def _player_attack_animated(self, dcol=0, drow=0):
+        """Start a melee attack with slash animation, then resolve."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        # Determine slash direction from fighter to monster if not provided
+        if dcol == 0 and drow == 0:
+            col, row = self.fighter_positions[f]
+            dcol = 1 if self.monster_col > col else -1 if self.monster_col < col else 0
+            drow = 1 if self.monster_row > row else -1 if self.monster_row < row else 0
+
+        # Class color for the slash
+        from src.renderer import Renderer
+        slash_color = Renderer._CLASS_COLORS.get(
+            f.char_class.lower(), (255, 255, 255))
+
+        # Create a melee slash effect at the monster's position
+        effect = MeleeEffect(self.monster_col, self.monster_row,
+                             (dcol, drow), color=slash_color)
+        self.melee_effects.append(effect)
+
+        # Defer the attack resolution
+        self._pending_melee = {"fighter": f}
+        self.phase = PHASE_MELEE_ANIM
+        self.combat_log.append(f"{f.name} attacks with {f.weapon}!")
+
+    def _player_attack(self):
+        """Melee attack — now always animated."""
+        self._player_attack_animated()
+
+    def _resolve_melee(self):
+        """Called when the melee slash animation finishes. Resolve hit/miss."""
+        info = self._pending_melee
+        self._pending_melee = None
+
+        if not info:
+            self._end_fighter_turn()
+            return
+
+        f = info["fighter"]
+        self.defending[f] = False
+        atk_bonus = f.get_attack_bonus()
+        hit, roll, total, crit = roll_attack(atk_bonus, self.monster.ac)
+
+        if crit:
+            self.combat_log.append(
+                f"{f.name} rolls {roll} — CRITICAL HIT!"
+            )
+        elif hit:
+            self.combat_log.append(
+                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
+                f"= {total} vs AC {self.monster.ac} — Hit!"
+            )
+        else:
+            self.combat_log.append(
+                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
+                f"= {total} vs AC {self.monster.ac} — Miss!"
+            )
+
+        if hit:
+            dice_count, dice_sides, dmg_bonus = f.get_damage_dice()
+            damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
+            self.monster.hp = max(0, self.monster.hp - damage)
+            self.combat_log.append(
+                f"{f.name} deals {damage} damage with {f.weapon}!"
+            )
+            # Spawn a hit flash on the monster
+            self.hit_effects.append(
+                HitEffect(self.monster_col, self.monster_row, damage))
+
+        if not self.monster.is_alive():
+            self.phase = PHASE_VICTORY
+            self.phase_timer = 2500
+            xp = self.monster.xp_reward
+            gold = self.monster.gold_reward
             for m in self.fighters:
                 if m.is_alive():
                     m.exp += xp
@@ -341,7 +688,6 @@ class CombatState(BaseState):
 
     def _monster_turn(self):
         """Monster AI: attack if adjacent to any fighter, otherwise move toward closest."""
-        # Find the closest alive fighter
         best_dist = 999
         best_target = None
         for member in self.fighters:
@@ -354,12 +700,11 @@ class CombatState(BaseState):
                 best_target = member
 
         if not best_target:
-            # No alive targets
             self.phase = PHASE_VICTORY
             self.phase_timer = 1500
             return
 
-        # Check adjacency to any alive fighter — attack them
+        # Check adjacency to any alive fighter
         adjacent_targets = []
         for member in self.fighters:
             if not member.is_alive():
@@ -390,7 +735,6 @@ class CombatState(BaseState):
             (-1, -1), (-1, 1), (1, -1), (1, 1),
         ]:
             nc, nr = mc + dcol, mr + drow
-            # Don't walk onto players
             occupied = False
             for m in self.fighters:
                 if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
@@ -454,11 +798,13 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{self.monster.name} deals {damage} damage to {target.name}!"
             )
+            # Spawn hit flash on the target party member
+            tcol, trow = self.fighter_positions.get(target, (3, 5))
+            self.hit_effects.append(HitEffect(tcol, trow, damage))
 
         if not target.is_alive():
             self.combat_log.append(f"{target.name} has fallen!")
 
-        # Check if all party members are dead
         if not any(m.is_alive() for m in self.fighters):
             self.phase = PHASE_DEFEAT
             self.phase_timer = 2500
@@ -479,6 +825,36 @@ class CombatState(BaseState):
                 self.combat_message = ""
                 self.combat_msg_timer = 0
 
+        # Update all visual effects (always, regardless of phase)
+        for fx in self.hit_effects:
+            if fx.alive:
+                fx.update(dt)
+        self.hit_effects = [fx for fx in self.hit_effects if fx.alive]
+
+        # Update projectiles
+        if self.phase == PHASE_PROJECTILE:
+            for proj in self.projectiles:
+                if proj.alive:
+                    proj.update(dt)
+
+            # Check if all projectiles have arrived
+            if all(not p.alive for p in self.projectiles):
+                self.projectiles = []
+                self._resolve_ranged()
+            return
+
+        # Update melee effects
+        if self.phase == PHASE_MELEE_ANIM:
+            for fx in self.melee_effects:
+                if fx.alive:
+                    fx.update(dt)
+
+            # Check if all melee effects are done
+            if all(not fx.alive for fx in self.melee_effects):
+                self.melee_effects = []
+                self._resolve_melee()
+            return
+
         if self.phase_timer > 0:
             self.phase_timer -= dt_ms
             if self.phase_timer <= 0:
@@ -492,11 +868,9 @@ class CombatState(BaseState):
         elif self.phase == PHASE_MONSTER:
             self._monster_turn()
         elif self.phase == PHASE_MONSTER_ACT:
-            # Reset defending for all fighters, start new round
             for m in self.fighters:
                 self.defending[m] = False
             self.active_idx = 0
-            # Skip dead fighters at start
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
                 self.active_idx += 1
@@ -516,12 +890,23 @@ class CombatState(BaseState):
         if won and self.monster_ref:
             dungeon_state = self.game.states.get("dungeon")
             if dungeon_state and dungeon_state.dungeon_data:
-                monsters = dungeon_state.dungeon_data.monsters
+                ddata = dungeon_state.dungeon_data
+                monsters = ddata.monsters
                 if self.monster_ref in monsters:
                     monsters.remove(self.monster_ref)
 
+                # Place a treasure chest where the monster stood
+                from src.settings import TILE_CHEST
+                mc = self.monster_map_col
+                mr = self.monster_map_row
+                ddata.tile_map.set_tile(mc, mr, TILE_CHEST)
+
+                # Tell the dungeon state to show a treasure message
+                dungeon_state.pending_combat_message = (
+                    f"Victory! A treasure chest appears!"
+                )
+
         if not won:
-            # Revive all dead members with 1 HP
             for m in self.game.party.members:
                 if not m.is_alive():
                     m.hp = 1
@@ -544,9 +929,11 @@ class CombatState(BaseState):
             monster_row=self.monster_row,
             is_adjacent=self._is_adjacent(),
             combat_message=self.combat_message,
-            # New: pass all fighter data for multi-character rendering
             fighters=self.fighters,
             fighter_positions=self.fighter_positions,
             active_fighter=self.active_fighter,
             defending_map=self.defending,
+            projectiles=self.projectiles,
+            melee_effects=self.melee_effects,
+            hit_effects=self.hit_effects,
         )

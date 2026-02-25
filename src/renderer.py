@@ -1155,7 +1155,9 @@ class Renderer:
                           monster_col, monster_row,
                           is_adjacent, combat_message,
                           fighters=None, fighter_positions=None,
-                          active_fighter=None, defending_map=None):
+                          active_fighter=None, defending_map=None,
+                          projectiles=None,
+                          melee_effects=None, hit_effects=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1194,6 +1196,59 @@ class Renderer:
             # Fallback: single player sprite
             self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
 
+        # ── 2b. projectiles ──
+        if projectiles:
+            for proj in projectiles:
+                if proj.alive:
+                    pcx = mx + proj.current_col * ts + ts // 2
+                    pcy = my + proj.current_row * ts + ts // 2
+                    # Draw projectile symbol as colored shape
+                    color = proj.color
+                    sym = proj.symbol
+                    # Main projectile body — bright dot with trail effect
+                    pygame.draw.circle(self.screen, color, (int(pcx), int(pcy)), 4)
+                    pygame.draw.circle(self.screen, self._U3_WHITE,
+                                       (int(pcx), int(pcy)), 2)
+                    # Direction indicator (arrow head)
+                    if sym == ">":
+                        pts = [(int(pcx) + 6, int(pcy)),
+                               (int(pcx) + 1, int(pcy) - 4),
+                               (int(pcx) + 1, int(pcy) + 4)]
+                        pygame.draw.polygon(self.screen, color, pts)
+                    elif sym == "<":
+                        pts = [(int(pcx) - 6, int(pcy)),
+                               (int(pcx) - 1, int(pcy) - 4),
+                               (int(pcx) - 1, int(pcy) + 4)]
+                        pygame.draw.polygon(self.screen, color, pts)
+                    elif sym == "v":
+                        pts = [(int(pcx), int(pcy) + 6),
+                               (int(pcx) - 4, int(pcy) + 1),
+                               (int(pcx) + 4, int(pcy) + 1)]
+                        pygame.draw.polygon(self.screen, color, pts)
+                    elif sym == "^":
+                        pts = [(int(pcx), int(pcy) - 6),
+                               (int(pcx) - 4, int(pcy) - 1),
+                               (int(pcx) + 4, int(pcy) - 1)]
+                        pygame.draw.polygon(self.screen, color, pts)
+                    # Trail - small fading dot behind projectile
+                    trail_x = pcx - (proj.end_col - proj.start_col) * 0.3 * ts
+                    trail_y = pcy - (proj.end_row - proj.start_row) * 0.3 * ts
+                    trail_col = (color[0] // 3, color[1] // 3, color[2] // 3)
+                    pygame.draw.circle(self.screen, trail_col,
+                                       (int(trail_x), int(trail_y)), 2)
+
+        # ── 2c. melee slash effects ──
+        if melee_effects:
+            for fx in melee_effects:
+                if fx.alive:
+                    self._u3_draw_melee_effect(mx, my, ts, fx)
+
+        # ── 2d. hit flash effects ──
+        if hit_effects:
+            for fx in hit_effects:
+                if fx.alive:
+                    self._u3_draw_hit_effect(mx, my, ts, fx)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
@@ -1213,7 +1268,8 @@ class Renderer:
 
         self._u3_monster_panel(monster, rx, 188, rw, 100)
         self._u3_action_panel(phase, selected_action, is_adjacent,
-                              rx, 292, rw, 110)
+                              rx, 292, rw, 110,
+                              active_fighter=active_fighter)
         self._u3_log_panel(combat_log, rx, 406, rw, 190)
 
         # ── 5. left-side combat log (below arena) ──
@@ -1224,8 +1280,13 @@ class Renderer:
         # ── 6. bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        self._u3_text("[WASD] MOVE   [UP/DN] MENU   [ENTER] ACT   [SPACE] SPEED",
-                      8, bar_y + 5, self._U3_BLUE)
+        is_ranged_bar = (active_fighter and active_fighter.is_ranged())
+        if is_ranged_bar:
+            self._u3_text("[WASD] MOVE  [ARROWS] SHOOT  [ENTER] ACT  [SPACE] SPEED",
+                          8, bar_y + 5, self._U3_BLUE)
+        else:
+            self._u3_text("[WASD] MOVE  [ARROWS] ATTACK  [ENTER] ACT  [SPACE] SPEED",
+                          8, bar_y + 5, self._U3_BLUE)
 
         # ── 7. floating combat message ──
         if combat_message:
@@ -1383,6 +1444,110 @@ class Renderer:
         self.screen.blit(name_surf, (cx - 3, cy + 14))
 
     # ==============================================================
+    #  COMBAT EFFECTS (slash, hit flash)
+    # ==============================================================
+
+    def _u3_draw_melee_effect(self, ax, ay, ts, fx):
+        """Draw a melee slash effect — animated arc/sweep at the target tile."""
+        import math
+
+        cx = ax + fx.col * ts + ts // 2
+        cy = ay + fx.row * ts + ts // 2
+        p = fx.progress  # 0 → 1
+
+        color = fx.color
+        dcol, drow = fx.direction
+
+        # Fade out alpha by drawing progressively dimmer
+        brightness = max(0.0, 1.0 - p * 0.6)
+        c = (int(color[0] * brightness),
+             int(color[1] * brightness),
+             int(color[2] * brightness))
+
+        # Slash sweep: a rotating line that sweeps ~90 degrees
+        # Base angle determined by attack direction
+        if dcol > 0:
+            base_angle = 0
+        elif dcol < 0:
+            base_angle = math.pi
+        elif drow > 0:
+            base_angle = math.pi / 2
+        else:
+            base_angle = -math.pi / 2
+
+        # Sweep from -45 to +45 degrees around the base angle
+        sweep_offset = (p - 0.5) * math.pi * 0.8
+        angle = base_angle + sweep_offset
+
+        slash_len = int(14 + p * 6)  # grows slightly as it sweeps
+        x1 = cx + int(math.cos(angle) * 4)
+        y1 = cy + int(math.sin(angle) * 4)
+        x2 = cx + int(math.cos(angle) * slash_len)
+        y2 = cy + int(math.sin(angle) * slash_len)
+
+        # Main slash line
+        pygame.draw.line(self.screen, c, (x1, y1), (x2, y2), 3)
+
+        # Bright tip
+        pygame.draw.circle(self.screen, self._U3_WHITE, (x2, y2), 2)
+
+        # Secondary slash line (slightly offset for a wider sweep look)
+        angle2 = base_angle + sweep_offset * 0.7
+        x3 = cx + int(math.cos(angle2) * slash_len * 0.7)
+        y3 = cy + int(math.sin(angle2) * slash_len * 0.7)
+        dim_c = (c[0] // 2, c[1] // 2, c[2] // 2)
+        pygame.draw.line(self.screen, dim_c, (cx, cy), (x3, y3), 2)
+
+        # Impact sparks at early/mid animation
+        if 0.2 < p < 0.7:
+            for i in range(3):
+                spark_angle = base_angle + (i - 1) * 0.5 + p * 2
+                spark_dist = 8 + i * 4
+                sx = cx + int(math.cos(spark_angle) * spark_dist)
+                sy = cy + int(math.sin(spark_angle) * spark_dist)
+                pygame.draw.circle(self.screen, self._U3_WHITE, (sx, sy), 1)
+
+    def _u3_draw_hit_effect(self, ax, ay, ts, fx):
+        """Draw a hit flash — white flash then red, with shake and damage number."""
+        cx = ax + fx.col * ts + ts // 2
+        cy = ay + fx.row * ts + ts // 2
+        p = fx.progress  # 0 → 1
+
+        # Phase 1 (0–0.4): bright white flash expanding outward
+        # Phase 2 (0.4–1.0): red flash fading out + damage number floating up
+        if p < 0.4:
+            # White flash — expanding ring
+            sub_p = p / 0.4
+            radius = int(6 + sub_p * 12)
+            alpha_f = 1.0 - sub_p * 0.5
+            c = (int(255 * alpha_f), int(255 * alpha_f), int(255 * alpha_f))
+            pygame.draw.circle(self.screen, c, (cx, cy), radius, 2)
+            # Central flash
+            pygame.draw.circle(self.screen, self._U3_WHITE, (cx, cy),
+                               int(4 + sub_p * 4))
+        else:
+            # Red flash fading out
+            sub_p = (p - 0.4) / 0.6
+            alpha_f = 1.0 - sub_p
+            r_val = int(255 * alpha_f)
+            if r_val > 0:
+                c = (r_val, int(60 * alpha_f), int(60 * alpha_f))
+                radius = int(10 + sub_p * 4)
+                pygame.draw.circle(self.screen, c, (cx, cy), radius, 2)
+
+        # Damage number floating upward
+        if fx.damage > 0 and p > 0.15:
+            float_y = cy - 14 - int(p * 20)
+            dmg_text = str(fx.damage)
+            # White text with dark outline for readability
+            surf = self.font_small.render(dmg_text, True, self._U3_WHITE)
+            outline = self.font_small.render(dmg_text, True, self._U3_BLACK)
+            rx = cx - surf.get_width() // 2
+            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                self.screen.blit(outline, (rx + ox, float_y + oy))
+            self.screen.blit(surf, (rx, float_y))
+
+    # ==============================================================
     #  RIGHT-HAND PANELS
     # ==============================================================
 
@@ -1490,24 +1655,43 @@ class Renderer:
                              pygame.Rect(bar_x + 1, ty + 1, fill, bar_h - 2))
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
-                         x, y, w, h):
+                         x, y, w, h, active_fighter=None):
         """Action menu in retro style."""
         from src.states.combat import (
             ACTION_NAMES, ACTION_ATTACK,
             PHASE_PLAYER, PHASE_VICTORY, PHASE_DEFEAT,
+            PHASE_PROJECTILE, PHASE_MELEE_ANIM,
         )
 
         self._u3_panel(x, y, w, h)
         tx = x + 8
         ty = y + 6
 
-        if phase == PHASE_PLAYER:
-            self._u3_text("-- YOUR TURN --", tx, ty, self._U3_ORANGE)
+        is_ranged = (active_fighter and active_fighter.is_ranged())
+
+        if phase == PHASE_PROJECTILE:
+            self._u3_text("-- FIRING --", tx, ty, self._U3_ORANGE)
+            self._u3_text("PROJECTILE IN FLIGHT...", tx, ty + 24, self._U3_WHITE)
+
+        elif phase == PHASE_MELEE_ANIM:
+            self._u3_text("-- ATTACKING --", tx, ty, self._U3_ORANGE)
+            self._u3_text("STRIKE!", tx, ty + 24, self._U3_WHITE)
+
+        elif phase == PHASE_PLAYER:
+            if is_ranged:
+                self._u3_text("-- YOUR TURN (RANGED) --", tx, ty, self._U3_ORANGE)
+            else:
+                self._u3_text("-- YOUR TURN --", tx, ty, self._U3_ORANGE)
 
             for i, name in enumerate(ACTION_NAMES):
                 iy = ty + 24 + i * 24
                 selected = (i == selected_action)
-                grayed = (i == ACTION_ATTACK and not is_adjacent)
+
+                # For ranged fighters, Attack is never grayed out
+                if is_ranged:
+                    grayed = False
+                else:
+                    grayed = (i == ACTION_ATTACK and not is_adjacent)
 
                 prefix = "> " if selected else "  "
                 if grayed:
@@ -1523,7 +1707,10 @@ class Renderer:
                 self._u3_text(label, tx, iy, color)
 
             self._u3_text("[WASD] MOVE", tx, y + h - 32, self._U3_BLUE)
-            self._u3_text("[ENTER] CONFIRM", tx, y + h - 16, self._U3_BLUE)
+            if is_ranged:
+                self._u3_text("[ARROWS] SHOOT  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE)
+            else:
+                self._u3_text("[ARROWS] STRIKE  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE)
 
         elif phase == PHASE_VICTORY:
             self._u3_text("** VICTORY! **", tx, ty, self._U3_GREEN)

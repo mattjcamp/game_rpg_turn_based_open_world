@@ -30,6 +30,11 @@ class DungeonState(BaseState):
         self.overworld_col = 0
         self.overworld_row = 0
 
+        # Message queued by combat state on return
+        self.pending_combat_message = None
+        # Track if we've already entered (so re-entry from combat doesn't reset position)
+        self._entered = False
+
     def enter_dungeon(self, dungeon_data, overworld_col, overworld_row):
         """
         Set up the dungeon state with dungeon-specific data.
@@ -38,10 +43,25 @@ class DungeonState(BaseState):
         self.dungeon_data = dungeon_data
         self.overworld_col = overworld_col
         self.overworld_row = overworld_row
+        self._entered = False
+        self.pending_combat_message = None
 
     def enter(self):
         """Called when this state becomes active."""
+        # Returning from combat — keep party position, just show message
+        if self._entered and self.dungeon_data:
+            if self.pending_combat_message:
+                self.show_message(self.pending_combat_message, 2500)
+                self.pending_combat_message = None
+            # Refresh camera to current party position
+            self.game.camera.map_width = self.dungeon_data.tile_map.width
+            self.game.camera.map_height = self.dungeon_data.tile_map.height
+            self.game.camera.update(self.game.party.col, self.game.party.row)
+            return
+
+        # First entry into dungeon
         if self.dungeon_data:
+            self._entered = True
             self.show_message(
                 f"You descend into {self.dungeon_data.name}...", 2500
             )
@@ -185,6 +205,10 @@ class DungeonState(BaseState):
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""
+        # Reset entered flag so next dungeon visit starts fresh
+        self._entered = False
+        self.pending_combat_message = None
+
         # Restore party position on the overworld
         self.game.party.col = self.overworld_col
         self.game.party.row = self.overworld_row
