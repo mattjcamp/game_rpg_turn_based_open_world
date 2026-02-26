@@ -21,7 +21,7 @@ from src.combat_engine import (
 
 # ── Arena constants ──────────────────────────────────────────────
 ARENA_COLS = 15
-ARENA_ROWS = 10
+ARENA_ROWS = 17
 
 # ── Combat phases ────────────────────────────────────────────────
 PHASE_INIT        = "init"
@@ -244,17 +244,6 @@ class CombatState(BaseState):
         self.melee_effects = []
         self.hit_effects = []
         self._pending_melee = None
-
-        # For overworld encounters, double the monster (two orcs)
-        self.is_warband = False
-        if source_state == "overworld":
-            self.is_warband = True
-            # Beef up the orc to represent two combatants
-            monster.name = "Orc Warband"
-            monster.max_hp = monster.max_hp * 2
-            monster.hp = monster.max_hp
-            monster.xp_reward = monster.xp_reward * 2
-            monster.gold_reward = monster.gold_reward * 2
 
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
@@ -929,7 +918,7 @@ class CombatState(BaseState):
                     if self.monster_ref in overworld_state.overworld_monsters:
                         overworld_state.overworld_monsters.remove(self.monster_ref)
                     overworld_state.pending_combat_message = (
-                        f"Victory! The orc warband is defeated!"
+                        f"Victory! The orc is defeated!"
                     )
 
         if not won:
@@ -962,5 +951,6 @@ class CombatState(BaseState):
             projectiles=self.projectiles,
             melee_effects=self.melee_effects,
             hit_effects=self.hit_effects,
-            is_warband=self.is_warband,
+            is_warband=False,
+            source_state=self.source_state,
         )

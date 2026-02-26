@@ -1244,11 +1244,11 @@ class Renderer:
     # ── Layout constants ──
     _ARENA_TILE = 32
     _ARENA_COLS = 15
-    _ARENA_ROWS = 10
+    _ARENA_ROWS = 17
     _MAP_X  = 4                                     # left edge of map panel
     _MAP_Y  = 4
     _MAP_W  = _ARENA_COLS * _ARENA_TILE              # 480
-    _MAP_H  = _ARENA_ROWS * _ARENA_TILE              # 320
+    _MAP_H  = _ARENA_ROWS * _ARENA_TILE              # 544
     _RPANEL_X = _MAP_X + _MAP_W + 8                  # 492
     _RPANEL_W = SCREEN_WIDTH - _RPANEL_X - 4          # 304
 
@@ -1278,7 +1278,7 @@ class Renderer:
                           active_fighter=None, defending_map=None,
                           projectiles=None,
                           melee_effects=None, hit_effects=None,
-                          is_warband=False):
+                          is_warband=False, source_state="dungeon"):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1286,6 +1286,7 @@ class Renderer:
 
         mx, my = self._MAP_X, self._MAP_Y
         ts = self._ARENA_TILE
+        is_outdoor = (source_state == "overworld")
 
         # ── 1. draw arena tiles ──
         for r in range(self._ARENA_ROWS):
@@ -1294,19 +1295,25 @@ class Renderer:
                 py = my + r * ts
                 wall = (c == 0 or c == self._ARENA_COLS - 1
                         or r == 0 or r == self._ARENA_ROWS - 1)
-                if wall:
-                    self._u3_draw_wall_tile(px, py, ts)
+                if is_outdoor:
+                    if wall:
+                        self._u3_draw_outdoor_edge_tile(px, py, ts, c, r)
+                    else:
+                        self._u3_draw_outdoor_floor_tile(px, py, ts, c, r)
                 else:
-                    self._u3_draw_floor_tile(px, py, ts, c, r)
+                    if wall:
+                        self._u3_draw_wall_tile(px, py, ts)
+                    else:
+                        self._u3_draw_floor_tile(px, py, ts, c, r)
 
         # ── 2. sprites ──
         if monster.is_alive():
-            self._u3_draw_monster_sprite(monster, mx, my, ts,
-                                         monster_col, monster_row)
-            # Draw a second orc sprite offset for warband encounters
-            if is_warband:
+            if is_outdoor:
+                self._u3_draw_orc_combat_sprite(monster, mx, my, ts,
+                                                monster_col, monster_row)
+            else:
                 self._u3_draw_monster_sprite(monster, mx, my, ts,
-                                             monster_col, monster_row - 2)
+                                             monster_col, monster_row)
 
         # Draw ALL party members on the arena
         if fighters and fighter_positions:
@@ -1383,36 +1390,56 @@ class Renderer:
         rx = self._RPANEL_X
         rw = self._RPANEL_W
 
-        # Party roster panel (shows all 4 members compactly)
+        # Party roster panel (shows all 4 members with sprites and bars)
+        party_h = 260
         if fighters:
             self._u3_party_combat_panel(fighters, active_fighter,
                                         defending_map or {},
-                                        rx, 4, rw, 180)
+                                        rx, 4, rw, party_h)
         else:
             self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138)
+            party_h = 138
 
-        self._u3_monster_panel(monster, rx, 188, rw, 100)
+        monster_y = 4 + party_h + 4
+        self._u3_monster_panel(monster, rx, monster_y, rw, 90,
+                               source_state=is_outdoor and "overworld" or "dungeon")
+        action_y = monster_y + 94
+        arena_bottom = my + self._MAP_H
+        action_h = arena_bottom - action_y
         self._u3_action_panel(phase, selected_action, is_adjacent,
-                              rx, 292, rw, 110,
+                              rx, action_y, rw, action_h,
                               active_fighter=active_fighter)
-        self._u3_log_panel(combat_log, rx, 406, rw, 190)
 
-        # ── 5. left-side combat log (below arena) ──
-        log_y = my + self._MAP_H + 4
-        log_h = SCREEN_HEIGHT - log_y - 30
-        self._u3_log_panel(combat_log, mx - 2, log_y, self._MAP_W + 4, log_h)
+        # ── 5. bottom combat log ──
+        bar_y = arena_bottom + 2
+        bar_h = SCREEN_HEIGHT - bar_y
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
-        # ── 6. bottom status bar ──
-        bar_y = SCREEN_HEIGHT - 24
-        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        f = self.font
-        is_ranged_bar = (active_fighter and active_fighter.is_ranged())
-        if is_ranged_bar:
-            self._u3_text("[WASD] MOVE  [ARROWS] SHOOT  [ENTER] ACT  [SPACE] SPEED",
-                          8, bar_y + 4, self._U3_LTBLUE, font=f)
-        else:
-            self._u3_text("[WASD] MOVE  [ARROWS] ATTACK  [ENTER] ACT  [SPACE] SPEED",
-                          8, bar_y + 4, self._U3_LTBLUE, font=f)
+        log_y_start = bar_y + 4
+        line_h = 16
+        max_lines = (bar_h - 8) // line_h
+        if max_lines > 0 and combat_log:
+            visible = combat_log[-max_lines:]
+            for i, line in enumerate(visible):
+                if "CRITICAL" in line:
+                    color = (255, 200, 80)
+                elif "Hit!" in line:
+                    color = self._U3_WHITE
+                elif "Miss" in line or "Failed" in line:
+                    color = (200, 200, 210)
+                elif "damage" in line and "deals" in line:
+                    color = (255, 100, 100)
+                elif "defeated" in line or "XP" in line or "Escaped" in line:
+                    color = (80, 255, 80)
+                elif "fallen" in line:
+                    color = (255, 100, 100)
+                elif "---" in line:
+                    color = (255, 200, 80)
+                elif "moves closer" in line:
+                    color = (255, 200, 80)
+                else:
+                    color = (210, 210, 255)
+                self._u3_text(line, 8, log_y_start + i * line_h, color, self.font)
 
         # ── 7. floating combat message ──
         if combat_message:
@@ -1459,6 +1486,59 @@ class Renderer:
             x2, y2 = px + dx2, py + dy2
             pygame.draw.rect(self.screen, self._U3_DKGRN,
                              pygame.Rect(x2, y2, 2, 2))
+
+    def _u3_draw_outdoor_floor_tile(self, px, py, ts, col, row):
+        """Grass-style floor tile for outdoor combat arenas."""
+        # Use grass sprite from tile sheet if available
+        sprite = self._tile_sprites.get((0, 1))  # grass tile
+        if sprite:
+            self.screen.blit(sprite, (px, py))
+        else:
+            # Fallback: procedural grass
+            pygame.draw.rect(self.screen, (15, 60, 15),
+                             pygame.Rect(px, py, ts, ts))
+            seed = (col * 31 + row * 17)
+            if seed % 4 < 2:
+                dx = (seed * 7) % (ts - 8) + 4
+                dy = (seed * 13) % (ts - 8) + 4
+                c = (30, 100, 30) if seed % 3 else (20, 70, 20)
+                pygame.draw.line(self.screen, c,
+                                 (px + dx, py + dy - 2), (px + dx, py + dy + 2), 1)
+
+    def _u3_draw_outdoor_edge_tile(self, px, py, ts, col, row):
+        """Edge tiles for outdoor arena — forest/tree border."""
+        # Use forest sprite from tile sheet if available
+        sprite = self._tile_sprites.get((0, 3))  # forest tile
+        if sprite:
+            self.screen.blit(sprite, (px, py))
+        else:
+            # Fallback: dark green tree edge
+            pygame.draw.rect(self.screen, (10, 50, 10),
+                             pygame.Rect(px, py, ts, ts))
+            cx, cy = px + ts // 2, py + ts // 2
+            pygame.draw.circle(self.screen, (20, 80, 20), (cx, cy), 10)
+            pygame.draw.circle(self.screen, (15, 60, 15), (cx, cy), 7)
+
+    def _u3_draw_orc_combat_sprite(self, monster, ax, ay, ts, col, row):
+        """Draw orc using tile sheet orc sprite for overworld combat."""
+        cx = ax + col * ts + ts // 2
+        cy = ay + row * ts + ts // 2
+
+        # Use orc sprite from tile sheet (R1 C8)
+        sprite = self._tile_sprites.get((1, 8))
+        if sprite:
+            sx = cx - sprite.get_width() // 2
+            sy = cy - sprite.get_height() // 2
+            self.screen.blit(sprite, (sx, sy))
+        else:
+            # Fallback: green blocky orc
+            mc = monster.color
+            body = pygame.Rect(cx - 8, cy - 6, 16, 14)
+            pygame.draw.rect(self.screen, mc, body)
+            pygame.draw.rect(self.screen, mc,
+                             pygame.Rect(cx - 5, cy - 12, 10, 7))
+            pygame.draw.rect(self.screen, self._U3_WHITE,
+                             pygame.Rect(cx - 4, cy - 10, 3, 3))
 
     # ==============================================================
     #  SPRITE DRAWING  (simple retro pixel-art figures)
@@ -1690,9 +1770,18 @@ class Renderer:
     #  RIGHT-HAND PANELS
     # ==============================================================
 
+    def _u3_draw_stat_bar(self, x, y, w, h, current, maximum, color, bg=(40, 40, 40)):
+        """Draw a horizontal stat bar (HP or MP style)."""
+        pygame.draw.rect(self.screen, bg, pygame.Rect(x, y, w, h))
+        if maximum > 0:
+            fill = max(1, int((w - 2) * current / maximum))
+            pygame.draw.rect(self.screen, color,
+                             pygame.Rect(x + 1, y + 1, fill, h - 2))
+        pygame.draw.rect(self.screen, (80, 80, 80), pygame.Rect(x, y, w, h), 1)
+
     def _u3_party_combat_panel(self, fighters, active_fighter,
                                 defending_map, x, y, w, h):
-        """Compact party roster for combat — all 4 members in one panel."""
+        """Party roster with character sprites and HP/MP bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
         tx = x + 8
@@ -1701,37 +1790,69 @@ class Renderer:
         self._u3_text("PARTY", tx, ty, self._U3_ORANGE, f)
         ty += 22
 
+        sprite_size = 32  # sprite display area
+        bar_w = w - sprite_size - 30  # bar width after sprite + padding
+        bar_h = 8
+
         for i, member in enumerate(fighters):
             is_active = (member is active_fighter)
             is_def = defending_map.get(member, False)
+            row_top = ty
 
-            # Prefix: arrow for active, space otherwise
-            prefix = "> " if is_active else "  "
+            # ── Character sprite ──
+            sprite = self._get_class_sprite(member.char_class)
+            if sprite:
+                sx = tx
+                sy = row_top + 2
+                if not member.is_alive():
+                    # Dim the sprite for dead members
+                    dim = sprite.copy()
+                    dim.set_alpha(80)
+                    self.screen.blit(dim, (sx, sy))
+                else:
+                    self.screen.blit(sprite, (sx, sy))
+                    if is_active:
+                        # Orange highlight box around active character
+                        pygame.draw.rect(self.screen, self._U3_ORANGE,
+                                         pygame.Rect(sx - 2, sy - 2,
+                                                     sprite.get_width() + 4,
+                                                     sprite.get_height() + 4), 2)
 
-            # Name + class
+            # ── Name + class (to the right of sprite) ──
+            info_x = tx + sprite_size + 6
+
             if not member.is_alive():
                 name_color = self._U3_RED
-                status = "DEAD"
             elif is_active:
                 name_color = self._U3_ORANGE
-                status = ""
             else:
                 name_color = self._U3_WHITE
-                status = ""
 
             cls_short = member.char_class[:3].upper()
-            self._u3_text(f"{prefix}{member.name}", tx, ty, name_color, f)
-            self._u3_text(cls_short, tx + 160, ty, self._U3_LTBLUE, f)
+            self._u3_text(member.name, info_x, row_top, name_color, f)
+            self._u3_text(cls_short, x + w - 40, row_top, self._U3_LTBLUE, f)
 
-            ty += 16
-            hp_text = f"HP:{member.hp:04d}/{member.max_hp:04d}"
+            # ── HP bar ──
+            bar_y = row_top + 18
+            hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
+            self._u3_draw_stat_bar(info_x, bar_y, bar_w, bar_h,
+                                   member.hp, member.max_hp, hp_color)
+            self._u3_text(f"HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
+
+            # ── MP bar ──
+            mp_y = bar_y + bar_h + 3
+            mp_val = member.mp
+            mp_max = member.max_mp
+            if mp_max > 0:
+                self._u3_draw_stat_bar(info_x, mp_y, bar_w, bar_h,
+                                       mp_val, mp_max, (100, 100, 255))
+                self._u3_text(f"MP", info_x - 26, mp_y - 2, (200, 200, 200), self.font_small)
+
+            # ── DEF indicator ──
             if is_def:
-                hp_text += " DEF"
-            if status:
-                hp_text += f" {status}"
-            self._u3_text(hp_text, tx + 16, ty, (200, 200, 200), f)
+                self._u3_text("DEF", x + w - 40, row_top + 18, self._U3_ORANGE, self.font_small)
 
-            ty += 20
+            ty += 58  # row height per character
 
     def _u3_fighter_panel(self, fighter, defending, x, y, w, h):
         """Player stats in Ultima III format."""
@@ -1766,35 +1887,37 @@ class Renderer:
         atk = f"ATK: D20{format_modifier(fighter.get_attack_bonus())}  DMG: {dice_c}D{dice_s}{format_modifier(dice_b)}"
         self._u3_text(atk, tx, ty, (200, 200, 200), f)
 
-    def _u3_monster_panel(self, monster, x, y, w, h):
-        """Monster stats panel."""
+    def _u3_monster_panel(self, monster, x, y, w, h, source_state="dungeon"):
+        """Monster stats panel with sprite and HP bar."""
         self._u3_panel(x, y, w, h)
         f = self.font
         tx = x + 8
         ty = y + 6
 
-        self._u3_text(monster.name, tx, ty, self._U3_RED, f)
+        # ── Monster sprite ──
+        if source_state == "overworld":
+            sprite = self._tile_sprites.get((1, 8))  # orc
+        else:
+            sprite = self._tile_sprites.get((1, 9))  # skeleton
+        if sprite:
+            self.screen.blit(sprite, (tx, ty + 2))
 
-        ty += 22
-        self._u3_text(f"HP:{monster.hp:04d}/{monster.max_hp:04d}  AC:{monster.ac:02d}",
-                      tx, ty, self._U3_WHITE, f)
+        # ── Name + stats to the right of sprite ──
+        info_x = tx + 38
+        self._u3_text(monster.name, info_x, ty, self._U3_RED, f)
 
-        ty += 18
-        atk_text = f"ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
-        self._u3_text(atk_text, tx, ty, (200, 200, 200), f)
-
-        # HP bar (retro style: bracketed text bar)
         ty += 20
+        atk_text = f"AC:{monster.ac:02d}  ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
+        self._u3_text(atk_text, info_x, ty, (200, 200, 200), self.font_small)
+
+        # ── HP bar (full width) ──
+        ty += 16
         bar_w = w - 20
-        bar_h = 8
-        bar_x = tx
-        pygame.draw.rect(self.screen, self._U3_BLUE,
-                         pygame.Rect(bar_x, ty, bar_w, bar_h), 1)
-        if monster.max_hp > 0:
-            fill = max(1, int((bar_w - 2) * monster.hp / monster.max_hp))
-            bc = self._U3_RED if monster.hp <= monster.max_hp * 0.3 else (170, 0, 0)
-            pygame.draw.rect(self.screen, bc,
-                             pygame.Rect(bar_x + 1, ty + 1, fill, bar_h - 2))
+        bar_h = 10
+        hp_color = self._U3_RED if monster.hp <= monster.max_hp * 0.3 else (200, 40, 40)
+        self._u3_draw_stat_bar(tx, ty, bar_w, bar_h,
+                               monster.hp, monster.max_hp, hp_color)
+        self._u3_text("HP", tx + bar_w + 4, ty - 1, (200, 200, 200), self.font_small)
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None):
