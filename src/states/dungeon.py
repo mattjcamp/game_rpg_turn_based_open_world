@@ -122,7 +122,7 @@ class DungeonState(BaseState):
             self._try_move(dcol, drow)
 
     def _try_move(self, dcol, drow):
-        """Move the party within the dungeon."""
+        """Move the party within the dungeon, then let monsters take a step."""
         party = self.game.party
         target_col = party.col + dcol
         target_row = party.row + drow
@@ -139,8 +139,45 @@ class DungeonState(BaseState):
             party.row = target_row
             self.move_cooldown = MOVE_REPEAT_DELAY
             self._check_tile_events()
+            # After party moves, let every alive monster take a step
+            self._move_monsters()
+            # A monster may have walked adjacent — check for contact
+            self._check_monster_contact()
         else:
             self.move_cooldown = MOVE_REPEAT_DELAY
+
+    def _move_monsters(self):
+        """Move each alive monster one step toward the party."""
+        if not self.dungeon_data:
+            return
+        party = self.game.party
+        alive = [m for m in self.dungeon_data.monsters if m.is_alive()]
+        # Build set of occupied positions (other monsters) to prevent stacking
+        occupied = {(m.col, m.row) for m in alive}
+        for monster in alive:
+            # Remove self from occupied so it can move
+            occupied.discard((monster.col, monster.row))
+            monster.try_move_toward(
+                party.col, party.row,
+                self.dungeon_data.tile_map,
+                occupied,
+            )
+            # Add new position back
+            occupied.add((monster.col, monster.row))
+
+    def _check_monster_contact(self):
+        """If a monster moved adjacent to the party, start combat."""
+        if not self.dungeon_data:
+            return
+        party = self.game.party
+        for monster in self.dungeon_data.monsters:
+            if not monster.is_alive():
+                continue
+            dc = abs(monster.col - party.col)
+            dr = abs(monster.row - party.row)
+            if dc + dr == 1:  # Cardinal-adjacent
+                self._start_combat(monster)
+                return
 
     def _get_monster_at(self, col, row):
         """Return the monster at (col, row) if any, else None."""

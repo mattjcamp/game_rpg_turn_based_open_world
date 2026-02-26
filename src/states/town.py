@@ -187,16 +187,17 @@ class TownState(BaseState):
                 self.move_cooldown = 0
 
     def draw(self, renderer):
-        """Draw the town."""
+        """Draw the town in Ultima III style."""
         if self.showing_party:
             renderer.draw_party_screen_u3(self.game.party)
             return
-        renderer.draw_map(self.town_data.tile_map, self.game.camera)
-        renderer.draw_npcs(self.town_data.npcs, self.game.camera)
-        renderer.draw_party(self.game.party, self.game.camera)
-        renderer.draw_hud_town(self.game.party, self.town_data)
-        if self.message:
-            if self.npc_dialogue_active:
-                renderer.draw_dialogue_box(self.message)
-            else:
-                renderer.draw_message(self.message)
+        # Use the new sprite-tile-based town renderer
+        msg = self.message if not self.npc_dialogue_active else ""
+        renderer.draw_town_u3(
+            self.game.party,
+            self.town_data,
+            message=msg,
+        )
+        # Dialogue box renders on top if active
+        if self.message and self.npc_dialogue_active:
+            renderer.draw_dialogue_box(self.message)

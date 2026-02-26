@@ -33,6 +33,88 @@ class Monster:
     def is_alive(self):
         return self.hp > 0
 
+    def try_move_toward(self, target_col, target_row, tile_map,
+                        occupied_positions):
+        """
+        Attempt to move one step toward the target (the party).
+
+        Uses simple cardinal-direction pursuit: pick the axis with the
+        largest gap and try to close it.  If that tile is blocked, try
+        the other axis.  If both are blocked, stay put.
+
+        Parameters
+        ----------
+        target_col, target_row : int
+            Where the party is standing.
+        tile_map : TileMap
+            Used for walkability checks.
+        occupied_positions : set of (col, row)
+            Tiles already occupied by other monsters (prevents stacking).
+        """
+        if not self.is_alive():
+            return
+
+        dx = target_col - self.col
+        dy = target_row - self.row
+
+        # Determine preferred movement order (largest gap first)
+        moves = []
+        if abs(dx) >= abs(dy):
+            if dx != 0:
+                moves.append((1 if dx > 0 else -1, 0))
+            if dy != 0:
+                moves.append((0, 1 if dy > 0 else -1))
+        else:
+            if dy != 0:
+                moves.append((0, 1 if dy > 0 else -1))
+            if dx != 0:
+                moves.append((1 if dx > 0 else -1, 0))
+
+        for mc, mr in moves:
+            nc, nr = self.col + mc, self.row + mr
+            if (tile_map.is_walkable(nc, nr)
+                    and (nc, nr) != (target_col, target_row)
+                    and (nc, nr) not in occupied_positions):
+                self.col = nc
+                self.row = nr
+                return
+
+    def try_move_random(self, tile_map, occupied_positions,
+                        party_col=None, party_row=None):
+        """
+        Attempt to move one step in a random cardinal direction.
+
+        The monster picks a random walkable, unoccupied neighbour and
+        moves there.  If no direction is free, it stays put.
+
+        Parameters
+        ----------
+        tile_map : TileMap
+            Used for walkability checks.
+        occupied_positions : set of (col, row)
+            Tiles already occupied by other monsters.
+        party_col, party_row : int or None
+            Party position – the monster will avoid stepping onto the
+            party tile directly (combat is handled elsewhere).
+        """
+        if not self.is_alive():
+            return
+
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        random.shuffle(directions)
+
+        for dc, dr in directions:
+            nc, nr = self.col + dc, self.row + dr
+            if not tile_map.is_walkable(nc, nr):
+                continue
+            if (nc, nr) in occupied_positions:
+                continue
+            if party_col is not None and (nc, nr) == (party_col, party_row):
+                continue
+            self.col = nc
+            self.row = nr
+            return
+
 
 # ----- Monster factory functions -----
 

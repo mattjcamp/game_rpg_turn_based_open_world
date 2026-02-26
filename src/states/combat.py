@@ -224,7 +224,9 @@ class CombatState(BaseState):
     # ── Setup ────────────────────────────────────────────────────
 
     def start_combat(self, fighter, monster, source_state="dungeon"):
-        """Start combat. fighter param kept for compatibility but we use full party."""
+        """Start combat. fighter param kept for compatibility but we use full party.
+        For overworld encounters, the monster is an Orc Warband (two orcs combined)
+        and two orc sprites are displayed."""
         self.monster = monster
         self.source_state = source_state
         self.monster_ref = monster
@@ -242,6 +244,17 @@ class CombatState(BaseState):
         self.melee_effects = []
         self.hit_effects = []
         self._pending_melee = None
+
+        # For overworld encounters, double the monster (two orcs)
+        self.is_warband = False
+        if source_state == "overworld":
+            self.is_warband = True
+            # Beef up the orc to represent two combatants
+            monster.name = "Orc Warband"
+            monster.max_hp = monster.max_hp * 2
+            monster.hp = monster.max_hp
+            monster.xp_reward = monster.xp_reward * 2
+            monster.gold_reward = monster.gold_reward * 2
 
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
@@ -891,23 +904,33 @@ class CombatState(BaseState):
 
     def _end_combat(self, won):
         if won and self.monster_ref:
-            dungeon_state = self.game.states.get("dungeon")
-            if dungeon_state and dungeon_state.dungeon_data:
-                ddata = dungeon_state.dungeon_data
-                monsters = ddata.monsters
-                if self.monster_ref in monsters:
-                    monsters.remove(self.monster_ref)
+            if self.source_state == "dungeon":
+                dungeon_state = self.game.states.get("dungeon")
+                if dungeon_state and dungeon_state.dungeon_data:
+                    ddata = dungeon_state.dungeon_data
+                    monsters = ddata.monsters
+                    if self.monster_ref in monsters:
+                        monsters.remove(self.monster_ref)
 
-                # Place a treasure chest where the monster stood
-                from src.settings import TILE_CHEST
-                mc = self.monster_map_col
-                mr = self.monster_map_row
-                ddata.tile_map.set_tile(mc, mr, TILE_CHEST)
+                    # Place a treasure chest where the monster stood
+                    from src.settings import TILE_CHEST
+                    mc = self.monster_map_col
+                    mr = self.monster_map_row
+                    ddata.tile_map.set_tile(mc, mr, TILE_CHEST)
 
-                # Tell the dungeon state to show a treasure message
-                dungeon_state.pending_combat_message = (
-                    f"Victory! A treasure chest appears!"
-                )
+                    dungeon_state.pending_combat_message = (
+                        f"Victory! A treasure chest appears!"
+                    )
+
+            elif self.source_state == "overworld":
+                overworld_state = self.game.states.get("overworld")
+                if overworld_state:
+                    # Remove the defeated orc from the overworld
+                    if self.monster_ref in overworld_state.overworld_monsters:
+                        overworld_state.overworld_monsters.remove(self.monster_ref)
+                    overworld_state.pending_combat_message = (
+                        f"Victory! The orc warband is defeated!"
+                    )
 
         if not won:
             for m in self.game.party.members:
@@ -939,4 +962,5 @@ class CombatState(BaseState):
             projectiles=self.projectiles,
             melee_effects=self.melee_effects,
             hit_effects=self.hit_effects,
+            is_warband=self.is_warband,
         )

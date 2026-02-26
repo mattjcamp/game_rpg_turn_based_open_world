@@ -217,6 +217,155 @@ The monster's body color comes from the `Monster.color` attribute:
 
 ---
 
+## Tile Sprite Reference (U3TilesE.gif)
+
+Source file: `example_graphics/U3TilesE.gif` — a 256×80 pixel sprite sheet containing a 16×5 grid of 16×16 pixel tiles (80 tiles total). These are authentic Ultima III Amiga-style tiles for use as replacements for our procedurally drawn tiles.
+
+### Row 0: Terrain & Overworld Tiles
+
+| Pos | Name | Description |
+|-----|------|-------------|
+| R0 C0 | Water (Deep Ocean) | Blue horizontal wave lines on dark background. Used for seas and oceans on the overworld map. |
+| R0 C1 | Grass / Plains | Sparse green dots on black. The basic open terrain tile for fields and meadows. |
+| R0 C2 | Brush / Scrubland | Green cross-shaped vegetation on black. Transitional terrain between grass and forest. |
+| R0 C3 | Forest | Dense green foliage clusters. Heavier tree cover, may slow movement. |
+| R0 C4 | Mountains | Orange/brown chevron pattern representing peaks. Impassable or difficult terrain. |
+| R0 C5 | Dungeon Entrance | Gray stone archway/doorway set against mountain terrain. Entry point to dungeon levels. |
+| R0 C6 | Town / Village | White buildings with green surroundings and a red flag. Settlement that can be entered. |
+| R0 C7 | Castle | White castle structure with blue base and flags. Major location such as Lord British's castle. |
+| R0 C8 | Brick Wall | Red brick pattern. Interior wall tile used in towns and dungeons. |
+| R0 C9 | Treasure Chest | Yellow/gold chest on black background. Lootable container found in dungeons and towns. |
+| R0 C10 | Horse | Orange horse sprite. Mountable creature that increases overworld travel speed. |
+| R0 C11 | Ship / Frigate | Sailing vessel with white sails and orange hull. Used for ocean travel. |
+| R0 C12 | Whirlpool | Blue spiral pattern. Dangerous water hazard that can transport or damage the party. |
+| R0 C13 | Island / Jungle | Green land mass with palm tree on blue water. Tropical terrain or small island. |
+| R0 C14 | Moongate / Portal | Cyan vertical beams with white sparkle. Magical teleportation gate tied to moon phases. |
+| R0 C15 | Pirate Ship / Ship Variant | Orange hull with white upper structure. Enemy vessel or alternate ship sprite. |
+
+### Row 1: Characters & Monsters (Animation Frame 1)
+
+| Pos | Name | Description |
+|-----|------|-------------|
+| R1 C0 | Fighter (Frame 1) | Character with orange hair, green pants. Standard melee warrior class. |
+| R1 C1 | Thief (Frame 1) | Running pose with red legs. Agile rogue class specializing in traps and ranged attacks. |
+| R1 C2 | Paladin (Frame 1) | White/orange armored figure. Holy warrior with both combat and priest magic. |
+| R1 C3 | Wizard (Frame 1) | Blue-robed figure holding a staff. Primary spellcaster with sorcerer magic. |
+| R1 C4 | Barbarian (Frame 1) | Green-clad figure with blue headgear. Strong melee fighter, no magic ability. |
+| R1 C5 | Cleric (Frame 1) | Green figure carrying a cross/staff. Healer class with priest spells. |
+| R1 C6 | Lark (Frame 1) | Figure with blue weapon and red pants. Hybrid class with some magical ability. |
+| R1 C7 | Illusionist (Frame 1) | Magenta/purple-robed figure. Spellcaster class with both priest and sorcerer magic. |
+| R1 C8 | Orc | Green-skinned humanoid creature with red eyes. Common enemy monster. |
+| R1 C9 | Skeleton | Gray bone structure on black. Undead enemy found in dungeons. |
+| R1 C10 | Pirate / Brigand | Red/orange figure with blue weapon. Human enemy encountered on land or sea. |
+| R1 C11 | Balron / Demon | Red-winged creature with yellow flames. Powerful late-game enemy. |
+| R1 C12 | Man-Thing / Treant | Yellow and green plant-like creature. Nature-based monster. |
+| R1 C13 | Dragon | Green serpentine dragon shape. Powerful monster with breath attacks. |
+| R1 C14 | Daemon | Red bat-winged creature. High-level demonic enemy. |
+| R1 C15 | Town Gate / Portcullis | Gray grid with blue accents. Iron gate structure used at town and castle entrances. |
+
+### Row 2: Effects, Terrain Variants & Font (Part 1)
+
+| Pos | Name | Description |
+|-----|------|-------------|
+| R2 C0 | Lava / Fire Field | Yellow and red vertical stripes. Damaging terrain found in dungeons and volcanic areas. |
+| R2 C1 | Poison / Flames | Red chaotic pattern. Hazardous terrain that poisons or damages the party. |
+| R2 C2 | Night Sky / Stars | White diamond sparkles on blue. Starfield or magical effect background. |
+| R2 C3 | Void / Empty (Black) | Solid black tile. Used for unexplored areas, void, or empty space. |
+| R2 C4–C13 | Font: Letters A–I, U | Gray serif letters on black background. Part of the in-game text font. |
+| R2 C14–C15 | Blank / Unused | Mostly black. Possibly unused tile slots or spacers. |
+
+### Row 3: Font (Part 2) & Special Tiles
+
+| Pos | Name | Description |
+|-----|------|-------------|
+| R3 C0–C9 | Font: Letters Y, L, D, M, O, P, U, R, S, T | Gray serif letters on black background. Continuation of the in-game text font. |
+| R3 C10 | Font: Letter S (variant) | Gray stylized S, possibly a lightning or path symbol. |
+| R3 C11 | Lightning / Z | Zigzag shape. Could be letter Z or a lightning bolt effect symbol. |
+| R3 C12 | Moongate (Active) | Bright cyan circle with white star center. Active moongate or magical portal. |
+| R3 C13 | Cursor / Sparkle | Small white four-point star on black. Selection cursor or magic effect particle. |
+| R3 C14 | Shrine / Church | Gray stone building with orange cross on top. Healing or prayer location. |
+| R3 C15 | NPC / Townsfolk | Person holding a weapon/tool. Generic NPC or town character sprite. |
+
+### Row 4: Characters & Monsters (Animation Frame 2)
+
+| Pos | Name | Description |
+|-----|------|-------------|
+| R4 C0–C7 | Class Sprites (Frame 2) | Alternate animation frames for Fighter, Thief, Paladin, Wizard, Barbarian, Cleric, Lark, Illusionist. Arms/legs in different positions for walk cycle. |
+| R4 C8–C14 | Monster Sprites (Frame 2) | Alternate animation frames for Orc, Skeleton, Pirate, Balron, Man-Thing, Dragon, Daemon. |
+| R4 C15 | Whirlpool (Frame 2) | Blue spiral variant. Alternate animation frame or secondary portal graphic. |
+
+### Tile-to-Game Mapping
+
+When integrating these sprites, the following mapping applies to our current tile system:
+
+| Game Tile Constant | Sprite Sheet Position | Notes |
+|--------------------|----------------------|-------|
+| `TILE_WATER` | R0 C0 | Direct replacement for procedural water |
+| `TILE_GRASS` | R0 C1 | Direct replacement for procedural grass |
+| `TILE_FOREST` | R0 C3 | Direct replacement; R0 C2 (brush) available for light forest variant |
+| `TILE_MOUNTAIN` | R0 C4 | Direct replacement for procedural mountains |
+| `TILE_TOWN` | R0 C6 | Direct replacement for procedural town marker |
+| `TILE_DUNGEON` | R0 C5 | Direct replacement for procedural dungeon entrance |
+| `TILE_PATH` | — | No exact match; could use R0 C2 (brush) or keep procedural |
+| `TILE_SAND` | — | No exact match; keep procedural |
+| `TILE_BRIDGE` | — | No exact match; keep procedural |
+| `TILE_WALL` / `TILE_DWALL` | R0 C8 | Red brick wall for interior/dungeon walls |
+| `TILE_FLOOR` / `TILE_DFLOOR` | R2 C3 (void) or R0 C1 | Black void or grass depending on context |
+| `TILE_CHEST` | R0 C9 | Direct replacement for treasure chest |
+| `TILE_STAIRS` | — | No exact match; keep procedural |
+| `TILE_TRAP` | — | No exact match; keep procedural (intentionally hidden) |
+| `TILE_DOOR` | — | No exact match; keep procedural |
+
+### Character Sprite Mapping
+
+These sprites from `example_graphics/` are already loaded at runtime by the renderer:
+
+| Class | Standalone Sprite File | Sheet Position (Frame 1 / Frame 2) |
+|-------|----------------------|-------------------------------------|
+| Fighter | `Ultima3_AMI_sprite_fighter.png` | R1 C0 / R4 C0 |
+| Thief | `Ultima3_AMI_sprite_thief.png` | R1 C1 / R4 C1 |
+| Cleric | `Ultima3_AMI_sprite_cleric.png` | R1 C5 / R4 C5 |
+| Wizard | `Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png` | R1 C3 / R4 C3 |
+| Barbarian | `Ultima3_AMI_sprite_barbarian.png` | R1 C4 / R4 C4 |
+| Paladin | — | R1 C2 / R4 C2 |
+| Lark | — | R1 C6 / R4 C6 |
+| Illusionist | — (shares wizard sprite) | R1 C7 / R4 C7 |
+
+### Monster Sprite Mapping
+
+Monsters available in the tile sheet that could replace procedural monster sprites:
+
+| Monster | Sheet Position (Frame 1 / Frame 2) |
+|---------|-------------------------------------|
+| Orc | R1 C8 / R4 C8 |
+| Skeleton | R1 C9 / R4 C9 |
+| Pirate / Brigand | R1 C10 / R4 C10 |
+| Balron / Demon | R1 C11 / R4 C11 |
+| Man-Thing / Treant | R1 C12 / R4 C12 |
+| Dragon | R1 C13 / R4 C13 |
+| Daemon | R1 C14 / R4 C14 |
+
+### Additional Tiles Available for Future Use
+
+| Sheet Position | Name | Potential Use |
+|---------------|------|---------------|
+| R0 C7 | Castle | Lord British's castle or major quest location |
+| R0 C10 | Horse | Mount system for faster overworld travel |
+| R0 C11 | Ship | Sea travel vehicle |
+| R0 C12 | Whirlpool | Ocean hazard or dungeon teleporter |
+| R0 C13 | Island / Jungle | New terrain type for tropical areas |
+| R0 C14 | Moongate | Fast-travel portal system |
+| R0 C15 | Pirate Ship | Enemy ship encounters at sea |
+| R1 C15 | Town Gate | Town entrance tile |
+| R2 C0 | Lava | Dungeon hazard terrain |
+| R2 C1 | Poison Field | Dungeon hazard terrain |
+| R2 C2 | Night Sky | Cutscene or special area background |
+| R3 C12 | Moongate (Active) | Animated portal effect |
+| R3 C13 | Cursor / Sparkle | Selection indicator or spell effect |
+| R3 C14 | Shrine / Church | Healing location on the overworld |
+
+---
+
 ## Summary of Key Rules
 
 1. **Black background everywhere** — never dark gray, never dark blue.
