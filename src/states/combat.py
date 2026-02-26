@@ -250,16 +250,27 @@ class CombatState(BaseState):
         self.active_idx = 0
         self.defending = {m: False for m in self.fighters}
 
-        # Place party members on left side of arena, spaced out
+        # Place party members near the bottom, randomly spread out
         self.fighter_positions = {}
-        start_rows = [2, 4, 6, 8]
-        for i, member in enumerate(self.fighters):
-            row = start_rows[i] if i < len(start_rows) else 2 + i
-            self.fighter_positions[member] = (2, row)
+        bottom_zone_start = ARENA_ROWS - 5  # rows 12-15 in a 17-row arena
+        used = set()
+        for member in self.fighters:
+            for _attempt in range(30):
+                col = random.randint(2, ARENA_COLS - 3)
+                row = random.randint(bottom_zone_start, ARENA_ROWS - 2)
+                if (col, row) not in used:
+                    self.fighter_positions[member] = (col, row)
+                    used.add((col, row))
+                    break
 
-        # Monster on the right
-        self.monster_col = ARENA_COLS - 4
-        self.monster_row = ARENA_ROWS // 2
+        # Monster near the top, randomly placed
+        for _attempt in range(30):
+            mc = random.randint(3, ARENA_COLS - 4)
+            mr = random.randint(2, 5)
+            if (mc, mr) not in used:
+                break
+        self.monster_col = mc
+        self.monster_row = mr
 
         # Keep a reference to the first fighter for backward compat
         self.fighter = fighter

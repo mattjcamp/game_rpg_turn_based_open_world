@@ -1411,7 +1411,7 @@ class Renderer:
                               active_fighter=active_fighter)
 
         # ── 5. bottom combat log ──
-        bar_y = arena_bottom + 2
+        bar_y = arena_bottom + 6
         bar_h = SCREEN_HEIGHT - bar_y
         self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
@@ -1888,11 +1888,18 @@ class Renderer:
         self._u3_text(atk, tx, ty, (200, 200, 200), f)
 
     def _u3_monster_panel(self, monster, x, y, w, h, source_state="dungeon"):
-        """Monster stats panel with sprite and HP bar."""
+        """Monster stats panel — same layout as party panel entries."""
         self._u3_panel(x, y, w, h)
         f = self.font
         tx = x + 8
         ty = y + 6
+
+        self._u3_text("ENEMY", tx, ty, self._U3_RED, f)
+        ty += 22
+
+        sprite_size = 32
+        bar_w = w - sprite_size - 30
+        bar_h = 8
 
         # ── Monster sprite ──
         if source_state == "overworld":
@@ -1900,24 +1907,27 @@ class Renderer:
         else:
             sprite = self._tile_sprites.get((1, 9))  # skeleton
         if sprite:
-            self.screen.blit(sprite, (tx, ty + 2))
+            sx = tx
+            sy = ty + 2
+            self.screen.blit(sprite, (sx, sy))
 
-        # ── Name + stats to the right of sprite ──
-        info_x = tx + 38
+        # ── Name + type (to the right of sprite) ──
+        info_x = tx + sprite_size + 6
         self._u3_text(monster.name, info_x, ty, self._U3_RED, f)
+        atk_short = f"AC:{monster.ac}"
+        self._u3_text(atk_short, x + w - 50, ty, self._U3_LTBLUE, f)
 
-        ty += 20
-        atk_text = f"AC:{monster.ac:02d}  ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
-        self._u3_text(atk_text, info_x, ty, (200, 200, 200), self.font_small)
-
-        # ── HP bar (full width) ──
-        ty += 16
-        bar_w = w - 20
-        bar_h = 10
-        hp_color = self._U3_RED if monster.hp <= monster.max_hp * 0.3 else (200, 40, 40)
-        self._u3_draw_stat_bar(tx, ty, bar_w, bar_h,
+        # ── HP bar ──
+        bar_y = ty + 18
+        hp_color = (200, 40, 40) if monster.hp > monster.max_hp * 0.3 else self._U3_RED
+        self._u3_draw_stat_bar(info_x, bar_y, bar_w, bar_h,
                                monster.hp, monster.max_hp, hp_color)
-        self._u3_text("HP", tx + bar_w + 4, ty - 1, (200, 200, 200), self.font_small)
+        self._u3_text("HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
+
+        # ── ATK/DMG line ──
+        stat_y = bar_y + bar_h + 3
+        atk_text = f"ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
+        self._u3_text(atk_text, info_x, stat_y, (200, 200, 200), self.font_small)
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None):
