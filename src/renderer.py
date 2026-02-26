@@ -436,11 +436,11 @@ class Renderer:
 
         # ── 6. floating message ──
         if message:
-            surf = self.font.render(message.upper(), True, (255, 170, 85))
+            surf = self.font.render(message.upper(), True, (255, 220, 140))
             rect = surf.get_rect(center=(SCREEN_WIDTH // 2, 16))
             bg = rect.inflate(20, 8)
             pygame.draw.rect(self.screen, (0, 0, 0), bg)
-            pygame.draw.rect(self.screen, (68, 68, 255), bg, 2)
+            pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
             self.screen.blit(surf, rect)
 
     def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr):
@@ -783,21 +783,22 @@ class Renderer:
         self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
         tile_name = tile_map.get_tile_name(party.col, party.row)
+        f = self.font  # larger 16px font for readability
         # Top line: game info
-        self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
-        self._u3_text(f"TERRAIN:{tile_name}", 200, bar_y + 6, (68, 68, 255))
-        self._u3_text(f"POS:({party.col},{party.row})", 500, bar_y + 6, (136, 136, 136))
+        self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0), font=f)
+        self._u3_text(f"TERRAIN:{tile_name}", 220, bar_y + 6, (200, 200, 255), font=f)
+        self._u3_text(f"POS:({party.col},{party.row})", 530, bar_y + 6, (220, 220, 220), font=f)
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] QUIT",
-                      8, bar_y + 28, (68, 68, 255))
+                      8, bar_y + 28, (200, 200, 255), font=f)
 
         # ── 6. floating message ──
         if message:
-            surf = self.font.render(message.upper(), True, (255, 170, 85))
+            surf = self.font.render(message.upper(), True, (255, 220, 140))
             rect = surf.get_rect(center=(SCREEN_WIDTH // 2, 16))
             bg = rect.inflate(20, 8)
             pygame.draw.rect(self.screen, (0, 0, 0), bg)
-            pygame.draw.rect(self.screen, (68, 68, 255), bg, 2)
+            pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
             self.screen.blit(surf, rect)
 
     # ── overworld tile rendering ─────────────────────────────
@@ -966,11 +967,11 @@ class Renderer:
 
         # ── 7. floating message ──
         if message:
-            surf = self.font.render(message.upper(), True, (255, 170, 85))
+            surf = self.font.render(message.upper(), True, (255, 220, 140))
             rect = surf.get_rect(center=(SCREEN_WIDTH // 2, 16))
             bg = rect.inflate(20, 8)
             pygame.draw.rect(self.screen, (0, 0, 0), bg)
-            pygame.draw.rect(self.screen, (68, 68, 255), bg, 2)
+            pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
             self.screen.blit(surf, rect)
 
     # ── dungeon tile rendering ─────────────────────────────
@@ -1230,6 +1231,7 @@ class Renderer:
     # ── Retro colour palette (C64 / Apple II inspired) ──
     _U3_BLACK  = (0, 0, 0)
     _U3_BLUE   = (68, 68, 255)
+    _U3_LTBLUE = (160, 160, 255)   # brighter blue for readable text
     _U3_WHITE  = (255, 255, 255)
     _U3_ORANGE = (255, 170, 85)
     _U3_GREEN  = (0, 170, 0)
@@ -1403,13 +1405,14 @@ class Renderer:
         # ── 6. bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        f = self.font
         is_ranged_bar = (active_fighter and active_fighter.is_ranged())
         if is_ranged_bar:
             self._u3_text("[WASD] MOVE  [ARROWS] SHOOT  [ENTER] ACT  [SPACE] SPEED",
-                          8, bar_y + 5, self._U3_BLUE)
+                          8, bar_y + 4, self._U3_LTBLUE, font=f)
         else:
             self._u3_text("[WASD] MOVE  [ARROWS] ATTACK  [ENTER] ACT  [SPACE] SPEED",
-                          8, bar_y + 5, self._U3_BLUE)
+                          8, bar_y + 4, self._U3_LTBLUE, font=f)
 
         # ── 7. floating combat message ──
         if combat_message:
@@ -1691,11 +1694,12 @@ class Renderer:
                                 defending_map, x, y, w, h):
         """Compact party roster for combat — all 4 members in one panel."""
         self._u3_panel(x, y, w, h)
+        f = self.font
         tx = x + 8
         ty = y + 6
 
-        self._u3_text("PARTY", tx, ty, self._U3_ORANGE, self.font)
-        ty += 20
+        self._u3_text("PARTY", tx, ty, self._U3_ORANGE, f)
+        ty += 22
 
         for i, member in enumerate(fighters):
             is_active = (member is active_fighter)
@@ -1716,66 +1720,68 @@ class Renderer:
                 status = ""
 
             cls_short = member.char_class[:3].upper()
-            self._u3_text(f"{prefix}{member.name}", tx, ty, name_color)
-            self._u3_text(cls_short, tx + 160, ty, self._U3_BLUE)
+            self._u3_text(f"{prefix}{member.name}", tx, ty, name_color, f)
+            self._u3_text(cls_short, tx + 160, ty, self._U3_LTBLUE, f)
 
-            ty += 14
-            hp_text = f"  HP:{member.hp:04d}/{member.max_hp:04d}"
+            ty += 16
+            hp_text = f"HP:{member.hp:04d}/{member.max_hp:04d}"
             if is_def:
                 hp_text += " DEF"
             if status:
                 hp_text += f" {status}"
-            self._u3_text(hp_text, tx, ty, self._U3_GRAY)
+            self._u3_text(hp_text, tx + 16, ty, (200, 200, 200), f)
 
-            ty += 18
+            ty += 20
 
     def _u3_fighter_panel(self, fighter, defending, x, y, w, h):
         """Player stats in Ultima III format."""
         self._u3_panel(x, y, w, h)
+        f = self.font
         tx = x + 8
         ty = y + 6
 
-        self._u3_text(fighter.name, tx, ty, self._U3_ORANGE, self.font)
-        self._u3_text(fighter.char_class, tx + 160, ty, self._U3_BLUE, self.font)
+        self._u3_text(fighter.name, tx, ty, self._U3_ORANGE, f)
+        self._u3_text(fighter.char_class, tx + 160, ty, self._U3_LTBLUE, f)
 
         ty += 22
         ac = fighter.get_ac() + (2 if defending else 0)
         self._u3_text(f"HP:{fighter.hp:04d}/{fighter.max_hp:04d}  AC:{ac:02d}",
-                      tx, ty)
+                      tx, ty, self._U3_WHITE, f)
         if defending:
-            self._u3_text("DEF", tx + 220, ty, self._U3_ORANGE)
+            self._u3_text("DEF", tx + 220, ty, self._U3_ORANGE, f)
 
-        ty += 16
+        ty += 18
         self._u3_text(f"S:{fighter.strength:02d} D:{fighter.dexterity:02d} I:{fighter.intelligence:02d} W:{fighter.wisdom:02d}",
-                      tx, ty)
+                      tx, ty, (200, 200, 200), f)
 
-        ty += 16
+        ty += 18
         self._u3_text(f"LVL:{fighter.level:02d}  EXP:{fighter.exp:04d}",
-                      tx, ty)
+                      tx, ty, (200, 200, 200), f)
 
-        ty += 16
-        self._u3_text(f"WPN: {fighter.weapon}", tx, ty, self._U3_GRAY)
+        ty += 18
+        self._u3_text(f"WPN: {fighter.weapon}", tx, ty, (200, 200, 200), f)
 
-        ty += 16
+        ty += 18
         dice_c, dice_s, dice_b = fighter.get_damage_dice()
         atk = f"ATK: D20{format_modifier(fighter.get_attack_bonus())}  DMG: {dice_c}D{dice_s}{format_modifier(dice_b)}"
-        self._u3_text(atk, tx, ty, self._U3_GRAY)
+        self._u3_text(atk, tx, ty, (200, 200, 200), f)
 
     def _u3_monster_panel(self, monster, x, y, w, h):
         """Monster stats panel."""
         self._u3_panel(x, y, w, h)
+        f = self.font
         tx = x + 8
         ty = y + 6
 
-        self._u3_text(monster.name, tx, ty, self._U3_RED, self.font)
+        self._u3_text(monster.name, tx, ty, self._U3_RED, f)
 
         ty += 22
         self._u3_text(f"HP:{monster.hp:04d}/{monster.max_hp:04d}  AC:{monster.ac:02d}",
-                      tx, ty)
+                      tx, ty, self._U3_WHITE, f)
 
-        ty += 16
+        ty += 18
         atk_text = f"ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
-        self._u3_text(atk_text, tx, ty, self._U3_GRAY)
+        self._u3_text(atk_text, tx, ty, (200, 200, 200), f)
 
         # HP bar (retro style: bracketed text bar)
         ty += 20
@@ -1800,24 +1806,25 @@ class Renderer:
         )
 
         self._u3_panel(x, y, w, h)
+        f = self.font
         tx = x + 8
         ty = y + 6
 
         is_ranged = (active_fighter and active_fighter.is_ranged())
 
         if phase == PHASE_PROJECTILE:
-            self._u3_text("-- FIRING --", tx, ty, self._U3_ORANGE)
-            self._u3_text("PROJECTILE IN FLIGHT...", tx, ty + 24, self._U3_WHITE)
+            self._u3_text("-- FIRING --", tx, ty, self._U3_ORANGE, f)
+            self._u3_text("PROJECTILE IN FLIGHT...", tx, ty + 24, self._U3_WHITE, f)
 
         elif phase == PHASE_MELEE_ANIM:
-            self._u3_text("-- ATTACKING --", tx, ty, self._U3_ORANGE)
-            self._u3_text("STRIKE!", tx, ty + 24, self._U3_WHITE)
+            self._u3_text("-- ATTACKING --", tx, ty, self._U3_ORANGE, f)
+            self._u3_text("STRIKE!", tx, ty + 24, self._U3_WHITE, f)
 
         elif phase == PHASE_PLAYER:
             if is_ranged:
-                self._u3_text("-- YOUR TURN (RANGED) --", tx, ty, self._U3_ORANGE)
+                self._u3_text("-- YOUR TURN (RANGED) --", tx, ty, self._U3_ORANGE, f)
             else:
-                self._u3_text("-- YOUR TURN --", tx, ty, self._U3_ORANGE)
+                self._u3_text("-- YOUR TURN --", tx, ty, self._U3_ORANGE, f)
 
             for i, name in enumerate(ACTION_NAMES):
                 iy = ty + 24 + i * 24
@@ -1832,39 +1839,40 @@ class Renderer:
                 prefix = "> " if selected else "  "
                 if grayed:
                     label = prefix + name.upper() + " (CLOSER!)"
-                    color = self._U3_GRAY
+                    color = (180, 180, 180)
                 elif selected:
                     label = prefix + name.upper()
                     color = self._U3_WHITE
                 else:
                     label = prefix + name.upper()
-                    color = self._U3_BLUE
+                    color = self._U3_LTBLUE
 
-                self._u3_text(label, tx, iy, color)
+                self._u3_text(label, tx, iy, color, f)
 
-            self._u3_text("[WASD] MOVE", tx, y + h - 32, self._U3_BLUE)
+            self._u3_text("[WASD] MOVE", tx, y + h - 32, self._U3_LTBLUE, f)
             if is_ranged:
-                self._u3_text("[ARROWS] SHOOT  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE)
+                self._u3_text("[ARROWS] SHOOT  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE, f)
             else:
-                self._u3_text("[ARROWS] STRIKE  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE)
+                self._u3_text("[ARROWS] STRIKE  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_VICTORY:
-            self._u3_text("** VICTORY! **", tx, ty, self._U3_GREEN)
-            self._u3_text("RETURNING...", tx, ty + 20, self._U3_GREEN)
+            self._u3_text("** VICTORY! **", tx, ty, self._U3_GREEN, f)
+            self._u3_text("RETURNING...", tx, ty + 20, self._U3_GREEN, f)
 
         elif phase == PHASE_DEFEAT:
-            self._u3_text("** DEFEATED **", tx, ty, self._U3_RED)
-            self._u3_text("RETREATING...", tx, ty + 20, self._U3_RED)
+            self._u3_text("** DEFEATED **", tx, ty, self._U3_RED, f)
+            self._u3_text("RETREATING...", tx, ty + 20, self._U3_RED, f)
 
         else:
-            self._u3_text("-- ENEMY TURN --", tx, ty, self._U3_RED)
-            self._u3_text("[SPACE] SPEED UP", tx, y + h - 16, self._U3_BLUE)
+            self._u3_text("-- ENEMY TURN --", tx, ty, self._U3_RED, f)
+            self._u3_text("[SPACE] SPEED UP", tx, y + h - 16, self._U3_LTBLUE, f)
 
     def _u3_log_panel(self, combat_log, x, y, w, h):
         """Combat log panel with blue border and retro text."""
         self._u3_panel(x, y, w, h)
+        f = self.font
 
-        line_h = 15
+        line_h = 18
         max_lines = (h - 10) // line_h
         visible = combat_log[-max_lines:]
 
@@ -1874,7 +1882,7 @@ class Renderer:
             elif "Hit!" in line:
                 color = self._U3_WHITE
             elif "Miss" in line or "Failed" in line:
-                color = self._U3_GRAY
+                color = (180, 180, 180)
             elif "damage" in line and "deals" in line:
                 color = self._U3_RED
             elif "defeated" in line or "XP" in line or "Escaped" in line:
@@ -1886,9 +1894,9 @@ class Renderer:
             elif "moves closer" in line:
                 color = self._U3_ORANGE
             else:
-                color = self._U3_BLUE
+                color = self._U3_LTBLUE
 
-            self._u3_text(line, x + 6, y + 5 + i * line_h, color)
+            self._u3_text(line, x + 6, y + 5 + i * line_h, color, f)
 
     # ========================================================
     # PARTY SCREEN  –  Ultima III retro style (P key overlay)
