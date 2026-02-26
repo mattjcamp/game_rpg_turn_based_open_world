@@ -9,7 +9,7 @@ class.  Damage uses (weapon_power + 1.5 * STR).  Evasion comes from armor.
 
 # ── Weapon table ──────────────────────────────────────────────────
 WEAPONS = {
-    "Dagger":       {"power": 1, "ranged": False},
+    "Dagger":       {"power": 1, "ranged": True, "consumable": True},
     "Mace":         {"power": 2, "ranged": False},
     "Sling":        {"power": 3, "ranged": True},
     "Axe":          {"power": 4, "ranged": False},
@@ -60,6 +60,22 @@ class PartyMember:
         self.weapon = "Fists"
         self.armor = "Cloth"
 
+        # Equipment slots: body armor, melee weapon, ranged weapon
+        self.equipped = {
+            "body": "Cloth",
+            "melee": "Fists",
+            "ranged": None,       # None means no ranged weapon equipped
+        }
+
+        # Inventory — list of item name strings the character is carrying
+        self.inventory = []
+
+        # Mutable MP pool — initialized lazily on first access
+        self._current_mp = None
+
+        # Ammo tracking for consumable ranged weapons {weapon_name: count}
+        self.ammo = {}
+
     # ── Derived stats ──────────────────────────────────────────
 
     @property
@@ -84,6 +100,17 @@ class PartyMember:
     def max_mp(self):
         """MP cap equals the derived mp value."""
         return self.mp
+
+    @property
+    def current_mp(self):
+        """Mutable MP pool. Initializes to max_mp on first access."""
+        if self._current_mp is None:
+            self._current_mp = self.mp
+        return self._current_mp
+
+    @current_mp.setter
+    def current_mp(self, value):
+        self._current_mp = max(0, min(value, self.max_mp))
 
     def is_alive(self):
         return self.hp > 0
@@ -142,8 +169,29 @@ class PartyMember:
             return (1, 10, self.str_mod)
 
     def is_ranged(self):
-        """True if the equipped weapon can attack at range."""
-        return WEAPONS.get(self.weapon, {"ranged": False})["ranged"]
+        """True if the equipped weapon can attack at range and has ammo (if consumable)."""
+        wdata = WEAPONS.get(self.weapon, {"ranged": False})
+        if not wdata.get("ranged", False):
+            return False
+        # Consumable weapons need ammo to fire
+        if wdata.get("consumable", False):
+            return self.get_ammo() > 0
+        return True
+
+    def is_consumable_weapon(self):
+        """True if the equipped weapon is consumed on ranged use."""
+        return WEAPONS.get(self.weapon, {}).get("consumable", False)
+
+    def get_ammo(self):
+        """Return current ammo count for the equipped weapon."""
+        return self.ammo.get(self.weapon, 0)
+
+    def consume_ammo(self):
+        """Use one ammo for the equipped weapon. Returns True if successful."""
+        if self.weapon in self.ammo and self.ammo[self.weapon] > 0:
+            self.ammo[self.weapon] -= 1
+            return True
+        return False
 
     # ── Magic helpers ──────────────────────────────────────────
 
@@ -154,6 +202,69 @@ class PartyMember:
     def can_cast_sorcerer(self):
         cls = self.char_class.lower()
         return cls in ("wizard", "lark", "alchemist", "druid", "ranger")
+
+    # ── Equipment management ──────────────────────────────────
+
+    # Default items for each slot (cannot be unequipped below these)
+    _SLOT_DEFAULTS = {"body": "Cloth", "melee": "Fists", "ranged": None}
+
+    def _determine_slot(self, item_name):
+        """Return the equipment slot for an item, or None if not equippable."""
+        if item_name in ARMORS:
+            return "body"
+        wp = WEAPONS.get(item_name)
+        if wp:
+            return "ranged" if wp.get("ranged", False) else "melee"
+        return None
+
+    def equip_item(self, item_name):
+        """Equip an item from inventory to the appropriate slot.
+
+        Returns True if the item was equipped, False otherwise.
+        The previously equipped item in that slot (if any) is moved to inventory.
+        """
+        if item_name not in self.inventory:
+            return False
+        slot = self._determine_slot(item_name)
+        if slot is None:
+            return False
+
+        # Move the currently equipped item back to inventory (if not a default)
+        old_item = self.equipped.get(slot)
+        if old_item and old_item != self._SLOT_DEFAULTS.get(slot):
+            self.inventory.append(old_item)
+
+        # Remove from inventory and equip
+        self.inventory.remove(item_name)
+        self.equipped[slot] = item_name
+
+        # Sync legacy fields used by combat engine
+        self._sync_legacy_fields()
+        return True
+
+    def unequip_slot(self, slot):
+        """Unequip the item in the given slot, moving it to inventory.
+
+        Returns True if something was unequipped, False if slot was already
+        empty or at its default.
+        """
+        current = self.equipped.get(slot)
+        default = self._SLOT_DEFAULTS.get(slot)
+        if current is None or current == default:
+            return False
+
+        self.inventory.append(current)
+        self.equipped[slot] = default
+
+        # Sync legacy fields
+        self._sync_legacy_fields()
+        return True
+
+    def _sync_legacy_fields(self):
+        """Keep the old .weapon and .armor fields in sync with equipped dict."""
+        self.armor = self.equipped.get("body") or "Cloth"
+        # Weapon defaults to melee; combat engine uses .weapon for active weapon
+        self.weapon = self.equipped.get("melee") or "Fists"
 
 
 class Party:
@@ -209,6 +320,8 @@ def create_default_party(start_col, start_row):
     )
     roland.weapon = "Iron Sword"
     roland.armor = "Chain"
+    roland.equipped = {"body": "Chain", "melee": "Iron Sword", "ranged": None}
+    roland.inventory = ["Torch", "Healing Herb", "Rope"]
     party.add_member(roland)
 
     # 2. Bobbit Cleric — healer, priest spells, decent armor
@@ -219,6 +332,8 @@ def create_default_party(start_col, start_row):
     )
     mira.weapon = "Mace"
     mira.armor = "Chain"
+    mira.equipped = {"body": "Chain", "melee": "Mace", "ranged": "Sling"}
+    mira.inventory = ["Holy Water", "Healing Herb", "Antidote"]
     party.add_member(mira)
 
     # 3. Fuzzy Wizard — nuker, mass-destruction spells
@@ -229,16 +344,21 @@ def create_default_party(start_col, start_row):
     )
     theron.weapon = "Dagger"
     theron.armor = "Cloth"
+    theron.equipped = {"body": "Cloth", "melee": "Dagger", "ranged": None}
+    theron.inventory = ["Scroll of Fire", "Mana Potion", "Torch"]
     party.add_member(theron)
 
-    # 4. Elf Thief — trap disarmer, ranged attacks, high evasion
+    # 4. Elf Thief — trap disarmer, thrown daggers, high evasion
     sable = PartyMember(
         "Sable", "Thief", race="Elf",
         hp=20, strength=12, dexterity=18,
         intelligence=10, wisdom=8, level=1,
     )
-    sable.weapon = "Bow"
+    sable.weapon = "Dagger"
     sable.armor = "Leather"
+    sable.equipped = {"body": "Leather", "melee": "Sword", "ranged": "Dagger"}
+    sable.ammo = {"Dagger": 5}
+    sable.inventory = ["Lockpick", "Smoke Bomb", "Healing Herb", "Torch"]
     party.add_member(sable)
 
     return party

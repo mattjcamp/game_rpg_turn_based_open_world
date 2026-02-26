@@ -25,20 +25,32 @@ ARENA_ROWS = 17
 
 # ── Combat phases ────────────────────────────────────────────────
 PHASE_INIT        = "init"
-PHASE_PLAYER      = "player"
+PHASE_PLAYER      = "player"         # menu selection (up/down + enter)
+PHASE_PLAYER_DIR  = "player_dir"     # choosing direction for action
 PHASE_PLAYER_ACT  = "player_act"
-PHASE_PROJECTILE  = "projectile"      # projectile in flight
-PHASE_MELEE_ANIM  = "melee_anim"      # melee slash animation
+PHASE_PROJECTILE  = "projectile"     # projectile in flight
+PHASE_MELEE_ANIM  = "melee_anim"     # melee slash animation
+PHASE_FIREBALL    = "fireball"       # fireball in flight
+PHASE_HEAL        = "heal"           # heal animation playing
 PHASE_MONSTER     = "monster"
 PHASE_MONSTER_ACT = "monster_act"
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
+# ── Fireball constants ──────────────────────────────────────────
+FIREBALL_MP_COST  = 5
+FIREBALL_SPEED    = 320   # pixels per second (slower than arrow for drama)
+
+# ── Heal constants ─────────────────────────────────────────────
+HEAL_MP_COST      = 4
+
 # ── Action indices ───────────────────────────────────────────────
-ACTION_ATTACK = 0
-ACTION_DEFEND = 1
-ACTION_FLEE   = 2
-ACTION_NAMES  = ["Attack", "Defend", "Flee"]
+ACTION_MOVE   = 0
+ACTION_ATTACK = 1
+ACTION_CAST   = 2
+ACTION_HEAL   = 3
+ACTION_SKIP   = 4
+ACTION_NAMES  = ["Move", "Attack", "Cast", "Heal", "Skip"]
 
 # ── Projectile speed (pixels per second) ─────────────────────────
 PROJECTILE_SPEED = 480
@@ -134,6 +146,89 @@ class HitEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class FireballEffect:
+    """An animated fireball traveling across the arena."""
+
+    def __init__(self, start_col, start_row, end_col, end_row):
+        self.start_col = start_col
+        self.start_row = start_row
+        self.end_col = end_col
+        self.end_row = end_row
+        self.progress = 0.0  # 0 = start, 1 = arrived
+        self.alive = True
+        self.radius = 6  # base visual radius in pixels
+
+    def update(self, dt):
+        """Advance the fireball. dt in seconds."""
+        dx = self.end_col - self.start_col
+        dy = self.end_row - self.start_row
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist < 0.01:
+            self.progress = 1.0
+            self.alive = False
+            return
+
+        tiles_per_sec = FIREBALL_SPEED / 32.0
+        self.progress += (tiles_per_sec / dist) * dt
+
+        if self.progress >= 1.0:
+            self.progress = 1.0
+            self.alive = False
+
+    @property
+    def current_col(self):
+        return self.start_col + (self.end_col - self.start_col) * self.progress
+
+    @property
+    def current_row(self):
+        return self.start_row + (self.end_row - self.start_row) * self.progress
+
+
+class FireballExplosion:
+    """A brief explosion effect when the fireball hits."""
+
+    DURATION = 0.5
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class HealEffect:
+    """A glowing heal animation over a party member."""
+
+    DURATION = 0.8  # seconds
+
+    def __init__(self, col, row, amount=0):
+        self.col = col
+        self.row = row
+        self.amount = amount
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles a single combat encounter on a tactical arena."""
 
@@ -142,6 +237,7 @@ class CombatState(BaseState):
         self.monster = None
         self.phase = PHASE_INIT
         self.selected_action = 0
+        self.directing_action = None  # which action is being directed
         self.combat_log = []
         self.phase_timer = 0
 
@@ -167,6 +263,14 @@ class CombatState(BaseState):
         self.melee_effects = []   # active MeleeEffect objects
         self.hit_effects = []     # active HitEffect objects
         self._pending_melee = None  # deferred melee resolution after anim
+
+        # Fireball effects
+        self.fireballs = []           # active FireballEffect objects
+        self.fireball_explosions = [] # active FireballExplosion objects
+        self._pending_fireball = None # deferred fireball resolution
+
+        # Heal effects
+        self.heal_effects = []        # active HealEffect objects
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -244,6 +348,10 @@ class CombatState(BaseState):
         self.melee_effects = []
         self.hit_effects = []
         self._pending_melee = None
+        self.fireballs = []
+        self.fireball_explosions = []
+        self._pending_fireball = None
+        self.heal_effects = []
 
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
@@ -300,10 +408,11 @@ class CombatState(BaseState):
 
     def handle_input(self, events, keys_pressed):
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL):
             return
 
-        if self.phase != PHASE_PLAYER:
+        # Speed up non-player phases with Space/Enter
+        if self.phase not in (PHASE_PLAYER, PHASE_PLAYER_DIR):
             for event in events:
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_SPACE, pygame.K_RETURN):
@@ -312,37 +421,18 @@ class CombatState(BaseState):
             return
 
         for event in events:
-            if event.type == pygame.KEYDOWN:
-                # ── Arrow key attacks ──
+            if event.type != pygame.KEYDOWN:
+                continue
+
+            # ── PHASE_PLAYER: menu navigation + WASD quick-move ──
+            if self.phase == PHASE_PLAYER:
                 if event.key == pygame.K_UP:
-                    f = self.active_fighter
-                    if f and f.is_ranged():
-                        self._fire_ranged(0, -1)
-                    elif f and not f.is_ranged():
-                        self._try_melee_directional(0, -1)
+                    self.selected_action = (self.selected_action - 1) % len(ACTION_NAMES)
                 elif event.key == pygame.K_DOWN:
-                    f = self.active_fighter
-                    if f and f.is_ranged():
-                        self._fire_ranged(0, 1)
-                    elif f and not f.is_ranged():
-                        self._try_melee_directional(0, 1)
-                elif event.key == pygame.K_LEFT:
-                    f = self.active_fighter
-                    if f and f.is_ranged():
-                        self._fire_ranged(-1, 0)
-                    elif f and not f.is_ranged():
-                        self._try_melee_directional(-1, 0)
-                elif event.key == pygame.K_RIGHT:
-                    f = self.active_fighter
-                    if f and f.is_ranged():
-                        self._fire_ranged(1, 0)
-                    elif f and not f.is_ranged():
-                        self._try_melee_directional(1, 0)
-
+                    self.selected_action = (self.selected_action + 1) % len(ACTION_NAMES)
                 elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                    self._execute_player_action()
-
-                # ── Arena movement (WASD) ──
+                    self._confirm_action()
+                # WASD direct movement (skip menu)
                 elif event.key == pygame.K_w:
                     self._try_arena_move(0, -1)
                 elif event.key == pygame.K_s:
@@ -351,6 +441,60 @@ class CombatState(BaseState):
                     self._try_arena_move(-1, 0)
                 elif event.key == pygame.K_d:
                     self._try_arena_move(1, 0)
+
+            # ── PHASE_PLAYER_DIR: directional input ──
+            elif self.phase == PHASE_PLAYER_DIR:
+                dcol, drow = 0, 0
+                if event.key == pygame.K_UP:
+                    drow = -1
+                elif event.key == pygame.K_DOWN:
+                    drow = 1
+                elif event.key == pygame.K_LEFT:
+                    dcol = -1
+                elif event.key == pygame.K_RIGHT:
+                    dcol = 1
+                elif event.key == pygame.K_ESCAPE:
+                    # Cancel back to menu
+                    self.phase = PHASE_PLAYER
+                    self.directing_action = None
+                    continue
+
+                if dcol != 0 or drow != 0:
+                    self._execute_directed_action(dcol, drow)
+
+    def _confirm_action(self):
+        """Player confirmed a menu selection — enter direction mode or act."""
+        action = self.selected_action
+
+        if action == ACTION_SKIP:
+            # Skip needs no direction — end turn immediately
+            self.combat_log.append(f"{self.active_fighter.name} skips their turn.")
+            self._end_fighter_turn()
+            return
+
+        # Enter direction mode for Move, Attack, Cast, Heal
+        self.directing_action = action
+        self.phase = PHASE_PLAYER_DIR
+
+    def _execute_directed_action(self, dcol, drow):
+        """Execute the chosen action in the given direction."""
+        action = self.directing_action
+
+        if action == ACTION_MOVE:
+            self._try_arena_move(dcol, drow)
+
+        elif action == ACTION_ATTACK:
+            f = self.active_fighter
+            if f and f.is_ranged():
+                self._fire_ranged(dcol, drow)
+            else:
+                self._try_melee_directional(dcol, drow)
+
+        elif action == ACTION_CAST:
+            self._fire_fireball(dcol, drow)
+
+        elif action == ACTION_HEAL:
+            self._cast_heal(dcol, drow)
 
     # ── Player actions ───────────────────────────────────────────
 
@@ -402,7 +546,17 @@ class CombatState(BaseState):
         """Fire a ranged attack in the given direction."""
         f = self.active_fighter
         if not f or not f.is_ranged():
+            if f and not f.is_ranged() and f.is_consumable_weapon():
+                self.combat_log.append(f"{f.name} is out of {f.weapon}s!")
             return
+
+        # Consume ammo for consumable weapons (daggers, etc.)
+        if f.is_consumable_weapon():
+            f.consume_ammo()
+            ammo_left = f.get_ammo()
+            ammo_note = f" ({ammo_left} left)"
+        else:
+            ammo_note = ""
 
         col, row = self.fighter_positions[f]
 
@@ -451,6 +605,8 @@ class CombatState(BaseState):
 
         self.phase = PHASE_PROJECTILE
         self.combat_log.append(
+            f"{f.name} throws {f.weapon}!{ammo_note}"
+            if f.is_consumable_weapon() or ammo_note else
             f"{f.name} fires {f.weapon}!"
         )
 
@@ -645,6 +801,189 @@ class CombatState(BaseState):
         else:
             self._end_fighter_turn()
 
+    # ── Fireball casting ─────────────────────────────────────────
+
+    def _fire_fireball(self, dcol, drow):
+        """Cast a fireball in the given direction. Costs MP, deals INT-based damage."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        # Check if character can cast sorcerer spells
+        if not f.can_cast_sorcerer():
+            self.combat_log.append(f"{f.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        # Check MP
+        if f.current_mp < FIREBALL_MP_COST:
+            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {FIREBALL_MP_COST})")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        # Deduct MP
+        f.current_mp -= FIREBALL_MP_COST
+
+        col, row = self.fighter_positions[f]
+
+        # Trace ray to find monster or wall
+        tc, tr = col + dcol, row + drow
+        hit_monster = False
+        end_col, end_row = col, row
+
+        while not self._is_arena_wall(tc, tr):
+            if tc == self.monster_col and tr == self.monster_row:
+                hit_monster = True
+                end_col, end_row = tc, tr
+                break
+            tc += dcol
+            tr += drow
+
+        if not hit_monster:
+            end_col = tc - dcol
+            end_row = tr - drow
+            if end_col == col and end_row == row:
+                end_col = tc
+                end_row = tr
+
+        fb = FireballEffect(col, row, end_col, end_row)
+        self.fireballs.append(fb)
+
+        self._pending_fireball = {
+            "fighter": f,
+            "hit_monster": hit_monster,
+            "end_col": end_col,
+            "end_row": end_row,
+        }
+
+        self.phase = PHASE_FIREBALL
+        self.combat_log.append(
+            f"{f.name} casts FIREBALL! (-{FIREBALL_MP_COST} MP)"
+        )
+
+    def _resolve_fireball(self):
+        """Called when the fireball arrives. Resolve damage."""
+        info = self._pending_fireball
+        self._pending_fireball = None
+
+        if not info:
+            self._end_fighter_turn()
+            return
+
+        f = info["fighter"]
+        hit_monster = info["hit_monster"]
+        end_col = info["end_col"]
+        end_row = info["end_row"]
+
+        # Spawn explosion effect at impact point
+        self.fireball_explosions.append(FireballExplosion(end_col, end_row))
+
+        if not hit_monster:
+            self.combat_log.append(f"{f.name}'s fireball fizzles against the wall!")
+            self._end_fighter_turn()
+            return
+
+        # Fireball always hits — no attack roll needed, uses INT for damage
+        # Damage: 2d8 + INT modifier (serious damage!)
+        int_mod = f.int_mod
+        damage = 0
+        for _ in range(2):
+            damage += random.randint(1, 8)
+        damage += int_mod
+        damage = max(1, damage)
+
+        self.monster.hp = max(0, self.monster.hp - damage)
+        self.combat_log.append(
+            f"FIREBALL hits {self.monster.name} for {damage} damage!"
+        )
+        self.hit_effects.append(
+            HitEffect(self.monster_col, self.monster_row, damage))
+
+        if not self.monster.is_alive():
+            self.phase = PHASE_VICTORY
+            self.phase_timer = 2500
+            xp = self.monster.xp_reward
+            gold = self.monster.gold_reward
+            for m in self.fighters:
+                if m.is_alive():
+                    m.exp += xp
+            self.game.party.gold += gold
+            self.combat_log.append(
+                f"{self.monster.name} is defeated! +{xp} XP each, +{gold} gold!"
+            )
+        else:
+            self._end_fighter_turn()
+
+    # ── Heal casting ──────────────────────────────────────────────
+
+    def _cast_heal(self, dcol, drow):
+        """Cast a heal in the given direction. Targets the first ally in that line."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast healing spells!")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        # Check MP
+        if f.current_mp < HEAL_MP_COST:
+            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {HEAL_MP_COST})")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        col, row = self.fighter_positions[f]
+
+        # Ray-trace in the chosen direction to find the first alive ally
+        target = None
+        tc, tr = col + dcol, row + drow
+        while not self._is_arena_wall(tc, tr):
+            for member in self.fighters:
+                if member is f or not member.is_alive():
+                    continue
+                mc, mr = self.fighter_positions.get(member, (-1, -1))
+                if mc == tc and mr == tr:
+                    target = member
+                    break
+            if target:
+                break
+            tc += dcol
+            tr += drow
+
+        if target is None:
+            self.combat_log.append(f"No ally in that direction!")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        # Deduct MP
+        f.current_mp -= HEAL_MP_COST
+
+        # Calculate heal amount: 1d8 + WIS modifier
+        wis_mod = f.wis_mod
+        heal_amount = random.randint(1, 8) + wis_mod
+        heal_amount = max(1, heal_amount)
+
+        # Apply healing (cap at max HP)
+        old_hp = target.hp
+        target.hp = min(target.max_hp, target.hp + heal_amount)
+        actual_heal = target.hp - old_hp
+
+        # Spawn heal effect over the target
+        tcol, trow = self.fighter_positions.get(target, (3, 5))
+        self.heal_effects.append(HealEffect(tcol, trow, actual_heal))
+
+        self.phase = PHASE_HEAL
+        self.combat_log.append(
+            f"{f.name} casts HEAL on {target.name}! (+{actual_heal} HP, -{HEAL_MP_COST} MP)"
+        )
+
     def _player_defend(self):
         f = self.active_fighter
         if not f:
@@ -681,6 +1020,7 @@ class CombatState(BaseState):
 
     def _end_fighter_turn(self):
         """Advance to next alive fighter, or to monster turn if all have acted."""
+        self.directing_action = None
         self.active_idx += 1
 
         # Skip dead fighters
@@ -694,10 +1034,9 @@ class CombatState(BaseState):
             self.phase_timer = 400
         else:
             # Next fighter's turn — always reset to PHASE_PLAYER
-            # (critical: phase may still be PHASE_MELEE_ANIM or PHASE_PROJECTILE
-            #  from the previous fighter's attack animation)
             self.phase = PHASE_PLAYER
             self.selected_action = 0
+            self.directing_action = None
             self._announce_turn()
 
     # ── Monster actions ──────────────────────────────────────────
@@ -847,6 +1186,35 @@ class CombatState(BaseState):
                 fx.update(dt)
         self.hit_effects = [fx for fx in self.hit_effects if fx.alive]
 
+        # Update fireball explosions (always, visual only)
+        for fx in self.fireball_explosions:
+            if fx.alive:
+                fx.update(dt)
+        self.fireball_explosions = [fx for fx in self.fireball_explosions if fx.alive]
+
+        # Update heal effects
+        for fx in self.heal_effects:
+            if fx.alive:
+                fx.update(dt)
+        # Check if heal phase is done
+        if self.phase == PHASE_HEAL:
+            if all(not fx.alive for fx in self.heal_effects):
+                self.heal_effects = []
+                self._end_fighter_turn()
+            return
+        self.heal_effects = [fx for fx in self.heal_effects if fx.alive]
+
+        # Update fireballs
+        if self.phase == PHASE_FIREBALL:
+            for fb in self.fireballs:
+                if fb.alive:
+                    fb.update(dt)
+
+            if all(not fb.alive for fb in self.fireballs):
+                self.fireballs = []
+                self._resolve_fireball()
+            return
+
         # Update projectiles
         if self.phase == PHASE_PROJECTILE:
             for proj in self.projectiles:
@@ -962,6 +1330,10 @@ class CombatState(BaseState):
             projectiles=self.projectiles,
             melee_effects=self.melee_effects,
             hit_effects=self.hit_effects,
+            fireballs=self.fireballs,
+            fireball_explosions=self.fireball_explosions,
+            heal_effects=self.heal_effects,
             is_warband=False,
             source_state=self.source_state,
+            directing_action=self.directing_action,
         )

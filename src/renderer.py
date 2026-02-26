@@ -7,6 +7,7 @@ worrying about art assets. When we're ready for sprites, we
 just swap the draw_tile method.
 """
 
+import math
 import pygame
 
 from src.combat_engine import format_modifier
@@ -25,6 +26,7 @@ class Renderer:
     def __init__(self, screen):
         self.screen = screen
         self.font = pygame.font.SysFont("monospace", 16)
+        self.font_med = pygame.font.SysFont("monospace", 14)
         self.font_small = pygame.font.SysFont("monospace", 12)
         self._load_class_sprites()
         self._load_tile_sheet()
@@ -846,23 +848,43 @@ class Renderer:
             pygame.draw.rect(self.screen, BLACK, rect)
 
     def _u3_draw_overworld_party(self, cx, cy):
-        """White stick-figure party sprite on the overworld."""
+        """White warrior party sprite with visible sword and shield."""
         W = (255, 255, 255)
-        BLU = (120, 120, 255)
+        DK = (180, 180, 180)   # slight shade for depth
         # Head
-        pygame.draw.circle(self.screen, W, (cx, cy - 9), 4)
+        pygame.draw.circle(self.screen, W, (cx, cy - 9), 5)
+        pygame.draw.circle(self.screen, DK, (cx, cy - 9), 5, 1)
         # Body
-        pygame.draw.line(self.screen, W, (cx, cy - 5), (cx, cy + 4), 2)
-        # Arms
-        pygame.draw.line(self.screen, W, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
+        pygame.draw.line(self.screen, W, (cx, cy - 4), (cx, cy + 4), 3)
+        # Arms — angled: left arm holds shield up, right arm holds sword
+        pygame.draw.line(self.screen, W, (cx, cy - 2), (cx - 8, cy - 6), 2)
+        pygame.draw.line(self.screen, W, (cx, cy - 2), (cx + 8, cy - 6), 2)
         # Legs
-        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx - 5, cy + 12), 2)
-        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx + 5, cy + 12), 2)
-        # Sword
-        pygame.draw.line(self.screen, BLU, (cx + 6, cy - 8), (cx + 6, cy + 2), 2)
-        # Shield
-        pygame.draw.rect(self.screen, BLU,
-                         pygame.Rect(cx - 10, cy - 5, 4, 7))
+        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx - 5, cy + 13), 2)
+        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx + 5, cy + 13), 2)
+
+        # ── Sword (right hand) — blade + crossguard + pommel ──
+        # Blade
+        pygame.draw.line(self.screen, W, (cx + 8, cy - 6), (cx + 12, cy - 14), 3)
+        # Crossguard
+        pygame.draw.line(self.screen, W, (cx + 6, cy - 7), (cx + 10, cy - 5), 2)
+        # Pommel dot
+        pygame.draw.circle(self.screen, DK, (cx + 8, cy - 5), 1)
+
+        # ── Shield (left hand) — rounded rectangle shape ──
+        shx = cx - 14
+        shy = cy - 10
+        shw = 7
+        shh = 10
+        # Shield body
+        pygame.draw.rect(self.screen, W, pygame.Rect(shx, shy, shw, shh))
+        # Shield border for definition
+        pygame.draw.rect(self.screen, DK, pygame.Rect(shx, shy, shw, shh), 1)
+        # Shield cross/boss detail
+        pygame.draw.line(self.screen, DK, (shx + shw // 2, shy + 1),
+                         (shx + shw // 2, shy + shh - 2), 1)
+        pygame.draw.line(self.screen, DK, (shx + 1, shy + shh // 2),
+                         (shx + shw - 2, shy + shh // 2), 1)
 
     # ── overworld right panel ────────────────────────────────
 
@@ -1278,7 +1300,10 @@ class Renderer:
                           active_fighter=None, defending_map=None,
                           projectiles=None,
                           melee_effects=None, hit_effects=None,
-                          is_warband=False, source_state="dungeon"):
+                          fireballs=None, fireball_explosions=None,
+                          heal_effects=None,
+                          is_warband=False, source_state="dungeon",
+                          directing_action=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1381,6 +1406,24 @@ class Renderer:
                 if fx.alive:
                     self._u3_draw_hit_effect(mx, my, ts, fx)
 
+        # ── 2e. fireball projectiles ──
+        if fireballs:
+            for fb in fireballs:
+                if fb.alive:
+                    self._u3_draw_fireball(mx, my, ts, fb)
+
+        # ── 2f. fireball explosions ──
+        if fireball_explosions:
+            for fx in fireball_explosions:
+                if fx.alive:
+                    self._u3_draw_fireball_explosion(mx, my, ts, fx)
+
+        # ── 2g. heal effects ──
+        if heal_effects:
+            for fx in heal_effects:
+                if fx.alive:
+                    self._u3_draw_heal_effect(mx, my, ts, fx)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
@@ -1408,7 +1451,8 @@ class Renderer:
         action_h = arena_bottom - action_y
         self._u3_action_panel(phase, selected_action, is_adjacent,
                               rx, action_y, rw, action_h,
-                              active_fighter=active_fighter)
+                              active_fighter=active_fighter,
+                              directing_action=directing_action)
 
         # ── 5. bottom combat log ──
         bar_y = arena_bottom + 6
@@ -1766,6 +1810,138 @@ class Renderer:
                 self.screen.blit(outline, (rx + ox, float_y + oy))
             self.screen.blit(surf, (rx, float_y))
 
+    def _u3_draw_fireball(self, ax, ay, ts, fb):
+        """Draw a fireball projectile — orange/red glowing ball with trail."""
+        cx = int(ax + fb.current_col * ts + ts // 2)
+        cy = int(ay + fb.current_row * ts + ts // 2)
+
+        # Pulsating radius
+        pulse = 1.0 + 0.3 * math.sin(fb.progress * 20)
+        radius = int(fb.radius * pulse)
+
+        # Core — bright yellow-white
+        pygame.draw.circle(self.screen, (255, 255, 200), (cx, cy), max(2, radius // 2))
+        # Inner glow — orange
+        pygame.draw.circle(self.screen, (255, 160, 30), (cx, cy), radius)
+        # Outer glow — red/orange, slightly transparent look via thinner ring
+        pygame.draw.circle(self.screen, (255, 80, 20), (cx, cy), radius + 3, 2)
+
+        # Trail particles — fading orange dots behind
+        dx = fb.end_col - fb.start_col
+        dy = fb.end_row - fb.start_row
+        for i in range(3):
+            t_offset = (i + 1) * 0.08
+            trail_prog = max(0, fb.progress - t_offset)
+            tx = int(ax + (fb.start_col + dx * trail_prog) * ts + ts // 2)
+            ty = int(ay + (fb.start_row + dy * trail_prog) * ts + ts // 2)
+            fade = max(0, 200 - i * 60)
+            tr = max(1, radius - i * 2)
+            pygame.draw.circle(self.screen, (fade, fade // 3, 0), (tx, ty), tr)
+
+    def _u3_draw_fireball_explosion(self, ax, ay, ts, fx):
+        """Draw fireball explosion — expanding ring of fire."""
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+
+        # Expanding rings of fire
+        max_radius = int(ts * 1.5)
+
+        if p < 0.5:
+            # Phase 1: bright expanding fireball
+            sub_p = p / 0.5
+            radius = int(6 + sub_p * max_radius)
+            # Bright yellow-orange core
+            core_r = max(1, int(radius * 0.5))
+            pygame.draw.circle(self.screen, (255, 255, 100), (cx, cy), core_r)
+            # Orange ring
+            pygame.draw.circle(self.screen, (255, 140, 20), (cx, cy), radius, 3)
+            # Red outer ring
+            pygame.draw.circle(self.screen, (255, 50, 10), (cx, cy),
+                               int(radius * 1.2), 2)
+        else:
+            # Phase 2: fading out
+            sub_p = (p - 0.5) / 0.5
+            alpha_f = 1.0 - sub_p
+            radius = int(max_radius * (0.8 + sub_p * 0.4))
+            r_val = int(255 * alpha_f)
+            g_val = int(80 * alpha_f)
+            if r_val > 0:
+                pygame.draw.circle(self.screen, (r_val, g_val, 0), (cx, cy),
+                                   radius, 2)
+            # Smoke-like gray ring
+            gray = int(100 * alpha_f)
+            if gray > 0:
+                pygame.draw.circle(self.screen, (gray, gray, gray), (cx, cy),
+                                   int(radius * 1.3), 1)
+
+    def _u3_draw_heal_effect(self, ax, ay, ts, fx):
+        """Draw a healing glow — green sparkles rising upward with heal number."""
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ax + fx.row * ts + ts // 2)
+        # Fix: use ay for y-axis
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+
+        # Phase 1 (0–0.4): green glow expanding
+        # Phase 2 (0.4–0.7): sparkles rising
+        # Phase 3 (0.7–1.0): fade out
+
+        if p < 0.4:
+            # Green glow expanding from center
+            sub_p = p / 0.4
+            radius = int(4 + sub_p * 14)
+            # Bright green core
+            g_val = int(200 + 55 * sub_p)
+            pygame.draw.circle(self.screen, (80, g_val, 80), (cx, cy), radius)
+            # White sparkle center
+            pygame.draw.circle(self.screen, (200, 255, 200), (cx, cy),
+                               max(1, radius // 3))
+        elif p < 0.7:
+            # Sparkles rising upward
+            sub_p = (p - 0.4) / 0.3
+            base_radius = int(14 - sub_p * 4)
+            # Central glow fading
+            alpha_f = 1.0 - sub_p * 0.5
+            g_val = int(220 * alpha_f)
+            if g_val > 0:
+                pygame.draw.circle(self.screen, (int(60 * alpha_f), g_val,
+                                                  int(60 * alpha_f)),
+                                   (cx, cy), base_radius)
+            # Rising sparkle particles
+            for i in range(4):
+                angle = (i * 90 + sub_p * 120) * 3.14159 / 180
+                spark_r = int(8 + sub_p * 12)
+                sx = cx + int(math.cos(angle) * spark_r)
+                sy = cy - int(sub_p * 16) + int(math.sin(angle) * spark_r // 2)
+                spark_size = max(1, int(3 * (1.0 - sub_p)))
+                pygame.draw.circle(self.screen, (150, 255, 150),
+                                   (sx, sy), spark_size)
+        else:
+            # Fade out — gentle green shimmer
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+            g_val = int(180 * alpha_f)
+            if g_val > 0:
+                for i in range(3):
+                    float_y = cy - int(12 + sub_p * 20) + i * 6
+                    spark_size = max(1, int(2 * alpha_f))
+                    pygame.draw.circle(self.screen,
+                                       (int(100 * alpha_f), g_val,
+                                        int(100 * alpha_f)),
+                                       (cx - 4 + i * 4, float_y), spark_size)
+
+        # Heal number floating upward (green "+N")
+        if fx.amount > 0 and p > 0.15:
+            float_y = cy - 14 - int(p * 24)
+            heal_text = f"+{fx.amount}"
+            surf = self.font.render(heal_text, True, (100, 255, 100))
+            outline = self.font.render(heal_text, True, self._U3_BLACK)
+            rx = cx - surf.get_width() // 2
+            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                self.screen.blit(outline, (rx + ox, float_y + oy))
+            self.screen.blit(surf, (rx, float_y))
+
     # ==============================================================
     #  RIGHT-HAND PANELS
     # ==============================================================
@@ -1841,7 +2017,7 @@ class Renderer:
 
             # ── MP bar ──
             mp_y = bar_y + bar_h + 3
-            mp_val = member.mp
+            mp_val = member.current_mp
             mp_max = member.max_mp
             if mp_max > 0:
                 self._u3_draw_stat_bar(info_x, mp_y, bar_w, bar_h,
@@ -1851,6 +2027,13 @@ class Renderer:
             # ── DEF indicator ──
             if is_def:
                 self._u3_text("DEF", x + w - 40, row_top + 18, self._U3_ORANGE, self.font_small)
+
+            # ── Ammo indicator for consumable ranged weapons ──
+            if member.is_consumable_weapon():
+                ammo_count = member.get_ammo()
+                ammo_color = self._U3_WHITE if ammo_count > 0 else self._U3_RED
+                ammo_y = mp_y if mp_max > 0 else bar_y + bar_h + 3
+                self._u3_text(f"x{ammo_count}", x + w - 32, ammo_y - 2, ammo_color, self.font_small)
 
             ty += 58  # row height per character
 
@@ -1915,7 +2098,7 @@ class Renderer:
         info_x = tx + sprite_size + 6
         self._u3_text(monster.name, info_x, ty, self._U3_RED, f)
         atk_short = f"AC:{monster.ac}"
-        self._u3_text(atk_short, x + w - 50, ty, self._U3_LTBLUE, f)
+        self._u3_text(atk_short, x + w - 70, ty, self._U3_LTBLUE, f)
 
         # ── HP bar ──
         bar_y = ty + 18
@@ -1930,12 +2113,14 @@ class Renderer:
         self._u3_text(atk_text, info_x, stat_y, (200, 200, 200), self.font_small)
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
-                         x, y, w, h, active_fighter=None):
+                         x, y, w, h, active_fighter=None,
+                         directing_action=None):
         """Action menu in retro style."""
         from src.states.combat import (
-            ACTION_NAMES, ACTION_ATTACK,
-            PHASE_PLAYER, PHASE_VICTORY, PHASE_DEFEAT,
-            PHASE_PROJECTILE, PHASE_MELEE_ANIM,
+            ACTION_NAMES, ACTION_MOVE, ACTION_ATTACK, ACTION_CAST, ACTION_HEAL,
+            ACTION_SKIP,
+            PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_VICTORY, PHASE_DEFEAT,
+            PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL,
         )
 
         self._u3_panel(x, y, w, h)
@@ -1943,9 +2128,15 @@ class Renderer:
         tx = x + 8
         ty = y + 6
 
-        is_ranged = (active_fighter and active_fighter.is_ranged())
+        if phase == PHASE_FIREBALL:
+            self._u3_text("-- CASTING --", tx, ty, (255, 140, 30), f)
+            self._u3_text("FIREBALL!", tx, ty + 24, (255, 200, 60), f)
 
-        if phase == PHASE_PROJECTILE:
+        elif phase == PHASE_HEAL:
+            self._u3_text("-- HEALING --", tx, ty, (80, 255, 80), f)
+            self._u3_text("RESTORE!", tx, ty + 24, (150, 255, 150), f)
+
+        elif phase == PHASE_PROJECTILE:
             self._u3_text("-- FIRING --", tx, ty, self._U3_ORANGE, f)
             self._u3_text("PROJECTILE IN FLIGHT...", tx, ty + 24, self._U3_WHITE, f)
 
@@ -1954,39 +2145,44 @@ class Renderer:
             self._u3_text("STRIKE!", tx, ty + 24, self._U3_WHITE, f)
 
         elif phase == PHASE_PLAYER:
-            if is_ranged:
-                self._u3_text("-- YOUR TURN (RANGED) --", tx, ty, self._U3_ORANGE, f)
-            else:
-                self._u3_text("-- YOUR TURN --", tx, ty, self._U3_ORANGE, f)
+            # Menu selection mode
+            name = active_fighter.name if active_fighter else "???"
+            self._u3_text(f"-- {name.upper()}'S TURN --", tx, ty, self._U3_ORANGE, f)
 
-            for i, name in enumerate(ACTION_NAMES):
-                iy = ty + 24 + i * 24
+            for i, action_name in enumerate(ACTION_NAMES):
+                iy = ty + 28 + i * 24
                 selected = (i == selected_action)
-
-                # For ranged fighters, Attack is never grayed out
-                if is_ranged:
-                    grayed = False
-                else:
-                    grayed = (i == ACTION_ATTACK and not is_adjacent)
-
                 prefix = "> " if selected else "  "
-                if grayed:
-                    label = prefix + name.upper() + " (CLOSER!)"
-                    color = (180, 180, 180)
-                elif selected:
-                    label = prefix + name.upper()
-                    color = self._U3_WHITE
-                else:
-                    label = prefix + name.upper()
-                    color = self._U3_LTBLUE
+                label = action_name.upper()
+                # Show MP info next to Cast and Heal
+                if i in (ACTION_CAST, ACTION_HEAL) and active_fighter:
+                    mp_now = active_fighter.current_mp
+                    label += f" ({mp_now}MP)"
+                # Show ammo count next to Attack for consumable weapons
+                if i == ACTION_ATTACK and active_fighter and active_fighter.is_consumable_weapon():
+                    ammo = active_fighter.get_ammo()
+                    label += f" (x{ammo})"
+                color = self._U3_WHITE if selected else self._U3_LTBLUE
+                self._u3_text(prefix + label, tx, iy, color, f)
 
-                self._u3_text(label, tx, iy, color, f)
+            self._u3_text("[UP/DOWN] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
+            self._u3_text("[ENTER] CONFIRM", tx, y + h - 16, self._U3_ORANGE, f)
 
-            self._u3_text("[WASD] MOVE", tx, y + h - 32, self._U3_LTBLUE, f)
-            if is_ranged:
-                self._u3_text("[ARROWS] SHOOT  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE, f)
-            else:
-                self._u3_text("[ARROWS] STRIKE  [ENTER] ACT", tx, y + h - 16, self._U3_ORANGE, f)
+        elif phase == PHASE_PLAYER_DIR:
+            # Direction selection mode
+            action_name = ACTION_NAMES[directing_action].upper() if directing_action is not None else "???"
+            self._u3_text(f"-- {action_name} --", tx, ty, self._U3_ORANGE, f)
+            self._u3_text("CHOOSE DIRECTION", tx, ty + 28, self._U3_WHITE, f)
+
+            # Draw directional arrows hint
+            cx = x + w // 2
+            cy = ty + 80
+            self._u3_text("^", cx - 4, cy - 20, self._U3_WHITE, f)
+            self._u3_text("<   >", cx - 24, cy, self._U3_WHITE, f)
+            self._u3_text("v", cx - 4, cy + 20, self._U3_WHITE, f)
+
+            self._u3_text("[ARROWS] DIRECTION", tx, y + h - 32, self._U3_LTBLUE, f)
+            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_VICTORY:
             self._u3_text("** VICTORY! **", tx, ty, self._U3_GREEN, f)
@@ -2052,7 +2248,7 @@ class Renderer:
 
         # Four character cards, 2x2 grid
         card_w = SCREEN_WIDTH // 2 - 8
-        card_h = 240
+        card_h = 274
         positions = [
             (4, 36),
             (SCREEN_WIDTH // 2 + 4, 36),
@@ -2087,68 +2283,95 @@ class Renderer:
             self._u3_text(cls_label, tx + 190, ty, self._U3_BLUE, self.font)
 
             # Race
+            fm = self.font_med
             ty += 22
-            self._u3_text(f"RACE: {member.race}", tx, ty, self._U3_GRAY)
+            self._u3_text("RACE:", tx, ty, self._U3_LTBLUE, fm)
+            self._u3_text(f"{member.race}", tx + 58, ty, self._U3_WHITE, fm)
 
-            # HP / MP
-            ty += 18
+            # HP bar + text
+            ty += 20
+            hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
+            self._u3_text("HP:", tx, ty, (220, 220, 230), fm)
+            bar_x = tx + 30
+            bar_w = 120
+            bar_h = 12
+            self._u3_draw_stat_bar(bar_x, ty + 1, bar_w, bar_h,
+                                   member.hp, member.max_hp, hp_color)
             self._u3_text(
-                f"HP: {member.hp:04d}/{member.max_hp:04d}    "
-                f"MP: {member.mp:04d}",
-                tx, ty, self._U3_WHITE)
+                f"{member.hp:04d}/{member.max_hp:04d}",
+                bar_x + bar_w + 6, ty, self._U3_WHITE, fm)
+
+            # MP bar + text
+            ty += 18
+            mp_color = (100, 100, 255)
+            self._u3_text("MP:", tx, ty, (220, 220, 230), fm)
+            if member.max_mp > 0:
+                self._u3_draw_stat_bar(bar_x, ty + 1, bar_w, bar_h,
+                                       member.current_mp, member.max_mp, mp_color)
+                self._u3_text(
+                    f"{member.current_mp:04d}/{member.max_mp:04d}",
+                    bar_x + bar_w + 6, ty, self._U3_WHITE, fm)
+            else:
+                self._u3_text("----/----", bar_x + bar_w + 6, ty, (120, 120, 120), fm)
 
             # Stats
-            ty += 18
+            ty += 20
             self._u3_text(
                 f"STR:{member.strength:02d}  DEX:{member.dexterity:02d}  "
                 f"INT:{member.intelligence:02d}  WIS:{member.wisdom:02d}",
-                tx, ty, self._U3_WHITE)
+                tx, ty, self._U3_LTBLUE, fm)
 
             # Level / EXP
-            ty += 18
+            ty += 20
             self._u3_text(
                 f"LVL:{member.level:02d}  EXP:{member.exp:04d}  AC:{member.get_ac():02d}",
-                tx, ty, self._U3_WHITE)
+                tx, ty, self._U3_WHITE, fm)
 
             # Weapon info
             ty += 22
             wp = WEAPONS.get(member.weapon, {"power": 0, "ranged": False})
             rng = "RANGED" if wp["ranged"] else "MELEE"
+            ammo_str = f"  x{member.get_ammo()}" if member.is_consumable_weapon() else ""
+            self._u3_text("WPN:", tx, ty, self._U3_LTBLUE, fm)
             self._u3_text(
-                f"WPN: {member.weapon}  (PWR:{wp['power']:02d} {rng})",
-                tx, ty, self._U3_GRAY)
+                f"{member.weapon}  (PWR:{wp['power']:02d} {rng}){ammo_str}",
+                tx + 50, ty, (230, 230, 240), fm)
 
             # Armor info
-            ty += 18
+            ty += 20
             arm = ARMORS.get(member.armor, {"evasion": 50})
+            self._u3_text("ARM:", tx, ty, self._U3_LTBLUE, fm)
             self._u3_text(
-                f"ARM: {member.armor}  (EVD:{arm['evasion']}%)",
-                tx, ty, self._U3_GRAY)
+                f"{member.armor}  (EVD:{arm['evasion']}%)",
+                tx + 50, ty, (230, 230, 240), fm)
 
             # Magic type
-            ty += 18
+            ty += 20
             magic_types = []
             if member.can_cast_priest():
                 magic_types.append("PRIEST")
             if member.can_cast_sorcerer():
                 magic_types.append("SORCERER")
             if magic_types:
+                self._u3_text("MAGIC:", tx, ty, self._U3_LTBLUE, fm)
                 self._u3_text(
-                    f"MAGIC: {' + '.join(magic_types)}",
-                    tx, ty, (120, 120, 255))
+                    f"{' + '.join(magic_types)}",
+                    tx + 68, ty, (180, 180, 255), fm)
             else:
-                self._u3_text("MAGIC: NONE", tx, ty, (80, 80, 80))
+                self._u3_text("MAGIC:", tx, ty, self._U3_LTBLUE, fm)
+                self._u3_text("NONE", tx + 68, ty, (150, 150, 150), fm)
 
             # Damage estimate
-            ty += 18
+            ty += 20
             dmg = member.get_damage()
-            self._u3_text(f"EST DMG: {dmg:02d}", tx, ty, self._U3_GRAY)
+            self._u3_text("EST DMG:", tx, ty, self._U3_LTBLUE, fm)
+            self._u3_text(f"{dmg:02d}", tx + 88, ty, self._U3_WHITE, fm)
 
             # Status
-            ty += 18
+            ty += 20
             status = "ALIVE" if member.is_alive() else "DEAD"
             sc = self._U3_GREEN if member.is_alive() else self._U3_RED
-            self._u3_text(f"STATUS: {status}", tx, ty, sc)
+            self._u3_text(f"STATUS: {status}", tx, ty, sc, fm)
 
         # Bottom info bar
         info_y = 36 + card_h * 2 + 12
@@ -2164,5 +2387,255 @@ class Renderer:
         # Bottom status bar
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        self._u3_text("[P] CLOSE    [ESC] CLOSE",
+        self._u3_text("[1-4] DETAIL    [P] CLOSE    [ESC] CLOSE",
+                      8, bar_y + 5, self._U3_BLUE)
+
+    def draw_character_sheet_u3(self, member, index, cursor_index=0):
+        """
+        Full-screen detailed character sheet for a single party member.
+
+        Shows large sprite, all stats with modifiers, interactive equipment
+        and inventory list with cursor navigation.
+
+        cursor_index: selected row in the unified equip+inventory list (0-based).
+        """
+        from src.party import WEAPONS, ARMORS
+        from src.combat_engine import format_modifier
+
+        fm = self.font_med
+        f = self.font
+        self.screen.fill(self._U3_BLACK)
+
+        # ── Title bar ──
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        title = f"CHARACTER {index + 1}: {member.name.upper()}"
+        self._u3_text(title, SCREEN_WIDTH // 2 - len(title) * 5, 8,
+                       self._U3_ORANGE, f)
+
+        # ── Main content area: left panel + right panel ──
+        left_x = 4
+        left_w = SCREEN_WIDTH // 2 - 6
+        right_x = SCREEN_WIDTH // 2 + 2
+        right_w = SCREEN_WIDTH // 2 - 6
+        panel_y = 36
+        panel_h = SCREEN_HEIGHT - 36 - 28
+
+        self._u3_panel(left_x, panel_y, left_w, panel_h)
+        self._u3_panel(right_x, panel_y, right_w, panel_h)
+
+        # ═══════════════════════════════════════════════
+        # LEFT PANEL — Identity, sprite, core stats
+        # ═══════════════════════════════════════════════
+        tx = left_x + 12
+        ty = panel_y + 10
+
+        # Large sprite
+        sprite = self._get_class_sprite(member.char_class, big=True)
+        if sprite:
+            sx = left_x + left_w - sprite.get_width() - 14
+            sy = ty
+            if not member.is_alive():
+                dark = sprite.copy()
+                dark.fill((80, 80, 80), special_flags=pygame.BLEND_RGB_MULT)
+                self.screen.blit(dark, (sx, sy))
+            else:
+                self.screen.blit(sprite, (sx, sy))
+
+        # Name and class
+        self._u3_text(member.name, tx, ty, self._U3_ORANGE, f)
+        ty += 22
+        self._u3_text(f"{member.char_class}", tx, ty, self._U3_WHITE, f)
+        ty += 22
+        self._u3_text("RACE:", tx, ty, self._U3_LTBLUE, fm)
+        self._u3_text(f"{member.race}", tx + 58, ty, self._U3_WHITE, fm)
+        ty += 20
+        self._u3_text(f"LEVEL: {member.level:02d}", tx, ty, self._U3_WHITE, fm)
+        self._u3_text(f"EXP: {member.exp:04d}", tx + 120, ty, (220, 220, 230), fm)
+
+        # ── HP bar ──
+        ty += 28
+        hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
+        self._u3_text("HIT POINTS", tx, ty, self._U3_LTBLUE, fm)
+        ty += 18
+        bar_w = left_w - 100
+        bar_h = 14
+        self._u3_draw_stat_bar(tx, ty, bar_w, bar_h,
+                               member.hp, member.max_hp, hp_color)
+        self._u3_text(
+            f"{member.hp:04d} / {member.max_hp:04d}",
+            tx + bar_w + 8, ty, self._U3_WHITE, fm)
+
+        # ── MP bar ──
+        ty += 24
+        self._u3_text("MAGIC POINTS", tx, ty, self._U3_LTBLUE, fm)
+        ty += 18
+        if member.max_mp > 0:
+            self._u3_draw_stat_bar(tx, ty, bar_w, bar_h,
+                                   member.current_mp, member.max_mp, (100, 100, 255))
+            self._u3_text(
+                f"{member.current_mp:04d} / {member.max_mp:04d}",
+                tx + bar_w + 8, ty, self._U3_WHITE, fm)
+        else:
+            self._u3_draw_stat_bar(tx, ty, bar_w, bar_h, 0, 1, (60, 60, 60))
+            self._u3_text("---- / ----", tx + bar_w + 8, ty, (120, 120, 120), fm)
+
+        # ── Attributes with modifiers ──
+        ty += 30
+        self._u3_text("ATTRIBUTES", tx, ty, self._U3_ORANGE, fm)
+        ty += 20
+        attrs = [
+            ("STR", member.strength, member.str_mod),
+            ("DEX", member.dexterity, member.dex_mod),
+            ("INT", member.intelligence, member.int_mod),
+            ("WIS", member.wisdom, member.wis_mod),
+        ]
+        for label, val, mod in attrs:
+            mod_str = format_modifier(mod)
+            self._u3_text(f"{label}:", tx, ty, self._U3_LTBLUE, fm)
+            self._u3_text(f"{val:02d}", tx + 42, ty, self._U3_WHITE, fm)
+            mod_color = self._U3_GREEN if mod > 0 else self._U3_RED if mod < 0 else (180, 180, 180)
+            self._u3_text(f"({mod_str})", tx + 68, ty, mod_color, fm)
+            ty += 18
+
+        # ── Status ──
+        ty += 8
+        status = "ALIVE" if member.is_alive() else "DEAD"
+        sc = self._U3_GREEN if member.is_alive() else self._U3_RED
+        self._u3_text("STATUS:", tx, ty, self._U3_LTBLUE, fm)
+        self._u3_text(status, tx + 78, ty, sc, fm)
+
+        # ═══════════════════════════════════════════════
+        # RIGHT PANEL — Interactive equip/inventory list
+        # ═══════════════════════════════════════════════
+        rx = right_x + 12
+        ry = panel_y + 10
+        row_h = 20   # height per selectable row
+
+        eq = getattr(member, 'equipped', {})
+        inv = getattr(member, 'inventory', [])
+
+        # Build the unified list: 3 equipped slots + inventory items
+        # Each entry: (label, item_name, is_equipped, slot_key_or_None)
+        body_name = eq.get("body") or member.armor
+        melee_name = eq.get("melee") or member.weapon
+        ranged_name = eq.get("ranged")
+
+        unified = [
+            ("BODY",   body_name,   True,  "body"),
+            ("MELEE",  melee_name,  True,  "melee"),
+            ("RANGED", ranged_name, True,  "ranged"),
+        ]
+        for item_name in inv:
+            # Determine if equippable and what kind
+            equippable = item_name in ARMORS or item_name in WEAPONS
+            unified.append((None, item_name, False, None))
+
+        # ── EQUIPPED section header ──
+        self._u3_text("EQUIPPED", rx, ry, self._U3_ORANGE, fm)
+        ry += 22
+
+        list_row = 0
+        for i, (slot_label, item_name, is_eq, slot_key) in enumerate(unified):
+            # Insert ITEMS header before inventory section
+            if i == 3:
+                ry += 10
+                self._u3_text("ITEMS", rx, ry, self._U3_ORANGE, fm)
+                ry += 22
+
+            selected = (list_row == cursor_index)
+            prefix = "> " if selected else "  "
+
+            if is_eq:
+                # Equipped slot row
+                display_name = item_name if item_name else "-- NONE --"
+                name_color = self._U3_WHITE if selected else self._U3_LTBLUE
+
+                # Slot label
+                self._u3_text(f"{prefix}{slot_label}:", rx, ry, name_color, fm)
+                # Item name
+                if item_name:
+                    self._u3_text(f"{display_name}", rx + 90, ry, self._U3_WHITE if selected else (220, 220, 230), fm)
+                    # Stat hint
+                    hint = ""
+                    if slot_key == "body":
+                        arm = ARMORS.get(item_name, {"evasion": 50})
+                        hint = f"EVD:{arm['evasion']}%"
+                    elif slot_key == "melee":
+                        wp = WEAPONS.get(item_name, {"power": 0})
+                        hint = f"PWR:{wp['power']:02d}"
+                    elif slot_key == "ranged":
+                        wp = WEAPONS.get(item_name, {"power": 0})
+                        hint = f"PWR:{wp['power']:02d}"
+                        if WEAPONS.get(item_name, {}).get("consumable", False):
+                            ammo_count = member.ammo.get(item_name, 0)
+                            hint += f" x{ammo_count}"
+                    if hint:
+                        self._u3_text(hint, rx + right_w - 90, ry, (180, 180, 180), fm)
+                else:
+                    self._u3_text("-- NONE --", rx + 90, ry, (120, 120, 120), fm)
+
+                # Highlight bar behind selected row
+                if selected:
+                    sel_rect = pygame.Rect(rx - 4, ry - 1, right_w - 16, row_h)
+                    sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                    sel_surf.fill((255, 255, 255, 25))
+                    self.screen.blit(sel_surf, sel_rect)
+
+            else:
+                # Inventory item row
+                name_color = self._U3_WHITE if selected else (220, 220, 230)
+                self._u3_text(f"{prefix}{item_name}", rx, ry, name_color, fm)
+
+                # Show what slot it would equip to
+                equip_hint = ""
+                if item_name in ARMORS:
+                    equip_hint = "(BODY)"
+                elif item_name in WEAPONS:
+                    wp = WEAPONS[item_name]
+                    equip_hint = "(RANGED)" if wp.get("ranged", False) else "(MELEE)"
+                if equip_hint:
+                    self._u3_text(equip_hint, rx + right_w - 90, ry,
+                                  (160, 160, 255) if selected else (100, 100, 160), fm)
+
+                # Highlight bar behind selected row
+                if selected:
+                    sel_rect = pygame.Rect(rx - 4, ry - 1, right_w - 16, row_h)
+                    sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                    sel_surf.fill((255, 255, 255, 25))
+                    self.screen.blit(sel_surf, sel_rect)
+
+            ry += row_h
+            list_row += 1
+
+        # If inventory is empty, show placeholder
+        if len(inv) == 0 and list_row == 3:
+            ry += 10
+            self._u3_text("ITEMS", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+            self._u3_text("  (EMPTY)", rx, ry, (120, 120, 120), fm)
+
+        # ── Combat summary (compact) ──
+        ry += 16
+        pygame.draw.line(self.screen, (60, 60, 80),
+                         (rx, ry), (rx + right_w - 24, ry), 1)
+        ry += 8
+        ac = member.get_ac()
+        est_dmg = member.get_damage()
+        self._u3_text(f"AC:{ac:02d}  ATK:D20{format_modifier(member.get_attack_bonus())}  DMG:{est_dmg:02d}",
+                      rx, ry, self._U3_LTBLUE, fm)
+
+        # ── Magic summary (compact) ──
+        ry += 20
+        magic_types = []
+        if member.can_cast_priest():
+            magic_types.append("PRIEST")
+        if member.can_cast_sorcerer():
+            magic_types.append("SORCERER")
+        magic_str = " + ".join(magic_types) if magic_types else "NONE"
+        self._u3_text(f"MAGIC: {magic_str}", rx, ry, (180, 180, 255) if magic_types else (150, 150, 150), fm)
+
+        # ── Bottom status bar ──
+        bar_y = SCREEN_HEIGHT - 24
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        self._u3_text("[UP/DN] SELECT  [ENTER] EQUIP/UNEQUIP  [ESC] BACK  [P] CLOSE",
                       8, bar_y + 5, self._U3_BLUE)

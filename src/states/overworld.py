@@ -19,7 +19,7 @@ from src.monster import create_orc
 
 
 # How many orcs roam the overworld at a time
-_MAX_OVERWORLD_ORCS = 4
+_MAX_OVERWORLD_ORCS = 2
 # Minimum Chebyshev distance from party when spawning
 _SPAWN_MIN_DIST = 8
 _SPAWN_MAX_DIST = 14
@@ -34,6 +34,8 @@ class OverworldState(BaseState):
         self.message_timer = 0  # ms remaining to show message
         self.move_cooldown = 0  # ms until next move allowed
         self.showing_party = False
+        self.showing_char_detail = None  # index 0-3, or None
+        self.char_sheet_cursor = 0       # cursor position in equip/item list
 
         # Roaming overworld orcs
         self.overworld_monsters = []
@@ -50,6 +52,25 @@ class OverworldState(BaseState):
             self.message_timer = 3000
             # Spawn initial orcs
             self._spawn_orcs()
+
+    # ── Equipment management ─────────────────────────────────────
+
+    def _handle_equip_action(self, member):
+        """Handle Enter key on the character sheet item list."""
+        idx = self.char_sheet_cursor
+        if idx < 3:
+            # Equipped slot — unequip it
+            slot_keys = ["body", "melee", "ranged"]
+            member.unequip_slot(slot_keys[idx])
+        else:
+            # Inventory item — try to equip it
+            inv_idx = idx - 3
+            if inv_idx < len(member.inventory):
+                member.equip_item(member.inventory[inv_idx])
+        # Clamp cursor in case inventory changed size
+        total = 3 + len(member.inventory)
+        if self.char_sheet_cursor >= total:
+            self.char_sheet_cursor = max(0, total - 1)
 
     # ── Orc spawning ──────────────────────────────────────────────
 
@@ -86,17 +107,54 @@ class OverworldState(BaseState):
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    if self.showing_char_detail is not None:
+                        self.showing_char_detail = None
+                        self.char_sheet_cursor = 0
+                        return
                     if self.showing_party:
                         self.showing_party = False
                         return
                     self.game.running = False
                     return
                 if event.key == pygame.K_p:
+                    if self.showing_char_detail is not None:
+                        self.showing_char_detail = None
+                        self.char_sheet_cursor = 0
+                        self.showing_party = False
+                        return
                     self.showing_party = not self.showing_party
                     return
+                # Character sheet cursor navigation
+                if self.showing_char_detail is not None:
+                    member = self.game.party.members[self.showing_char_detail]
+                    total_rows = 3 + len(member.inventory)
+                    if event.key == pygame.K_UP:
+                        self.char_sheet_cursor = (self.char_sheet_cursor - 1) % total_rows
+                        return
+                    elif event.key == pygame.K_DOWN:
+                        self.char_sheet_cursor = (self.char_sheet_cursor + 1) % total_rows
+                        return
+                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        self._handle_equip_action(member)
+                        return
+                # 1-4 keys to open character detail from party screen
+                if self.showing_party and self.showing_char_detail is None:
+                    num = None
+                    if event.key == pygame.K_1:
+                        num = 0
+                    elif event.key == pygame.K_2:
+                        num = 1
+                    elif event.key == pygame.K_3:
+                        num = 2
+                    elif event.key == pygame.K_4:
+                        num = 3
+                    if num is not None and num < len(self.game.party.members):
+                        self.showing_char_detail = num
+                        self.char_sheet_cursor = 0
+                        return
 
-        # If showing party screen, block all other input
-        if self.showing_party:
+        # If showing party or character detail, block all other input
+        if self.showing_party or self.showing_char_detail is not None:
             return
 
         # Movement only if cooldown has elapsed
@@ -252,6 +310,11 @@ class OverworldState(BaseState):
 
     def draw(self, renderer):
         """Draw the overworld in Ultima III style."""
+        if self.showing_char_detail is not None:
+            idx = self.showing_char_detail
+            renderer.draw_character_sheet_u3(
+                self.game.party.members[idx], idx, self.char_sheet_cursor)
+            return
         if self.showing_party:
             renderer.draw_party_screen_u3(self.game.party)
             return
