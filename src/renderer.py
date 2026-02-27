@@ -3278,12 +3278,70 @@ class Renderer:
                                panel_y + panel_h - 18, self._U3_GRAY, self.font_small)
 
         # ═══════════════════════════════════════
-        # RIGHT PANEL — Item detail + character selection
+        # RIGHT PANEL — Characters + Item detail
         # ═══════════════════════════════════════
         rx = right_x + 10
         ry = panel_y + 10
 
-        # Determine which item is selected
+        # ── Character mini-cards (press 1-4 to open detail) ──
+        self._u3_text("PARTY  [1-4]", rx, ry, self._U3_ORANGE, fm)
+        ry += 20
+
+        char_card_h = 50
+        sprite_w = 36  # space reserved for avatar
+        for mi, member in enumerate(party.members):
+            cy = ry
+            alive = member.is_alive()
+            name_color = self._U3_WHITE if alive else self._U3_RED
+
+            # Avatar sprite
+            sprite = self._get_class_sprite(member.char_class, big=False)
+            if sprite:
+                sx = rx
+                sy = cy + (char_card_h - sprite.get_height()) // 2
+                if not alive:
+                    dark = sprite.copy()
+                    dark.fill((80, 80, 80), special_flags=pygame.BLEND_RGB_MULT)
+                    self.screen.blit(dark, (sx, sy))
+                else:
+                    self.screen.blit(sprite, (sx, sy))
+
+            # Text starts after avatar
+            tx2 = rx + sprite_w
+
+            # Number + name + class
+            self._u3_text(f"{mi+1}", tx2, cy, self._U3_BLUE, fm)
+            self._u3_text(member.name, tx2 + 16, cy, name_color, fm)
+            cls_short = member.char_class[:3].upper()
+            self._u3_text(cls_short, rx + right_w - 60, cy, self._U3_LTBLUE, fm)
+
+            # HP bar
+            cy += 16
+            hp_frac = member.hp / member.max_hp if member.max_hp > 0 else 0
+            hp_color = self._U3_GREEN if hp_frac > 0.3 else self._U3_RED
+            bar_w_px = right_w - sprite_w - 80
+            self._u3_text("HP", tx2, cy, (180, 180, 200), self.font_small)
+            self._u3_draw_stat_bar(tx2 + 22, cy + 1, bar_w_px, 10,
+                                   member.hp, member.max_hp, hp_color)
+            self._u3_text(f"{member.hp}/{member.max_hp}",
+                          tx2 + 22 + bar_w_px + 4, cy, (200, 200, 210), self.font_small)
+
+            # Weapon summary
+            cy += 14
+            rw_name = member.equipped.get("right_hand") or "---"
+            lw_name = member.equipped.get("left_hand") or "---"
+            equip_str = f"R:{rw_name}  L:{lw_name}"
+            self._u3_text(equip_str, tx2 + 4, cy, (160, 160, 180), self.font_small)
+
+            ry += char_card_h
+
+        # ── Divider ──
+        ry += 2
+        pygame.draw.line(self.screen, (60, 60, 80),
+                         (rx, ry), (rx + right_w - 20, ry), 1)
+        ry += 8
+
+        # ── Item detail section ──
         sel_item = None
         sel_charges = None
         is_equip_slot = cursor_index < NUM_SLOTS
@@ -3357,7 +3415,7 @@ class Renderer:
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
 
-        # ── Character selection mode ──
+        # ── Character selection mode (GIVE TO) ──
         if choosing_member:
             ry += 32
             pygame.draw.line(self.screen, (60, 60, 80),
@@ -3427,7 +3485,7 @@ class Renderer:
             self._u3_text("[UP/DN] SELECT MEMBER  [ENTER] CONFIRM  [ESC] CANCEL",
                           8, bar_y + 5, self._U3_BLUE)
         else:
-            self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [ESC] BACK  [P] CLOSE",
+            self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [1-4] CHARACTER  [ESC] BACK",
                           8, bar_y + 5, self._U3_BLUE)
 
     # ═══════════════════════════════════════════════════════════════

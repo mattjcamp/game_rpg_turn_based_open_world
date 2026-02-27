@@ -238,6 +238,14 @@ class OverworldState(BaseState):
             elif event.key == pygame.K_p:
                 self.showing_party_inv = False
                 self.showing_party = False
+            else:
+                # Number keys 1-4: open character detail sheet
+                num = {pygame.K_1: 0, pygame.K_2: 1,
+                       pygame.K_3: 2, pygame.K_4: 3}.get(event.key)
+                if num is not None and num < len(self.game.party.members):
+                    self.showing_party_inv = False
+                    self.showing_char_detail = num
+                    self.char_sheet_cursor = 0
 
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
@@ -353,6 +361,7 @@ class OverworldState(BaseState):
                     if self.showing_char_detail is not None:
                         self.showing_char_detail = None
                         self.char_sheet_cursor = 0
+                        self.showing_party_inv = True
                         return
                     if self.showing_party:
                         self.showing_party = False
@@ -363,12 +372,18 @@ class OverworldState(BaseState):
                     if self.showing_char_detail is not None:
                         self.showing_char_detail = None
                         self.char_sheet_cursor = 0
-                        self.showing_party = False
+                        self.showing_party_inv = True
+                        return
+                    if self.showing_party_inv:
+                        self.showing_party_inv = False
                         return
                     if self.showing_party:
                         self.showing_party = False
                         return
-                    self.showing_party = True
+                    self.showing_party_inv = True
+                    self.party_inv_cursor = 0
+                    self.party_inv_choosing = False
+                    self.party_inv_member = 0
                     return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
