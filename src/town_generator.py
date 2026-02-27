@@ -11,7 +11,7 @@ import random
 
 from src.tile_map import TileMap
 from src.settings import (
-    TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT, TILE_GRASS,
+    TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
 )
 
 
@@ -56,17 +56,13 @@ def _place_building(tmap, x, y, w, h, door_side="south"):
     Place a rectangular building on the town map.
 
     Walls on the perimeter, floor inside, one door opening.
-    Returns the interior floor coordinates for placing counters/NPCs.
     """
-    interior = []
-
     for row in range(y, y + h):
         for col in range(x, x + w):
             if row == y or row == y + h - 1 or col == x or col == x + w - 1:
                 tmap.set_tile(col, row, TILE_WALL)
             else:
                 tmap.set_tile(col, row, TILE_FLOOR)
-                interior.append((col, row))
 
     # Place door
     if door_side == "south":
@@ -84,101 +80,89 @@ def _place_building(tmap, x, y, w, h, door_side="south"):
 
     tmap.set_tile(door_col, door_row, TILE_DOOR)
 
-    return interior
-
 
 def generate_town(name="Thornwall"):
     """
-    Generate a town map with buildings, NPCs, and an exit.
+    Generate a town map with NPCs and an exit.
 
-    The town is 20x20 tiles:
-    - Outer wall border
-    - Floor everywhere inside
-    - Several buildings (weapon shop, armor shop, inn, elder's house)
-    - NPCs inside and outside
-    - Exit gate at the bottom center
+    The playable interior is 18×19 tiles of floor surrounded by a brick wall
+    border.  The total map is padded with extra wall tiles on every side so
+    the camera (25×17 viewport) never sees out-of-bounds areas.
     """
-    W = 20
-    TOWN_H = 21        # Playable town area (row 0..20)
-    BUFFER = 3          # Extra wall rows below so exit isn't hidden by HUD
-    H = TOWN_H + BUFFER # Total map height
-    tmap = TileMap(W, H, default_tile=TILE_FLOOR)
+    # Playable interior dimensions (floor area inside the walls)
+    INTERIOR_W = 18
+    INTERIOR_H = 19
 
-    # --- Outer wall (the playable town boundary) ---
-    for row in range(TOWN_H):
-        for col in range(W):
-            if row == 0 or row == TOWN_H - 1 or col == 0 or col == W - 1:
-                tmap.set_tile(col, row, TILE_WALL)
+    # Padding: enough extra wall tiles around the playable area so the
+    # camera can never scroll past the map boundary.
+    # Viewport is 25 cols × 17 rows; half-viewport is the most the camera
+    # can offset from the party position near the edges.
+    PAD_X = 13   # extra wall columns on each side
+    PAD_Y = 9    # extra wall rows on top and bottom
 
-    # --- Buffer rows below the wall (solid wall so camera can scroll past exit) ---
-    for row in range(TOWN_H, H):
-        for col in range(W):
-            tmap.set_tile(col, row, TILE_WALL)
+    # Total map size
+    W = INTERIOR_W + 2 + PAD_X * 2   # +2 for the brick border itself
+    H = INTERIOR_H + 2 + PAD_Y * 2
 
-    # --- Exit gate (bottom of the playable wall) ---
-    exit_col = W // 2
-    exit_row = TOWN_H - 1
+    # The playable brick border starts at (PAD_X, PAD_Y)
+    BORDER_X = PAD_X
+    BORDER_Y = PAD_Y
+    BORDER_W = INTERIOR_W + 2
+    BORDER_H = INTERIOR_H + 2
+
+    tmap = TileMap(W, H, default_tile=TILE_WALL)
+
+    # --- Floor inside the brick border ---
+    for row in range(BORDER_Y + 1, BORDER_Y + BORDER_H - 1):
+        for col in range(BORDER_X + 1, BORDER_X + BORDER_W - 1):
+            tmap.set_tile(col, row, TILE_FLOOR)
+
+    # --- Exit gate (bottom centre of the brick border) ---
+    exit_col = BORDER_X + BORDER_W // 2
+    exit_row = BORDER_Y + BORDER_H - 1
     tmap.set_tile(exit_col, exit_row, TILE_EXIT)
+
+    # --- Helper: convert interior-relative coords to world coords ---
+    # Interior (0,0) is the top-left floor tile inside the wall.
+    ox = BORDER_X + 1   # world col of interior col 0
+    oy = BORDER_Y + 1   # world row of interior row 0
 
     # --- Buildings ---
 
-    # Weapon Shop (top-left area)
-    _place_building(tmap, 2, 2, 6, 5, door_side="south")
-    # Counter inside
-    tmap.set_tile(4, 3, TILE_COUNTER)
-    tmap.set_tile(5, 3, TILE_COUNTER)
-    tmap.set_tile(6, 3, TILE_COUNTER)
+    # Shop (upper-left, 6 wide × 5 tall, door faces south)
+    _place_building(tmap, ox + 1, oy + 1, 6, 5, door_side="south")
+    # Counter inside the shop
+    tmap.set_tile(ox + 3, oy + 2, TILE_COUNTER)
+    tmap.set_tile(ox + 4, oy + 2, TILE_COUNTER)
+    tmap.set_tile(ox + 5, oy + 2, TILE_COUNTER)
 
-    # Armor Shop (top-right area)
-    _place_building(tmap, 12, 2, 6, 5, door_side="south")
-    # Counter inside
-    tmap.set_tile(14, 3, TILE_COUNTER)
-    tmap.set_tile(15, 3, TILE_COUNTER)
-    tmap.set_tile(16, 3, TILE_COUNTER)
-
-    # Inn (middle-left area)
-    _place_building(tmap, 2, 10, 7, 5, door_side="east")
-    # Counter (bar)
-    tmap.set_tile(3, 11, TILE_COUNTER)
-    tmap.set_tile(4, 11, TILE_COUNTER)
-
-    # Elder's House (middle-right area)
-    _place_building(tmap, 13, 10, 6, 5, door_side="west")
-
-    # --- Some decoration: grass patches in the town square ---
-    for col in range(8, 12):
-        for row in range(8, 11):
-            tmap.set_tile(col, row, TILE_GRASS)
+    # Inn (upper-right, 6 wide × 5 tall, door faces south)
+    _place_building(tmap, ox + 11, oy + 1, 6, 5, door_side="south")
+    # Bar counter inside the inn
+    tmap.set_tile(ox + 13, oy + 2, TILE_COUNTER)
+    tmap.set_tile(ox + 14, oy + 2, TILE_COUNTER)
 
     # --- NPCs ---
     npcs = []
 
-    # Weapon shopkeeper
-    npcs.append(NPC(5, 4, "Gruff", [
+    # Shopkeeper inside the shop (behind the counter)
+    npcs.append(NPC(ox + 4, oy + 3, "Gruff", [
         "Welcome to Gruff's Armaments!",
         "I've got the finest steel this side of the mountains.",
         "Swords, axes, bows -- you name it, I forge it.",
         "Come back when you've got more gold!",
     ], npc_type="shopkeep"))
 
-    # Armor shopkeeper
-    npcs.append(NPC(15, 4, "Helga", [
-        "Helga's Armor Emporium! Best protection in the realm.",
-        "Chain mail, plate armor, enchanted shields...",
-        "A good suit of armor is worth more than any sword.",
-        "Stay safe out there, adventurer.",
-    ], npc_type="shopkeep"))
-
-    # Innkeeper
-    npcs.append(NPC(3, 12, "Bertram", [
+    # Innkeeper inside the inn (behind the bar)
+    npcs.append(NPC(ox + 14, oy + 3, "Bertram", [
         "Welcome to the Sleeping Griffin Inn!",
         "Rest your weary bones. A room is 10 gold per night.",
         "I hear dark things stir in the dungeons to the east...",
         "Can I get you an ale?",
     ], npc_type="innkeeper"))
 
-    # Town elder
-    npcs.append(NPC(15, 12, "Elder Morath", [
+    # Town elder (wandering in the open area)
+    npcs.append(NPC(ox + 9, oy + 10, "Elder Morath", [
         "Ah, brave adventurers! Our town is in grave danger.",
         "A great evil festers in the dungeon to the east.",
         "You must find the four shrines hidden across the land.",
@@ -194,8 +178,7 @@ def generate_town(name="Thornwall"):
         ["I used to be an adventurer, you know.", "Then I took an arrow to the knee."],
     ]
 
-    # Place villagers in open floor spaces
-    villager_spots = [(6, 16), (14, 16), (10, 9)]
+    villager_spots = [(ox + 5, oy + 15), (ox + 13, oy + 15), (ox + 9, oy + 8)]
     for i, (vc, vr) in enumerate(villager_spots):
         name_pool = ["Tomas", "Elena", "Joric", "Bess", "Finn"]
         npcs.append(NPC(vc, vr, name_pool[i % len(name_pool)],

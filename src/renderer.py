@@ -65,6 +65,15 @@ class Renderer:
             raw = pygame.image.load(chest_path).convert_alpha()
             self._chest_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
 
+        # ── Load town gate tile ──
+        gate_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "src", "assets", "town_gate.png")
+        self._town_gate_tile = None
+        if os.path.exists(gate_path):
+            raw = pygame.image.load(gate_path).convert_alpha()
+            self._town_gate_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
+
         # Map game tile IDs to sheet positions (row, col)
         # Based on the style guide tile-to-game mapping
         from src.settings import (
@@ -462,6 +471,11 @@ class Renderer:
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
         )
+
+        # Use extracted town gate tile for exit
+        if tile_id == TILE_EXIT and self._town_gate_tile:
+            self.screen.blit(self._town_gate_tile, (px, py))
+            return
 
         # Try town tile map first, then overworld tile map
         pos = self._town_tile_map.get(tile_id)
