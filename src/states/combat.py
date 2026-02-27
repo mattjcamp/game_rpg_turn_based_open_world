@@ -34,6 +34,8 @@ PHASE_FIREBALL    = "fireball"       # fireball in flight
 PHASE_HEAL        = "heal"           # heal animation playing
 PHASE_MONSTER     = "monster"
 PHASE_MONSTER_ACT = "monster_act"
+PHASE_SPELL_SELECT = "spell_select"  # choosing a spell from the list
+PHASE_THROW_SELECT = "throw_select"  # choosing an item to throw
 PHASE_EQUIP       = "equip"          # character sheet / equip screen
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
@@ -53,6 +55,7 @@ ACTION_HEAL   = 3
 ACTION_SKIP   = 4      # spacebar skip
 ACTION_RANGED = 5      # menu ranged attack
 ACTION_EQUIP  = 6      # open equip screen (costs turn)
+ACTION_THROW  = 7      # throw a throwable item from inventory
 
 # Menu is built dynamically per character — see _build_menu_actions()
 
@@ -244,6 +247,16 @@ class CombatState(BaseState):
         self.menu_actions = []  # dynamic menu: [(action_id, label), ...]
         self.directing_action = None  # which action is being directed
 
+        # Spell selection state
+        self.spell_list = []        # available spells: [(spell_id, label, mp_cost), ...]
+        self.spell_cursor = 0       # cursor in spell list
+        self.selected_spell = None  # chosen spell id (e.g. "fireball", "heal")
+
+        # Throw selection state
+        self.throw_list = []        # throwable items: [(item_name, count), ...]
+        self.throw_cursor = 0       # cursor in throw list
+        self.selected_throw = None  # chosen item name to throw
+
         # Equip screen state
         self.equip_cursor = 0           # cursor in equip/item list
         self.equip_action_menu = False  # True when action popup is open
@@ -431,13 +444,52 @@ class CombatState(BaseState):
                 ammo = self.game.party.inv_get_charges(f.get_ammo_type())
                 label += f" (x{ammo})"
             self.menu_actions.append((ACTION_RANGED, label))
-        if f.can_cast_sorcerer() and f.current_mp >= FIREBALL_MP_COST:
+        # Show "Throw" if the character has any throwable items available
+        throwables = self._build_throw_list(f)
+        if throwables:
+            self.menu_actions.append((ACTION_THROW, "Throw"))
+        # Show "Cast" if the character has any castable spells
+        spells = self._build_spell_list(f)
+        if spells:
             self.menu_actions.append((ACTION_CAST, f"Cast ({f.current_mp}MP)"))
-        if f.can_cast_priest() and f.current_mp >= HEAL_MP_COST:
-            self.menu_actions.append((ACTION_HEAL, f"Heal ({f.current_mp}MP)"))
         # Equip is always available
         self.menu_actions.append((ACTION_EQUIP, "Equip"))
         self.selected_action = 0
+
+    def _build_spell_list(self, fighter):
+        """Build the list of spells available to this fighter.
+
+        Returns a list of (spell_id, label, mp_cost) tuples.
+        Only includes spells the fighter has enough MP to cast.
+        """
+        spells = []
+        if fighter.can_cast_sorcerer() and fighter.current_mp >= FIREBALL_MP_COST:
+            spells.append(("fireball", f"Fireball ({FIREBALL_MP_COST}MP)", FIREBALL_MP_COST))
+        if fighter.can_cast_priest() and fighter.current_mp >= HEAL_MP_COST:
+            spells.append(("heal", f"Heal ({HEAL_MP_COST}MP)", HEAL_MP_COST))
+        return spells
+
+    def _build_throw_list(self, fighter):
+        """Build the list of throwable items the fighter can throw.
+
+        Scans personal inventory and party shared stash for items with
+        the 'throwable' attribute. Returns [(item_name, count), ...].
+        """
+        from src.party import WEAPONS
+        seen = {}
+        # Check personal inventory
+        for item in fighter.inventory:
+            wp = WEAPONS.get(item)
+            if wp and wp.get("throwable", False):
+                seen[item] = seen.get(item, 0) + 1
+        # Check party shared stash
+        party = self.game.party
+        for entry in party.shared_inventory:
+            name = party.item_name(entry)
+            wp = WEAPONS.get(name)
+            if wp and wp.get("throwable", False):
+                seen[name] = seen.get(name, 0) + 1
+        return [(name, count) for name, count in seen.items()]
 
     # ── Input ────────────────────────────────────────────────────
 
@@ -451,6 +503,20 @@ class CombatState(BaseState):
             for event in events:
                 if event.type == pygame.KEYDOWN:
                     self._handle_equip_input(event)
+            return
+
+        # Spell selection screen handles its own input
+        if self.phase == PHASE_SPELL_SELECT:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    self._handle_spell_select_input(event)
+            return
+
+        # Throw selection screen handles its own input
+        if self.phase == PHASE_THROW_SELECT:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    self._handle_throw_select_input(event)
             return
 
         # Speed up non-player phases with Space/Enter
@@ -528,9 +594,70 @@ class CombatState(BaseState):
             self.phase = PHASE_EQUIP
             return
 
-        # Directional actions (ranged, cast, heal)
+        if action_id == ACTION_CAST:
+            # Open the spell selection sub-menu
+            f = self.active_fighter
+            self.spell_list = self._build_spell_list(f) if f else []
+            self.spell_cursor = 0
+            self.selected_spell = None
+            self.phase = PHASE_SPELL_SELECT
+            return
+
+        if action_id == ACTION_THROW:
+            # Open the throw item selection sub-menu
+            f = self.active_fighter
+            self.throw_list = self._build_throw_list(f) if f else []
+            self.throw_cursor = 0
+            self.selected_throw = None
+            self.phase = PHASE_THROW_SELECT
+            return
+
+        # Directional actions (ranged)
         self.directing_action = action_id
         self.phase = PHASE_PLAYER_DIR
+
+    # ── Spell selection ─────────────────────────────────────────
+
+    def _handle_spell_select_input(self, event):
+        """Handle input while the spell selection sub-menu is open."""
+        if not self.spell_list:
+            self.phase = PHASE_PLAYER
+            return
+
+        if event.key == pygame.K_UP:
+            self.spell_cursor = (self.spell_cursor - 1) % len(self.spell_list)
+        elif event.key == pygame.K_DOWN:
+            self.spell_cursor = (self.spell_cursor + 1) % len(self.spell_list)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            spell_id, _label, _cost = self.spell_list[self.spell_cursor]
+            self.selected_spell = spell_id
+            # Now enter direction mode for the chosen spell
+            self.directing_action = ACTION_CAST
+            self.phase = PHASE_PLAYER_DIR
+        elif event.key == pygame.K_ESCAPE:
+            # Cancel back to action menu
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+
+    def _handle_throw_select_input(self, event):
+        """Handle input while the throw item selection sub-menu is open."""
+        if not self.throw_list:
+            self.phase = PHASE_PLAYER
+            return
+
+        if event.key == pygame.K_UP:
+            self.throw_cursor = (self.throw_cursor - 1) % len(self.throw_list)
+        elif event.key == pygame.K_DOWN:
+            self.throw_cursor = (self.throw_cursor + 1) % len(self.throw_list)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            item_name, _count = self.throw_list[self.throw_cursor]
+            self.selected_throw = item_name
+            # Enter direction mode for the throw
+            self.directing_action = ACTION_THROW
+            self.phase = PHASE_PLAYER_DIR
+        elif event.key == pygame.K_ESCAPE:
+            self.phase = PHASE_PLAYER
+            self.selected_throw = None
 
     # ── Equip screen helpers ──────────────────────────────────────
 
@@ -548,7 +675,7 @@ class CombatState(BaseState):
 
     def _equip_get_action_options(self, member):
         """Build the action options for the current equip cursor position."""
-        from src.party import WEAPONS, ARMORS
+        from src.party import PartyMember
         idx = self.equip_cursor
         options = []
         if idx < 4:
@@ -562,8 +689,10 @@ class CombatState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
-                if item_name in ARMORS or item_name in WEAPONS:
-                    options.append("EQUIP")
+                valid_slots = member.get_valid_slots(item_name)
+                for s in valid_slots:
+                    label = PartyMember._SLOT_LABELS[s]
+                    options.append(f"EQUIP \u2192 {label}")
                 options.append("EXAMINE")
         return options
 
@@ -595,10 +724,14 @@ class CombatState(BaseState):
                 if chosen == "EXAMINE":
                     self.equip_examining = self._equip_get_item_at_cursor(f)
                     return
-                elif chosen == "EQUIP":
+                elif chosen.startswith("EQUIP"):
                     inv_idx = idx - 4
                     if inv_idx < len(f.inventory):
-                        f.equip_item(f.inventory[inv_idx])
+                        from src.party import PartyMember
+                        _label_to_key = {v: k for k, v in PartyMember._SLOT_LABELS.items()}
+                        slot_label = chosen.split("\u2192 ", 1)[1].strip()
+                        slot_key = _label_to_key.get(slot_label)
+                        f.equip_item(f.inventory[inv_idx], slot_key)
                 elif chosen == "UNEQUIP":
                     if idx < 4:
                         slot_keys = ["right_hand", "left_hand", "body", "head"]
@@ -656,10 +789,18 @@ class CombatState(BaseState):
             self._fire_ranged(dcol, drow)
 
         elif action == ACTION_CAST:
-            self._fire_fireball(dcol, drow)
+            # Dispatch based on selected spell
+            if self.selected_spell == "fireball":
+                self._fire_fireball(dcol, drow)
+            elif self.selected_spell == "heal":
+                self._cast_heal(dcol, drow)
+            else:
+                # Unknown spell — cancel safely
+                self.phase = PHASE_PLAYER
+                self.directing_action = None
 
-        elif action == ACTION_HEAL:
-            self._cast_heal(dcol, drow)
+        elif action == ACTION_THROW:
+            self._throw_item(dcol, drow)
 
     # ── Player actions ───────────────────────────────────────────
 
@@ -709,16 +850,16 @@ class CombatState(BaseState):
     # ── Ranged attack ────────────────────────────────────────────
 
     def _count_throwable(self, fighter):
-        """Count how many of the fighter's weapon are available to throw."""
-        wname = fighter.weapon
+        """Count how many of the fighter's ranged weapon are available to throw."""
+        wname = fighter.get_ranged_weapon() or fighter.weapon
         # Count in personal inventory + shared stash (equipped one is kept)
         count = fighter.inventory.count(wname)
         count += self.game.party.inv_count(wname)
         return count
 
     def _consume_throwable(self, fighter):
-        """Remove one of the fighter's weapon from inventory for throwing."""
-        wname = fighter.weapon
+        """Remove one of the fighter's ranged weapon from inventory for throwing."""
+        wname = fighter.get_ranged_weapon() or fighter.weapon
         # Take from personal inventory first, then shared stash
         if wname in fighter.inventory:
             fighter.inventory.remove(wname)
@@ -730,14 +871,17 @@ class CombatState(BaseState):
         """Fire a ranged attack in the given direction."""
         f = self.active_fighter
         if not f or not f.is_ranged(self.game.party):
+            rw = f.get_ranged_weapon() if f else None
             if f and f.is_throwable_weapon():
-                self.combat_log.append(f"{f.name} is out of {f.weapon}s to throw!")
+                self.combat_log.append(f"{f.name} is out of {rw}s to throw!")
             return
+
+        rw = f.get_ranged_weapon()
 
         # Consume ammo for throwable weapons (daggers, etc.)
         if f.is_throwable_weapon():
             if not self._consume_throwable(f):
-                self.combat_log.append(f"{f.name} has no {f.weapon}s left to throw!")
+                self.combat_log.append(f"{f.name} has no {rw}s left to throw!")
                 return
             ammo_left = self._count_throwable(f)
             ammo_note = f" ({ammo_left} left)"
@@ -777,13 +921,16 @@ class CombatState(BaseState):
                 end_row = tr
 
         # Determine projectile color based on weapon
+        rw_lower = rw.lower() if rw else ""
         proj_color = (255, 200, 80)  # default gold arrow
-        if "bow" in f.weapon.lower():
+        if "bow" in rw_lower:
             proj_color = (255, 255, 200)  # pale arrow
-        elif "sling" in f.weapon.lower():
+        elif "sling" in rw_lower:
             proj_color = (180, 180, 180)  # gray stone
-        elif "dagger" in f.weapon.lower():
+        elif "dagger" in rw_lower:
             proj_color = (200, 220, 240)  # silver
+        elif "rock" in rw_lower:
+            proj_color = (160, 140, 120)  # brown stone
 
         proj = Projectile(col, row, end_col, end_row,
                           color=proj_color, symbol=">" if dcol > 0 else
@@ -794,13 +941,81 @@ class CombatState(BaseState):
         self._pending_ranged = {
             "fighter": f,
             "hit_monster": hit_monster,
+            "ranged_weapon": rw,
         }
 
         self.phase = PHASE_PROJECTILE
-        if "dagger" in f.weapon.lower():
-            self.combat_log.append(f"{f.name} throws {f.weapon}!{ammo_note}")
+        if f.is_throwable_weapon():
+            self.combat_log.append(f"{f.name} throws {rw}!{ammo_note}")
         else:
-            self.combat_log.append(f"{f.name} fires {f.weapon}!{ammo_note}")
+            self.combat_log.append(f"{f.name} fires {rw}!{ammo_note}")
+
+    def _throw_item(self, dcol, drow):
+        """Throw a selected item from inventory in the given direction."""
+        from src.party import WEAPONS
+        f = self.active_fighter
+        item_name = self.selected_throw
+        if not f or not item_name:
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        # Consume one from personal inventory first, then party stash
+        if item_name in f.inventory:
+            f.inventory.remove(item_name)
+        else:
+            removed = self.game.party.inv_remove(item_name)
+            if removed is None:
+                self.combat_log.append(f"{f.name} has no {item_name} to throw!")
+                self.phase = PHASE_PLAYER
+                self.directing_action = None
+                return
+
+        col, row = self.fighter_positions[f]
+
+        # Trace ray to find monster or wall
+        tc, tr = col + dcol, row + drow
+        hit_monster = False
+        end_col, end_row = col, row
+
+        while not self._is_arena_wall(tc, tr):
+            if tc == self.monster_col and tr == self.monster_row:
+                hit_monster = True
+                end_col, end_row = tc, tr
+                break
+            tc += dcol
+            tr += drow
+
+        if not hit_monster:
+            end_col = tc - dcol
+            end_row = tr - drow
+            if end_col == col and end_row == row:
+                end_col = tc
+                end_row = tr
+
+        proj_color = (200, 220, 240)  # silver for thrown items
+        proj = Projectile(col, row, end_col, end_row,
+                          color=proj_color,
+                          symbol=">" if dcol > 0 else
+                          "<" if dcol < 0 else "v" if drow > 0 else "^")
+        self.projectiles.append(proj)
+
+        # Store the weapon stats for damage resolution — use the thrown
+        # item's power, not the equipped weapon's
+        wp = WEAPONS.get(item_name, {"power": 0})
+        self._pending_ranged = {
+            "fighter": f,
+            "hit_monster": hit_monster,
+            "thrown_item": item_name,
+            "thrown_power": wp.get("power", 0),
+        }
+
+        self.phase = PHASE_PROJECTILE
+        # Count remaining
+        remaining = f.inventory.count(item_name) + self.game.party.inv_count(item_name)
+        self.combat_log.append(
+            f"{f.name} throws {item_name}! ({remaining} left)"
+        )
 
     def _fire_ranged_at_monster(self):
         """Fire toward the monster directly (from menu Attack)."""
@@ -835,9 +1050,11 @@ class CombatState(BaseState):
 
         f = info["fighter"]
         hit_monster = info["hit_monster"]
+        thrown_item = info.get("thrown_item")
 
         if not hit_monster:
-            self.combat_log.append(f"{f.name}'s shot misses the target!")
+            label = thrown_item or info.get("ranged_weapon") or f.weapon
+            self.combat_log.append(f"{f.name}'s {label} misses the target!")
             self._end_fighter_turn()
             return
 
@@ -862,11 +1079,19 @@ class CombatState(BaseState):
             )
 
         if hit:
-            dice_count, dice_sides, dmg_bonus = f.get_damage_dice()
-            damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
+            if thrown_item:
+                # Thrown item uses its own power for damage (1d6 + power)
+                thrown_power = info.get("thrown_power", 0)
+                damage = roll_damage(1, 6, thrown_power, critical=crit)
+                dmg_label = thrown_item
+            else:
+                rw_name = info.get("ranged_weapon") or f.weapon
+                dice_count, dice_sides, dmg_bonus = f.get_damage_dice(rw_name)
+                damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
+                dmg_label = rw_name
             self.monster.hp = max(0, self.monster.hp - damage)
             self.combat_log.append(
-                f"{f.name} deals {damage} damage with {f.weapon}!"
+                f"{f.name} deals {damage} damage with {dmg_label}!"
             )
             # Spawn a hit flash on the monster
             self.hit_effects.append(
@@ -1213,6 +1438,8 @@ class CombatState(BaseState):
     def _end_fighter_turn(self):
         """Advance to next alive fighter, or to monster turn if all have acted."""
         self.directing_action = None
+        self.selected_spell = None
+        self.selected_throw = None
         self.active_idx += 1
 
         # Skip dead fighters
@@ -1552,4 +1779,10 @@ class CombatState(BaseState):
             source_state=self.source_state,
             directing_action=self.directing_action,
             menu_actions=self.menu_actions,
+            spell_list=self.spell_list,
+            spell_cursor=self.spell_cursor,
+            selected_spell=self.selected_spell,
+            throw_list=self.throw_list,
+            throw_cursor=self.throw_cursor,
+            selected_throw=self.selected_throw,
         )

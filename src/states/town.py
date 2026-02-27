@@ -456,7 +456,7 @@ class TownState(BaseState):
 
     def _get_action_options(self, member):
         """Build the list of action option keys for the current cursor position."""
-        from src.party import WEAPONS, ARMORS
+        from src.party import PartyMember
         idx = self.char_sheet_cursor
         options = []
         if idx < 4:
@@ -471,8 +471,10 @@ class TownState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
-                if item_name in ARMORS or item_name in WEAPONS:
-                    options.append("EQUIP")
+                valid_slots = member.get_valid_slots(item_name)
+                for s in valid_slots:
+                    label = PartyMember._SLOT_LABELS[s]
+                    options.append(f"EQUIP \u2192 {label}")
                 options.append("RETURN TO PARTY STASH")
                 options.append("EXAMINE")
         return options
@@ -507,10 +509,14 @@ class TownState(BaseState):
                     if not member.unequip_slot(slot_keys[idx]):
                         self.message = f"Cannot remove basic {member.equipped.get(slot_keys[idx], 'gear')}!"
                         self.message_timer = 2000
-            elif chosen == "EQUIP":
+            elif chosen.startswith("EQUIP"):
                 inv_idx = idx - 4
                 if inv_idx < len(member.inventory):
-                    member.equip_item(member.inventory[inv_idx])
+                    from src.party import PartyMember
+                    _label_to_key = {v: k for k, v in PartyMember._SLOT_LABELS.items()}
+                    slot_label = chosen.split("\u2192 ", 1)[1].strip()
+                    slot_key = _label_to_key.get(slot_label)
+                    member.equip_item(member.inventory[inv_idx], slot_key)
             elif chosen == "RETURN TO PARTY STASH":
                 if idx < 4:
                     slot_keys = ["right_hand", "left_hand", "body", "head"]

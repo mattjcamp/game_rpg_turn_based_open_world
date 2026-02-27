@@ -1,0 +1,24 @@
+{
+  "_comment": "Party configuration for Realm of Shadow. Edit this file to change starting position, gold, and shared inventory without touching code.",
+
+  "start_position": {
+    "col": 11,
+    "row": 14
+  },
+
+  "gold": 200,
+
+  "inventory": [
+    { "item": "Torch" },
+    { "item": "Arrows",  "charges": 10 },
+    { "item": "Dagger" },
+    { "item": "Dagger" },
+    { "item": "Rock" },
+    { "item": "Rock" },
+    { "item": "Rock" },
+    { "item": "Bow" },
+    { "item": "Sling" },
+    { "item": "Stones",  "charges": 10 }
+
+  ]
+}

@@ -5,22 +5,36 @@
     "Fists": {
       "power": 0,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "Bare knuckles. Not much, but always available.",
       "icon": "gloves"
     },
     "Dagger": {
       "power": 1,
-      "ranged": true,
+      "ranged": false,
       "melee": true,
       "throwable": true,
+      "slots": ["right_hand", "left_hand"],
       "description": "A short, light blade. Good for melee and throwing.",
       "icon": "dagger",
       "buy": 20,
       "sell": 10
     },
+    "Rock": {
+      "power": 1,
+      "ranged": true,
+      "melee": false,
+      "throwable": true,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A smooth river rock",
+      "icon": "rock",
+      "buy": 0,
+      "sell":0
+    },
     "Club": {
       "power": 1,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A simple wooden club. Cheap but sturdy.",
       "icon": "mace",
       "buy": 20,
@@ -29,6 +43,7 @@
     "Mace": {
       "power": 2,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A heavy flanged club, favored by clerics.",
       "icon": "mace",
       "buy": 40,
@@ -38,6 +53,7 @@
       "power": 3,
       "ranged": true,
       "ammo": "Stones",
+      "slots": ["right_hand", "left_hand"],
       "description": "A simple ranged weapon that hurls stones.",
       "icon": "bow",
       "buy": 60,
@@ -46,6 +62,7 @@
     "Axe": {
       "power": 4,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A single-headed battle axe. Reliable and brutal.",
       "icon": "axe",
       "buy": 80,
@@ -54,6 +71,7 @@
     "Sword": {
       "power": 5,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A well-balanced longsword. Standard fighter fare.",
       "icon": "sword",
       "buy": 120,
@@ -62,12 +80,14 @@
     "Spear": {
       "power": 6,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A long thrusting weapon with good reach.",
       "icon": "spear"
     },
     "Broad Axe": {
       "power": 7,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A massive double-headed axe. Devastating blows.",
       "icon": "axe"
     },
@@ -75,6 +95,7 @@
       "power": 7,
       "ranged": true,
       "ammo": "Arrows",
+      "slots": ["right_hand", "left_hand"],
       "description": "A sturdy longbow. Excellent at range.",
       "icon": "bow",
       "buy": 150,
@@ -83,18 +104,21 @@
     "Iron Sword": {
       "power": 8,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A finely forged iron blade. Sharp and durable.",
       "icon": "sword"
     },
     "Gloves": {
       "power": 8,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "Enchanted gauntlets that strike with magic force.",
       "icon": "gloves"
     },
     "Halberd": {
       "power": 9,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A polearm combining axe and spear. Fearsome reach.",
       "icon": "halberd"
     },
@@ -102,18 +126,21 @@
       "power": 9,
       "ranged": true,
       "ammo": "Arrows",
+      "slots": ["right_hand", "left_hand"],
       "description": "A silver-inlaid bow. Deadly against the undead.",
       "icon": "bow"
     },
     "Sun Sword": {
       "power": 10,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "A radiant blade infused with solar energy.",
       "icon": "sword"
     },
     "Mystic Sword": {
       "power": 10,
       "ranged": false,
+      "slots": ["right_hand", "left_hand"],
       "description": "An ancient blade pulsing with arcane power.",
       "icon": "sword"
     }
@@ -122,6 +149,7 @@
   "armors": {
     "Cloth": {
       "evasion": 50,
+      "slots": ["body"],
       "description": "Simple cloth garments. Minimal protection.",
       "icon": "armor_light",
       "buy": 20,
@@ -129,6 +157,7 @@
     },
     "Leather": {
       "evasion": 56,
+      "slots": ["body"],
       "description": "Toughened leather armor. Light and flexible.",
       "icon": "armor_light",
       "buy": 50,
@@ -136,6 +165,7 @@
     },
     "Chain": {
       "evasion": 58,
+      "slots": ["body"],
       "description": "Interlocking metal rings. Good all-round defense.",
       "icon": "armor_heavy",
       "buy": 120,
@@ -143,21 +173,25 @@
     },
     "Plate": {
       "evasion": 60,
+      "slots": ["body"],
       "description": "Heavy steel plates. Excellent protection.",
       "icon": "armor_heavy"
     },
     "+2 Chain": {
       "evasion": 62,
+      "slots": ["body"],
       "description": "Enchanted chainmail. Magically reinforced links.",
       "icon": "armor_heavy"
     },
     "+2 Plate": {
       "evasion": 64,
+      "slots": ["body"],
       "description": "Enchanted plate armor. Nearly impenetrable.",
       "icon": "armor_heavy"
     },
     "Exotic": {
       "evasion": 67,
+      "slots": ["body"],
       "description": "Mysterious armor of unknown origin. Supreme defense.",
       "icon": "armor_heavy"
     }

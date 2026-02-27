@@ -44,6 +44,8 @@ def load_items():
             entry["throwable"] = True
         if data.get("ammo"):
             entry["ammo"] = data["ammo"]
+        if data.get("slots"):
+            entry["slots"] = data["slots"]
         weapons[name] = entry
 
         # Description & icon (what ITEM_INFO needs)
@@ -65,7 +67,10 @@ def load_items():
 
     # ── Armors ──
     for name, data in raw.get("armors", {}).items():
-        armors[name] = {"evasion": data["evasion"]}
+        entry = {"evasion": data["evasion"]}
+        if data.get("slots"):
+            entry["slots"] = data["slots"]
+        armors[name] = entry
 
         if "description" in data or "icon" in data:
             info = {

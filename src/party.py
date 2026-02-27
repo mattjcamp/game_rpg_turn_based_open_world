@@ -10,10 +10,23 @@ data/items.json at startup.  Edit that file to add or tweak items without
 touching this code.
 """
 
+import json
+import os
+
 from src.data_loader import load_items
 
 # ── Load all item tables from data/items.json ─────────────────────
 WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
+
+# ── Load party config from data/party.json ────────────────────────
+_PARTY_JSON = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "party.json")
+
+
+def _load_party_config():
+    """Load party configuration from data/party.json."""
+    with open(_PARTY_JSON, "r") as f:
+        return json.load(f)
 
 
 def get_sell_price(item_name):
@@ -133,19 +146,21 @@ class PartyMember:
         """Melee attack bonus: STR modifier (+ weapon bonus later)."""
         return self.str_mod
 
-    def get_weapon_power(self):
-        """Return the equipped weapon's power rating."""
-        return WEAPONS.get(self.weapon, {"power": 0})["power"]
+    def get_weapon_power(self, weapon_name=None):
+        """Return a weapon's power rating. Defaults to main-hand weapon."""
+        wname = weapon_name or self.weapon
+        return WEAPONS.get(wname, {"power": 0})["power"]
 
     def get_damage(self):
         """Ultima III damage: weapon power + 1.5 * STR (min 1)."""
         wp = self.get_weapon_power()
         return max(1, int(wp + 1.5 * self.strength))
 
-    def get_damage_dice(self):
+    def get_damage_dice(self, weapon_name=None):
         """Return (count, sides, bonus) for weapon damage.
-        Uses weapon power to determine dice size, STR as bonus."""
-        wp = self.get_weapon_power()
+        Uses weapon power to determine dice size, STR as bonus.
+        Optionally specify a weapon_name to get dice for a specific weapon."""
+        wp = self.get_weapon_power(weapon_name)
         if wp <= 2:
             return (1, 4, self.str_mod)
         elif wp <= 5:
@@ -155,20 +170,34 @@ class PartyMember:
         else:
             return (1, 10, self.str_mod)
 
+    def get_ranged_weapon(self):
+        """Return the name of the first ranged weapon found in either hand, or None.
+
+        Checks right_hand first, then left_hand.
+        """
+        for slot in ("right_hand", "left_hand"):
+            wp_name = self.equipped.get(slot)
+            if wp_name:
+                wdata = WEAPONS.get(wp_name, {})
+                if wdata.get("ranged", False):
+                    return wp_name
+        return None
+
     def is_ranged(self, party=None):
-        """True if the equipped weapon can attack at range and has ammo.
+        """True if a ranged weapon is equipped in either hand and has ammo.
 
         Throwable weapons need copies in inventory to throw.
         Ammo weapons (bows) need ammo charges in party shared inventory.
         """
-        wdata = WEAPONS.get(self.weapon, {"ranged": False})
-        if not wdata.get("ranged", False):
+        rw = self.get_ranged_weapon()
+        if not rw:
             return False
+        wdata = WEAPONS[rw]
         # Throwable weapons need items in inventory to throw
         if wdata.get("throwable", False):
-            count = self.inventory.count(self.weapon)
+            count = self.inventory.count(rw)
             if party:
-                count += party.inv_count(self.weapon)
+                count += party.inv_count(rw)
             return count > 0
         # Ammo weapons need charges in shared inventory
         ammo_type = wdata.get("ammo")
@@ -179,15 +208,21 @@ class PartyMember:
         return True
 
     def is_throwable_weapon(self):
-        """True if the equipped weapon is thrown and consumed on ranged use."""
-        return WEAPONS.get(self.weapon, {}).get("throwable", False)
+        """True if the ranged weapon is thrown and consumed on ranged use."""
+        rw = self.get_ranged_weapon()
+        if not rw:
+            return False
+        return WEAPONS.get(rw, {}).get("throwable", False)
 
     def get_ammo_type(self):
-        """Return the ammo item name required by the equipped weapon, or None."""
-        return WEAPONS.get(self.weapon, {}).get("ammo")
+        """Return the ammo item name required by the ranged weapon, or None."""
+        rw = self.get_ranged_weapon()
+        if not rw:
+            return None
+        return WEAPONS.get(rw, {}).get("ammo")
 
     def uses_ammo(self):
-        """True if the equipped weapon requires ammunition from shared inventory."""
+        """True if the ranged weapon requires ammunition from shared inventory."""
         return self.get_ammo_type() is not None
 
     def get_ammo(self):
@@ -228,25 +263,37 @@ class PartyMember:
         "head": None,
     }
 
-    def _determine_slot(self, item_name):
-        """Return the equipment slot for an item, or None if not equippable."""
-        if item_name in ARMORS:
-            return "body"
+    def get_valid_slots(self, item_name):
+        """Return a list of equipment slots this item can be placed in.
+
+        Reads from the item's 'slots' field in the data files.
+        Falls back to legacy logic if no slots field is defined.
+        Returns an empty list if the item is not equippable.
+        """
+        # Check weapons first, then armors
         wp = WEAPONS.get(item_name)
         if wp:
-            return "right_hand"
-        return None
+            return list(wp.get("slots", ["right_hand"]))
+        arm = ARMORS.get(item_name)
+        if arm:
+            return list(arm.get("slots", ["body"]))
+        return []
 
-    def equip_item(self, item_name):
-        """Equip an item from inventory to the appropriate slot.
+    def equip_item(self, item_name, slot=None):
+        """Equip an item from inventory to the given slot.
 
+        If slot is None, falls back to the first valid slot (legacy behavior).
         Returns True if the item was equipped, False otherwise.
         The previously equipped item in that slot (if any) is moved to inventory.
         """
         if item_name not in self.inventory:
             return False
-        slot = self._determine_slot(item_name)
+        valid_slots = self.get_valid_slots(item_name)
+        if not valid_slots:
+            return False
         if slot is None:
+            slot = valid_slots[0]
+        elif slot not in valid_slots:
             return False
 
         # Move the currently equipped item back to inventory (if not a default)
@@ -538,12 +585,18 @@ class Party:
         return [m for m in self.members if m.is_alive()]
 
 
-def create_default_party(start_col, start_row):
+def create_default_party(start_col=None, start_row=None):
     """Create a classic balanced party of 4 characters (Ultima III style).
 
-    Everyone starts humble: cloth armor, a simple weapon, and one shared
-    torch.  Better gear must be found or purchased.
+    Party-level settings (position, gold, shared inventory) are loaded
+    from data/party.json so they can be tweaked without touching code.
+    If start_col/start_row are provided they override the JSON values.
     """
+    cfg = _load_party_config()
+    if start_col is None:
+        start_col = cfg["start_position"]["col"]
+    if start_row is None:
+        start_row = cfg["start_position"]["row"]
     party = Party(start_col, start_row)
 
     # 1. Dwarf Fighter — front-line tank
@@ -590,9 +643,16 @@ def create_default_party(start_col, start_row):
     sable.armor = "Cloth"
     party.add_member(sable)
 
-    # Shared party stash — start with a torch the player can equip
-    # Shared party stash — torch and starting ammo
-    party.shared_inventory = ["Torch"]
-    party.inv_add("Arrows", charges=10)
+    # ── Party-level config from data/party.json ──
+    party.gold = cfg.get("gold", 100)
+
+    party.shared_inventory = []
+    for entry in cfg.get("inventory", []):
+        item_name = entry["item"]
+        charges = entry.get("charges")
+        if charges is not None:
+            party.inv_add(item_name, charges=charges)
+        else:
+            party.shared_inventory.append(item_name)
 
     return party

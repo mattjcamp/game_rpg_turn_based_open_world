@@ -1428,7 +1428,11 @@ class Renderer:
                           heal_effects=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
-                          menu_actions=None):
+                          menu_actions=None,
+                          spell_list=None, spell_cursor=0,
+                          selected_spell=None,
+                          throw_list=None, throw_cursor=0,
+                          selected_throw=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1578,7 +1582,13 @@ class Renderer:
                               rx, action_y, rw, action_h,
                               active_fighter=active_fighter,
                               directing_action=directing_action,
-                              menu_actions=menu_actions)
+                              menu_actions=menu_actions,
+                              spell_list=spell_list,
+                              spell_cursor=spell_cursor,
+                              selected_spell=selected_spell,
+                              throw_list=throw_list,
+                              throw_cursor=throw_cursor,
+                              selected_throw=selected_throw)
 
         # ── 5. bottom combat log ──
         bar_y = arena_bottom + 6
@@ -2240,18 +2250,28 @@ class Renderer:
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None,
-                         directing_action=None, menu_actions=None):
+                         directing_action=None, menu_actions=None,
+                         spell_list=None, spell_cursor=0,
+                         selected_spell=None,
+                         throw_list=None, throw_cursor=0,
+                         selected_throw=None):
         """Action menu in retro style."""
         from src.states.combat import (
-            ACTION_RANGED, ACTION_CAST, ACTION_HEAL,
-            PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_VICTORY, PHASE_DEFEAT,
+            ACTION_RANGED, ACTION_CAST, ACTION_THROW,
+            PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_SPELL_SELECT,
+            PHASE_THROW_SELECT,
+            PHASE_VICTORY, PHASE_DEFEAT,
             PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL,
         )
 
         _DIR_LABELS = {
             ACTION_RANGED: "RANGE ATTACK",
             ACTION_CAST:   "CAST",
-            ACTION_HEAL:   "HEAL",
+            ACTION_THROW:  "THROW",
+        }
+        _SPELL_DIR_LABELS = {
+            "fireball": "FIREBALL",
+            "heal":     "HEAL",
         }
 
         self._u3_panel(x, y, w, h)
@@ -2293,9 +2313,51 @@ class Renderer:
             self._u3_text("[SPACE] SKIP TURN", tx, y + h - 32, self._U3_LTBLUE, f)
             self._u3_text("[ENTER] CONFIRM", tx, y + h - 16, self._U3_ORANGE, f)
 
+        elif phase == PHASE_SPELL_SELECT:
+            # Spell selection sub-menu
+            name = active_fighter.name if active_fighter else "???"
+            self._u3_text(f"-- {name.upper()}'S SPELLS --", tx, ty, self._U3_ORANGE, f)
+
+            if spell_list:
+                for i, (spell_id, label, mp_cost) in enumerate(spell_list):
+                    iy = ty + 28 + i * 24
+                    sel = (i == spell_cursor)
+                    prefix = "> " if sel else "  "
+                    color = self._U3_WHITE if sel else self._U3_LTBLUE
+                    self._u3_text(prefix + label.upper(), tx, iy, color, f)
+            else:
+                self._u3_text("  NO SPELLS AVAILABLE", tx, ty + 28, (160, 160, 160), f)
+
+            self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
+            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
+
+        elif phase == PHASE_THROW_SELECT:
+            # Throw item selection sub-menu
+            name = active_fighter.name if active_fighter else "???"
+            self._u3_text(f"-- THROW ITEM --", tx, ty, self._U3_ORANGE, f)
+
+            if throw_list:
+                for i, (item_name, count) in enumerate(throw_list):
+                    iy = ty + 28 + i * 24
+                    sel = (i == throw_cursor)
+                    prefix = "> " if sel else "  "
+                    color = self._U3_WHITE if sel else self._U3_LTBLUE
+                    label = f"{item_name.upper()} x{count}"
+                    self._u3_text(prefix + label, tx, iy, color, f)
+            else:
+                self._u3_text("  NO THROWABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
+
+            self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
+            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
+
         elif phase == PHASE_PLAYER_DIR:
-            # Direction selection mode
-            action_label = _DIR_LABELS.get(directing_action, "???")
+            # Direction selection mode — show spell/throw name if applicable
+            if directing_action == ACTION_CAST and selected_spell:
+                action_label = _SPELL_DIR_LABELS.get(selected_spell, "CAST")
+            elif directing_action == ACTION_THROW and selected_throw:
+                action_label = f"THROW {selected_throw.upper()}"
+            else:
+                action_label = _DIR_LABELS.get(directing_action, "???")
             self._u3_text(f"-- {action_label} --", tx, ty, self._U3_ORANGE, f)
             self._u3_text("CHOOSE DIRECTION", tx, ty + 28, self._U3_WHITE, f)
 
@@ -2717,7 +2779,7 @@ class Renderer:
                 if item_name in ARMORS:
                     equip_hint = "(BODY)"
                 elif item_name in WEAPONS:
-                    equip_hint = "(R.HAND)"
+                    equip_hint = "(WEAPON)"
                 if equip_hint:
                     self._u3_text(equip_hint, rx + right_w - 90, ry,
                                   (160, 160, 255) if selected else (100, 100, 160), fm)
