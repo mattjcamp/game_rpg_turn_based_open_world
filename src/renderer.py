@@ -2371,7 +2371,10 @@ class Renderer:
 
         elif phase == PHASE_PLAYER_DIR:
             # Direction selection mode — show spell/throw name if applicable
-            if directing_action == ACTION_CAST and selected_spell:
+            if directing_action == ACTION_RANGED and active_fighter:
+                rw = active_fighter.get_ranged_weapon()
+                action_label = f"SHOOT {rw.upper()}" if rw else "RANGE ATTACK"
+            elif directing_action == ACTION_CAST and selected_spell:
                 action_label = _SPELL_DIR_LABELS.get(selected_spell, "CAST")
             elif directing_action == ACTION_THROW and selected_throw:
                 action_label = f"THROW {selected_throw.upper()}"

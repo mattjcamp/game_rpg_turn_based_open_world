@@ -187,7 +187,8 @@ class PartyMember:
         """True if a ranged weapon is equipped in either hand and has ammo.
 
         Throwable weapons need copies in inventory to throw.
-        Ammo weapons (bows) need ammo charges in party shared inventory.
+        Ammo weapons (bows) need ammo charges in party shared inventory
+        or in the character's personal inventory.
         """
         rw = self.get_ranged_weapon()
         if not rw:
@@ -199,13 +200,25 @@ class PartyMember:
             if party:
                 count += party.inv_count(rw)
             return count > 0
-        # Ammo weapons need charges in shared inventory
+        # Ammo weapons need charges in shared or personal inventory
         ammo_type = wdata.get("ammo")
-        if ammo_type and party:
-            return party.inv_get_charges(ammo_type) > 0
-        elif ammo_type:
-            return False  # No party reference, can't check ammo
+        if ammo_type:
+            total = self._count_personal_ammo(ammo_type)
+            if party:
+                total += party.inv_get_charges(ammo_type)
+            return total > 0
         return True
+
+    def _count_personal_ammo(self, ammo_type):
+        """Count ammo charges in the character's personal inventory."""
+        total = 0
+        for entry in self.inventory:
+            if isinstance(entry, dict):
+                if entry.get("name") == ammo_type:
+                    total += entry.get("charges", 1)
+            elif entry == ammo_type:
+                total += 1
+        return total
 
     def is_throwable_weapon(self):
         """True if the ranged weapon is thrown and consumed on ranged use."""

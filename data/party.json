@@ -13,6 +13,8 @@
     { "item": "Rock" },
     { "item": "Rock" },
     { "item": "Rock" },
+    { "item": "Bow" },
+    { "item": "Arrows", "charges": 20 },
     { "item": "Healing Herb" }
   ]
 }

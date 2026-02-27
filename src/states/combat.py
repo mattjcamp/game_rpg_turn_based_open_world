@@ -442,14 +442,17 @@ class CombatState(BaseState):
         self.menu_actions = []  # list of (action_id, label)
         if not f:
             return
-        if f.is_ranged(self.game.party):
-            label = "Range Attack"
+        rw = f.get_ranged_weapon()
+        if rw and f.is_ranged(self.game.party):
+            label = f"{rw}"
             if f.is_throwable_weapon():
                 ammo = self._count_throwable(f)
                 label += f" (x{ammo})"
             elif f.uses_ammo():
-                ammo = self.game.party.inv_get_charges(f.get_ammo_type())
-                label += f" (x{ammo})"
+                ammo_type = f.get_ammo_type()
+                ammo = (f._count_personal_ammo(ammo_type)
+                        + self.game.party.inv_get_charges(ammo_type))
+                label += f" ({ammo} {ammo_type})"
             self.menu_actions.append((ACTION_RANGED, label))
         # Show "Throw" if the character has any throwable items available
         throwables = self._build_throw_list(f)
@@ -939,6 +942,24 @@ class CombatState(BaseState):
         removed = self.game.party.inv_remove(wname)
         return removed is not None
 
+    def _consume_personal_ammo(self, fighter, ammo_type):
+        """Consume one charge of ammo from the fighter's personal inventory.
+
+        Returns True if successful.
+        """
+        for i, entry in enumerate(fighter.inventory):
+            if isinstance(entry, dict) and entry.get("name") == ammo_type:
+                ch = entry.get("charges", 1)
+                if ch > 1:
+                    entry["charges"] = ch - 1
+                else:
+                    fighter.inventory.pop(i)
+                return True
+            elif entry == ammo_type:
+                fighter.inventory.pop(i)
+                return True
+        return False
+
     def _fire_ranged(self, dcol, drow):
         """Fire a ranged attack in the given direction."""
         f = self.active_fighter
@@ -959,10 +980,15 @@ class CombatState(BaseState):
             ammo_note = f" ({ammo_left} left)"
         elif f.uses_ammo():
             ammo_type = f.get_ammo_type()
-            if not self.game.party.inv_consume_charge(ammo_type):
+            # Try personal inventory first, then party shared stash
+            consumed = self._consume_personal_ammo(f, ammo_type)
+            if not consumed:
+                consumed = self.game.party.inv_consume_charge(ammo_type)
+            if not consumed:
                 self.combat_log.append(f"{f.name} is out of {ammo_type.lower()}!")
                 return
-            ammo_left = self.game.party.inv_get_charges(ammo_type)
+            ammo_left = (f._count_personal_ammo(ammo_type)
+                         + self.game.party.inv_get_charges(ammo_type))
             ammo_note = f" ({ammo_left} {ammo_type.lower()} left)"
         else:
             ammo_note = ""
