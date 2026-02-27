@@ -423,9 +423,12 @@ class CombatState(BaseState):
         if not f:
             return
         if f.is_ranged(self.game.party):
-            ammo = self._count_throwable(f) if f.is_throwable_weapon() else -1
             label = "Range Attack"
-            if ammo >= 0:
+            if f.is_throwable_weapon():
+                ammo = self._count_throwable(f)
+                label += f" (x{ammo})"
+            elif f.uses_ammo():
+                ammo = self.game.party.inv_get_charges(f.get_ammo_type())
                 label += f" (x{ammo})"
             self.menu_actions.append((ACTION_RANGED, label))
         if f.can_cast_sorcerer() and f.current_mp >= FIREBALL_MP_COST:
@@ -534,11 +537,11 @@ class CombatState(BaseState):
     def _equip_get_item_at_cursor(self, member):
         """Return the item name at the current equip cursor position."""
         idx = self.equip_cursor
-        if idx < 3:
-            slot_keys = ["body", "melee", "ranged"]
+        if idx < 4:
+            slot_keys = ["right_hand", "left_hand", "body", "head"]
             return member.equipped.get(slot_keys[idx])
         else:
-            inv_idx = idx - 3
+            inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 return member.inventory[inv_idx]
         return None
@@ -548,15 +551,15 @@ class CombatState(BaseState):
         from src.party import WEAPONS, ARMORS
         idx = self.equip_cursor
         options = []
-        if idx < 3:
-            slot_keys = ["body", "melee", "ranged"]
+        if idx < 4:
+            slot_keys = ["right_hand", "left_hand", "body", "head"]
             slot = slot_keys[idx]
             current = member.equipped.get(slot)
             if current:
                 options.append("UNEQUIP")
                 options.append("EXAMINE")
         else:
-            inv_idx = idx - 3
+            inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
                 if item_name in ARMORS or item_name in WEAPONS:
@@ -593,17 +596,17 @@ class CombatState(BaseState):
                     self.equip_examining = self._equip_get_item_at_cursor(f)
                     return
                 elif chosen == "EQUIP":
-                    inv_idx = idx - 3
+                    inv_idx = idx - 4
                     if inv_idx < len(f.inventory):
                         f.equip_item(f.inventory[inv_idx])
                 elif chosen == "UNEQUIP":
-                    if idx < 3:
-                        slot_keys = ["body", "melee", "ranged"]
+                    if idx < 4:
+                        slot_keys = ["right_hand", "left_hand", "body", "head"]
                         if not f.unequip_slot(slot_keys[idx]):
                             self.combat_log.append(f"Cannot remove basic {f.equipped.get(slot_keys[idx], 'gear')}!")
                 self.equip_action_menu = False
                 # Clamp cursor
-                total = 3 + len(f.inventory)
+                total = 4 + len(f.inventory)
                 if self.equip_cursor >= total:
                     self.equip_cursor = max(0, total - 1)
             elif event.key == pygame.K_ESCAPE:
@@ -611,7 +614,7 @@ class CombatState(BaseState):
             return
 
         # Main equip screen navigation
-        total_rows = 3 + len(f.inventory)
+        total_rows = 4 + len(f.inventory)
 
         if event.key == pygame.K_ESCAPE:
             # Close equip screen — costs the turn
@@ -738,6 +741,13 @@ class CombatState(BaseState):
                 return
             ammo_left = self._count_throwable(f)
             ammo_note = f" ({ammo_left} left)"
+        elif f.uses_ammo():
+            ammo_type = f.get_ammo_type()
+            if not self.game.party.inv_consume_charge(ammo_type):
+                self.combat_log.append(f"{f.name} is out of {ammo_type.lower()}!")
+                return
+            ammo_left = self.game.party.inv_get_charges(ammo_type)
+            ammo_note = f" ({ammo_left} {ammo_type.lower()} left)"
         else:
             ammo_note = ""
 

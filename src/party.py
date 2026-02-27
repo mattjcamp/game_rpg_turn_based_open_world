@@ -46,11 +46,12 @@ class PartyMember:
         self.weapon = "Fists"
         self.armor = "Cloth"
 
-        # Equipment slots: body armor, melee weapon, ranged weapon
+        # Equipment slots: right hand, left hand, body armor, head
         self.equipped = {
+            "right_hand": "Fists",
+            "left_hand": None,
             "body": "Cloth",
-            "melee": "Fists",
-            "ranged": None,       # None means no ranged weapon equipped
+            "head": None,
         }
 
         # Inventory — list of item name strings the character is carrying
@@ -155,8 +156,11 @@ class PartyMember:
             return (1, 10, self.str_mod)
 
     def is_ranged(self, party=None):
-        """True if the equipped weapon can attack at range and has ammo (if throwable).
-        For throwable weapons, pass party to check shared inventory."""
+        """True if the equipped weapon can attack at range and has ammo.
+
+        Throwable weapons need copies in inventory to throw.
+        Ammo weapons (bows) need ammo charges in party shared inventory.
+        """
         wdata = WEAPONS.get(self.weapon, {"ranged": False})
         if not wdata.get("ranged", False):
             return False
@@ -166,11 +170,25 @@ class PartyMember:
             if party:
                 count += party.inv_count(self.weapon)
             return count > 0
+        # Ammo weapons need charges in shared inventory
+        ammo_type = wdata.get("ammo")
+        if ammo_type and party:
+            return party.inv_get_charges(ammo_type) > 0
+        elif ammo_type:
+            return False  # No party reference, can't check ammo
         return True
 
     def is_throwable_weapon(self):
         """True if the equipped weapon is thrown and consumed on ranged use."""
         return WEAPONS.get(self.weapon, {}).get("throwable", False)
+
+    def get_ammo_type(self):
+        """Return the ammo item name required by the equipped weapon, or None."""
+        return WEAPONS.get(self.weapon, {}).get("ammo")
+
+    def uses_ammo(self):
+        """True if the equipped weapon requires ammunition from shared inventory."""
+        return self.get_ammo_type() is not None
 
     def get_ammo(self):
         """Return current ammo count for the equipped weapon."""
@@ -195,8 +213,20 @@ class PartyMember:
 
     # ── Equipment management ──────────────────────────────────
 
-    # Default items for each slot (cannot be unequipped below these)
-    _SLOT_DEFAULTS = {"body": "Cloth", "melee": "Fists", "ranged": None}
+    # Equipment slot order and defaults
+    _EQUIP_SLOTS = ["right_hand", "left_hand", "body", "head"]
+    _SLOT_LABELS = {
+        "right_hand": "RIGHT HAND",
+        "left_hand": "LEFT HAND",
+        "body": "BODY",
+        "head": "HEAD",
+    }
+    _SLOT_DEFAULTS = {
+        "right_hand": "Fists",
+        "left_hand": None,
+        "body": "Cloth",
+        "head": None,
+    }
 
     def _determine_slot(self, item_name):
         """Return the equipment slot for an item, or None if not equippable."""
@@ -204,10 +234,7 @@ class PartyMember:
             return "body"
         wp = WEAPONS.get(item_name)
         if wp:
-            # Weapons that are both melee and ranged go in the melee slot
-            if wp.get("melee", False):
-                return "melee"
-            return "ranged" if wp.get("ranged", False) else "melee"
+            return "right_hand"
         return None
 
     def equip_item(self, item_name):
@@ -281,8 +308,8 @@ class PartyMember:
     def _sync_legacy_fields(self):
         """Keep the old .weapon and .armor fields in sync with equipped dict."""
         self.armor = self.equipped.get("body") or "Cloth"
-        # Weapon defaults to melee; combat engine uses .weapon for active weapon
-        self.weapon = self.equipped.get("melee") or "Fists"
+        # Weapon is in the right hand; combat engine uses .weapon
+        self.weapon = self.equipped.get("right_hand") or "Fists"
 
 
 class Party:
@@ -351,6 +378,58 @@ class Party:
     def inv_names(self):
         """Return a list of display names for all shared inventory entries."""
         return [self.item_name(e) for e in self.shared_inventory]
+
+    def inv_add(self, item_name, charges=None):
+        """Add an item to shared inventory, stacking charges if stackable.
+
+        If the item is stackable and already exists in inventory, merge
+        the charges into the existing entry instead of creating a new one.
+        """
+        info = ITEM_INFO.get(item_name, {})
+        is_stackable = info.get("stackable", False)
+        # Default charges from item data if not specified
+        if charges is None:
+            charges = info.get("charges")
+
+        if is_stackable and charges is not None:
+            # Look for an existing stack to merge into
+            idx = self._find_inv_index(item_name)
+            if idx >= 0:
+                entry = self.shared_inventory[idx]
+                if isinstance(entry, dict):
+                    entry["charges"] = entry.get("charges", 0) + charges
+                    return
+            # No existing stack — create a new entry
+            self.shared_inventory.append({"name": item_name, "charges": charges})
+        elif charges is not None:
+            self.shared_inventory.append({"name": item_name, "charges": charges})
+        else:
+            self.shared_inventory.append(item_name)
+
+    def inv_get_charges(self, item_name):
+        """Return the charges on the first inventory entry matching item_name, or 0."""
+        idx = self._find_inv_index(item_name)
+        if idx < 0:
+            return 0
+        entry = self.shared_inventory[idx]
+        ch = self.item_charges(entry)
+        return ch if ch is not None else 0
+
+    def inv_consume_charge(self, item_name):
+        """Consume one charge from a stackable item. Returns True if successful.
+
+        Removes the entry entirely when charges reach 0.
+        """
+        idx = self._find_inv_index(item_name)
+        if idx < 0:
+            return False
+        entry = self.shared_inventory[idx]
+        if isinstance(entry, dict) and entry.get("charges", 0) > 0:
+            entry["charges"] -= 1
+            if entry["charges"] <= 0:
+                self.shared_inventory.pop(idx)
+            return True
+        return False
 
     # ── Constructor ───────────────────────────────────────────
 
@@ -473,7 +552,7 @@ def create_default_party(start_col, start_row):
         hp=30, strength=16, dexterity=12,
         intelligence=8, wisdom=10, level=1,
     )
-    roland.equipped = {"body": "Cloth", "melee": "Club", "ranged": None}
+    roland.equipped = {"right_hand": "Club", "left_hand": None, "body": "Cloth", "head": None}
     roland.weapon = "Club"
     roland.armor = "Cloth"
     party.add_member(roland)
@@ -484,7 +563,7 @@ def create_default_party(start_col, start_row):
         hp=22, strength=10, dexterity=10,
         intelligence=10, wisdom=18, level=1,
     )
-    mira.equipped = {"body": "Cloth", "melee": "Club", "ranged": None}
+    mira.equipped = {"right_hand": "Club", "left_hand": None, "body": "Cloth", "head": None}
     mira.weapon = "Club"
     mira.armor = "Cloth"
     party.add_member(mira)
@@ -495,7 +574,7 @@ def create_default_party(start_col, start_row):
         hp=14, strength=6, dexterity=14,
         intelligence=20, wisdom=8, level=1,
     )
-    theron.equipped = {"body": "Cloth", "melee": "Dagger", "ranged": None}
+    theron.equipped = {"right_hand": "Dagger", "left_hand": None, "body": "Cloth", "head": None}
     theron.weapon = "Dagger"
     theron.armor = "Cloth"
     party.add_member(theron)
@@ -506,12 +585,14 @@ def create_default_party(start_col, start_row):
         hp=20, strength=12, dexterity=18,
         intelligence=10, wisdom=8, level=1,
     )
-    sable.equipped = {"body": "Cloth", "melee": "Dagger", "ranged": None}
+    sable.equipped = {"right_hand": "Dagger", "left_hand": None, "body": "Cloth", "head": None}
     sable.weapon = "Dagger"
     sable.armor = "Cloth"
     party.add_member(sable)
 
     # Shared party stash — start with a torch the player can equip
+    # Shared party stash — torch and starting ammo
     party.shared_inventory = ["Torch"]
+    party.inv_add("Arrows", charges=10)
 
     return party

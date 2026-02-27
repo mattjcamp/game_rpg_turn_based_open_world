@@ -142,7 +142,7 @@ class DungeonState(BaseState):
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
                     member = self.game.party.members[self.showing_char_detail]
-                    total_rows = 3 + len(member.inventory)
+                    total_rows = 4 + len(member.inventory)
                     if event.key == pygame.K_UP:
                         self.char_sheet_cursor = (self.char_sheet_cursor - 1) % total_rows
                         return
@@ -357,17 +357,22 @@ class DungeonState(BaseState):
 
     def _handle_equip_action(self, member):
         """Open the action menu for the selected item/slot."""
+        options = self._get_action_options(member)
+        if not options:
+            self.message = "Empty slot — equip items from inventory"
+            self.message_timer = 2000
+            return
         self.char_action_menu = True
         self.char_action_cursor = 0
 
     def _get_item_at_cursor(self, member):
         """Return the item name at the current char_sheet_cursor position."""
         idx = self.char_sheet_cursor
-        if idx < 3:
-            slot_keys = ["body", "melee", "ranged"]
+        if idx < 4:
+            slot_keys = ["right_hand", "left_hand", "body", "head"]
             return member.equipped.get(slot_keys[idx])
         else:
-            inv_idx = idx - 3
+            inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 return member.inventory[inv_idx]
         return None
@@ -377,8 +382,8 @@ class DungeonState(BaseState):
         from src.party import WEAPONS, ARMORS
         idx = self.char_sheet_cursor
         options = []
-        if idx < 3:
-            slot_keys = ["body", "melee", "ranged"]
+        if idx < 4:
+            slot_keys = ["right_hand", "left_hand", "body", "head"]
             slot = slot_keys[idx]
             current = member.equipped.get(slot)
             if current:
@@ -386,7 +391,7 @@ class DungeonState(BaseState):
                 options.append("RETURN TO PARTY STASH")
                 options.append("EXAMINE")
         else:
-            inv_idx = idx - 3
+            inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
                 if item_name in ARMORS or item_name in WEAPONS:
@@ -420,26 +425,26 @@ class DungeonState(BaseState):
                 self.examining_item = self._get_item_at_cursor(member)
                 return
             elif chosen == "UNEQUIP":
-                if idx < 3:
-                    slot_keys = ["body", "melee", "ranged"]
+                if idx < 4:
+                    slot_keys = ["right_hand", "left_hand", "body", "head"]
                     if not member.unequip_slot(slot_keys[idx]):
                         self.message = f"Cannot remove basic {member.equipped.get(slot_keys[idx], 'gear')}!"
                         self.message_timer = 2000
             elif chosen == "EQUIP":
-                inv_idx = idx - 3
+                inv_idx = idx - 4
                 if inv_idx < len(member.inventory):
                     member.equip_item(member.inventory[inv_idx])
             elif chosen == "RETURN TO PARTY STASH":
-                if idx < 3:
-                    slot_keys = ["body", "melee", "ranged"]
+                if idx < 4:
+                    slot_keys = ["right_hand", "left_hand", "body", "head"]
                     member.return_equipped_to_party(slot_keys[idx], self.game.party)
                 else:
-                    inv_idx = idx - 3
+                    inv_idx = idx - 4
                     if inv_idx < len(member.inventory):
                         member.return_item_to_party(
                             member.inventory[inv_idx], self.game.party)
             self.char_action_menu = False
-            total = 3 + len(member.inventory)
+            total = 4 + len(member.inventory)
             if self.char_sheet_cursor >= total:
                 self.char_sheet_cursor = max(0, total - 1)
         elif event.key == pygame.K_ESCAPE:
@@ -689,7 +694,7 @@ class DungeonState(BaseState):
                 break
 
         if chosen_item:
-            self.game.party.shared_inventory.append(chosen_item)
+            self.game.party.inv_add(chosen_item)
             self.show_message(
                 f"Treasure! {gold} gold and {chosen_item}!", 2500)
         else:

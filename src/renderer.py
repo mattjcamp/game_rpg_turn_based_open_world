@@ -437,7 +437,7 @@ class Renderer:
         if 0 <= psc < cols and 0 <= psr < rows:
             cx = psc * ts + ts // 2
             cy = psr * ts + ts // 2
-            self._u3_draw_overworld_party(cx, cy)
+            self._u3_draw_overworld_party(cx, cy, party)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -806,7 +806,7 @@ class Renderer:
         if 0 <= psc < cols and 0 <= psr < rows:
             cx = psc * ts + ts // 2
             cy = psr * ts + ts // 2
-            self._u3_draw_overworld_party(cx, cy)
+            self._u3_draw_overworld_party(cx, cy, party)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -887,8 +887,9 @@ class Renderer:
         else:
             pygame.draw.rect(self.screen, BLACK, rect)
 
-    def _u3_draw_overworld_party(self, cx, cy):
+    def _u3_draw_overworld_party(self, cx, cy, party=None):
         """White warrior party sprite with visible sword and shield."""
+        import math
         W = (255, 255, 255)
         DK = (180, 180, 180)   # slight shade for depth
         # Head
@@ -925,6 +926,44 @@ class Renderer:
                          (shx + shw // 2, shy + shh - 2), 1)
         pygame.draw.line(self.screen, DK, (shx + 1, shy + shh // 2),
                          (shx + shw - 2, shy + shh // 2), 1)
+
+        # ── Flickering light effect when LIGHT slot is occupied ──
+        if party and party.get_equipped_name("light") is not None:
+            t = pygame.time.get_ticks()
+            # Use multiple sine waves at different speeds for organic flicker
+            flicker1 = math.sin(t * 0.008)          # slow sway
+            flicker2 = math.sin(t * 0.023) * 0.5    # medium pulse
+            flicker3 = math.sin(t * 0.051) * 0.3    # fast shimmer
+            flicker = flicker1 + flicker2 + flicker3  # range roughly -1.8..+1.8
+
+            # Flame position: above head, with horizontal sway
+            fx = cx + int(flicker * 2)
+            fy = cy - 19
+
+            # Outer glow (semi-transparent orange circle)
+            glow_r = 7 + int(flicker2 * 2)
+            glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+            glow_alpha = 50 + int(flicker * 10)
+            pygame.draw.circle(glow_surf, (255, 140, 40, glow_alpha),
+                               (glow_r, glow_r), glow_r)
+            self.screen.blit(glow_surf, (fx - glow_r, fy - glow_r))
+
+            # Flame core — 3 layers (outer orange, middle yellow, inner white)
+            h_outer = 6 + int(flicker2 * 2)
+            h_mid = 4 + int(flicker3 * 1)
+            h_inner = 2
+
+            # Outer flame (orange-red)
+            pts_outer = [(fx - 3, fy), (fx, fy - h_outer), (fx + 3, fy)]
+            pygame.draw.polygon(self.screen, (255, 100, 20), pts_outer)
+
+            # Mid flame (yellow)
+            pts_mid = [(fx - 2, fy), (fx, fy - h_mid), (fx + 2, fy)]
+            pygame.draw.polygon(self.screen, (255, 220, 60), pts_mid)
+
+            # Inner flame (white-hot)
+            pts_inner = [(fx - 1, fy), (fx, fy - h_inner), (fx + 1, fy)]
+            pygame.draw.polygon(self.screen, (255, 255, 200), pts_inner)
 
     # ── overworld right panel ────────────────────────────────
 
@@ -1006,7 +1045,7 @@ class Renderer:
         if 0 <= psc < cols and 0 <= psr < rows:
             cx = psc * ts + ts // 2
             cy = psr * ts + ts // 2
-            self._u3_draw_overworld_party(cx, cy)
+            self._u3_draw_overworld_party(cx, cy, party)
 
         # ── 4. fog of war ──
         self._u3_dungeon_fog(psc, psr, cols, rows, ts,
@@ -2604,17 +2643,16 @@ class Renderer:
         eq = getattr(member, 'equipped', {})
         inv = getattr(member, 'inventory', [])
 
-        # Build the unified list: 3 equipped slots + inventory items
+        # Build the unified list: 4 equipped slots + inventory items
         # Each entry: (label, item_name, is_equipped, slot_key_or_None)
-        body_name = eq.get("body") or member.armor
-        melee_name = eq.get("melee") or member.weapon
-        ranged_name = eq.get("ranged")
+        from src.party import PartyMember
+        _slots = PartyMember._EQUIP_SLOTS
+        _labels = PartyMember._SLOT_LABELS
 
-        unified = [
-            ("BODY",   body_name,   True,  "body"),
-            ("MELEE",  melee_name,  True,  "melee"),
-            ("RANGED", ranged_name, True,  "ranged"),
-        ]
+        unified = []
+        for sk in _slots:
+            item = eq.get(sk)
+            unified.append((_labels[sk], item, True, sk))
         for item_name in inv:
             # Determine if equippable and what kind
             equippable = item_name in ARMORS or item_name in WEAPONS
@@ -2625,9 +2663,10 @@ class Renderer:
         ry += 22
 
         list_row = 0
+        num_equip_slots = len(_slots)
         for i, (slot_label, item_name, is_eq, slot_key) in enumerate(unified):
             # Insert ITEMS header before inventory section
-            if i == 3:
+            if i == num_equip_slots:
                 ry += 10
                 self._u3_text("ITEMS", rx, ry, self._U3_ORANGE, fm)
                 ry += 22
@@ -2642,27 +2681,24 @@ class Renderer:
 
                 # Slot label
                 self._u3_text(f"{prefix}{slot_label}:", rx, ry, name_color, fm)
-                # Item name
+                # Item name (offset enough to clear longest label "RIGHT HAND:")
+                item_x = rx + 120
                 if item_name:
-                    self._u3_text(f"{display_name}", rx + 90, ry, self._U3_WHITE if selected else (220, 220, 230), fm)
+                    self._u3_text(f"{display_name}", item_x, ry, self._U3_WHITE if selected else (220, 220, 230), fm)
                     # Stat hint
                     hint = ""
                     if slot_key == "body":
                         arm = ARMORS.get(item_name, {"evasion": 50})
                         hint = f"EVD:{arm['evasion']}%"
-                    elif slot_key == "melee":
+                    elif slot_key == "head":
+                        hint = ""  # head slot — no stat preview yet
+                    elif slot_key in ("right_hand", "left_hand"):
                         wp = WEAPONS.get(item_name, {"power": 0})
                         hint = f"PWR:{wp['power']:02d}"
-                    elif slot_key == "ranged":
-                        wp = WEAPONS.get(item_name, {"power": 0})
-                        hint = f"PWR:{wp['power']:02d}"
-                        if WEAPONS.get(item_name, {}).get("throwable", False):
-                            ammo_count = member.ammo.get(item_name, 0)
-                            hint += f" x{ammo_count}"
                     if hint:
                         self._u3_text(hint, rx + right_w - 90, ry, (180, 180, 180), fm)
                 else:
-                    self._u3_text("-- NONE --", rx + 90, ry, (120, 120, 120), fm)
+                    self._u3_text("-- NONE --", item_x, ry, (120, 120, 120), fm)
 
                 # Highlight bar behind selected row
                 if selected:
@@ -2681,8 +2717,7 @@ class Renderer:
                 if item_name in ARMORS:
                     equip_hint = "(BODY)"
                 elif item_name in WEAPONS:
-                    wp = WEAPONS[item_name]
-                    equip_hint = "(RANGED)" if wp.get("ranged", False) else "(MELEE)"
+                    equip_hint = "(R.HAND)"
                 if equip_hint:
                     self._u3_text(equip_hint, rx + right_w - 90, ry,
                                   (160, 160, 255) if selected else (100, 100, 160), fm)
@@ -2965,8 +3000,7 @@ class Renderer:
                 self._u3_text(f"POWER: {wp['power']:02d}", rx, ry,
                               (220, 220, 230), fm)
                 ry += 18
-                slot = "RANGED" if wp.get("ranged", False) else "MELEE"
-                self._u3_text(f"SLOT: {slot}", rx, ry, (180, 180, 180), fm)
+                self._u3_text("SLOT: RIGHT HAND", rx, ry, (180, 180, 180), fm)
             else:
                 self._u3_text("TYPE: GENERAL ITEM", rx, ry,
                               self._U3_LTBLUE, fm)
@@ -3158,7 +3192,7 @@ class Renderer:
                     hint = "ARMOR"
                 elif item_name in WEAPONS:
                     wp = WEAPONS[item_name]
-                    hint = "RANGED WPN" if wp.get("ranged", False) else "MELEE WPN"
+                    hint = "WEAPON"
                 else:
                     hint = "ITEM"
                 hint_color = self._U3_LTBLUE if selected else (120, 120, 160)
@@ -3226,8 +3260,7 @@ class Renderer:
                 ry += 18
                 self._u3_text(f"POWER: {wp['power']:02d}", rx, ry, (220, 220, 230), fm)
                 ry += 18
-                slot = "RANGED" if wp.get("ranged", False) else "MELEE"
-                self._u3_text(f"SLOT: {slot}", rx, ry, (180, 180, 180), fm)
+                self._u3_text("SLOT: RIGHT HAND", rx, ry, (180, 180, 180), fm)
             else:
                 self._u3_text("TYPE: GENERAL ITEM", rx, ry, self._U3_LTBLUE, fm)
 
@@ -3679,9 +3712,8 @@ class Renderer:
             self._u3_text("TYPE:", name_x, ty, self._U3_LTBLUE, fm)
             self._u3_text(f"{wtype} WEAPON", name_x + 55, ty, self._U3_WHITE, fm)
             ty += 20
-            slot = "RANGED" if wp.get("ranged", False) else "MELEE"
             self._u3_text("SLOT:", name_x, ty, self._U3_LTBLUE, fm)
-            self._u3_text(slot, name_x + 55, ty, (220, 220, 230), fm)
+            self._u3_text("RIGHT HAND", name_x + 55, ty, (220, 220, 230), fm)
             ty += 20
             self._u3_text("POWER:", name_x, ty, self._U3_LTBLUE, fm)
             pwr = wp["power"]

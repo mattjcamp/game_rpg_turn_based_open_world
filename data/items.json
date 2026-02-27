@@ -37,6 +37,7 @@
     "Sling": {
       "power": 3,
       "ranged": true,
+      "ammo": "Stones",
       "description": "A simple ranged weapon that hurls stones.",
       "icon": "bow",
       "buy": 60,
@@ -73,6 +74,7 @@
     "Bow": {
       "power": 7,
       "ranged": true,
+      "ammo": "Arrows",
       "description": "A sturdy longbow. Excellent at range.",
       "icon": "bow",
       "buy": 150,
@@ -99,6 +101,7 @@
     "Silver Bow": {
       "power": 9,
       "ranged": true,
+      "ammo": "Arrows",
       "description": "A silver-inlaid bow. Deadly against the undead.",
       "icon": "bow"
     },
@@ -179,6 +182,22 @@
       "charges": 25,
       "buy": 5,
       "sell": 2
+    },
+    "Arrows": {
+      "description": "A bundle of arrows for bows.",
+      "icon": "ammo",
+      "charges": 10,
+      "stackable": true,
+      "buy": 5,
+      "sell": 2
+    },
+    "Stones": {
+      "description": "A pouch of smooth stones for slings.",
+      "icon": "ammo",
+      "charges": 10,
+      "stackable": true,
+      "buy": 3,
+      "sell": 1
     },
     "Rope": {
       "description": "A sturdy hemp rope. Useful for climbing.",

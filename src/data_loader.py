@@ -42,6 +42,8 @@ def load_items():
             entry["melee"] = True
         if data.get("throwable"):
             entry["throwable"] = True
+        if data.get("ammo"):
+            entry["ammo"] = data["ammo"]
         weapons[name] = entry
 
         # Description & icon (what ITEM_INFO needs)
@@ -89,6 +91,8 @@ def load_items():
             }
             if "charges" in data:
                 info["charges"] = data["charges"]
+            if data.get("stackable"):
+                info["stackable"] = True
             item_info[name] = info
 
         if "buy" in data:
