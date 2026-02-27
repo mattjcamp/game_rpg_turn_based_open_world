@@ -49,6 +49,9 @@ class OverworldState(BaseState):
         # Roaming overworld orcs
         self.overworld_monsters = []
 
+        # Track original tiles under placed chests: {(col, row): tile_id}
+        self.chest_under_tiles = {}
+
         # Message queued by combat state on return
         self.pending_combat_message = None
 
@@ -90,10 +93,9 @@ class OverworldState(BaseState):
             slot_keys = ["body", "melee", "ranged"]
             slot = slot_keys[idx]
             current = member.equipped.get(slot)
-            default = member._SLOT_DEFAULTS.get(slot)
-            if current and current != default:
-                options.append("RETURN TO PARTY STASH")
             if current:
+                options.append("UNEQUIP")
+                options.append("RETURN TO PARTY STASH")
                 options.append("EXAMINE")
         else:
             inv_idx = idx - 3
@@ -130,6 +132,12 @@ class OverworldState(BaseState):
             if chosen == "EXAMINE":
                 self.examining_item = self._get_item_at_cursor(member)
                 return
+            elif chosen == "UNEQUIP":
+                if idx < 3:
+                    slot_keys = ["body", "melee", "ranged"]
+                    if not member.unequip_slot(slot_keys[idx]):
+                        self.message = f"Cannot remove basic {member.equipped.get(slot_keys[idx], 'gear')}!"
+                        self.message_timer = 2000
             elif chosen == "EQUIP":
                 inv_idx = idx - 3
                 if inv_idx < len(member.inventory):
@@ -460,10 +468,10 @@ class OverworldState(BaseState):
 
         elif tile_id == TILE_CHEST:
             self._open_chest()
-            # Replace chest with grass
-            self.game.tile_map.set_tile(
-                self.game.party.col, self.game.party.row, TILE_GRASS
-            )
+            # Restore the original tile that was under the chest
+            pos = (self.game.party.col, self.game.party.row)
+            original = self.chest_under_tiles.pop(pos, TILE_GRASS)
+            self.game.tile_map.set_tile(pos[0], pos[1], original)
             return
 
     # ── Chest loot ─────────────────────────────────────────────
@@ -537,9 +545,12 @@ class OverworldState(BaseState):
             return
         if self.showing_char_detail is not None:
             idx = self.showing_char_detail
+            member = self.game.party.members[idx]
+            action_opts = self._get_action_options(member) if self.char_action_menu else None
             renderer.draw_character_sheet_u3(
-                self.game.party.members[idx], idx, self.char_sheet_cursor,
-                self.char_action_menu, self.char_action_cursor)
+                member, idx, self.char_sheet_cursor,
+                self.char_action_menu, self.char_action_cursor,
+                action_options=action_opts)
             if self.examining_item:
                 renderer.draw_item_examine(self.examining_item)
             return

@@ -552,10 +552,8 @@ class CombatState(BaseState):
             slot_keys = ["body", "melee", "ranged"]
             slot = slot_keys[idx]
             current = member.equipped.get(slot)
-            default = member._SLOT_DEFAULTS.get(slot)
-            if current and current != default:
-                options.append("UNEQUIP")
             if current:
+                options.append("UNEQUIP")
                 options.append("EXAMINE")
         else:
             inv_idx = idx - 3
@@ -601,7 +599,8 @@ class CombatState(BaseState):
                 elif chosen == "UNEQUIP":
                     if idx < 3:
                         slot_keys = ["body", "melee", "ranged"]
-                        f.unequip_slot(slot_keys[idx])
+                        if not f.unequip_slot(slot_keys[idx]):
+                            self.combat_log.append(f"Cannot remove basic {f.equipped.get(slot_keys[idx], 'gear')}!")
                 self.equip_action_menu = False
                 # Clamp cursor
                 total = 3 + len(f.inventory)
@@ -1480,6 +1479,10 @@ class CombatState(BaseState):
                     if self.monster_ref in overworld_state.overworld_monsters:
                         overworld_state.overworld_monsters.remove(self.monster_ref)
 
+                    # Remember the original tile before placing the chest
+                    original_tile = self.game.tile_map.get_tile(mc, mr)
+                    overworld_state.chest_under_tiles[(mc, mr)] = original_tile
+
                     # Place a treasure chest where the orc stood
                     self.game.tile_map.set_tile(mc, mr, TILE_CHEST)
                     overworld_state.pending_combat_message = (
@@ -1505,9 +1508,11 @@ class CombatState(BaseState):
                 if m is f:
                     real_idx = i
                     break
+            action_opts = self._equip_get_action_options(f) if self.equip_action_menu else None
             renderer.draw_character_sheet_u3(
                 f, real_idx, self.equip_cursor,
-                self.equip_action_menu, self.equip_action_cursor)
+                self.equip_action_menu, self.equip_action_cursor,
+                action_options=action_opts)
             if self.equip_examining:
                 renderer.draw_item_examine(self.equip_examining)
             return

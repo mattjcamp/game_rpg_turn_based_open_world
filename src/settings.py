@@ -6,7 +6,7 @@ All tunable values live here so they're easy to find and change.
 
 # ----- Display -----
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 700
 TILE_SIZE = 32          # Each tile is 32x32 pixels
 FPS = 60
 GAME_TITLE = "Realm of Shadow - An Ultima III Inspired RPG"

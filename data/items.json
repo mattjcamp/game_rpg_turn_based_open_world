@@ -1,0 +1,207 @@
+{
+  "_comment": "Item definitions for Realm of Shadow. Edit this file to add, remove, or tweak items without touching code.",
+
+  "weapons": {
+    "Fists": {
+      "power": 0,
+      "ranged": false,
+      "description": "Bare knuckles. Not much, but always available.",
+      "icon": "gloves"
+    },
+    "Dagger": {
+      "power": 1,
+      "ranged": true,
+      "melee": true,
+      "consumable": true,
+      "description": "A short, light blade. Good for melee and throwing.",
+      "icon": "dagger",
+      "buy": 20,
+      "sell": 10
+    },
+    "Club": {
+      "power": 1,
+      "ranged": false,
+      "description": "A simple wooden club. Cheap but sturdy.",
+      "icon": "mace",
+      "buy": 20,
+      "sell": 10
+    },
+    "Mace": {
+      "power": 2,
+      "ranged": false,
+      "description": "A heavy flanged club, favored by clerics.",
+      "icon": "mace",
+      "buy": 40,
+      "sell": 20
+    },
+    "Sling": {
+      "power": 3,
+      "ranged": true,
+      "description": "A simple ranged weapon that hurls stones.",
+      "icon": "bow",
+      "buy": 60,
+      "sell": 30
+    },
+    "Axe": {
+      "power": 4,
+      "ranged": false,
+      "description": "A single-headed battle axe. Reliable and brutal.",
+      "icon": "axe",
+      "buy": 80,
+      "sell": 40
+    },
+    "Sword": {
+      "power": 5,
+      "ranged": false,
+      "description": "A well-balanced longsword. Standard fighter fare.",
+      "icon": "sword",
+      "buy": 120,
+      "sell": 60
+    },
+    "Spear": {
+      "power": 6,
+      "ranged": false,
+      "description": "A long thrusting weapon with good reach.",
+      "icon": "spear"
+    },
+    "Broad Axe": {
+      "power": 7,
+      "ranged": false,
+      "description": "A massive double-headed axe. Devastating blows.",
+      "icon": "axe"
+    },
+    "Bow": {
+      "power": 7,
+      "ranged": true,
+      "description": "A sturdy longbow. Excellent at range.",
+      "icon": "bow",
+      "buy": 150,
+      "sell": 75
+    },
+    "Iron Sword": {
+      "power": 8,
+      "ranged": false,
+      "description": "A finely forged iron blade. Sharp and durable.",
+      "icon": "sword"
+    },
+    "Gloves": {
+      "power": 8,
+      "ranged": false,
+      "description": "Enchanted gauntlets that strike with magic force.",
+      "icon": "gloves"
+    },
+    "Halberd": {
+      "power": 9,
+      "ranged": false,
+      "description": "A polearm combining axe and spear. Fearsome reach.",
+      "icon": "halberd"
+    },
+    "Silver Bow": {
+      "power": 9,
+      "ranged": true,
+      "description": "A silver-inlaid bow. Deadly against the undead.",
+      "icon": "bow"
+    },
+    "Sun Sword": {
+      "power": 10,
+      "ranged": false,
+      "description": "A radiant blade infused with solar energy.",
+      "icon": "sword"
+    },
+    "Mystic Sword": {
+      "power": 10,
+      "ranged": false,
+      "description": "An ancient blade pulsing with arcane power.",
+      "icon": "sword"
+    }
+  },
+
+  "armors": {
+    "Cloth": {
+      "evasion": 50,
+      "description": "Simple cloth garments. Minimal protection.",
+      "icon": "armor_light",
+      "buy": 20,
+      "sell": 10
+    },
+    "Leather": {
+      "evasion": 56,
+      "description": "Toughened leather armor. Light and flexible.",
+      "icon": "armor_light",
+      "buy": 50,
+      "sell": 25
+    },
+    "Chain": {
+      "evasion": 58,
+      "description": "Interlocking metal rings. Good all-round defense.",
+      "icon": "armor_heavy",
+      "buy": 120,
+      "sell": 60
+    },
+    "Plate": {
+      "evasion": 60,
+      "description": "Heavy steel plates. Excellent protection.",
+      "icon": "armor_heavy"
+    },
+    "+2 Chain": {
+      "evasion": 62,
+      "description": "Enchanted chainmail. Magically reinforced links.",
+      "icon": "armor_heavy"
+    },
+    "+2 Plate": {
+      "evasion": 64,
+      "description": "Enchanted plate armor. Nearly impenetrable.",
+      "icon": "armor_heavy"
+    },
+    "Exotic": {
+      "evasion": 67,
+      "description": "Mysterious armor of unknown origin. Supreme defense.",
+      "icon": "armor_heavy"
+    }
+  },
+
+  "general": {
+    "Healing Herb": {
+      "description": "A fragrant herb that restores a small amount of HP.",
+      "icon": "herb",
+      "buy": 15,
+      "sell": 7
+    },
+    "Antidote": {
+      "description": "A bitter tincture that cures poison.",
+      "icon": "potion",
+      "buy": 10,
+      "sell": 5
+    },
+    "Torch": {
+      "description": "A wooden torch. Lights the way in dark places.",
+      "icon": "torch",
+      "buy": 5,
+      "sell": 2
+    },
+    "Rope": {
+      "description": "A sturdy hemp rope. Useful for climbing.",
+      "icon": "rope"
+    },
+    "Holy Water": {
+      "description": "Blessed water from a sacred spring. Burns the undead.",
+      "icon": "holy"
+    },
+    "Scroll of Fire": {
+      "description": "A single-use scroll containing a fire spell.",
+      "icon": "scroll"
+    },
+    "Mana Potion": {
+      "description": "A shimmering blue liquid that restores magic points.",
+      "icon": "potion"
+    },
+    "Lockpick": {
+      "description": "A set of fine tools for opening locked chests.",
+      "icon": "tool"
+    },
+    "Smoke Bomb": {
+      "description": "A small bomb that creates a blinding cloud.",
+      "icon": "bomb"
+    }
+  }
+}

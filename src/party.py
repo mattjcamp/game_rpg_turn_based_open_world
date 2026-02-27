@@ -4,139 +4,16 @@ Party management – Ultima III style.
 Each character has a race, class, and four attributes: STR, DEX, INT, WIS.
 Magic points are derived from INT (sorcerer) or WIS (priest) depending on
 class.  Damage uses (weapon_power + 1.5 * STR).  Evasion comes from armor.
+
+Item data (weapons, armors, descriptions, shop prices) is loaded from
+data/items.json at startup.  Edit that file to add or tweak items without
+touching this code.
 """
 
+from src.data_loader import load_items
 
-# ── Weapon table ──────────────────────────────────────────────────
-WEAPONS = {
-    "Dagger":       {"power": 1, "ranged": True, "melee": True, "consumable": True},
-    "Club":         {"power": 1, "ranged": False},
-    "Mace":         {"power": 2, "ranged": False},
-    "Sling":        {"power": 3, "ranged": True},
-    "Axe":          {"power": 4, "ranged": False},
-    "Sword":        {"power": 5, "ranged": False},
-    "Spear":        {"power": 6, "ranged": False},
-    "Broad Axe":    {"power": 7, "ranged": False},
-    "Bow":          {"power": 7, "ranged": True},
-    "Iron Sword":   {"power": 8, "ranged": False},
-    "Gloves":       {"power": 8, "ranged": False},
-    "Halberd":      {"power": 9, "ranged": False},
-    "Silver Bow":   {"power": 9, "ranged": True},
-    "Sun Sword":    {"power": 10, "ranged": False},
-    "Mystic Sword": {"power": 10, "ranged": False},
-    "Fists":        {"power": 0, "ranged": False},
-}
-
-# ── Armor table ───────────────────────────────────────────────────
-ARMORS = {
-    "Cloth":     {"evasion": 50},
-    "Leather":   {"evasion": 56},
-    "Chain":     {"evasion": 58},
-    "Plate":     {"evasion": 60},
-    "+2 Chain":  {"evasion": 62},
-    "+2 Plate":  {"evasion": 64},
-    "Exotic":    {"evasion": 67},
-}
-
-
-# ── Item descriptions & visual metadata ──────────────────────────
-# Each entry: { "desc": str, "icon": str (for pixel-art type) }
-# icon types: "sword", "axe", "bow", "dagger", "mace", "spear",
-#             "halberd", "gloves", "armor_light", "armor_heavy",
-#             "shield", "potion", "herb", "scroll", "torch", "rope",
-#             "tool", "bomb", "holy", "gem"
-ITEM_INFO = {
-    # ── Weapons ──
-    "Fists":        {"desc": "Bare knuckles. Not much, but always available.",
-                     "icon": "gloves"},
-    "Dagger":       {"desc": "A short, light blade. Good for melee and throwing.",
-                     "icon": "dagger"},
-    "Club":         {"desc": "A simple wooden club. Cheap but sturdy.",
-                     "icon": "mace"},
-    "Mace":         {"desc": "A heavy flanged club, favored by clerics.",
-                     "icon": "mace"},
-    "Sling":        {"desc": "A simple ranged weapon that hurls stones.",
-                     "icon": "bow"},
-    "Axe":          {"desc": "A single-headed battle axe. Reliable and brutal.",
-                     "icon": "axe"},
-    "Sword":        {"desc": "A well-balanced longsword. Standard fighter fare.",
-                     "icon": "sword"},
-    "Spear":        {"desc": "A long thrusting weapon with good reach.",
-                     "icon": "spear"},
-    "Broad Axe":    {"desc": "A massive double-headed axe. Devastating blows.",
-                     "icon": "axe"},
-    "Bow":          {"desc": "A sturdy longbow. Excellent at range.",
-                     "icon": "bow"},
-    "Iron Sword":   {"desc": "A finely forged iron blade. Sharp and durable.",
-                     "icon": "sword"},
-    "Gloves":       {"desc": "Enchanted gauntlets that strike with magic force.",
-                     "icon": "gloves"},
-    "Halberd":      {"desc": "A polearm combining axe and spear. Fearsome reach.",
-                     "icon": "halberd"},
-    "Silver Bow":   {"desc": "A silver-inlaid bow. Deadly against the undead.",
-                     "icon": "bow"},
-    "Sun Sword":    {"desc": "A radiant blade infused with solar energy.",
-                     "icon": "sword"},
-    "Mystic Sword": {"desc": "An ancient blade pulsing with arcane power.",
-                     "icon": "sword"},
-    # ── Armor ──
-    "Cloth":        {"desc": "Simple cloth garments. Minimal protection.",
-                     "icon": "armor_light"},
-    "Leather":      {"desc": "Toughened leather armor. Light and flexible.",
-                     "icon": "armor_light"},
-    "Chain":        {"desc": "Interlocking metal rings. Good all-round defense.",
-                     "icon": "armor_heavy"},
-    "Plate":        {"desc": "Heavy steel plates. Excellent protection.",
-                     "icon": "armor_heavy"},
-    "+2 Chain":     {"desc": "Enchanted chainmail. Magically reinforced links.",
-                     "icon": "armor_heavy"},
-    "+2 Plate":     {"desc": "Enchanted plate armor. Nearly impenetrable.",
-                     "icon": "armor_heavy"},
-    "Exotic":       {"desc": "Mysterious armor of unknown origin. Supreme defense.",
-                     "icon": "armor_heavy"},
-    # ── General items ──
-    "Healing Herb":  {"desc": "A fragrant herb that restores a small amount of HP.",
-                      "icon": "herb"},
-    "Antidote":      {"desc": "A bitter tincture that cures poison.",
-                      "icon": "potion"},
-    "Torch":         {"desc": "A wooden torch. Lights the way in dark places.",
-                      "icon": "torch"},
-    "Rope":          {"desc": "A sturdy hemp rope. Useful for climbing.",
-                      "icon": "rope"},
-    "Holy Water":    {"desc": "Blessed water from a sacred spring. Burns the undead.",
-                      "icon": "holy"},
-    "Scroll of Fire":{"desc": "A single-use scroll containing a fire spell.",
-                      "icon": "scroll"},
-    "Mana Potion":   {"desc": "A shimmering blue liquid that restores magic points.",
-                      "icon": "potion"},
-    "Lockpick":      {"desc": "A set of fine tools for opening locked chests.",
-                      "icon": "tool"},
-    "Smoke Bomb":    {"desc": "A small bomb that creates a blinding cloud.",
-                      "icon": "bomb"},
-}
-
-
-# ── Shop catalogue ─────────────────────────────────────────────────
-# buy = cost to purchase, sell = gold received when selling.
-# Items not listed here can still be sold for a flat 5 gold.
-SHOP_INVENTORY = {
-    # Weapons
-    "Dagger":       {"buy": 20,  "sell": 10},
-    "Club":         {"buy": 20,  "sell": 10},
-    "Mace":         {"buy": 40,  "sell": 20},
-    "Sling":        {"buy": 60,  "sell": 30},
-    "Axe":          {"buy": 80,  "sell": 40},
-    "Sword":        {"buy": 120, "sell": 60},
-    "Bow":          {"buy": 150, "sell": 75},
-    # Armor
-    "Cloth":        {"buy": 20,  "sell": 10},
-    "Leather":      {"buy": 50,  "sell": 25},
-    "Chain":        {"buy": 120, "sell": 60},
-    # Supplies
-    "Torch":        {"buy": 5,   "sell": 2},
-    "Healing Herb": {"buy": 15,  "sell": 7},
-    "Antidote":     {"buy": 10,  "sell": 5},
-}
+# ── Load all item tables from data/items.json ─────────────────────
+WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
 
 
 def get_sell_price(item_name):

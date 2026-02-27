@@ -2456,7 +2456,8 @@ class Renderer:
                       8, bar_y + 5, self._U3_BLUE)
 
     def draw_character_sheet_u3(self, member, index, cursor_index=0,
-                                action_menu=False, action_cursor=0):
+                                action_menu=False, action_cursor=0,
+                                action_options=None):
         """
         Full-screen detailed character sheet for a single party member.
 
@@ -2703,25 +2704,17 @@ class Renderer:
         self._u3_text(f"MAGIC: {magic_str}", rx, ry, (180, 180, 255) if magic_types else (150, 150, 150), fm)
 
         # ── Action menu popup ──
-        if action_menu and cursor_index < len(unified):
-            slot_label, item_name, is_eq, slot_key = unified[cursor_index]
-            # Build menu options (must match _get_action_options in state)
-            options = []
-            if is_eq:
-                # Equipped slot
-                if item_name and item_name not in ("Cloth", "Fists"):
-                    options.append("RETURN TO PARTY STASH")
-                if item_name:
-                    options.append("EXAMINE")
-            else:
-                # Inventory item
-                if item_name in ARMORS or item_name in WEAPONS:
-                    options.append("EQUIP")
-                options.append("RETURN TO PARTY STASH")
-                options.append("EXAMINE")
+        if action_menu and action_options:
+            # Use the options list passed from the state (single source of truth)
+            options = action_options
+            item_name = None
+            if cursor_index < len(unified):
+                _, item_name, _, _ = unified[cursor_index]
 
             if options:
-                popup_w = 240
+                # Size popup to fit longest option text
+                max_label = max((len(o) for o in options), default=0)
+                popup_w = max(240, max_label * 10 + 40)
                 popup_h = 22 + len(options) * 22 + 8
                 popup_x = SCREEN_WIDTH // 2 - popup_w // 2
                 popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
