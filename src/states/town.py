@@ -306,9 +306,16 @@ class TownState(BaseState):
                         0, len(self.game.party.shared_inventory) - 1)
 
     def _handle_party_inv_input(self, event):
-        """Handle input for the shared party inventory screen."""
-        inv = self.game.party.shared_inventory
-        members = self.game.party.members
+        """Handle input for the shared party inventory screen.
+
+        The unified cursor covers 4 party equipment slots (indices 0-3)
+        followed by shared inventory items (indices 4+).
+        """
+        party = self.game.party
+        inv = party.shared_inventory
+        members = party.members
+        NUM_SLOTS = len(party.PARTY_SLOTS)
+        total_items = NUM_SLOTS + len(inv)
 
         # Examining an item — close on ESC/Enter/Space
         if self.examining_item is not None:
@@ -328,13 +335,7 @@ class TownState(BaseState):
                 self.party_inv_action_cursor = (self.party_inv_action_cursor + 1) % len(options)
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 chosen = options[self.party_inv_action_cursor]
-                if chosen == "EXAMINE":
-                    if 0 <= self.party_inv_cursor < len(inv):
-                        self.examining_item = inv[self.party_inv_cursor]
-                elif chosen == "GIVE TO MEMBER":
-                    self.party_inv_action_menu = False
-                    self.party_inv_choosing = True
-                    self.party_inv_member = 0
+                self._handle_party_inv_action(chosen)
             elif event.key == pygame.K_ESCAPE:
                 self.party_inv_action_menu = False
             return
@@ -345,33 +346,90 @@ class TownState(BaseState):
             elif event.key == pygame.K_DOWN:
                 self.party_inv_member = (self.party_inv_member + 1) % len(members)
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                self.game.party.give_item_to_member(
-                    self.party_inv_cursor, self.party_inv_member)
+                inv_idx = self.party_inv_cursor - NUM_SLOTS
+                self.game.party.give_item_to_member(inv_idx, self.party_inv_member)
                 self.party_inv_choosing = False
-                if self.party_inv_cursor >= len(inv):
-                    self.party_inv_cursor = max(0, len(inv) - 1)
+                new_total = NUM_SLOTS + len(inv)
+                if self.party_inv_cursor >= new_total:
+                    self.party_inv_cursor = max(0, new_total - 1)
             elif event.key == pygame.K_ESCAPE:
                 self.party_inv_choosing = False
         else:
-            if event.key == pygame.K_UP and inv:
-                self.party_inv_cursor = (self.party_inv_cursor - 1) % len(inv)
-            elif event.key == pygame.K_DOWN and inv:
-                self.party_inv_cursor = (self.party_inv_cursor + 1) % len(inv)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and inv:
-                self.party_inv_action_menu = True
-                self.party_inv_action_cursor = 0
+            # Browsing unified list (equip slots + inventory)
+            if event.key == pygame.K_UP and total_items > 0:
+                self.party_inv_cursor = (self.party_inv_cursor - 1) % total_items
+            elif event.key == pygame.K_DOWN and total_items > 0:
+                self.party_inv_cursor = (self.party_inv_cursor + 1) % total_items
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and total_items > 0:
+                options = self._get_party_inv_action_options()
+                if options:
+                    self.party_inv_action_menu = True
+                    self.party_inv_action_cursor = 0
             elif event.key == pygame.K_ESCAPE:
                 self.showing_party_inv = False
             elif event.key == pygame.K_p:
                 self.showing_party_inv = False
                 self.showing_party = False
 
+    def _handle_party_inv_action(self, chosen):
+        """Execute the chosen action on the selected party inventory entry."""
+        party = self.game.party
+        NUM_SLOTS = len(party.PARTY_SLOTS)
+        idx = self.party_inv_cursor
+
+        if idx < NUM_SLOTS:
+            slot = party.PARTY_SLOTS[idx]
+            if chosen == "UNEQUIP":
+                party.party_unequip(slot)
+                self.party_inv_action_menu = False
+            elif chosen == "EXAMINE":
+                item = party.equipped.get(slot)
+                if item:
+                    self.examining_item = item
+        else:
+            inv_idx = idx - NUM_SLOTS
+            inv = party.shared_inventory
+            if inv_idx < len(inv):
+                item_name = inv[inv_idx]
+                if chosen == "EXAMINE":
+                    self.examining_item = item_name
+                elif chosen == "GIVE TO MEMBER":
+                    self.party_inv_action_menu = False
+                    self.party_inv_choosing = True
+                    self.party_inv_member = 0
+                elif chosen.startswith("EQUIP → "):
+                    slot = chosen.split("→ ", 1)[1].strip().lower()
+                    party.party_equip(item_name, slot)
+                    self.party_inv_action_menu = False
+                    new_total = NUM_SLOTS + len(party.shared_inventory)
+                    if self.party_inv_cursor >= new_total:
+                        self.party_inv_cursor = max(0, new_total - 1)
+
     def _get_party_inv_action_options(self):
-        """Build action options for the selected party inventory item."""
-        inv = self.game.party.shared_inventory
-        if not inv or self.party_inv_cursor >= len(inv):
-            return []
-        return ["GIVE TO MEMBER", "EXAMINE"]
+        """Build action options for the selected party inventory entry."""
+        party = self.game.party
+        NUM_SLOTS = len(party.PARTY_SLOTS)
+        idx = self.party_inv_cursor
+
+        if idx < NUM_SLOTS:
+            slot = party.PARTY_SLOTS[idx]
+            item = party.equipped.get(slot)
+            if item is None:
+                return []
+            return ["UNEQUIP", "EXAMINE"]
+        else:
+            inv_idx = idx - NUM_SLOTS
+            inv = party.shared_inventory
+            if inv_idx >= len(inv):
+                return []
+            options = []
+            for s in party.PARTY_SLOTS:
+                if party.equipped[s] is None:
+                    label = party.PARTY_SLOT_LABELS[s]
+                    options.append(f"EQUIP → {label}")
+            options.append("GIVE TO MEMBER")
+            options.append("EXAMINE")
+            return options
 
     def _handle_equip_action(self, member):
         """Open the action menu for the selected item/slot."""
@@ -512,10 +570,12 @@ class TownState(BaseState):
                 self.shop_message)
             return
         if self.showing_party_inv:
+            action_opts = self._get_party_inv_action_options() if self.party_inv_action_menu else None
             renderer.draw_party_inventory_u3(
                 self.game.party, self.party_inv_cursor,
                 self.party_inv_choosing, self.party_inv_member,
-                self.party_inv_action_menu, self.party_inv_action_cursor)
+                self.party_inv_action_menu, self.party_inv_action_cursor,
+                action_options=action_opts)
             if self.examining_item:
                 renderer.draw_item_examine(self.examining_item)
             return

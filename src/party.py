@@ -292,12 +292,53 @@ class Party:
     Holds up to 4 members and a position on the current map.
     """
 
+    # Party-level equipment slot names and defaults
+    PARTY_SLOTS = ["light", "navigation", "camping", "special"]
+    PARTY_SLOT_LABELS = {
+        "light": "LIGHT",
+        "navigation": "NAVIGATION",
+        "camping": "CAMPING",
+        "special": "SPECIAL",
+    }
+    PARTY_SLOT_DEFAULTS = {"light": None, "navigation": None,
+                           "camping": None, "special": None}
+
     def __init__(self, start_col, start_row):
         self.col = start_col
         self.row = start_row
         self.members = []
         self.gold = 100  # Shared party gold
         self.shared_inventory = []  # Party-wide item pool
+
+        # Party-level equipment: 4 utility slots
+        self.equipped = {s: None for s in self.PARTY_SLOTS}
+
+    def party_equip(self, item_name, slot):
+        """Equip an item from shared inventory into a party slot.
+        Returns True if successful."""
+        if item_name not in self.shared_inventory:
+            return False
+        if slot not in self.equipped:
+            return False
+        # Move current equipped item back to inventory
+        old = self.equipped[slot]
+        if old is not None:
+            self.shared_inventory.append(old)
+        self.shared_inventory.remove(item_name)
+        self.equipped[slot] = item_name
+        return True
+
+    def party_unequip(self, slot):
+        """Unequip a party slot back to shared inventory.
+        Returns True if something was unequipped."""
+        if slot not in self.equipped:
+            return False
+        current = self.equipped[slot]
+        if current is None:
+            return False
+        self.shared_inventory.append(current)
+        self.equipped[slot] = None
+        return True
 
     def give_item_to_member(self, item_index, member_index):
         """Move an item from shared inventory to a party member's inventory.
@@ -392,7 +433,10 @@ def create_default_party(start_col, start_row):
     sable.armor = "Cloth"
     party.add_member(sable)
 
-    # Shared party stash — just one torch to start
-    party.shared_inventory = ["Torch"]
+    # Shared party stash
+    party.shared_inventory = []
+
+    # Party equipment — torch in the light slot
+    party.equipped["light"] = "Torch"
 
     return party

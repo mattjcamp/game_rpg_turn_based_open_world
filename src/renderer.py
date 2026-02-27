@@ -3011,17 +3011,22 @@ class Renderer:
 
     def draw_party_inventory_u3(self, party, cursor_index=0,
                                  choosing_member=False, member_cursor=0,
-                                 action_menu=False, action_cursor=0):
+                                 action_menu=False, action_cursor=0,
+                                 action_options=None):
         """
-        Full-screen shared party inventory.
+        Full-screen shared party inventory with party equipment slots.
+
+        The list is unified: first 4 rows are party equipment slots,
+        followed by shared inventory items.
 
         Modes:
         - Normal: browse items with cursor, Enter to open action menu.
-        - action_menu: choose GIVE TO MEMBER or EXAMINE.
+        - action_menu: choose from context-sensitive options.
         - choosing_member: pick which party member receives the item.
         """
-        from src.party import WEAPONS, ARMORS
+        from src.party import WEAPONS, ARMORS, ITEM_INFO
 
+        NUM_SLOTS = len(party.PARTY_SLOTS)
         fm = self.font_med
         f = self.font
         self.screen.fill(self._U3_BLACK)
@@ -3046,11 +3051,45 @@ class Renderer:
         row_h = 20
 
         # ═══════════════════════════════════════
-        # LEFT PANEL — Item list
+        # LEFT PANEL — Equipped slots + Item list
         # ═══════════════════════════════════════
         tx = left_x + 12
         ty = panel_y + 10
 
+        # ── Party equipment section ──
+        self._u3_text("PARTY EQUIPMENT", tx, ty, self._U3_ORANGE, fm)
+        ty += 24
+
+        for si, slot_key in enumerate(party.PARTY_SLOTS):
+            slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
+            item_name = party.equipped.get(slot_key)
+            selected = (si == cursor_index) and not choosing_member
+            prefix = "> " if selected else "  "
+
+            name_color = self._U3_WHITE if selected else self._U3_LTBLUE
+            self._u3_text(f"{prefix}{slot_label}:", tx, ty, name_color, fm)
+
+            if item_name:
+                item_color = self._U3_WHITE if selected else (220, 220, 230)
+                self._u3_text(item_name, tx + 120, ty, item_color, fm)
+            else:
+                self._u3_text("-- EMPTY --", tx + 120, ty, (120, 120, 120), fm)
+
+            if selected:
+                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                sel_surf.fill((255, 255, 255, 25))
+                self.screen.blit(sel_surf, sel_rect)
+
+            ty += row_h
+
+        # ── Divider between equipment and stash ──
+        ty += 6
+        pygame.draw.line(self.screen, (60, 60, 80),
+                         (tx, ty), (tx + left_w - 32, ty), 1)
+        ty += 8
+
+        # ── Shared stash section ──
         self._u3_text("SHARED STASH", tx, ty, self._U3_ORANGE, fm)
         self._u3_text(f"({len(inv)} ITEMS)", tx + 140, ty, self._U3_GRAY, fm)
         ty += 24
@@ -3059,15 +3098,20 @@ class Renderer:
             self._u3_text("  (EMPTY)", tx, ty, (120, 120, 120), fm)
         else:
             # Compute visible window (scroll if list is long)
-            max_visible = (panel_h - 60) // row_h
+            stash_area_top = ty
+            stash_area_h = panel_y + panel_h - ty - 10
+            max_visible = stash_area_h // row_h
+
             scroll_top = 0
+            inv_cursor = cursor_index - NUM_SLOTS  # cursor relative to inventory
             if len(inv) > max_visible:
-                scroll_top = max(0, min(cursor_index - max_visible // 2,
+                scroll_top = max(0, min(inv_cursor - max_visible // 2,
                                         len(inv) - max_visible))
 
             for vi, item_idx in enumerate(range(scroll_top, min(scroll_top + max_visible, len(inv)))):
                 item_name = inv[item_idx]
-                selected = (item_idx == cursor_index) and not choosing_member
+                global_idx = item_idx + NUM_SLOTS
+                selected = (global_idx == cursor_index) and not choosing_member
                 prefix = "> " if selected else "  "
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
 
@@ -3096,7 +3140,7 @@ class Renderer:
 
             # Scroll indicators
             if scroll_top > 0:
-                self._u3_text("^ MORE ^", tx + left_w // 2 - 50, panel_y + 32,
+                self._u3_text("^ MORE ^", tx + left_w // 2 - 50, stash_area_top - 2,
                                self._U3_GRAY, self.font_small)
             if scroll_top + max_visible < len(inv):
                 self._u3_text("v MORE v", tx + left_w // 2 - 50,
@@ -3108,10 +3152,22 @@ class Renderer:
         rx = right_x + 10
         ry = panel_y + 10
 
+        # Determine which item is selected
+        sel_item = None
+        is_equip_slot = cursor_index < NUM_SLOTS
+        if is_equip_slot:
+            slot_key = party.PARTY_SLOTS[cursor_index]
+            sel_item = party.equipped.get(slot_key)
+        elif cursor_index - NUM_SLOTS < len(inv):
+            sel_item = inv[cursor_index - NUM_SLOTS]
+
         # Show details of the selected item
-        if inv and 0 <= cursor_index < len(inv):
-            sel_item = inv[cursor_index]
-            self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
+        if sel_item:
+            if is_equip_slot:
+                slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
+                self._u3_text(f"EQUIPPED ({slot_label})", rx, ry, self._U3_ORANGE, fm)
+            else:
+                self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
             ry += 22
             self._u3_text(sel_item, rx, ry, self._U3_WHITE, f)
             ry += 24
@@ -3135,13 +3191,35 @@ class Renderer:
                 self._u3_text(f"SLOT: {slot}", rx, ry, (180, 180, 180), fm)
             else:
                 self._u3_text("TYPE: GENERAL ITEM", rx, ry, self._U3_LTBLUE, fm)
-                ry += 18
-                self._u3_text("NOT EQUIPPABLE", rx, ry, (180, 180, 180), fm)
+
+            # Description
+            info = ITEM_INFO.get(sel_item)
+            if info and info.get("desc"):
+                ry += 24
+                desc = info["desc"]
+                # Word-wrap description
+                words = desc.split()
+                line = ""
+                for word in words:
+                    test = f"{line} {word}".strip()
+                    if len(test) > 28:
+                        self._u3_text(line, rx, ry, (180, 180, 200), fm)
+                        ry += 16
+                        line = word
+                    else:
+                        line = test
+                if line:
+                    self._u3_text(line, rx, ry, (180, 180, 200), fm)
+        elif is_equip_slot:
+            slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
+            self._u3_text(f"{slot_label} SLOT", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+            self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
 
         # ── Character selection mode ──
-        if choosing_member and inv:
+        if choosing_member:
             ry += 32
             pygame.draw.line(self.screen, (60, 60, 80),
                              (rx, ry), (rx + right_w - 20, ry), 1)
@@ -3171,11 +3249,12 @@ class Renderer:
         self._u3_text(f"GOLD: {party.gold:05d}", rx + 30, gold_y + 2, (255, 255, 0), fm)
 
         # ── Action menu popup ──
-        if action_menu and inv and 0 <= cursor_index < len(inv):
-            options = ["GIVE TO MEMBER", "EXAMINE"]
-            sel_item = inv[cursor_index]
+        if action_menu and action_options:
+            options = action_options
+            popup_item = sel_item or "EMPTY SLOT"
 
-            popup_w = 220
+            max_label = max((len(o) for o in options), default=0)
+            popup_w = max(220, max_label * 10 + 40)
             popup_h = 22 + len(options) * 22 + 8
             popup_x = SCREEN_WIDTH // 2 - popup_w // 2
             popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
@@ -3185,7 +3264,7 @@ class Renderer:
             pygame.draw.rect(self.screen, self._U3_LTBLUE,
                              (popup_x, popup_y, popup_w, popup_h), 2)
 
-            self._u3_text(sel_item, popup_x + 10, popup_y + 6, self._U3_ORANGE, fm)
+            self._u3_text(popup_item, popup_x + 10, popup_y + 6, self._U3_ORANGE, fm)
             oy = popup_y + 26
             for oi, opt_text in enumerate(options):
                 sel = (oi == action_cursor)
