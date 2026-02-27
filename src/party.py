@@ -38,6 +38,81 @@ ARMORS = {
 }
 
 
+# ── Item descriptions & visual metadata ──────────────────────────
+# Each entry: { "desc": str, "icon": str (for pixel-art type) }
+# icon types: "sword", "axe", "bow", "dagger", "mace", "spear",
+#             "halberd", "gloves", "armor_light", "armor_heavy",
+#             "shield", "potion", "herb", "scroll", "torch", "rope",
+#             "tool", "bomb", "holy", "gem"
+ITEM_INFO = {
+    # ── Weapons ──
+    "Fists":        {"desc": "Bare knuckles. Not much, but always available.",
+                     "icon": "gloves"},
+    "Dagger":       {"desc": "A short, light blade. Can be thrown at enemies.",
+                     "icon": "dagger"},
+    "Mace":         {"desc": "A heavy flanged club, favored by clerics.",
+                     "icon": "mace"},
+    "Sling":        {"desc": "A simple ranged weapon that hurls stones.",
+                     "icon": "bow"},
+    "Axe":          {"desc": "A single-headed battle axe. Reliable and brutal.",
+                     "icon": "axe"},
+    "Sword":        {"desc": "A well-balanced longsword. Standard fighter fare.",
+                     "icon": "sword"},
+    "Spear":        {"desc": "A long thrusting weapon with good reach.",
+                     "icon": "spear"},
+    "Broad Axe":    {"desc": "A massive double-headed axe. Devastating blows.",
+                     "icon": "axe"},
+    "Bow":          {"desc": "A sturdy longbow. Excellent at range.",
+                     "icon": "bow"},
+    "Iron Sword":   {"desc": "A finely forged iron blade. Sharp and durable.",
+                     "icon": "sword"},
+    "Gloves":       {"desc": "Enchanted gauntlets that strike with magic force.",
+                     "icon": "gloves"},
+    "Halberd":      {"desc": "A polearm combining axe and spear. Fearsome reach.",
+                     "icon": "halberd"},
+    "Silver Bow":   {"desc": "A silver-inlaid bow. Deadly against the undead.",
+                     "icon": "bow"},
+    "Sun Sword":    {"desc": "A radiant blade infused with solar energy.",
+                     "icon": "sword"},
+    "Mystic Sword": {"desc": "An ancient blade pulsing with arcane power.",
+                     "icon": "sword"},
+    # ── Armor ──
+    "Cloth":        {"desc": "Simple cloth garments. Minimal protection.",
+                     "icon": "armor_light"},
+    "Leather":      {"desc": "Toughened leather armor. Light and flexible.",
+                     "icon": "armor_light"},
+    "Chain":        {"desc": "Interlocking metal rings. Good all-round defense.",
+                     "icon": "armor_heavy"},
+    "Plate":        {"desc": "Heavy steel plates. Excellent protection.",
+                     "icon": "armor_heavy"},
+    "+2 Chain":     {"desc": "Enchanted chainmail. Magically reinforced links.",
+                     "icon": "armor_heavy"},
+    "+2 Plate":     {"desc": "Enchanted plate armor. Nearly impenetrable.",
+                     "icon": "armor_heavy"},
+    "Exotic":       {"desc": "Mysterious armor of unknown origin. Supreme defense.",
+                     "icon": "armor_heavy"},
+    # ── General items ──
+    "Healing Herb":  {"desc": "A fragrant herb that restores a small amount of HP.",
+                      "icon": "herb"},
+    "Antidote":      {"desc": "A bitter tincture that cures poison.",
+                      "icon": "potion"},
+    "Torch":         {"desc": "A wooden torch. Lights the way in dark places.",
+                      "icon": "torch"},
+    "Rope":          {"desc": "A sturdy hemp rope. Useful for climbing.",
+                      "icon": "rope"},
+    "Holy Water":    {"desc": "Blessed water from a sacred spring. Burns the undead.",
+                      "icon": "holy"},
+    "Scroll of Fire":{"desc": "A single-use scroll containing a fire spell.",
+                      "icon": "scroll"},
+    "Mana Potion":   {"desc": "A shimmering blue liquid that restores magic points.",
+                      "icon": "potion"},
+    "Lockpick":      {"desc": "A set of fine tools for opening locked chests.",
+                      "icon": "tool"},
+    "Smoke Bomb":    {"desc": "A small bomb that creates a blinding cloud.",
+                      "icon": "bomb"},
+}
+
+
 class PartyMember:
     """A single character in the party."""
 
@@ -260,6 +335,31 @@ class PartyMember:
         self._sync_legacy_fields()
         return True
 
+    def return_item_to_party(self, item_name, party):
+        """Move an item from personal inventory to the party shared stash.
+
+        Returns True if the item was returned, False otherwise.
+        """
+        if item_name not in self.inventory:
+            return False
+        self.inventory.remove(item_name)
+        party.shared_inventory.append(item_name)
+        return True
+
+    def return_equipped_to_party(self, slot, party):
+        """Unequip an item and send it to the party shared stash.
+
+        Returns True if something was returned, False if slot was at default.
+        """
+        current = self.equipped.get(slot)
+        default = self._SLOT_DEFAULTS.get(slot)
+        if current is None or current == default:
+            return False
+        party.shared_inventory.append(current)
+        self.equipped[slot] = default
+        self._sync_legacy_fields()
+        return True
+
     def _sync_legacy_fields(self):
         """Keep the old .weapon and .armor fields in sync with equipped dict."""
         self.armor = self.equipped.get("body") or "Cloth"
@@ -279,6 +379,20 @@ class Party:
         self.row = start_row
         self.members = []
         self.gold = 100  # Shared party gold
+        self.shared_inventory = []  # Party-wide item pool
+
+    def give_item_to_member(self, item_index, member_index):
+        """Move an item from shared inventory to a party member's inventory.
+
+        Returns True if successful, False otherwise.
+        """
+        if item_index < 0 or item_index >= len(self.shared_inventory):
+            return False
+        if member_index < 0 or member_index >= len(self.members):
+            return False
+        item = self.shared_inventory.pop(item_index)
+        self.members[member_index].inventory.append(item)
+        return True
 
     def add_member(self, member):
         """Add a party member (max 4)."""
@@ -360,5 +474,12 @@ def create_default_party(start_col, start_row):
     sable.ammo = {"Dagger": 5}
     sable.inventory = ["Lockpick", "Smoke Bomb", "Healing Herb", "Torch"]
     party.add_member(sable)
+
+    # Shared party stash
+    party.shared_inventory = [
+        "Healing Herb", "Healing Herb", "Antidote",
+        "Torch", "Torch",
+        "Leather", "Axe", "Bow",
+    ]
 
     return party

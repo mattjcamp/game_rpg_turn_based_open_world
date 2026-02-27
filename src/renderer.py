@@ -56,6 +56,15 @@ class Renderer:
                 scaled = pygame.transform.scale(tile_surf, (dst_ts, dst_ts))
                 self._tile_sprites[(r, c)] = scaled
 
+        # ── Load treasure chest tile from reference doc asset ──
+        chest_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "src", "assets", "chest_tile.png")
+        self._chest_tile = None
+        if os.path.exists(chest_path):
+            raw = pygame.image.load(chest_path).convert_alpha()
+            self._chest_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
+
         # Map game tile IDs to sheet positions (row, col)
         # Based on the style guide tile-to-game mapping
         from src.settings import (
@@ -264,16 +273,18 @@ class Renderer:
             pygame.draw.polygon(self.screen, (180, 220, 180), arrow)
 
         elif tile_id == TILE_CHEST:
-            # Treasure chest
-            body = pygame.Rect(cx - 7, cy - 3, 14, 10)
-            pygame.draw.rect(self.screen, (140, 100, 30), body)
-            pygame.draw.rect(self.screen, (100, 70, 20), body, 1)
-            # Lid (rounded top)
-            lid = pygame.Rect(cx - 7, cy - 7, 14, 5)
-            pygame.draw.rect(self.screen, (160, 115, 35), lid)
-            pygame.draw.rect(self.screen, (100, 70, 20), lid, 1)
-            # Lock
-            pygame.draw.circle(self.screen, COLOR_YELLOW, (cx, cy - 1), 2)
+            # Treasure chest — use reference tile image
+            if self._chest_tile:
+                self.screen.blit(self._chest_tile, (rect.x, rect.y))
+            else:
+                # Fallback procedural
+                body = pygame.Rect(cx - 7, cy - 3, 14, 10)
+                pygame.draw.rect(self.screen, (140, 100, 30), body)
+                pygame.draw.rect(self.screen, (100, 70, 20), body, 1)
+                lid = pygame.Rect(cx - 7, cy - 7, 14, 5)
+                pygame.draw.rect(self.screen, (160, 115, 35), lid)
+                pygame.draw.rect(self.screen, (100, 70, 20), lid, 1)
+                pygame.draw.circle(self.screen, COLOR_YELLOW, (cx, cy - 1), 2)
 
         elif tile_id == TILE_TRAP:
             # Hidden trap — subtle red-ish marks on floor
@@ -916,7 +927,8 @@ class Renderer:
     _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 800
     _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 544
 
-    def draw_dungeon_u3(self, party, dungeon_data, message=""):
+    def draw_dungeon_u3(self, party, dungeon_data, message="",
+                         visible_tiles=None, torch_steps=-1):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -945,16 +957,19 @@ class Renderer:
                 py = sr * ts
                 self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr)
 
-        # ── 2. monster sprites ──
+        # ── 2. monster sprites (only within visible tiles) ──
         for monster in dungeon_data.monsters:
             if not monster.is_alive():
                 continue
             msc = monster.col - off_c
             msr = monster.row - off_r
             if 0 <= msc < cols and 0 <= msr < rows:
-                mx = msc * ts + ts // 2
-                my = msr * ts + ts // 2
-                self._u3_draw_dungeon_monster(monster, mx, my)
+                _vis = visible_tiles and (monster.col, monster.row) in visible_tiles
+                _fallback = not visible_tiles and abs(monster.col - party.col) <= 1 and abs(monster.row - party.row) <= 1
+                if _vis or _fallback:
+                    mx = msc * ts + ts // 2
+                    my = msr * ts + ts // 2
+                    self._u3_draw_dungeon_monster(monster, mx, my)
 
         # ── 3. party sprite ──
         psc = party.col - off_c
@@ -965,7 +980,8 @@ class Renderer:
             self._u3_draw_overworld_party(cx, cy)
 
         # ── 4. fog of war ──
-        self._u3_dungeon_fog(psc, psr, cols, rows, ts, light_radius=4)
+        self._u3_dungeon_fog(psc, psr, cols, rows, ts,
+                              visible_tiles=visible_tiles, off_c=off_c, off_r=off_r)
 
         # ── 5. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -981,7 +997,12 @@ class Renderer:
         # Top line: game info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
         self._u3_text(dungeon_data.name.upper(), 200, bar_y + 6, (200, 60, 60))
-        self._u3_text(f"CHESTS:{chests:02d}", 420, bar_y + 6, (255, 170, 85))
+        # Torch status
+        if torch_steps >= 0:
+            torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
+            self._u3_text(f"TORCH:{torch_steps:02d}", 420, bar_y + 6, torch_color)
+        else:
+            self._u3_text("NO TORCH", 420, bar_y + 6, (136, 136, 136))
         self._u3_text(f"POS:({party.col},{party.row})", 600, bar_y + 6, (136, 136, 136))
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] STAIRS",
@@ -1084,18 +1105,19 @@ class Renderer:
             pygame.draw.polygon(self.screen, BLUE, arrow)
 
         elif tile_id == TILE_CHEST:
-            # Treasure chest on black floor
-            pygame.draw.rect(self.screen, BLACK, rect)
-            # Chest body
-            body = pygame.Rect(cx - 7, cy - 2, 14, 9)
-            pygame.draw.rect(self.screen, BROWN, body)
-            pygame.draw.rect(self.screen, (100, 70, 30), body, 1)
-            # Lid
-            lid = pygame.Rect(cx - 7, cy - 6, 14, 5)
-            pygame.draw.rect(self.screen, (160, 115, 40), lid)
-            pygame.draw.rect(self.screen, (100, 70, 30), lid, 1)
-            # Lock
-            pygame.draw.circle(self.screen, YELLOW, (cx, cy), 2)
+            # Treasure chest — use reference tile image
+            if self._chest_tile:
+                self.screen.blit(self._chest_tile, (rect.x, rect.y))
+            else:
+                # Fallback procedural
+                pygame.draw.rect(self.screen, BLACK, rect)
+                body = pygame.Rect(cx - 7, cy - 2, 14, 9)
+                pygame.draw.rect(self.screen, BROWN, body)
+                pygame.draw.rect(self.screen, (100, 70, 30), body, 1)
+                lid = pygame.Rect(cx - 7, cy - 6, 14, 5)
+                pygame.draw.rect(self.screen, (160, 115, 40), lid)
+                pygame.draw.rect(self.screen, (100, 70, 30), lid, 1)
+                pygame.draw.circle(self.screen, YELLOW, (cx, cy), 2)
 
         elif tile_id == TILE_TRAP:
             # Trap — looks like floor but with faint red X
@@ -1160,31 +1182,57 @@ class Renderer:
 
     # ── dungeon fog of war ─────────────────────────────────
 
-    def _u3_dungeon_fog(self, party_sc, party_sr, cols, rows, ts, light_radius=4):
-        """Draw fog of war over the U3 dungeon map area."""
+    def _u3_dungeon_fog(self, party_sc, party_sr, cols, rows, ts,
+                         visible_tiles=None, off_c=0, off_r=0):
+        """Draw fog of war over the U3 dungeon map area.
+
+        If *visible_tiles* is provided (a set of (col, row) world coords),
+        tiles in the set are fully visible, tiles one step beyond get a soft
+        fade, and everything else is blacked out.  Falls back to a simple
+        radius-1 Euclidean fog when no set is supplied.
+        """
         import math
 
         fog = pygame.Surface((self._U3_DG_MAP_W, self._U3_DG_MAP_H), pygame.SRCALPHA)
 
-        fade_start = light_radius
-        fade_end = light_radius + 1.5
-
-        for sr in range(rows):
-            for sc in range(cols):
-                dx = sc - party_sc
-                dy = sr - party_sr
-                dist = math.sqrt(dx * dx + dy * dy)
-
-                if dist <= fade_start:
-                    continue
-                elif dist >= fade_end:
-                    alpha = 255
-                else:
-                    t = (dist - fade_start) / (fade_end - fade_start)
-                    alpha = int(255 * t)
-
-                rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
-                fog.fill((0, 0, 0, alpha), rect)
+        if visible_tiles is not None:
+            for sr in range(rows):
+                for sc in range(cols):
+                    wc = sc + off_c
+                    wr = sr + off_r
+                    if (wc, wr) in visible_tiles:
+                        # Fully visible — no fog
+                        continue
+                    # Check if any visible neighbour exists (edge fade)
+                    edge = False
+                    for dc in (-1, 0, 1):
+                        for dr in (-1, 0, 1):
+                            if (wc + dc, wr + dr) in visible_tiles:
+                                edge = True
+                                break
+                        if edge:
+                            break
+                    alpha = 160 if edge else 255
+                    rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
+                    fog.fill((0, 0, 0, alpha), rect)
+        else:
+            # Fallback: simple radius-1 fog
+            fade_start = 1
+            fade_end = 2.5
+            for sr in range(rows):
+                for sc in range(cols):
+                    dx = sc - party_sc
+                    dy = sr - party_sr
+                    dist = math.sqrt(dx * dx + dy * dy)
+                    if dist <= fade_start:
+                        continue
+                    elif dist >= fade_end:
+                        alpha = 255
+                    else:
+                        t = (dist - fade_start) / (fade_end - fade_start)
+                        alpha = int(255 * t)
+                    rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
+                    fog.fill((0, 0, 0, alpha), rect)
 
         self.screen.blit(fog, (0, 0))
 
@@ -2387,10 +2435,11 @@ class Renderer:
         # Bottom status bar
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        self._u3_text("[1-4] DETAIL    [P] CLOSE    [ESC] CLOSE",
+        self._u3_text("[1-4] DETAIL    [5] STASH    [P] CLOSE    [ESC] CLOSE",
                       8, bar_y + 5, self._U3_BLUE)
 
-    def draw_character_sheet_u3(self, member, index, cursor_index=0):
+    def draw_character_sheet_u3(self, member, index, cursor_index=0,
+                                action_menu=False, action_cursor=0):
         """
         Full-screen detailed character sheet for a single party member.
 
@@ -2398,6 +2447,8 @@ class Renderer:
         and inventory list with cursor navigation.
 
         cursor_index: selected row in the unified equip+inventory list (0-based).
+        action_menu: if True, show an action popup over the selected item.
+        action_cursor: which option is highlighted in the action popup.
         """
         from src.party import WEAPONS, ARMORS
         from src.combat_engine import format_modifier
@@ -2634,8 +2685,680 @@ class Renderer:
         magic_str = " + ".join(magic_types) if magic_types else "NONE"
         self._u3_text(f"MAGIC: {magic_str}", rx, ry, (180, 180, 255) if magic_types else (150, 150, 150), fm)
 
+        # ── Action menu popup ──
+        if action_menu and cursor_index < len(unified):
+            slot_label, item_name, is_eq, slot_key = unified[cursor_index]
+            # Build menu options (must match _get_action_options in state)
+            options = []
+            if is_eq:
+                # Equipped slot
+                if item_name and item_name not in ("Cloth", "Fists"):
+                    options.append("RETURN TO PARTY STASH")
+                if item_name:
+                    options.append("EXAMINE")
+            else:
+                # Inventory item
+                if item_name in ARMORS or item_name in WEAPONS:
+                    options.append("EQUIP")
+                options.append("RETURN TO PARTY STASH")
+                options.append("EXAMINE")
+
+            if options:
+                popup_w = 240
+                popup_h = 22 + len(options) * 22 + 8
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+                # Background
+                pygame.draw.rect(self.screen, (20, 20, 40),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, self._U3_LTBLUE,
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+
+                # Title
+                disp = item_name if item_name else "NONE"
+                self._u3_text(disp, popup_x + 10, popup_y + 6, self._U3_ORANGE, fm)
+                oy = popup_y + 26
+                for oi, opt_text in enumerate(options):
+                    sel = (oi == action_cursor)
+                    prefix = "> " if sel else "  "
+                    col = self._U3_WHITE if sel else self._U3_LTBLUE
+                    self._u3_text(f"{prefix}{opt_text}", popup_x + 10, oy, col, fm)
+                    if sel:
+                        hl = pygame.Rect(popup_x + 4, oy - 1, popup_w - 8, 20)
+                        hl_s = pygame.Surface((hl.w, hl.h), pygame.SRCALPHA)
+                        hl_s.fill((255, 255, 255, 25))
+                        self.screen.blit(hl_s, hl)
+                    oy += 22
+
         # ── Bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        self._u3_text("[UP/DN] SELECT  [ENTER] EQUIP/UNEQUIP  [ESC] BACK  [P] CLOSE",
-                      8, bar_y + 5, self._U3_BLUE)
+        if action_menu:
+            self._u3_text("[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
+                          8, bar_y + 5, self._U3_BLUE)
+        else:
+            self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [ESC] BACK  [P] CLOSE",
+                          8, bar_y + 5, self._U3_BLUE)
+
+    def draw_party_inventory_u3(self, party, cursor_index=0,
+                                 choosing_member=False, member_cursor=0,
+                                 action_menu=False, action_cursor=0):
+        """
+        Full-screen shared party inventory.
+
+        Modes:
+        - Normal: browse items with cursor, Enter to open action menu.
+        - action_menu: choose GIVE TO MEMBER or EXAMINE.
+        - choosing_member: pick which party member receives the item.
+        """
+        from src.party import WEAPONS, ARMORS
+
+        fm = self.font_med
+        f = self.font
+        self.screen.fill(self._U3_BLACK)
+
+        # ── Title bar ──
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        self._u3_text("PARTY INVENTORY", SCREEN_WIDTH // 2 - 75, 8,
+                       self._U3_ORANGE, f)
+
+        # ── Layout: left = item list, right = item details + member select ──
+        left_x = 4
+        left_w = SCREEN_WIDTH // 2 + 60
+        right_x = left_x + left_w + 4
+        right_w = SCREEN_WIDTH - right_x - 4
+        panel_y = 36
+        panel_h = SCREEN_HEIGHT - 36 - 28
+
+        self._u3_panel(left_x, panel_y, left_w, panel_h)
+        self._u3_panel(right_x, panel_y, right_w, panel_h)
+
+        inv = party.shared_inventory
+        row_h = 20
+
+        # ═══════════════════════════════════════
+        # LEFT PANEL — Item list
+        # ═══════════════════════════════════════
+        tx = left_x + 12
+        ty = panel_y + 10
+
+        self._u3_text("SHARED STASH", tx, ty, self._U3_ORANGE, fm)
+        self._u3_text(f"({len(inv)} ITEMS)", tx + 140, ty, self._U3_GRAY, fm)
+        ty += 24
+
+        if not inv:
+            self._u3_text("  (EMPTY)", tx, ty, (120, 120, 120), fm)
+        else:
+            # Compute visible window (scroll if list is long)
+            max_visible = (panel_h - 60) // row_h
+            scroll_top = 0
+            if len(inv) > max_visible:
+                scroll_top = max(0, min(cursor_index - max_visible // 2,
+                                        len(inv) - max_visible))
+
+            for vi, item_idx in enumerate(range(scroll_top, min(scroll_top + max_visible, len(inv)))):
+                item_name = inv[item_idx]
+                selected = (item_idx == cursor_index) and not choosing_member
+                prefix = "> " if selected else "  "
+                name_color = self._U3_WHITE if selected else (220, 220, 230)
+
+                self._u3_text(f"{prefix}{item_name}", tx, ty, name_color, fm)
+
+                # Type hint on the right
+                hint = ""
+                if item_name in ARMORS:
+                    hint = "ARMOR"
+                elif item_name in WEAPONS:
+                    wp = WEAPONS[item_name]
+                    hint = "RANGED WPN" if wp.get("ranged", False) else "MELEE WPN"
+                else:
+                    hint = "ITEM"
+                hint_color = self._U3_LTBLUE if selected else (120, 120, 160)
+                self._u3_text(hint, tx + left_w - 120, ty, hint_color, fm)
+
+                # Highlight bar
+                if selected:
+                    sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                    sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                    sel_surf.fill((255, 255, 255, 25))
+                    self.screen.blit(sel_surf, sel_rect)
+
+                ty += row_h
+
+            # Scroll indicators
+            if scroll_top > 0:
+                self._u3_text("^ MORE ^", tx + left_w // 2 - 50, panel_y + 32,
+                               self._U3_GRAY, self.font_small)
+            if scroll_top + max_visible < len(inv):
+                self._u3_text("v MORE v", tx + left_w // 2 - 50,
+                               panel_y + panel_h - 18, self._U3_GRAY, self.font_small)
+
+        # ═══════════════════════════════════════
+        # RIGHT PANEL — Item detail + character selection
+        # ═══════════════════════════════════════
+        rx = right_x + 10
+        ry = panel_y + 10
+
+        # Show details of the selected item
+        if inv and 0 <= cursor_index < len(inv):
+            sel_item = inv[cursor_index]
+            self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+            self._u3_text(sel_item, rx, ry, self._U3_WHITE, f)
+            ry += 24
+
+            # Item stats
+            if sel_item in ARMORS:
+                arm = ARMORS[sel_item]
+                self._u3_text(f"TYPE: ARMOR", rx, ry, self._U3_LTBLUE, fm)
+                ry += 18
+                self._u3_text(f"EVASION: {arm['evasion']}%", rx, ry, (220, 220, 230), fm)
+                ry += 18
+                self._u3_text("SLOT: BODY", rx, ry, (180, 180, 180), fm)
+            elif sel_item in WEAPONS:
+                wp = WEAPONS[sel_item]
+                wtype = "RANGED" if wp.get("ranged", False) else "MELEE"
+                self._u3_text(f"TYPE: {wtype} WEAPON", rx, ry, self._U3_LTBLUE, fm)
+                ry += 18
+                self._u3_text(f"POWER: {wp['power']:02d}", rx, ry, (220, 220, 230), fm)
+                ry += 18
+                slot = "RANGED" if wp.get("ranged", False) else "MELEE"
+                self._u3_text(f"SLOT: {slot}", rx, ry, (180, 180, 180), fm)
+            else:
+                self._u3_text("TYPE: GENERAL ITEM", rx, ry, self._U3_LTBLUE, fm)
+                ry += 18
+                self._u3_text("NOT EQUIPPABLE", rx, ry, (180, 180, 180), fm)
+        else:
+            self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
+
+        # ── Character selection mode ──
+        if choosing_member and inv:
+            ry += 32
+            pygame.draw.line(self.screen, (60, 60, 80),
+                             (rx, ry), (rx + right_w - 20, ry), 1)
+            ry += 10
+            self._u3_text("GIVE TO:", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+
+            for mi, member in enumerate(party.members):
+                selected = (mi == member_cursor)
+                prefix = "> " if selected else "  "
+                name_color = self._U3_WHITE if selected else self._U3_LTBLUE
+                cls_short = member.char_class[:3].upper()
+                label = f"{prefix}{member.name} ({cls_short})"
+                self._u3_text(label, rx, ry, name_color, fm)
+
+                if selected:
+                    sel_rect = pygame.Rect(rx - 4, ry - 1, right_w - 20, row_h)
+                    sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                    sel_surf.fill((255, 255, 255, 25))
+                    self.screen.blit(sel_surf, sel_rect)
+
+                ry += row_h
+
+        # ── Gold display with chest icon ──
+        gold_y = panel_y + panel_h - 30
+        self._draw_item_icon(rx + 12, gold_y + 8, "chest", 28)
+        self._u3_text(f"GOLD: {party.gold:05d}", rx + 30, gold_y + 2, (255, 255, 0), fm)
+
+        # ── Action menu popup ──
+        if action_menu and inv and 0 <= cursor_index < len(inv):
+            options = ["GIVE TO MEMBER", "EXAMINE"]
+            sel_item = inv[cursor_index]
+
+            popup_w = 220
+            popup_h = 22 + len(options) * 22 + 8
+            popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+            popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+            pygame.draw.rect(self.screen, (20, 20, 40),
+                             (popup_x, popup_y, popup_w, popup_h))
+            pygame.draw.rect(self.screen, self._U3_LTBLUE,
+                             (popup_x, popup_y, popup_w, popup_h), 2)
+
+            self._u3_text(sel_item, popup_x + 10, popup_y + 6, self._U3_ORANGE, fm)
+            oy = popup_y + 26
+            for oi, opt_text in enumerate(options):
+                sel = (oi == action_cursor)
+                prefix = "> " if sel else "  "
+                col = self._U3_WHITE if sel else self._U3_LTBLUE
+                self._u3_text(f"{prefix}{opt_text}", popup_x + 10, oy, col, fm)
+                if sel:
+                    hl = pygame.Rect(popup_x + 4, oy - 1, popup_w - 8, 20)
+                    hl_s = pygame.Surface((hl.w, hl.h), pygame.SRCALPHA)
+                    hl_s.fill((255, 255, 255, 25))
+                    self.screen.blit(hl_s, hl)
+                oy += 22
+
+        # ── Bottom status bar ──
+        bar_y = SCREEN_HEIGHT - 24
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        if action_menu:
+            self._u3_text("[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
+                          8, bar_y + 5, self._U3_BLUE)
+        elif choosing_member:
+            self._u3_text("[UP/DN] SELECT MEMBER  [ENTER] CONFIRM  [ESC] CANCEL",
+                          8, bar_y + 5, self._U3_BLUE)
+        else:
+            self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [ESC] BACK  [P] CLOSE",
+                          8, bar_y + 5, self._U3_BLUE)
+
+    # ═══════════════════════════════════════════════════════════════
+    # ITEM EXAMINATION OVERLAY
+    # ═══════════════════════════════════════════════════════════════
+
+    def _draw_item_icon(self, cx, cy, icon_type, size=64):
+        """Draw a pixel-art icon for an item type, centered at (cx, cy)."""
+        s = size
+        hs = s // 2
+        x0 = cx - hs
+        y0 = cy - hs
+
+        # Colors
+        STEEL = (180, 190, 200)
+        DARK_STEEL = (120, 130, 140)
+        BROWN = (140, 90, 40)
+        DARK_BROWN = (100, 60, 25)
+        GOLD = (220, 180, 60)
+        RED = (200, 60, 60)
+        GREEN = (60, 180, 60)
+        BLUE = (80, 120, 220)
+        LIGHT_BLUE = (140, 180, 255)
+        WHITE = (240, 240, 240)
+        ORANGE = (255, 170, 85)
+        PURPLE = (160, 80, 200)
+        YELLOW = (255, 220, 80)
+
+        if icon_type == "sword":
+            # Blade
+            pygame.draw.line(self.screen, STEEL, (cx - 2, cy + hs - 8), (cx + 2, cy - hs + 6), 4)
+            pygame.draw.line(self.screen, WHITE, (cx - 1, cy + hs - 12), (cx + 1, cy - hs + 8), 2)
+            # Crossguard
+            pygame.draw.line(self.screen, GOLD, (cx - 10, cy + 4), (cx + 10, cy + 4), 4)
+            # Grip
+            pygame.draw.line(self.screen, BROWN, (cx, cy + 6), (cx, cy + hs - 6), 4)
+            # Pommel
+            pygame.draw.circle(self.screen, GOLD, (cx, cy + hs - 4), 4)
+
+        elif icon_type == "axe":
+            # Handle
+            pygame.draw.line(self.screen, BROWN, (cx, cy + hs - 6), (cx, cy - hs + 10), 4)
+            # Axe head
+            pts = [(cx - 2, cy - hs + 10), (cx - 14, cy - hs + 20),
+                   (cx - 14, cy - 4), (cx - 2, cy + 4)]
+            pygame.draw.polygon(self.screen, STEEL, pts)
+            pygame.draw.polygon(self.screen, DARK_STEEL, pts, 2)
+            # Edge highlight
+            pygame.draw.line(self.screen, WHITE, (cx - 14, cy - hs + 20), (cx - 14, cy - 4), 2)
+
+        elif icon_type == "bow":
+            # Bow arc
+            pygame.draw.arc(self.screen, BROWN,
+                           (cx - 16, cy - hs + 4, 24, s - 8),
+                           -1.2, 1.2, 3)
+            # String
+            pygame.draw.line(self.screen, (200, 200, 200),
+                           (cx + 4, cy - hs + 10), (cx + 4, cy + hs - 10), 1)
+            # Arrow
+            pygame.draw.line(self.screen, STEEL, (cx + 4, cy - hs + 14), (cx + 4, cy + hs - 14), 2)
+            # Arrowhead
+            pygame.draw.polygon(self.screen, STEEL,
+                               [(cx + 4, cy - hs + 10), (cx + 1, cy - hs + 18), (cx + 7, cy - hs + 18)])
+
+        elif icon_type == "dagger":
+            # Blade
+            pygame.draw.line(self.screen, STEEL, (cx, cy - hs + 8), (cx, cy + 6), 3)
+            pygame.draw.line(self.screen, WHITE, (cx, cy - hs + 10), (cx, cy + 2), 1)
+            # Guard
+            pygame.draw.line(self.screen, GOLD, (cx - 7, cy + 8), (cx + 7, cy + 8), 3)
+            # Handle
+            pygame.draw.line(self.screen, DARK_BROWN, (cx, cy + 10), (cx, cy + hs - 6), 4)
+
+        elif icon_type == "mace":
+            # Handle
+            pygame.draw.line(self.screen, BROWN, (cx, cy + hs - 6), (cx, cy - 6), 4)
+            # Head
+            pygame.draw.circle(self.screen, STEEL, (cx, cy - 14), 12)
+            pygame.draw.circle(self.screen, DARK_STEEL, (cx, cy - 14), 12, 2)
+            # Flanges
+            for angle_off in [-8, 0, 8]:
+                pygame.draw.circle(self.screen, WHITE, (cx + angle_off, cy - 20), 3)
+
+        elif icon_type == "spear":
+            # Shaft
+            pygame.draw.line(self.screen, BROWN, (cx, cy + hs - 4), (cx, cy - hs + 14), 3)
+            # Spearhead
+            pts = [(cx, cy - hs + 6), (cx - 6, cy - hs + 18), (cx + 6, cy - hs + 18)]
+            pygame.draw.polygon(self.screen, STEEL, pts)
+            pygame.draw.polygon(self.screen, WHITE, pts, 1)
+
+        elif icon_type == "halberd":
+            # Shaft
+            pygame.draw.line(self.screen, BROWN, (cx, cy + hs - 4), (cx, cy - hs + 8), 3)
+            # Axe blade on side
+            pts = [(cx, cy - hs + 12), (cx - 14, cy - hs + 20),
+                   (cx - 12, cy - 2), (cx, cy + 2)]
+            pygame.draw.polygon(self.screen, STEEL, pts)
+            pygame.draw.polygon(self.screen, DARK_STEEL, pts, 1)
+            # Spear tip
+            pts2 = [(cx, cy - hs + 6), (cx - 4, cy - hs + 14), (cx + 4, cy - hs + 14)]
+            pygame.draw.polygon(self.screen, STEEL, pts2)
+
+        elif icon_type == "gloves":
+            # Left glove
+            pygame.draw.rect(self.screen, STEEL, (cx - 16, cy - 10, 14, 20), border_radius=3)
+            pygame.draw.rect(self.screen, DARK_STEEL, (cx - 16, cy - 10, 14, 20), 2, border_radius=3)
+            # Right glove
+            pygame.draw.rect(self.screen, STEEL, (cx + 2, cy - 10, 14, 20), border_radius=3)
+            pygame.draw.rect(self.screen, DARK_STEEL, (cx + 2, cy - 10, 14, 20), 2, border_radius=3)
+            # Fingers
+            for gx in [cx - 12, cx - 8, cx + 6, cx + 10]:
+                pygame.draw.rect(self.screen, STEEL, (gx, cy - 16, 4, 8), border_radius=2)
+            # Glow
+            pygame.draw.circle(self.screen, (100, 150, 255, 128), (cx, cy), 18, 1)
+
+        elif icon_type == "armor_light":
+            # Torso shape
+            pts = [(cx - 12, cy - 16), (cx + 12, cy - 16),
+                   (cx + 16, cy + 6), (cx + 10, cy + 20),
+                   (cx - 10, cy + 20), (cx - 16, cy + 6)]
+            pygame.draw.polygon(self.screen, BROWN, pts)
+            pygame.draw.polygon(self.screen, DARK_BROWN, pts, 2)
+            # Neck opening
+            pygame.draw.arc(self.screen, DARK_BROWN,
+                           (cx - 6, cy - 20, 12, 12), 0, 3.14, 2)
+            # Stitching detail
+            pygame.draw.line(self.screen, DARK_BROWN, (cx, cy - 14), (cx, cy + 16), 1)
+
+        elif icon_type == "armor_heavy":
+            # Torso plates
+            pts = [(cx - 14, cy - 18), (cx + 14, cy - 18),
+                   (cx + 18, cy + 4), (cx + 12, cy + 22),
+                   (cx - 12, cy + 22), (cx - 18, cy + 4)]
+            pygame.draw.polygon(self.screen, STEEL, pts)
+            pygame.draw.polygon(self.screen, DARK_STEEL, pts, 2)
+            # Plate lines
+            pygame.draw.line(self.screen, DARK_STEEL, (cx - 12, cy - 6), (cx + 12, cy - 6), 1)
+            pygame.draw.line(self.screen, DARK_STEEL, (cx - 14, cy + 6), (cx + 14, cy + 6), 1)
+            # Neck guard
+            pygame.draw.arc(self.screen, DARK_STEEL,
+                           (cx - 8, cy - 24, 16, 14), 0, 3.14, 2)
+            # Highlight
+            pygame.draw.line(self.screen, WHITE, (cx - 4, cy - 14), (cx - 4, cy + 2), 1)
+
+        elif icon_type == "potion":
+            # Bottle body
+            pygame.draw.ellipse(self.screen, BLUE, (cx - 10, cy - 4, 20, 24))
+            pygame.draw.ellipse(self.screen, LIGHT_BLUE, (cx - 10, cy - 4, 20, 24), 2)
+            # Neck
+            pygame.draw.rect(self.screen, BLUE, (cx - 4, cy - 14, 8, 12))
+            pygame.draw.rect(self.screen, LIGHT_BLUE, (cx - 4, cy - 14, 8, 12), 1)
+            # Cork
+            pygame.draw.rect(self.screen, BROWN, (cx - 5, cy - 18, 10, 6), border_radius=2)
+            # Highlight
+            pygame.draw.ellipse(self.screen, WHITE, (cx - 4, cy + 2, 6, 8), 1)
+
+        elif icon_type == "herb":
+            # Stem
+            pygame.draw.line(self.screen, GREEN, (cx, cy + 16), (cx, cy - 4), 2)
+            # Leaves
+            pygame.draw.ellipse(self.screen, GREEN, (cx - 14, cy - 10, 14, 8))
+            pygame.draw.ellipse(self.screen, GREEN, (cx, cy - 14, 14, 8))
+            pygame.draw.ellipse(self.screen, GREEN, (cx - 8, cy - 20, 12, 8))
+            # Highlight
+            pygame.draw.ellipse(self.screen, (100, 220, 100), (cx - 12, cy - 9, 8, 4))
+            pygame.draw.ellipse(self.screen, (100, 220, 100), (cx + 2, cy - 13, 8, 4))
+
+        elif icon_type == "scroll":
+            # Main body
+            pygame.draw.rect(self.screen, (230, 210, 170), (cx - 12, cy - 16, 24, 32))
+            # Top roll
+            pygame.draw.ellipse(self.screen, (210, 190, 150), (cx - 14, cy - 20, 28, 10))
+            # Bottom roll
+            pygame.draw.ellipse(self.screen, (210, 190, 150), (cx - 14, cy + 12, 28, 10))
+            # Text lines
+            for ly in range(cy - 10, cy + 10, 5):
+                pygame.draw.line(self.screen, (160, 140, 100),
+                               (cx - 8, ly), (cx + 8, ly), 1)
+            # Magic glow
+            pygame.draw.rect(self.screen, PURPLE, (cx - 14, cy - 20, 28, 42), 1)
+
+        elif icon_type == "torch":
+            # Handle
+            pygame.draw.rect(self.screen, BROWN, (cx - 3, cy, 6, 22))
+            pygame.draw.rect(self.screen, DARK_BROWN, (cx - 3, cy, 6, 22), 1)
+            # Flame base
+            pygame.draw.ellipse(self.screen, ORANGE, (cx - 8, cy - 14, 16, 18))
+            # Flame tip
+            pygame.draw.polygon(self.screen, YELLOW,
+                               [(cx, cy - 22), (cx - 5, cy - 10), (cx + 5, cy - 10)])
+            # Flame core
+            pygame.draw.ellipse(self.screen, YELLOW, (cx - 4, cy - 10, 8, 10))
+
+        elif icon_type == "rope":
+            # Coiled rope
+            for i in range(4):
+                oy = cy - 12 + i * 8
+                pygame.draw.ellipse(self.screen, BROWN, (cx - 14, oy, 28, 10), 2)
+            # End
+            pygame.draw.line(self.screen, BROWN, (cx + 12, cy + 14), (cx + 16, cy + 22), 2)
+
+        elif icon_type == "tool":
+            # Pick body
+            pygame.draw.line(self.screen, STEEL, (cx - 12, cy - 8), (cx + 12, cy - 8), 2)
+            # Handle
+            pygame.draw.line(self.screen, BROWN, (cx, cy - 6), (cx, cy + 18), 3)
+            # Second pick
+            pygame.draw.line(self.screen, STEEL, (cx - 8, cy - 4), (cx + 8, cy + 4), 2)
+            # Ring
+            pygame.draw.circle(self.screen, GOLD, (cx, cy - 10), 4, 1)
+
+        elif icon_type == "bomb":
+            # Body
+            pygame.draw.circle(self.screen, (60, 60, 60), (cx, cy + 4), 14)
+            pygame.draw.circle(self.screen, (80, 80, 80), (cx, cy + 4), 14, 2)
+            # Fuse
+            pygame.draw.line(self.screen, BROWN, (cx + 6, cy - 8), (cx + 12, cy - 18), 2)
+            # Spark
+            pygame.draw.circle(self.screen, YELLOW, (cx + 12, cy - 20), 4)
+            pygame.draw.circle(self.screen, ORANGE, (cx + 12, cy - 20), 2)
+            # Highlight
+            pygame.draw.circle(self.screen, (100, 100, 100), (cx - 4, cy), 3)
+
+        elif icon_type == "holy":
+            # Vial
+            pygame.draw.ellipse(self.screen, LIGHT_BLUE, (cx - 8, cy - 2, 16, 20))
+            pygame.draw.ellipse(self.screen, WHITE, (cx - 8, cy - 2, 16, 20), 1)
+            # Neck
+            pygame.draw.rect(self.screen, LIGHT_BLUE, (cx - 3, cy - 12, 6, 12))
+            # Cork
+            pygame.draw.rect(self.screen, BROWN, (cx - 4, cy - 16, 8, 6), border_radius=2)
+            # Cross symbol
+            pygame.draw.line(self.screen, YELLOW, (cx, cy + 2), (cx, cy + 12), 2)
+            pygame.draw.line(self.screen, YELLOW, (cx - 4, cy + 6), (cx + 4, cy + 6), 2)
+            # Glow
+            pygame.draw.circle(self.screen, (255, 255, 200), (cx, cy + 6), 10, 1)
+
+        elif icon_type == "chest":
+            # Treasure chest — based on the in-game chest tile art
+            # Body
+            body_w, body_h = 28, 18
+            body_rect = pygame.Rect(cx - body_w // 2, cy - 2, body_w, body_h)
+            pygame.draw.rect(self.screen, (140, 100, 30), body_rect)
+            pygame.draw.rect(self.screen, (100, 70, 20), body_rect, 2)
+            # Horizontal plank lines
+            pygame.draw.line(self.screen, (120, 85, 25),
+                           (cx - body_w // 2 + 2, cy + 5),
+                           (cx + body_w // 2 - 2, cy + 5), 1)
+            pygame.draw.line(self.screen, (120, 85, 25),
+                           (cx - body_w // 2 + 2, cy + 11),
+                           (cx + body_w // 2 - 2, cy + 11), 1)
+            # Lid (arched top)
+            lid_rect = pygame.Rect(cx - body_w // 2, cy - 14, body_w, 14)
+            pygame.draw.rect(self.screen, (160, 115, 35), lid_rect)
+            pygame.draw.rect(self.screen, (100, 70, 20), lid_rect, 2)
+            # Lid arch highlight
+            pygame.draw.line(self.screen, (180, 135, 50),
+                           (cx - body_w // 2 + 3, cy - 12),
+                           (cx + body_w // 2 - 3, cy - 12), 1)
+            # Metal clasp/band across front
+            pygame.draw.rect(self.screen, DARK_STEEL,
+                            (cx - 2, cy - 14, 4, body_h + 14))
+            pygame.draw.rect(self.screen, STEEL,
+                            (cx - 2, cy - 14, 4, body_h + 14), 1)
+            # Lock
+            pygame.draw.circle(self.screen, GOLD, (cx, cy - 1), 4)
+            pygame.draw.circle(self.screen, (180, 140, 40), (cx, cy - 1), 4, 1)
+            pygame.draw.rect(self.screen, GOLD, (cx - 1, cy, 2, 3))
+            # Corner rivets
+            for rx_off, ry_off in [(-11, -10), (11, -10), (-11, 12), (11, 12)]:
+                pygame.draw.circle(self.screen, GOLD, (cx + rx_off, cy + ry_off), 2)
+
+        elif icon_type == "gem":
+            # Diamond shape
+            pts = [(cx, cy - 16), (cx + 14, cy), (cx, cy + 16), (cx - 14, cy)]
+            pygame.draw.polygon(self.screen, LIGHT_BLUE, pts)
+            pygame.draw.polygon(self.screen, WHITE, pts, 2)
+            # Facet lines
+            pygame.draw.line(self.screen, WHITE, (cx, cy - 16), (cx, cy + 16), 1)
+            pygame.draw.line(self.screen, WHITE, (cx - 14, cy), (cx + 14, cy), 1)
+
+        else:
+            # Unknown — draw a question mark box
+            pygame.draw.rect(self.screen, (60, 60, 80), (cx - 14, cy - 14, 28, 28), border_radius=4)
+            pygame.draw.rect(self.screen, STEEL, (cx - 14, cy - 14, 28, 28), 2, border_radius=4)
+            self._u3_text("?", cx - 4, cy - 6, WHITE, self.font)
+
+    def draw_item_examine(self, item_name):
+        """Draw a centered item examination popup overlay.
+
+        Shows a pixel-art icon, item name, type, stats, and description.
+        """
+        from src.party import WEAPONS, ARMORS, ITEM_INFO
+
+        fm = self.font_med
+        f = self.font
+
+        # Popup dimensions
+        pw, ph = 340, 280
+        px = (SCREEN_WIDTH - pw) // 2
+        py = (SCREEN_HEIGHT - ph) // 2
+
+        # Dim background
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 140))
+        self.screen.blit(dim, (0, 0))
+
+        # Popup box
+        pygame.draw.rect(self.screen, (16, 16, 32), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
+
+        # ── Icon area (left side) ──
+        icon_cx = px + 56
+        icon_cy = py + 70
+        # Icon background circle
+        pygame.draw.circle(self.screen, (30, 30, 50), (icon_cx, icon_cy), 36)
+        pygame.draw.circle(self.screen, (60, 60, 100), (icon_cx, icon_cy), 36, 1)
+
+        info = ITEM_INFO.get(item_name, {})
+        icon_type = info.get("icon", "gem")
+        self._draw_item_icon(icon_cx, icon_cy, icon_type, 60)
+
+        # ── Item name ──
+        name_x = px + 110
+        name_y = py + 14
+        self._u3_text(item_name.upper(), name_x, name_y, self._U3_ORANGE, f)
+
+        # ── Type and stats ──
+        ty = name_y + 26
+        if item_name in ARMORS:
+            arm = ARMORS[item_name]
+            self._u3_text("TYPE:", name_x, ty, self._U3_LTBLUE, fm)
+            self._u3_text("ARMOR", name_x + 55, ty, self._U3_WHITE, fm)
+            ty += 20
+            self._u3_text("SLOT:", name_x, ty, self._U3_LTBLUE, fm)
+            self._u3_text("BODY", name_x + 55, ty, (220, 220, 230), fm)
+            ty += 20
+            self._u3_text("EVASION:", name_x, ty, self._U3_LTBLUE, fm)
+            self._u3_text(f"{arm['evasion']}%", name_x + 80, ty, self._U3_GREEN, fm)
+        elif item_name in WEAPONS:
+            wp = WEAPONS[item_name]
+            wtype = "RANGED" if wp.get("ranged", False) else "MELEE"
+            self._u3_text("TYPE:", name_x, ty, self._U3_LTBLUE, fm)
+            self._u3_text(f"{wtype} WEAPON", name_x + 55, ty, self._U3_WHITE, fm)
+            ty += 20
+            slot = "RANGED" if wp.get("ranged", False) else "MELEE"
+            self._u3_text("SLOT:", name_x, ty, self._U3_LTBLUE, fm)
+            self._u3_text(slot, name_x + 55, ty, (220, 220, 230), fm)
+            ty += 20
+            self._u3_text("POWER:", name_x, ty, self._U3_LTBLUE, fm)
+            pwr = wp["power"]
+            pwr_color = self._U3_GREEN if pwr >= 7 else self._U3_ORANGE if pwr >= 4 else (220, 220, 230)
+            self._u3_text(f"{pwr:02d}", name_x + 65, ty, pwr_color, fm)
+            if wp.get("consumable", False):
+                ty += 20
+                self._u3_text("NOTE:", name_x, ty, self._U3_LTBLUE, fm)
+                self._u3_text("CONSUMABLE", name_x + 55, ty, self._U3_RED, fm)
+        else:
+            self._u3_text("TYPE:", name_x, ty, self._U3_LTBLUE, fm)
+            self._u3_text("GENERAL ITEM", name_x + 55, ty, self._U3_WHITE, fm)
+            ty += 20
+            self._u3_text("NOT EQUIPPABLE", name_x, ty, (150, 150, 150), fm)
+
+        # ── Description ──
+        desc = info.get("desc", "A mysterious object of unknown origin.")
+        desc_y = py + 140
+        pygame.draw.line(self.screen, (60, 60, 100),
+                        (px + 14, desc_y - 6), (px + pw - 14, desc_y - 6), 1)
+
+        # Word wrap the description
+        words = desc.split()
+        lines = []
+        current_line = ""
+        max_chars = 38  # chars per line at font_med
+        for word in words:
+            test = current_line + (" " if current_line else "") + word
+            if len(test) <= max_chars:
+                current_line = test
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+
+        for line in lines:
+            self._u3_text(line, px + 18, desc_y, (200, 200, 210), fm)
+            desc_y += 18
+
+        # ── Rarity bar (based on power/evasion) ──
+        bar_y = py + ph - 40
+        pygame.draw.line(self.screen, (60, 60, 100),
+                        (px + 14, bar_y - 6), (px + pw - 14, bar_y - 6), 1)
+        # Determine rarity
+        PURPLE = (160, 80, 200)
+        rarity = "COMMON"
+        rarity_color = self._U3_GRAY
+        if item_name in WEAPONS:
+            pwr = WEAPONS[item_name]["power"]
+            if pwr >= 9:
+                rarity, rarity_color = "LEGENDARY", PURPLE
+            elif pwr >= 7:
+                rarity, rarity_color = "RARE", self._U3_LTBLUE
+            elif pwr >= 4:
+                rarity, rarity_color = "UNCOMMON", self._U3_GREEN
+        elif item_name in ARMORS:
+            ev = ARMORS[item_name]["evasion"]
+            if ev >= 65:
+                rarity, rarity_color = "LEGENDARY", PURPLE
+            elif ev >= 60:
+                rarity, rarity_color = "RARE", self._U3_LTBLUE
+            elif ev >= 56:
+                rarity, rarity_color = "UNCOMMON", self._U3_GREEN
+        self._u3_text("RARITY:", px + 18, bar_y, self._U3_LTBLUE, fm)
+        self._u3_text(rarity, px + 80, bar_y, rarity_color, fm)
+
+        # ── Dismiss hint ──
+        self._u3_text("[ESC] CLOSE", px + pw - 100, py + ph - 20,
+                      self._U3_BLUE, self.font_small)
