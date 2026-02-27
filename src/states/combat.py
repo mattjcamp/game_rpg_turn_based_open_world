@@ -1272,32 +1272,33 @@ class CombatState(BaseState):
 
     def _end_combat(self, won):
         if won and self.monster_ref:
+            from src.settings import TILE_CHEST
+            mc = self.monster_map_col
+            mr = self.monster_map_row
+
             if self.source_state == "dungeon":
                 dungeon_state = self.game.states.get("dungeon")
                 if dungeon_state and dungeon_state.dungeon_data:
                     ddata = dungeon_state.dungeon_data
-                    monsters = ddata.monsters
-                    if self.monster_ref in monsters:
-                        monsters.remove(self.monster_ref)
+                    if self.monster_ref in ddata.monsters:
+                        ddata.monsters.remove(self.monster_ref)
 
                     # Place a treasure chest where the monster stood
-                    from src.settings import TILE_CHEST
-                    mc = self.monster_map_col
-                    mr = self.monster_map_row
                     ddata.tile_map.set_tile(mc, mr, TILE_CHEST)
-
                     dungeon_state.pending_combat_message = (
-                        f"Victory! A treasure chest appears!"
+                        "Victory! A treasure chest appears!"
                     )
 
             elif self.source_state == "overworld":
                 overworld_state = self.game.states.get("overworld")
                 if overworld_state:
-                    # Remove the defeated orc from the overworld
                     if self.monster_ref in overworld_state.overworld_monsters:
                         overworld_state.overworld_monsters.remove(self.monster_ref)
+
+                    # Place a treasure chest where the orc stood
+                    self.game.tile_map.set_tile(mc, mr, TILE_CHEST)
                     overworld_state.pending_combat_message = (
-                        f"Victory! The orc is defeated!"
+                        "Victory! A treasure chest appears!"
                     )
 
         if not won:

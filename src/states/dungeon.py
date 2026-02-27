@@ -559,10 +559,7 @@ class DungeonState(BaseState):
             pos = (col, row)
             if pos not in self.dungeon_data.opened_chests:
                 self.dungeon_data.opened_chests.add(pos)
-                # Random treasure
-                gold = random.randint(10, 50)
-                self.game.party.gold += gold
-                self.show_message(f"Treasure! Found {gold} gold!", 2000)
+                self._open_chest()
                 # Replace chest with floor now that it's opened
                 self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
 
@@ -581,6 +578,50 @@ class DungeonState(BaseState):
                     )
                 # Disarm the trap (replace with floor)
                 self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
+
+    # ── Chest loot ─────────────────────────────────────────────
+
+    # Weighted loot table: (item_name, weight)
+    # Higher weight = more common.  None means gold only.
+    _CHEST_LOOT = [
+        (None,           10),   # gold only (most common)
+        ("Torch",         6),
+        ("Healing Herb",  5),
+        ("Antidote",      3),
+        ("Dagger",        3),
+        ("Club",          3),
+        ("Mace",          2),
+        ("Leather",       2),
+        ("Sling",         2),
+        ("Axe",           1),
+        ("Sword",         1),
+        ("Chain",         1),
+        ("Bow",           1),
+    ]
+
+    def _open_chest(self):
+        """Roll random loot from a chest: gold, an item, or both."""
+        # Always give some gold
+        gold = random.randint(5, 30)
+        self.game.party.gold += gold
+
+        # Roll on the loot table
+        total_weight = sum(w for _, w in self._CHEST_LOOT)
+        roll = random.randint(1, total_weight)
+        cumulative = 0
+        chosen_item = None
+        for item, weight in self._CHEST_LOOT:
+            cumulative += weight
+            if roll <= cumulative:
+                chosen_item = item
+                break
+
+        if chosen_item:
+            self.game.party.shared_inventory.append(chosen_item)
+            self.show_message(
+                f"Treasure! {gold} gold and {chosen_item}!", 2500)
+        else:
+            self.show_message(f"Treasure! Found {gold} gold!", 2000)
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""

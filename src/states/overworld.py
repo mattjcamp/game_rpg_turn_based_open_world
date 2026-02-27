@@ -12,7 +12,7 @@ import pygame
 
 from src.states.base_state import BaseState
 from src.settings import (
-    MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON,
+    MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
 )
 from src.dungeon_generator import generate_dungeon
 from src.monster import create_orc
@@ -457,6 +457,54 @@ class OverworldState(BaseState):
             )
             self.game.change_state("dungeon")
             return
+
+        elif tile_id == TILE_CHEST:
+            self._open_chest()
+            # Replace chest with grass
+            self.game.tile_map.set_tile(
+                self.game.party.col, self.game.party.row, TILE_GRASS
+            )
+            return
+
+    # ── Chest loot ─────────────────────────────────────────────
+
+    _CHEST_LOOT = [
+        (None,           10),   # gold only
+        ("Torch",         6),
+        ("Healing Herb",  5),
+        ("Antidote",      3),
+        ("Dagger",        3),
+        ("Club",          3),
+        ("Mace",          2),
+        ("Leather",       2),
+        ("Sling",         2),
+        ("Axe",           1),
+        ("Sword",         1),
+        ("Chain",         1),
+        ("Bow",           1),
+    ]
+
+    def _open_chest(self):
+        """Roll random loot from a chest: gold, an item, or both."""
+        gold = random.randint(5, 30)
+        self.game.party.gold += gold
+
+        total_weight = sum(w for _, w in self._CHEST_LOOT)
+        roll = random.randint(1, total_weight)
+        cumulative = 0
+        chosen_item = None
+        for item, weight in self._CHEST_LOOT:
+            cumulative += weight
+            if roll <= cumulative:
+                chosen_item = item
+                break
+
+        if chosen_item:
+            self.game.party.shared_inventory.append(chosen_item)
+            self.show_message(
+                f"Treasure! {gold} gold and {chosen_item}!", 2500)
+        else:
+            self.show_message(f"Treasure! Found {gold} gold!", 2000)
 
     def show_message(self, text, duration_ms=2000):
         """Display a temporary message."""

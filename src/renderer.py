@@ -91,6 +91,8 @@ class Renderer:
             TILE_TOWN:     (0, 6),
             # PATH uses brush/scrubland tile (R0 C2)
             TILE_PATH:     (0, 2),
+            # Treasure chest (same sprite as town chest)
+            TILE_CHEST:    (0, 9),
             # No exact match for sand or bridge — will fall back to procedural
         }
         # Town interior tile mapping
