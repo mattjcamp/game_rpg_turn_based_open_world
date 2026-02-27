@@ -45,12 +45,14 @@ FIREBALL_SPEED    = 320   # pixels per second (slower than arrow for drama)
 HEAL_MP_COST      = 4
 
 # ── Action indices ───────────────────────────────────────────────
-ACTION_MOVE   = 0
-ACTION_ATTACK = 1
+ACTION_MOVE   = 0      # kept for internal use (WASD movement)
+ACTION_ATTACK = 1      # kept for internal use (bump-to-attack)
 ACTION_CAST   = 2
 ACTION_HEAL   = 3
-ACTION_SKIP   = 4
-ACTION_NAMES  = ["Move", "Attack", "Cast", "Heal", "Skip"]
+ACTION_SKIP   = 4      # spacebar skip
+ACTION_RANGED = 5      # menu ranged attack
+
+# Menu is built dynamically per character — see _build_menu_actions()
 
 # ── Projectile speed (pixels per second) ─────────────────────────
 PROJECTILE_SPEED = 480
@@ -237,6 +239,7 @@ class CombatState(BaseState):
         self.monster = None
         self.phase = PHASE_INIT
         self.selected_action = 0
+        self.menu_actions = []  # dynamic menu: [(action_id, label), ...]
         self.directing_action = None  # which action is being directed
         self.combat_log = []
         self.phase_timer = 0
@@ -401,8 +404,27 @@ class CombatState(BaseState):
         """Add a log entry for whose turn it is."""
         f = self.active_fighter
         if f:
-            ranged_hint = " [RANGED]" if f.is_ranged() else ""
+            ranged_hint = " [RANGED]" if f.is_ranged(self.game.party) else ""
             self.combat_log.append(f"-- {f.name}'s turn --{ranged_hint}")
+        self._rebuild_menu()
+
+    def _rebuild_menu(self):
+        """Build the dynamic action menu for the current fighter."""
+        f = self.active_fighter
+        self.menu_actions = []  # list of (action_id, label)
+        if not f:
+            return
+        if f.is_ranged(self.game.party):
+            ammo = self._count_throwable(f) if f.is_consumable_weapon() else -1
+            label = "Range Attack"
+            if ammo >= 0:
+                label += f" (x{ammo})"
+            self.menu_actions.append((ACTION_RANGED, label))
+        if f.can_cast_sorcerer() and f.current_mp >= FIREBALL_MP_COST:
+            self.menu_actions.append((ACTION_CAST, f"Cast ({f.current_mp}MP)"))
+        if f.can_cast_priest() and f.current_mp >= HEAL_MP_COST:
+            self.menu_actions.append((ACTION_HEAL, f"Heal ({f.current_mp}MP)"))
+        self.selected_action = 0
 
     # ── Input ────────────────────────────────────────────────────
 
@@ -424,15 +446,24 @@ class CombatState(BaseState):
             if event.type != pygame.KEYDOWN:
                 continue
 
-            # ── PHASE_PLAYER: menu navigation + WASD quick-move ──
+            # ── PHASE_PLAYER: menu navigation + WASD move + spacebar skip ──
             if self.phase == PHASE_PLAYER:
                 if event.key == pygame.K_UP:
-                    self.selected_action = (self.selected_action - 1) % len(ACTION_NAMES)
+                    if self.menu_actions:
+                        self.selected_action = (self.selected_action - 1) % len(self.menu_actions)
                 elif event.key == pygame.K_DOWN:
-                    self.selected_action = (self.selected_action + 1) % len(ACTION_NAMES)
-                elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                    self._confirm_action()
-                # WASD direct movement (skip menu)
+                    if self.menu_actions:
+                        self.selected_action = (self.selected_action + 1) % len(self.menu_actions)
+                elif event.key == pygame.K_RETURN:
+                    if self.menu_actions:
+                        self._confirm_action()
+                elif event.key == pygame.K_SPACE:
+                    # Spacebar skips turn
+                    f = self.active_fighter
+                    if f:
+                        self.combat_log.append(f"{f.name} skips their turn.")
+                    self._end_fighter_turn()
+                # WASD direct movement + bump-to-attack
                 elif event.key == pygame.K_w:
                     self._try_arena_move(0, -1)
                 elif event.key == pygame.K_s:
@@ -464,16 +495,12 @@ class CombatState(BaseState):
 
     def _confirm_action(self):
         """Player confirmed a menu selection — enter direction mode or act."""
-        action = self.selected_action
-
-        if action == ACTION_SKIP:
-            # Skip needs no direction — end turn immediately
-            self.combat_log.append(f"{self.active_fighter.name} skips their turn.")
-            self._end_fighter_turn()
+        if not self.menu_actions:
             return
+        action_id, _label = self.menu_actions[self.selected_action]
 
-        # Enter direction mode for Move, Attack, Cast, Heal
-        self.directing_action = action
+        # All current menu actions need a direction
+        self.directing_action = action_id
         self.phase = PHASE_PLAYER_DIR
 
     def _execute_directed_action(self, dcol, drow):
@@ -485,10 +512,19 @@ class CombatState(BaseState):
 
         elif action == ACTION_ATTACK:
             f = self.active_fighter
-            if f and f.is_ranged():
-                self._fire_ranged(dcol, drow)
-            else:
-                self._try_melee_directional(dcol, drow)
+            if f:
+                # Check if monster is adjacent in that direction — melee
+                col, row = self.fighter_positions[f]
+                tc, tr = col + dcol, row + drow
+                if tc == self.monster_col and tr == self.monster_row:
+                    self._player_attack_animated(dcol, drow)
+                elif f.is_ranged(self.game.party):
+                    self._fire_ranged(dcol, drow)
+                else:
+                    self._try_melee_directional(dcol, drow)
+
+        elif action == ACTION_RANGED:
+            self._fire_ranged(dcol, drow)
 
         elif action == ACTION_CAST:
             self._fire_fireball(dcol, drow)
@@ -527,11 +563,12 @@ class CombatState(BaseState):
         action = self.selected_action
         if action == ACTION_ATTACK:
             f = self.active_fighter
-            if f and f.is_ranged():
+            if f and self._is_adjacent():
+                # Always prefer melee when adjacent
+                self._player_attack()
+            elif f and f.is_ranged(self.game.party):
                 # For ranged fighters, menu Attack fires toward monster
                 self._fire_ranged_at_monster()
-            elif self._is_adjacent():
-                self._player_attack()
             else:
                 self.combat_message = "Too far! Move next to the enemy."
                 self.combat_msg_timer = 1200
@@ -542,18 +579,40 @@ class CombatState(BaseState):
 
     # ── Ranged attack ────────────────────────────────────────────
 
+    def _count_throwable(self, fighter):
+        """Count how many of the fighter's weapon are available to throw."""
+        wname = fighter.weapon
+        # Count in personal inventory + shared stash (equipped one is kept)
+        count = fighter.inventory.count(wname)
+        count += self.game.party.shared_inventory.count(wname)
+        return count
+
+    def _consume_throwable(self, fighter):
+        """Remove one of the fighter's weapon from inventory for throwing."""
+        wname = fighter.weapon
+        # Take from personal inventory first, then shared stash
+        if wname in fighter.inventory:
+            fighter.inventory.remove(wname)
+            return True
+        if wname in self.game.party.shared_inventory:
+            self.game.party.shared_inventory.remove(wname)
+            return True
+        return False
+
     def _fire_ranged(self, dcol, drow):
         """Fire a ranged attack in the given direction."""
         f = self.active_fighter
-        if not f or not f.is_ranged():
-            if f and not f.is_ranged() and f.is_consumable_weapon():
-                self.combat_log.append(f"{f.name} is out of {f.weapon}s!")
+        if not f or not f.is_ranged(self.game.party):
+            if f and f.is_consumable_weapon():
+                self.combat_log.append(f"{f.name} is out of {f.weapon}s to throw!")
             return
 
         # Consume ammo for consumable weapons (daggers, etc.)
         if f.is_consumable_weapon():
-            f.consume_ammo()
-            ammo_left = f.get_ammo()
+            if not self._consume_throwable(f):
+                self.combat_log.append(f"{f.name} has no {f.weapon}s left to throw!")
+                return
+            ammo_left = self._count_throwable(f)
             ammo_note = f" ({ammo_left} left)"
         else:
             ammo_note = ""
@@ -604,11 +663,10 @@ class CombatState(BaseState):
         }
 
         self.phase = PHASE_PROJECTILE
-        self.combat_log.append(
-            f"{f.name} throws {f.weapon}!{ammo_note}"
-            if f.is_consumable_weapon() or ammo_note else
-            f"{f.name} fires {f.weapon}!"
-        )
+        if "dagger" in f.weapon.lower():
+            self.combat_log.append(f"{f.name} throws {f.weapon}!{ammo_note}")
+        else:
+            self.combat_log.append(f"{f.name} fires {f.weapon}!{ammo_note}")
 
     def _fire_ranged_at_monster(self):
         """Fire toward the monster directly (from menu Attack)."""
@@ -1337,4 +1395,5 @@ class CombatState(BaseState):
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,
+            menu_actions=self.menu_actions,
         )

@@ -9,7 +9,7 @@ class.  Damage uses (weapon_power + 1.5 * STR).  Evasion comes from armor.
 
 # ── Weapon table ──────────────────────────────────────────────────
 WEAPONS = {
-    "Dagger":       {"power": 1, "ranged": True, "consumable": True},
+    "Dagger":       {"power": 1, "ranged": True, "melee": True, "consumable": True},
     "Club":         {"power": 1, "ranged": False},
     "Mace":         {"power": 2, "ranged": False},
     "Sling":        {"power": 3, "ranged": True},
@@ -49,7 +49,7 @@ ITEM_INFO = {
     # ── Weapons ──
     "Fists":        {"desc": "Bare knuckles. Not much, but always available.",
                      "icon": "gloves"},
-    "Dagger":       {"desc": "A short, light blade. Can be thrown at enemies.",
+    "Dagger":       {"desc": "A short, light blade. Good for melee and throwing.",
                      "icon": "dagger"},
     "Club":         {"desc": "A simple wooden club. Cheap but sturdy.",
                      "icon": "mace"},
@@ -277,14 +277,18 @@ class PartyMember:
         else:
             return (1, 10, self.str_mod)
 
-    def is_ranged(self):
-        """True if the equipped weapon can attack at range and has ammo (if consumable)."""
+    def is_ranged(self, party=None):
+        """True if the equipped weapon can attack at range and has ammo (if consumable).
+        For consumable weapons, pass party to check shared inventory."""
         wdata = WEAPONS.get(self.weapon, {"ranged": False})
         if not wdata.get("ranged", False):
             return False
-        # Consumable weapons need ammo to fire
+        # Consumable weapons need throwable items in inventory
         if wdata.get("consumable", False):
-            return self.get_ammo() > 0
+            count = self.inventory.count(self.weapon)
+            if party:
+                count += party.shared_inventory.count(self.weapon)
+            return count > 0
         return True
 
     def is_consumable_weapon(self):
@@ -323,6 +327,9 @@ class PartyMember:
             return "body"
         wp = WEAPONS.get(item_name)
         if wp:
+            # Weapons that are both melee and ranged go in the melee slot
+            if wp.get("melee", False):
+                return "melee"
             return "ranged" if wp.get("ranged", False) else "melee"
         return None
 

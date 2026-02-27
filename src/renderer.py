@@ -1367,7 +1367,8 @@ class Renderer:
                           fireballs=None, fireball_explosions=None,
                           heal_effects=None,
                           is_warband=False, source_state="dungeon",
-                          directing_action=None):
+                          directing_action=None,
+                          menu_actions=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1516,7 +1517,8 @@ class Renderer:
         self._u3_action_panel(phase, selected_action, is_adjacent,
                               rx, action_y, rw, action_h,
                               active_fighter=active_fighter,
-                              directing_action=directing_action)
+                              directing_action=directing_action,
+                              menu_actions=menu_actions)
 
         # ── 5. bottom combat log ──
         bar_y = arena_bottom + 6
@@ -2068,9 +2070,9 @@ class Renderer:
             else:
                 name_color = self._U3_WHITE
 
-            cls_short = member.char_class[:3].upper()
-            self._u3_text(member.name, info_x, row_top, name_color, f)
-            self._u3_text(cls_short, x + w - 40, row_top, self._U3_LTBLUE, f)
+            wpn_label = member.weapon if member.weapon else "Fists"
+            name_wpn = f"{member.name} [{wpn_label}]"
+            self._u3_text(name_wpn, info_x, row_top, name_color, f)
 
             # ── HP bar ──
             bar_y = row_top + 18
@@ -2178,14 +2180,19 @@ class Renderer:
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None,
-                         directing_action=None):
+                         directing_action=None, menu_actions=None):
         """Action menu in retro style."""
         from src.states.combat import (
-            ACTION_NAMES, ACTION_MOVE, ACTION_ATTACK, ACTION_CAST, ACTION_HEAL,
-            ACTION_SKIP,
+            ACTION_RANGED, ACTION_CAST, ACTION_HEAL,
             PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_VICTORY, PHASE_DEFEAT,
             PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL,
         )
+
+        _DIR_LABELS = {
+            ACTION_RANGED: "RANGE ATTACK",
+            ACTION_CAST:   "CAST",
+            ACTION_HEAL:   "HEAL",
+        }
 
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -2213,29 +2220,23 @@ class Renderer:
             name = active_fighter.name if active_fighter else "???"
             self._u3_text(f"-- {name.upper()}'S TURN --", tx, ty, self._U3_ORANGE, f)
 
-            for i, action_name in enumerate(ACTION_NAMES):
-                iy = ty + 28 + i * 24
-                selected = (i == selected_action)
-                prefix = "> " if selected else "  "
-                label = action_name.upper()
-                # Show MP info next to Cast and Heal
-                if i in (ACTION_CAST, ACTION_HEAL) and active_fighter:
-                    mp_now = active_fighter.current_mp
-                    label += f" ({mp_now}MP)"
-                # Show ammo count next to Attack for consumable weapons
-                if i == ACTION_ATTACK and active_fighter and active_fighter.is_consumable_weapon():
-                    ammo = active_fighter.get_ammo()
-                    label += f" (x{ammo})"
-                color = self._U3_WHITE if selected else self._U3_LTBLUE
-                self._u3_text(prefix + label, tx, iy, color, f)
+            if menu_actions:
+                for i, (action_id, label) in enumerate(menu_actions):
+                    iy = ty + 28 + i * 24
+                    selected = (i == selected_action)
+                    prefix = "> " if selected else "  "
+                    color = self._U3_WHITE if selected else self._U3_LTBLUE
+                    self._u3_text(prefix + label.upper(), tx, iy, color, f)
 
-            self._u3_text("[UP/DOWN] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
+            # Controls hint at bottom
+            self._u3_text("[WASD] MOVE/ATTACK", tx, y + h - 48, self._U3_LTBLUE, f)
+            self._u3_text("[SPACE] SKIP TURN", tx, y + h - 32, self._U3_LTBLUE, f)
             self._u3_text("[ENTER] CONFIRM", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_PLAYER_DIR:
             # Direction selection mode
-            action_name = ACTION_NAMES[directing_action].upper() if directing_action is not None else "???"
-            self._u3_text(f"-- {action_name} --", tx, ty, self._U3_ORANGE, f)
+            action_label = _DIR_LABELS.get(directing_action, "???")
+            self._u3_text(f"-- {action_label} --", tx, ty, self._U3_ORANGE, f)
             self._u3_text("CHOOSE DIRECTION", tx, ty + 28, self._U3_WHITE, f)
 
             # Draw directional arrows hint
