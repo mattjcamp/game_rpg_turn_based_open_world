@@ -2893,13 +2893,18 @@ class Renderer:
                 for vi, item_idx in enumerate(
                         range(scroll_top,
                               min(scroll_top + max_visible, len(items)))):
-                    item_name = items[item_idx]
+                    entry = items[item_idx]
+                    item_name = party.item_name(entry)
+                    item_ch = party.item_charges(entry)
                     selected = (item_idx == cursor_index)
                     prefix = "> " if selected else "  "
                     name_color = self._U3_WHITE if selected else (220, 220, 230)
                     price = get_sell_price(item_name)
 
-                    self._u3_text(f"{prefix}{item_name}", tx, ty,
+                    display = item_name
+                    if item_ch is not None:
+                        display = f"{item_name} ({item_ch})"
+                    self._u3_text(f"{prefix}{display}", tx, ty,
                                   name_color, fm)
                     price_col = (255, 255, 0) if selected else (200, 200, 100)
                     self._u3_text(f"{price}g", tx + left_w - 80, ty,
@@ -2934,7 +2939,7 @@ class Renderer:
         if mode == "buy" and buy_items and 0 <= cursor_index < len(buy_items):
             sel_item = buy_items[cursor_index]
         elif mode == "sell" and sell_items and 0 <= cursor_index < len(sell_items):
-            sel_item = sell_items[cursor_index]
+            sel_item = party.item_name(sell_items[cursor_index])
 
         if sel_item:
             self._u3_text("DETAILS", rx, ry, self._U3_ORANGE, fm)
@@ -3134,13 +3139,18 @@ class Renderer:
                                         len(inv) - max_visible))
 
             for vi, item_idx in enumerate(range(scroll_top, min(scroll_top + max_visible, len(inv)))):
-                item_name = inv[item_idx]
+                entry = inv[item_idx]
+                item_name = party.item_name(entry)
+                item_ch = party.item_charges(entry)
                 global_idx = item_idx + NUM_SLOTS
                 selected = (global_idx == cursor_index) and not choosing_member
                 prefix = "> " if selected else "  "
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
 
-                self._u3_text(f"{prefix}{item_name}", tx, ty, name_color, fm)
+                display = item_name
+                if item_ch is not None:
+                    display = f"{item_name} ({item_ch})"
+                self._u3_text(f"{prefix}{display}", tx, ty, name_color, fm)
 
                 # Type hint on the right
                 hint = ""
@@ -3186,7 +3196,9 @@ class Renderer:
             sel_item = party.get_equipped_name(slot_key)
             sel_charges = party.get_equipped_charges(slot_key)
         elif cursor_index - NUM_SLOTS < len(inv):
-            sel_item = inv[cursor_index - NUM_SLOTS]
+            entry = inv[cursor_index - NUM_SLOTS]
+            sel_item = party.item_name(entry)
+            sel_charges = party.item_charges(entry)
 
         # Show details of the selected item
         if sel_item:

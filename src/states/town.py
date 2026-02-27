@@ -294,7 +294,8 @@ class TownState(BaseState):
             elif event.key == pygame.K_DOWN:
                 self.shop_sell_cursor = (self.shop_sell_cursor + 1) % len(sell_items)
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                item_name = sell_items[self.shop_sell_cursor]
+                entry = sell_items[self.shop_sell_cursor]
+                item_name = self.game.party.item_name(entry)
                 price = get_sell_price(item_name)
                 self.game.party.gold += price
                 self.game.party.shared_inventory.pop(self.shop_sell_cursor)
@@ -390,7 +391,7 @@ class TownState(BaseState):
             inv_idx = idx - NUM_SLOTS
             inv = party.shared_inventory
             if inv_idx < len(inv):
-                item_name = inv[inv_idx]
+                item_name = party.item_name(inv[inv_idx])
                 if chosen == "EXAMINE":
                     self.examining_item = item_name
                 elif chosen == "GIVE TO MEMBER":

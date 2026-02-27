@@ -311,7 +311,7 @@ class DungeonState(BaseState):
             inv_idx = idx - NUM_SLOTS
             inv = party.shared_inventory
             if inv_idx < len(inv):
-                item_name = inv[inv_idx]
+                item_name = party.item_name(inv[inv_idx])
                 if chosen == "EXAMINE":
                     self.examining_item = item_name
                 elif chosen == "GIVE TO MEMBER":

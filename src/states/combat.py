@@ -710,7 +710,7 @@ class CombatState(BaseState):
         wname = fighter.weapon
         # Count in personal inventory + shared stash (equipped one is kept)
         count = fighter.inventory.count(wname)
-        count += self.game.party.shared_inventory.count(wname)
+        count += self.game.party.inv_count(wname)
         return count
 
     def _consume_throwable(self, fighter):
@@ -720,10 +720,8 @@ class CombatState(BaseState):
         if wname in fighter.inventory:
             fighter.inventory.remove(wname)
             return True
-        if wname in self.game.party.shared_inventory:
-            self.game.party.shared_inventory.remove(wname)
-            return True
-        return False
+        removed = self.game.party.inv_remove(wname)
+        return removed is not None
 
     def _fire_ranged(self, dcol, drow):
         """Fire a ranged attack in the given direction."""

@@ -164,7 +164,7 @@ class PartyMember:
         if wdata.get("throwable", False):
             count = self.inventory.count(self.weapon)
             if party:
-                count += party.shared_inventory.count(self.weapon)
+                count += party.inv_count(self.weapon)
             return count > 0
         return True
 
@@ -303,6 +303,57 @@ class Party:
     PARTY_SLOT_DEFAULTS = {"light": None, "navigation": None,
                            "camping": None, "special": None}
 
+    # ── Inventory item helpers ──────────────────────────────────
+    # Shared inventory entries can be a plain string ("Sword") or a dict
+    # with charges: {"name": "Torch", "charges": 15}.  These helpers
+    # let the rest of the code work with either form transparently.
+
+    @staticmethod
+    def item_name(entry):
+        """Return the display name of an inventory entry (str or dict)."""
+        if isinstance(entry, dict):
+            return entry["name"]
+        return entry
+
+    @staticmethod
+    def item_charges(entry):
+        """Return charges for an inventory entry, or None if uncharged."""
+        if isinstance(entry, dict):
+            return entry.get("charges")
+        return None
+
+    @staticmethod
+    def _make_inv_entry(name, charges=None):
+        """Create an inventory entry — plain string if no charges, dict otherwise."""
+        if charges is not None:
+            return {"name": name, "charges": charges}
+        return name
+
+    def _find_inv_index(self, item_name):
+        """Find the index of the first inventory entry matching item_name."""
+        for i, entry in enumerate(self.shared_inventory):
+            if self.item_name(entry) == item_name:
+                return i
+        return -1
+
+    def inv_count(self, item_name):
+        """Count how many inventory entries match item_name."""
+        return sum(1 for e in self.shared_inventory
+                   if self.item_name(e) == item_name)
+
+    def inv_remove(self, item_name):
+        """Remove the first inventory entry matching item_name. Returns the removed entry."""
+        idx = self._find_inv_index(item_name)
+        if idx >= 0:
+            return self.shared_inventory.pop(idx)
+        return None
+
+    def inv_names(self):
+        """Return a list of display names for all shared inventory entries."""
+        return [self.item_name(e) for e in self.shared_inventory]
+
+    # ── Constructor ───────────────────────────────────────────
+
     def __init__(self, start_col, start_row):
         self.col = start_col
         self.row = start_row
@@ -316,33 +367,41 @@ class Party:
     def party_equip(self, item_name, slot):
         """Equip an item from shared inventory into a party slot.
 
-        Stores the item as a dict: {"name": str, "charges": int or None}.
-        Charges are loaded from ITEM_INFO if the item has them.
+        Preserves charges from the inventory entry if present,
+        otherwise loads max charges from ITEM_INFO.
         Returns True if successful.
         """
-        if item_name not in self.shared_inventory:
+        idx = self._find_inv_index(item_name)
+        if idx < 0:
             return False
         if slot not in self.equipped:
             return False
         # Move current equipped item back to inventory
         old = self.equipped[slot]
         if old is not None:
-            self.shared_inventory.append(old["name"])
-        self.shared_inventory.remove(item_name)
-        # Build equipped entry with charges from item data
-        max_charges = ITEM_INFO.get(item_name, {}).get("charges")
-        self.equipped[slot] = {"name": item_name, "charges": max_charges}
+            self.shared_inventory.append(
+                self._make_inv_entry(old["name"], old.get("charges")))
+        # Pop the inventory entry (may carry charges)
+        inv_entry = self.shared_inventory.pop(idx)
+        existing_charges = self.item_charges(inv_entry)
+        if existing_charges is not None:
+            charges = existing_charges
+        else:
+            charges = ITEM_INFO.get(item_name, {}).get("charges")
+        self.equipped[slot] = {"name": item_name, "charges": charges}
         return True
 
     def party_unequip(self, slot):
         """Unequip a party slot back to shared inventory.
+        Preserves remaining charges on the returned item.
         Returns True if something was unequipped."""
         if slot not in self.equipped:
             return False
         current = self.equipped[slot]
         if current is None:
             return False
-        self.shared_inventory.append(current["name"])
+        self.shared_inventory.append(
+            self._make_inv_entry(current["name"], current.get("charges")))
         self.equipped[slot] = None
         return True
 
@@ -361,14 +420,15 @@ class Party:
     def give_item_to_member(self, item_index, member_index):
         """Move an item from shared inventory to a party member's inventory.
 
+        Charged items are given as their name only (members don't track charges).
         Returns True if successful, False otherwise.
         """
         if item_index < 0 or item_index >= len(self.shared_inventory):
             return False
         if member_index < 0 or member_index >= len(self.members):
             return False
-        item = self.shared_inventory.pop(item_index)
-        self.members[member_index].inventory.append(item)
+        entry = self.shared_inventory.pop(item_index)
+        self.members[member_index].inventory.append(self.item_name(entry))
         return True
 
     def add_member(self, member):
