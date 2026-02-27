@@ -423,7 +423,7 @@ class CombatState(BaseState):
         if not f:
             return
         if f.is_ranged(self.game.party):
-            ammo = self._count_throwable(f) if f.is_consumable_weapon() else -1
+            ammo = self._count_throwable(f) if f.is_throwable_weapon() else -1
             label = "Range Attack"
             if ammo >= 0:
                 label += f" (x{ammo})"
@@ -729,12 +729,12 @@ class CombatState(BaseState):
         """Fire a ranged attack in the given direction."""
         f = self.active_fighter
         if not f or not f.is_ranged(self.game.party):
-            if f and f.is_consumable_weapon():
+            if f and f.is_throwable_weapon():
                 self.combat_log.append(f"{f.name} is out of {f.weapon}s to throw!")
             return
 
-        # Consume ammo for consumable weapons (daggers, etc.)
-        if f.is_consumable_weapon():
+        # Consume ammo for throwable weapons (daggers, etc.)
+        if f.is_throwable_weapon():
             if not self._consume_throwable(f):
                 self.combat_log.append(f"{f.name} has no {f.weapon}s left to throw!")
                 return

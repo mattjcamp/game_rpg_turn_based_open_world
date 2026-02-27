@@ -12,7 +12,7 @@
       "power": 1,
       "ranged": true,
       "melee": true,
-      "consumable": true,
+      "throwable": true,
       "description": "A short, light blade. Good for melee and throwing.",
       "icon": "dagger",
       "buy": 20,

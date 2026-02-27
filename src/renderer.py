@@ -2094,8 +2094,8 @@ class Renderer:
             if is_def:
                 self._u3_text("DEF", x + w - 40, row_top + 18, self._U3_ORANGE, self.font_small)
 
-            # ── Ammo indicator for consumable ranged weapons ──
-            if member.is_consumable_weapon():
+            # ── Ammo indicator for throwable weapons ──
+            if member.is_throwable_weapon():
                 ammo_count = member.get_ammo()
                 ammo_color = self._U3_WHITE if ammo_count > 0 else self._U3_RED
                 ammo_y = mp_y if mp_max > 0 else bar_y + bar_h + 3
@@ -2396,7 +2396,7 @@ class Renderer:
             ty += 22
             wp = WEAPONS.get(member.weapon, {"power": 0, "ranged": False})
             rng = "RANGED" if wp["ranged"] else "MELEE"
-            ammo_str = f"  x{member.get_ammo()}" if member.is_consumable_weapon() else ""
+            ammo_str = f"  x{member.get_ammo()}" if member.is_throwable_weapon() else ""
             self._u3_text("WPN:", tx, ty, self._U3_LTBLUE, fm)
             self._u3_text(
                 f"{member.weapon}  (PWR:{wp['power']:02d} {rng}){ammo_str}",
@@ -2635,7 +2635,7 @@ class Renderer:
                     elif slot_key == "ranged":
                         wp = WEAPONS.get(item_name, {"power": 0})
                         hint = f"PWR:{wp['power']:02d}"
-                        if WEAPONS.get(item_name, {}).get("consumable", False):
+                        if WEAPONS.get(item_name, {}).get("throwable", False):
                             ammo_count = member.ammo.get(item_name, 0)
                             hint += f" x{ammo_count}"
                     if hint:
@@ -3564,7 +3564,7 @@ class Renderer:
             pwr = wp["power"]
             pwr_color = self._U3_GREEN if pwr >= 7 else self._U3_ORANGE if pwr >= 4 else (220, 220, 230)
             self._u3_text(f"{pwr:02d}", name_x + 65, ty, pwr_color, fm)
-            if wp.get("consumable", False):
+            if wp.get("throwable", False):
                 ty += 20
                 self._u3_text("NOTE:", name_x, ty, self._U3_LTBLUE, fm)
                 self._u3_text("CONSUMABLE", name_x + 55, ty, self._U3_RED, fm)

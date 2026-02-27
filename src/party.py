@@ -59,7 +59,7 @@ class PartyMember:
         # Mutable MP pool — initialized lazily on first access
         self._current_mp = None
 
-        # Ammo tracking for consumable ranged weapons {weapon_name: count}
+        # Ammo tracking for throwable weapons {weapon_name: count}
         self.ammo = {}
 
     # ── Derived stats ──────────────────────────────────────────
@@ -155,22 +155,22 @@ class PartyMember:
             return (1, 10, self.str_mod)
 
     def is_ranged(self, party=None):
-        """True if the equipped weapon can attack at range and has ammo (if consumable).
-        For consumable weapons, pass party to check shared inventory."""
+        """True if the equipped weapon can attack at range and has ammo (if throwable).
+        For throwable weapons, pass party to check shared inventory."""
         wdata = WEAPONS.get(self.weapon, {"ranged": False})
         if not wdata.get("ranged", False):
             return False
-        # Consumable weapons need throwable items in inventory
-        if wdata.get("consumable", False):
+        # Throwable weapons need items in inventory to throw
+        if wdata.get("throwable", False):
             count = self.inventory.count(self.weapon)
             if party:
                 count += party.shared_inventory.count(self.weapon)
             return count > 0
         return True
 
-    def is_consumable_weapon(self):
-        """True if the equipped weapon is consumed on ranged use."""
-        return WEAPONS.get(self.weapon, {}).get("consumable", False)
+    def is_throwable_weapon(self):
+        """True if the equipped weapon is thrown and consumed on ranged use."""
+        return WEAPONS.get(self.weapon, {}).get("throwable", False)
 
     def get_ammo(self):
         """Return current ammo count for the equipped weapon."""

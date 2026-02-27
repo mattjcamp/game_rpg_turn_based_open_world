@@ -40,8 +40,8 @@ def load_items():
         entry = {"power": data["power"], "ranged": data.get("ranged", False)}
         if data.get("melee"):
             entry["melee"] = True
-        if data.get("consumable"):
-            entry["consumable"] = True
+        if data.get("throwable"):
+            entry["throwable"] = True
         weapons[name] = entry
 
         # Description & icon (what ITEM_INFO needs)
