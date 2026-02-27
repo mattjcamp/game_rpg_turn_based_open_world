@@ -36,6 +36,7 @@ PHASE_MONSTER     = "monster"
 PHASE_MONSTER_ACT = "monster_act"
 PHASE_SPELL_SELECT = "spell_select"  # choosing a spell from the list
 PHASE_THROW_SELECT = "throw_select"  # choosing an item to throw
+PHASE_USE_ITEM     = "use_item"      # choosing an item to use
 PHASE_EQUIP       = "equip"          # character sheet / equip screen
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
@@ -56,6 +57,7 @@ ACTION_SKIP   = 4      # spacebar skip
 ACTION_RANGED = 5      # menu ranged attack
 ACTION_EQUIP  = 6      # open equip screen (costs turn)
 ACTION_THROW  = 7      # throw a throwable item from inventory
+ACTION_USE_ITEM = 8    # use a consumable item (herb, potion, etc.)
 
 # Menu is built dynamically per character — see _build_menu_actions()
 
@@ -257,6 +259,11 @@ class CombatState(BaseState):
         self.throw_cursor = 0       # cursor in throw list
         self.selected_throw = None  # chosen item name to throw
 
+        # Use item selection state
+        self.use_item_list = []       # usable items: [(item_name, count, effect, power), ...]
+        self.use_item_cursor = 0      # cursor in use item list
+        self.selected_use_item = None # chosen item name to use
+
         # Equip screen state
         self.equip_cursor = 0           # cursor in equip/item list
         self.equip_action_menu = False  # True when action popup is open
@@ -452,6 +459,10 @@ class CombatState(BaseState):
         spells = self._build_spell_list(f)
         if spells:
             self.menu_actions.append((ACTION_CAST, f"Cast ({f.current_mp}MP)"))
+        # Show "Use Item" if the character has any usable items
+        usable = self._build_usable_item_list(f)
+        if usable:
+            self.menu_actions.append((ACTION_USE_ITEM, "Use Item"))
         # Equip is always available
         self.menu_actions.append((ACTION_EQUIP, "Equip"))
         self.selected_action = 0
@@ -491,6 +502,32 @@ class CombatState(BaseState):
                 seen[name] = seen.get(name, 0) + 1
         return [(name, count) for name, count in seen.items()]
 
+    def _build_usable_item_list(self, fighter):
+        """Build the list of usable items available to this fighter.
+
+        Scans personal inventory and party shared stash for items with
+        the 'usable' attribute. Returns [(item_name, count, effect, power), ...].
+        """
+        from src.party import ITEM_INFO
+        seen = {}  # name -> (count, effect, power)
+        # Check personal inventory
+        for item in fighter.inventory:
+            info = ITEM_INFO.get(item, {})
+            if info.get("usable", False):
+                if item not in seen:
+                    seen[item] = [0, info.get("effect", ""), info.get("power", 0)]
+                seen[item][0] += 1
+        # Check party shared stash
+        party = self.game.party
+        for entry in party.shared_inventory:
+            name = party.item_name(entry)
+            info = ITEM_INFO.get(name, {})
+            if info.get("usable", False):
+                if name not in seen:
+                    seen[name] = [0, info.get("effect", ""), info.get("power", 0)]
+                seen[name][0] += 1
+        return [(name, cnt, eff, pwr) for name, (cnt, eff, pwr) in seen.items()]
+
     # ── Input ────────────────────────────────────────────────────
 
     def handle_input(self, events, keys_pressed):
@@ -517,6 +554,13 @@ class CombatState(BaseState):
             for event in events:
                 if event.type == pygame.KEYDOWN:
                     self._handle_throw_select_input(event)
+            return
+
+        # Use item selection screen handles its own input
+        if self.phase == PHASE_USE_ITEM:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    self._handle_use_item_select_input(event)
             return
 
         # Speed up non-player phases with Space/Enter
@@ -612,6 +656,15 @@ class CombatState(BaseState):
             self.phase = PHASE_THROW_SELECT
             return
 
+        if action_id == ACTION_USE_ITEM:
+            # Open the use-item selection sub-menu
+            f = self.active_fighter
+            self.use_item_list = self._build_usable_item_list(f) if f else []
+            self.use_item_cursor = 0
+            self.selected_use_item = None
+            self.phase = PHASE_USE_ITEM
+            return
+
         # Directional actions (ranged)
         self.directing_action = action_id
         self.phase = PHASE_PLAYER_DIR
@@ -658,6 +711,25 @@ class CombatState(BaseState):
         elif event.key == pygame.K_ESCAPE:
             self.phase = PHASE_PLAYER
             self.selected_throw = None
+
+    def _handle_use_item_select_input(self, event):
+        """Handle input while the use-item selection sub-menu is open."""
+        if not self.use_item_list:
+            self.phase = PHASE_PLAYER
+            return
+
+        if event.key == pygame.K_UP:
+            self.use_item_cursor = (self.use_item_cursor - 1) % len(self.use_item_list)
+        elif event.key == pygame.K_DOWN:
+            self.use_item_cursor = (self.use_item_cursor + 1) % len(self.use_item_list)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            item_name, _count, effect, power = self.use_item_list[self.use_item_cursor]
+            self.selected_use_item = item_name
+            # Use items are self-targeted — apply immediately
+            self._apply_use_item(item_name, effect, power)
+        elif event.key == pygame.K_ESCAPE:
+            self.phase = PHASE_PLAYER
+            self.selected_use_item = None
 
     # ── Equip screen helpers ──────────────────────────────────────
 
@@ -1401,6 +1473,64 @@ class CombatState(BaseState):
             f"{f.name} casts HEAL on {target.name}! (+{actual_heal} HP, -{HEAL_MP_COST} MP)"
         )
 
+    def _apply_use_item(self, item_name, effect, power):
+        """Apply a consumable item's effect and consume it."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        # Consume the item — personal inventory first, then shared stash
+        consumed = False
+        if item_name in f.inventory:
+            f.inventory.remove(item_name)
+            consumed = True
+        else:
+            removed = self.game.party.inv_remove(item_name)
+            consumed = removed is not None
+
+        if not consumed:
+            self.combat_log.append(f"No {item_name} available!")
+            self.phase = PHASE_PLAYER
+            return
+
+        if effect == "heal_hp":
+            # Restore HP: power is the base heal amount
+            heal = power + random.randint(1, 6)
+            old_hp = f.hp
+            f.hp = min(f.max_hp, f.hp + heal)
+            actual = f.hp - old_hp
+            # Spawn heal effect over the fighter
+            fcol, frow = self.fighter_positions.get(f, (3, 5))
+            self.heal_effects.append(HealEffect(fcol, frow, actual))
+            self.combat_log.append(
+                f"{f.name} uses {item_name}! (+{actual} HP)"
+            )
+            self.phase = PHASE_HEAL
+
+        elif effect == "heal_mp":
+            # Restore MP
+            restore = power + random.randint(1, 4)
+            old_mp = f.current_mp
+            f.current_mp = min(f.max_mp, f.current_mp + restore)
+            actual = f.current_mp - old_mp
+            self.combat_log.append(
+                f"{f.name} uses {item_name}! (+{actual} MP)"
+            )
+            self._end_fighter_turn()
+
+        elif effect == "cure_poison":
+            self.combat_log.append(
+                f"{f.name} uses {item_name}!"
+            )
+            self._end_fighter_turn()
+
+        else:
+            # Unknown effect — just consume and end turn
+            self.combat_log.append(
+                f"{f.name} uses {item_name}!"
+            )
+            self._end_fighter_turn()
+
     def _player_defend(self):
         f = self.active_fighter
         if not f:
@@ -1440,6 +1570,7 @@ class CombatState(BaseState):
         self.directing_action = None
         self.selected_spell = None
         self.selected_throw = None
+        self.selected_use_item = None
         self.active_idx += 1
 
         # Skip dead fighters
@@ -1785,4 +1916,7 @@ class CombatState(BaseState):
             throw_list=self.throw_list,
             throw_cursor=self.throw_cursor,
             selected_throw=self.selected_throw,
+            use_item_list=self.use_item_list,
+            use_item_cursor=self.use_item_cursor,
+            selected_use_item=self.selected_use_item,
         )

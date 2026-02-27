@@ -98,6 +98,14 @@ def load_items():
                 info["charges"] = data["charges"]
             if data.get("stackable"):
                 info["stackable"] = True
+            if data.get("throwable"):
+                info["throwable"] = True
+            if data.get("usable"):
+                info["usable"] = True
+            if data.get("effect"):
+                info["effect"] = data["effect"]
+            if "power" in data:
+                info["power"] = data["power"]
             item_info[name] = info
 
         if "buy" in data:

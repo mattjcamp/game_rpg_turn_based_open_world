@@ -140,6 +140,25 @@ class Renderer:
                     img, (img.get_width() * 3, img.get_height() * 3))
                 self._class_sprites_big[cls_name] = big
 
+        # Create a white-tinted fighter sprite for the party map marker.
+        # The source sprite has a solid black (0,0,0) background — make
+        # those pixels transparent and turn the actual figure pixels white.
+        self._party_map_sprite = None
+        fighter_src = self._class_sprites.get("fighter")
+        if fighter_src:
+            w, h = fighter_src.get_size()
+            white_sprite = pygame.Surface((w, h), pygame.SRCALPHA)
+            for px in range(w):
+                for py in range(h):
+                    r, g, b, a = fighter_src.get_at((px, py))
+                    if a == 0 or (r == 0 and g == 0 and b == 0):
+                        # Background — keep transparent
+                        pass
+                    else:
+                        # Figure pixel — make white
+                        white_sprite.set_at((px, py), (255, 255, 255, 255))
+            self._party_map_sprite = white_sprite
+
     def _get_class_sprite(self, char_class, big=False):
         """Return the sprite surface for a character class, or None."""
         key = char_class.lower()
@@ -888,44 +907,17 @@ class Renderer:
             pygame.draw.rect(self.screen, BLACK, rect)
 
     def _u3_draw_overworld_party(self, cx, cy, party=None):
-        """White warrior party sprite with visible sword and shield."""
+        """Party map sprite — white-tinted fighter tile with torch effect."""
         import math
-        W = (255, 255, 255)
-        DK = (180, 180, 180)   # slight shade for depth
-        # Head
-        pygame.draw.circle(self.screen, W, (cx, cy - 9), 5)
-        pygame.draw.circle(self.screen, DK, (cx, cy - 9), 5, 1)
-        # Body
-        pygame.draw.line(self.screen, W, (cx, cy - 4), (cx, cy + 4), 3)
-        # Arms — angled: left arm holds shield up, right arm holds sword
-        pygame.draw.line(self.screen, W, (cx, cy - 2), (cx - 8, cy - 6), 2)
-        pygame.draw.line(self.screen, W, (cx, cy - 2), (cx + 8, cy - 6), 2)
-        # Legs
-        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx - 5, cy + 13), 2)
-        pygame.draw.line(self.screen, W, (cx, cy + 4), (cx + 5, cy + 13), 2)
 
-        # ── Sword (right hand) — blade + crossguard + pommel ──
-        # Blade
-        pygame.draw.line(self.screen, W, (cx + 8, cy - 6), (cx + 12, cy - 14), 3)
-        # Crossguard
-        pygame.draw.line(self.screen, W, (cx + 6, cy - 7), (cx + 10, cy - 5), 2)
-        # Pommel dot
-        pygame.draw.circle(self.screen, DK, (cx + 8, cy - 5), 1)
-
-        # ── Shield (left hand) — rounded rectangle shape ──
-        shx = cx - 14
-        shy = cy - 10
-        shw = 7
-        shh = 10
-        # Shield body
-        pygame.draw.rect(self.screen, W, pygame.Rect(shx, shy, shw, shh))
-        # Shield border for definition
-        pygame.draw.rect(self.screen, DK, pygame.Rect(shx, shy, shw, shh), 1)
-        # Shield cross/boss detail
-        pygame.draw.line(self.screen, DK, (shx + shw // 2, shy + 1),
-                         (shx + shw // 2, shy + shh - 2), 1)
-        pygame.draw.line(self.screen, DK, (shx + 1, shy + shh // 2),
-                         (shx + shw - 2, shy + shh // 2), 1)
+        sprite = self._party_map_sprite
+        if sprite:
+            sx = cx - sprite.get_width() // 2
+            sy = cy - sprite.get_height() // 2
+            self.screen.blit(sprite, (sx, sy))
+        else:
+            # Fallback: simple white dot if sprite failed to load
+            pygame.draw.circle(self.screen, (255, 255, 255), (cx, cy), 6)
 
         # ── Flickering light effect when LIGHT slot is occupied ──
         if party and party.get_equipped_name("light") is not None:
@@ -936,9 +928,10 @@ class Renderer:
             flicker3 = math.sin(t * 0.051) * 0.3    # fast shimmer
             flicker = flicker1 + flicker2 + flicker3  # range roughly -1.8..+1.8
 
-            # Flame position: above head, with horizontal sway
+            # Flame position: above sprite top, with horizontal sway
+            sprite_top = cy - (sprite.get_height() // 2 if sprite else 16)
             fx = cx + int(flicker * 2)
-            fy = cy - 19
+            fy = sprite_top - 3
 
             # Outer glow (semi-transparent orange circle)
             glow_r = 7 + int(flicker2 * 2)
@@ -1432,7 +1425,9 @@ class Renderer:
                           spell_list=None, spell_cursor=0,
                           selected_spell=None,
                           throw_list=None, throw_cursor=0,
-                          selected_throw=None):
+                          selected_throw=None,
+                          use_item_list=None, use_item_cursor=0,
+                          selected_use_item=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1588,7 +1583,10 @@ class Renderer:
                               selected_spell=selected_spell,
                               throw_list=throw_list,
                               throw_cursor=throw_cursor,
-                              selected_throw=selected_throw)
+                              selected_throw=selected_throw,
+                              use_item_list=use_item_list,
+                              use_item_cursor=use_item_cursor,
+                              selected_use_item=selected_use_item)
 
         # ── 5. bottom combat log ──
         bar_y = arena_bottom + 6
@@ -2254,12 +2252,14 @@ class Renderer:
                          spell_list=None, spell_cursor=0,
                          selected_spell=None,
                          throw_list=None, throw_cursor=0,
-                         selected_throw=None):
+                         selected_throw=None,
+                         use_item_list=None, use_item_cursor=0,
+                         selected_use_item=None):
         """Action menu in retro style."""
         from src.states.combat import (
-            ACTION_RANGED, ACTION_CAST, ACTION_THROW,
+            ACTION_RANGED, ACTION_CAST, ACTION_THROW, ACTION_USE_ITEM,
             PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_SPELL_SELECT,
-            PHASE_THROW_SELECT,
+            PHASE_THROW_SELECT, PHASE_USE_ITEM,
             PHASE_VICTORY, PHASE_DEFEAT,
             PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL,
         )
@@ -2346,6 +2346,25 @@ class Renderer:
                     self._u3_text(prefix + label, tx, iy, color, f)
             else:
                 self._u3_text("  NO THROWABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
+
+            self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
+            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
+
+        elif phase == PHASE_USE_ITEM:
+            # Use item selection sub-menu
+            name = active_fighter.name if active_fighter else "???"
+            self._u3_text(f"-- USE ITEM --", tx, ty, self._U3_ORANGE, f)
+
+            if use_item_list:
+                for i, (item_name, count, effect, power) in enumerate(use_item_list):
+                    iy = ty + 28 + i * 24
+                    sel = (i == use_item_cursor)
+                    prefix = "> " if sel else "  "
+                    color = self._U3_WHITE if sel else self._U3_LTBLUE
+                    label = f"{item_name.upper()} x{count}"
+                    self._u3_text(prefix + label, tx, iy, color, f)
+            else:
+                self._u3_text("  NO USABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
 
             self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
             self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)

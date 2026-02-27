@@ -201,19 +201,24 @@
     "Healing Herb": {
       "description": "A fragrant herb that restores a small amount of HP.",
       "icon": "herb",
+      "usable": true,
+      "effect": "heal_hp",
+      "power": 15,
       "buy": 15,
       "sell": 7
     },
     "Antidote": {
       "description": "A bitter tincture that cures poison.",
       "icon": "potion",
+      "usable": true,
+      "effect": "cure_poison",
       "buy": 10,
       "sell": 5
     },
     "Torch": {
       "description": "A wooden torch. Lights the way in dark places.",
       "icon": "torch",
-      "charges": 25,
+      "charges": 50,
       "buy": 5,
       "sell": 2
     },
@@ -247,7 +252,10 @@
     },
     "Mana Potion": {
       "description": "A shimmering blue liquid that restores magic points.",
-      "icon": "potion"
+      "icon": "potion",
+      "usable": true,
+      "effect": "heal_mp",
+      "power": 10
     },
     "Lockpick": {
       "description": "A set of fine tools for opening locked chests.",
