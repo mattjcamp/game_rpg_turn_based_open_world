@@ -6,19 +6,13 @@
     "row": 14
   },
 
-  "gold": 200,
+  "gold": 50,
 
   "inventory": [
     { "item": "Torch" },
-    { "item": "Arrows",  "charges": 10 },
-    { "item": "Dagger" },
-    { "item": "Dagger" },
     { "item": "Rock" },
     { "item": "Rock" },
     { "item": "Rock" },
-    { "item": "Bow" },
-    { "item": "Sling" },
-    { "item": "Stones",  "charges": 10 }
-
+    { "item": "Healing Herb" }
   ]
 }

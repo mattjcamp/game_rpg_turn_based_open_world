@@ -523,7 +523,9 @@ class DungeonState(BaseState):
         """Compute the set of (col, row) world tiles visible to the party.
 
         Without a light source: only the 8 adjacent tiles + party tile (radius 1).
-        With a torch equipped or actively burning: raycasts up to 4 tiles, blocked by walls.
+        With a torch: recursive shadowcasting reveals all tiles in line of sight,
+        with walls blocking light naturally.  Walls themselves are visible if a
+        ray reaches them, but light does not pass through.
         """
         party = self.game.party
         pc, pr = party.col, party.row
@@ -537,17 +539,84 @@ class DungeonState(BaseState):
                     visible.add((pc + dc, pr + dr))
             return visible
 
-        # Torch lit — raycast to all tiles within radius 4
-        radius = 4
-        for dc in range(-radius, radius + 1):
-            for dr in range(-radius, radius + 1):
-                if dc * dc + dr * dr > radius * radius:
-                    continue
-                tc, tr = pc + dc, pr + dr
-                if self._has_line_of_sight(pc, pr, tc, tr):
-                    visible.add((tc, tr))
+        # Torch lit — use recursive shadowcasting for full line-of-sight
+        tile_map = self.dungeon_data.tile_map
+        max_radius = max(tile_map.width, tile_map.height)
 
+        # Eight octants cover all 360 degrees
+        # Each octant is defined by multipliers (xx, xy, yx, yy) that map
+        # (row along ray, column offset) to (dx, dy) world offsets.
+        octants = [
+            ( 1,  0,  0,  1),   # ENE
+            ( 0,  1,  1,  0),   # NNE
+            ( 0, -1,  1,  0),   # NNW
+            (-1,  0,  0,  1),   # WNW
+            (-1,  0,  0, -1),   # WSW
+            ( 0, -1, -1,  0),   # SSW
+            ( 0,  1, -1,  0),   # SSE
+            ( 1,  0,  0, -1),   # ESE
+        ]
+        for xx, xy, yx, yy in octants:
+            self._cast_light(visible, tile_map, pc, pr,
+                             1, 1.0, 0.0, max_radius,
+                             xx, xy, yx, yy)
         return visible
+
+    def _cast_light(self, visible, tile_map, cx, cy,
+                    row, start_slope, end_slope, max_radius,
+                    xx, xy, yx, yy):
+        """Recursive shadowcasting for one octant.
+
+        Scans row by row outward from the origin. When a wall is found the
+        visible arc is narrowed; when transitioning from wall to open space
+        a recursive call handles the remaining sub-arc.
+        """
+        if start_slope < end_slope:
+            return
+
+        for j in range(row, max_radius + 1):
+            blocked = False
+            new_start = start_slope
+            dx = -j - 1
+            dy = -j
+
+            while dx <= 0:
+                dx += 1
+                # Map octant-local (dx, dy) to world coordinates
+                map_x = cx + dx * xx + dy * xy
+                map_y = cy + dx * yx + dy * yy
+
+                # Slopes for this cell
+                l_slope = (dx - 0.5) / (dy + 0.5)
+                r_slope = (dx + 0.5) / (dy - 0.5)
+
+                if start_slope < r_slope:
+                    continue
+                if end_slope > l_slope:
+                    break
+
+                # This tile is visible (including walls — you can see them)
+                visible.add((map_x, map_y))
+
+                # Check if this tile blocks light
+                is_wall = not tile_map.is_walkable(map_x, map_y)
+
+                if blocked:
+                    if is_wall:
+                        new_start = r_slope
+                    else:
+                        blocked = False
+                        start_slope = new_start
+                else:
+                    if is_wall and j < max_radius:
+                        blocked = True
+                        self._cast_light(visible, tile_map, cx, cy,
+                                         j + 1, start_slope, l_slope,
+                                         max_radius, xx, xy, yx, yy)
+                        new_start = r_slope
+
+            if blocked:
+                break
 
     def _has_line_of_sight(self, x0, y0, x1, y1):
         """Check if there is a clear line of sight between two tiles.
