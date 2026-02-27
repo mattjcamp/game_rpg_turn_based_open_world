@@ -77,14 +77,14 @@ class DungeonState(BaseState):
         # First entry into dungeon
         if self.dungeon_data:
             self._entered = True
-            # Try to light a torch automatically
-            if self._consume_torch():
+            # Try to light the equipped torch automatically
+            if self._activate_torch():
                 self.show_message(
                     f"You descend into {self.dungeon_data.name}... Torch lit!", 2500
                 )
             else:
                 self.show_message(
-                    f"You descend into {self.dungeon_data.name}... No torches!", 2500
+                    f"You descend into {self.dungeon_data.name}... No torch equipped!", 2500
                 )
             # Move party to dungeon entry point (the stairs)
             self.game.party.col = self.dungeon_data.entry_col
@@ -299,8 +299,12 @@ class DungeonState(BaseState):
             if chosen == "UNEQUIP":
                 party.party_unequip(slot)
                 self.party_inv_action_menu = False
+                # If the light slot was cleared, deactivate torch
+                if slot == "light":
+                    self.torch_active = False
+                    self.torch_steps = 0
             elif chosen == "EXAMINE":
-                item = party.equipped.get(slot)
+                item = party.get_equipped_name(slot)
                 if item:
                     self.examining_item = item
         else:
@@ -321,6 +325,9 @@ class DungeonState(BaseState):
                     new_total = NUM_SLOTS + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
+                    # If a torch was equipped to the light slot, activate it
+                    if slot == "light" and party.get_equipped_name("light") == "Torch":
+                        self._activate_torch()
 
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
@@ -330,7 +337,7 @@ class DungeonState(BaseState):
 
         if idx < NUM_SLOTS:
             slot = party.PARTY_SLOTS[idx]
-            item = party.equipped.get(slot)
+            item = party.get_equipped_name(slot)
             if item is None:
                 return []
             return ["UNEQUIP", "EXAMINE"]
@@ -341,7 +348,7 @@ class DungeonState(BaseState):
                 return []
             options = []
             for s in party.PARTY_SLOTS:
-                if party.equipped[s] is None:
+                if party.get_equipped_name(s) is None:
                     label = party.PARTY_SLOT_LABELS[s]
                     options.append(f"EQUIP → {label}")
             options.append("GIVE TO MEMBER")
@@ -440,71 +447,61 @@ class DungeonState(BaseState):
 
     # ── Torch system ─────────────────────────────────────────────
 
-    def _consume_torch(self):
-        """Find and consume a torch from party equipment, members, or shared stash.
+    def _activate_torch(self):
+        """Activate the torch equipped in the party LIGHT slot.
 
-        Returns True if a torch was found and lit, False otherwise.
-        Priority: party light slot → member inventories → shared inventory.
+        Returns True if a torch is equipped and was activated, False otherwise.
+        Uses the item's charges to determine burn duration.
         """
         party = self.game.party
-        # Check party equipment light slot first
-        if party.equipped.get("light") == "Torch":
-            party.equipped["light"] = None
+        if party.get_equipped_name("light") == "Torch":
+            charges = party.get_equipped_charges("light")
             self.torch_active = True
-            self.torch_steps = 10
-            return True
-        # Check party members' inventories
-        for member in party.members:
-            if "Torch" in member.inventory:
-                member.inventory.remove("Torch")
-                self.torch_active = True
-                self.torch_steps = 10
-                return True
-        # Check shared inventory
-        if "Torch" in party.shared_inventory:
-            party.shared_inventory.remove("Torch")
-            self.torch_active = True
-            self.torch_steps = 10
+            self.torch_steps = charges if charges is not None else 10
             return True
         return False
 
-    def _count_torches(self):
-        """Count total torches available across equipment and all inventories."""
+    def _consume_torch(self):
+        """Remove the burned-out torch from the party LIGHT slot."""
         party = self.game.party
-        count = 0
-        # Count torch in party light slot
-        if party.equipped.get("light") == "Torch":
-            count += 1
-        for member in party.members:
-            count += member.inventory.count("Torch")
-        count += party.shared_inventory.count("Torch")
-        return count
+        if party.get_equipped_name("light") == "Torch":
+            party.equipped["light"] = None
+
+    def _has_torch_equipped(self):
+        """Check if a torch is equipped in the party LIGHT slot."""
+        return self.game.party.get_equipped_name("light") == "Torch"
 
     def _tick_torch(self):
-        """Decrement torch and handle burnout after a step."""
+        """Decrement torch charges and handle burnout after a step."""
         if not self.torch_active:
             return
         self.torch_steps -= 1
+        # Sync charges back to the equipped item
+        party = self.game.party
+        entry = party.equipped.get("light")
+        if entry and entry.get("charges") is not None:
+            entry["charges"] = max(0, self.torch_steps)
         if self.torch_steps <= 0:
             self.torch_active = False
-            if self._consume_torch():
-                remaining = self._count_torches()
-                self.show_message(
-                    f"Lit a new torch! ({remaining} remaining)", 2000)
+            self._consume_torch()  # Remove the burned-out torch
+            # Try to reactivate if somehow another torch is equipped
+            if self._activate_torch():
+                self.show_message("Lit a new torch!", 2000)
             else:
                 self.show_message("Your torch has burned out!", 2500)
 
     def _compute_visible_tiles(self):
         """Compute the set of (col, row) world tiles visible to the party.
 
-        Without a torch: only the 8 adjacent tiles + party tile (radius 1).
-        With a torch: raycasts up to 4 tiles, blocked by walls.
+        Without a light source: only the 8 adjacent tiles + party tile (radius 1).
+        With a torch equipped or actively burning: raycasts up to 4 tiles, blocked by walls.
         """
         party = self.game.party
         pc, pr = party.col, party.row
         visible = {(pc, pr)}
 
-        if not self.torch_active:
+        has_light = self.torch_active or self._has_torch_equipped()
+        if not has_light:
             # Minimal visibility — just the 8 neighbours
             for dc in (-1, 0, 1):
                 for dr in (-1, 0, 1):
@@ -764,5 +761,5 @@ class DungeonState(BaseState):
             self.dungeon_data,
             message=self.message,
             visible_tiles=visible,
-            torch_steps=self.torch_steps if self.torch_active else -1,
+            torch_steps=self.torch_steps if (self.torch_active or self._has_torch_equipped()) else -1,
         )

@@ -452,7 +452,13 @@ class Renderer:
         # Top line: town info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
         self._u3_text(town_data.name.upper(), 200, bar_y + 6, (255, 170, 85))
-        self._u3_text(f"TILE:{tile_name}", 420, bar_y + 6, (68, 68, 255))
+        light_name = party.get_equipped_name("light")
+        if light_name:
+            charges = party.get_equipped_charges("light")
+            lbl = f"LIGHT:{light_name.upper()}"
+            if charges is not None:
+                lbl += f":{charges:02d}"
+            self._u3_text(lbl, 420, bar_y + 6, (255, 170, 85))
         self._u3_text(f"POS:({party.col},{party.row})", 620, bar_y + 6, (136, 136, 136))
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE  [P] PARTY  [BUMP NPC] TALK  [ESC] LEAVE",
@@ -816,7 +822,14 @@ class Renderer:
         # Top line: game info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0), font=f)
         self._u3_text(f"TERRAIN:{tile_name}", 220, bar_y + 6, (200, 200, 255), font=f)
-        self._u3_text(f"POS:({party.col},{party.row})", 530, bar_y + 6, (220, 220, 220), font=f)
+        light_name = party.get_equipped_name("light")
+        if light_name:
+            charges = party.get_equipped_charges("light")
+            lbl = f"LIGHT:{light_name.upper()}"
+            if charges is not None:
+                lbl += f":{charges:02d}"
+            self._u3_text(lbl, 420, bar_y + 6, (255, 170, 85), font=f)
+        self._u3_text(f"POS:({party.col},{party.row})", 600, bar_y + 6, (220, 220, 220), font=f)
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] QUIT",
                       8, bar_y + 28, (200, 200, 255), font=f)
@@ -1013,12 +1026,20 @@ class Renderer:
         # Top line: game info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
         self._u3_text(dungeon_data.name.upper(), 200, bar_y + 6, (200, 60, 60))
-        # Torch status
+        # Light status
+        light_name = party.get_equipped_name("light")
+        light_charges = party.get_equipped_charges("light")
         if torch_steps >= 0:
             torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
-            self._u3_text(f"TORCH:{torch_steps:02d}", 420, bar_y + 6, torch_color)
+            lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:02d}"
+            self._u3_text(lbl, 420, bar_y + 6, torch_color)
+        elif light_name:
+            lbl = f"LIGHT:{light_name.upper()}"
+            if light_charges is not None:
+                lbl += f":{light_charges:02d}"
+            self._u3_text(lbl, 420, bar_y + 6, (255, 170, 85))
         else:
-            self._u3_text("NO TORCH", 420, bar_y + 6, (136, 136, 136))
+            self._u3_text("NO LIGHT", 420, bar_y + 6, (136, 136, 136))
         self._u3_text(f"POS:({party.col},{party.row})", 600, bar_y + 6, (136, 136, 136))
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] STAIRS",
@@ -3062,7 +3083,8 @@ class Renderer:
 
         for si, slot_key in enumerate(party.PARTY_SLOTS):
             slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
-            item_name = party.equipped.get(slot_key)
+            item_name = party.get_equipped_name(slot_key)
+            charges = party.get_equipped_charges(slot_key)
             selected = (si == cursor_index) and not choosing_member
             prefix = "> " if selected else "  "
 
@@ -3070,8 +3092,11 @@ class Renderer:
             self._u3_text(f"{prefix}{slot_label}:", tx, ty, name_color, fm)
 
             if item_name:
+                display = item_name
+                if charges is not None:
+                    display = f"{item_name} ({charges})"
                 item_color = self._U3_WHITE if selected else (220, 220, 230)
-                self._u3_text(item_name, tx + 120, ty, item_color, fm)
+                self._u3_text(display, tx + 120, ty, item_color, fm)
             else:
                 self._u3_text("-- EMPTY --", tx + 120, ty, (120, 120, 120), fm)
 
@@ -3154,10 +3179,12 @@ class Renderer:
 
         # Determine which item is selected
         sel_item = None
+        sel_charges = None
         is_equip_slot = cursor_index < NUM_SLOTS
         if is_equip_slot:
             slot_key = party.PARTY_SLOTS[cursor_index]
-            sel_item = party.equipped.get(slot_key)
+            sel_item = party.get_equipped_name(slot_key)
+            sel_charges = party.get_equipped_charges(slot_key)
         elif cursor_index - NUM_SLOTS < len(inv):
             sel_item = inv[cursor_index - NUM_SLOTS]
 
@@ -3191,6 +3218,11 @@ class Renderer:
                 self._u3_text(f"SLOT: {slot}", rx, ry, (180, 180, 180), fm)
             else:
                 self._u3_text("TYPE: GENERAL ITEM", rx, ry, self._U3_LTBLUE, fm)
+
+            # Charges (for equipped items with charges)
+            if sel_charges is not None:
+                ry += 18
+                self._u3_text(f"CHARGES: {sel_charges}", rx, ry, (255, 170, 85), fm)
 
             # Description
             info = ITEM_INFO.get(sel_item)

@@ -35,9 +35,9 @@ class Game:
         # --- Create game world ---
         self.tile_map = create_test_map()
 
-        # Party starts near the center of the map
-        start_col = 15
-        start_row = 14
+        # Party starts just south of the dungeon entrance
+        start_col = 30
+        start_row = 9
         self.party = create_default_party(start_col, start_row)
 
         # Camera follows the party

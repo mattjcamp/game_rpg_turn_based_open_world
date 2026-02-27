@@ -46,10 +46,13 @@ def load_items():
 
         # Description & icon (what ITEM_INFO needs)
         if "description" in data or "icon" in data:
-            item_info[name] = {
+            info = {
                 "desc": data.get("description", ""),
                 "icon": data.get("icon", "sword"),
             }
+            if "charges" in data:
+                info["charges"] = data["charges"]
+            item_info[name] = info
 
         # Shop prices (what SHOP_INVENTORY needs)
         if "buy" in data:
@@ -63,10 +66,13 @@ def load_items():
         armors[name] = {"evasion": data["evasion"]}
 
         if "description" in data or "icon" in data:
-            item_info[name] = {
+            info = {
                 "desc": data.get("description", ""),
                 "icon": data.get("icon", "armor_light"),
             }
+            if "charges" in data:
+                info["charges"] = data["charges"]
+            item_info[name] = info
 
         if "buy" in data:
             shop_inventory[name] = {
@@ -77,10 +83,13 @@ def load_items():
     # ── General items ──
     for name, data in raw.get("general", {}).items():
         if "description" in data or "icon" in data:
-            item_info[name] = {
+            info = {
                 "desc": data.get("description", ""),
                 "icon": data.get("icon", "tool"),
             }
+            if "charges" in data:
+                info["charges"] = data["charges"]
+            item_info[name] = info
 
         if "buy" in data:
             shop_inventory[name] = {

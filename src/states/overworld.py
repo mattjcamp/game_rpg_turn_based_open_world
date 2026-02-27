@@ -240,7 +240,7 @@ class OverworldState(BaseState):
                 party.party_unequip(slot)
                 self.party_inv_action_menu = False
             elif chosen == "EXAMINE":
-                item = party.equipped.get(slot)
+                item = party.get_equipped_name(slot)
                 if item:
                     self.examining_item = item
         else:
@@ -273,7 +273,7 @@ class OverworldState(BaseState):
         if idx < NUM_SLOTS:
             # Equipment slot — show UNEQUIP if occupied, EXAMINE
             slot = party.PARTY_SLOTS[idx]
-            item = party.equipped.get(slot)
+            item = party.get_equipped_name(slot)
             if item is None:
                 return []
             return ["UNEQUIP", "EXAMINE"]
@@ -286,7 +286,7 @@ class OverworldState(BaseState):
             options = []
             # Offer equip to each empty party slot
             for s in party.PARTY_SLOTS:
-                if party.equipped[s] is None:
+                if party.get_equipped_name(s) is None:
                     label = party.PARTY_SLOT_LABELS[s]
                     options.append(f"EQUIP → {label}")
             options.append("GIVE TO MEMBER")

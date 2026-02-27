@@ -176,6 +176,7 @@
     "Torch": {
       "description": "A wooden torch. Lights the way in dark places.",
       "icon": "torch",
+      "charges": 25,
       "buy": 5,
       "sell": 2
     },
