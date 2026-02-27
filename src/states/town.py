@@ -35,6 +35,14 @@ class TownState(BaseState):
         self.party_inv_action_menu = False
         self.party_inv_action_cursor = 0
 
+        # Shop screen
+        self.showing_shop = False
+        self.shop_mode = "buy"      # "buy" or "sell"
+        self.shop_cursor = 0        # cursor in buy list
+        self.shop_sell_cursor = 0   # cursor in sell list
+        self.shop_message = ""
+        self.shop_message_timer = 0
+
         # We'll save the overworld position so we can restore it on exit
         self.overworld_col = 0
         self.overworld_row = 0
@@ -70,6 +78,11 @@ class TownState(BaseState):
         """Handle movement and NPC interaction."""
         for event in events:
             if event.type == pygame.KEYDOWN:
+                # ── Shop screen input ──
+                if self.showing_shop:
+                    self._handle_shop_input(event)
+                    return
+
                 # ── Party inventory screen input ──
                 if self.showing_party_inv:
                     self._handle_party_inv_input(event)
@@ -152,8 +165,10 @@ class TownState(BaseState):
                         self._advance_dialogue()
                         return
 
-        # If showing party screen, character detail, inventory, or dialogue, block movement
+        # If showing party screen, character detail, inventory, dialogue, or shop, block movement
         if self.showing_party or self.showing_char_detail is not None or self.showing_party_inv:
+            return
+        if self.showing_shop:
             return
         if self.npc_dialogue_active:
             return
@@ -206,7 +221,16 @@ class TownState(BaseState):
             self._exit_town()
 
     def _start_dialogue(self, npc):
-        """Begin talking to an NPC."""
+        """Begin talking to an NPC, or open the shop for shopkeepers."""
+        if npc.npc_type == "shopkeep":
+            self.showing_shop = True
+            self.shop_mode = "buy"
+            self.shop_cursor = 0
+            self.shop_sell_cursor = 0
+            self.shop_message = ""
+            self.shop_message_timer = 0
+            return
+
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         line = npc.get_dialogue()
@@ -219,6 +243,67 @@ class TownState(BaseState):
         self.npc_speaking = None
         self.message = ""
         self.message_timer = 0
+
+    # ── Shop ──────────────────────────────────────────────────────
+
+    def _handle_shop_input(self, event):
+        """Handle input while the shop screen is open."""
+        from src.party import SHOP_INVENTORY, get_sell_price
+
+        buy_items = list(SHOP_INVENTORY.keys())
+        sell_items = self.game.party.shared_inventory
+
+        if event.key == pygame.K_ESCAPE:
+            self.showing_shop = False
+            return
+
+        if event.key == pygame.K_TAB:
+            # Toggle buy / sell
+            if self.shop_mode == "buy":
+                self.shop_mode = "sell"
+                self.shop_sell_cursor = min(
+                    self.shop_sell_cursor, max(0, len(sell_items) - 1))
+            else:
+                self.shop_mode = "buy"
+            return
+
+        if self.shop_mode == "buy":
+            if not buy_items:
+                return
+            if event.key == pygame.K_UP:
+                self.shop_cursor = (self.shop_cursor - 1) % len(buy_items)
+            elif event.key == pygame.K_DOWN:
+                self.shop_cursor = (self.shop_cursor + 1) % len(buy_items)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                item_name = buy_items[self.shop_cursor]
+                cost = SHOP_INVENTORY[item_name]["buy"]
+                if self.game.party.gold >= cost:
+                    self.game.party.gold -= cost
+                    self.game.party.shared_inventory.append(item_name)
+                    self.shop_message = f"Bought {item_name}!"
+                    self.shop_message_timer = 1500
+                else:
+                    self.shop_message = "Not enough gold!"
+                    self.shop_message_timer = 1500
+
+        else:  # sell mode
+            if not sell_items:
+                return
+            if event.key == pygame.K_UP:
+                self.shop_sell_cursor = (self.shop_sell_cursor - 1) % len(sell_items)
+            elif event.key == pygame.K_DOWN:
+                self.shop_sell_cursor = (self.shop_sell_cursor + 1) % len(sell_items)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                item_name = sell_items[self.shop_sell_cursor]
+                price = get_sell_price(item_name)
+                self.game.party.gold += price
+                self.game.party.shared_inventory.pop(self.shop_sell_cursor)
+                self.shop_message = f"Sold {item_name} for {price}g!"
+                self.shop_message_timer = 1500
+                # Clamp cursor
+                if self.shop_sell_cursor >= len(self.game.party.shared_inventory):
+                    self.shop_sell_cursor = max(
+                        0, len(self.game.party.shared_inventory) - 1)
 
     def _handle_party_inv_input(self, event):
         """Handle input for the shared party inventory screen."""
@@ -401,6 +486,12 @@ class TownState(BaseState):
                     self.message = ""
                 self.message_timer = 0
 
+        if self.shop_message_timer > 0:
+            self.shop_message_timer -= dt_ms
+            if self.shop_message_timer <= 0:
+                self.shop_message = ""
+                self.shop_message_timer = 0
+
         if self.move_cooldown > 0:
             self.move_cooldown -= dt_ms
             if self.move_cooldown < 0:
@@ -408,6 +499,13 @@ class TownState(BaseState):
 
     def draw(self, renderer):
         """Draw the town in Ultima III style."""
+        if self.showing_shop:
+            cursor = (self.shop_cursor if self.shop_mode == "buy"
+                      else self.shop_sell_cursor)
+            renderer.draw_shop_u3(
+                self.game.party, self.shop_mode, cursor,
+                self.shop_message)
+            return
         if self.showing_party_inv:
             renderer.draw_party_inventory_u3(
                 self.game.party, self.party_inv_cursor,

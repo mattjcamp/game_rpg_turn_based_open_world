@@ -2755,6 +2755,264 @@ class Renderer:
             self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [ESC] BACK  [P] CLOSE",
                           8, bar_y + 5, self._U3_BLUE)
 
+    # ========================================================
+    # SHOP SCREEN
+    # ========================================================
+
+    def draw_shop_u3(self, party, mode="buy", cursor_index=0, message=""):
+        """
+        Full-screen shop for buying and selling items.
+
+        *mode*: "buy" or "sell"
+        *cursor_index*: position in the active list
+        *message*: transient feedback text (e.g. "Bought Sword!")
+        """
+        from src.party import SHOP_INVENTORY, WEAPONS, ARMORS, ITEM_INFO, get_sell_price
+
+        fm = self.font_med
+        f = self.font
+        self.screen.fill(self._U3_BLACK)
+
+        buy_items = list(SHOP_INVENTORY.keys())
+        sell_items = party.shared_inventory
+
+        # ── Title bar with BUY / SELL tabs ──
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        self._u3_text("SHOP", 10, 8, self._U3_ORANGE, f)
+
+        # Tab indicators
+        buy_col = self._U3_WHITE if mode == "buy" else self._U3_GRAY
+        sell_col = self._U3_WHITE if mode == "sell" else self._U3_GRAY
+        buy_bg = self._U3_BLUE if mode == "buy" else (40, 40, 60)
+        sell_bg = self._U3_BLUE if mode == "sell" else (40, 40, 60)
+
+        buy_tab = pygame.Rect(200, 4, 80, 22)
+        sell_tab = pygame.Rect(286, 4, 80, 22)
+        pygame.draw.rect(self.screen, buy_bg, buy_tab)
+        pygame.draw.rect(self.screen, sell_bg, sell_tab)
+        pygame.draw.rect(self.screen, self._U3_LTBLUE, buy_tab, 1)
+        pygame.draw.rect(self.screen, self._U3_LTBLUE, sell_tab, 1)
+        self._u3_text("BUY", 224, 8, buy_col, fm)
+        self._u3_text("SELL", 308, 8, sell_col, fm)
+
+        # ── Layout ──
+        left_x = 4
+        left_w = SCREEN_WIDTH // 2 + 60
+        right_x = left_x + left_w + 4
+        right_w = SCREEN_WIDTH - right_x - 4
+        panel_y = 36
+        panel_h = SCREEN_HEIGHT - 36 - 28
+
+        self._u3_panel(left_x, panel_y, left_w, panel_h)
+        self._u3_panel(right_x, panel_y, right_w, panel_h)
+
+        row_h = 20
+
+        # ═══════════════════════════════════════
+        # LEFT PANEL — Item list
+        # ═══════════════════════════════════════
+        tx = left_x + 12
+        ty = panel_y + 10
+
+        if mode == "buy":
+            self._u3_text("FOR SALE", tx, ty, self._U3_ORANGE, fm)
+            self._u3_text(f"({len(buy_items)} ITEMS)", tx + 110, ty,
+                          self._U3_GRAY, fm)
+            ty += 24
+
+            items = buy_items
+            max_visible = (panel_h - 60) // row_h
+            scroll_top = 0
+            if len(items) > max_visible:
+                scroll_top = max(0, min(cursor_index - max_visible // 2,
+                                        len(items) - max_visible))
+
+            for vi, item_idx in enumerate(
+                    range(scroll_top, min(scroll_top + max_visible, len(items)))):
+                item_name = items[item_idx]
+                selected = (item_idx == cursor_index)
+                prefix = "> " if selected else "  "
+                name_color = self._U3_WHITE if selected else (220, 220, 230)
+                cost = SHOP_INVENTORY[item_name]["buy"]
+
+                self._u3_text(f"{prefix}{item_name}", tx, ty, name_color, fm)
+                # Price on the right
+                price_col = (255, 255, 0) if selected else (200, 200, 100)
+                self._u3_text(f"{cost}g", tx + left_w - 80, ty, price_col, fm)
+
+                if selected:
+                    sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                    sel_surf = pygame.Surface(
+                        (sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                    sel_surf.fill((255, 255, 255, 25))
+                    self.screen.blit(sel_surf, sel_rect)
+                ty += row_h
+
+            if scroll_top > 0:
+                self._u3_text("^ MORE ^", tx + left_w // 2 - 50,
+                              panel_y + 32, self._U3_GRAY, self.font_small)
+            if scroll_top + max_visible < len(items):
+                self._u3_text("v MORE v", tx + left_w // 2 - 50,
+                              panel_y + panel_h - 18, self._U3_GRAY,
+                              self.font_small)
+
+        else:  # sell
+            self._u3_text("YOUR ITEMS", tx, ty, self._U3_ORANGE, fm)
+            self._u3_text(f"({len(sell_items)} ITEMS)", tx + 120, ty,
+                          self._U3_GRAY, fm)
+            ty += 24
+
+            if not sell_items:
+                self._u3_text("  (NOTHING TO SELL)", tx, ty,
+                              (120, 120, 120), fm)
+            else:
+                items = sell_items
+                max_visible = (panel_h - 60) // row_h
+                scroll_top = 0
+                if len(items) > max_visible:
+                    scroll_top = max(0, min(cursor_index - max_visible // 2,
+                                            len(items) - max_visible))
+
+                for vi, item_idx in enumerate(
+                        range(scroll_top,
+                              min(scroll_top + max_visible, len(items)))):
+                    item_name = items[item_idx]
+                    selected = (item_idx == cursor_index)
+                    prefix = "> " if selected else "  "
+                    name_color = self._U3_WHITE if selected else (220, 220, 230)
+                    price = get_sell_price(item_name)
+
+                    self._u3_text(f"{prefix}{item_name}", tx, ty,
+                                  name_color, fm)
+                    price_col = (255, 255, 0) if selected else (200, 200, 100)
+                    self._u3_text(f"{price}g", tx + left_w - 80, ty,
+                                  price_col, fm)
+
+                    if selected:
+                        sel_rect = pygame.Rect(tx - 4, ty - 1,
+                                               left_w - 24, row_h)
+                        sel_surf = pygame.Surface(
+                            (sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                        sel_surf.fill((255, 255, 255, 25))
+                        self.screen.blit(sel_surf, sel_rect)
+                    ty += row_h
+
+                if scroll_top > 0:
+                    self._u3_text("^ MORE ^", tx + left_w // 2 - 50,
+                                  panel_y + 32, self._U3_GRAY,
+                                  self.font_small)
+                if scroll_top + max_visible < len(items):
+                    self._u3_text("v MORE v", tx + left_w // 2 - 50,
+                                  panel_y + panel_h - 18, self._U3_GRAY,
+                                  self.font_small)
+
+        # ═══════════════════════════════════════
+        # RIGHT PANEL — Item details + gold
+        # ═══════════════════════════════════════
+        rx = right_x + 10
+        ry = panel_y + 10
+
+        # Determine selected item
+        sel_item = None
+        if mode == "buy" and buy_items and 0 <= cursor_index < len(buy_items):
+            sel_item = buy_items[cursor_index]
+        elif mode == "sell" and sell_items and 0 <= cursor_index < len(sell_items):
+            sel_item = sell_items[cursor_index]
+
+        if sel_item:
+            self._u3_text("DETAILS", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+            self._u3_text(sel_item, rx, ry, self._U3_WHITE, f)
+            ry += 24
+
+            # Item stats
+            if sel_item in ARMORS:
+                arm = ARMORS[sel_item]
+                self._u3_text("TYPE: ARMOR", rx, ry, self._U3_LTBLUE, fm)
+                ry += 18
+                self._u3_text(f"EVASION: {arm['evasion']}%", rx, ry,
+                              (220, 220, 230), fm)
+                ry += 18
+                self._u3_text("SLOT: BODY", rx, ry, (180, 180, 180), fm)
+            elif sel_item in WEAPONS:
+                wp = WEAPONS[sel_item]
+                wtype = "RANGED" if wp.get("ranged", False) else "MELEE"
+                self._u3_text(f"TYPE: {wtype} WEAPON", rx, ry,
+                              self._U3_LTBLUE, fm)
+                ry += 18
+                self._u3_text(f"POWER: {wp['power']:02d}", rx, ry,
+                              (220, 220, 230), fm)
+                ry += 18
+                slot = "RANGED" if wp.get("ranged", False) else "MELEE"
+                self._u3_text(f"SLOT: {slot}", rx, ry, (180, 180, 180), fm)
+            else:
+                self._u3_text("TYPE: GENERAL ITEM", rx, ry,
+                              self._U3_LTBLUE, fm)
+                ry += 18
+                self._u3_text("NOT EQUIPPABLE", rx, ry,
+                              (180, 180, 180), fm)
+
+            ry += 28
+            # Price line
+            if mode == "buy":
+                cost = SHOP_INVENTORY[sel_item]["buy"]
+                affordable = party.gold >= cost
+                price_color = (255, 255, 0) if affordable else self._U3_RED
+                self._u3_text(f"COST: {cost} GOLD", rx, ry, price_color, fm)
+                if not affordable:
+                    ry += 18
+                    self._u3_text("(NOT ENOUGH GOLD)", rx, ry,
+                                  self._U3_RED, self.font_small)
+            else:
+                price = get_sell_price(sel_item)
+                self._u3_text(f"VALUE: {price} GOLD", rx, ry,
+                              (255, 255, 0), fm)
+
+            # Description from ITEM_INFO
+            ry += 28
+            info = ITEM_INFO.get(sel_item)
+            if info:
+                desc = info.get("desc", "")
+                # Word-wrap description
+                words = desc.split()
+                line = ""
+                for word in words:
+                    test = f"{line} {word}".strip()
+                    if fm.size(test)[0] > right_w - 24:
+                        self._u3_text(line, rx, ry, self._U3_GRAY, fm)
+                        ry += 16
+                        line = word
+                    else:
+                        line = test
+                if line:
+                    self._u3_text(line, rx, ry, self._U3_GRAY, fm)
+        else:
+            self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
+
+        # ── Gold display ──
+        gold_y = panel_y + panel_h - 30
+        self._draw_item_icon(rx + 12, gold_y + 8, "chest", 28)
+        self._u3_text(f"GOLD: {party.gold:05d}", rx + 30, gold_y + 2,
+                      (255, 255, 0), fm)
+
+        # ── Floating shop message ──
+        if message:
+            surf = fm.render(message.upper(), True, (255, 220, 140))
+            rect = surf.get_rect(center=(SCREEN_WIDTH // 2,
+                                         SCREEN_HEIGHT // 2))
+            bg = rect.inflate(24, 12)
+            pygame.draw.rect(self.screen, (0, 0, 0), bg)
+            pygame.draw.rect(self.screen, self._U3_LTBLUE, bg, 2)
+            self.screen.blit(surf, rect)
+
+        # ── Bottom status bar ──
+        bar_y = SCREEN_HEIGHT - 24
+        self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
+        action = "BUY" if mode == "buy" else "SELL"
+        self._u3_text(
+            f"[UP/DN] SELECT  [ENTER] {action}  [TAB] BUY/SELL  [ESC] LEAVE",
+            8, bar_y + 5, self._U3_BLUE)
+
     def draw_party_inventory_u3(self, party, cursor_index=0,
                                  choosing_member=False, member_cursor=0,
                                  action_menu=False, action_cursor=0):

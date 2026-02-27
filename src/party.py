@@ -10,6 +10,7 @@ class.  Damage uses (weapon_power + 1.5 * STR).  Evasion comes from armor.
 # ── Weapon table ──────────────────────────────────────────────────
 WEAPONS = {
     "Dagger":       {"power": 1, "ranged": True, "consumable": True},
+    "Club":         {"power": 1, "ranged": False},
     "Mace":         {"power": 2, "ranged": False},
     "Sling":        {"power": 3, "ranged": True},
     "Axe":          {"power": 4, "ranged": False},
@@ -50,6 +51,8 @@ ITEM_INFO = {
                      "icon": "gloves"},
     "Dagger":       {"desc": "A short, light blade. Can be thrown at enemies.",
                      "icon": "dagger"},
+    "Club":         {"desc": "A simple wooden club. Cheap but sturdy.",
+                     "icon": "mace"},
     "Mace":         {"desc": "A heavy flanged club, favored by clerics.",
                      "icon": "mace"},
     "Sling":        {"desc": "A simple ranged weapon that hurls stones.",
@@ -111,6 +114,37 @@ ITEM_INFO = {
     "Smoke Bomb":    {"desc": "A small bomb that creates a blinding cloud.",
                       "icon": "bomb"},
 }
+
+
+# ── Shop catalogue ─────────────────────────────────────────────────
+# buy = cost to purchase, sell = gold received when selling.
+# Items not listed here can still be sold for a flat 5 gold.
+SHOP_INVENTORY = {
+    # Weapons
+    "Dagger":       {"buy": 20,  "sell": 10},
+    "Club":         {"buy": 20,  "sell": 10},
+    "Mace":         {"buy": 40,  "sell": 20},
+    "Sling":        {"buy": 60,  "sell": 30},
+    "Axe":          {"buy": 80,  "sell": 40},
+    "Sword":        {"buy": 120, "sell": 60},
+    "Bow":          {"buy": 150, "sell": 75},
+    # Armor
+    "Cloth":        {"buy": 20,  "sell": 10},
+    "Leather":      {"buy": 50,  "sell": 25},
+    "Chain":        {"buy": 120, "sell": 60},
+    # Supplies
+    "Torch":        {"buy": 5,   "sell": 2},
+    "Healing Herb": {"buy": 15,  "sell": 7},
+    "Antidote":     {"buy": 10,  "sell": 5},
+}
+
+
+def get_sell_price(item_name):
+    """Return the sell price for an item. Falls back to 5 gold if unlisted."""
+    info = SHOP_INVENTORY.get(item_name)
+    if info:
+        return info["sell"]
+    return 5
 
 
 class PartyMember:
@@ -423,63 +457,58 @@ class Party:
 
 
 def create_default_party(start_col, start_row):
-    """Create a classic balanced party of 4 characters (Ultima III style)."""
+    """Create a classic balanced party of 4 characters (Ultima III style).
+
+    Everyone starts humble: cloth armor, a simple weapon, and one shared
+    torch.  Better gear must be found or purchased.
+    """
     party = Party(start_col, start_row)
 
-    # 1. Dwarf Fighter — front-line tank, best weapons/armor
+    # 1. Dwarf Fighter — front-line tank
     roland = PartyMember(
         "Roland", "Fighter", race="Dwarf",
         hp=30, strength=16, dexterity=12,
         intelligence=8, wisdom=10, level=1,
     )
-    roland.weapon = "Iron Sword"
-    roland.armor = "Chain"
-    roland.equipped = {"body": "Chain", "melee": "Iron Sword", "ranged": None}
-    roland.inventory = ["Torch", "Healing Herb", "Rope"]
+    roland.equipped = {"body": "Cloth", "melee": "Club", "ranged": None}
+    roland.weapon = "Club"
+    roland.armor = "Cloth"
     party.add_member(roland)
 
-    # 2. Bobbit Cleric — healer, priest spells, decent armor
+    # 2. Bobbit Cleric — healer, priest spells
     mira = PartyMember(
         "Mira", "Cleric", race="Bobbit",
         hp=22, strength=10, dexterity=10,
         intelligence=10, wisdom=18, level=1,
     )
-    mira.weapon = "Mace"
-    mira.armor = "Chain"
-    mira.equipped = {"body": "Chain", "melee": "Mace", "ranged": "Sling"}
-    mira.inventory = ["Holy Water", "Healing Herb", "Antidote"]
+    mira.equipped = {"body": "Cloth", "melee": "Club", "ranged": None}
+    mira.weapon = "Club"
+    mira.armor = "Cloth"
     party.add_member(mira)
 
-    # 3. Fuzzy Wizard — nuker, mass-destruction spells
+    # 3. Fuzzy Wizard — nuker, sorcerer spells
     theron = PartyMember(
         "Theron", "Wizard", race="Fuzzy",
         hp=14, strength=6, dexterity=14,
         intelligence=20, wisdom=8, level=1,
     )
+    theron.equipped = {"body": "Cloth", "melee": "Dagger", "ranged": None}
     theron.weapon = "Dagger"
     theron.armor = "Cloth"
-    theron.equipped = {"body": "Cloth", "melee": "Dagger", "ranged": None}
-    theron.inventory = ["Scroll of Fire", "Mana Potion", "Torch"]
     party.add_member(theron)
 
-    # 4. Elf Thief — trap disarmer, thrown daggers, high evasion
+    # 4. Elf Thief — trap disarmer, high evasion
     sable = PartyMember(
         "Sable", "Thief", race="Elf",
         hp=20, strength=12, dexterity=18,
         intelligence=10, wisdom=8, level=1,
     )
+    sable.equipped = {"body": "Cloth", "melee": "Dagger", "ranged": None}
     sable.weapon = "Dagger"
-    sable.armor = "Leather"
-    sable.equipped = {"body": "Leather", "melee": "Sword", "ranged": "Dagger"}
-    sable.ammo = {"Dagger": 5}
-    sable.inventory = ["Lockpick", "Smoke Bomb", "Healing Herb", "Torch"]
+    sable.armor = "Cloth"
     party.add_member(sable)
 
-    # Shared party stash
-    party.shared_inventory = [
-        "Healing Herb", "Healing Herb", "Antidote",
-        "Torch", "Torch",
-        "Leather", "Axe", "Bow",
-    ]
+    # Shared party stash — just one torch to start
+    party.shared_inventory = ["Torch"]
 
     return party
