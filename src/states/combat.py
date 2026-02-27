@@ -34,6 +34,7 @@ PHASE_FIREBALL    = "fireball"       # fireball in flight
 PHASE_HEAL        = "heal"           # heal animation playing
 PHASE_MONSTER     = "monster"
 PHASE_MONSTER_ACT = "monster_act"
+PHASE_EQUIP       = "equip"          # character sheet / equip screen
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -51,6 +52,7 @@ ACTION_CAST   = 2
 ACTION_HEAL   = 3
 ACTION_SKIP   = 4      # spacebar skip
 ACTION_RANGED = 5      # menu ranged attack
+ACTION_EQUIP  = 6      # open equip screen (costs turn)
 
 # Menu is built dynamically per character — see _build_menu_actions()
 
@@ -241,6 +243,12 @@ class CombatState(BaseState):
         self.selected_action = 0
         self.menu_actions = []  # dynamic menu: [(action_id, label), ...]
         self.directing_action = None  # which action is being directed
+
+        # Equip screen state
+        self.equip_cursor = 0           # cursor in equip/item list
+        self.equip_action_menu = False  # True when action popup is open
+        self.equip_action_cursor = 0    # selected option in action popup
+        self.equip_examining = None     # item name being examined
         self.combat_log = []
         self.phase_timer = 0
 
@@ -424,6 +432,8 @@ class CombatState(BaseState):
             self.menu_actions.append((ACTION_CAST, f"Cast ({f.current_mp}MP)"))
         if f.can_cast_priest() and f.current_mp >= HEAL_MP_COST:
             self.menu_actions.append((ACTION_HEAL, f"Heal ({f.current_mp}MP)"))
+        # Equip is always available
+        self.menu_actions.append((ACTION_EQUIP, "Equip"))
         self.selected_action = 0
 
     # ── Input ────────────────────────────────────────────────────
@@ -431,6 +441,13 @@ class CombatState(BaseState):
     def handle_input(self, events, keys_pressed):
         # During animation phases, no input
         if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL):
+            return
+
+        # Equip screen handles its own input
+        if self.phase == PHASE_EQUIP:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    self._handle_equip_input(event)
             return
 
         # Speed up non-player phases with Space/Enter
@@ -499,9 +516,119 @@ class CombatState(BaseState):
             return
         action_id, _label = self.menu_actions[self.selected_action]
 
-        # All current menu actions need a direction
+        if action_id == ACTION_EQUIP:
+            # Open the equip screen for the active fighter
+            self.equip_cursor = 0
+            self.equip_action_menu = False
+            self.equip_action_cursor = 0
+            self.equip_examining = None
+            self.phase = PHASE_EQUIP
+            return
+
+        # Directional actions (ranged, cast, heal)
         self.directing_action = action_id
         self.phase = PHASE_PLAYER_DIR
+
+    # ── Equip screen helpers ──────────────────────────────────────
+
+    def _equip_get_item_at_cursor(self, member):
+        """Return the item name at the current equip cursor position."""
+        idx = self.equip_cursor
+        if idx < 3:
+            slot_keys = ["body", "melee", "ranged"]
+            return member.equipped.get(slot_keys[idx])
+        else:
+            inv_idx = idx - 3
+            if inv_idx < len(member.inventory):
+                return member.inventory[inv_idx]
+        return None
+
+    def _equip_get_action_options(self, member):
+        """Build the action options for the current equip cursor position."""
+        from src.party import WEAPONS, ARMORS
+        idx = self.equip_cursor
+        options = []
+        if idx < 3:
+            slot_keys = ["body", "melee", "ranged"]
+            slot = slot_keys[idx]
+            current = member.equipped.get(slot)
+            default = member._SLOT_DEFAULTS.get(slot)
+            if current and current != default:
+                options.append("UNEQUIP")
+            if current:
+                options.append("EXAMINE")
+        else:
+            inv_idx = idx - 3
+            if inv_idx < len(member.inventory):
+                item_name = member.inventory[inv_idx]
+                if item_name in ARMORS or item_name in WEAPONS:
+                    options.append("EQUIP")
+                options.append("EXAMINE")
+        return options
+
+    def _handle_equip_input(self, event):
+        """Handle input while the equip screen is open during combat."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        # Examining an item — close on any key
+        if self.equip_examining is not None:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                self.equip_examining = None
+            return
+
+        # Action popup is open
+        if self.equip_action_menu:
+            options = self._equip_get_action_options(f)
+            if not options:
+                self.equip_action_menu = False
+                return
+            if event.key == pygame.K_UP:
+                self.equip_action_cursor = (self.equip_action_cursor - 1) % len(options)
+            elif event.key == pygame.K_DOWN:
+                self.equip_action_cursor = (self.equip_action_cursor + 1) % len(options)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                chosen = options[self.equip_action_cursor]
+                idx = self.equip_cursor
+                if chosen == "EXAMINE":
+                    self.equip_examining = self._equip_get_item_at_cursor(f)
+                    return
+                elif chosen == "EQUIP":
+                    inv_idx = idx - 3
+                    if inv_idx < len(f.inventory):
+                        f.equip_item(f.inventory[inv_idx])
+                elif chosen == "UNEQUIP":
+                    if idx < 3:
+                        slot_keys = ["body", "melee", "ranged"]
+                        f.unequip_slot(slot_keys[idx])
+                self.equip_action_menu = False
+                # Clamp cursor
+                total = 3 + len(f.inventory)
+                if self.equip_cursor >= total:
+                    self.equip_cursor = max(0, total - 1)
+            elif event.key == pygame.K_ESCAPE:
+                self.equip_action_menu = False
+            return
+
+        # Main equip screen navigation
+        total_rows = 3 + len(f.inventory)
+
+        if event.key == pygame.K_ESCAPE:
+            # Close equip screen — costs the turn
+            self.combat_log.append(f"{f.name} changes equipment.")
+            self._rebuild_menu()
+            self._end_fighter_turn()
+        elif event.key == pygame.K_UP:
+            if total_rows > 0:
+                self.equip_cursor = (self.equip_cursor - 1) % total_rows
+        elif event.key == pygame.K_DOWN:
+            if total_rows > 0:
+                self.equip_cursor = (self.equip_cursor + 1) % total_rows
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Open action popup for selected item/slot
+            self.equip_action_menu = True
+            self.equip_action_cursor = 0
 
     def _execute_directed_action(self, dcol, drow):
         """Execute the chosen action in the given direction."""
@@ -1369,6 +1496,22 @@ class CombatState(BaseState):
     # ── Drawing ──────────────────────────────────────────────────
 
     def draw(self, renderer):
+        if self.phase == PHASE_EQUIP and self.active_fighter:
+            f = self.active_fighter
+            member_idx = self.fighters.index(f) if f in self.fighters else 0
+            # Find the real party index for this member
+            real_idx = 0
+            for i, m in enumerate(self.game.party.members):
+                if m is f:
+                    real_idx = i
+                    break
+            renderer.draw_character_sheet_u3(
+                f, real_idx, self.equip_cursor,
+                self.equip_action_menu, self.equip_action_cursor)
+            if self.equip_examining:
+                renderer.draw_item_examine(self.equip_examining)
+            return
+
         renderer.draw_combat_arena(
             fighter=self.active_fighter or self.fighters[0],
             monster=self.monster,
