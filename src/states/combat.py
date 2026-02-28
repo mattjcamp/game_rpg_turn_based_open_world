@@ -764,10 +764,12 @@ class CombatState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
-                valid_slots = member.get_valid_slots(item_name)
-                for s in valid_slots:
-                    label = PartyMember._SLOT_LABELS[s]
-                    options.append(f"EQUIP \u2192 {label}")
+                # Only show equip options if the class can use the weapon
+                if member.can_use_item(item_name):
+                    valid_slots = member.get_valid_slots(item_name)
+                    for s in valid_slots:
+                        label = PartyMember._SLOT_LABELS[s]
+                        options.append(f"EQUIP \u2192 {label}")
                 options.append("EXAMINE")
         return options
 

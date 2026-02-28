@@ -264,6 +264,11 @@
     "Smoke Bomb": {
       "description": "A small bomb that creates a blinding cloud.",
       "icon": "bomb"
+    },
+    "Shadow Crystal": {
+      "description": "A pulsing dark crystal radiating ancient power. The innkeeper seeks this.",
+      "icon": "artifact",
+      "quest_item": true
     }
   }
 }

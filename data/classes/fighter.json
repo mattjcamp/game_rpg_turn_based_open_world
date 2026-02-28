@@ -1,0 +1,6 @@
+{
+  "_comment": "Fighter class template. Fighters can use all weapons and all armor.",
+
+  "allowed_weapons": "all",
+  "allowed_armor": "all"
+}

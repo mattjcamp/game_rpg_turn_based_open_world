@@ -18,13 +18,17 @@ from src.settings import (
 class NPC:
     """A non-player character inside a town."""
 
-    def __init__(self, col, row, name, dialogue, npc_type="villager"):
+    def __init__(self, col, row, name, dialogue, npc_type="villager",
+                 quest_dialogue=None, quest_choices=None):
         self.col = col
         self.row = row
         self.name = name
         self.dialogue = dialogue  # list of strings, cycles through on each talk
         self.npc_type = npc_type  # villager, shopkeep, innkeeper, elder
         self._talk_index = 0
+        # Quest support — only used for quest-giving NPCs
+        self.quest_dialogue = quest_dialogue  # list of strings for quest offer
+        self.quest_choices = quest_choices    # e.g. ["Yes, I'll do it!", "Not right now."]
 
     def get_dialogue(self):
         """Return the next line of dialogue and advance the index."""
@@ -159,7 +163,13 @@ def generate_town(name="Thornwall"):
         "Rest your weary bones. A room is 10 gold per night.",
         "I hear dark things stir in the dungeons to the east...",
         "Can I get you an ale?",
-    ], npc_type="innkeeper"))
+    ], npc_type="innkeeper",
+       quest_dialogue=[
+           "Psst... adventurer! I've heard rumors of a Shadow Crystal hidden in a dungeon that appeared near our lands.",
+           "It radiates dark energy and threatens our town. Will you seek it out and bring it back to me?",
+       ],
+       quest_choices=["Yes, I'll find it!", "Not right now."],
+    ))
 
     # Town elder (wandering in the open area)
     npcs.append(NPC(ox + 9, oy + 10, "Elder Morath", [

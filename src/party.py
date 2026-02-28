@@ -115,6 +115,67 @@ class PartyMember:
     def is_alive(self):
         return self.hp > 0
 
+    # ── Equipment proficiency ─────────────────────────────────────
+    #
+    # Loaded once from data/classes/<classname>.json.  Each file may set
+    # "allowed_weapons" and "allowed_armor" to either "all" (no
+    # restriction) or a list of item names.  If no file exists for a
+    # class, everything is allowed (fighter-like).
+
+    _class_templates = {}   # class cache: {classname: dict}
+
+    @classmethod
+    def _load_class_template(cls, class_name):
+        """Load and cache a class template from data/classes/<name>.json."""
+        key = class_name.lower()
+        if key in cls._class_templates:
+            return cls._class_templates[key]
+
+        path = os.path.join("data", "classes", f"{key}.json")
+        if os.path.isfile(path):
+            with open(path, "r") as fh:
+                data = json.load(fh)
+        else:
+            data = {}  # unknown class — allow everything
+
+        # Normalise into sets (or None for "all")
+        template = {}
+        for field in ("allowed_weapons", "allowed_armor"):
+            raw = data.get(field, "all")
+            if raw == "all":
+                template[field] = None       # None means no restriction
+            else:
+                template[field] = set(raw)   # convert list → set
+
+        cls._class_templates[key] = template
+        return template
+
+    def can_use_weapon(self, weapon_name):
+        """Return True if this character's class can wield the named weapon."""
+        if weapon_name is None:
+            return True
+        tmpl = self._load_class_template(self.char_class)
+        allowed = tmpl["allowed_weapons"]
+        return allowed is None or weapon_name in allowed
+
+    def can_use_armor(self, armor_name):
+        """Return True if this character's class can wear the named armor."""
+        if armor_name is None:
+            return True
+        tmpl = self._load_class_template(self.char_class)
+        allowed = tmpl["allowed_armor"]
+        return allowed is None or armor_name in allowed
+
+    def can_use_item(self, item_name):
+        """Return True if this character's class can equip the named item."""
+        if item_name is None:
+            return True
+        if item_name in WEAPONS:
+            return self.can_use_weapon(item_name)
+        if item_name in ARMORS:
+            return self.can_use_armor(item_name)
+        return True
+
     # ── Combat helpers ─────────────────────────────────────────
 
     def get_modifier(self, stat_value):
@@ -300,6 +361,9 @@ class PartyMember:
         The previously equipped item in that slot (if any) is moved to inventory.
         """
         if item_name not in self.inventory:
+            return False
+        # Check class proficiency (weapons and armor)
+        if not self.can_use_item(item_name):
             return False
         valid_slots = self.get_valid_slots(item_name)
         if not valid_slots:

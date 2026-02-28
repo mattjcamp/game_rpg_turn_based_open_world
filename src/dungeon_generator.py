@@ -16,6 +16,7 @@ import random
 from src.tile_map import TileMap
 from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
+    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT,
 )
 from src.monster import create_random_monster
 
@@ -102,10 +103,49 @@ def _connect_rooms(tmap, room_a, room_b):
         _carve_h_tunnel(tmap, ax, bx, by)
 
 
+def _place_doors(tmap, rooms):
+    """Place doors where corridors meet room edges.
+
+    Scans the perimeter of each room.  A perimeter tile gets a door if it
+    is a floor tile and at least one of its cardinal neighbours is also a
+    floor tile that lies *outside* every room (i.e. in a corridor).
+    """
+    # Build a set of all tiles that belong to a room interior
+    room_tiles = set()
+    for room in rooms:
+        for r in range(room.y, room.y2):
+            for c in range(room.x, room.x2):
+                room_tiles.add((c, r))
+
+    for room in rooms:
+        # Walk the perimeter (the outermost ring of the room)
+        perimeter = set()
+        for c in range(room.x, room.x2):
+            perimeter.add((c, room.y))
+            perimeter.add((c, room.y2 - 1))
+        for r in range(room.y, room.y2):
+            perimeter.add((room.x, r))
+            perimeter.add((room.x2 - 1, r))
+
+        for (pc, pr) in perimeter:
+            if tmap.get_tile(pc, pr) != TILE_DFLOOR:
+                continue
+            # Check cardinal neighbours outside the room
+            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                nc, nr = pc + dc, pr + dr
+                if (nc, nr) in room_tiles:
+                    continue
+                if tmap.get_tile(nc, nr) == TILE_DFLOOR:
+                    tmap.set_tile(pc, pr, TILE_DDOOR)
+                    break  # one door per perimeter tile
+
+
 def generate_dungeon(name="The Depths", width=40, height=30,
                      min_rooms=6, max_rooms=10,
                      room_min_size=4, room_max_size=8,
-                     seed=None):
+                     seed=None,
+                     place_stairs_down=False, place_artifact=False,
+                     place_doors=False):
     """
     Generate a procedural dungeon.
 
@@ -118,6 +158,9 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         room_min_size: Minimum room dimension (width or height)
         room_max_size: Maximum room dimension
         seed: Optional random seed for reproducibility
+        place_stairs_down: If True, place stairs-down in the last room
+        place_artifact: If True, place the quest artifact in the last room
+        place_doors: If True, place doors at room/corridor junctions
 
     Returns:
         DungeonData with the generated map and metadata.
@@ -204,9 +247,48 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                 monster.row = my
                 monsters.append(monster)
 
+    # --- Optional: place stairs down in the last (deepest) room ---
+    if place_stairs_down and len(rooms) >= 2:
+        last_room = rooms[-1]
+        sc, sr = last_room.center
+        tmap.set_tile(sc, sr, TILE_STAIRS_DOWN)
+
+    # --- Optional: place quest artifact in the last room ---
+    if place_artifact and len(rooms) >= 2:
+        last_room = rooms[-1]
+        ac, ar = last_room.center
+        tmap.set_tile(ac, ar, TILE_ARTIFACT)
+
+    # --- Optional: place doors at corridor/room junctions ---
+    if place_doors:
+        _place_doors(tmap, rooms)
+
     # Entry point is on the stairs
     entry_col = stairs_col
     entry_row = stairs_row
 
     return DungeonData(tmap, rooms, entry_col, entry_row, name,
                        monsters=monsters)
+
+
+def generate_quest_dungeon(name="Shadow Dungeon"):
+    """Generate a two-level quest dungeon with doors and an artifact.
+
+    Level 0: standard dungeon with stairs down in the deepest room.
+    Level 1: deeper dungeon with the quest artifact in the deepest room.
+    Both levels have doors at room/corridor junctions.
+
+    Returns:
+        A list [level_0_data, level_1_data] of DungeonData objects.
+    """
+    level_0 = generate_dungeon(
+        name=f"{name} - Level 1",
+        place_stairs_down=True,
+        place_doors=True,
+    )
+    level_1 = generate_dungeon(
+        name=f"{name} - Level 2",
+        place_artifact=True,
+        place_doors=True,
+    )
+    return [level_0, level_1]

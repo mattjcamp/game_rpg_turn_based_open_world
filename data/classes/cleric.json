@@ -1,0 +1,6 @@
+{
+  "_comment": "Cleric class template. Clerics favor blunt weapons and medium armor.",
+
+  "allowed_weapons": ["Fists", "Club", "Mace", "Sling"],
+  "allowed_armor": ["Cloth", "Leather", "Chain"]
+}

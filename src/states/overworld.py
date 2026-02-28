@@ -106,10 +106,11 @@ class OverworldState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
-                valid_slots = member.get_valid_slots(item_name)
-                for s in valid_slots:
-                    label = PartyMember._SLOT_LABELS[s]
-                    options.append(f"EQUIP \u2192 {label}")
+                if member.can_use_item(item_name):
+                    valid_slots = member.get_valid_slots(item_name)
+                    for s in valid_slots:
+                        label = PartyMember._SLOT_LABELS[s]
+                        options.append(f"EQUIP \u2192 {label}")
                 options.append("RETURN TO PARTY STASH")
                 options.append("EXAMINE")
         return options
@@ -545,14 +546,26 @@ class OverworldState(BaseState):
             return
 
         elif tile_id == TILE_DUNGEON:
-            # Generate a fresh dungeon each time!
-            dungeon_data = generate_dungeon("The Depths")
             dungeon_state = self.game.states["dungeon"]
-            dungeon_state.enter_dungeon(
-                dungeon_data,
-                self.game.party.col,
-                self.game.party.row
-            )
+            # Check if this is the quest dungeon location
+            quest = self.game.quest
+            if (quest and quest["status"] in ("active", "artifact_found")
+                    and self.game.party.col == quest["dungeon_col"]
+                    and self.game.party.row == quest["dungeon_row"]):
+                # Enter the persistent quest dungeon
+                dungeon_state.enter_quest_dungeon(
+                    quest["levels"],
+                    self.game.party.col,
+                    self.game.party.row
+                )
+            else:
+                # Generate a fresh dungeon each time!
+                dungeon_data = generate_dungeon("The Depths")
+                dungeon_state.enter_dungeon(
+                    dungeon_data,
+                    self.game.party.col,
+                    self.game.party.row
+                )
             self.game.change_state("dungeon")
             return
 

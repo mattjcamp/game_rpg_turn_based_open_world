@@ -17,6 +17,7 @@ from src.settings import (
     PARTY_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT,
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
+    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT,
 )
 
 
@@ -706,6 +707,24 @@ class Renderer:
         hint_surface = self.font_small.render(hint, True, (120, 120, 140))
         self.screen.blit(hint_surface, (box_x + 12, box_y + 36))
 
+    def draw_quest_choice_box(self, choices, cursor):
+        """Draw a Y/N quest choice prompt at the bottom of the dialogue area."""
+        box_width = SCREEN_WIDTH - 60
+        box_height = 50
+        box_x = 30
+        box_y = 80  # below the dialogue box
+
+        box_rect = pygame.Rect(box_x, box_y, box_width, box_height)
+        pygame.draw.rect(self.screen, (15, 15, 30), box_rect)
+        pygame.draw.rect(self.screen, (200, 180, 50), box_rect, 2)
+
+        # Draw each choice
+        for i, choice in enumerate(choices):
+            color = COLOR_YELLOW if i == cursor else COLOR_WHITE
+            prefix = "> " if i == cursor else "  "
+            text_surf = self.font.render(f"{prefix}{choice}", True, color)
+            self.screen.blit(text_surf, (box_x + 16, box_y + 6 + i * 20))
+
     def draw_monsters(self, monsters, camera):
         """Draw monster sprites on the dungeon map (Ultima III style)."""
         W = (255, 255, 255)
@@ -989,7 +1008,8 @@ class Renderer:
     _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 544
 
     def draw_dungeon_u3(self, party, dungeon_data, message="",
-                         visible_tiles=None, torch_steps=-1):
+                         visible_tiles=None, torch_steps=-1,
+                         level_label=None):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -1057,7 +1077,10 @@ class Renderer:
         chests = len(dungeon_data.opened_chests)
         # Top line: game info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
-        self._u3_text(dungeon_data.name.upper(), 200, bar_y + 6, (200, 60, 60))
+        dg_name = dungeon_data.name.upper()
+        if level_label:
+            dg_name += f"  [{level_label}]"
+        self._u3_text(dg_name, 200, bar_y + 6, (200, 60, 60))
         # Light status
         light_name = party.get_equipped_name("light")
         light_charges = party.get_equipped_charges("light")
@@ -1217,6 +1240,55 @@ class Renderer:
             pygame.draw.rect(self.screen, BLACK, rect)
             arrow = [(cx, cy + 8), (cx - 6, cy - 2), (cx + 6, cy - 2)]
             pygame.draw.polygon(self.screen, (0, 170, 0), arrow)
+
+        elif tile_id == TILE_STAIRS_DOWN:
+            # Stairs down — darker steps with down arrow
+            pygame.draw.rect(self.screen, BLACK, rect)
+            for i in range(4):
+                step_y = py + 4 + i * 7
+                step_w = ts - 8 - (3 - i) * 3
+                step_x = px + 4 + (3 - i)
+                sc = 90 - i * 12  # gradually darker
+                step_rect = pygame.Rect(step_x, step_y, step_w, 5)
+                pygame.draw.rect(self.screen, (sc, sc - 10, sc - 5), step_rect)
+                pygame.draw.rect(self.screen, (40, 35, 45), step_rect, 1)
+            # Down arrow
+            arrow = [(cx, py + ts - 3), (cx - 4, py + ts - 7), (cx + 4, py + ts - 7)]
+            pygame.draw.polygon(self.screen, ORANGE, arrow)
+
+        elif tile_id == TILE_DDOOR:
+            # Dungeon door — brown planks
+            pygame.draw.rect(self.screen, BLACK, rect)
+            door_rect = pygame.Rect(px + 6, py + 2, ts - 12, ts - 4)
+            pygame.draw.rect(self.screen, (90, 55, 25), door_rect)
+            # Plank lines
+            for dy in range(4, ts - 6, 6):
+                pygame.draw.line(self.screen, (60, 35, 15),
+                                 (px + 7, py + dy), (px + ts - 7, py + dy), 1)
+            # Handle
+            pygame.draw.circle(self.screen, YELLOW, (cx + 4, cy), 2)
+            pygame.draw.rect(self.screen, (60, 35, 15), door_rect, 1)
+
+        elif tile_id == TILE_ARTIFACT:
+            # Glowing crystal on pedestal
+            pygame.draw.rect(self.screen, BLACK, rect)
+            # Pedestal
+            ped = pygame.Rect(cx - 5, cy + 4, 10, 6)
+            pygame.draw.rect(self.screen, GRAY, ped)
+            pygame.draw.rect(self.screen, (100, 100, 110), ped, 1)
+            # Crystal — diamond shape
+            crystal = [
+                (cx, cy - 8),       # top
+                (cx + 5, cy),       # right
+                (cx, cy + 4),       # bottom
+                (cx - 5, cy),       # left
+            ]
+            pygame.draw.polygon(self.screen, (180, 60, 200), crystal)
+            pygame.draw.polygon(self.screen, (220, 100, 255), crystal, 1)
+            # Glow effect
+            glow = pygame.Surface((16, 16), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (200, 100, 255, 50), (8, 8), 8)
+            self.screen.blit(glow, (cx - 8, cy - 8))
 
         else:
             # Fallback: black

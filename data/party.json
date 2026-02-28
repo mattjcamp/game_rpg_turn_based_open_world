@@ -14,6 +14,11 @@
     { "item": "Rock" },
     { "item": "Rock" },
     { "item": "Bow" },
+    { "item": "Sword" },
+    { "item": "Chain" },
+    { "item": "Leather" },
+    { "item": "Plate" },
+    { "item": "Mace" },
     { "item": "Arrows", "charges": 20 },
     { "item": "Healing Herb" }
   ]

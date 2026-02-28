@@ -168,9 +168,7 @@ ultima3_clone/
   - Bottom status bar with control hints
 
 ### Next Steps
-- Procedural overworld generation
-- Multi-character combat (party of 4 vs monster groups)
-- Shop system (buy/sell weapons and armor)
-- Inn functionality (rest to restore HP/MP)
-- Deeper dungeons (multiple floors, boss rooms)
-- Spells and magic system
+- flesh out differences in characters more clearly
+- implement experience and leveling system
+- create quest procedure
+- flesh out early spells and items for for level 1 to 2

@@ -49,6 +49,10 @@ class Game:
         # Pre-generate the town so it persists across visits
         self.town_data = generate_town("Thornwall")
 
+        # --- Quest state ---
+        # None when no quest active; dict when quest is in progress
+        self.quest = None
+
         # --- State machine ---
         self.states = {
             "overworld": OverworldState(self),

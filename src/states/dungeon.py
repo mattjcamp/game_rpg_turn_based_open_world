@@ -12,6 +12,7 @@ import pygame
 from src.states.base_state import BaseState
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
+    TILE_STAIRS_DOWN, TILE_ARTIFACT,
 )
 
 
@@ -45,6 +46,10 @@ class DungeonState(BaseState):
         self.overworld_col = 0
         self.overworld_row = 0
 
+        # Quest dungeon multi-level support
+        self.quest_levels = None   # list of DungeonData if this is a quest dungeon
+        self.current_level = 0     # 0 or 1
+
         # Message queued by combat state on return
         self.pending_combat_message = None
         # Track if we've already entered (so re-entry from combat doesn't reset position)
@@ -56,6 +61,21 @@ class DungeonState(BaseState):
         Called before change_state.
         """
         self.dungeon_data = dungeon_data
+        self.overworld_col = overworld_col
+        self.overworld_row = overworld_row
+        self.quest_levels = None
+        self.current_level = 0
+        self._entered = False
+        self.pending_combat_message = None
+
+    def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
+        """
+        Set up a multi-level quest dungeon.
+        levels is a list of DungeonData [level_0, level_1].
+        """
+        self.quest_levels = levels
+        self.current_level = 0
+        self.dungeon_data = levels[0]
         self.overworld_col = overworld_col
         self.overworld_row = overworld_row
         self._entered = False
@@ -143,7 +163,11 @@ class DungeonState(BaseState):
                         self.game.party.col, self.game.party.row
                     )
                     if tile_id == TILE_STAIRS:
-                        self._exit_dungeon()
+                        if self.quest_levels and self.current_level == 1:
+                            # Ascend back to level 0
+                            self._ascend_level()
+                        else:
+                            self._exit_dungeon()
                     else:
                         self.show_message(
                             "Find the stairs to escape!", 1500
@@ -412,10 +436,11 @@ class DungeonState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
-                valid_slots = member.get_valid_slots(item_name)
-                for s in valid_slots:
-                    label = PartyMember._SLOT_LABELS[s]
-                    options.append(f"EQUIP \u2192 {label}")
+                if member.can_use_item(item_name):
+                    valid_slots = member.get_valid_slots(item_name)
+                    for s in valid_slots:
+                        label = PartyMember._SLOT_LABELS[s]
+                        options.append(f"EQUIP \u2192 {label}")
                 options.append("RETURN TO PARTY STASH")
                 options.append("EXAMINE")
         return options
@@ -749,6 +774,34 @@ class DungeonState(BaseState):
                 # Disarm the trap (replace with floor)
                 self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
 
+        elif tile_id == TILE_STAIRS_DOWN:
+            if self.quest_levels and self.current_level == 0:
+                # Descend to level 2
+                self.current_level = 1
+                self.dungeon_data = self.quest_levels[1]
+                self.game.party.col = self.dungeon_data.entry_col
+                self.game.party.row = self.dungeon_data.entry_row
+                self.game.camera.map_width = self.dungeon_data.tile_map.width
+                self.game.camera.map_height = self.dungeon_data.tile_map.height
+                self.game.camera.update(self.game.party.col, self.game.party.row)
+                # Recompute visibility for the new level
+                self._visible_tiles = set()
+                if self.torch_active:
+                    self._visible_tiles = self._compute_visible_tiles()
+                self.show_message("You descend deeper...", 2000)
+                if self.game.quest:
+                    self.game.quest["current_level"] = 1
+            else:
+                self.show_message("Stairs leading down...", 1500)
+
+        elif tile_id == TILE_ARTIFACT:
+            # Pick up the quest artifact
+            self.game.party.inv_add("Shadow Crystal")
+            self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
+            if self.game.quest:
+                self.game.quest["status"] = "artifact_found"
+            self.show_message("Found the Shadow Crystal!", 3000)
+
     # ── Chest loot ─────────────────────────────────────────────
 
     # Weighted loot table: (item_name, weight)
@@ -792,6 +845,36 @@ class DungeonState(BaseState):
                 f"Treasure! {gold} gold and {chosen_item}!", 2500)
         else:
             self.show_message(f"Treasure! Found {gold} gold!", 2000)
+
+    def _ascend_level(self):
+        """Ascend from level 1 back to level 0 in a quest dungeon."""
+        self.current_level = 0
+        self.dungeon_data = self.quest_levels[0]
+        # Find the stairs-down tile on level 0 to place the party there
+        tmap = self.dungeon_data.tile_map
+        placed = False
+        for r in range(tmap.height):
+            for c in range(tmap.width):
+                if tmap.get_tile(c, r) == TILE_STAIRS_DOWN:
+                    self.game.party.col = c
+                    self.game.party.row = r
+                    placed = True
+                    break
+            if placed:
+                break
+        if not placed:
+            # Fallback to entry point
+            self.game.party.col = self.dungeon_data.entry_col
+            self.game.party.row = self.dungeon_data.entry_row
+        self.game.camera.map_width = tmap.width
+        self.game.camera.map_height = tmap.height
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self._visible_tiles = set()
+        if self.torch_active:
+            self._visible_tiles = self._compute_visible_tiles()
+        if self.game.quest:
+            self.game.quest["current_level"] = 0
+        self.show_message("You ascend to the upper level.", 2000)
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""
@@ -854,10 +937,14 @@ class DungeonState(BaseState):
             renderer.draw_party_screen_u3(self.game.party)
             return
         visible = self._compute_visible_tiles()
+        level_label = None
+        if self.quest_levels:
+            level_label = f"LEVEL {self.current_level + 1}"
         renderer.draw_dungeon_u3(
             self.game.party,
             self.dungeon_data,
             message=self.message,
             visible_tiles=visible,
             torch_steps=self.torch_steps if (self.torch_active or self._has_torch_equipped()) else -1,
+            level_label=level_label,
         )

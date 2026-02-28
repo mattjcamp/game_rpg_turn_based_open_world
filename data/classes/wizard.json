@@ -1,0 +1,6 @@
+{
+  "_comment": "Wizard class template. Wizards are limited to daggers and cloth.",
+
+  "allowed_weapons": ["Fists", "Dagger"],
+  "allowed_armor": ["Cloth"]
+}

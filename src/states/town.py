@@ -5,10 +5,17 @@ The party walks around inside a town, talks to NPCs by bumping into them,
 and can leave through the exit gate to return to the overworld.
 """
 
+import random
+
 import pygame
 
 from src.states.base_state import BaseState
-from src.settings import MOVE_REPEAT_DELAY, TILE_EXIT
+from src.settings import (
+    MOVE_REPEAT_DELAY, TILE_EXIT, TILE_DUNGEON,
+    TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
+    TILE_TOWN,
+)
+from src.dungeon_generator import generate_quest_dungeon
 
 
 class TownState(BaseState):
@@ -34,6 +41,13 @@ class TownState(BaseState):
         self.party_inv_member = 0
         self.party_inv_action_menu = False
         self.party_inv_action_cursor = 0
+
+        # Quest dialogue
+        self.quest_choice_active = False
+        self.quest_choice_cursor = 0
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
 
         # Shop screen
         self.showing_shop = False
@@ -155,15 +169,33 @@ class TownState(BaseState):
                         self.party_inv_member = 0
                         return
                     if self.npc_dialogue_active:
-                        # Dismiss dialogue
+                        # Dismiss dialogue (and any quest choice state)
                         self.npc_dialogue_active = False
                         self.npc_speaking = None
                         self.message = ""
                         self.message_timer = 0
+                        self.quest_choice_active = False
+                        self.quest_choices = []
+                        self.quest_dialogue_lines = []
+                        self.quest_dialogue_index = 0
                     else:
                         # Leave town
                         self._exit_town()
                         return
+
+                # Quest choice navigation
+                if self.quest_choice_active and self.quest_choices:
+                    if event.key == pygame.K_UP:
+                        self.quest_choice_cursor = (self.quest_choice_cursor - 1) % len(self.quest_choices)
+                        return
+                    elif event.key == pygame.K_DOWN:
+                        self.quest_choice_cursor = (self.quest_choice_cursor + 1) % len(self.quest_choices)
+                        return
+                    elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                        self._handle_quest_choice()
+                        return
+                    # Block other keys while choices are shown
+                    return
 
                 # Space/Enter to advance NPC dialogue or interact
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
@@ -238,6 +270,30 @@ class TownState(BaseState):
             self.shop_message_timer = 0
             return
 
+        # Innkeeper quest logic
+        if npc.npc_type == "innkeeper":
+            quest = self.game.quest
+            # No quest yet — offer one
+            if quest is None and npc.quest_dialogue:
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self.quest_dialogue_lines = list(npc.quest_dialogue)
+                self.quest_dialogue_index = 0
+                self.message = f"{npc.name}: {self.quest_dialogue_lines[0]}"
+                self.message_timer = 0
+                return
+            # Player has the artifact — complete the quest
+            if quest and quest["status"] == "artifact_found":
+                self._complete_quest(npc)
+                return
+            # Quest already active — hint
+            if quest and quest["status"] == "active":
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self.message = f"{npc.name}: Have you found the Shadow Crystal yet? It's out there somewhere..."
+                self.message_timer = 0
+                return
+
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         line = npc.get_dialogue()
@@ -245,10 +301,126 @@ class TownState(BaseState):
         self.message_timer = 0  # dialogue stays until dismissed
 
     def _advance_dialogue(self):
-        """Dismiss the current dialogue."""
+        """Advance or dismiss the current dialogue."""
+        # If in quest dialogue flow, advance through lines then show choices
+        if self.quest_dialogue_lines:
+            self.quest_dialogue_index += 1
+            if self.quest_dialogue_index < len(self.quest_dialogue_lines):
+                # Show next quest dialogue line
+                npc = self.npc_speaking
+                self.message = f"{npc.name}: {self.quest_dialogue_lines[self.quest_dialogue_index]}"
+                return
+            else:
+                # All dialogue lines shown — present the Y/N choices
+                npc = self.npc_speaking
+                if npc and npc.quest_choices:
+                    self.quest_choice_active = True
+                    self.quest_choices = list(npc.quest_choices)
+                    self.quest_choice_cursor = 0
+                    return
+                # No choices defined — just dismiss
+                self.quest_dialogue_lines = []
+                self.quest_dialogue_index = 0
+
         self.npc_dialogue_active = False
         self.npc_speaking = None
         self.message = ""
+        self.message_timer = 0
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
+
+    # ── Quest ─────────────────────────────────────────────────────
+
+    def _handle_quest_choice(self):
+        """Handle the player's Y/N choice on the quest offer."""
+        if self.quest_choice_cursor == 0:
+            # Accepted
+            self._accept_quest()
+        else:
+            # Declined
+            npc = self.npc_speaking
+            self.message = f"{npc.name}: No worries. Come back if you change your mind."
+            self.quest_choice_active = False
+            self.quest_choices = []
+            self.quest_dialogue_lines = []
+            self.quest_dialogue_index = 0
+            # Keep dialogue active to show the decline message
+
+    def _accept_quest(self):
+        """Accept the innkeeper's quest: place a dungeon on the overworld."""
+        npc = self.npc_speaking
+
+        # Generate the two-level quest dungeon
+        levels = generate_quest_dungeon("Shadow Dungeon")
+
+        # Find a random accessible tile on the overworld for the dungeon
+        dc, dr = self._find_quest_dungeon_location()
+
+        # Place dungeon tile on the overworld map
+        self.game.tile_map.set_tile(dc, dr, TILE_DUNGEON)
+
+        # Store quest state
+        self.game.quest = {
+            "name": "The Shadow Crystal",
+            "status": "active",
+            "dungeon_col": dc,
+            "dungeon_row": dr,
+            "levels": levels,
+            "current_level": 0,
+        }
+
+        # Show confirmation
+        self.message = f"{npc.name}: Thank you! I've marked a suspicious location on your map. Be careful down there!"
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
+
+    def _find_quest_dungeon_location(self):
+        """Find a random walkable overworld tile for the quest dungeon.
+
+        Avoids water, mountains, town, and existing dungeon tiles.
+        Stays within the playable map area (inside ocean border).
+        """
+        tmap = self.game.tile_map
+        candidates = []
+        ok_tiles = {TILE_GRASS, TILE_FOREST, TILE_PATH}
+
+        for r in range(4, tmap.height - 4):
+            for c in range(4, tmap.width - 4):
+                if tmap.get_tile(c, r) in ok_tiles:
+                    candidates.append((c, r))
+
+        # Shuffle and pick first candidate with some spacing from town
+        random.shuffle(candidates)
+        town_col, town_row = 10, 14  # known town location
+        for c, r in candidates:
+            dist = abs(c - town_col) + abs(r - town_row)
+            if dist >= 6:
+                return (c, r)
+        # Fallback — just pick any candidate
+        return candidates[0] if candidates else (20, 10)
+
+    def _complete_quest(self, npc):
+        """Complete the quest: remove artifact, give reward."""
+        party = self.game.party
+
+        # Remove the Shadow Crystal from inventory
+        party.inv_remove("Shadow Crystal")
+
+        # Give gold reward
+        reward = 200
+        party.gold += reward
+
+        # Mark quest completed
+        self.game.quest["status"] = "completed"
+
+        # Show completion dialogue
+        self.npc_dialogue_active = True
+        self.npc_speaking = npc
+        self.message = f"{npc.name}: You found the Shadow Crystal! Here's {reward} gold for your bravery!"
         self.message_timer = 0
 
     # ── Shop ──────────────────────────────────────────────────────
@@ -486,10 +658,11 @@ class TownState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
-                valid_slots = member.get_valid_slots(item_name)
-                for s in valid_slots:
-                    label = PartyMember._SLOT_LABELS[s]
-                    options.append(f"EQUIP \u2192 {label}")
+                if member.can_use_item(item_name):
+                    valid_slots = member.get_valid_slots(item_name)
+                    for s in valid_slots:
+                        label = PartyMember._SLOT_LABELS[s]
+                        options.append(f"EQUIP \u2192 {label}")
                 options.append("RETURN TO PARTY STASH")
                 options.append("EXAMINE")
         return options
@@ -630,3 +803,7 @@ class TownState(BaseState):
         # Dialogue box renders on top if active
         if self.message and self.npc_dialogue_active:
             renderer.draw_dialogue_box(self.message)
+        # Quest choice overlay (Y/N prompt)
+        if self.quest_choice_active:
+            renderer.draw_quest_choice_box(
+                self.quest_choices, self.quest_choice_cursor)

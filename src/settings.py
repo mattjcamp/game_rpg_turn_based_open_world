@@ -45,6 +45,9 @@ TILE_DWALL    = 21
 TILE_STAIRS   = 22
 TILE_CHEST    = 23
 TILE_TRAP     = 24
+TILE_STAIRS_DOWN = 25
+TILE_DDOOR    = 26
+TILE_ARTIFACT = 27
 
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
@@ -70,6 +73,9 @@ TILE_DEFS = {
     TILE_STAIRS:   {"color": (80, 75, 60),    "walkable": True,  "name": "Stairs Up"},
     TILE_CHEST:    {"color": (50, 45, 40),    "walkable": True,  "name": "Chest"},
     TILE_TRAP:     {"color": (50, 45, 40),    "walkable": True,  "name": "Trap"},
+    TILE_STAIRS_DOWN: {"color": (60, 50, 45), "walkable": True, "name": "Stairs Down"},
+    TILE_DDOOR:    {"color": (120, 80, 40),  "walkable": True,  "name": "Door"},
+    TILE_ARTIFACT: {"color": (200, 180, 50), "walkable": True,  "name": "Artifact"},
 }
 
 # ----- Colors (UI) -----
