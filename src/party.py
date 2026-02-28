@@ -73,6 +73,9 @@ class PartyMember:
         # Mutable MP pool — initialized lazily on first access
         self._current_mp = None
 
+        # Bonus MP gained from leveling up
+        self._bonus_mp = 0
+
         # Ammo tracking for throwable weapons {weapon_name: count}
         self.ammo = {}
 
@@ -98,8 +101,8 @@ class PartyMember:
 
     @property
     def max_mp(self):
-        """MP cap equals the derived mp value."""
-        return self.mp
+        """MP cap equals the derived mp value plus any bonus from leveling."""
+        return self.mp + self._bonus_mp
 
     @property
     def current_mp(self):
@@ -114,6 +117,37 @@ class PartyMember:
 
     def is_alive(self):
         return self.hp > 0
+
+    # ── Leveling ───────────────────────────────────────────────────
+
+    def check_level_up(self):
+        """Check if enough XP has been earned to level up.
+
+        Level N requires (N-1)*100 total XP:
+          Level 2 at 100, Level 3 at 200, Level 4 at 300, ...
+
+        Returns a list of message strings for each level gained.
+        """
+        messages = []
+        while self.exp >= self.level * 100:
+            self.level += 1
+            # Load class template for HP/MP gains
+            template = self._load_class_template(self.char_class)
+            hp_gain = template.get("hp_per_level", 6)
+            mp_gain = template.get("mp_per_level", 0)
+
+            self.max_hp += hp_gain
+            self.hp = self.max_hp  # full heal on level up
+
+            if mp_gain > 0:
+                self._bonus_mp += mp_gain
+                self._current_mp = self.max_mp  # full MP restore
+
+            msg = f"{self.name} reached Level {self.level}! HP+{hp_gain}"
+            if mp_gain > 0:
+                msg += f" MP+{mp_gain}"
+            messages.append(msg)
+        return messages
 
     # ── Equipment proficiency ─────────────────────────────────────
     #

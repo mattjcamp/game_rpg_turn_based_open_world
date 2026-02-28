@@ -2,5 +2,8 @@
   "_comment": "Wizard class template. Wizards are limited to daggers and cloth.",
 
   "allowed_weapons": ["Fists", "Dagger"],
-  "allowed_armor": ["Cloth"]
+  "allowed_armor": ["Cloth"],
+
+  "hp_per_level": 4,
+  "mp_per_level": 6
 }
