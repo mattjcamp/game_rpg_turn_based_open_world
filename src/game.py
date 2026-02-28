@@ -16,7 +16,7 @@ from src.states.town import TownState
 from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.town_generator import generate_town
-from src.music import MusicManager
+from src.music import MusicManager, SoundEffects
 
 
 class Game:
@@ -54,8 +54,9 @@ class Game:
         # None when no quest active; dict when quest is in progress
         self.quest = None
 
-        # --- Music ---
+        # --- Music & Sound Effects ---
         self.music = MusicManager()
+        self.sfx = SoundEffects()
 
         # --- Settings screen ---
         self.showing_settings = False
@@ -133,18 +134,19 @@ class Game:
                         self.showing_settings = True
                         self.settings_cursor = 0
                         break
-                    # 1-4 opens character sheet if the state supports it
+                    # 1-4 opens/switches character sheet if the state supports it
                     num = {pygame.K_1: 0, pygame.K_2: 1,
                            pygame.K_3: 2, pygame.K_4: 3}.get(event.key)
                     if num is not None:
                         state = self.current_state
                         if (hasattr(state, 'showing_char_detail')
-                                and state.showing_char_detail is None
                                 and not getattr(state, 'showing_party_inv', False)
+                                and not getattr(state, 'char_action_menu', False)
                                 and num < len(self.party.members)):
                             state.showing_char_detail = num
                             state.char_sheet_cursor = 0
                             state.char_action_menu = False
+                            state.examining_item = None
                             break
 
                 # --- Input ---

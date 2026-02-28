@@ -32,7 +32,7 @@ class TownState(BaseState):
         self.showing_party = False
         self.showing_char_detail = None
         self.char_sheet_cursor = 0
-        self.char_sheet_from_inv = False
+        self.char_sheet_origin = None
         self.char_action_menu = False
         self.char_action_cursor = 0
         self.examining_item = None
@@ -42,6 +42,9 @@ class TownState(BaseState):
         self.party_inv_member = 0
         self.party_inv_action_menu = False
         self.party_inv_action_cursor = 0
+        self.choosing_effect = False
+        self.effect_list = []
+        self.effect_cursor = 0
 
         # Quest dialogue
         self.quest_choice_active = False
@@ -110,12 +113,14 @@ class TownState(BaseState):
 
                 if event.key == pygame.K_p:
                     if self.showing_char_detail is not None:
-                        back_to_inv = self.char_sheet_from_inv
+                        origin = self.char_sheet_origin
                         self.showing_char_detail = None
                         self.char_sheet_cursor = 0
-                        self.char_sheet_from_inv = False
-                        if back_to_inv:
+                        self.char_sheet_origin = None
+                        if origin == "inventory":
                             self.showing_party_inv = True
+                        elif origin == "party":
+                            self.showing_party = True
                         return
                     if self.showing_party_inv:
                         self.showing_party_inv = False
@@ -131,12 +136,14 @@ class TownState(BaseState):
                         return
                 if event.key == pygame.K_ESCAPE:
                     if self.showing_char_detail is not None:
-                        back_to_inv = self.char_sheet_from_inv
+                        origin = self.char_sheet_origin
                         self.showing_char_detail = None
                         self.char_sheet_cursor = 0
-                        self.char_sheet_from_inv = False
-                        if back_to_inv:
+                        self.char_sheet_origin = None
+                        if origin == "inventory":
                             self.showing_party_inv = True
+                        elif origin == "party":
+                            self.showing_party = True
                         return
                     if self.showing_party:
                         self.showing_party = False
@@ -168,6 +175,7 @@ class TownState(BaseState):
                     if num is not None and num < len(self.game.party.members):
                         self.showing_char_detail = num
                         self.char_sheet_cursor = 0
+                        self.char_sheet_origin = "party"
                         return
                     if event.key == pygame.K_5:
                         self.showing_party_inv = True
@@ -502,12 +510,29 @@ class TownState(BaseState):
         inv = party.shared_inventory
         members = party.members
         NUM_SLOTS = len(party.PARTY_SLOTS)
-        total_items = NUM_SLOTS + len(inv)
+        NUM_EFFECTS = len(party.EFFECT_SLOTS)
+        total_items = NUM_SLOTS + NUM_EFFECTS + len(inv)
 
         # Examining an item — close on ESC/Enter/Space
         if self.examining_item is not None:
             if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self.examining_item = None
+            return
+
+        # Effect chooser is open
+        if self.choosing_effect:
+            if event.key == pygame.K_ESCAPE:
+                self.choosing_effect = False
+            elif event.key == pygame.K_UP and self.effect_list:
+                self.effect_cursor = (self.effect_cursor - 1) % len(self.effect_list)
+            elif event.key == pygame.K_DOWN and self.effect_list:
+                self.effect_cursor = (self.effect_cursor + 1) % len(self.effect_list)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and self.effect_list:
+                chosen_eff = self.effect_list[self.effect_cursor]
+                eff_idx = self.party_inv_cursor - NUM_SLOTS
+                slot_key = party.EFFECT_SLOTS[eff_idx]
+                party.set_effect(slot_key, chosen_eff["name"])
+                self.choosing_effect = False
             return
 
         # Action menu is open
@@ -527,7 +552,7 @@ class TownState(BaseState):
                 self.party_inv_action_menu = False
             return
 
-        # Browsing unified list (equip slots + inventory)
+        # Browsing unified list (equip slots + effect slots + inventory)
         if True:
             if event.key == pygame.K_UP and total_items > 0:
                 self.party_inv_cursor = (self.party_inv_cursor - 1) % total_items
@@ -551,12 +576,13 @@ class TownState(BaseState):
                     self.showing_party_inv = False
                     self.showing_char_detail = num
                     self.char_sheet_cursor = 0
-                    self.char_sheet_from_inv = True
+                    self.char_sheet_origin = "inventory"
 
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
         party = self.game.party
         NUM_SLOTS = len(party.PARTY_SLOTS)
+        NUM_EFFECTS = len(party.EFFECT_SLOTS)
         idx = self.party_inv_cursor
 
         if idx < NUM_SLOTS:
@@ -568,8 +594,20 @@ class TownState(BaseState):
                 item = party.get_equipped_name(slot)
                 if item:
                     self.examining_item = item
+        elif idx < NUM_SLOTS + NUM_EFFECTS:
+            # Acting on an effect slot
+            eff_idx = idx - NUM_SLOTS
+            slot_key = party.EFFECT_SLOTS[eff_idx]
+            if chosen == "ASSIGN EFFECT":
+                self.effect_list = party.get_available_effects()
+                self.effect_cursor = 0
+                self.choosing_effect = True
+                self.party_inv_action_menu = False
+            elif chosen == "REMOVE":
+                party.set_effect(slot_key, None)
+                self.party_inv_action_menu = False
         else:
-            inv_idx = idx - NUM_SLOTS
+            inv_idx = idx - NUM_SLOTS - NUM_EFFECTS
             inv = party.shared_inventory
             if inv_idx < len(inv):
                 item_name = party.item_name(inv[inv_idx])
@@ -582,14 +620,14 @@ class TownState(BaseState):
                             party.give_item_to_member(inv_idx, mi)
                             break
                     self.party_inv_action_menu = False
-                    new_total = NUM_SLOTS + len(party.shared_inventory)
+                    new_total = NUM_SLOTS + NUM_EFFECTS + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen.startswith("EQUIP → "):
                     slot = chosen.split("→ ", 1)[1].strip().lower()
                     party.party_equip(item_name, slot)
                     self.party_inv_action_menu = False
-                    new_total = NUM_SLOTS + len(party.shared_inventory)
+                    new_total = NUM_SLOTS + NUM_EFFECTS + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
 
@@ -597,6 +635,7 @@ class TownState(BaseState):
         """Build action options for the selected party inventory entry."""
         party = self.game.party
         NUM_SLOTS = len(party.PARTY_SLOTS)
+        NUM_EFFECTS = len(party.EFFECT_SLOTS)
         idx = self.party_inv_cursor
 
         if idx < NUM_SLOTS:
@@ -605,8 +644,18 @@ class TownState(BaseState):
             if item is None:
                 return []
             return ["UNEQUIP", "EXAMINE"]
+        elif idx < NUM_SLOTS + NUM_EFFECTS:
+            eff_idx = idx - NUM_SLOTS
+            slot_key = party.EFFECT_SLOTS[eff_idx]
+            current = party.get_effect(slot_key)
+            options = []
+            if party.get_available_effects():
+                options.append("ASSIGN EFFECT")
+            if current is not None:
+                options.append("REMOVE")
+            return options
         else:
-            inv_idx = idx - NUM_SLOTS
+            inv_idx = idx - NUM_SLOTS - NUM_EFFECTS
             inv = party.shared_inventory
             if inv_idx >= len(inv):
                 return []
@@ -776,7 +825,10 @@ class TownState(BaseState):
                 self.game.party, self.party_inv_cursor,
                 self.party_inv_choosing, self.party_inv_member,
                 self.party_inv_action_menu, self.party_inv_action_cursor,
-                action_options=action_opts)
+                action_options=action_opts,
+                choosing_effect=self.choosing_effect,
+                effect_list=self.effect_list,
+                effect_cursor=self.effect_cursor)
             if self.examining_item:
                 renderer.draw_item_examine(self.examining_item)
             return

@@ -412,3 +412,258 @@ class MusicManager:
     @property
     def is_muted(self):
         return self._muted
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SOUND EFFECTS — chiptune-style combat SFX
+# ═══════════════════════════════════════════════════════════════
+
+def _sfx_sweep(start_freq, end_freq, duration, wave_fn=_square_wave,
+               volume=0.30, duty=0.5):
+    """Generate a frequency-sweep sound effect."""
+    n_samples = int(SAMPLE_RATE * duration)
+    t = np.linspace(0, duration, n_samples, endpoint=False)
+    freqs = np.linspace(start_freq, end_freq, n_samples)
+    phase = np.cumsum(freqs / SAMPLE_RATE)
+    if wave_fn == _square_wave:
+        wave = np.where(phase % 1.0 < duty, 1.0, -1.0).astype(np.float32)
+    else:
+        wave = (2.0 * np.abs(2.0 * (phase % 1.0) - 1.0) - 1.0).astype(np.float32)
+    wave = _envelope(wave, attack=0.005, release=duration * 0.3)
+    return wave * volume
+
+
+def _gen_sfx_sword_hit():
+    """Melee hit: short noise burst + descending tone."""
+    burst = _noise(0.04) * 0.35
+    burst = _envelope(burst, attack=0.002, release=0.02)
+    tone = _sfx_sweep(600, 200, 0.10, volume=0.30)
+    pad = np.zeros(int(SAMPLE_RATE * 0.02), dtype=np.float32)
+    return np.concatenate([burst, pad, tone])
+
+
+def _gen_sfx_miss():
+    """Attack miss: quick rising whoosh."""
+    whoosh = _noise(0.12) * 0.15
+    whoosh = _envelope(whoosh, attack=0.005, release=0.08)
+    tone = _sfx_sweep(200, 500, 0.08, volume=0.12)
+    return _mix_tracks(whoosh, tone)
+
+
+def _gen_sfx_critical():
+    """Critical hit: sharp impact + rising fanfare."""
+    impact = _noise(0.06) * 0.40
+    impact = _envelope(impact, attack=0.001, release=0.03)
+    tone1 = _sfx_sweep(400, 800, 0.08, volume=0.30)
+    tone2 = _sfx_sweep(600, 1200, 0.08, volume=0.25)
+    pad = np.zeros(int(SAMPLE_RATE * 0.03), dtype=np.float32)
+    combined = np.concatenate([impact, pad, tone1])
+    # Layer the second tone offset slightly
+    result = np.zeros(len(combined) + len(tone2), dtype=np.float32)
+    result[:len(combined)] += combined
+    offset = len(impact) + len(pad) + int(SAMPLE_RATE * 0.03)
+    result[offset:offset + len(tone2)] += tone2
+    return np.clip(result, -1.0, 1.0)
+
+
+def _gen_sfx_arrow():
+    """Arrow/projectile fire: quick ascending whistle."""
+    tone = _sfx_sweep(300, 900, 0.12, duty=0.25, volume=0.25)
+    return tone
+
+
+def _gen_sfx_fireball():
+    """Fireball cast: rising roar with noise."""
+    roar = _noise(0.25) * 0.20
+    roar = _envelope(roar, attack=0.01, release=0.15)
+    tone = _sfx_sweep(150, 600, 0.25, volume=0.25)
+    return _mix_tracks(roar, tone)
+
+
+def _gen_sfx_explosion():
+    """Fireball explosion: loud noise burst + descending boom."""
+    burst = _noise(0.15) * 0.40
+    burst = _envelope(burst, attack=0.002, release=0.10)
+    boom = _sfx_sweep(300, 50, 0.20, wave_fn=_triangle_wave, volume=0.35)
+    return _mix_tracks(burst, boom)
+
+
+def _gen_sfx_heal():
+    """Heal spell: ascending arpeggio (gentle chime)."""
+    notes = ['C5', 'E5', 'G5', 'C6']
+    parts = []
+    for n_str in notes:
+        freq = _n(n_str)
+        raw = _square_wave(freq, 0.08, duty=0.25)
+        raw = _envelope(raw, attack=0.005, release=0.04)
+        parts.append(raw * 0.20)
+    return np.concatenate(parts)
+
+
+def _gen_sfx_monster_hit():
+    """Monster takes damage: thud + crunch."""
+    thud = _triangle_wave(80, 0.06)
+    thud = _envelope(thud, attack=0.002, release=0.04) * 0.35
+    crunch = _noise(0.06) * 0.25
+    crunch = _envelope(crunch, attack=0.002, release=0.04)
+    return _mix_tracks(thud, crunch)
+
+
+def _gen_sfx_player_hurt():
+    """Player takes damage: descending tone + noise."""
+    tone = _sfx_sweep(500, 150, 0.15, volume=0.25)
+    hit = _noise(0.05) * 0.30
+    hit = _envelope(hit, attack=0.002, release=0.03)
+    result = np.zeros(len(tone), dtype=np.float32)
+    result[:len(hit)] += hit
+    result += tone
+    return np.clip(result, -1.0, 1.0)
+
+
+def _gen_sfx_victory():
+    """Victory: triumphant ascending fanfare."""
+    notes = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'C6']
+    parts = []
+    for n_str in notes:
+        freq = _n(n_str)
+        raw = _square_wave(freq, 0.10, duty=0.5)
+        raw = _envelope(raw, attack=0.005, release=0.05)
+        parts.append(raw * 0.25)
+    return np.concatenate(parts)
+
+
+def _gen_sfx_defeat():
+    """Defeat: sad descending tones."""
+    notes = ['C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3']
+    parts = []
+    for n_str in notes:
+        freq = _n(n_str)
+        raw = _triangle_wave(freq, 0.15)
+        raw = _envelope(raw, attack=0.01, release=0.10)
+        parts.append(raw * 0.25)
+    return np.concatenate(parts)
+
+
+def _gen_sfx_level_up():
+    """Level up: bright ascending arpeggio with harmonics."""
+    notes = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'C6']
+    parts = []
+    for i, n_str in enumerate(notes):
+        freq = _n(n_str)
+        raw = _square_wave(freq, 0.08, duty=0.25)
+        raw = _envelope(raw, attack=0.003, release=0.04)
+        parts.append(raw * 0.22)
+    fanfare = np.concatenate(parts)
+    # Add a bright final chord
+    chord_dur = 0.25
+    c = _square_wave(_n('C5'), chord_dur, duty=0.25) * 0.15
+    e = _square_wave(_n('E5'), chord_dur, duty=0.25) * 0.12
+    g = _square_wave(_n('G5'), chord_dur, duty=0.25) * 0.12
+    chord = _envelope(_mix_tracks(c, e, g), attack=0.005, release=0.15)
+    return np.concatenate([fanfare, chord])
+
+
+def _gen_sfx_defend():
+    """Defend stance: shield-like clang."""
+    tone = _square_wave(800, 0.05, duty=0.5)
+    tone = _envelope(tone, attack=0.001, release=0.03) * 0.25
+    ring = _square_wave(1200, 0.10, duty=0.125)
+    ring = _envelope(ring, attack=0.005, release=0.08) * 0.12
+    return np.concatenate([tone, ring])
+
+
+def _gen_sfx_flee():
+    """Flee: quick descending run."""
+    notes = ['G4', 'F4', 'E4', 'D4', 'C4']
+    parts = []
+    for n_str in notes:
+        freq = _n(n_str)
+        raw = _square_wave(freq, 0.06, duty=0.5)
+        raw = _envelope(raw, attack=0.003, release=0.03)
+        parts.append(raw * 0.20)
+    return np.concatenate(parts)
+
+
+def _gen_sfx_treasure():
+    """Treasure chest opened: bright coin jingle + chime."""
+    # Coin jingle — rapid high notes
+    jingle_notes = ['E6', 'G6', 'E6', 'C6', 'E6', 'G6']
+    parts = []
+    for n_str in jingle_notes:
+        freq = _n(n_str)
+        raw = _square_wave(freq, 0.04, duty=0.25)
+        raw = _envelope(raw, attack=0.002, release=0.02)
+        parts.append(raw * 0.18)
+    jingle = np.concatenate(parts)
+    # Reward chime — bright chord
+    chord_dur = 0.20
+    c = _square_wave(_n('C5'), chord_dur, duty=0.25) * 0.15
+    e = _square_wave(_n('E5'), chord_dur, duty=0.25) * 0.12
+    g = _square_wave(_n('G5'), chord_dur, duty=0.25) * 0.12
+    chord = _envelope(_mix_tracks(c, e, g), attack=0.005, release=0.12)
+    return np.concatenate([jingle, chord])
+
+
+def _gen_sfx_encounter():
+    """Monster encounter: alarming descending stinger."""
+    # Sharp alert tone
+    alert = _square_wave(900, 0.06, duty=0.5)
+    alert = _envelope(alert, attack=0.001, release=0.03) * 0.30
+    # Descending menacing sweep
+    sweep = _sfx_sweep(700, 200, 0.18, volume=0.25)
+    # Noise burst for tension
+    burst = _noise(0.08) * 0.20
+    burst = _envelope(burst, attack=0.002, release=0.05)
+    pad = np.zeros(int(SAMPLE_RATE * 0.02), dtype=np.float32)
+    combined = np.concatenate([alert, pad, sweep])
+    result = np.zeros(len(combined), dtype=np.float32)
+    result[:len(combined)] += combined
+    result[:len(burst)] += burst
+    return np.clip(result, -1.0, 1.0)
+
+
+class SoundEffects:
+    """Manages chiptune combat sound effects."""
+
+    _SFX_GENERATORS = {
+        "sword_hit":    _gen_sfx_sword_hit,
+        "miss":         _gen_sfx_miss,
+        "critical":     _gen_sfx_critical,
+        "arrow":        _gen_sfx_arrow,
+        "fireball":     _gen_sfx_fireball,
+        "explosion":    _gen_sfx_explosion,
+        "heal":         _gen_sfx_heal,
+        "monster_hit":  _gen_sfx_monster_hit,
+        "player_hurt":  _gen_sfx_player_hurt,
+        "victory":      _gen_sfx_victory,
+        "defeat":       _gen_sfx_defeat,
+        "level_up":     _gen_sfx_level_up,
+        "defend":       _gen_sfx_defend,
+        "flee":         _gen_sfx_flee,
+        "treasure":     _gen_sfx_treasure,
+        "encounter":    _gen_sfx_encounter,
+    }
+
+    def __init__(self):
+        """Pre-generate all sound effects."""
+        self._sounds = {}
+        self._muted = False
+        for name, gen_fn in self._SFX_GENERATORS.items():
+            wave = gen_fn()
+            self._sounds[name] = _to_sound(wave)
+
+    def play(self, sfx_name):
+        """Play a sound effect by name. Silently ignores unknown names."""
+        if self._muted:
+            return
+        sound = self._sounds.get(sfx_name)
+        if sound:
+            sound.play()
+
+    @property
+    def muted(self):
+        return self._muted
+
+    @muted.setter
+    def muted(self, value):
+        self._muted = value

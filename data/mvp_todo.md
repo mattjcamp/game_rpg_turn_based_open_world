@@ -1,12 +1,20 @@
 Purpose: to create a playable adventure from beginning to end with a simple version of the game systems
 
-- Create level 1 monsters
+MVP
 - Thief class should be able to see traps and unlock doors
 - Add 2 additional level 1 spells for each spellcaster
-- Make sure each class is flesh out enough for level 1
-- Add sound effects
-- Add Starting screen
-- Add more to End Quest event
+- Flesh out current 4 character classes
+- Add Save Game
+- Start Game from Settings Screen
+- Add bling to End Quest event
 - Refine User Interface
-- Calibrate party
+- Calibrate gameplay (monsters, level 1)
 - Optional: Make encounters include multiple monsters (this one can get complicated, optional)
+
+Full Game
+- Make system configurable (spells, abilities, character instances, quests)
+- Make system as extensible as possible for the future
+- Add rich descriptions to some tiles
+- Add character creation
+- Add Party level spells/abilities (each character gets party slot for special ability like detect traps, see in dark)
+- Add Time with nighttime effects

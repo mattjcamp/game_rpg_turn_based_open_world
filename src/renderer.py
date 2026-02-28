@@ -3326,7 +3326,9 @@ class Renderer:
     def draw_party_inventory_u3(self, party, cursor_index=0,
                                  choosing_member=False, member_cursor=0,
                                  action_menu=False, action_cursor=0,
-                                 action_options=None):
+                                 action_options=None,
+                                 choosing_effect=False, effect_list=None,
+                                 effect_cursor=0):
         """
         Full-screen shared party inventory with party equipment slots.
 
@@ -3400,7 +3402,42 @@ class Renderer:
 
             ty += row_h
 
-        # ── Divider between equipment and stash ──
+        # ── Divider between equipment and effects ──
+        ty += 6
+        pygame.draw.line(self.screen, (60, 60, 80),
+                         (tx, ty), (tx + left_w - 32, ty), 1)
+        ty += 8
+
+        # ── Effects section ──
+        self._u3_text("EFFECTS", tx, ty, self._U3_ORANGE, fm)
+        ty += 24
+
+        NUM_EFFECTS = len(party.EFFECT_SLOTS)
+        for ei, slot_key in enumerate(party.EFFECT_SLOTS):
+            effect = party.get_effect(slot_key)
+            global_ei = ei + NUM_SLOTS
+            selected = (global_ei == cursor_index)
+            prefix = "> " if selected else "  "
+
+            slot_num = f"{ei + 1}."
+            name_color = self._U3_WHITE if selected else self._U3_LTBLUE
+            self._u3_text(f"{prefix}{slot_num}", tx, ty, name_color, fm)
+
+            if effect:
+                eff_color = self._U3_WHITE if selected else (220, 220, 230)
+                self._u3_text(effect, tx + 40, ty, eff_color, fm)
+            else:
+                self._u3_text("-- EMPTY --", tx + 40, ty, (120, 120, 120), fm)
+
+            if selected:
+                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                sel_surf.fill((255, 255, 255, 25))
+                self.screen.blit(sel_surf, sel_rect)
+
+            ty += row_h
+
+        # ── Divider between effects and stash ──
         ty += 6
         pygame.draw.line(self.screen, (60, 60, 80),
                          (tx, ty), (tx + left_w - 32, ty), 1)
@@ -3420,7 +3457,8 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            inv_cursor = cursor_index - NUM_SLOTS  # cursor relative to inventory
+            header_count = NUM_SLOTS + NUM_EFFECTS
+            inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
                                         len(inv) - max_visible))
@@ -3429,7 +3467,7 @@ class Renderer:
                 entry = inv[item_idx]
                 item_name = party.item_name(entry)
                 item_ch = party.item_charges(entry)
-                global_idx = item_idx + NUM_SLOTS
+                global_idx = item_idx + header_count
                 selected = (global_idx == cursor_index)
                 prefix = "> " if selected else "  "
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
@@ -3536,12 +3574,18 @@ class Renderer:
         sel_item = None
         sel_charges = None
         is_equip_slot = cursor_index < NUM_SLOTS
+        is_effect_slot = (NUM_SLOTS <= cursor_index < NUM_SLOTS + NUM_EFFECTS)
+        header_count = NUM_SLOTS + NUM_EFFECTS
         if is_equip_slot:
             slot_key = party.PARTY_SLOTS[cursor_index]
             sel_item = party.get_equipped_name(slot_key)
             sel_charges = party.get_equipped_charges(slot_key)
-        elif cursor_index - NUM_SLOTS < len(inv):
-            entry = inv[cursor_index - NUM_SLOTS]
+        elif is_effect_slot:
+            eff_idx = cursor_index - NUM_SLOTS
+            eff_slot_key = party.EFFECT_SLOTS[eff_idx]
+            sel_item = party.get_effect(eff_slot_key)
+        elif cursor_index - header_count < len(inv):
+            entry = inv[cursor_index - header_count]
             sel_item = party.item_name(entry)
             sel_charges = party.item_charges(entry)
 
@@ -3550,6 +3594,8 @@ class Renderer:
             if is_equip_slot:
                 slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
                 self._u3_text(f"EQUIPPED ({slot_label})", rx, ry, self._U3_ORANGE, fm)
+            elif is_effect_slot:
+                self._u3_text("ACTIVE EFFECT", rx, ry, self._U3_ORANGE, fm)
             else:
                 self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
             ry += 22
@@ -3603,6 +3649,10 @@ class Renderer:
             self._u3_text(f"{slot_label} SLOT", rx, ry, self._U3_ORANGE, fm)
             ry += 22
             self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
+        elif is_effect_slot:
+            self._u3_text("EFFECT SLOT", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+            self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
 
@@ -3642,10 +3692,46 @@ class Renderer:
                     self.screen.blit(hl_s, hl)
                 oy += 22
 
+        # ── Effect chooser popup ──
+        if choosing_effect and effect_list:
+            efl = effect_list
+            popup_w = 340
+            popup_h = 28 + len(efl) * 22 + 8
+            popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+            popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+            pygame.draw.rect(self.screen, (20, 20, 40),
+                             (popup_x, popup_y, popup_w, popup_h))
+            pygame.draw.rect(self.screen, self._U3_ORANGE,
+                             (popup_x, popup_y, popup_w, popup_h), 2)
+
+            self._u3_text("ASSIGN EFFECT", popup_x + 10, popup_y + 6,
+                          self._U3_ORANGE, fm)
+            oy = popup_y + 28
+            for ei, eff in enumerate(efl):
+                sel = (ei == effect_cursor)
+                prefix = "> " if sel else "  "
+                col = self._U3_WHITE if sel else self._U3_LTBLUE
+                dur = eff["duration"]
+                dur_str = "PERM" if dur == "permanent" else f"{dur} steps"
+                self._u3_text(f"{prefix}{eff['name']}", popup_x + 10, oy,
+                              col, fm)
+                self._u3_text(dur_str, popup_x + popup_w - 100, oy,
+                              (160, 160, 180), self.font_small)
+                if sel:
+                    hl = pygame.Rect(popup_x + 4, oy - 1, popup_w - 8, 20)
+                    hl_s = pygame.Surface((hl.w, hl.h), pygame.SRCALPHA)
+                    hl_s.fill((255, 255, 255, 25))
+                    self.screen.blit(hl_s, hl)
+                oy += 22
+
         # ── Bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        if action_menu:
+        if choosing_effect:
+            self._u3_text("[UP/DN] SELECT  [ENTER] ASSIGN  [ESC] CANCEL",
+                          8, bar_y + 5, self._U3_BLUE)
+        elif action_menu:
             self._u3_text("[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
                           8, bar_y + 5, self._U3_BLUE)
         else:

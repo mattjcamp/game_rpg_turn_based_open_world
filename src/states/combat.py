@@ -1036,6 +1036,7 @@ class CombatState(BaseState):
                           color=proj_color, symbol=">" if dcol > 0 else
                           "<" if dcol < 0 else "v" if drow > 0 else "^")
         self.projectiles.append(proj)
+        self.game.sfx.play("arrow")
 
         # Defer attack resolution until projectile arrives
         self._pending_ranged = {
@@ -1099,6 +1100,7 @@ class CombatState(BaseState):
                           symbol=">" if dcol > 0 else
                           "<" if dcol < 0 else "v" if drow > 0 else "^")
         self.projectiles.append(proj)
+        self.game.sfx.play("arrow")
 
         # Store the weapon stats for damage resolution — use the thrown
         # item's power, not the equipped weapon's
@@ -1155,6 +1157,7 @@ class CombatState(BaseState):
         if not hit_monster:
             label = thrown_item or info.get("ranged_weapon") or f.weapon
             self.combat_log.append(f"{f.name}'s {label} misses the target!")
+            self.game.sfx.play("miss")
             self._end_fighter_turn()
             return
 
@@ -1167,16 +1170,19 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{f.name} rolls {roll} — CRITICAL HIT!"
             )
+            self.game.sfx.play("critical")
         elif hit:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
                 f"= {total} vs AC {self.monster.ac} — Hit!"
             )
+            self.game.sfx.play("sword_hit")
         else:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
                 f"= {total} vs AC {self.monster.ac} — Miss!"
             )
+            self.game.sfx.play("miss")
 
         if hit:
             if thrown_item:
@@ -1271,16 +1277,19 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{f.name} rolls {roll} — CRITICAL HIT!"
             )
+            self.game.sfx.play("critical")
         elif hit:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
                 f"= {total} vs AC {self.monster.ac} — Hit!"
             )
+            self.game.sfx.play("sword_hit")
         else:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
                 f"= {total} vs AC {self.monster.ac} — Miss!"
             )
+            self.game.sfx.play("miss")
 
         if hit:
             dice_count, dice_sides, dmg_bonus = f.get_damage_dice()
@@ -1347,6 +1356,7 @@ class CombatState(BaseState):
 
         fb = FireballEffect(col, row, end_col, end_row)
         self.fireballs.append(fb)
+        self.game.sfx.play("fireball")
 
         self._pending_fireball = {
             "fighter": f,
@@ -1376,6 +1386,7 @@ class CombatState(BaseState):
 
         # Spawn explosion effect at impact point
         self.fireball_explosions.append(FireballExplosion(end_col, end_row))
+        self.game.sfx.play("explosion")
 
         if not hit_monster:
             self.combat_log.append(f"{f.name}'s fireball fizzles against the wall!")
@@ -1467,6 +1478,7 @@ class CombatState(BaseState):
         self.heal_effects.append(HealEffect(tcol, trow, actual_heal))
 
         self.phase = PHASE_HEAL
+        self.game.sfx.play("heal")
         self.combat_log.append(
             f"{f.name} casts HEAL on {target.name}! (+{actual_heal} HP, -{HEAL_MP_COST} MP)"
         )
@@ -1503,6 +1515,7 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{f.name} uses {item_name}! (+{actual} HP)"
             )
+            self.game.sfx.play("heal")
             self.phase = PHASE_HEAL
 
         elif effect == "heal_mp":
@@ -1534,6 +1547,7 @@ class CombatState(BaseState):
         if not f:
             return
         self.defending[f] = True
+        self.game.sfx.play("defend")
         self.combat_log.append(
             f"{f.name} takes a defensive stance! (+2 AC)"
         )
@@ -1555,6 +1569,7 @@ class CombatState(BaseState):
             )
             self.phase = PHASE_VICTORY
             self.phase_timer = 1500
+            self.game.sfx.play("flee")
             self.combat_log.append("Your party flees the battle!")
         else:
             self.combat_log.append(
@@ -1677,18 +1692,21 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{self.monster.name} → {target.name}: rolls {roll} — CRITICAL HIT!"
             )
+            self.game.sfx.play("critical")
         elif hit:
             self.combat_log.append(
                 f"{self.monster.name} → {target.name}: rolls {roll} "
                 f"({format_modifier(self.monster.attack_bonus)}) "
                 f"= {total} vs {ac_display} — Hit!"
             )
+            self.game.sfx.play("player_hurt")
         else:
             self.combat_log.append(
                 f"{self.monster.name} → {target.name}: rolls {roll} "
                 f"({format_modifier(self.monster.attack_bonus)}) "
                 f"= {total} vs {ac_display} — Miss!"
             )
+            self.game.sfx.play("miss")
 
         if hit:
             damage = roll_damage(
@@ -1711,6 +1729,7 @@ class CombatState(BaseState):
         if not any(m.is_alive() for m in self.fighters):
             self.phase = PHASE_DEFEAT
             self.phase_timer = 2500
+            self.game.sfx.play("defeat")
             self.combat_log.append("The party has been defeated!")
         else:
             self.phase = PHASE_MONSTER_ACT
@@ -1828,6 +1847,7 @@ class CombatState(BaseState):
             if m.is_alive():
                 m.exp += xp
         self.game.party.gold += gold
+        self.game.sfx.play("victory")
         self.combat_log.append(
             f"{self.monster.name} is defeated! +{xp} XP each, +{gold} gold!"
         )
@@ -1837,6 +1857,7 @@ class CombatState(BaseState):
                 level_msgs = m.check_level_up()
                 for msg in level_msgs:
                     self.combat_log.append(msg)
+                    self.game.sfx.play("level_up")
                     self.phase_timer += 1500  # extra time per level-up
 
     def _end_combat(self, won):

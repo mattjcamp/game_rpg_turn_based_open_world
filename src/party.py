@@ -22,11 +22,25 @@ WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
 _PARTY_JSON = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "party.json")
 
+# ── Load effect definitions from data/effects.json ───────────────
+_EFFECTS_JSON = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "effects.json")
+
 
 def _load_party_config():
     """Load party configuration from data/party.json."""
     with open(_PARTY_JSON, "r") as f:
         return json.load(f)
+
+
+def _load_effects_config():
+    """Load effect definitions from data/effects.json."""
+    with open(_EFFECTS_JSON, "r") as f:
+        return json.load(f)
+
+
+# Pre-load effect definitions at import time
+EFFECTS_DATA = _load_effects_config().get("effects", [])
 
 
 def get_sell_price(item_name):
@@ -488,6 +502,15 @@ class Party:
     PARTY_SLOT_DEFAULTS = {"light": None, "navigation": None,
                            "camping": None, "special": None}
 
+    # Party-level passive effect slots (4 slots)
+    EFFECT_SLOTS = ["effect_1", "effect_2", "effect_3", "effect_4"]
+    EFFECT_SLOT_LABELS = {
+        "effect_1": "EFFECT 1",
+        "effect_2": "EFFECT 2",
+        "effect_3": "EFFECT 3",
+        "effect_4": "EFFECT 4",
+    }
+
     # ── Inventory item helpers ──────────────────────────────────
     # Shared inventory entries can be a plain string ("Sword") or a dict
     # with charges: {"name": "Torch", "charges": 15}.  These helpers
@@ -601,6 +624,9 @@ class Party:
         # Party-level equipment: 4 utility slots
         self.equipped = {s: None for s in self.PARTY_SLOTS}
 
+        # Party-level passive effects: 4 effect slots
+        self.effects = {s: None for s in self.EFFECT_SLOTS}
+
     def party_equip(self, item_name, slot):
         """Equip an item from shared inventory into a party slot.
 
@@ -653,6 +679,73 @@ class Party:
         if entry is None:
             return None
         return entry.get("charges")
+
+    def get_effect(self, slot):
+        """Return the effect name in the given effect slot, or None."""
+        return self.effects.get(slot)
+
+    def set_effect(self, slot, effect_name):
+        """Set an effect in the given slot. Pass None to clear."""
+        if slot in self.effects:
+            self.effects[slot] = effect_name
+
+    def has_effect(self, effect_name):
+        """Return True if the party has the named effect in any slot."""
+        return any(v == effect_name for v in self.effects.values())
+
+    def get_available_effects(self):
+        """Return list of effect dicts from EFFECTS_DATA that the party qualifies for.
+
+        Requirements use ALL-match logic:
+          - class: party must have an alive member of that class
+          - race:  party must have an alive member of that race
+          - min_level: party must have an alive member at or above that level
+
+        Effects already slotted are excluded.
+        """
+        slotted = set(v for v in self.effects.values() if v is not None)
+        available = []
+        for eff in EFFECTS_DATA:
+            if eff["name"] in slotted:
+                continue
+            reqs = eff.get("requirements", {})
+            if not self._meets_requirements(reqs):
+                continue
+            available.append(eff)
+        return available
+
+    def _meets_requirements(self, reqs):
+        """Check if the party meets ALL requirements."""
+        alive = [m for m in self.members if m.is_alive()]
+        if not alive:
+            return False
+
+        req_class = reqs.get("class")
+        req_race = reqs.get("race")
+        req_min_level = reqs.get("min_level")
+
+        # Find members that match class/race requirements
+        candidates = alive
+
+        if req_class is not None:
+            candidates = [m for m in candidates
+                          if m.char_class == req_class]
+            if not candidates:
+                return False
+
+        if req_race is not None:
+            candidates = [m for m in candidates
+                          if m.race == req_race]
+            if not candidates:
+                return False
+
+        if req_min_level is not None:
+            candidates = [m for m in candidates
+                          if m.level >= req_min_level]
+            if not candidates:
+                return False
+
+        return True
 
     def give_item_to_member(self, item_index, member_index):
         """Move an item from shared inventory to a party member's inventory.
@@ -752,6 +845,13 @@ def create_default_party(start_col=None, start_row=None):
                 "name": entry["name"],
                 "charges": entry.get("charges"),
             }
+
+    # ── Party-level passive effects from JSON ──
+    party_eff = cfg.get("party_effects", {})
+    for slot in party.EFFECT_SLOTS:
+        effect = party_eff.get(slot)
+        if effect is not None:
+            party.effects[slot] = effect
 
     # ── Shared inventory ──
     party.shared_inventory = []
