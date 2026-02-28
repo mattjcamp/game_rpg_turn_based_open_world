@@ -262,6 +262,7 @@ class DungeonState(BaseState):
             party.row = target_row
             self.move_cooldown = MOVE_REPEAT_DELAY
             self._check_tile_events()
+            self._attempt_trap_detection()
             # After party moves, let every alive monster take a step
             self._move_monsters()
             # A monster may have walked adjacent — check for contact
@@ -792,6 +793,44 @@ class DungeonState(BaseState):
             combat_state.start_combat(fighter, monster, source_state="dungeon")
             self.game.change_state("combat")
 
+    def _attempt_trap_detection(self):
+        """If Detect Traps effect is active, the thief rolls to spot traps in view.
+
+        For each visible TILE_TRAP not already detected or triggered, the thief
+        makes a saving throw: d20 + DEX modifier >= 10.  Each trap is rolled
+        once per step while it remains in line of sight.
+        """
+        party = self.game.party
+        if not party.has_effect("Detect Traps"):
+            return
+
+        # Find an alive Thief in the party
+        thief = None
+        for m in party.members:
+            if m.is_alive() and m.char_class == "Thief":
+                thief = m
+                break
+        if thief is None:
+            return
+
+        visible = self._compute_visible_tiles()
+        tile_map = self.dungeon_data.tile_map
+        detected = self.dungeon_data.detected_traps
+        triggered = self.dungeon_data.triggered_traps
+
+        for (wc, wr) in visible:
+            if tile_map.get_tile(wc, wr) != TILE_TRAP:
+                continue
+            pos = (wc, wr)
+            if pos in detected or pos in triggered:
+                continue
+            # Saving throw: d20 + DEX modifier vs DC 10
+            roll = random.randint(1, 20) + thief.get_modifier(thief.dexterity)
+            if roll >= 10:
+                detected.add(pos)
+                self.show_message(
+                    f"{thief.name} spotted a trap!", 1500)
+
     def _check_tile_events(self):
         """Check for special tiles the party stepped on."""
         col = self.game.party.col
@@ -813,6 +852,7 @@ class DungeonState(BaseState):
             pos = (col, row)
             if pos not in self.dungeon_data.triggered_traps:
                 self.dungeon_data.triggered_traps.add(pos)
+                self.game.sfx.play("trap")
                 # Damage a random party member
                 alive = [m for m in self.game.party.members if m.is_alive()]
                 if alive:
@@ -1032,4 +1072,5 @@ class DungeonState(BaseState):
             visible_tiles=visible,
             torch_steps=self.torch_steps if (self.torch_active or self._has_torch_equipped()) else -1,
             level_label=level_label,
+            detected_traps=self.dungeon_data.detected_traps,
         )

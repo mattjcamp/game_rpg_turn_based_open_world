@@ -622,6 +622,26 @@ def _gen_sfx_encounter():
     return np.clip(result, -1.0, 1.0)
 
 
+def _gen_sfx_trap():
+    """Trap sprung: sharp snap + descending dissonant screech."""
+    # Sharp snap
+    snap = _noise(0.04) * 0.45
+    snap = _envelope(snap, attack=0.001, release=0.02)
+    # Dissonant descending screech
+    screech1 = _sfx_sweep(1100, 300, 0.20, duty=0.5, volume=0.25)
+    screech2 = _sfx_sweep(900, 200, 0.20, duty=0.25, volume=0.20)
+    screech = _mix_tracks(screech1, screech2)
+    # Low rumble
+    rumble = _triangle_wave(60, 0.15)
+    rumble = _envelope(rumble, attack=0.01, release=0.10) * 0.25
+    pad = np.zeros(int(SAMPLE_RATE * 0.02), dtype=np.float32)
+    combined = np.concatenate([snap, pad, screech])
+    result = np.zeros(len(combined), dtype=np.float32)
+    result[:len(combined)] += combined
+    result[:len(rumble)] += rumble
+    return np.clip(result, -1.0, 1.0)
+
+
 class SoundEffects:
     """Manages chiptune combat sound effects."""
 
@@ -642,6 +662,7 @@ class SoundEffects:
         "flee":         _gen_sfx_flee,
         "treasure":     _gen_sfx_treasure,
         "encounter":    _gen_sfx_encounter,
+        "trap":         _gen_sfx_trap,
     }
 
     def __init__(self):

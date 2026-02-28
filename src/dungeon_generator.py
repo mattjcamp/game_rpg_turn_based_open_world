@@ -66,6 +66,8 @@ class DungeonData:
         self.opened_chests = set()
         # Track which traps have been triggered
         self.triggered_traps = set()
+        # Track which traps have been detected by the thief
+        self.detected_traps = set()
         # Monsters placed in the dungeon
         self.monsters = monsters or []
 

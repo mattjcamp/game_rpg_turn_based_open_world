@@ -2,8 +2,8 @@
   "_comment": "Party configuration for Realm of Shadow. Edit this file to change starting characters, position, gold, and shared inventory without touching code.",
 
   "start_position": {
-    "col": 11,
-    "row": 14
+    "col": 30,
+    "row": 11
   },
 
   "gold": 50,

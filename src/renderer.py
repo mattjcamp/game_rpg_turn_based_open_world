@@ -1023,7 +1023,7 @@ class Renderer:
 
     def draw_dungeon_u3(self, party, dungeon_data, message="",
                          visible_tiles=None, torch_steps=-1,
-                         level_label=None):
+                         level_label=None, detected_traps=None):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -1051,6 +1051,28 @@ class Renderer:
                 px = sc * ts
                 py = sr * ts
                 self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr)
+
+        # ── 1b. red glow on detected traps ──
+        if detected_traps:
+            import math
+            pulse = 0.55 + 0.45 * math.sin(pygame.time.get_ticks() * 0.005)
+            alpha = int(70 * pulse)
+            for (tc, tr) in detected_traps:
+                sc_t = tc - off_c
+                sr_t = tr - off_r
+                if 0 <= sc_t < cols and 0 <= sr_t < rows:
+                    glow_rect = pygame.Rect(sc_t * ts, sr_t * ts, ts, ts)
+                    glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                    glow_surf.fill((255, 30, 30, alpha))
+                    self.screen.blit(glow_surf, glow_rect)
+                    # Bright red X over the trap
+                    cx_t = sc_t * ts + ts // 2
+                    cy_t = sr_t * ts + ts // 2
+                    line_col = (255, int(50 * pulse), int(50 * pulse))
+                    pygame.draw.line(self.screen, line_col,
+                                     (cx_t - 6, cy_t - 6), (cx_t + 6, cy_t + 6), 2)
+                    pygame.draw.line(self.screen, line_col,
+                                     (cx_t + 6, cy_t - 6), (cx_t - 6, cy_t + 6), 2)
 
         # ── 2. monster sprites (only within visible tiles) ──
         for monster in dungeon_data.monsters:
