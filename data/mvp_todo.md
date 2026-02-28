@@ -2,7 +2,7 @@ Purpose: to create a playable adventure from beginning to end with a simple vers
 
 MVP
 - Thief class should be able to see traps and unlock doors
-- Add 2 additional level 1 spells for each spellcaster
+- Add 2 additional level 1 combat spells for each spellcaster
 - Flesh out current 4 character classes
 - Add Save Game
 - Start Game from Settings Screen

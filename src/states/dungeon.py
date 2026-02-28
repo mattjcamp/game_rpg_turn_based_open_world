@@ -12,7 +12,7 @@ import pygame
 from src.states.base_state import BaseState
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
-    TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL,
+    TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
 )
 
 
@@ -254,6 +254,13 @@ class DungeonState(BaseState):
         monster = self._get_monster_at(target_col, target_row)
         if monster:
             self._start_combat(monster)
+            self.move_cooldown = MOVE_REPEAT_DELAY
+            return
+
+        # Check for locked door — thief attempts to pick the lock
+        tile_id = self.dungeon_data.tile_map.get_tile(target_col, target_row)
+        if tile_id == TILE_LOCKED_DOOR:
+            self._attempt_lock_pick(target_col, target_row)
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
@@ -792,6 +799,34 @@ class DungeonState(BaseState):
             self.game.sfx.play("encounter")
             combat_state.start_combat(fighter, monster, source_state="dungeon")
             self.game.change_state("combat")
+
+    def _attempt_lock_pick(self, col, row):
+        """Thief attempts to pick a locked door. DEX saving throw: d20 + DEX mod >= 12."""
+        party = self.game.party
+
+        # Find an alive Thief
+        thief = None
+        for m in party.members:
+            if m.is_alive() and m.char_class == "Thief":
+                thief = m
+                break
+
+        if thief is None:
+            self.show_message("The door is locked. You need a thief!", 2000)
+            return
+
+        roll = random.randint(1, 20) + thief.get_modifier(thief.dexterity)
+        if roll >= 12:
+            # Success — unlock the door
+            self.dungeon_data.tile_map.set_tile(col, row, TILE_DDOOR)
+            self.game.sfx.play("lock_pick_success")
+            self.show_message(
+                f"{thief.name} picked the lock!", 1800)
+        else:
+            # Failure
+            self.game.sfx.play("lock_pick_fail")
+            self.show_message(
+                f"{thief.name} failed to pick the lock.", 1500)
 
     def _attempt_trap_detection(self):
         """If Detect Traps effect is active, the thief rolls to spot traps in view.

@@ -642,6 +642,31 @@ def _gen_sfx_trap():
     return np.clip(result, -1.0, 1.0)
 
 
+def _gen_sfx_lock_pick_success():
+    """Lock picked successfully: metallic clicks ascending to a satisfying clunk."""
+    clicks = []
+    for freq in [800, 1000, 1200, 1500]:
+        click = _square_wave(freq, 0.03, duty=0.125)
+        click = _envelope(click, attack=0.001, release=0.02) * 0.20
+        clicks.append(click)
+        clicks.append(np.zeros(int(SAMPLE_RATE * 0.04), dtype=np.float32))
+    # Final satisfying clunk
+    clunk = _triangle_wave(200, 0.08)
+    clunk = _envelope(clunk, attack=0.002, release=0.05) * 0.30
+    return np.concatenate(clicks + [clunk])
+
+
+def _gen_sfx_lock_pick_fail():
+    """Lock pick failed: metallic scrape + dull thud."""
+    scrape = _noise(0.08) * 0.20
+    scrape = _envelope(scrape, attack=0.005, release=0.05)
+    tone = _sfx_sweep(600, 300, 0.08, duty=0.125, volume=0.15)
+    thud = _triangle_wave(100, 0.06)
+    thud = _envelope(thud, attack=0.002, release=0.04) * 0.25
+    pad = np.zeros(int(SAMPLE_RATE * 0.03), dtype=np.float32)
+    return np.concatenate([_mix_tracks(scrape, tone), pad, thud])
+
+
 class SoundEffects:
     """Manages chiptune combat sound effects."""
 
@@ -663,6 +688,8 @@ class SoundEffects:
         "treasure":     _gen_sfx_treasure,
         "encounter":    _gen_sfx_encounter,
         "trap":         _gen_sfx_trap,
+        "lock_pick_success": _gen_sfx_lock_pick_success,
+        "lock_pick_fail":    _gen_sfx_lock_pick_fail,
     }
 
     def __init__(self):

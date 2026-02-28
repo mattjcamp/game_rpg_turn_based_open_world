@@ -17,7 +17,7 @@ from src.settings import (
     PARTY_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT,
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL,
+    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
 )
 
 
@@ -1304,6 +1304,23 @@ class Renderer:
             # Handle
             pygame.draw.circle(self.screen, YELLOW, (cx + 4, cy), 2)
             pygame.draw.rect(self.screen, (60, 35, 15), door_rect, 1)
+
+        elif tile_id == TILE_LOCKED_DOOR:
+            # Locked dungeon door — iron-bound dark planks with keyhole
+            pygame.draw.rect(self.screen, BLACK, rect)
+            door_rect = pygame.Rect(px + 5, py + 2, ts - 10, ts - 4)
+            pygame.draw.rect(self.screen, (60, 38, 18), door_rect)
+            # Iron bands
+            for dy in (4, ts // 2, ts - 8):
+                pygame.draw.line(self.screen, (100, 100, 110),
+                                 (px + 5, py + dy), (px + ts - 5, py + dy), 2)
+            # Keyhole
+            pygame.draw.circle(self.screen, (180, 170, 50), (cx, cy), 3)
+            pygame.draw.circle(self.screen, (30, 20, 10), (cx, cy), 2)
+            pygame.draw.line(self.screen, (30, 20, 10),
+                             (cx, cy), (cx, cy + 4), 1)
+            # Border
+            pygame.draw.rect(self.screen, (80, 80, 90), door_rect, 1)
 
         elif tile_id == TILE_ARTIFACT:
             # Glowing crystal on pedestal

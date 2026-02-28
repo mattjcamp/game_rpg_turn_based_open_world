@@ -16,7 +16,7 @@ import random
 from src.tile_map import TileMap
 from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT,
+    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
 )
 from src.monster import create_random_monster
 
@@ -142,6 +142,65 @@ def _place_doors(tmap, rooms):
                     break  # one door per perimeter tile
 
 
+def _place_locked_doors(tmap, rooms):
+    """Place locked doors on rooms that have exactly one tile-wide entrance.
+
+    A room entrance is a perimeter tile that is floor/door and has a cardinal
+    neighbour outside the room that is also floor/door (i.e. corridor).
+    If there is exactly one such entrance tile, replace it with a locked door.
+    Skip the first room (entrance room with stairs).
+    """
+    PASSABLE = {TILE_DFLOOR, TILE_DDOOR, TILE_STAIRS, TILE_CHEST,
+                TILE_TRAP, TILE_STAIRS_DOWN, TILE_ARTIFACT}
+
+    # Build set of tiles belonging to each room
+    room_tile_sets = []
+    for room in rooms:
+        tiles = set()
+        for r in range(room.y, room.y2):
+            for c in range(room.x, room.x2):
+                tiles.add((c, r))
+        room_tile_sets.append(tiles)
+
+    all_room_tiles = set()
+    for s in room_tile_sets:
+        all_room_tiles |= s
+
+    for ri, room in enumerate(rooms):
+        if ri == 0:
+            continue  # don't lock the entrance room
+
+        room_tiles = room_tile_sets[ri]
+
+        # Find perimeter tiles
+        perimeter = set()
+        for c in range(room.x, room.x2):
+            perimeter.add((c, room.y))
+            perimeter.add((c, room.y2 - 1))
+        for r in range(room.y, room.y2):
+            perimeter.add((room.x, r))
+            perimeter.add((room.x2 - 1, r))
+
+        # Find entrance tiles: perimeter floor/door tiles with an outside
+        # cardinal neighbour that is also passable
+        entrances = []
+        for (pc, pr) in perimeter:
+            tid = tmap.get_tile(pc, pr)
+            if tid not in PASSABLE and tid != TILE_DDOOR:
+                continue
+            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                nc, nr = pc + dc, pr + dr
+                if (nc, nr) in room_tiles:
+                    continue  # neighbour is inside the room
+                if tmap.get_tile(nc, nr) in PASSABLE or tmap.get_tile(nc, nr) == TILE_DDOOR:
+                    entrances.append((pc, pr))
+                    break
+
+        if len(entrances) == 1:
+            ec, er = entrances[0]
+            tmap.set_tile(ec, er, TILE_LOCKED_DOOR)
+
+
 def generate_dungeon(name="The Depths", width=40, height=30,
                      min_rooms=6, max_rooms=10,
                      room_min_size=4, room_max_size=8,
@@ -264,6 +323,9 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # --- Optional: place doors at corridor/room junctions ---
     if place_doors:
         _place_doors(tmap, rooms)
+
+    # --- Place locked doors on rooms with single-tile entrances ---
+    _place_locked_doors(tmap, rooms)
 
     # Entry point is on the stairs
     entry_col = stairs_col
