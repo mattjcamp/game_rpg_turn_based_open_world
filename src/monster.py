@@ -29,7 +29,7 @@ class Monster:
     def __init__(self, name, hp, ac, attack_bonus,
                  damage_dice=1, damage_sides=4, damage_bonus=0,
                  xp_reward=25, gold_reward=10, color=(200, 50, 50),
-                 tile=None):
+                 tile=None, undead=False):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -42,6 +42,7 @@ class Monster:
         self.gold_reward = gold_reward
         self.color = color   # Fallback color for procedural rendering
         self.tile = tile     # Filename in src/assets/ (e.g. "orc_f1.png")
+        self.undead = undead  # True for undead creatures (skeleton, zombie, etc.)
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -153,6 +154,7 @@ def create_monster(name):
             data.get("gold_min", 5), data.get("gold_max", 15)),
         color=tuple(data.get("color", [200, 50, 50])),
         tile=data.get("tile"),
+        undead=data.get("undead", False),
     )
 
 

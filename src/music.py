@@ -667,6 +667,51 @@ def _gen_sfx_lock_pick_fail():
     return np.concatenate([_mix_tracks(scrape, tone), pad, thud])
 
 
+def _gen_sfx_shield():
+    """Shield spell: crystalline ascending shimmer + bright chime."""
+    # Ascending shimmer — three rising tones
+    notes = ['C5', 'E5', 'G5']
+    parts = []
+    for n_str in notes:
+        freq = _n(n_str)
+        raw = _triangle_wave(freq, 0.08)
+        raw = _envelope(raw, attack=0.005, release=0.05)
+        parts.append(raw * 0.18)
+    shimmer = np.concatenate(parts)
+    # Bright chime at the end
+    chime = _triangle_wave(_n('C6'), 0.15)
+    chime = _envelope(chime, attack=0.005, release=0.12) * 0.15
+    # Harmonic overlay
+    overlay = _triangle_wave(_n('E6'), 0.12)
+    overlay = _envelope(overlay, attack=0.01, release=0.10) * 0.10
+    return np.concatenate([shimmer, _mix_tracks(chime, overlay)])
+
+
+def _gen_sfx_turn_undead():
+    """Turn Undead: majestic holy chord building to a bright blast."""
+    # Low holy drone — organ-like chord (C4 + E4 + G4)
+    dur = 0.18
+    c4 = _triangle_wave(_n('C4'), dur) * 0.12
+    e4 = _triangle_wave(_n('E4'), dur) * 0.10
+    g4 = _triangle_wave(_n('G4'), dur) * 0.10
+    chord = _mix_tracks(_mix_tracks(c4, e4), g4)
+    chord = _envelope(chord, attack=0.01, release=0.12)
+    # Rising holy sweep — ascending from C5 to C6
+    sweep = _sfx_sweep(_n('C5'), _n('C6'), 0.15, duty=0.25, volume=0.15)
+    sweep = _envelope(sweep, attack=0.01, release=0.10)
+    # Bright burst — high octave chord (C6 + E6 + G6)
+    burst_dur = 0.20
+    c6 = _triangle_wave(_n('C6'), burst_dur) * 0.14
+    e6 = _triangle_wave(_n('E6'), burst_dur) * 0.12
+    g6 = _triangle_wave(_n('G6'), burst_dur) * 0.10
+    burst = _mix_tracks(_mix_tracks(c6, e6), g6)
+    burst = _envelope(burst, attack=0.005, release=0.15)
+    # Noise crackle for the blast impact
+    crackle = _noise(0.08) * 0.08
+    crackle = _envelope(crackle, attack=0.002, release=0.06)
+    return np.concatenate([chord, sweep, _mix_tracks(burst, crackle)])
+
+
 class SoundEffects:
     """Manages chiptune combat sound effects."""
 
@@ -690,6 +735,8 @@ class SoundEffects:
         "trap":         _gen_sfx_trap,
         "lock_pick_success": _gen_sfx_lock_pick_success,
         "lock_pick_fail":    _gen_sfx_lock_pick_fail,
+        "shield":            _gen_sfx_shield,
+        "turn_undead":       _gen_sfx_turn_undead,
     }
 
     def __init__(self):

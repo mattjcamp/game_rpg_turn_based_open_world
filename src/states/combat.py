@@ -46,6 +46,9 @@ PHASE_PROJECTILE  = "projectile"     # projectile in flight
 PHASE_MELEE_ANIM  = "melee_anim"     # melee slash animation
 PHASE_FIREBALL    = "fireball"       # fireball in flight
 PHASE_HEAL        = "heal"           # heal animation playing
+PHASE_SHIELD      = "shield"         # shield animation playing
+PHASE_SHIELD_TARGET = "shield_target"  # selecting a target for shield spell
+PHASE_TURN_UNDEAD   = "turn_undead"    # turn undead holy blast animation
 PHASE_MONSTER     = "monster"
 PHASE_MONSTER_ACT = "monster_act"
 PHASE_SPELL_SELECT = "spell_select"  # choosing a spell from the list
@@ -250,6 +253,54 @@ class HealEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class ShieldEffect:
+    """A blue shield glow animation over a party member."""
+
+    DURATION = 0.8  # seconds
+
+    def __init__(self, col, row, ac_bonus=0):
+        self.col = col
+        self.row = row
+        self.ac_bonus = ac_bonus
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class TurnUndeadEffect:
+    """A holy blast radiating out from the caster toward the monster."""
+
+    DURATION = 1.2  # seconds — longer for dramatic effect
+
+    def __init__(self, caster_col, caster_row, monster_col, monster_row, damage=0):
+        self.caster_col = caster_col
+        self.caster_row = caster_row
+        self.monster_col = monster_col
+        self.monster_row = monster_row
+        self.damage = damage
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles a single combat encounter on a tactical arena."""
 
@@ -314,6 +365,17 @@ class CombatState(BaseState):
 
         # Heal effects
         self.heal_effects = []        # active HealEffect objects
+
+        # Shield effects
+        self.shield_effects = []      # active ShieldEffect objects
+        self.shield_buffs = {}        # member -> {"ac_bonus": int, "turns_left": int}
+
+        # Shield target selection cursor
+        self.shield_target_col = 0
+        self.shield_target_row = 0
+
+        # Turn Undead effects
+        self.turn_undead_effects = []  # active TurnUndeadEffect objects
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -395,6 +457,9 @@ class CombatState(BaseState):
         self.fireball_explosions = []
         self._pending_fireball = None
         self.heal_effects = []
+        self.shield_effects = []
+        self.shield_buffs = {}
+        self.turn_undead_effects = []
 
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
@@ -560,7 +625,7 @@ class CombatState(BaseState):
 
     def handle_input(self, events, keys_pressed):
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD):
             return
 
         # Equip screen handles its own input
@@ -575,6 +640,13 @@ class CombatState(BaseState):
             for event in events:
                 if event.type == pygame.KEYDOWN:
                     self._handle_spell_select_input(event)
+            return
+
+        # Shield target selection handles its own input
+        if self.phase == PHASE_SHIELD_TARGET:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    self._handle_shield_target_input(event)
             return
 
         # Throw selection screen handles its own input
@@ -712,12 +784,71 @@ class CombatState(BaseState):
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             spell_id, _label, _cost = self.spell_list[self.spell_cursor]
             self.selected_spell = spell_id
-            # Now enter direction mode for the chosen spell
-            self.directing_action = ACTION_CAST
-            self.phase = PHASE_PLAYER_DIR
+            # Check targeting mode for the selected spell
+            spell_data = SPELLS_DATA.get(spell_id, {})
+            targeting = spell_data.get("targeting", "directional_projectile")
+            if targeting == "select_ally":
+                # Enter free-cursor target selection mode
+                f = self.active_fighter
+                if f:
+                    col, row = self.fighter_positions.get(f, (3, 5))
+                    self.shield_target_col = col
+                    self.shield_target_row = row
+                self.phase = PHASE_SHIELD_TARGET
+            elif targeting == "auto_monster":
+                # Auto-targeting spell — cast immediately on the monster
+                self._cast_auto_monster_spell(spell_id)
+            else:
+                # Standard directional targeting
+                self.directing_action = ACTION_CAST
+                self.phase = PHASE_PLAYER_DIR
         elif event.key == pygame.K_ESCAPE:
             # Cancel back to action menu
             self.phase = PHASE_PLAYER
+            self.selected_spell = None
+
+    def _handle_shield_target_input(self, event):
+        """Handle input during free-cursor target selection (e.g. Shield spell).
+
+        Arrow keys move the selection box around the arena.
+        Enter confirms the target if an alive ally occupies the cell.
+        Escape cancels back to spell selection.
+        """
+        if event.key == pygame.K_UP:
+            self.shield_target_row = max(1, self.shield_target_row - 1)
+        elif event.key == pygame.K_DOWN:
+            self.shield_target_row = min(ARENA_ROWS - 2, self.shield_target_row + 1)
+        elif event.key == pygame.K_LEFT:
+            self.shield_target_col = max(1, self.shield_target_col - 1)
+        elif event.key == pygame.K_RIGHT:
+            self.shield_target_col = min(ARENA_COLS - 2, self.shield_target_col + 1)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Check if an alive ally is at the cursor position
+            f = self.active_fighter
+            target = None
+            for member in self.fighters:
+                if member is f or not member.is_alive():
+                    continue
+                mc, mr = self.fighter_positions.get(member, (-1, -1))
+                if mc == self.shield_target_col and mr == self.shield_target_row:
+                    target = member
+                    break
+            if target:
+                # Check range from caster
+                spell = SPELLS_DATA.get(self.selected_spell, {})
+                spell_range = spell.get("range", 99)
+                caster_col, caster_row = self.fighter_positions.get(f, (0, 0))
+                dist = max(abs(self.shield_target_col - caster_col),
+                           abs(self.shield_target_row - caster_row))
+                if dist > spell_range:
+                    self.combat_log.append("Target is out of range!")
+                else:
+                    self._cast_shield_on_target(target)
+            else:
+                self.combat_log.append("No ally at that position!")
+        elif event.key == pygame.K_ESCAPE:
+            # Cancel back to spell selection
+            self.phase = PHASE_SPELL_SELECT
             self.selected_spell = None
 
     def _handle_throw_select_input(self, event):
@@ -1514,6 +1645,134 @@ class CombatState(BaseState):
             f"{f.name} casts HEAL on {target.name}! (+{actual_heal} HP, -{HEAL_MP_COST} MP)"
         )
 
+    # ── Shield casting ─────────────────────────────────────────────
+
+    def _cast_shield_on_target(self, target):
+        """Cast the shield spell on a specific ally chosen via the selection box."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell = SPELLS_DATA[self.selected_spell]
+        mp_cost = spell["mp_cost"]
+
+        # Check if character can cast sorcerer spells
+        if not f.can_cast_sorcerer():
+            self.combat_log.append(f"{f.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {mp_cost})")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Apply shield buff
+        ac_bonus = spell["effect_value"].get("ac_bonus", 2)
+        duration = spell.get("duration", 3)
+        self.shield_buffs[target] = {"ac_bonus": ac_bonus, "turns_left": duration}
+
+        # Spawn shield effect over the target
+        tcol, trow = self.fighter_positions.get(target, (3, 5))
+        self.shield_effects.append(ShieldEffect(tcol, trow, ac_bonus))
+
+        self.phase = PHASE_SHIELD
+        self.game.sfx.play("shield")
+        self.combat_log.append(
+            f"{f.name} casts SHIELD on {target.name}! (+{ac_bonus} AC for {duration} turns, -{mp_cost} MP)"
+        )
+
+    def _tick_shield_buffs(self):
+        """Decrement shield buff durations at the end of each full round.
+        Called when all fighters have taken their turns."""
+        expired = []
+        for member, buff in self.shield_buffs.items():
+            buff["turns_left"] -= 1
+            if buff["turns_left"] <= 0:
+                expired.append(member)
+                self.combat_log.append(
+                    f"{member.name}'s shield fades away."
+                )
+        for member in expired:
+            del self.shield_buffs[member]
+
+    # ── Auto-monster spell dispatch ──────────────────────────────
+
+    def _cast_auto_monster_spell(self, spell_id):
+        """Dispatch auto-targeting spells that hit the monster directly."""
+        if spell_id == "turn_undead":
+            self._cast_turn_undead()
+        else:
+            # Unknown auto-monster spell — cancel safely
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+
+    # ── Turn Undead casting ────────────────────────────────────────
+
+    def _cast_turn_undead(self):
+        """Cast Turn Undead — deals 75% of the undead monster's HP as damage."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell = SPELLS_DATA["turn_undead"]
+        mp_cost = spell["mp_cost"]
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast priest spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {mp_cost})")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check if monster is undead
+        if not getattr(self.monster, "undead", False):
+            self.combat_log.append(
+                f"{self.monster.name} is not undead! The holy energy has no effect."
+            )
+            # Still costs the turn but not MP
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Calculate damage: 75% of monster's current HP
+        hp_pct = spell["effect_value"].get("hp_percent", 0.75)
+        damage = max(1, int(self.monster.hp * hp_pct))
+
+        # Apply damage
+        self.monster.hp = max(0, self.monster.hp - damage)
+
+        # Spawn the holy blast effect
+        caster_col, caster_row = self.fighter_positions.get(f, (3, 5))
+        self.turn_undead_effects.append(
+            TurnUndeadEffect(caster_col, caster_row,
+                             self.monster_col, self.monster_row, damage))
+
+        # Also spawn a hit effect on the monster for the damage number
+        self.hit_effects.append(HitEffect(self.monster_col, self.monster_row, damage))
+
+        self.phase = PHASE_TURN_UNDEAD
+        self.game.sfx.play("turn_undead")
+        self.combat_log.append(
+            f"{f.name} channels TURN UNDEAD! Holy light sears {self.monster.name} for {damage} damage! (-{mp_cost} MP)"
+        )
+
     def _apply_use_item(self, item_name, effect, power):
         """Apply a consumable item's effect and consume it."""
         f = self.active_fighter
@@ -1710,6 +1969,9 @@ class CombatState(BaseState):
         player_ac = target.get_ac()
         if self.defending.get(target, False):
             player_ac += 2
+        shield = self.shield_buffs.get(target)
+        if shield:
+            player_ac += shield["ac_bonus"]
 
         hit, roll, total, crit = roll_attack(
             self.monster.attack_bonus, player_ac
@@ -1718,6 +1980,8 @@ class CombatState(BaseState):
         ac_display = f"AC {player_ac}"
         if self.defending.get(target, False):
             ac_display += " (def)"
+        if shield:
+            ac_display += " (shld)"
 
         if crit:
             self.combat_log.append(
@@ -1802,6 +2066,32 @@ class CombatState(BaseState):
             return
         self.heal_effects = [fx for fx in self.heal_effects if fx.alive]
 
+        # Update shield effects
+        for fx in self.shield_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_SHIELD:
+            if all(not fx.alive for fx in self.shield_effects):
+                self.shield_effects = []
+                self._end_fighter_turn()
+            return
+        self.shield_effects = [fx for fx in self.shield_effects if fx.alive]
+
+        # Update turn undead effects
+        for fx in self.turn_undead_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_TURN_UNDEAD:
+            if all(not fx.alive for fx in self.turn_undead_effects):
+                self.turn_undead_effects = []
+                # Check if monster died from the holy blast
+                if not self.monster.is_alive():
+                    self._trigger_victory()
+                else:
+                    self._end_fighter_turn()
+            return
+        self.turn_undead_effects = [fx for fx in self.turn_undead_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -1852,6 +2142,7 @@ class CombatState(BaseState):
         elif self.phase == PHASE_MONSTER_ACT:
             for m in self.fighters:
                 self.defending[m] = False
+            self._tick_shield_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
@@ -1977,6 +2268,11 @@ class CombatState(BaseState):
             fireballs=self.fireballs,
             fireball_explosions=self.fireball_explosions,
             heal_effects=self.heal_effects,
+            shield_effects=self.shield_effects,
+            shield_buffs=self.shield_buffs,
+            shield_target_col=self.shield_target_col,
+            shield_target_row=self.shield_target_row,
+            turn_undead_effects=self.turn_undead_effects,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,

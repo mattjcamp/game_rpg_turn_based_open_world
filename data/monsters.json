@@ -4,6 +4,7 @@
   "monsters": {
     "Giant Rat": {
       "description": "A large rat. Weak but fast.",
+      "undead": false,
       "hp": 8,
       "ac": 12,
       "attack_bonus": 2,
@@ -19,6 +20,7 @@
     },
     "Skeleton": {
       "description": "An undead skeleton warrior. Medium difficulty.",
+      "undead": true,
       "hp": 16,
       "ac": 13,
       "attack_bonus": 3,
@@ -34,6 +36,7 @@
     },
     "Orc": {
       "description": "A brutal orc. Tough fight.",
+      "undead": false,
       "hp": 22,
       "ac": 13,
       "attack_bonus": 5,
@@ -49,6 +52,7 @@
     },
     "Goblin": {
       "description": "A small, sneaky goblin. Attacks in groups.",
+      "undead": false,
       "hp": 6,
       "ac": 11,
       "attack_bonus": 2,
@@ -64,6 +68,7 @@
     },
     "Zombie": {
       "description": "A shambling corpse. Slow but durable.",
+      "undead": true,
       "hp": 20,
       "ac": 10,
       "attack_bonus": 2,
@@ -79,6 +84,7 @@
     },
     "Wolf": {
       "description": "A fierce grey wolf. Fast and cunning.",
+      "undead": false,
       "hp": 12,
       "ac": 13,
       "attack_bonus": 4,
@@ -94,6 +100,7 @@
     },
     "Dark Mage": {
       "description": "A robed figure crackling with dark energy.",
+      "undead": false,
       "hp": 14,
       "ac": 12,
       "attack_bonus": 4,
@@ -109,6 +116,7 @@
     },
     "Troll": {
       "description": "A massive brute with thick hide. Hits hard.",
+      "undead": false,
       "hp": 30,
       "ac": 14,
       "attack_bonus": 6,

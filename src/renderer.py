@@ -1589,6 +1589,11 @@ class Renderer:
                           melee_effects=None, hit_effects=None,
                           fireballs=None, fireball_explosions=None,
                           heal_effects=None,
+                          shield_effects=None,
+                          shield_buffs=None,
+                          shield_target_col=0,
+                          shield_target_row=0,
+                          turn_undead_effects=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -1643,6 +1648,14 @@ class Renderer:
                 is_active = (member is active_fighter)
                 self._u3_draw_party_member_sprite(
                     mx, my, ts, col, row, member, is_active)
+
+            # Draw persistent shield bubbles over buffed fighters
+            if shield_buffs:
+                for member, buff in shield_buffs.items():
+                    if member.is_alive() and member in fighter_positions:
+                        sc, sr = fighter_positions[member]
+                        self._u3_draw_shield_bubble(mx, my, ts, sc, sr,
+                                                    buff["turns_left"])
         else:
             # Fallback: single player sprite
             self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
@@ -1718,6 +1731,24 @@ class Renderer:
                 if fx.alive:
                     self._u3_draw_heal_effect(mx, my, ts, fx)
 
+        # ── 2h. shield effects ──
+        if shield_effects:
+            for fx in shield_effects:
+                if fx.alive:
+                    self._u3_draw_shield_effect(mx, my, ts, fx)
+
+        # ── 2i. shield target selection box ──
+        from src.states.combat import PHASE_SHIELD_TARGET
+        if phase == PHASE_SHIELD_TARGET:
+            self._u3_draw_target_cursor(mx, my, ts,
+                                        shield_target_col, shield_target_row)
+
+        # ── 2j. turn undead effects ──
+        if turn_undead_effects:
+            for fx in turn_undead_effects:
+                if fx.alive:
+                    self._u3_draw_turn_undead_effect(mx, my, ts, fx)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
@@ -1732,9 +1763,11 @@ class Renderer:
         if fighters:
             self._u3_party_combat_panel(fighters, active_fighter,
                                         defending_map or {},
-                                        rx, 4, rw, party_h)
+                                        rx, 4, rw, party_h,
+                                        shield_buffs=shield_buffs or {})
         else:
-            self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138)
+            self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138,
+                                   shield_buffs=shield_buffs or {})
             party_h = 138
 
         monster_y = 4 + party_h + 4
@@ -2243,6 +2276,332 @@ class Renderer:
                 self.screen.blit(outline, (rx + ox, float_y + oy))
             self.screen.blit(surf, (rx, float_y))
 
+    def _u3_draw_shield_bubble(self, ax, ay, ts, col, row, turns_left):
+        """Draw a persistent glowing bubble around a shielded character.
+
+        The bubble pulses gently, with orbiting sparkles. As the buff nears
+        expiration (1 turn left), the bubble flickers to signal it's fading.
+        """
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ay + row * ts + ts // 2)
+
+        # Gentle pulse
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.003)
+
+        # Flicker when about to expire
+        if turns_left <= 1:
+            flicker = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(ticks * 0.02))
+        else:
+            flicker = 1.0
+
+        base_alpha = int((40 + 25 * pulse) * flicker)
+        radius = int(ts * 0.48)
+
+        # Translucent dome fill
+        bubble_surf = pygame.Surface((radius * 2 + 4, radius * 2 + 4),
+                                     pygame.SRCALPHA)
+        fill_color = (80, 160, 255, base_alpha)
+        pygame.draw.circle(bubble_surf, fill_color,
+                           (radius + 2, radius + 2), radius)
+        self.screen.blit(bubble_surf,
+                         (cx - radius - 2, cy - radius - 2))
+
+        # Bright ring outline
+        ring_alpha = int((120 + 80 * pulse) * flicker)
+        ring_surf = pygame.Surface((radius * 2 + 4, radius * 2 + 4),
+                                   pygame.SRCALPHA)
+        ring_color = (100, 180, 255, ring_alpha)
+        pygame.draw.circle(ring_surf, ring_color,
+                           (radius + 2, radius + 2), radius, 2)
+        self.screen.blit(ring_surf,
+                         (cx - radius - 2, cy - radius - 2))
+
+        # Orbiting sparkles (3 small dots circling the perimeter)
+        num_sparkles = 3
+        orbit_r = radius - 2
+        for i in range(num_sparkles):
+            angle_offset = (i * 360.0 / num_sparkles)
+            angle = math.radians(angle_offset + ticks * 0.08)
+            sx = cx + int(math.cos(angle) * orbit_r)
+            sy = cy + int(math.sin(angle) * orbit_r)
+            sparkle_alpha = int((160 + 80 * pulse) * flicker)
+            sparkle_surf = pygame.Surface((6, 6), pygame.SRCALPHA)
+            pygame.draw.circle(sparkle_surf,
+                               (180, 220, 255, sparkle_alpha), (3, 3), 2)
+            self.screen.blit(sparkle_surf, (sx - 3, sy - 3))
+
+        # Top highlight arc (subtle shine on top of bubble)
+        shine_alpha = int((60 + 40 * pulse) * flicker)
+        shine_surf = pygame.Surface((radius * 2 + 4, radius + 4),
+                                    pygame.SRCALPHA)
+        shine_rect = pygame.Rect(4, 4, radius * 2 - 4, radius - 2)
+        pygame.draw.ellipse(shine_surf,
+                            (200, 230, 255, shine_alpha), shine_rect, 1)
+        self.screen.blit(shine_surf,
+                         (cx - radius - 2, cy - radius - 2))
+
+    def _u3_draw_turn_undead_effect(self, ax, ay, ts, fx):
+        """Draw the Turn Undead holy blast — a radiant wave of golden-white
+        light expanding from the caster and engulfing the monster.
+
+        Phase 1 (0–0.25): Holy glow builds around caster
+        Phase 2 (0.25–0.65): Radiant wave travels toward the monster
+        Phase 3 (0.65–1.0): Bright explosion on the monster + fade
+        """
+        p = fx.progress  # 0 → 1
+
+        # Caster and monster pixel centers
+        cast_cx = int(ax + fx.caster_col * ts + ts // 2)
+        cast_cy = int(ay + fx.caster_row * ts + ts // 2)
+        mon_cx = int(ax + fx.monster_col * ts + ts // 2)
+        mon_cy = int(ay + fx.monster_row * ts + ts // 2)
+
+        # Gold / holy white colors
+        GOLD = (255, 220, 80)
+        HOLY_WHITE = (255, 255, 220)
+        HOLY_GLOW = (255, 240, 150)
+
+        if p < 0.25:
+            # Phase 1: holy glow building around caster
+            sub_p = p / 0.25
+            radius = int(4 + sub_p * 14)
+            # Bright gold core
+            glow_surf = pygame.Surface((radius * 2 + 4, radius * 2 + 4),
+                                       pygame.SRCALPHA)
+            alpha = int(120 * sub_p)
+            pygame.draw.circle(glow_surf, (*GOLD, alpha),
+                               (radius + 2, radius + 2), radius)
+            self.screen.blit(glow_surf,
+                             (cast_cx - radius - 2, cast_cy - radius - 2))
+            # White sparkle center
+            pygame.draw.circle(self.screen, HOLY_WHITE,
+                               (cast_cx, cast_cy), max(2, int(3 * sub_p)))
+            # Rising holy sparkles
+            ticks = pygame.time.get_ticks()
+            for i in range(4):
+                angle = math.radians(i * 90 + ticks * 0.15)
+                sr = int(6 + sub_p * 8)
+                sx = cast_cx + int(math.cos(angle) * sr)
+                sy = cast_cy - int(sub_p * 8) + int(math.sin(angle) * sr // 2)
+                s_size = max(1, int(2 * sub_p))
+                pygame.draw.circle(self.screen, HOLY_GLOW, (sx, sy), s_size)
+
+        elif p < 0.65:
+            # Phase 2: radiant wave traveling from caster to monster
+            sub_p = (p - 0.25) / 0.4
+            # Interpolate position
+            wave_cx = int(cast_cx + (mon_cx - cast_cx) * sub_p)
+            wave_cy = int(cast_cy + (mon_cy - cast_cy) * sub_p)
+
+            # Trailing glow at caster (fading)
+            fade = max(0, 1.0 - sub_p * 1.5)
+            if fade > 0:
+                tr_r = int(10 * fade)
+                tr_surf = pygame.Surface((tr_r * 2 + 4, tr_r * 2 + 4),
+                                         pygame.SRCALPHA)
+                pygame.draw.circle(tr_surf, (*GOLD, int(60 * fade)),
+                                   (tr_r + 2, tr_r + 2), tr_r)
+                self.screen.blit(tr_surf,
+                                 (cast_cx - tr_r - 2, cast_cy - tr_r - 2))
+
+            # Main wave orb
+            orb_r = int(8 + 4 * math.sin(sub_p * 6))
+            orb_surf = pygame.Surface((orb_r * 2 + 4, orb_r * 2 + 4),
+                                       pygame.SRCALPHA)
+            pygame.draw.circle(orb_surf, (*HOLY_WHITE, 180),
+                               (orb_r + 2, orb_r + 2), orb_r)
+            self.screen.blit(orb_surf,
+                             (wave_cx - orb_r - 2, wave_cy - orb_r - 2))
+            # Gold ring around orb
+            pygame.draw.circle(self.screen, GOLD, (wave_cx, wave_cy),
+                               orb_r + 2, 2)
+
+            # Trail particles
+            for i in range(3):
+                t_off = sub_p - i * 0.08
+                if t_off < 0:
+                    continue
+                tx = int(cast_cx + (mon_cx - cast_cx) * t_off)
+                ty = int(cast_cy + (mon_cy - cast_cy) * t_off)
+                trail_alpha = max(0, 1.0 - i * 0.35)
+                tr_size = max(1, int(3 * trail_alpha))
+                tr_surf2 = pygame.Surface((tr_size * 2 + 2, tr_size * 2 + 2),
+                                           pygame.SRCALPHA)
+                pygame.draw.circle(tr_surf2,
+                                   (*HOLY_GLOW, int(100 * trail_alpha)),
+                                   (tr_size + 1, tr_size + 1), tr_size)
+                self.screen.blit(tr_surf2,
+                                 (tx - tr_size - 1, ty - tr_size - 1))
+
+        else:
+            # Phase 3: explosion of holy light on the monster
+            sub_p = (p - 0.65) / 0.35
+            fade = 1.0 - sub_p
+
+            # Expanding radiant burst
+            burst_r = int(12 + sub_p * 20)
+            burst_surf = pygame.Surface((burst_r * 2 + 4, burst_r * 2 + 4),
+                                         pygame.SRCALPHA)
+            alpha = int(160 * fade)
+            pygame.draw.circle(burst_surf, (*GOLD, alpha),
+                               (burst_r + 2, burst_r + 2), burst_r)
+            self.screen.blit(burst_surf,
+                             (mon_cx - burst_r - 2, mon_cy - burst_r - 2))
+
+            # Inner white flash
+            flash_r = int(burst_r * 0.5)
+            flash_surf = pygame.Surface((flash_r * 2 + 4, flash_r * 2 + 4),
+                                         pygame.SRCALPHA)
+            pygame.draw.circle(flash_surf, (*HOLY_WHITE, int(200 * fade)),
+                               (flash_r + 2, flash_r + 2), flash_r)
+            self.screen.blit(flash_surf,
+                             (mon_cx - flash_r - 2, mon_cy - flash_r - 2))
+
+            # Holy rays radiating outward
+            num_rays = 8
+            for i in range(num_rays):
+                angle = math.radians(i * (360 / num_rays) + sub_p * 45)
+                inner_r = int(burst_r * 0.3)
+                outer_r = burst_r
+                x1 = mon_cx + int(math.cos(angle) * inner_r)
+                y1 = mon_cy + int(math.sin(angle) * inner_r)
+                x2 = mon_cx + int(math.cos(angle) * outer_r)
+                y2 = mon_cy + int(math.sin(angle) * outer_r)
+                ray_surf = pygame.Surface(
+                    (abs(x2 - x1) + 6, abs(y2 - y1) + 6), pygame.SRCALPHA)
+                # Draw ray as a line on main screen with alpha approximation
+                ray_alpha = fade
+                ray_color = (int(255 * ray_alpha), int(240 * ray_alpha),
+                             int(150 * ray_alpha))
+                if ray_color[0] > 10:
+                    pygame.draw.line(self.screen, ray_color, (x1, y1),
+                                     (x2, y2), max(1, int(2 * fade)))
+
+            # Scattering sparkles
+            ticks = pygame.time.get_ticks()
+            for i in range(6):
+                angle = math.radians(i * 60 + ticks * 0.1)
+                dist = int(burst_r * 0.7 + sub_p * 10)
+                sx = mon_cx + int(math.cos(angle) * dist)
+                sy = mon_cy + int(math.sin(angle) * dist)
+                s_size = max(1, int(2 * fade))
+                s_alpha = int(180 * fade)
+                if s_alpha > 10:
+                    spark_surf = pygame.Surface((s_size * 2 + 2, s_size * 2 + 2),
+                                                pygame.SRCALPHA)
+                    pygame.draw.circle(spark_surf, (*HOLY_WHITE, s_alpha),
+                                       (s_size + 1, s_size + 1), s_size)
+                    self.screen.blit(spark_surf,
+                                     (sx - s_size - 1, sy - s_size - 1))
+
+    def _u3_draw_target_cursor(self, ax, ay, ts, col, row):
+        """Draw a pulsing blue selection box at (col, row) on the arena."""
+        ticks = pygame.time.get_ticks()
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.006)
+
+        px = ax + col * ts
+        py = ay + row * ts
+
+        # Pulsing blue box outline (2-pixel border)
+        blue_val = int(140 + 115 * pulse)
+        color = (80, int(160 * pulse), blue_val)
+        rect = pygame.Rect(px, py, ts, ts)
+        pygame.draw.rect(self.screen, color, rect, 2)
+
+        # Corner brackets for extra visibility
+        bracket_len = ts // 3
+        bright = (int(120 + 135 * pulse), int(180 + 75 * pulse), 255)
+        # Top-left
+        pygame.draw.line(self.screen, bright, (px, py), (px + bracket_len, py), 2)
+        pygame.draw.line(self.screen, bright, (px, py), (px, py + bracket_len), 2)
+        # Top-right
+        pygame.draw.line(self.screen, bright, (px + ts, py), (px + ts - bracket_len, py), 2)
+        pygame.draw.line(self.screen, bright, (px + ts, py), (px + ts, py + bracket_len), 2)
+        # Bottom-left
+        pygame.draw.line(self.screen, bright, (px, py + ts), (px + bracket_len, py + ts), 2)
+        pygame.draw.line(self.screen, bright, (px, py + ts), (px, py + ts - bracket_len), 2)
+        # Bottom-right
+        pygame.draw.line(self.screen, bright, (px + ts, py + ts), (px + ts - bracket_len, py + ts), 2)
+        pygame.draw.line(self.screen, bright, (px + ts, py + ts), (px + ts, py + ts - bracket_len), 2)
+
+        # Subtle translucent blue fill
+        overlay = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        alpha = int(30 + 30 * pulse)
+        overlay.fill((80, 160, 255, alpha))
+        self.screen.blit(overlay, (px, py))
+
+    def _u3_draw_shield_effect(self, ax, ay, ts, fx):
+        """Draw a shield glow — blue energy dome coalescing around the target."""
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+
+        # Phase 1 (0–0.3): blue sparks converging inward
+        # Phase 2 (0.3–0.6): shield dome forming
+        # Phase 3 (0.6–1.0): bright flash then fade
+
+        if p < 0.3:
+            sub_p = p / 0.3
+            # Blue sparks converging from edges
+            for i in range(6):
+                angle = (i * 60 + sub_p * 180) * 3.14159 / 180
+                dist = int(18 * (1.0 - sub_p))
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                spark_size = max(1, int(2 + sub_p * 2))
+                blue_val = int(180 + 75 * sub_p)
+                pygame.draw.circle(self.screen, (100, 160, blue_val),
+                                   (sx, sy), spark_size)
+        elif p < 0.6:
+            sub_p = (p - 0.3) / 0.3
+            # Shield dome forming — concentric blue rings
+            radius = int(6 + sub_p * 10)
+            blue_val = int(200 + 55 * sub_p)
+            # Outer ring
+            pygame.draw.circle(self.screen, (80, 140, blue_val),
+                               (cx, cy), radius, 2)
+            # Inner glow
+            inner_r = max(1, radius - 4)
+            glow_surf = pygame.Surface((inner_r * 2, inner_r * 2), pygame.SRCALPHA)
+            alpha = int(80 * sub_p)
+            pygame.draw.circle(glow_surf, (100, 180, 255, alpha),
+                               (inner_r, inner_r), inner_r)
+            self.screen.blit(glow_surf, (cx - inner_r, cy - inner_r))
+        else:
+            sub_p = (p - 0.6) / 0.4
+            alpha_f = 1.0 - sub_p
+            # Fading shield dome
+            radius = int(16 - sub_p * 4)
+            blue_val = int(255 * alpha_f)
+            if blue_val > 10:
+                pygame.draw.circle(self.screen, (int(60 * alpha_f),
+                                                  int(120 * alpha_f),
+                                                  blue_val),
+                                   (cx, cy), radius, 2)
+                # Fading inner sparkles
+                for i in range(3):
+                    angle = (i * 120 + sub_p * 90) * 3.14159 / 180
+                    sr = int(radius * 0.6)
+                    sx = cx + int(math.cos(angle) * sr)
+                    sy = cy + int(math.sin(angle) * sr)
+                    s_size = max(1, int(2 * alpha_f))
+                    pygame.draw.circle(self.screen,
+                                       (int(100 * alpha_f), int(180 * alpha_f),
+                                        int(255 * alpha_f)),
+                                       (sx, sy), s_size)
+
+        # AC bonus text floating upward (blue "+N AC")
+        if fx.ac_bonus > 0 and p > 0.2:
+            float_y = cy - 14 - int(p * 24)
+            txt = f"+{fx.ac_bonus} AC"
+            surf = self.font.render(txt, True, (100, 180, 255))
+            outline = self.font.render(txt, True, self._U3_BLACK)
+            rx = cx - surf.get_width() // 2
+            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                self.screen.blit(outline, (rx + ox, float_y + oy))
+            self.screen.blit(surf, (rx, float_y))
+
     # ==============================================================
     #  RIGHT-HAND PANELS
     # ==============================================================
@@ -2257,7 +2616,8 @@ class Renderer:
         pygame.draw.rect(self.screen, (80, 80, 80), pygame.Rect(x, y, w, h), 1)
 
     def _u3_party_combat_panel(self, fighters, active_fighter,
-                                defending_map, x, y, w, h):
+                                defending_map, x, y, w, h,
+                                shield_buffs=None):
         """Party roster with character sprites and HP/MP bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -2325,9 +2685,13 @@ class Renderer:
                                        mp_val, mp_max, (100, 100, 255))
                 self._u3_text(f"MP", info_x - 26, mp_y - 2, (200, 200, 200), self.font_small)
 
-            # ── DEF indicator ──
+            # ── DEF / SHLD indicators ──
+            indicator_y = row_top + 18
             if is_def:
-                self._u3_text("DEF", x + w - 40, row_top + 18, self._U3_ORANGE, self.font_small)
+                self._u3_text("DEF", x + w - 40, indicator_y, self._U3_ORANGE, self.font_small)
+                indicator_y += 12
+            if shield_buffs and shield_buffs.get(member):
+                self._u3_text("SHLD", x + w - 44, indicator_y, (100, 180, 255), self.font_small)
 
             # ── Ammo indicator for throwable weapons ──
             if member.is_throwable_weapon():
@@ -2338,7 +2702,8 @@ class Renderer:
 
             ty += 58  # row height per character
 
-    def _u3_fighter_panel(self, fighter, defending, x, y, w, h):
+    def _u3_fighter_panel(self, fighter, defending, x, y, w, h,
+                          shield_buffs=None):
         """Player stats in Ultima III format."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -2350,10 +2715,16 @@ class Renderer:
 
         ty += 22
         ac = fighter.get_ac() + (2 if defending else 0)
+        shield = (shield_buffs or {}).get(fighter)
+        if shield:
+            ac += shield["ac_bonus"]
         self._u3_text(f"HP:{fighter.hp:04d}/{fighter.max_hp:04d}  AC:{ac:02d}",
                       tx, ty, self._U3_WHITE, f)
         if defending:
             self._u3_text("DEF", tx + 220, ty, self._U3_ORANGE, f)
+        if shield:
+            label_x = tx + 220 + (32 if defending else 0)
+            self._u3_text("SHLD", label_x, ty, (100, 180, 255), f)
 
         ty += 18
         self._u3_text(f"S:{fighter.strength:02d} D:{fighter.dexterity:02d} I:{fighter.intelligence:02d} W:{fighter.wisdom:02d}",
@@ -2426,6 +2797,7 @@ class Renderer:
             PHASE_THROW_SELECT, PHASE_USE_ITEM,
             PHASE_VICTORY, PHASE_DEFEAT,
             PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL,
+            PHASE_SHIELD, PHASE_SHIELD_TARGET, PHASE_TURN_UNDEAD,
         )
 
         _DIR_LABELS = {
@@ -2450,6 +2822,36 @@ class Renderer:
         elif phase == PHASE_HEAL:
             self._u3_text("-- HEALING --", tx, ty, (80, 255, 80), f)
             self._u3_text("RESTORE!", tx, ty + 24, (150, 255, 150), f)
+
+        elif phase == PHASE_SHIELD:
+            self._u3_text("-- SHIELDING --", tx, ty, (100, 180, 255), f)
+            self._u3_text("BARRIER!", tx, ty + 24, (150, 200, 255), f)
+
+        elif phase == PHASE_TURN_UNDEAD:
+            self._u3_text("-- HOLY POWER --", tx, ty, (255, 220, 80), f)
+            self._u3_text("TURN UNDEAD!", tx, ty + 24, (255, 255, 200), f)
+
+        elif phase == PHASE_SHIELD_TARGET:
+            # Free-cursor target selection mode
+            spell_name = "SHIELD"
+            if selected_spell:
+                from src.states.combat import SPELLS_DATA
+                sd = SPELLS_DATA.get(selected_spell, {})
+                spell_name = sd.get("name", "SHIELD").upper()
+
+            self._u3_text(f"-- {spell_name} --", tx, ty, (100, 180, 255), f)
+            self._u3_text("SELECT TARGET", tx, ty + 28, self._U3_WHITE, f)
+
+            # Show visual hint
+            cx = x + w // 2
+            cy = ty + 76
+            self._u3_text("^", cx - 4, cy - 20, self._U3_WHITE, f)
+            self._u3_text("<   >", cx - 24, cy, self._U3_WHITE, f)
+            self._u3_text("v", cx - 4, cy + 20, self._U3_WHITE, f)
+
+            self._u3_text("[ARROWS] MOVE CURSOR", tx, y + h - 48, self._U3_LTBLUE, f)
+            self._u3_text("[ENTER] CONFIRM", tx, y + h - 32, self._U3_LTBLUE, f)
+            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_PROJECTILE:
             self._u3_text("-- FIRING --", tx, ty, self._U3_ORANGE, f)

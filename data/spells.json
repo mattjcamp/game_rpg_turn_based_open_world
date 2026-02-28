@@ -4,9 +4,9 @@
   "spells": [
     {
       "id": "fireball",
-      "name": "Fireball",
-      "description": "Hurls a ball of fire in a straight line, exploding on impact.",
-      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid", "Ranger"],
+      "name": "Magic Dart",
+      "description": "Hurls an energy charged dark in a straight line, exploding on impact.",
+      "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
       "min_level": 1,
       "mp_cost": 5,
@@ -24,9 +24,9 @@
     },
     {
       "id": "heal",
-      "name": "Heal",
+      "name": "Minor Heal",
       "description": "Sends a wave of healing energy toward an ally.",
-      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
       "casting_type": "priest",
       "min_level": 1,
       "mp_cost": 5,
@@ -40,6 +40,42 @@
       "range": 2,
       "targeting": "directional_ally",
       "sfx": "heal",
+      "hit_sfx": null
+    },
+    {
+      "id": "shield",
+      "name": "Shield",
+      "description": "Conjures a magical barrier around an ally, boosting their armor.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": 3,
+      "effect_type": "ac_buff",
+      "effect_value": {
+        "ac_bonus": 2
+      },
+      "range": 5,
+      "targeting": "select_ally",
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
+      "id": "turn_undead",
+      "name": "Turn Undead",
+      "description": "Channels holy energy that sears undead creatures, stripping 75% of their life force.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 8,
+      "duration": "instant",
+      "effect_type": "undead_damage",
+      "effect_value": {
+        "hp_percent": 0.75
+      },
+      "range": 99,
+      "targeting": "auto_monster",
+      "sfx": "turn_undead",
       "hit_sfx": null
     }
   ]
