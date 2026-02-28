@@ -10,6 +10,8 @@ party member and attacks when adjacent.
 
 import random
 import math
+import json
+import os
 import pygame
 
 from src.states.base_state import BaseState
@@ -17,6 +19,18 @@ from src.combat_engine import (
     roll_initiative, roll_attack, roll_damage, roll_d20,
     format_modifier,
 )
+
+# ── Load spell definitions from JSON ──────────────────────────────
+_SPELLS_JSON = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "data", "spells.json",
+)
+
+def _load_spells():
+    with open(_SPELLS_JSON, "r") as f:
+        return json.load(f).get("spells", [])
+
+SPELLS_DATA = {s["id"]: s for s in _load_spells()}
 
 
 # ── Arena constants ──────────────────────────────────────────────
@@ -41,12 +55,10 @@ PHASE_EQUIP       = "equip"          # character sheet / equip screen
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
-# ── Fireball constants ──────────────────────────────────────────
-FIREBALL_MP_COST  = 5
+# ── Spell constants (loaded from data/spells.json) ────────────────
+FIREBALL_MP_COST  = SPELLS_DATA["fireball"]["mp_cost"]
 FIREBALL_SPEED    = 320   # pixels per second (slower than arrow for drama)
-
-# ── Heal constants ─────────────────────────────────────────────
-HEAL_MP_COST      = 4
+HEAL_MP_COST      = SPELLS_DATA["heal"]["mp_cost"]
 
 # ── Action indices ───────────────────────────────────────────────
 ACTION_MOVE   = 0      # kept for internal use (WASD movement)
@@ -474,13 +486,26 @@ class CombatState(BaseState):
         """Build the list of spells available to this fighter.
 
         Returns a list of (spell_id, label, mp_cost) tuples.
-        Only includes spells the fighter has enough MP to cast.
+        Only includes spells the fighter has enough MP to cast and
+        whose class/level requirements are met (driven by data/spells.json).
         """
         spells = []
-        if fighter.can_cast_sorcerer() and fighter.current_mp >= FIREBALL_MP_COST:
-            spells.append(("fireball", f"Fireball ({FIREBALL_MP_COST}MP)", FIREBALL_MP_COST))
-        if fighter.can_cast_priest() and fighter.current_mp >= HEAL_MP_COST:
-            spells.append(("heal", f"Heal ({HEAL_MP_COST}MP)", HEAL_MP_COST))
+        fighter_class = fighter.char_class.strip()
+        fighter_level = getattr(fighter, "level", 1)
+        for spell_id, spell in SPELLS_DATA.items():
+            # Check class requirement
+            allowed = [c.lower() for c in spell.get("allowable_classes", [])]
+            if fighter_class.lower() not in allowed:
+                continue
+            # Check level requirement
+            if fighter_level < spell.get("min_level", 1):
+                continue
+            # Check MP
+            cost = spell["mp_cost"]
+            if fighter.current_mp < cost:
+                continue
+            label = f"{spell['name']} ({cost}MP)"
+            spells.append((spell_id, label, cost))
         return spells
 
     def _build_throw_list(self, fighter):
@@ -1334,18 +1359,21 @@ class CombatState(BaseState):
 
         col, row = self.fighter_positions[f]
 
-        # Trace ray to find monster or wall
+        # Trace ray to find monster or wall (capped by spell range)
+        spell_range = SPELLS_DATA["fireball"].get("range", 99)
         tc, tr = col + dcol, row + drow
         hit_monster = False
         end_col, end_row = col, row
+        steps = 0
 
-        while not self._is_arena_wall(tc, tr):
+        while not self._is_arena_wall(tc, tr) and steps < spell_range:
             if tc == self.monster_col and tr == self.monster_row:
                 hit_monster = True
                 end_col, end_row = tc, tr
                 break
             tc += dcol
             tr += drow
+            steps += 1
 
         if not hit_monster:
             end_col = tc - dcol
@@ -1438,10 +1466,12 @@ class CombatState(BaseState):
 
         col, row = self.fighter_positions[f]
 
-        # Ray-trace in the chosen direction to find the first alive ally
+        # Ray-trace in the chosen direction to find the first alive ally (capped by range)
+        spell_range = SPELLS_DATA["heal"].get("range", 99)
         target = None
         tc, tr = col + dcol, row + drow
-        while not self._is_arena_wall(tc, tr):
+        steps = 0
+        while not self._is_arena_wall(tc, tr) and steps < spell_range:
             for member in self.fighters:
                 if member is f or not member.is_alive():
                     continue
@@ -1453,6 +1483,7 @@ class CombatState(BaseState):
                 break
             tc += dcol
             tr += drow
+            steps += 1
 
         if target is None:
             self.combat_log.append(f"No ally in that direction!")
