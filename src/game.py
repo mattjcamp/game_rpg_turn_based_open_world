@@ -16,6 +16,7 @@ from src.states.town import TownState
 from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.town_generator import generate_town
+from src.music import MusicManager
 
 
 class Game:
@@ -53,6 +54,9 @@ class Game:
         # None when no quest active; dict when quest is in progress
         self.quest = None
 
+        # --- Music ---
+        self.music = MusicManager()
+
         # --- State machine ---
         self.states = {
             "overworld": OverworldState(self),
@@ -69,6 +73,8 @@ class Game:
             self.current_state.exit()
         self.current_state = self.states[state_name]
         self.current_state.enter()
+        # Switch music to match the new state
+        self.music.play(state_name)
 
     def run(self):
         """Main game loop."""
@@ -80,6 +86,8 @@ class Game:
             for event in events:
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+                    self.music.toggle_mute()
 
             # --- Input ---
             keys_pressed = pygame.key.get_pressed()

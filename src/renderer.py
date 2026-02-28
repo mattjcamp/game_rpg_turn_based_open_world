@@ -17,7 +17,7 @@ from src.settings import (
     PARTY_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT,
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT,
+    TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL,
 )
 
 
@@ -1289,6 +1289,42 @@ class Renderer:
             glow = pygame.Surface((16, 16), pygame.SRCALPHA)
             pygame.draw.circle(glow, (200, 100, 255, 50), (8, 8), 8)
             self.screen.blit(glow, (cx - 8, cy - 8))
+
+        elif tile_id == TILE_PORTAL:
+            # Swirling portal doorway — distinct cyan/blue energy arch
+            pygame.draw.rect(self.screen, BLACK, rect)
+            # Stone archway frame
+            arch_color = (100, 100, 120)
+            # Left pillar
+            pygame.draw.rect(self.screen, arch_color,
+                             pygame.Rect(px + 3, py + 6, 5, ts - 8))
+            # Right pillar
+            pygame.draw.rect(self.screen, arch_color,
+                             pygame.Rect(px + ts - 8, py + 6, 5, ts - 8))
+            # Top arch
+            pygame.draw.rect(self.screen, arch_color,
+                             pygame.Rect(px + 3, py + 3, ts - 6, 5))
+            # Swirling energy fill inside the arch
+            inner = pygame.Surface((ts - 14, ts - 12), pygame.SRCALPHA)
+            inner.fill((0, 180, 255, 80))
+            self.screen.blit(inner, (px + 7, py + 7))
+            # Energy swirl lines
+            import math as _math
+            for i in range(3):
+                sy = py + 10 + i * 7
+                for sx_off in range(1, ts - 15, 2):
+                    wave = int(_math.sin(sx_off * 0.5 + i * 2.0) * 2)
+                    c_val = 150 + (sx_off * 7 + i * 30) % 105
+                    pygame.draw.rect(self.screen, (0, c_val, 255),
+                                     pygame.Rect(px + 8 + sx_off, sy + wave, 2, 1))
+            # Bright glow around the portal
+            glow = pygame.Surface((ts, ts), pygame.SRCALPHA)
+            pygame.draw.rect(glow, (0, 180, 255, 40),
+                             pygame.Rect(0, 0, ts, ts))
+            self.screen.blit(glow, (px, py))
+            # Pillar highlights
+            pygame.draw.rect(self.screen, (140, 140, 160),
+                             pygame.Rect(px + 3, py + 3, ts - 6, 5), 1)
 
         else:
             # Fallback: black

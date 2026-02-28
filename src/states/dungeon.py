@@ -12,7 +12,7 @@ import pygame
 from src.states.base_state import BaseState
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
-    TILE_STAIRS_DOWN, TILE_ARTIFACT,
+    TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL,
 )
 
 
@@ -800,7 +800,23 @@ class DungeonState(BaseState):
             self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
             if self.game.quest:
                 self.game.quest["status"] = "artifact_found"
-            self.show_message("Found the Shadow Crystal!", 3000)
+            # Spawn a portal doorway on an adjacent floor tile
+            self._place_portal(col, row)
+            self.show_message("Found the Shadow Crystal! A portal appears!", 3000)
+
+        elif tile_id == TILE_PORTAL:
+            # Portal whisks the party back to the overworld
+            self._entered = False
+            self.pending_combat_message = None
+            self.quest_levels = None
+            self.current_level = 0
+            self.game.party.col = self.overworld_col
+            self.game.party.row = self.overworld_row
+            self.game.camera.map_width = self.game.tile_map.width
+            self.game.camera.map_height = self.game.tile_map.height
+            self.game.camera.update(self.game.party.col, self.game.party.row)
+            self.show_message("The portal returns you to the surface!", 3000)
+            self.game.change_state("overworld")
 
     # ── Chest loot ─────────────────────────────────────────────
 
@@ -845,6 +861,20 @@ class DungeonState(BaseState):
                 f"Treasure! {gold} gold and {chosen_item}!", 2500)
         else:
             self.show_message(f"Treasure! Found {gold} gold!", 2000)
+
+    def _place_portal(self, col, row):
+        """Place a TILE_PORTAL on an adjacent walkable floor tile."""
+        tmap = self.dungeon_data.tile_map
+        # Try cardinal directions first, then diagonals
+        for dc, dr in [(0, -1), (1, 0), (0, 1), (-1, 0),
+                       (1, -1), (1, 1), (-1, 1), (-1, -1)]:
+            nc, nr = col + dc, row + dr
+            if 0 <= nc < tmap.width and 0 <= nr < tmap.height:
+                if tmap.get_tile(nc, nr) == TILE_DFLOOR:
+                    tmap.set_tile(nc, nr, TILE_PORTAL)
+                    return
+        # Fallback: place it right where the artifact was (already floor)
+        tmap.set_tile(col, row, TILE_PORTAL)
 
     def _ascend_level(self):
         """Ascend from level 1 back to level 0 in a quest dungeon."""
