@@ -75,6 +75,20 @@ class Renderer:
             raw = pygame.image.load(gate_path).convert_alpha()
             self._town_gate_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
 
+        # ── Load monster tile sprites from assets ──
+        self._monster_tiles = {}  # tile filename -> scaled pygame surface
+        from src.monster import MONSTERS
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "src", "assets")
+        for name, data in MONSTERS.items():
+            tile_file = data.get("tile")
+            if tile_file and tile_file not in self._monster_tiles:
+                tile_path = os.path.join(assets_dir, tile_file)
+                if os.path.exists(tile_path):
+                    raw = pygame.image.load(tile_path).convert_alpha()
+                    self._monster_tiles[tile_file] = pygame.transform.scale(
+                        raw, (dst_ts, dst_ts))
+
         # Map game tile IDs to sheet positions (row, col)
         # Based on the style guide tile-to-game mapping
         from src.settings import (
@@ -824,7 +838,6 @@ class Renderer:
 
         # ── 2. overworld monster sprites ──
         if overworld_monsters:
-            orc_sprite = self._tile_sprites.get((1, 8))  # Orc sprite
             for mon in overworld_monsters:
                 if not mon.is_alive():
                     continue
@@ -833,10 +846,11 @@ class Renderer:
                 if 0 <= msc < cols and 0 <= msr < rows:
                     mx = msc * ts + ts // 2
                     my = msr * ts + ts // 2
-                    if orc_sprite:
-                        sx = mx - orc_sprite.get_width() // 2
-                        sy = my - orc_sprite.get_height() // 2
-                        self.screen.blit(orc_sprite, (sx, sy))
+                    mon_sprite = self._get_monster_sprite(mon)
+                    if mon_sprite:
+                        sx = mx - mon_sprite.get_width() // 2
+                        sy = my - mon_sprite.get_height() // 2
+                        self.screen.blit(mon_sprite, (sx, sy))
 
         # ── 3. party sprite ──
         psc = party.col - off_c
@@ -1332,16 +1346,25 @@ class Renderer:
 
     # ── dungeon monster sprite ─────────────────────────────
 
+    def _get_monster_sprite(self, monster):
+        """Get the tile sprite for a monster, falling back to tile sheet."""
+        # Try per-monster tile from assets
+        if monster.tile:
+            sprite = self._monster_tiles.get(monster.tile)
+            if sprite:
+                return sprite
+        # Fallback to tile sheet skeleton
+        return self._tile_sprites.get((1, 9))
+
     def _u3_draw_dungeon_monster(self, monster, cx, cy):
-        """Draw a monster in the dungeon using the tile sheet skeleton sprite."""
-        # Use skeleton sprite from tile sheet (R1 C9)
-        sprite = self._tile_sprites.get((1, 9))
+        """Draw a monster in the dungeon using its unique tile sprite."""
+        sprite = self._get_monster_sprite(monster)
         if sprite:
             sx = cx - sprite.get_width() // 2
             sy = cy - sprite.get_height() // 2
             self.screen.blit(sprite, (sx, sy))
         else:
-            # Fallback: blocky monster
+            # Fallback: blocky monster with monster-specific color
             mc = monster.color
             W = (255, 255, 255)
             body = pygame.Rect(cx - 8, cy - 6, 16, 14)
@@ -1806,18 +1829,16 @@ class Renderer:
             pygame.draw.circle(self.screen, (15, 60, 15), (cx, cy), 7)
 
     def _u3_draw_orc_combat_sprite(self, monster, ax, ay, ts, col, row):
-        """Draw orc using tile sheet orc sprite for overworld combat."""
+        """Draw monster using its unique tile sprite for overworld combat."""
         cx = ax + col * ts + ts // 2
         cy = ay + row * ts + ts // 2
 
-        # Use orc sprite from tile sheet (R1 C8)
-        sprite = self._tile_sprites.get((1, 8))
+        sprite = self._get_monster_sprite(monster)
         if sprite:
             sx = cx - sprite.get_width() // 2
             sy = cy - sprite.get_height() // 2
             self.screen.blit(sprite, (sx, sy))
         else:
-            # Fallback: green blocky orc
             mc = monster.color
             body = pygame.Rect(cx - 8, cy - 6, 16, 14)
             pygame.draw.rect(self.screen, mc, body)
@@ -1853,18 +1874,17 @@ class Renderer:
                          pygame.Rect(cx - 10, cy - 5, 4, 7))
 
     def _u3_draw_monster_sprite(self, monster, ax, ay, ts, col, row):
-        """Draw monster using tile sheet skeleton sprite, with fallback."""
+        """Draw monster using its unique tile sprite for dungeon combat."""
         cx = ax + col * ts + ts // 2
         cy = ay + row * ts + ts // 2
 
-        # Use skeleton sprite from tile sheet (R1 C9)
-        sprite = self._tile_sprites.get((1, 9))
+        sprite = self._get_monster_sprite(monster)
         if sprite:
             sx = cx - sprite.get_width() // 2
             sy = cy - sprite.get_height() // 2
             self.screen.blit(sprite, (sx, sy))
         else:
-            # Fallback: blocky monster
+            # Fallback: blocky monster with arms and legs
             mc = monster.color
             W = self._U3_WHITE
             body = pygame.Rect(cx - 8, cy - 6, 16, 14)
@@ -2327,10 +2347,7 @@ class Renderer:
         bar_h = 8
 
         # ── Monster sprite ──
-        if source_state == "overworld":
-            sprite = self._tile_sprites.get((1, 8))  # orc
-        else:
-            sprite = self._tile_sprites.get((1, 9))  # skeleton
+        sprite = self._get_monster_sprite(monster)
         if sprite:
             sx = tx
             sy = ty + 2
@@ -2547,6 +2564,51 @@ class Renderer:
     # ========================================================
     # PARTY SCREEN  –  Ultima III retro style (P key overlay)
     # ========================================================
+
+    def draw_settings_screen(self, settings, cursor):
+        """Draw a full-screen settings overlay in Ultima III style.
+
+        settings: list of dicts with keys 'label', 'value', 'type'
+                  type is 'toggle' (on/off)
+        cursor:   which row is selected
+        """
+        self.screen.fill((0, 0, 0))
+
+        # Title bar
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        self._u3_text("SETTINGS", SCREEN_WIDTH // 2 - 40, 8,
+                       (255, 170, 85), self.font)
+
+        # Settings panel
+        panel_w = 400
+        panel_h = 40 + len(settings) * 40 + 50
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = 60
+
+        self._u3_panel(panel_x, panel_y, panel_w, panel_h)
+
+        for i, setting in enumerate(settings):
+            y = panel_y + 20 + i * 40
+            selected = (i == cursor)
+            label_color = (255, 255, 0) if selected else (200, 200, 200)
+            prefix = "> " if selected else "  "
+
+            # Label
+            self._u3_text(f"{prefix}{setting['label']}",
+                          panel_x + 16, y, label_color, self.font)
+
+            # Value
+            if setting['type'] == 'toggle':
+                val_text = "ON" if setting['value'] else "OFF"
+                val_color = (0, 200, 0) if setting['value'] else (200, 60, 60)
+                # Draw a toggle indicator
+                tx = panel_x + panel_w - 80
+                self._u3_text(f"[ {val_text} ]", tx, y, val_color, self.font)
+
+        # Controls hint
+        hint_y = panel_y + panel_h - 30
+        self._u3_text("[UP/DOWN] SELECT   [ENTER] TOGGLE   [S/ESC] CLOSE",
+                      panel_x + 16, hint_y, (68, 68, 255), self.font_small)
 
     def draw_party_screen_u3(self, party):
         """

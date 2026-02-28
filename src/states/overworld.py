@@ -15,10 +15,10 @@ from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
 )
 from src.dungeon_generator import generate_dungeon
-from src.monster import create_orc
+from src.monster import create_random_monster
 
 
-# How many orcs roam the overworld at a time
+# How many monsters roam the overworld at a time
 _MAX_OVERWORLD_ORCS = 2
 # Minimum Chebyshev distance from party when spawning
 _SPAWN_MIN_DIST = 8
@@ -325,7 +325,7 @@ class OverworldState(BaseState):
         party = self.game.party
 
         for _ in range(needed):
-            orc = create_orc()
+            orc = create_random_monster("overworld")
             placed = False
             for _attempt in range(60):
                 c = party.col + random.randint(-_SPAWN_MAX_DIST, _SPAWN_MAX_DIST)

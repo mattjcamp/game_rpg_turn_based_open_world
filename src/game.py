@@ -57,6 +57,17 @@ class Game:
         # --- Music ---
         self.music = MusicManager()
 
+        # --- Settings screen ---
+        self.showing_settings = False
+        self.settings_cursor = 0
+        self.settings_options = [
+            {"label": "MUSIC", "value": False, "type": "toggle",
+             "action": self._toggle_music},
+        ]
+
+        # Start with music muted by default
+        self.music.toggle_mute()
+
         # --- State machine ---
         self.states = {
             "overworld": OverworldState(self),
@@ -67,6 +78,11 @@ class Game:
         self.current_state = None
         self.change_state("overworld")
 
+    def _toggle_music(self):
+        """Toggle music on/off and sync settings display."""
+        muted = self.music.toggle_mute()
+        self.settings_options[0]["value"] = not muted
+
     def change_state(self, state_name):
         """Switch to a different game state."""
         if self.current_state:
@@ -75,6 +91,23 @@ class Game:
         self.current_state.enter()
         # Switch music to match the new state
         self.music.play(state_name)
+
+    def _handle_settings_input(self, event):
+        """Handle input while the settings screen is open."""
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key in (pygame.K_s, pygame.K_ESCAPE):
+            self.showing_settings = False
+        elif event.key == pygame.K_UP:
+            self.settings_cursor = (
+                (self.settings_cursor - 1) % len(self.settings_options))
+        elif event.key == pygame.K_DOWN:
+            self.settings_cursor = (
+                (self.settings_cursor + 1) % len(self.settings_options))
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            opt = self.settings_options[self.settings_cursor]
+            if opt["type"] == "toggle":
+                opt["action"]()
 
     def run(self):
         """Main game loop."""
@@ -86,20 +119,37 @@ class Game:
             for event in events:
                 if event.type == pygame.QUIT:
                     self.running = False
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_m:
-                    self.music.toggle_mute()
 
-            # --- Input ---
-            keys_pressed = pygame.key.get_pressed()
-            self.current_state.handle_input(events, keys_pressed)
+            if self.showing_settings:
+                # Settings screen intercepts all input
+                for event in events:
+                    self._handle_settings_input(event)
+            else:
+                # Check for S key to open settings
+                for event in events:
+                    if (event.type == pygame.KEYDOWN
+                            and event.key == pygame.K_s):
+                        self.showing_settings = True
+                        self.settings_cursor = 0
+                        break
+
+                # --- Input ---
+                if not self.showing_settings:
+                    keys_pressed = pygame.key.get_pressed()
+                    self.current_state.handle_input(events, keys_pressed)
 
             # --- Update ---
-            self.current_state.update(dt)
-            self.camera.update(self.party.col, self.party.row)
+            if not self.showing_settings:
+                self.current_state.update(dt)
+                self.camera.update(self.party.col, self.party.row)
 
             # --- Draw ---
             self.screen.fill(COLOR_BLACK)
-            self.current_state.draw(self.renderer)
+            if self.showing_settings:
+                self.renderer.draw_settings_screen(
+                    self.settings_options, self.settings_cursor)
+            else:
+                self.current_state.draw(self.renderer)
             pygame.display.flip()
 
         pygame.quit()

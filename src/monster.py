@@ -1,11 +1,26 @@
 """
 Monster definitions for combat encounters.
 
-Each monster has D&D-style stats: HP, AC, attack bonus, damage dice,
-and rewards (XP and gold). Factory functions create specific monster types.
+Loads monster stats from data/monsters.json so new creatures can be added
+or tweaked without touching code. Each monster has D&D-style stats: HP,
+AC, attack bonus, damage dice, and rewards (XP and gold).
 """
 
+import json
+import os
 import random
+
+
+# ── Load monster data from JSON ─────────────────────────────────
+
+_DATA_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "monsters.json")
+
+with open(_DATA_PATH, "r") as f:
+    _MONSTER_DATA = json.load(f)
+
+MONSTERS = _MONSTER_DATA["monsters"]
+SPAWN_TABLES = _MONSTER_DATA.get("spawn_tables", {})
 
 
 class Monster:
@@ -13,7 +28,8 @@ class Monster:
 
     def __init__(self, name, hp, ac, attack_bonus,
                  damage_dice=1, damage_sides=4, damage_bonus=0,
-                 xp_reward=25, gold_reward=10, color=(200, 50, 50)):
+                 xp_reward=25, gold_reward=10, color=(200, 50, 50),
+                 tile=None):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -24,7 +40,8 @@ class Monster:
         self.damage_bonus = damage_bonus
         self.xp_reward = xp_reward
         self.gold_reward = gold_reward
-        self.color = color  # For rendering on map and in combat
+        self.color = color   # Fallback color for procedural rendering
+        self.tile = tile     # Filename in src/assets/ (e.g. "orc_f1.png")
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -116,47 +133,60 @@ class Monster:
             return
 
 
-# ----- Monster factory functions -----
+# ── Monster factory functions ───────────────────────────────────
+
+def create_monster(name):
+    """Create a monster by name from the JSON data."""
+    data = MONSTERS.get(name)
+    if not data:
+        raise ValueError(f"Unknown monster: {name}")
+    return Monster(
+        name=name,
+        hp=data["hp"],
+        ac=data["ac"],
+        attack_bonus=data["attack_bonus"],
+        damage_dice=data.get("damage_dice", 1),
+        damage_sides=data.get("damage_sides", 4),
+        damage_bonus=data.get("damage_bonus", 0),
+        xp_reward=data.get("xp_reward", 25),
+        gold_reward=random.randint(
+            data.get("gold_min", 5), data.get("gold_max", 15)),
+        color=tuple(data.get("color", [200, 50, 50])),
+        tile=data.get("tile"),
+    )
+
+
+def create_random_monster(table="dungeon"):
+    """Pick a random monster using weighted spawn tables from JSON."""
+    pool = SPAWN_TABLES.get(table, list(MONSTERS.keys()))
+    # Build weighted list from spawn_weight values
+    weighted = []
+    for name in pool:
+        data = MONSTERS.get(name)
+        if data:
+            weighted.append((name, data.get("spawn_weight", 20)))
+    if not weighted:
+        # Fallback to first monster
+        return create_monster(list(MONSTERS.keys())[0])
+
+    total = sum(w for _, w in weighted)
+    roll = random.randint(1, total)
+    cumulative = 0
+    for name, weight in weighted:
+        cumulative += weight
+        if roll <= cumulative:
+            return create_monster(name)
+    # Shouldn't reach here, but just in case
+    return create_monster(weighted[0][0])
+
+
+# ── Legacy factory functions (for backward compatibility) ───────
 
 def create_giant_rat():
-    """A large rat. Weak but fast."""
-    return Monster(
-        name="Giant Rat",
-        hp=8, ac=12, attack_bonus=2,
-        damage_dice=1, damage_sides=4, damage_bonus=0,
-        xp_reward=15, gold_reward=random.randint(2, 8),
-        color=(140, 100, 80),
-    )
-
+    return create_monster("Giant Rat")
 
 def create_skeleton():
-    """An undead skeleton warrior. Medium difficulty."""
-    return Monster(
-        name="Skeleton",
-        hp=16, ac=13, attack_bonus=3,
-        damage_dice=1, damage_sides=6, damage_bonus=1,
-        xp_reward=30, gold_reward=random.randint(5, 20),
-        color=(220, 220, 200),
-    )
-
+    return create_monster("Skeleton")
 
 def create_orc():
-    """A brutal orc. Tough fight."""
-    return Monster(
-        name="Orc",
-        hp=22, ac=13, attack_bonus=5,
-        damage_dice=1, damage_sides=8, damage_bonus=2,
-        xp_reward=50, gold_reward=random.randint(10, 30),
-        color=(80, 140, 60),
-    )
-
-
-def create_random_monster():
-    """Pick a random monster appropriate for early-game dungeons."""
-    roll = random.random()
-    if roll < 0.4:
-        return create_giant_rat()
-    elif roll < 0.75:
-        return create_skeleton()
-    else:
-        return create_orc()
+    return create_monster("Orc")
