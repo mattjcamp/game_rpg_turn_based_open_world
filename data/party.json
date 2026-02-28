@@ -1,5 +1,5 @@
 {
-  "_comment": "Party configuration for Realm of Shadow. Edit this file to change starting position, gold, and shared inventory without touching code.",
+  "_comment": "Party configuration for Realm of Shadow. Edit this file to change starting characters, position, gold, and shared inventory without touching code.",
 
   "start_position": {
     "col": 11,
@@ -7,6 +7,88 @@
   },
 
   "gold": 50,
+
+  "characters": [
+    {
+      "name": "Roland",
+      "class": "Fighter",
+      "race": "Dwarf",
+      "hp": 30,
+      "strength": 16,
+      "dexterity": 12,
+      "intelligence": 8,
+      "wisdom": 10,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Sword",
+        "left_hand": null,
+        "body": "Plate",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Mira",
+      "class": "Cleric",
+      "race": "Bobbit",
+      "hp": 22,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 10,
+      "wisdom": 18,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Mace",
+        "left_hand": null,
+        "body": "Chain",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Theron",
+      "class": "Wizard",
+      "race": "Fuzzy",
+      "hp": 14,
+      "strength": 6,
+      "dexterity": 14,
+      "intelligence": 20,
+      "wisdom": 8,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Dagger",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Sable",
+      "class": "Thief",
+      "race": "Elf",
+      "hp": 20,
+      "strength": 12,
+      "dexterity": 18,
+      "intelligence": 10,
+      "wisdom": 8,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Bow",
+        "left_hand": null,
+        "body": "Leather",
+        "head": null
+      },
+      "inventory": []
+    }
+  ],
+
+  "party_equipped": {
+    "light": { "name": "Torch", "charges": 150 },
+    "navigation": null,
+    "camping": null,
+    "special": null
+  },
 
   "inventory": [
     { "item": "Torch" },

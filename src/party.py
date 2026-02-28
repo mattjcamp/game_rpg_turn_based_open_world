@@ -697,10 +697,11 @@ class Party:
 
 
 def create_default_party(start_col=None, start_row=None):
-    """Create a classic balanced party of 4 characters (Ultima III style).
+    """Create a party from data/party.json configuration.
 
-    Party-level settings (position, gold, shared inventory) are loaded
-    from data/party.json so they can be tweaked without touching code.
+    Characters, equipment, personal inventories, party position, gold,
+    and shared inventory are all loaded from the JSON file so the game
+    can be tweaked without touching code.
     If start_col/start_row are provided they override the JSON values.
     """
     cfg = _load_party_config()
@@ -710,53 +711,49 @@ def create_default_party(start_col=None, start_row=None):
         start_row = cfg["start_position"]["row"]
     party = Party(start_col, start_row)
 
-    # 1. Dwarf Fighter — front-line tank
-    roland = PartyMember(
-        "Roland", "Fighter", race="Dwarf",
-        hp=30, strength=16, dexterity=12,
-        intelligence=8, wisdom=10, level=1,
-    )
-    roland.equipped = {"right_hand": "Club", "left_hand": None, "body": "Cloth", "head": None}
-    roland.weapon = "Club"
-    roland.armor = "Cloth"
-    party.add_member(roland)
+    # ── Build party members from JSON ──
+    for char_cfg in cfg.get("characters", []):
+        member = PartyMember(
+            name=char_cfg["name"],
+            char_class=char_cfg["class"],
+            race=char_cfg.get("race", "Human"),
+            hp=char_cfg.get("hp", 20),
+            strength=char_cfg.get("strength", 10),
+            dexterity=char_cfg.get("dexterity", 10),
+            intelligence=char_cfg.get("intelligence", 10),
+            wisdom=char_cfg.get("wisdom", 10),
+            level=char_cfg.get("level", 1),
+        )
+        # Equipment slots
+        equip = char_cfg.get("equipped", {})
+        member.equipped = {
+            "right_hand": equip.get("right_hand", "Fists"),
+            "left_hand": equip.get("left_hand"),
+            "body": equip.get("body", "Cloth"),
+            "head": equip.get("head"),
+        }
+        member._sync_legacy_fields()
 
-    # 2. Bobbit Cleric — healer, priest spells
-    mira = PartyMember(
-        "Mira", "Cleric", race="Bobbit",
-        hp=22, strength=10, dexterity=10,
-        intelligence=10, wisdom=18, level=1,
-    )
-    mira.equipped = {"right_hand": "Club", "left_hand": None, "body": "Cloth", "head": None}
-    mira.weapon = "Club"
-    mira.armor = "Cloth"
-    party.add_member(mira)
+        # Personal inventory
+        for item in char_cfg.get("inventory", []):
+            member.inventory.append(item)
 
-    # 3. Fuzzy Wizard — nuker, sorcerer spells
-    theron = PartyMember(
-        "Theron", "Wizard", race="Fuzzy",
-        hp=14, strength=6, dexterity=14,
-        intelligence=20, wisdom=8, level=1,
-    )
-    theron.equipped = {"right_hand": "Dagger", "left_hand": None, "body": "Cloth", "head": None}
-    theron.weapon = "Dagger"
-    theron.armor = "Cloth"
-    party.add_member(theron)
+        party.add_member(member)
 
-    # 4. Elf Thief — trap disarmer, high evasion
-    sable = PartyMember(
-        "Sable", "Thief", race="Elf",
-        hp=20, strength=12, dexterity=18,
-        intelligence=10, wisdom=8, level=1,
-    )
-    sable.equipped = {"right_hand": "Dagger", "left_hand": None, "body": "Cloth", "head": None}
-    sable.weapon = "Dagger"
-    sable.armor = "Cloth"
-    party.add_member(sable)
-
-    # ── Party-level config from data/party.json ──
+    # ── Party-level config ──
     party.gold = cfg.get("gold", 100)
 
+    # ── Party-level equipment slots from JSON ──
+    party_eq = cfg.get("party_equipped", {})
+    for slot in party.PARTY_SLOTS:
+        entry = party_eq.get(slot)
+        if entry is not None:
+            party.equipped[slot] = {
+                "name": entry["name"],
+                "charges": entry.get("charges"),
+            }
+
+    # ── Shared inventory ──
     party.shared_inventory = []
     for entry in cfg.get("inventory", []):
         item_name = entry["item"]

@@ -96,7 +96,7 @@ class Game:
         """Handle input while the settings screen is open."""
         if event.type != pygame.KEYDOWN:
             return
-        if event.key in (pygame.K_s, pygame.K_ESCAPE):
+        if event.key in (pygame.K_m, pygame.K_ESCAPE):
             self.showing_settings = False
         elif event.key == pygame.K_UP:
             self.settings_cursor = (
@@ -125,13 +125,27 @@ class Game:
                 for event in events:
                     self._handle_settings_input(event)
             else:
-                # Check for S key to open settings
+                # Check for M key to open settings, 1-4 for character sheets
                 for event in events:
-                    if (event.type == pygame.KEYDOWN
-                            and event.key == pygame.K_s):
+                    if event.type != pygame.KEYDOWN:
+                        continue
+                    if event.key == pygame.K_m:
                         self.showing_settings = True
                         self.settings_cursor = 0
                         break
+                    # 1-4 opens character sheet if the state supports it
+                    num = {pygame.K_1: 0, pygame.K_2: 1,
+                           pygame.K_3: 2, pygame.K_4: 3}.get(event.key)
+                    if num is not None:
+                        state = self.current_state
+                        if (hasattr(state, 'showing_char_detail')
+                                and state.showing_char_detail is None
+                                and not getattr(state, 'showing_party_inv', False)
+                                and num < len(self.party.members)):
+                            state.showing_char_detail = num
+                            state.char_sheet_cursor = 0
+                            state.char_action_menu = False
+                            break
 
                 # --- Input ---
                 if not self.showing_settings:

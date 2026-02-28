@@ -1,6 +1,5 @@
 Purpose: to create a playable adventure from beginning to end with a simple version of the game systems
 
-- Create configurable json models for monsters
 - Create level 1 monsters
 - Thief class should be able to see traps and unlock doors
 - Add 2 additional level 1 spells for each spellcaster

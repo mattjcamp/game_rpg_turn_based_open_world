@@ -2607,7 +2607,7 @@ class Renderer:
 
         # Controls hint
         hint_y = panel_y + panel_h - 30
-        self._u3_text("[UP/DOWN] SELECT   [ENTER] TOGGLE   [S/ESC] CLOSE",
+        self._u3_text("[UP/DOWN] SELECT   [ENTER] TOGGLE   [M/ESC] CLOSE",
                       panel_x + 16, hint_y, (68, 68, 255), self.font_small)
 
     def draw_party_screen_u3(self, party):
@@ -3336,7 +3336,6 @@ class Renderer:
         Modes:
         - Normal: browse items with cursor, Enter to open action menu.
         - action_menu: choose from context-sensitive options.
-        - choosing_member: pick which party member receives the item.
         """
         from src.party import WEAPONS, ARMORS, ITEM_INFO
 
@@ -3378,7 +3377,7 @@ class Renderer:
             slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
             item_name = party.get_equipped_name(slot_key)
             charges = party.get_equipped_charges(slot_key)
-            selected = (si == cursor_index) and not choosing_member
+            selected = (si == cursor_index)
             prefix = "> " if selected else "  "
 
             name_color = self._U3_WHITE if selected else self._U3_LTBLUE
@@ -3431,7 +3430,7 @@ class Renderer:
                 item_name = party.item_name(entry)
                 item_ch = party.item_charges(entry)
                 global_idx = item_idx + NUM_SLOTS
-                selected = (global_idx == cursor_index) and not choosing_member
+                selected = (global_idx == cursor_index)
                 prefix = "> " if selected else "  "
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
 
@@ -3607,30 +3606,6 @@ class Renderer:
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
 
-        # ── Character selection mode (GIVE TO) ──
-        if choosing_member:
-            ry += 32
-            pygame.draw.line(self.screen, (60, 60, 80),
-                             (rx, ry), (rx + right_w - 20, ry), 1)
-            ry += 10
-            self._u3_text("GIVE TO:", rx, ry, self._U3_ORANGE, fm)
-            ry += 22
-
-            for mi, member in enumerate(party.members):
-                selected = (mi == member_cursor)
-                prefix = "> " if selected else "  "
-                name_color = self._U3_WHITE if selected else self._U3_LTBLUE
-                cls_short = member.char_class[:3].upper()
-                label = f"{prefix}{member.name} ({cls_short})"
-                self._u3_text(label, rx, ry, name_color, fm)
-
-                if selected:
-                    sel_rect = pygame.Rect(rx - 4, ry - 1, right_w - 20, row_h)
-                    sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
-                    sel_surf.fill((255, 255, 255, 25))
-                    self.screen.blit(sel_surf, sel_rect)
-
-                ry += row_h
 
         # ── Gold display with chest icon ──
         gold_y = panel_y + panel_h - 30
@@ -3672,9 +3647,6 @@ class Renderer:
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
         if action_menu:
             self._u3_text("[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
-                          8, bar_y + 5, self._U3_BLUE)
-        elif choosing_member:
-            self._u3_text("[UP/DN] SELECT MEMBER  [ENTER] CONFIRM  [ESC] CANCEL",
                           8, bar_y + 5, self._U3_BLUE)
         else:
             self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [1-4] CHARACTER  [ESC] BACK",

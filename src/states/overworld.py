@@ -36,6 +36,7 @@ class OverworldState(BaseState):
         self.showing_party = False
         self.showing_char_detail = None  # index 0-3, or None
         self.char_sheet_cursor = 0       # cursor position in equip/item list
+        self.char_sheet_from_inv = False # True if opened from party inventory
         self.char_action_menu = False    # True when action popup is open
         self.char_action_cursor = 0      # selected option in action popup
         self.examining_item = None       # item name being examined, or None
@@ -207,24 +208,8 @@ class OverworldState(BaseState):
                 self.party_inv_action_menu = False
             return
 
-        if self.party_inv_choosing:
-            # Choosing which member to give the item to
-            if event.key == pygame.K_UP:
-                self.party_inv_member = (self.party_inv_member - 1) % len(members)
-            elif event.key == pygame.K_DOWN:
-                self.party_inv_member = (self.party_inv_member + 1) % len(members)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                inv_idx = self.party_inv_cursor - NUM_SLOTS
-                self.game.party.give_item_to_member(inv_idx, self.party_inv_member)
-                self.party_inv_choosing = False
-                # Clamp cursor
-                new_total = NUM_SLOTS + len(inv)
-                if self.party_inv_cursor >= new_total:
-                    self.party_inv_cursor = max(0, new_total - 1)
-            elif event.key == pygame.K_ESCAPE:
-                self.party_inv_choosing = False
-        else:
-            # Browsing unified list (equip slots + inventory)
+        # Browsing unified list (equip slots + inventory)
+        if True:
             if event.key == pygame.K_UP and total_items > 0:
                 self.party_inv_cursor = (self.party_inv_cursor - 1) % total_items
             elif event.key == pygame.K_DOWN and total_items > 0:
@@ -247,6 +232,7 @@ class OverworldState(BaseState):
                     self.showing_party_inv = False
                     self.showing_char_detail = num
                     self.char_sheet_cursor = 0
+                    self.char_sheet_from_inv = True
 
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
@@ -272,10 +258,16 @@ class OverworldState(BaseState):
                 item_name = party.item_name(inv[inv_idx])
                 if chosen == "EXAMINE":
                     self.examining_item = item_name
-                elif chosen == "GIVE TO MEMBER":
+                elif chosen.startswith("GIVE TO "):
+                    give_name = chosen[8:].strip()
+                    for mi, member in enumerate(party.members):
+                        if member.name.upper() == give_name:
+                            party.give_item_to_member(inv_idx, mi)
+                            break
                     self.party_inv_action_menu = False
-                    self.party_inv_choosing = True
-                    self.party_inv_member = 0
+                    new_total = NUM_SLOTS + len(party.shared_inventory)
+                    if self.party_inv_cursor >= new_total:
+                        self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen.startswith("EQUIP → "):
                     slot = chosen.split("→ ", 1)[1].strip().lower()
                     party.party_equip(item_name, slot)
@@ -310,7 +302,8 @@ class OverworldState(BaseState):
                 if party.get_equipped_name(s) is None:
                     label = party.PARTY_SLOT_LABELS[s]
                     options.append(f"EQUIP → {label}")
-            options.append("GIVE TO MEMBER")
+            for mi, member in enumerate(self.game.party.members):
+                options.append(f"GIVE TO {member.name.upper()}")
             options.append("EXAMINE")
             return options
 
@@ -360,9 +353,12 @@ class OverworldState(BaseState):
 
                 if event.key == pygame.K_ESCAPE:
                     if self.showing_char_detail is not None:
+                        back_to_inv = self.char_sheet_from_inv
                         self.showing_char_detail = None
                         self.char_sheet_cursor = 0
-                        self.showing_party_inv = True
+                        self.char_sheet_from_inv = False
+                        if back_to_inv:
+                            self.showing_party_inv = True
                         return
                     if self.showing_party:
                         self.showing_party = False
@@ -371,9 +367,12 @@ class OverworldState(BaseState):
                     return
                 if event.key == pygame.K_p:
                     if self.showing_char_detail is not None:
+                        back_to_inv = self.char_sheet_from_inv
                         self.showing_char_detail = None
                         self.char_sheet_cursor = 0
-                        self.showing_party_inv = True
+                        self.char_sheet_from_inv = False
+                        if back_to_inv:
+                            self.showing_party_inv = True
                         return
                     if self.showing_party_inv:
                         self.showing_party_inv = False

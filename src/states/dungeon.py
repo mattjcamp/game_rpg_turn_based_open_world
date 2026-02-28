@@ -28,6 +28,7 @@ class DungeonState(BaseState):
         self.showing_party = False
         self.showing_char_detail = None
         self.char_sheet_cursor = 0
+        self.char_sheet_from_inv = False
         self.char_action_menu = False
         self.char_action_cursor = 0
         self.examining_item = None
@@ -291,22 +292,8 @@ class DungeonState(BaseState):
                 self.party_inv_action_menu = False
             return
 
-        if self.party_inv_choosing:
-            if event.key == pygame.K_UP:
-                self.party_inv_member = (self.party_inv_member - 1) % len(members)
-            elif event.key == pygame.K_DOWN:
-                self.party_inv_member = (self.party_inv_member + 1) % len(members)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                inv_idx = self.party_inv_cursor - NUM_SLOTS
-                self.game.party.give_item_to_member(inv_idx, self.party_inv_member)
-                self.party_inv_choosing = False
-                new_total = NUM_SLOTS + len(inv)
-                if self.party_inv_cursor >= new_total:
-                    self.party_inv_cursor = max(0, new_total - 1)
-            elif event.key == pygame.K_ESCAPE:
-                self.party_inv_choosing = False
-        else:
-            # Browsing unified list (equip slots + inventory)
+        # Browsing unified list (equip slots + inventory)
+        if True:
             if event.key == pygame.K_UP and total_items > 0:
                 self.party_inv_cursor = (self.party_inv_cursor - 1) % total_items
             elif event.key == pygame.K_DOWN and total_items > 0:
@@ -356,10 +343,16 @@ class DungeonState(BaseState):
                 item_name = party.item_name(inv[inv_idx])
                 if chosen == "EXAMINE":
                     self.examining_item = item_name
-                elif chosen == "GIVE TO MEMBER":
+                elif chosen.startswith("GIVE TO "):
+                    give_name = chosen[8:].strip()
+                    for mi, member in enumerate(party.members):
+                        if member.name.upper() == give_name:
+                            party.give_item_to_member(inv_idx, mi)
+                            break
                     self.party_inv_action_menu = False
-                    self.party_inv_choosing = True
-                    self.party_inv_member = 0
+                    new_total = NUM_SLOTS + len(party.shared_inventory)
+                    if self.party_inv_cursor >= new_total:
+                        self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen.startswith("EQUIP → "):
                     slot = chosen.split("→ ", 1)[1].strip().lower()
                     party.party_equip(item_name, slot)
@@ -393,7 +386,8 @@ class DungeonState(BaseState):
                 if party.get_equipped_name(s) is None:
                     label = party.PARTY_SLOT_LABELS[s]
                     options.append(f"EQUIP → {label}")
-            options.append("GIVE TO MEMBER")
+            for mi, member in enumerate(self.game.party.members):
+                options.append(f"GIVE TO {member.name.upper()}")
             options.append("EXAMINE")
             return options
 
