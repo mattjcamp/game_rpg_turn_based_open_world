@@ -137,18 +137,18 @@ class PartyMember:
     def check_level_up(self):
         """Check if enough XP has been earned to level up.
 
-        Level N requires (N-1)*100 total XP:
-          Level 2 at 100, Level 3 at 200, Level 4 at 300, ...
+        Level N requires N * exp_per_level total XP (from class template):
+          e.g. with exp_per_level=500: Level 2 at 500, Level 3 at 1000, ...
 
         Returns a list of message strings for each level gained.
         """
         messages = []
-        while self.exp >= self.level * 100:
+        template = self._load_class_template(self.char_class)
+        xp_per = template["exp_per_level"]
+        while self.exp >= self.level * xp_per:
             self.level += 1
-            # Load class template for HP/MP gains
-            template = self._load_class_template(self.char_class)
-            hp_gain = template.get("hp_per_level", 6)
-            mp_gain = template.get("mp_per_level", 0)
+            hp_gain = template["hp_per_level"]
+            mp_gain = template["mp_per_level"]
 
             self.max_hp += hp_gain
             self.hp = min(self.hp + hp_gain, self.max_hp)
@@ -196,6 +196,12 @@ class PartyMember:
             else:
                 template[field] = set(raw)   # convert list → set
 
+        # Scalar attributes with defaults
+        template["hp_per_level"] = data.get("hp_per_level", 6)
+        template["mp_per_level"] = data.get("mp_per_level", 0)
+        template["range"] = data.get("range", 1)
+        template["exp_per_level"] = data.get("exp_per_level", 500)
+
         cls._class_templates[key] = template
         return template
 
@@ -214,6 +220,12 @@ class PartyMember:
         tmpl = self._load_class_template(self.char_class)
         allowed = tmpl["allowed_armor"]
         return allowed is None or armor_name in allowed
+
+    @property
+    def range(self):
+        """Attack range in tiles (from class template)."""
+        tmpl = self._load_class_template(self.char_class)
+        return tmpl["range"]
 
     def can_use_item(self, item_name):
         """Return True if this character's class can equip the named item."""

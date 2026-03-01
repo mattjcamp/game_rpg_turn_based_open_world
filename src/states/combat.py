@@ -368,6 +368,7 @@ class CombatState(BaseState):
         self.fighters = []        # list of alive PartyMembers in combat
         self.fighter_positions = {}  # member -> (col, row)
         self.defending = {}       # member -> bool
+        self.moves_remaining = 0  # movement steps left this turn (from class range)
 
         # Temporary combat message
         self.combat_message = ""
@@ -586,9 +587,10 @@ class CombatState(BaseState):
         pass
 
     def _announce_turn(self):
-        """Add a log entry for whose turn it is."""
+        """Add a log entry for whose turn it is and reset move budget."""
         f = self.active_fighter
         if f:
+            self.moves_remaining = f.range
             ranged_hint = " [RANGED]" if f.is_ranged(self.game.party) else ""
             self.combat_log.append(f"-- {f.name}'s turn --{ranged_hint}")
         self._rebuild_menu()
@@ -1156,7 +1158,7 @@ class CombatState(BaseState):
         new_col = col + dcol
         new_row = row + drow
 
-        # Bump attack: moving into a monster's tile
+        # Bump attack: moving into a monster's tile (uses all remaining moves)
         bump_monster = self._get_monster_at(new_col, new_row)
         if bump_monster:
             self._player_attack_animated(dcol, drow, target_monster=bump_monster)
@@ -1166,11 +1168,12 @@ class CombatState(BaseState):
         if self._is_occupied_by_ally(new_col, new_row, exclude=f):
             return
 
-        # Normal movement
+        # Normal movement — spend one move step
         if not self._is_arena_wall(new_col, new_row):
             self.fighter_positions[f] = (new_col, new_row)
-            # Moving ends this fighter's turn
-            self._end_fighter_turn()
+            self.moves_remaining -= 1
+            if self.moves_remaining <= 0:
+                self._end_fighter_turn()
 
     def _execute_player_action(self):
         action = self.selected_action

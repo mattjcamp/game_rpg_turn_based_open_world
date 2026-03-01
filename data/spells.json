@@ -13,9 +13,9 @@
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
-        "dice": "2d8",
+        "dice": "12d8",
         "stat_bonus": "intelligence",
-        "min_damage": 1
+        "min_damage": 1000
       },
       "range": 99,
       "targeting": "directional_projectile",
