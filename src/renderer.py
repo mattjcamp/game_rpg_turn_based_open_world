@@ -8,6 +8,7 @@ just swap the draw_tile method.
 """
 
 import math
+import os
 import pygame
 
 from src.combat_engine import format_modifier
@@ -88,6 +89,10 @@ class Renderer:
                     raw = pygame.image.load(tile_path).convert_alpha()
                     self._monster_tiles[tile_file] = pygame.transform.scale(
                         raw, (dst_ts, dst_ts))
+
+        # ── Unique tile sprite cache (loaded on demand) ──
+        self._unique_tile_sprites = {}  # filename -> scaled surface
+        self._assets_dir = assets_dir
 
         # Map game tile IDs to sheet positions (row, col)
         # Based on the style guide tile-to-game mapping
@@ -1048,7 +1053,8 @@ class Renderer:
     _U3_OW_MAP_W = _U3_OW_COLS * _U3_OW_TS   # 960
     _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 672
 
-    def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None):
+    def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None,
+                          unique_text="", unique_flash=0.0, unique_pos=None):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -1088,6 +1094,19 @@ class Renderer:
                 px = sc * ts
                 py = sr * ts
                 self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr)
+
+        # ── 1b. draw visible unique tile sprites ──
+        for (uc, ur), utile in tile_map.unique_tiles.items():
+            if not utile.get("visible") or not utile.get("tile"):
+                continue
+            usc = uc - off_c
+            usr = ur - off_r
+            if 0 <= usc < cols and 0 <= usr < rows:
+                sprite = self._get_unique_tile_sprite(utile["tile"], ts)
+                if sprite:
+                    px = usc * ts
+                    py = usr * ts
+                    self.screen.blit(sprite, (px, py))
 
         # ── 2. overworld monster sprites ──
         if overworld_monsters:
@@ -1135,6 +1154,45 @@ class Renderer:
                 lbl += f":{charges:02d}"
             self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85), font=f)
         self._u3_text(f"POS:({party.col},{party.row})", 750, bar_y + 6, (220, 220, 220), font=f)
+
+        # ── 5b. unique tile description in second row ──
+        if unique_text:
+            # Pulsing amber color for attention
+            pulse = (math.sin(unique_flash) + 1.0) * 0.5  # 0..1
+            r = int(200 + 55 * pulse)
+            g = int(170 + 60 * pulse)
+            b = int(80 * (1.0 - pulse * 0.4))
+            # Truncate long text to fit
+            display_text = unique_text
+            if len(display_text) > 90:
+                display_text = display_text[:87] + "..."
+            self._u3_text(display_text, 8, bar_y + 28,
+                          (r, g, b), font=self.font_small)
+
+        # ── 5c. sparkle effect on the map tile ──
+        if unique_pos and unique_flash > 0:
+            uc, ur = unique_pos
+            usc = uc - off_c
+            usr = ur - off_r
+            if 0 <= usc < cols and 0 <= usr < rows:
+                cx = usc * ts + ts // 2
+                cy = usr * ts + ts // 2
+                # Expanding ring
+                ring_r = int(8 + 12 * ((math.sin(unique_flash * 1.5) + 1) * 0.5))
+                ring_alpha = int(180 * max(0, (math.cos(unique_flash * 0.8) + 1) * 0.5))
+                ring_surf = pygame.Surface((ring_r * 2 + 4, ring_r * 2 + 4), pygame.SRCALPHA)
+                pygame.draw.circle(ring_surf, (255, 220, 100, ring_alpha),
+                                   (ring_r + 2, ring_r + 2), ring_r, 2)
+                self.screen.blit(ring_surf, (cx - ring_r - 2, cy - ring_r - 2))
+                # Sparkle dots orbiting the tile
+                for i in range(4):
+                    angle = unique_flash * 2.0 + i * (math.pi / 2)
+                    sx = cx + int(14 * math.cos(angle))
+                    sy = cy + int(14 * math.sin(angle))
+                    dot_alpha = int(200 * max(0, math.sin(unique_flash * 3.0 + i)))
+                    dot_surf = pygame.Surface((6, 6), pygame.SRCALPHA)
+                    pygame.draw.circle(dot_surf, (255, 255, 200, dot_alpha), (3, 3), 3)
+                    self.screen.blit(dot_surf, (sx - 3, sy - 3))
 
         # ── 6. floating message ──
         if message:
@@ -1632,6 +1690,21 @@ class Renderer:
         else:
             # Fallback: black
             pygame.draw.rect(self.screen, BLACK, rect)
+
+    # ── unique tile sprite ─────────────────────────────────
+
+    def _get_unique_tile_sprite(self, filename, size=32):
+        """Load and cache a unique tile sprite from assets."""
+        key = (filename, size)
+        if key not in self._unique_tile_sprites:
+            path = os.path.join(self._assets_dir, filename)
+            if os.path.exists(path):
+                raw = pygame.image.load(path).convert_alpha()
+                self._unique_tile_sprites[key] = pygame.transform.scale(
+                    raw, (size, size))
+            else:
+                self._unique_tile_sprites[key] = None
+        return self._unique_tile_sprites[key]
 
     # ── dungeon monster sprite ─────────────────────────────
 

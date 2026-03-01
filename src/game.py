@@ -81,16 +81,13 @@ class Game:
         self.save_load_message = None    # feedback message ("Saved!", "Loaded!", etc.)
         self.save_load_msg_timer = 0.0   # seconds remaining for message display
         self.settings_options = [
-            {"label": "MUSIC", "value": False, "type": "toggle",
+            {"label": "MUSIC", "value": True, "type": "toggle",
              "action": self._toggle_music},
             {"label": "SAVE GAME", "value": None, "type": "action",
              "action": self._open_save_screen},
             {"label": "LOAD GAME", "value": None, "type": "action",
              "action": self._open_load_screen},
         ]
-
-        # Start with music muted by default
-        self.music.toggle_mute()
 
         # --- State machine ---
         self.states = {

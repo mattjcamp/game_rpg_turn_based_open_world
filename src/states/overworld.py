@@ -57,6 +57,12 @@ class OverworldState(BaseState):
         # Help overlay
         self.showing_help = False
 
+        # Unique tile discovery display
+        self.unique_tile_text = ""
+        self.unique_tile_timer = 0       # ms remaining to show text
+        self.unique_tile_flash = 0.0     # animation phase (radians)
+        self.unique_tile_pos = None      # (col, row) for map flash effect
+
         # Roaming overworld orcs
         self.overworld_monsters = []
 
@@ -541,6 +547,7 @@ class OverworldState(BaseState):
 
             if moved:
                 self.move_cooldown = MOVE_REPEAT_DELAY
+                self.game.tile_map.tick_cooldowns()
                 self._check_tile_events()
                 # Move orcs after party moves
                 self._move_monsters()
@@ -680,6 +687,58 @@ class OverworldState(BaseState):
             self.game.tile_map.set_tile(pos[0], pos[1], original)
             return
 
+        # ── Unique tile check ──
+        self._check_unique_tile()
+
+    # ── Unique tile interaction ────────────────────────────────
+
+    def _check_unique_tile(self):
+        """Check if the party is standing on a unique tile and trigger it."""
+        tmap = self.game.tile_map
+        col, row = self.game.party.col, self.game.party.row
+        utile = tmap.get_unique(col, row)
+        if not utile:
+            return
+
+        # One-time tiles that have already been triggered
+        one_time = utile.get("interact_data", {}).get("one_time", False)
+        if one_time and tmap.is_unique_triggered(col, row):
+            return
+
+        # Cooldown check
+        if tmap.is_unique_on_cooldown(col, row):
+            return
+
+        # ── Show the description and interact text ──
+        name = utile.get("name", "Something")
+        description = utile.get("description", "")
+        interact_text = utile.get("interact_text", "")
+
+        # Log the discovery
+        self.game.game_log.append(f"-- {name} --")
+        if description:
+            self.game.game_log.append(description)
+        if interact_text:
+            self.game.game_log.append(interact_text)
+
+        # Show a brief floating message on screen
+        self.show_message(name, 3500)
+
+        # Show description in bottom bar with animation
+        self.unique_tile_text = description or interact_text or name
+        self.unique_tile_timer = 5000  # 5 seconds
+        self.unique_tile_flash = 0.0
+        self.unique_tile_pos = (col, row)
+
+        # Mark one-time tiles
+        if one_time:
+            tmap.mark_unique_triggered(col, row)
+
+        # Apply cooldown if specified
+        cooldown = utile.get("interact_data", {}).get("cooldown_steps", 0)
+        if cooldown > 0:
+            tmap.set_unique_cooldown(col, row, cooldown)
+
     # ── Chest loot ─────────────────────────────────────────────
 
     _CHEST_LOOT = [
@@ -742,6 +801,15 @@ class OverworldState(BaseState):
             if self.move_cooldown < 0:
                 self.move_cooldown = 0
 
+        # Unique tile discovery animation
+        if self.unique_tile_timer > 0:
+            self.unique_tile_timer -= dt_ms
+            self.unique_tile_flash += dt * 6.0  # ~6 radians/sec for pulsing
+            if self.unique_tile_timer <= 0:
+                self.unique_tile_timer = 0
+                self.unique_tile_text = ""
+                self.unique_tile_pos = None
+
     def draw(self, renderer):
         """Draw the overworld in Ultima III style."""
         if self.showing_party_inv:
@@ -776,6 +844,9 @@ class OverworldState(BaseState):
             self.game.tile_map,
             message=self.message,
             overworld_monsters=self.overworld_monsters,
+            unique_text=self.unique_tile_text,
+            unique_flash=self.unique_tile_flash,
+            unique_pos=self.unique_tile_pos,
         )
         if self.showing_help:
             renderer.draw_overworld_help_overlay()
