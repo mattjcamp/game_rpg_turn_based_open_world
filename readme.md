@@ -166,9 +166,3 @@ ultima3_clone/
   - Zero-padded stat numbers (`HP:0030/0030 AC:12`)
   - Combat log with color-coded lines in blue-bordered scrolling panel
   - Bottom status bar with control hints
-
-### Next Steps
-- flesh out differences in characters more clearly
-- implement experience and leveling system
-- create quest procedure
-- flesh out early spells and items for for level 1 to 2

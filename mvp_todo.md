@@ -1,11 +1,9 @@
 Purpose: to create a playable adventure from beginning to end with a simple version of the game systems
 
-MVP
-- Optional: Make encounters include multiple monsters (this one can get complicated, optional)
+Full Game
 - Calibrate gameplay (monsters, level 1)
 - Refine User Interface
 
-Full Game
 - Make system configurable (spells, abilities, character instances, quests)
 - Make system as extensible as possible for the future
 - Add rich descriptions to some tiles
