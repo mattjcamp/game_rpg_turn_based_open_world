@@ -50,6 +50,10 @@ class OverworldState(BaseState):
         self.effect_list = []                 # available effects for current slot
         self.effect_cursor = 0               # cursor in effect chooser
 
+        # Game log overlay
+        self.showing_log = False
+        self.log_scroll = 0
+
         # Roaming overworld orcs
         self.overworld_monsters = []
 
@@ -393,6 +397,16 @@ class OverworldState(BaseState):
         """Handle arrow key movement with repeat delay."""
         for event in events:
             if event.type == pygame.KEYDOWN:
+                # ── Log overlay input ──
+                if self.showing_log:
+                    if event.key == pygame.K_l or event.key == pygame.K_ESCAPE:
+                        self.showing_log = False
+                    elif event.key == pygame.K_UP:
+                        self.log_scroll += 3
+                    elif event.key == pygame.K_DOWN:
+                        self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
                 # ── Party inventory screen input ──
                 if self.showing_party_inv:
                     self._handle_party_inv_input(event)
@@ -440,6 +454,10 @@ class OverworldState(BaseState):
                     self.party_inv_cursor = 0
                     self.party_inv_choosing = False
                     self.party_inv_member = 0
+                    return
+                if event.key == pygame.K_l:
+                    self.showing_log = True
+                    self.log_scroll = 0
                     return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
@@ -695,6 +713,8 @@ class OverworldState(BaseState):
         """Display a temporary message."""
         self.message = text
         self.message_timer = duration_ms
+        if text:
+            self.game.game_log.append(text)
 
     def update(self, dt):
         """Update timers."""
@@ -745,3 +765,5 @@ class OverworldState(BaseState):
             message=self.message,
             overworld_monsters=self.overworld_monsters,
         )
+        if self.showing_log:
+            renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

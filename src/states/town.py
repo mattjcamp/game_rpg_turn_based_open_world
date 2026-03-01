@@ -106,6 +106,10 @@ class TownState(BaseState):
         self.effect_list = []
         self.effect_cursor = 0
 
+        # Game log overlay
+        self.showing_log = False
+        self.log_scroll = 0
+
         # Quest dialogue
         self.quest_choice_active = False
         self.quest_choice_cursor = 0
@@ -163,6 +167,16 @@ class TownState(BaseState):
 
         for event in events:
             if event.type == pygame.KEYDOWN:
+                # ── Log overlay input ──
+                if self.showing_log:
+                    if event.key == pygame.K_l or event.key == pygame.K_ESCAPE:
+                        self.showing_log = False
+                    elif event.key == pygame.K_UP:
+                        self.log_scroll += 3
+                    elif event.key == pygame.K_DOWN:
+                        self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
                 # ── Shop screen input ──
                 if self.showing_shop:
                     self._handle_shop_input(event)
@@ -215,6 +229,11 @@ class TownState(BaseState):
                     if self.showing_party:
                         self.showing_party = False
                         return
+                if event.key == pygame.K_l:
+                    if not self.npc_dialogue_active:
+                        self.showing_log = True
+                        self.log_scroll = 0
+                    return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
                     member = self.game.party.members[self.showing_char_detail]
@@ -870,6 +889,8 @@ class TownState(BaseState):
         """Display a temporary message."""
         self.message = text
         self.message_timer = duration_ms
+        if text:
+            self.game.game_log.append(text)
 
     def update(self, dt):
         """Update timers."""
@@ -963,3 +984,5 @@ class TownState(BaseState):
         if self.quest_choice_active:
             renderer.draw_quest_choice_box(
                 self.quest_choices, self.quest_choice_cursor)
+        if self.showing_log:
+            renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

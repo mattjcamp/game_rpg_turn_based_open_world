@@ -55,6 +55,10 @@ class Game:
         # None when no quest active; dict when quest is in progress
         self.quest = None
 
+        # --- Game log ---
+        # Accumulates all messages from every state for the log overlay
+        self.game_log = []
+
         # --- Music & Sound Effects ---
         self.music = MusicManager()
         self.sfx = SoundEffects()

@@ -15,6 +15,18 @@ import os
 import pygame
 
 from src.states.base_state import BaseState
+
+
+class _DualLog(list):
+    """A list that also appends each entry to a second target list."""
+
+    def __init__(self, mirror_target):
+        super().__init__()
+        self._mirror = mirror_target
+
+    def append(self, item):
+        super().append(item)
+        self._mirror.append(item)
 from src.combat_engine import (
     roll_initiative, roll_attack, roll_damage, roll_d20,
     format_modifier,
@@ -34,8 +46,8 @@ SPELLS_DATA = {s["id"]: s for s in _load_spells()}
 
 
 # ── Arena constants ──────────────────────────────────────────────
-ARENA_COLS = 15
-ARENA_ROWS = 17
+ARENA_COLS = 18
+ARENA_ROWS = 21
 
 # ── Combat phases ────────────────────────────────────────────────
 PHASE_INIT        = "init"
@@ -341,8 +353,15 @@ class CombatState(BaseState):
         self.equip_action_menu = False  # True when action popup is open
         self.equip_action_cursor = 0    # selected option in action popup
         self.equip_examining = None     # item name being examined
-        self.combat_log = []
+        self.combat_log = _DualLog(self.game.game_log)
         self.phase_timer = 0
+
+        # Game log overlay
+        self.showing_log = False
+        self.log_scroll = 0
+
+        # Help overlay
+        self.showing_help = False
 
         # Active fighter index (which party member's turn it is)
         self.active_idx = 0
@@ -491,7 +510,7 @@ class CombatState(BaseState):
             self.monster_map_positions[m] = (m.col, m.row)
 
         self.active_monster_idx = 0
-        self.combat_log = []
+        self.combat_log = _DualLog(self.game.game_log)
         self.phase = PHASE_INIT
         self.selected_action = 0
         self.phase_timer = 0
@@ -509,6 +528,9 @@ class CombatState(BaseState):
         self.shield_effects = []
         self.shield_buffs = {}
         self.turn_undead_effects = []
+        self.showing_log = False
+        self.log_scroll = 0
+        self.showing_help = False
 
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
@@ -682,6 +704,26 @@ class CombatState(BaseState):
     # ── Input ────────────────────────────────────────────────────
 
     def handle_input(self, events, keys_pressed):
+        # ── Help overlay input ──
+        if self.showing_help:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_h, pygame.K_ESCAPE):
+                        self.showing_help = False
+            return
+
+        # ── Log overlay input ──
+        if self.showing_log:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_l or event.key == pygame.K_ESCAPE:
+                        self.showing_log = False
+                    elif event.key == pygame.K_UP:
+                        self.log_scroll += 3
+                    elif event.key == pygame.K_DOWN:
+                        self.log_scroll = max(0, self.log_scroll - 3)
+            return
+
         # During animation phases, no input
         if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD):
             return
@@ -733,6 +775,15 @@ class CombatState(BaseState):
         for event in events:
             if event.type != pygame.KEYDOWN:
                 continue
+
+            if event.key == pygame.K_l:
+                self.showing_log = True
+                self.log_scroll = 0
+                return
+
+            if event.key == pygame.K_h:
+                self.showing_help = True
+                return
 
             # ── PHASE_PLAYER: menu navigation + WASD move + spacebar skip ──
             if self.phase == PHASE_PLAYER:
@@ -2437,3 +2488,7 @@ class CombatState(BaseState):
             monster_positions=self.monster_positions,
             encounter_name=self.encounter_name,
         )
+        if self.showing_help:
+            renderer.draw_combat_help_overlay()
+        if self.showing_log:
+            renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

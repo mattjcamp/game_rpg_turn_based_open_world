@@ -42,6 +42,10 @@ class DungeonState(BaseState):
         self.effect_list = []
         self.effect_cursor = 0
 
+        # Game log overlay
+        self.showing_log = False
+        self.log_scroll = 0
+
         # Torch lighting system
         self.torch_active = False
         self.torch_steps = 0
@@ -126,6 +130,16 @@ class DungeonState(BaseState):
         """Handle movement and interactions."""
         for event in events:
             if event.type == pygame.KEYDOWN:
+                # ── Log overlay input ──
+                if self.showing_log:
+                    if event.key == pygame.K_l or event.key == pygame.K_ESCAPE:
+                        self.showing_log = False
+                    elif event.key == pygame.K_UP:
+                        self.log_scroll += 3
+                    elif event.key == pygame.K_DOWN:
+                        self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
                 # ── Party inventory screen input ──
                 if self.showing_party_inv:
                     self._handle_party_inv_input(event)
@@ -186,6 +200,10 @@ class DungeonState(BaseState):
                         self.show_message(
                             "Find the stairs to escape!", 1500
                         )
+                    return
+                if event.key == pygame.K_l:
+                    self.showing_log = True
+                    self.log_scroll = 0
                     return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
@@ -1072,6 +1090,8 @@ class DungeonState(BaseState):
     def show_message(self, text, duration_ms=2000):
         self.message = text
         self.message_timer = duration_ms
+        if text:
+            self.game.game_log.append(text)
 
     def update(self, dt):
         dt_ms = dt * 1000
@@ -1128,3 +1148,5 @@ class DungeonState(BaseState):
             level_label=level_label,
             detected_traps=self.dungeon_data.detected_traps,
         )
+        if self.showing_log:
+            renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

@@ -1,10 +1,8 @@
 Purpose: to create a playable adventure from beginning to end with a simple version of the game systems
 
 Full Game
-- Calibrate gameplay (monsters, level 1)
 - Refine User Interface
-
-- Make system configurable (spells, abilities, character instances, quests)
+- Calibrate gameplay (monsters, level 1)
 - Make system as extensible as possible for the future
 - Add rich descriptions to some tiles
 - Add character creation

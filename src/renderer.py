@@ -422,11 +422,11 @@ class Renderer:
     # TOWN  –  Ultima III retro style (sprite tiles)
     # ========================================================
 
-    _U3_TN_COLS = 25       # tiles visible horizontally (full width)
-    _U3_TN_ROWS = 17       # tiles visible vertically
+    _U3_TN_COLS = 30       # tiles visible horizontally (full width)
+    _U3_TN_ROWS = 21       # tiles visible vertically
     _U3_TN_TS   = 32       # tile size
-    _U3_TN_MAP_W = _U3_TN_COLS * _U3_TN_TS   # 800
-    _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 544
+    _U3_TN_MAP_W = _U3_TN_COLS * _U3_TN_TS   # 960
+    _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 672
 
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False):
@@ -529,15 +529,15 @@ class Renderer:
         tile_name = tile_map.get_tile_name(party.col, party.row)
         # Top line: town info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
-        self._u3_text(town_data.name.upper(), 200, bar_y + 6, (255, 170, 85))
+        self._u3_text(town_data.name.upper(), 240, bar_y + 6, (255, 170, 85))
         light_name = party.get_equipped_name("light")
         if light_name:
             charges = party.get_equipped_charges("light")
             lbl = f"LIGHT:{light_name.upper()}"
             if charges is not None:
                 lbl += f":{charges:02d}"
-            self._u3_text(lbl, 420, bar_y + 6, (255, 170, 85))
-        self._u3_text(f"POS:({party.col},{party.row})", 620, bar_y + 6, (136, 136, 136))
+            self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85))
+        self._u3_text(f"POS:({party.col},{party.row})", 770, bar_y + 6, (136, 136, 136))
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE  [P] PARTY  [BUMP NPC] TALK  [ESC] LEAVE",
                       8, bar_y + 28, (68, 68, 255))
@@ -1042,11 +1042,11 @@ class Renderer:
     # ========================================================
 
     # Map viewport for the U3 split-screen layout
-    _U3_OW_COLS = 25       # tiles visible horizontally (full width)
-    _U3_OW_ROWS = 17       # tiles visible vertically
+    _U3_OW_COLS = 30       # tiles visible horizontally (full width)
+    _U3_OW_ROWS = 21       # tiles visible vertically
     _U3_OW_TS   = 32       # tile size (same as global TILE_SIZE)
-    _U3_OW_MAP_W = _U3_OW_COLS * _U3_OW_TS   # 800
-    _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 544
+    _U3_OW_MAP_W = _U3_OW_COLS * _U3_OW_TS   # 960
+    _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 672
 
     def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None):
         """
@@ -1126,15 +1126,15 @@ class Renderer:
         f = self.font  # larger 16px font for readability
         # Top line: game info
         self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0), font=f)
-        self._u3_text(f"TERRAIN:{tile_name}", 220, bar_y + 6, (200, 200, 255), font=f)
+        self._u3_text(f"TERRAIN:{tile_name}", 260, bar_y + 6, (200, 200, 255), font=f)
         light_name = party.get_equipped_name("light")
         if light_name:
             charges = party.get_equipped_charges("light")
             lbl = f"LIGHT:{light_name.upper()}"
             if charges is not None:
                 lbl += f":{charges:02d}"
-            self._u3_text(lbl, 420, bar_y + 6, (255, 170, 85), font=f)
-        self._u3_text(f"POS:({party.col},{party.row})", 600, bar_y + 6, (220, 220, 220), font=f)
+            self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85), font=f)
+        self._u3_text(f"POS:({party.col},{party.row})", 750, bar_y + 6, (220, 220, 220), font=f)
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] QUIT",
                       8, bar_y + 28, (200, 200, 255), font=f)
@@ -1268,11 +1268,11 @@ class Renderer:
     # ========================================================
 
     # Dungeon viewport: same split-screen as overworld
-    _U3_DG_COLS = 25
-    _U3_DG_ROWS = 17
+    _U3_DG_COLS = 30
+    _U3_DG_ROWS = 21
     _U3_DG_TS   = 32
-    _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 800
-    _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 544
+    _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 960
+    _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 672
 
     def draw_dungeon_u3(self, party, dungeon_data, message="",
                          visible_tiles=None, torch_steps=-1,
@@ -1369,22 +1369,22 @@ class Renderer:
         dg_name = dungeon_data.name.upper()
         if level_label:
             dg_name += f"  [{level_label}]"
-        self._u3_text(dg_name, 200, bar_y + 6, (200, 60, 60))
+        self._u3_text(dg_name, 240, bar_y + 6, (200, 60, 60))
         # Light status
         light_name = party.get_equipped_name("light")
         light_charges = party.get_equipped_charges("light")
         if torch_steps >= 0:
             torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
             lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:02d}"
-            self._u3_text(lbl, 420, bar_y + 6, torch_color)
+            self._u3_text(lbl, 520, bar_y + 6, torch_color)
         elif light_name:
             lbl = f"LIGHT:{light_name.upper()}"
             if light_charges is not None:
                 lbl += f":{light_charges:02d}"
-            self._u3_text(lbl, 420, bar_y + 6, (255, 170, 85))
+            self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85))
         else:
-            self._u3_text("NO LIGHT", 420, bar_y + 6, (136, 136, 136))
-        self._u3_text(f"POS:({party.col},{party.row})", 600, bar_y + 6, (136, 136, 136))
+            self._u3_text("NO LIGHT", 520, bar_y + 6, (136, 136, 136))
+        self._u3_text(f"POS:({party.col},{party.row})", 750, bar_y + 6, (136, 136, 136))
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] STAIRS",
                       8, bar_y + 28, (68, 68, 255))
@@ -1805,14 +1805,14 @@ class Renderer:
 
     # ── Layout constants ──
     _ARENA_TILE = 32
-    _ARENA_COLS = 15
-    _ARENA_ROWS = 17
+    _ARENA_COLS = 18
+    _ARENA_ROWS = 21
     _MAP_X  = 4                                     # left edge of map panel
     _MAP_Y  = 4
-    _MAP_W  = _ARENA_COLS * _ARENA_TILE              # 480
-    _MAP_H  = _ARENA_ROWS * _ARENA_TILE              # 544
-    _RPANEL_X = _MAP_X + _MAP_W + 8                  # 492
-    _RPANEL_W = SCREEN_WIDTH - _RPANEL_X - 4          # 304
+    _MAP_W  = _ARENA_COLS * _ARENA_TILE              # 576
+    _MAP_H  = _ARENA_ROWS * _ARENA_TILE              # 672
+    _RPANEL_X = _MAP_X + _MAP_W + 8                  # 588
+    _RPANEL_W = SCREEN_WIDTH - _RPANEL_X - 4          # 368
 
     # ── helper: draw a blue-bordered retro panel ──
     def _u3_panel(self, x, y, w, h):
@@ -2024,7 +2024,7 @@ class Renderer:
         rw = self._RPANEL_W
 
         # Party roster panel (shows all 4 members with sprites and bars)
-        party_h = 260
+        party_h = 300
         if fighters:
             self._u3_party_combat_panel(fighters, active_fighter,
                                         defending_map or {},
@@ -2037,7 +2037,7 @@ class Renderer:
 
         monster_y = 4 + party_h + 4
         alive_monsters = [m for m in (monsters or []) if m.is_alive()] if monsters else ([monster] if monster and monster.is_alive() else [])
-        monster_panel_h = max(50, 28 + 28 * len(alive_monsters))
+        monster_panel_h = max(50, 28 + 68 * len(alive_monsters))
         self._u3_monster_panel_multi(alive_monsters, rx, monster_y, rw, monster_panel_h,
                                      source_state=is_outdoor and "overworld" or "dungeon",
                                      encounter_name=encounter_name)
@@ -2934,15 +2934,26 @@ class Renderer:
                 name_color = self._U3_WHITE
 
             wpn_label = member.weapon if member.weapon else "Fists"
-            name_wpn = f"{member.name} [{wpn_label}]"
-            self._u3_text(name_wpn, info_x, row_top, name_color, f)
+            self._u3_text(member.name, info_x, row_top, name_color, f)
+
+            # ── Stat line: AC, weapon, damage dice ──
+            stat_y = row_top + 16
+            ac_val = member.get_ac()
+            dice_c, dice_s, dice_b = member.get_damage_dice()
+            dmg_str = f"{dice_c}d{dice_s}"
+            if dice_b > 0:
+                dmg_str += f"+{dice_b}"
+            elif dice_b < 0:
+                dmg_str += f"{dice_b}"
+            stat_line = f"AC:{ac_val}  {wpn_label}  DMG:{dmg_str}"
+            self._u3_text(stat_line, info_x, stat_y, self._U3_GRAY, self.font_small)
 
             # ── HP bar ──
-            bar_y = row_top + 18
+            bar_y = row_top + 28
             hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
             self._u3_draw_stat_bar(info_x, bar_y, bar_w, bar_h,
                                    member.hp, member.max_hp, hp_color)
-            self._u3_text(f"HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
+            self._u3_text("HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
 
             # ── MP bar ──
             mp_y = bar_y + bar_h + 3
@@ -2951,10 +2962,10 @@ class Renderer:
             if mp_max > 0:
                 self._u3_draw_stat_bar(info_x, mp_y, bar_w, bar_h,
                                        mp_val, mp_max, (100, 100, 255))
-                self._u3_text(f"MP", info_x - 26, mp_y - 2, (200, 200, 200), self.font_small)
+                self._u3_text("MP", info_x - 26, mp_y - 2, (200, 200, 200), self.font_small)
 
             # ── DEF / SHLD indicators ──
-            indicator_y = row_top + 18
+            indicator_y = row_top + 28
             if is_def:
                 self._u3_text("DEF", x + w - 40, indicator_y, self._U3_ORANGE, self.font_small)
                 indicator_y += 12
@@ -2968,7 +2979,7 @@ class Renderer:
                 ammo_y = mp_y if mp_max > 0 else bar_y + bar_h + 3
                 self._u3_text(f"x{ammo_count}", x + w - 32, ammo_y - 2, ammo_color, self.font_small)
 
-            ty += 58  # row height per character
+            ty += 68  # row height per character
 
     def _u3_fighter_panel(self, fighter, defending, x, y, w, h,
                           shield_buffs=None):
@@ -3051,7 +3062,7 @@ class Renderer:
 
     def _u3_monster_panel_multi(self, monsters, x, y, w, h,
                                source_state="dungeon", encounter_name=None):
-        """Monster stats panel showing all alive monsters compactly."""
+        """Monster stats panel matching the party panel format with sprites and bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
         tx = x + 8
@@ -3061,19 +3072,49 @@ class Renderer:
         self._u3_text(label, tx, ty, self._U3_RED, f)
         ty += 22
 
-        bar_w = w - 60
-        bar_h = 6
+        sprite_size = 32  # sprite display area (matches party panel)
+        bar_w = w - sprite_size - 30  # bar width after sprite + padding
+        bar_h = 8
 
         for mon in monsters:
-            # Name
-            self._u3_text(mon.name, tx, ty, self._U3_RED, self.font_small)
-            ac_text = f"AC:{mon.ac}"
-            self._u3_text(ac_text, x + w - 60, ty, self._U3_LTBLUE, self.font_small)
-            ty += 12
-            # HP bar
+            row_top = ty
+
+            # ── Monster sprite ──
+            sprite = self._get_monster_sprite(mon)
+            if sprite:
+                sx = tx
+                sy = row_top + 2
+                if not mon.is_alive():
+                    dim = sprite.copy()
+                    dim.set_alpha(80)
+                    self.screen.blit(dim, (sx, sy))
+                else:
+                    self.screen.blit(sprite, (sx, sy))
+
+            # ── Name (to the right of sprite) ──
+            info_x = tx + sprite_size + 6
+            name_color = self._U3_RED if mon.is_alive() else (120, 40, 40)
+            self._u3_text(mon.name, info_x, row_top, name_color, f)
+
+            # ── Stat line: AC, damage dice, attack bonus ──
+            stat_y = row_top + 16
+            dmg_str = f"{mon.damage_dice}d{mon.damage_sides}"
+            if mon.damage_bonus > 0:
+                dmg_str += f"+{mon.damage_bonus}"
+            elif mon.damage_bonus < 0:
+                dmg_str += f"{mon.damage_bonus}"
+            atk_str = f"+{mon.attack_bonus}" if mon.attack_bonus >= 0 else f"{mon.attack_bonus}"
+            stat_line = f"AC:{mon.ac}  ATK:{atk_str}  DMG:{dmg_str}"
+            self._u3_text(stat_line, info_x, stat_y, self._U3_GRAY, self.font_small)
+
+            # ── HP bar ──
+            bar_y = row_top + 28
             hp_color = (200, 40, 40) if mon.hp > mon.max_hp * 0.3 else self._U3_RED
-            self._u3_draw_stat_bar(tx, ty, bar_w, bar_h, mon.hp, mon.max_hp, hp_color)
-            ty += bar_h + 6
+            self._u3_draw_stat_bar(info_x, bar_y, bar_w, bar_h,
+                                   mon.hp, mon.max_hp, hp_color)
+            self._u3_text("HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
+
+            ty += 68  # row height per monster (matches party panel)
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None,
@@ -3143,9 +3184,6 @@ class Renderer:
             self._u3_text("<   >", cx - 24, cy, self._U3_WHITE, f)
             self._u3_text("v", cx - 4, cy + 20, self._U3_WHITE, f)
 
-            self._u3_text("[ARROWS] MOVE CURSOR", tx, y + h - 48, self._U3_LTBLUE, f)
-            self._u3_text("[ENTER] CONFIRM", tx, y + h - 32, self._U3_LTBLUE, f)
-            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_PROJECTILE:
             self._u3_text("-- FIRING --", tx, ty, self._U3_ORANGE, f)
@@ -3168,10 +3206,6 @@ class Renderer:
                     color = self._U3_WHITE if selected else self._U3_LTBLUE
                     self._u3_text(prefix + label.upper(), tx, iy, color, f)
 
-            # Controls hint at bottom
-            self._u3_text("[WASD] MOVE/ATTACK", tx, y + h - 48, self._U3_LTBLUE, f)
-            self._u3_text("[SPACE] SKIP TURN", tx, y + h - 32, self._U3_LTBLUE, f)
-            self._u3_text("[ENTER] CONFIRM", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_SPELL_SELECT:
             # Spell selection sub-menu
@@ -3188,8 +3222,6 @@ class Renderer:
             else:
                 self._u3_text("  NO SPELLS AVAILABLE", tx, ty + 28, (160, 160, 160), f)
 
-            self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
-            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_THROW_SELECT:
             # Throw item selection sub-menu
@@ -3207,8 +3239,6 @@ class Renderer:
             else:
                 self._u3_text("  NO THROWABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
 
-            self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
-            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_USE_ITEM:
             # Use item selection sub-menu
@@ -3226,8 +3256,6 @@ class Renderer:
             else:
                 self._u3_text("  NO USABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
 
-            self._u3_text("[ENTER] SELECT", tx, y + h - 32, self._U3_LTBLUE, f)
-            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_PLAYER_DIR:
             # Direction selection mode — show spell/throw name if applicable
@@ -3250,8 +3278,6 @@ class Renderer:
             self._u3_text("<   >", cx - 24, cy, self._U3_WHITE, f)
             self._u3_text("v", cx - 4, cy + 20, self._U3_WHITE, f)
 
-            self._u3_text("[ARROWS] DIRECTION", tx, y + h - 32, self._U3_LTBLUE, f)
-            self._u3_text("[ESC] CANCEL", tx, y + h - 16, self._U3_ORANGE, f)
 
         elif phase == PHASE_VICTORY:
             self._u3_text("** VICTORY! **", tx, ty, self._U3_GREEN, f)
@@ -3263,7 +3289,6 @@ class Renderer:
 
         else:
             self._u3_text("-- ENEMY TURN --", tx, ty, self._U3_RED, f)
-            self._u3_text("[SPACE] SPEED UP", tx, y + h - 16, self._U3_LTBLUE, f)
 
     def _u3_log_panel(self, combat_log, x, y, w, h):
         """Combat log panel with blue border and retro text."""
@@ -3364,7 +3389,7 @@ class Renderer:
             r = min(255, int(r * (1.0 + pulse)))
             g = min(255, int(g * (1.0 + pulse)))
             b = min(255, int(b * (1.0 + pulse)))
-            self._u3_text(line, 100, art_y + i * 16, (r, g, b), self.font_small)
+            self._u3_text(line, 180, art_y + i * 16, (r, g, b), self.font_small)
 
         # ── Subtitle ──
         sub_fade = min(1.0, max(0.0, (elapsed - 1.5) / 1.0))
@@ -5236,3 +5261,199 @@ class Renderer:
         # ── Dismiss hint ──
         self._u3_text("[ESC] CLOSE", px + pw - 100, py + ph - 20,
                       self._U3_BLUE, self.font_small)
+
+    def draw_combat_help_overlay(self):
+        """Draw a full-screen overlay showing all combat controls."""
+        # Dim background
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 200))
+        self.screen.blit(dim, (0, 0))
+
+        margin = 60
+        px, py = margin, margin
+        pw = SCREEN_WIDTH - margin * 2
+        ph = SCREEN_HEIGHT - margin * 2
+
+        pygame.draw.rect(self.screen, (12, 12, 24), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
+
+        # Title
+        self._u3_text("COMBAT CONTROLS", px + pw // 2 - 70, py + 10,
+                       self._U3_ORANGE, self.font)
+
+        f = self.font_small
+        lh = 18  # line height
+        col1_x = px + 20
+        col2_x = px + pw // 2 + 10
+        y = py + 40
+
+        # ── Left column ──
+        self._u3_text("MOVEMENT & ACTIONS", col1_x, y, self._U3_LTBLUE, f)
+        y += lh + 4
+        lines_left = [
+            ("[W/A/S/D]", "Move / Melee attack"),
+            ("[ARROWS]", "Navigate menus / Choose direction"),
+            ("[ENTER]", "Confirm selection"),
+            ("[SPACE]", "Skip turn / Speed up animations"),
+            ("[ESC]", "Cancel current action"),
+        ]
+        for key, desc in lines_left:
+            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
+            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            y += lh
+
+        y += 8
+        self._u3_text("MENU COMMANDS", col1_x, y, self._U3_LTBLUE, f)
+        y += lh + 4
+        lines_menu = [
+            ("[ENTER]", "Select highlighted action"),
+            ("[UP/DOWN]", "Scroll action menu"),
+        ]
+        for key, desc in lines_menu:
+            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
+            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            y += lh
+
+        y += 8
+        self._u3_text("ACTIONS", col1_x, y, self._U3_LTBLUE, f)
+        y += lh + 4
+        lines_actions = [
+            ("Attack", "Move into an adjacent enemy"),
+            ("Ranged", "Fire weapon in a direction"),
+            ("Spell", "Cast a spell from your list"),
+            ("Throw", "Throw an item at enemies"),
+            ("Use Item", "Use a consumable item"),
+            ("Defend", "Reduce damage taken this round"),
+            ("Flee", "Attempt to escape combat"),
+        ]
+        for action, desc in lines_actions:
+            self._u3_text(action, col1_x, y, (200, 180, 120), f)
+            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            y += lh
+
+        # ── Right column ──
+        ry = py + 40
+        self._u3_text("SPELLS", col2_x, ry, self._U3_LTBLUE, f)
+        ry += lh + 4
+        lines_spells = [
+            ("Fireball", "Ranged fire damage (directional)"),
+            ("Heal", "Restore HP to a party member"),
+            ("Shield", "Boost AC of a party member"),
+            ("Turn Undead", "Damage all undead enemies"),
+        ]
+        for spell, desc in lines_spells:
+            self._u3_text(spell, col2_x, ry, (200, 180, 120), f)
+            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ry += lh
+
+        ry += 8
+        self._u3_text("TARGETING", col2_x, ry, self._U3_LTBLUE, f)
+        ry += lh + 4
+        lines_target = [
+            ("[ARROWS]", "Choose direction for ranged/spells"),
+            ("[ARROWS]", "Move cursor for shield target"),
+            ("[ENTER]", "Confirm target"),
+            ("[ESC]", "Cancel and return to menu"),
+        ]
+        for key, desc in lines_target:
+            self._u3_text(key, col2_x, ry, self._U3_WHITE, f)
+            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ry += lh
+
+        ry += 8
+        self._u3_text("OTHER", col2_x, ry, self._U3_LTBLUE, f)
+        ry += lh + 4
+        lines_other = [
+            ("[L]", "Open game log"),
+            ("[H]", "Toggle this help screen"),
+            ("[E]", "Open equipment screen"),
+        ]
+        for key, desc in lines_other:
+            self._u3_text(key, col2_x, ry, self._U3_WHITE, f)
+            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ry += lh
+
+        # Footer hint
+        self._u3_text("[H / ESC] CLOSE",
+                      px + pw // 2 - 50, py + ph - 22,
+                      self._U3_BLUE, self.font_small)
+
+    def draw_log_overlay(self, log_entries, scroll_offset=0):
+        """Draw a full-screen scrollable game log overlay.
+
+        log_entries : list[str]  – all accumulated log messages
+        scroll_offset : int      – how many lines scrolled up from the bottom
+        """
+        # Dim background
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 180))
+        self.screen.blit(dim, (0, 0))
+
+        # Log panel
+        margin = 40
+        px = margin
+        py = margin
+        pw = SCREEN_WIDTH - margin * 2
+        ph = SCREEN_HEIGHT - margin * 2
+
+        pygame.draw.rect(self.screen, (12, 12, 24), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
+
+        # Title
+        self._u3_text("GAME LOG", px + pw // 2 - 40, py + 8,
+                       self._U3_ORANGE, self.font)
+
+        # Hints
+        self._u3_text("[UP/DOWN] SCROLL    [L/ESC] CLOSE",
+                      px + pw // 2 - 130, py + ph - 20,
+                      self._U3_BLUE, self.font_small)
+
+        # Content area
+        content_y = py + 32
+        content_h = ph - 56  # room for title + hint
+        line_h = 16
+        max_visible = content_h // line_h
+
+        if not log_entries:
+            self._u3_text("No log entries yet.",
+                          px + 16, content_y + 8, self._U3_GRAY, self.font)
+            return
+
+        total = len(log_entries)
+
+        # scroll_offset 0 = bottom (most recent visible)
+        # Clamp scroll
+        max_scroll = max(0, total - max_visible)
+        scroll_offset = max(0, min(scroll_offset, max_scroll))
+
+        # Which entries to show
+        end_idx = total - scroll_offset
+        start_idx = max(0, end_idx - max_visible)
+        visible = log_entries[start_idx:end_idx]
+
+        for i, line in enumerate(visible):
+            ly = content_y + i * line_h
+            # Color code based on content
+            if "CRITICAL" in line or "defeated" in line.lower():
+                color = (255, 200, 80)
+            elif "Hit!" in line or "damage" in line:
+                color = self._U3_WHITE
+            elif "Miss" in line or "Failed" in line:
+                color = (160, 160, 170)
+            elif line.startswith("--"):
+                color = self._U3_ORANGE
+            elif "gold" in line.lower() or "treasure" in line.lower():
+                color = (255, 255, 0)
+            else:
+                color = (180, 180, 200)
+            self._u3_text(line, px + 16, ly, color, self.font_small)
+
+        # Scroll indicator
+        if scroll_offset > 0:
+            self._u3_text("v MORE v", px + pw // 2 - 30,
+                          content_y + content_h - 14,
+                          self._U3_LTBLUE, self.font_small)
+        if end_idx < total or start_idx > 0:
+            if scroll_offset < max_scroll:
+                self._u3_text("^ MORE ^", px + pw // 2 - 30,
+                              content_y, self._U3_LTBLUE, self.font_small)

@@ -5,16 +5,16 @@ All tunable values live here so they're easy to find and change.
 """
 
 # ----- Display -----
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 736
 TILE_SIZE = 32          # Each tile is 32x32 pixels
 FPS = 60
 GAME_TITLE = "Realm of Shadow - An Ultima III Inspired RPG"
 
 # ----- Viewport -----
 # How many tiles visible on screen at once
-VIEWPORT_COLS = SCREEN_WIDTH // TILE_SIZE   # 25
-VIEWPORT_ROWS = SCREEN_HEIGHT // TILE_SIZE  # 18 (with a bit of room)
+VIEWPORT_COLS = SCREEN_WIDTH // TILE_SIZE   # 30
+VIEWPORT_ROWS = SCREEN_HEIGHT // TILE_SIZE  # 26
 
 # ----- Movement -----
 # Delay (in ms) between repeated moves when holding a key
