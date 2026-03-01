@@ -206,7 +206,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      room_min_size=4, room_max_size=8,
                      seed=None,
                      place_stairs_down=False, place_artifact=False,
-                     place_doors=False):
+                     place_doors=False,
+                     encounter_area="dungeon"):
     """
     Generate a procedural dungeon.
 
@@ -307,7 +308,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             my += random.randint(-1, 1)
             # Make sure we're on a floor tile (not a chest/trap/stairs)
             if tmap.get_tile(mx, my) == TILE_DFLOOR:
-                enc = create_encounter("dungeon")
+                enc = create_encounter(encounter_area)
                 # Create the map-visible monster using the party tile
                 monster = create_monster(enc["monster_party_tile"])
                 monster.col = mx
@@ -346,6 +347,38 @@ def generate_dungeon(name="The Depths", width=40, height=30,
 
     return DungeonData(tmap, rooms, entry_col, entry_row, name,
                        monsters=monsters)
+
+
+def generate_house_dungeon(name="Elara's House"):
+    """Generate a two-level house dungeon (ground floor + basement).
+
+    Level 0 (Ground Floor): a small house with a few rooms and stairs
+        down to the basement. Easy monsters (rats, goblins).
+    Level 1 (Basement): a cramped cellar with the family heirloom
+        in the deepest room.
+
+    Returns:
+        A list [level_0_data, level_1_data] of DungeonData objects.
+    """
+    level_0 = generate_dungeon(
+        name=f"{name} - Ground Floor",
+        width=24, height=18,
+        min_rooms=4, max_rooms=5,
+        room_min_size=3, room_max_size=5,
+        place_stairs_down=True,
+        place_doors=True,
+        encounter_area="house_basement",
+    )
+    level_1 = generate_dungeon(
+        name=f"{name} - Basement",
+        width=20, height=15,
+        min_rooms=3, max_rooms=4,
+        room_min_size=3, room_max_size=5,
+        place_artifact=True,
+        place_doors=True,
+        encounter_area="house_basement",
+    )
+    return [level_0, level_1]
 
 
 def generate_quest_dungeon(name="Shadow Dungeon"):

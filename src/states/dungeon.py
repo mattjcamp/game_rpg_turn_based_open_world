@@ -58,6 +58,16 @@ class DungeonState(InventoryMixin, BaseState):
         self._entered = False
         self.pending_combat_message = None
 
+    def _get_active_quest(self):
+        """Return the quest dict that owns this dungeon, or None."""
+        oc, orow = self.overworld_col, self.overworld_row
+        for q in (self.game.quest, getattr(self.game, "house_quest", None)):
+            if (q and q.get("status") in ("active", "artifact_found")
+                    and q.get("dungeon_col") == oc
+                    and q.get("dungeon_row") == orow):
+                return q
+        return None
+
     def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
         """
         Set up a multi-level quest dungeon.
@@ -679,20 +689,23 @@ class DungeonState(InventoryMixin, BaseState):
                 if self.torch_active:
                     self._visible_tiles = self._compute_visible_tiles()
                 self.show_message("You descend deeper...", 2000)
-                if self.game.quest:
-                    self.game.quest["current_level"] = 1
+                active_q = self._get_active_quest()
+                if active_q:
+                    active_q["current_level"] = 1
             else:
                 self.show_message("Stairs leading down...", 1500)
 
         elif tile_id == TILE_ARTIFACT:
-            # Pick up the quest artifact
-            self.game.party.inv_add("Shadow Crystal")
+            # Pick up whatever quest artifact belongs to this dungeon
+            active_q = self._get_active_quest()
+            artifact = active_q.get("artifact_name", "Shadow Crystal") if active_q else "Shadow Crystal"
+            self.game.party.inv_add(artifact)
             self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
-            if self.game.quest:
-                self.game.quest["status"] = "artifact_found"
+            if active_q:
+                active_q["status"] = "artifact_found"
             # Spawn a portal doorway on an adjacent floor tile
             self._place_portal(col, row)
-            self.show_message("Found the Shadow Crystal! A portal appears!", 3000)
+            self.show_message(f"Found the {artifact}! A portal appears!", 3000)
 
         elif tile_id == TILE_PORTAL:
             # Portal whisks the party back to the overworld
@@ -793,8 +806,9 @@ class DungeonState(InventoryMixin, BaseState):
         self._visible_tiles = set()
         if self.torch_active:
             self._visible_tiles = self._compute_visible_tiles()
-        if self.game.quest:
-            self.game.quest["current_level"] = 0
+        active_q = self._get_active_quest()
+        if active_q:
+            active_q["current_level"] = 0
         self.show_message("You ascend to the upper level.", 2000)
 
     def _exit_dungeon(self):

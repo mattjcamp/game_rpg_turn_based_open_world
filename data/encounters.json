@@ -102,6 +102,33 @@
         "monster_party_tile": "Troll",
         "monsters": ["Troll"]
       }
+    ],
+
+    "house_basement": [
+      {
+        "name": "Rat Infestation",
+        "weight": 40,
+        "monster_party_tile": "Giant Rat",
+        "monsters": ["Giant Rat", "Giant Rat"]
+      },
+      {
+        "name": "Cellar Rats",
+        "weight": 30,
+        "monster_party_tile": "Giant Rat",
+        "monsters": ["Giant Rat"]
+      },
+      {
+        "name": "Stray Goblin",
+        "weight": 20,
+        "monster_party_tile": "Goblin",
+        "monsters": ["Goblin"]
+      },
+      {
+        "name": "Goblin Squatters",
+        "weight": 10,
+        "monster_party_tile": "Goblin",
+        "monsters": ["Goblin", "Giant Rat"]
+      }
     ]
   }
 }

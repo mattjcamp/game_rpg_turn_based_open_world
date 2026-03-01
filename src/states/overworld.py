@@ -15,7 +15,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
 )
-from src.dungeon_generator import generate_dungeon
+from src.dungeon_generator import generate_dungeon, generate_house_dungeon
 from src.monster import create_random_monster, create_encounter, create_monster
 
 
@@ -369,24 +369,29 @@ class OverworldState(InventoryMixin, BaseState):
 
         elif tile_id == TILE_DUNGEON:
             dungeon_state = self.game.states["dungeon"]
-            # Check if this is the quest dungeon location
+            pcol, prow = self.game.party.col, self.game.party.row
+
+            # Check if this is the Shadow Crystal quest dungeon
             quest = self.game.quest
             if (quest and quest["status"] in ("active", "artifact_found")
-                    and self.game.party.col == quest["dungeon_col"]
-                    and self.game.party.row == quest["dungeon_row"]):
-                # Enter the persistent quest dungeon
+                    and pcol == quest["dungeon_col"]
+                    and prow == quest["dungeon_row"]):
                 dungeon_state.enter_quest_dungeon(
-                    quest["levels"],
-                    self.game.party.col,
-                    self.game.party.row
+                    quest["levels"], pcol, prow
                 )
+
+            # Check if this is the house quest dungeon
+            elif self._is_house_quest_dungeon(pcol, prow):
+                hq = self.game.house_quest
+                dungeon_state.enter_quest_dungeon(
+                    hq["levels"], pcol, prow
+                )
+
             else:
                 # Generate a fresh dungeon each time!
                 dungeon_data = generate_dungeon("The Depths")
                 dungeon_state.enter_dungeon(
-                    dungeon_data,
-                    self.game.party.col,
-                    self.game.party.row
+                    dungeon_data, pcol, prow
                 )
             self.game.change_state("dungeon")
             return
@@ -450,6 +455,72 @@ class OverworldState(InventoryMixin, BaseState):
         cooldown = utile.get("interact_data", {}).get("cooldown_steps", 0)
         if cooldown > 0:
             tmap.set_unique_cooldown(col, row, cooldown)
+
+        # ── Special quest handling ──
+        quest_id = utile.get("interact_data", {}).get("quest_id")
+        if quest_id == "house_quest":
+            self._activate_house_quest()
+
+    # ── House quest ───────────────────────────────────────────
+
+    def _is_house_quest_dungeon(self, col, row):
+        """Check if the tile at (col, row) is the active house quest dungeon."""
+        hq = getattr(self.game, "house_quest", None)
+        if not hq or hq["status"] not in ("active", "artifact_found"):
+            return False
+        return col == hq["dungeon_col"] and row == hq["dungeon_row"]
+
+    def _activate_house_quest(self):
+        """Activate the house quest when the party speaks to Elara."""
+        hq = getattr(self.game, "house_quest", None)
+        if hq and hq["status"] != "not_started":
+            # Quest already active or completed
+            if hq["status"] == "completed":
+                self.show_message("Elara: Thank you again for returning my heirloom!", 3000)
+            elif hq["status"] == "artifact_found":
+                self.show_message("Elara: You found it! Thank you so much!", 3000)
+                self._complete_house_quest()
+            else:
+                self.show_message("Elara: Please, my heirloom is still in the basement!", 3000)
+            return
+
+        # Generate the house dungeon
+        levels = generate_house_dungeon()
+        house_col, house_row = 7, 10  # fixed house dungeon location
+
+        # Store house quest state
+        self.game.house_quest = {
+            "name": "Family Heirloom",
+            "status": "active",
+            "dungeon_col": house_col,
+            "dungeon_row": house_row,
+            "levels": levels,
+            "current_level": 0,
+            "artifact_name": "Family Heirloom",
+        }
+
+        self.show_message("Elara: Thank you! The house is just north of here. Be careful!", 4000)
+        self.game.game_log.append("Quest accepted: Retrieve the Family Heirloom from Elara's house.")
+
+    def _complete_house_quest(self):
+        """Complete the house quest: remove heirloom, give reward."""
+        party = self.game.party
+
+        # Remove the heirloom
+        party.inv_remove("Family Heirloom")
+
+        # Give gold reward
+        reward_gold = 100
+        party.gold += reward_gold
+
+        # Give XP to all alive members
+        for member in party.alive_members():
+            member.exp += 30
+
+        self.game.house_quest["status"] = "completed"
+        self.game.game_log.append(
+            f"Quest complete! Elara rewards the party with {reward_gold} gold."
+        )
 
     # ── Chest loot ─────────────────────────────────────────────
 

@@ -54,6 +54,7 @@ class Game:
         # --- Quest state ---
         # None when no quest active; dict when quest is in progress
         self.quest = None
+        self.house_quest = None
 
         # --- Game log ---
         # Accumulates all messages from every state for the log overlay
@@ -108,6 +109,7 @@ class Game:
         """Start a fresh new game from the title screen."""
         self.party = create_default_party()
         self.quest = None
+        self.house_quest = None
         self.showing_title = False
         self.change_state("overworld")
         self.camera.update(self.party.col, self.party.row)

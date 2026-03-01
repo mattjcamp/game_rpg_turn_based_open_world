@@ -459,6 +459,7 @@ class TownState(InventoryMixin, BaseState):
             "dungeon_row": dr,
             "levels": levels,
             "current_level": 0,
+            "artifact_name": "Shadow Crystal",
         }
 
         # Show confirmation

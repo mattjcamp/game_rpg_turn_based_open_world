@@ -342,6 +342,13 @@
       "party_can_equip": false,
       "character_can_equip": false
     },
+    "Family Heirloom": {
+      "description": "A delicate silver locket engraved with a family crest. It belongs to Elara.",
+      "icon": "artifact",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
     "Camping Supplies": {
       "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
       "icon": "tool",

@@ -5,9 +5,9 @@
   "allowed_armor": ["Cloth"],
 
   "hp_per_level": 4,
-  "mp_per_level": 6,
+  "mp_per_level": 15,
 
-  "range": 100,
+  "range": 2,
 
   "exp_per_level": 500
 }

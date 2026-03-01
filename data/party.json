@@ -6,7 +6,7 @@
     "row": 16
   },
 
-  "gold": 50,
+  "gold": 25,
 
   "characters": [
     {
@@ -20,9 +20,9 @@
       "wisdom": 10,
       "level": 1,
       "equipped": {
-        "right_hand": "Sword",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Plate",
+        "body": "Leather",
         "head": null
       },
       "inventory": []
@@ -38,9 +38,9 @@
       "wisdom": 18,
       "level": 1,
       "equipped": {
-        "right_hand": "Mace",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Chain",
+        "body": "Leather",
         "head": null
       },
       "inventory": []
@@ -74,7 +74,7 @@
       "wisdom": 8,
       "level": 1,
       "equipped": {
-        "right_hand": "Bow",
+        "right_hand": null,
         "left_hand": null,
         "body": "Leather",
         "head": null
@@ -91,8 +91,8 @@
   },
 
   "party_effects": {
-    "effect_1": "Detect Traps",
-    "effect_2": "Torch",
+    "effect_1": null,
+    "effect_2": null,
     "effect_3": null,
     "effect_4": null
   },
@@ -100,12 +100,10 @@
   "inventory": [
     { "item": "Torch" },
     { "item": "Torch" },
-    { "item": "Torch" },
     { "item": "Rock" },
-    { "item": "Dagger" },
-    { "item": "Dagger" },
-    { "item": "Arrows", "charges": 20 },
+    { "item": "Rock" },
+    { "item": "Rock" },
     { "item": "Healing Herb" },
-    { "item": "Camping Supplies", "charges": 3 }
+    { "item": "Camping Supplies", "charges": 1 }
   ]
 }

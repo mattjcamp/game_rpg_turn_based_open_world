@@ -4,10 +4,10 @@
   "allowed_weapons": "all",
   "allowed_armor": "all",
 
-  "hp_per_level": 10,
+  "hp_per_level": 15,
   "mp_per_level": 0,
 
-  "range": 100,
+  "range": 2,
 
   "exp_per_level": 500
 }

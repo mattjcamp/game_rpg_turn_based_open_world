@@ -524,6 +524,23 @@
           "encounter_name": "Treasure Guardian"
         }
       }
+    },
+
+    "elara_npc": {
+      "name": "Worried Woman",
+      "description": "A woman in a torn dress stands at the roadside, wringing her hands. She looks desperate for help.",
+      "tile": null,
+      "visible": false,
+      "walkable": true,
+      "base_tile": "grass",
+      "category": "npc",
+      "interact_type": "dialogue",
+      "interact_text": "Please, brave adventurers! Creatures have overrun my home. My family's heirloom is still inside. Will you help me?",
+      "interact_data": {
+        "npc_name": "Elara",
+        "dialogue_id": "house_quest",
+        "quest_id": "house_quest"
+      }
     }
   },
 

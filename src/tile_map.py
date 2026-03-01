@@ -171,6 +171,9 @@ def create_test_map():
     # --- Dungeon entrance (right side, in the mountains) ---
     tmap.set_tile(30, 8, TILE_DUNGEON)
 
+    # --- House dungeon (near town, introductory quest) ---
+    tmap.set_tile(7, 10, TILE_DUNGEON)
+
     # --- Place unique tiles ---
     unique_defs = load_unique_tiles()
     _place_unique_tiles(tmap, unique_defs)
@@ -222,6 +225,8 @@ def _place_unique_tiles(tmap, unique_defs):
         ("cursed_well",         7,  17),
         # Poison swamp south-east area
         ("poison_swamp",        30, 22),
+        # Elara — worried woman near town who gives the house quest
+        ("elara_npc",           8,  12),
     ]
 
     for tile_id, col, row in placements:

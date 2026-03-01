@@ -4,10 +4,10 @@
   "allowed_weapons": ["Fists", "Dagger", "Club", "Sling", "Bow", "Silver Bow"],
   "allowed_armor": ["Cloth", "Leather"],
 
-  "hp_per_level": 7,
+  "hp_per_level": 5,
   "mp_per_level": 0,
 
-  "range": 300,
+  "range": 5,
 
   "exp_per_level": 500
 }
