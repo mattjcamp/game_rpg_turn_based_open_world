@@ -1,11 +1,12 @@
 Purpose: to create a playable adventure from beginning to end with a simple version of the game systems
 
 Full Game
-- Add camping or food to let party regain hit points
+- Clean up Stash screen
 - Add Time with nighttime effects
-- Add character creation/party composition
+- Add Range attribute for characters and monsters
 - Work on randomized quest system
 - Work on scripted quest system
-- Build richer world
 - Build more character classes, items, spells, monsters
+- Add character creation/party composition
 - Build scenario 
+- Build richer world

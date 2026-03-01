@@ -269,6 +269,16 @@
       "description": "A pulsing dark crystal radiating ancient power. The innkeeper seeks this.",
       "icon": "artifact",
       "quest_item": true
+    },
+    "Camping Supplies": {
+      "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
+      "icon": "tool",
+      "usable": true,
+      "effect": "rest",
+      "power": 0,
+      "charges": 3,
+      "buy": 25,
+      "sell": 12
     }
   }
 }

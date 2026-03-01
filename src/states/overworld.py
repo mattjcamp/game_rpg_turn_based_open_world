@@ -50,6 +50,9 @@ class OverworldState(BaseState):
         self.effect_list = []                 # available effects for current slot
         self.effect_cursor = 0               # cursor in effect chooser
 
+        # Use-item animation overlay
+        self.use_item_anim = None
+
         # Game log overlay
         self.showing_log = False
         self.log_scroll = 0
@@ -302,7 +305,13 @@ class OverworldState(BaseState):
             inv = party.shared_inventory
             if inv_idx < len(inv):
                 item_name = party.item_name(inv[inv_idx])
-                if chosen == "EXAMINE":
+                if chosen == "USE":
+                    self._use_party_item(item_name, inv_idx)
+                    self.party_inv_action_menu = False
+                    new_total = NUM_SLOTS + NUM_EFFECTS + len(party.shared_inventory)
+                    if self.party_inv_cursor >= new_total:
+                        self.party_inv_cursor = max(0, new_total - 1)
+                elif chosen == "EXAMINE":
                     self.examining_item = item_name
                 elif chosen.startswith("GIVE TO "):
                     give_name = chosen[8:].strip()
@@ -355,6 +364,11 @@ class OverworldState(BaseState):
             if inv_idx >= len(inv):
                 return []
             options = []
+            item_name = party.item_name(inv[inv_idx])
+            from src.party import ITEM_INFO
+            info = ITEM_INFO.get(item_name, {})
+            if info.get("usable", False):
+                options.append("USE")
             # Offer equip to each empty party slot
             for s in party.PARTY_SLOTS:
                 if party.get_equipped_name(s) is None:
@@ -364,6 +378,106 @@ class OverworldState(BaseState):
                 options.append(f"GIVE TO {member.name.upper()}")
             options.append("EXAMINE")
             return options
+
+    # ── Use consumable items from party stash ─────────────────────
+
+    def _use_party_item(self, item_name, inv_idx):
+        """Use a consumable item from the party stash."""
+        from src.party import ITEM_INFO
+        party = self.game.party
+        info = ITEM_INFO.get(item_name, {})
+        effect = info.get("effect", "")
+        power = info.get("power", 0)
+
+        if effect == "rest":
+            total_hp = 0
+            total_mp = 0
+            for m in party.members:
+                if m.hp <= 0:
+                    continue
+                hp_restore = max(1, int(m.max_hp * 0.35)) + random.randint(1, 8)
+                mp_restore = max(1, int(m.max_mp * 0.30)) + random.randint(1, 4)
+                old_hp, old_mp = m.hp, getattr(m, "current_mp", 0)
+                m.hp = min(m.max_hp, m.hp + hp_restore)
+                m.current_mp = min(m.max_mp, getattr(m, "current_mp", 0) + mp_restore)
+                total_hp += m.hp - old_hp
+                total_mp += m.current_mp - old_mp
+            self.game.game_log.append(f"The party rests using {item_name}...")
+            self.game.game_log.append(
+                f"  Restored {total_hp} HP and {total_mp} MP across the party!")
+            self.show_message(f"Rested! +{total_hp} HP, +{total_mp} MP", 3500)
+        elif effect == "heal_hp":
+            best = None
+            best_missing = 0
+            for m in party.members:
+                if m.hp <= 0:
+                    continue
+                missing = m.max_hp - m.hp
+                if missing > best_missing:
+                    best_missing = missing
+                    best = m
+            if best and best_missing > 0:
+                heal = power + random.randint(1, 6)
+                best.hp = min(best.max_hp, best.hp + heal)
+                self.game.game_log.append(
+                    f"{best.name} uses {item_name}. (+{heal} HP)")
+                self.show_message(f"{best.name}: +{heal} HP", 3000)
+            else:
+                self.game.game_log.append("Everyone is already at full health!")
+                self.show_message("Everyone is at full health!", 2500)
+                return
+        elif effect == "heal_mp":
+            best = None
+            best_missing = 0
+            for m in party.members:
+                if m.hp <= 0:
+                    continue
+                missing = m.max_mp - getattr(m, "current_mp", 0)
+                if missing > best_missing:
+                    best_missing = missing
+                    best = m
+            if best and best_missing > 0:
+                restore = power + random.randint(1, 4)
+                best.current_mp = min(best.max_mp,
+                                      getattr(best, "current_mp", 0) + restore)
+                self.game.game_log.append(
+                    f"{best.name} uses {item_name}. (+{restore} MP)")
+                self.show_message(f"{best.name}: +{restore} MP", 3000)
+            else:
+                self.game.game_log.append("Everyone is already at full mana!")
+                self.show_message("Everyone is at full mana!", 2500)
+                return
+        elif effect == "cure_poison":
+            cured = False
+            for m in party.members:
+                if getattr(m, "poisoned", False):
+                    m.poisoned = False
+                    self.game.game_log.append(f"{m.name}'s poison was cured!")
+                    cured = True
+                    break
+            if not cured:
+                self.game.game_log.append("Nobody is poisoned!")
+                self.show_message("Nobody is poisoned!", 2500)
+                return
+        else:
+            self.game.game_log.append(f"Used {item_name}.")
+            self.show_message(f"Used {item_name}", 2000)
+
+        # Start use-item animation
+        anim_text = self.message or f"Used {item_name}"
+        self.use_item_anim = {
+            "effect": effect,
+            "timer": 1800,
+            "duration": 1800,
+            "text": anim_text,
+        }
+
+        # Consume charge or remove item
+        entry = party.shared_inventory[inv_idx] if inv_idx < len(party.shared_inventory) else None
+        if entry is not None and isinstance(entry, dict) and entry.get("charges", 0) > 0:
+            party.inv_consume_charge(item_name)
+        else:
+            party.inv_remove(item_name)
 
     # ── Orc spawning ──────────────────────────────────────────────
 
@@ -801,6 +915,12 @@ class OverworldState(BaseState):
             if self.move_cooldown < 0:
                 self.move_cooldown = 0
 
+        # Tick use-item animation
+        if self.use_item_anim and self.use_item_anim["timer"] > 0:
+            self.use_item_anim["timer"] -= dt_ms
+            if self.use_item_anim["timer"] <= 0:
+                self.use_item_anim = None
+
         # Unique tile discovery animation
         if self.unique_tile_timer > 0:
             self.unique_tile_timer -= dt_ms
@@ -822,6 +942,8 @@ class OverworldState(BaseState):
                 choosing_effect=self.choosing_effect,
                 effect_list=self.effect_list,
                 effect_cursor=self.effect_cursor)
+            if self.use_item_anim:
+                renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:
                 renderer.draw_item_examine(self.examining_item)
             return

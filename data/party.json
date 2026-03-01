@@ -105,6 +105,7 @@
     { "item": "Dagger" },
     { "item": "Dagger" },
     { "item": "Arrows", "charges": 20 },
-    { "item": "Healing Herb" }
+    { "item": "Healing Herb" },
+    { "item": "Camping Supplies", "charges": 3 }
   ]
 }

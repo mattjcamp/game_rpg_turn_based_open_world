@@ -4934,6 +4934,148 @@ class Renderer:
                           8, bar_y + 5, self._U3_BLUE)
 
     # ═══════════════════════════════════════════════════════════════
+    # USE-ITEM ANIMATION OVERLAY  (drawn on top of party inventory)
+    # ═══════════════════════════════════════════════════════════════
+
+    def draw_use_item_animation(self, party, anim):
+        """Draw a healing / rest animation overlay on the party inventory screen.
+
+        *anim* is a dict with keys:
+            effect   – "rest", "heal_hp", "heal_mp", "cure_poison", etc.
+            timer    – remaining ms  (starts at duration, ticks down)
+            duration – total ms
+            text     – short feedback string like "+12 HP"
+        """
+        if not anim or anim["timer"] <= 0:
+            return
+
+        t = anim["timer"]
+        dur = anim["duration"]
+        progress = 1.0 - (t / dur)          # 0 → 1 over lifetime
+        effect = anim.get("effect", "rest")
+
+        # ── Layout constants matching draw_party_inventory_u3 ──
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+        left_w = int(sw * 0.56)
+        right_w = sw - left_w - 4
+        right_x = left_w + 2
+        title_h = 30
+        panel_y = title_h + 2
+        rx = right_x + 10
+        ry = panel_y + 10 + 20       # skip "PARTY [1-4]" header
+
+        char_card_h = 50
+
+        # ── Pick colours per effect type ──
+        if effect == "rest":
+            glow_color = (60, 220, 120)       # green glow
+            particle_color = (120, 255, 180)
+            text_color = (100, 255, 160)
+        elif effect == "heal_hp":
+            glow_color = (60, 220, 120)
+            particle_color = (120, 255, 180)
+            text_color = (100, 255, 160)
+        elif effect == "heal_mp":
+            glow_color = (80, 140, 255)       # blue glow
+            particle_color = (140, 200, 255)
+            text_color = (120, 180, 255)
+        elif effect == "cure_poison":
+            glow_color = (255, 255, 100)      # yellow glow
+            particle_color = (255, 255, 200)
+            text_color = (255, 255, 140)
+        else:
+            glow_color = (200, 200, 200)
+            particle_color = (255, 255, 255)
+            text_color = (220, 220, 220)
+
+        # ── Phase timing ──
+        # Phase 1 (0-40%): glow sweeps across character cards
+        # Phase 2 (20-80%): rising particles + HP numbers
+        # Phase 3 (60-100%): fade out
+
+        fade_alpha = 1.0
+        if progress > 0.75:
+            fade_alpha = max(0.0, 1.0 - (progress - 0.75) / 0.25)
+
+        # ── Glow sweep over character cards ──
+        if progress < 0.6:
+            sweep = min(1.0, progress / 0.4)   # 0→1 over first 40%
+            glow_a = int(60 * fade_alpha * (0.5 + 0.5 * math.sin(progress * 12)))
+            glow_s = pygame.Surface((right_w - 20, int(char_card_h * len(party.members) * sweep)),
+                                    pygame.SRCALPHA)
+            glow_s.fill((*glow_color, max(0, min(255, glow_a))))
+            self.screen.blit(glow_s, (rx, ry))
+
+        # ── Rising sparkle particles ──
+        if 0.1 < progress < 0.9:
+            sparkle_phase = (progress - 0.1) / 0.8    # 0→1
+            n_particles = 12
+            for i in range(n_particles):
+                seed = i * 137.508  # golden angle spread
+                px_base = rx + 10 + ((i * 23) % (right_w - 40))
+                py_base = ry + char_card_h * len(party.members)
+                # Rise upward
+                rise = sparkle_phase * (40 + (i % 5) * 20)
+                px = px_base + int(8 * math.sin(seed + progress * 8))
+                py = int(py_base - rise)
+                # Fade in/out
+                p_alpha = int(180 * fade_alpha * (0.5 + 0.5 * math.sin(seed + progress * 10)))
+                p_alpha = max(0, min(255, p_alpha))
+                sz = 2 + int(2 * ((i % 3) / 2))
+                spark_s = pygame.Surface((sz * 2, sz * 2), pygame.SRCALPHA)
+                pygame.draw.circle(spark_s, (*particle_color, p_alpha), (sz, sz), sz)
+                self.screen.blit(spark_s, (px - sz, py - sz))
+
+        # ── Per-character "+" indicators rising from each card ──
+        if 0.15 < progress < 0.85:
+            ind_alpha = int(220 * fade_alpha)
+            fm = self.font_med
+            for mi, member in enumerate(party.members):
+                if member.hp <= 0 and effect != "cure_poison":
+                    continue
+                cy = ry + mi * char_card_h + char_card_h // 2
+                # Float upward
+                float_y = int((progress - 0.15) * 40)
+                txt_y = cy - float_y
+                if effect == "rest":
+                    indicator = "+HP +MP"
+                elif effect == "heal_hp":
+                    indicator = "+HP"
+                elif effect == "heal_mp":
+                    indicator = "+MP"
+                elif effect == "cure_poison":
+                    indicator = "CURED"
+                else:
+                    indicator = "+"
+                ind_surf = fm.render(indicator, True, text_color)
+                ind_surf.set_alpha(max(0, min(255, ind_alpha)))
+                self.screen.blit(ind_surf,
+                                 (rx + right_w - 80, txt_y))
+
+        # ── Central feedback text (fades in then out) ──
+        text = anim.get("text", "")
+        if text and 0.2 < progress < 0.95:
+            text_alpha = int(255 * fade_alpha)
+            f = self.font
+            ts = f.render(text, True, text_color)
+            ts.set_alpha(max(0, min(255, text_alpha)))
+            tx = sw // 2 - ts.get_width() // 2
+            ty = sh // 2 - ts.get_height() // 2
+            # Dark backdrop
+            pad = 12
+            bg = pygame.Surface((ts.get_width() + pad * 2, ts.get_height() + pad * 2),
+                                pygame.SRCALPHA)
+            bg.fill((0, 0, 0, min(255, int(180 * fade_alpha))))
+            self.screen.blit(bg, (tx - pad, ty - pad))
+            # Border
+            pygame.draw.rect(self.screen,
+                             (*glow_color, min(255, int(160 * fade_alpha))),
+                             (tx - pad, ty - pad,
+                              ts.get_width() + pad * 2, ts.get_height() + pad * 2), 2)
+            self.screen.blit(ts, (tx, ty))
+
+    # ═══════════════════════════════════════════════════════════════
     # ITEM EXAMINATION OVERLAY
     # ═══════════════════════════════════════════════════════════════
 
