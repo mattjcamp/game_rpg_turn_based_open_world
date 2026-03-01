@@ -53,6 +53,8 @@ def load_items():
             info = {
                 "desc": data.get("description", ""),
                 "icon": data.get("icon", "sword"),
+                "party_can_equip": data.get("party_can_equip", False),
+                "character_can_equip": data.get("character_can_equip", False),
             }
             if "charges" in data:
                 info["charges"] = data["charges"]
@@ -76,6 +78,8 @@ def load_items():
             info = {
                 "desc": data.get("description", ""),
                 "icon": data.get("icon", "armor_light"),
+                "party_can_equip": data.get("party_can_equip", False),
+                "character_can_equip": data.get("character_can_equip", False),
             }
             if "charges" in data:
                 info["charges"] = data["charges"]
@@ -93,6 +97,8 @@ def load_items():
             info = {
                 "desc": data.get("description", ""),
                 "icon": data.get("icon", "tool"),
+                "party_can_equip": data.get("party_can_equip", False),
+                "character_can_equip": data.get("character_can_equip", False),
             }
             if "charges" in data:
                 info["charges"] = data["charges"]

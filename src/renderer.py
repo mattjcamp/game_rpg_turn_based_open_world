@@ -4560,7 +4560,7 @@ class Renderer:
         row_h = 20
 
         # ═══════════════════════════════════════
-        # LEFT PANEL — Effects + Torch + Item list
+        # LEFT PANEL — Effects + Item list
         # ═══════════════════════════════════════
         tx = left_x + 12
         ty = panel_y + 10
@@ -4581,7 +4581,12 @@ class Renderer:
 
             if effect:
                 eff_color = self._U3_WHITE if selected else (220, 220, 230)
-                self._u3_text(effect, tx + 40, ty, eff_color, fm)
+                display_eff = effect
+                if effect == "Torch":
+                    torch_charges = party.get_equipped_charges("light")
+                    if torch_charges is not None:
+                        display_eff = f"Torch ({torch_charges})"
+                self._u3_text(display_eff, tx + 40, ty, eff_color, fm)
             else:
                 self._u3_text("-- EMPTY --", tx + 40, ty, (120, 120, 120), fm)
 
@@ -4592,29 +4597,6 @@ class Renderer:
                 self.screen.blit(sel_surf, sel_rect)
 
             ty += row_h
-
-        # ── Torch slot (rendered in effects section) ──
-        torch_idx = NUM_EFFECTS   # index for the torch row
-        torch_name = party.get_equipped_name("light")
-        torch_charges = party.get_equipped_charges("light")
-        selected = (torch_idx == cursor_index)
-        prefix = "> " if selected else "  "
-        name_color = self._U3_WHITE if selected else self._U3_LTBLUE
-        self._u3_text(f"{prefix}TORCH:", tx, ty, name_color, fm)
-        if torch_name:
-            display = torch_name
-            if torch_charges is not None:
-                display = f"{torch_name} ({torch_charges})"
-            item_color = self._U3_WHITE if selected else (220, 220, 230)
-            self._u3_text(display, tx + 90, ty, item_color, fm)
-        else:
-            self._u3_text("-- EMPTY --", tx + 90, ty, (120, 120, 120), fm)
-        if selected:
-            sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
-            sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
-            sel_surf.fill((255, 255, 255, 25))
-            self.screen.blit(sel_surf, sel_rect)
-        ty += row_h
 
         # ── Divider between effects and stash ──
         ty += 6
@@ -4636,7 +4618,7 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = NUM_EFFECTS + 1  # effects + torch row
+            header_count = NUM_EFFECTS
             inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
@@ -4753,14 +4735,13 @@ class Renderer:
         sel_item = None
         sel_charges = None
         is_effect_slot = (cursor_index < NUM_EFFECTS)
-        is_torch_slot = (cursor_index == NUM_EFFECTS)
-        header_count = NUM_EFFECTS + 1  # effects + torch row
+        header_count = NUM_EFFECTS
         if is_effect_slot:
             eff_slot_key = party.EFFECT_SLOTS[cursor_index]
             sel_item = party.get_effect(eff_slot_key)
-        elif is_torch_slot:
-            sel_item = party.get_equipped_name("light")
-            sel_charges = party.get_equipped_charges("light")
+            # Show torch charges when effect is Torch
+            if sel_item == "Torch":
+                sel_charges = party.get_equipped_charges("light")
         elif cursor_index - header_count < len(inv):
             entry = inv[cursor_index - header_count]
             sel_item = party.item_name(entry)
@@ -4770,8 +4751,6 @@ class Renderer:
         if sel_item:
             if is_effect_slot:
                 self._u3_text("ACTIVE EFFECT", rx, ry, self._U3_ORANGE, fm)
-            elif is_torch_slot:
-                self._u3_text("EQUIPPED (TORCH)", rx, ry, self._U3_ORANGE, fm)
             else:
                 self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
             ry += 22
@@ -4822,10 +4801,6 @@ class Renderer:
                     self._u3_text(line, rx, ry, (180, 180, 200), fm)
         elif is_effect_slot:
             self._u3_text("EFFECT SLOT", rx, ry, self._U3_ORANGE, fm)
-            ry += 22
-            self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
-        elif is_torch_slot:
-            self._u3_text("TORCH SLOT", rx, ry, self._U3_ORANGE, fm)
             ry += 22
             self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
         else:

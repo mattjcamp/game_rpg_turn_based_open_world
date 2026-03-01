@@ -686,9 +686,21 @@ class Party:
         return self.effects.get(slot)
 
     def set_effect(self, slot, effect_name):
-        """Set an effect in the given slot. Pass None to clear."""
-        if slot in self.effects:
-            self.effects[slot] = effect_name
+        """Set an effect in the given slot. Pass None to clear.
+
+        Special handling for "Torch": equipping moves a Torch from the
+        shared stash into equipped["light"]; clearing moves it back.
+        """
+        if slot not in self.effects:
+            return
+        old = self.effects[slot]
+        # Unequip old torch if we're replacing or clearing a Torch effect
+        if old == "Torch" and effect_name != "Torch":
+            self.party_unequip("light")
+        self.effects[slot] = effect_name
+        # Equip new torch from stash
+        if effect_name == "Torch" and old != "Torch":
+            self.party_equip("Torch", "light")
 
     def has_effect(self, effect_name):
         """Return True if the party has the named effect in any slot."""
@@ -703,6 +715,8 @@ class Party:
           - min_level: party must have an alive member at or above that level
 
         Effects already slotted are excluded.
+        Also includes "Torch" if the party has a torch in stash inventory
+        and no torch is currently slotted.
         """
         slotted = set(v for v in self.effects.values() if v is not None)
         available = []
@@ -713,6 +727,19 @@ class Party:
             if not self._meets_requirements(reqs):
                 continue
             available.append(eff)
+
+        # Offer Torch as an assignable effect if one is in the stash
+        if "Torch" not in slotted:
+            has_torch = any(
+                self.item_name(e) == "Torch" for e in self.shared_inventory
+            )
+            if has_torch:
+                available.append({
+                    "id": "torch",
+                    "name": "Torch",
+                    "description": "Lights the way in dark places.",
+                    "duration": "permanent",
+                })
         return available
 
     def _meets_requirements(self, reqs):

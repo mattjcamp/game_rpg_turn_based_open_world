@@ -92,7 +92,7 @@
 
   "party_effects": {
     "effect_1": "Detect Traps",
-    "effect_2": null,
+    "effect_2": "Torch",
     "effect_3": null,
     "effect_4": null
   },
