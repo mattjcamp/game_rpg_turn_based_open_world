@@ -5,6 +5,7 @@ The party walks around inside a town, talks to NPCs by bumping into them,
 and can leave through the exit gate to return to the overworld.
 """
 
+import math
 import random
 
 import pygame
@@ -16,6 +17,65 @@ from src.settings import (
     TILE_TOWN,
 )
 from src.dungeon_generator import generate_quest_dungeon
+
+
+class QuestCompleteEffect:
+    """Multi-phase celebration animation when a quest is completed.
+
+    Phase 1 (0.0 - 1.5s): The Shadow Crystal rises and glows at center screen.
+    Phase 2 (1.5 - 3.0s): Crystal shatters into sparks, gold coins rain down.
+    Phase 3 (3.0 - 5.0s): "QUEST COMPLETE" banner fades in with fanfare sparkles.
+    """
+    DURATION = 5.0
+
+    def __init__(self, reward_gold, item_name="Shadow Crystal"):
+        self.timer = 0.0
+        self.alive = True
+        self.reward_gold = reward_gold
+        self.item_name = item_name
+
+        # Pre-generate particle data for the shattering crystal
+        self.shards = []
+        for _ in range(24):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(60, 200)
+            self.shards.append({
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed - 80,  # upward bias
+                "color": random.choice([
+                    (100, 60, 200), (140, 80, 255), (80, 40, 180),
+                    (200, 160, 255), (60, 20, 140),
+                ]),
+                "size": random.randint(2, 5),
+            })
+
+        # Pre-generate gold coin rain positions
+        self.coins = []
+        for _ in range(16):
+            self.coins.append({
+                "x": random.randint(100, 700),
+                "delay": random.uniform(0.0, 1.0),
+                "speed": random.uniform(80, 160),
+            })
+
+        # Pre-generate sparkles for the banner phase
+        self.sparkles = []
+        for _ in range(20):
+            self.sparkles.append({
+                "x": random.randint(50, 750),
+                "y": random.randint(50, 650),
+                "phase": random.uniform(0, 2 * math.pi),
+                "speed": random.uniform(2, 5),
+            })
+
+    def update(self, dt):
+        self.timer += dt
+        if self.timer >= self.DURATION:
+            self.alive = False
+
+    @property
+    def progress(self):
+        return min(1.0, self.timer / self.DURATION)
 
 
 class TownState(BaseState):
@@ -61,6 +121,9 @@ class TownState(BaseState):
         self.shop_message = ""
         self.shop_message_timer = 0
 
+        # Quest completion celebration effect
+        self.quest_complete_effect = None
+
         # We'll save the overworld position so we can restore it on exit
         self.overworld_col = 0
         self.overworld_row = 0
@@ -94,6 +157,10 @@ class TownState(BaseState):
 
     def handle_input(self, events, keys_pressed):
         """Handle movement and NPC interaction."""
+        # Block all input during quest celebration
+        if self.quest_complete_effect:
+            return
+
         for event in events:
             if event.type == pygame.KEYDOWN:
                 # ── Shop screen input ──
@@ -308,6 +375,13 @@ class TownState(BaseState):
                 self.message = f"{npc.name}: Have you found the Shadow Crystal yet? It's out there somewhere..."
                 self.message_timer = 0
                 return
+            # Quest completed — display item dialogue
+            if quest and quest["status"] == "completed":
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self.message = f"{npc.name}: The Shadow Crystal sits safely behind my counter. You've earned a hero's welcome here!"
+                self.message_timer = 0
+                return
 
         self.npc_dialogue_active = True
         self.npc_speaking = npc
@@ -419,7 +493,7 @@ class TownState(BaseState):
         return candidates[0] if candidates else (20, 10)
 
     def _complete_quest(self, npc):
-        """Complete the quest: remove artifact, give reward."""
+        """Complete the quest: remove artifact, give reward, play celebration."""
         party = self.game.party
 
         # Remove the Shadow Crystal from inventory
@@ -429,10 +503,18 @@ class TownState(BaseState):
         reward = 200
         party.gold += reward
 
+        # Give XP reward to all alive members
+        for member in party.alive_members():
+            member.exp += 50
+
         # Mark quest completed
         self.game.quest["status"] = "completed"
 
-        # Show completion dialogue
+        # Launch celebration animation and play fanfare
+        self.quest_complete_effect = QuestCompleteEffect(reward)
+        self.game.sfx.play("quest_complete")
+
+        # Dialogue will show after the animation finishes
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         self.message = f"{npc.name}: You found the Shadow Crystal! Here's {reward} gold for your bravery!"
@@ -792,6 +874,14 @@ class TownState(BaseState):
     def update(self, dt):
         """Update timers."""
         dt_ms = dt * 1000
+
+        # Quest completion animation blocks everything else
+        if self.quest_complete_effect:
+            self.quest_complete_effect.update(dt)
+            if not self.quest_complete_effect.alive:
+                self.quest_complete_effect = None
+            return
+
         if self.message_timer > 0:
             self.message_timer -= dt_ms
             if self.message_timer <= 0:
@@ -815,9 +905,13 @@ class TownState(BaseState):
         if self.showing_shop:
             cursor = (self.shop_cursor if self.shop_mode == "buy"
                       else self.shop_sell_cursor)
+            quest = self.game.quest
+            quest_complete = (quest is not None
+                              and quest.get("status") == "completed")
             renderer.draw_shop_u3(
                 self.game.party, self.shop_mode, cursor,
-                self.shop_message)
+                self.shop_message,
+                quest_complete=quest_complete)
             return
         if self.showing_party_inv:
             action_opts = self._get_party_inv_action_options() if self.party_inv_action_menu else None
@@ -848,11 +942,20 @@ class TownState(BaseState):
             return
         # Use the new sprite-tile-based town renderer
         msg = self.message if not self.npc_dialogue_active else ""
+        quest = self.game.quest
+        quest_complete = (quest is not None
+                          and quest.get("status") == "completed")
         renderer.draw_town_u3(
             self.game.party,
             self.town_data,
             message=msg,
+            quest_complete=quest_complete,
         )
+        # Quest completion celebration overlay
+        if self.quest_complete_effect:
+            renderer.draw_quest_complete_effect(self.quest_complete_effect)
+            return  # blocks dialogue rendering during animation
+
         # Dialogue box renders on top if active
         if self.message and self.npc_dialogue_active:
             renderer.draw_dialogue_box(self.message)

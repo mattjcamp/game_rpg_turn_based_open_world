@@ -153,179 +153,374 @@ def _to_sound(wave):
 #  TRACK COMPOSITIONS
 # ═══════════════════════════════════════════════════════════════
 
-def _compose_overworld():
-    """Heroic overworld march — bright, adventurous feel."""
-    bpm = 140
+def _compose_title():
+    """Mysterious, majestic title screen theme — sets the tone for adventure."""
+    bpm = 80
     note_dur = 60.0 / bpm
 
-    # Melody: heroic fanfare-like phrase (2 repeats of a 16-note phrase)
-    phrase_a = [
-        'C4', 'C4', 'G4', 'G4', 'A4', 'A4', 'G4', 'R',
-        'F4', 'F4', 'E4', 'E4', 'D4', 'D4', 'C4', 'R',
+    # Slow, haunting melody — minor key with rising hope
+    melody_a = [
+        'R', 'R', 'R', 'R',
+        'E4', 'R', 'E4', 'F4', 'G4', 'R', 'G4', 'A4',
+        'B4', 'R', 'B4', 'A4', 'G4', 'R', 'R', 'R',
+        'A4', 'R', 'A4', 'G4', 'F4', 'R', 'E4', 'R',
     ]
-    phrase_b = [
-        'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'G4', 'E4',
-        'F4', 'E4', 'D4', 'C4', 'D4', 'E4', 'C4', 'R',
+    melody_b = [
+        'R', 'R', 'R', 'R',
+        'C5', 'R', 'B4', 'A4', 'G4', 'R', 'A4', 'B4',
+        'C5', 'R', 'D5', 'C5', 'B4', 'R', 'A4', 'R',
+        'G4', 'R', 'A4', 'G4', 'E4', 'R', 'R', 'R',
     ]
-    melody_notes = phrase_a + phrase_b + phrase_a + phrase_b
+    melody_notes = melody_a + melody_b
 
-    # Bass: root notes following the harmony
-    bass_phrase_a = [
-        'C2', 'C2', 'C2', 'C2', 'F2', 'F2', 'C2', 'C2',
-        'F2', 'F2', 'C2', 'C2', 'G2', 'G2', 'C2', 'C2',
+    # Deep bass — pedal tones, slow and ominous
+    bass_a = [
+        'E2', 'E2', 'E2', 'E2',
+        'E2', 'E2', 'E2', 'E2', 'C2', 'C2', 'C2', 'C2',
+        'G2', 'G2', 'G2', 'G2', 'E2', 'E2', 'E2', 'E2',
+        'A2', 'A2', 'A2', 'A2', 'B2', 'B2', 'E2', 'E2',
     ]
-    bass_phrase_b = [
-        'C2', 'C2', 'E2', 'E2', 'G2', 'G2', 'E2', 'E2',
-        'F2', 'F2', 'G2', 'G2', 'G2', 'G2', 'C2', 'C2',
+    bass_b = [
+        'C2', 'C2', 'C2', 'C2',
+        'C2', 'C2', 'C2', 'C2', 'G2', 'G2', 'G2', 'G2',
+        'A2', 'A2', 'A2', 'A2', 'F2', 'F2', 'F2', 'F2',
+        'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
     ]
-    bass_notes = bass_phrase_a + bass_phrase_b + bass_phrase_a + bass_phrase_b
+    bass_notes = bass_a + bass_b
 
-    # Counter-melody: arpeggiated harmony line
-    counter_a = [
-        'E5', 'R', 'E5', 'R', 'F5', 'R', 'E5', 'R',
-        'A4', 'R', 'G4', 'R', 'F4', 'R', 'E4', 'R',
+    # High arpeggiated shimmer — ethereal atmosphere
+    arp_a = [
+        'E5', 'B4', 'E5', 'B4',
+        'E5', 'G5', 'E5', 'R', 'C5', 'E5', 'C5', 'R',
+        'G5', 'B4', 'G5', 'R', 'E5', 'G4', 'E5', 'R',
+        'A5', 'E5', 'A5', 'R', 'B4', 'E5', 'B4', 'R',
     ]
-    counter_b = [
-        'G5', 'R', 'G5', 'R', 'E5', 'R', 'C5', 'R',
-        'A4', 'R', 'B4', 'R', 'C5', 'R', 'E5', 'R',
+    arp_b = [
+        'C5', 'G5', 'C5', 'G5',
+        'C5', 'E5', 'G5', 'R', 'G5', 'C5', 'E5', 'R',
+        'A5', 'C5', 'A5', 'R', 'F5', 'A4', 'F5', 'R',
+        'E5', 'G4', 'B4', 'R', 'E5', 'B4', 'E4', 'R',
     ]
-    counter_notes = counter_a + counter_b + counter_a + counter_b
+    arp_notes = arp_a + arp_b
 
-    # Drums
-    drum_bar = ['K', 'H', 'S', 'H'] * 4
-    drum_pattern = drum_bar * 4
-
-    melody = _render_melody(melody_notes, note_dur, duty=0.5, volume=0.30)
-    counter = _render_melody(counter_notes, note_dur, duty=0.25, volume=0.15)
+    melody = _render_melody(melody_notes, note_dur, _square_wave,
+                            duty=0.25, volume=0.30, attack=0.02, release=0.1)
     bass = _render_bass(bass_notes, note_dur, volume=0.25)
-    drums = _render_drums(drum_pattern, note_dur, volume=0.10)
+    arp = _render_melody(arp_notes, note_dur, _triangle_wave,
+                         volume=0.12, attack=0.01, release=0.15)
 
+    return _mix_tracks(melody, bass, arp)
+
+
+# ── Overworld variations ──────────────────────────────────────
+
+def _compose_overworld_1():
+    """Overworld A — heroic march."""
+    bpm = 100
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['C4', 'C4', 'G4', 'G4', 'A4', 'A4', 'G4', 'R',
+         'F4', 'F4', 'E4', 'E4', 'D4', 'D4', 'C4', 'R',
+         'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'G4', 'E4',
+         'F4', 'E4', 'D4', 'C4', 'D4', 'E4', 'C4', 'R'] * 2,
+        nd, duty=0.5, volume=0.30)
+    counter = _render_melody(
+        ['E5', 'R', 'E5', 'R', 'F5', 'R', 'E5', 'R',
+         'A4', 'R', 'G4', 'R', 'F4', 'R', 'E4', 'R',
+         'G5', 'R', 'G5', 'R', 'E5', 'R', 'C5', 'R',
+         'A4', 'R', 'B4', 'R', 'C5', 'R', 'E5', 'R'] * 2,
+        nd, duty=0.25, volume=0.15)
+    bass = _render_bass(
+        ['C2', 'C2', 'C2', 'C2', 'F2', 'F2', 'C2', 'C2',
+         'F2', 'F2', 'C2', 'C2', 'G2', 'G2', 'C2', 'C2',
+         'C2', 'C2', 'E2', 'E2', 'G2', 'G2', 'E2', 'E2',
+         'F2', 'F2', 'G2', 'G2', 'G2', 'G2', 'C2', 'C2'] * 2,
+        nd, volume=0.25)
+    drums = _render_drums((['K', 'H', 'S', 'H'] * 4) * 4, nd, volume=0.10)
     return _mix_tracks(melody, counter, bass, drums)
 
 
-def _compose_town():
-    """Peaceful town theme — gentle, lilting waltz feel."""
-    bpm = 110
-    note_dur = 60.0 / bpm
-
-    # Melody: gentle folk tune
-    phrase_a = [
-        'E4', 'G4', 'A4', 'G4', 'E4', 'D4', 'C4', 'R',
-        'D4', 'F4', 'G4', 'F4', 'D4', 'C4', 'D4', 'R',
-    ]
-    phrase_b = [
-        'E4', 'G4', 'C5', 'B4', 'A4', 'G4', 'A4', 'R',
-        'G4', 'F4', 'E4', 'D4', 'E4', 'G4', 'E4', 'R',
-    ]
-    melody_notes = phrase_a + phrase_b + phrase_a + phrase_b
-
-    # Bass: simple root movement
-    bass_phrase = [
-        'C3', 'R', 'G2', 'R', 'C3', 'R', 'C3', 'R',
-        'D3', 'R', 'G2', 'R', 'D3', 'R', 'G2', 'R',
-    ]
-    bass_notes = bass_phrase * 4
-
-    # Light arpeggio harmony
-    arp_a = [
-        'C5', 'E5', 'G5', 'E5', 'C5', 'R', 'R', 'R',
-        'D5', 'F5', 'A5', 'F5', 'D5', 'R', 'R', 'R',
-    ]
-    arp_b = [
-        'E5', 'G5', 'C6', 'G5', 'E5', 'R', 'R', 'R',
-        'G5', 'R', 'E5', 'R', 'C5', 'R', 'R', 'R',
-    ]
-    arp_notes = arp_a + arp_b + arp_a + arp_b
-
-    melody = _render_melody(melody_notes, note_dur, duty=0.25, volume=0.28)
-    arp = _render_melody(arp_notes, note_dur, duty=0.125, volume=0.12)
-    bass = _render_bass(bass_notes, note_dur, volume=0.20)
-
+def _compose_overworld_2():
+    """Overworld B — pastoral wandering, gentler feel."""
+    bpm = 95
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['E4', 'R', 'G4', 'A4', 'G4', 'R', 'E4', 'R',
+         'D4', 'R', 'F4', 'G4', 'F4', 'R', 'D4', 'R',
+         'C4', 'E4', 'G4', 'R', 'A4', 'G4', 'E4', 'R',
+         'F4', 'E4', 'D4', 'R', 'C4', 'R', 'R', 'R'] * 2,
+        nd, duty=0.25, volume=0.28, attack=0.01, release=0.06)
+    arp = _render_melody(
+        ['C5', 'E5', 'G5', 'R', 'R', 'R', 'R', 'R',
+         'D5', 'F5', 'A5', 'R', 'R', 'R', 'R', 'R',
+         'E5', 'G5', 'C6', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, _triangle_wave, volume=0.12, attack=0.01, release=0.12)
+    bass = _render_bass(
+        ['C2', 'C2', 'R', 'R', 'F2', 'F2', 'R', 'R',
+         'G2', 'G2', 'R', 'R', 'C2', 'C2', 'R', 'R'] * 4,
+        nd, volume=0.22)
     return _mix_tracks(melody, arp, bass)
 
 
-def _compose_dungeon():
-    """Dark dungeon theme — ominous minor key, slow and tense."""
+def _compose_overworld_3():
+    """Overworld C — bold adventure, syncopated rhythm."""
+    bpm = 105
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['G4', 'R', 'G4', 'A4', 'B4', 'R', 'A4', 'G4',
+         'E4', 'R', 'E4', 'F4', 'G4', 'R', 'F4', 'E4',
+         'D4', 'R', 'D4', 'E4', 'F4', 'G4', 'A4', 'R',
+         'G4', 'F4', 'E4', 'D4', 'C4', 'R', 'R', 'R'] * 2,
+        nd, duty=0.5, volume=0.28)
+    counter = _render_melody(
+        ['R', 'B4', 'R', 'R', 'R', 'D5', 'R', 'R',
+         'R', 'G4', 'R', 'R', 'R', 'B4', 'R', 'R',
+         'R', 'R', 'A4', 'R', 'R', 'R', 'C5', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.25, volume=0.14)
+    bass = _render_bass(
+        ['G2', 'R', 'G2', 'R', 'C2', 'R', 'C2', 'R',
+         'E2', 'R', 'E2', 'R', 'G2', 'R', 'G2', 'R',
+         'D2', 'R', 'D2', 'R', 'F2', 'R', 'G2', 'R',
+         'C2', 'R', 'C2', 'R', 'C2', 'R', 'C2', 'R'] * 2,
+        nd, volume=0.24)
+    drums = _render_drums(
+        (['K', 'R', 'H', 'K', 'S', 'R', 'H', 'R'] * 4) * 2,
+        nd, volume=0.09)
+    return _mix_tracks(melody, counter, bass, drums)
+
+
+# ── Town variations ───────────────────────────────────────────
+
+def _compose_town_1():
+    """Town A — gentle folk waltz."""
+    bpm = 110
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['E4', 'G4', 'A4', 'G4', 'E4', 'D4', 'C4', 'R',
+         'D4', 'F4', 'G4', 'F4', 'D4', 'C4', 'D4', 'R',
+         'E4', 'G4', 'C5', 'B4', 'A4', 'G4', 'A4', 'R',
+         'G4', 'F4', 'E4', 'D4', 'E4', 'G4', 'E4', 'R'] * 2,
+        nd, duty=0.25, volume=0.28)
+    arp = _render_melody(
+        ['C5', 'E5', 'G5', 'E5', 'C5', 'R', 'R', 'R',
+         'D5', 'F5', 'A5', 'F5', 'D5', 'R', 'R', 'R',
+         'E5', 'G5', 'C6', 'G5', 'E5', 'R', 'R', 'R',
+         'G5', 'R', 'E5', 'R', 'C5', 'R', 'R', 'R'] * 2,
+        nd, duty=0.125, volume=0.12)
+    bass = _render_bass(
+        ['C3', 'R', 'G2', 'R', 'C3', 'R', 'C3', 'R',
+         'D3', 'R', 'G2', 'R', 'D3', 'R', 'G2', 'R'] * 4,
+        nd, volume=0.20)
+    return _mix_tracks(melody, arp, bass)
+
+
+def _compose_town_2():
+    """Town B — cosy tavern melody, warmer tone."""
+    bpm = 100
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['C4', 'E4', 'G4', 'E4', 'C4', 'R', 'R', 'R',
+         'D4', 'F4', 'A4', 'F4', 'D4', 'R', 'R', 'R',
+         'E4', 'G4', 'B4', 'G4', 'E4', 'D4', 'C4', 'R',
+         'D4', 'E4', 'F4', 'E4', 'D4', 'C4', 'R', 'R'] * 2,
+        nd, duty=0.25, volume=0.26, attack=0.01, release=0.08)
+    counter = _render_melody(
+        ['R', 'R', 'R', 'R', 'E5', 'R', 'C5', 'R',
+         'R', 'R', 'R', 'R', 'F5', 'R', 'D5', 'R',
+         'R', 'R', 'R', 'R', 'G5', 'R', 'E5', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, _triangle_wave, volume=0.10, attack=0.01, release=0.12)
+    bass = _render_bass(
+        ['C2', 'R', 'C2', 'R', 'G2', 'R', 'G2', 'R',
+         'D2', 'R', 'D2', 'R', 'A2', 'R', 'A2', 'R',
+         'E2', 'R', 'E2', 'R', 'G2', 'R', 'C2', 'R',
+         'D2', 'R', 'G2', 'R', 'C2', 'R', 'R', 'R'] * 2,
+        nd, volume=0.20)
+    return _mix_tracks(melody, counter, bass)
+
+
+def _compose_town_3():
+    """Town C — airy market square, bright and playful."""
+    bpm = 115
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['G4', 'A4', 'B4', 'C5', 'B4', 'A4', 'G4', 'R',
+         'A4', 'B4', 'C5', 'D5', 'C5', 'B4', 'A4', 'R',
+         'B4', 'C5', 'D5', 'E5', 'D5', 'C5', 'B4', 'A4',
+         'G4', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.25, volume=0.26)
+    arp = _render_melody(
+        ['G5', 'R', 'D5', 'R', 'B4', 'R', 'R', 'R',
+         'A5', 'R', 'E5', 'R', 'C5', 'R', 'R', 'R',
+         'B5', 'R', 'G5', 'R', 'D5', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.125, volume=0.10)
+    bass = _render_bass(
+        ['G2', 'R', 'G2', 'R', 'D2', 'R', 'D2', 'R',
+         'A2', 'R', 'A2', 'R', 'E2', 'R', 'E2', 'R',
+         'B2', 'R', 'B2', 'R', 'G2', 'R', 'G2', 'R',
+         'C2', 'R', 'D2', 'R', 'G2', 'R', 'R', 'R'] * 2,
+        nd, volume=0.18)
+    return _mix_tracks(melody, arp, bass)
+
+
+# ── Dungeon variations ────────────────────────────────────────
+
+def _compose_dungeon_1():
+    """Dungeon A — ominous creep, original theme."""
     bpm = 85
-    note_dur = 60.0 / bpm
-
-    # Melody: creepy minor-key phrases
-    phrase_a = [
-        'A3', 'R', 'C4', 'R', 'B3', 'R', 'A3', 'R',
-        'E3', 'R', 'F3', 'R', 'E3', 'R', 'R', 'R',
-    ]
-    phrase_b = [
-        'A3', 'R', 'E4', 'R', 'D4', 'R', 'C4', 'B3',
-        'A3', 'R', 'G#3', 'R', 'A3', 'R', 'R', 'R',
-    ]
-    melody_notes = phrase_a + phrase_b + phrase_a + phrase_b
-
-    # Droning bass
-    bass_notes = [
-        'A1', 'A1', 'A1', 'A1', 'A1', 'A1', 'A1', 'A1',
-        'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
-    ] * 4
-
-    # Eerie high arpeggios
-    eerie_a = [
-        'R', 'E5', 'R', 'R', 'R', 'C5', 'R', 'R',
-        'R', 'R', 'B4', 'R', 'R', 'R', 'A4', 'R',
-    ]
-    eerie_b = [
-        'R', 'R', 'E5', 'R', 'R', 'R', 'R', 'D5',
-        'R', 'R', 'R', 'C5', 'R', 'R', 'R', 'R',
-    ]
-    eerie_notes = eerie_a + eerie_b + eerie_a + eerie_b
-
-    # Sparse percussion
-    drum_bar = ['R', 'R', 'R', 'H', 'R', 'R', 'K', 'R'] * 2
-    drum_pattern = drum_bar * 4
-
-    melody = _render_melody(melody_notes, note_dur, duty=0.5, volume=0.25,
-                            attack=0.02, release=0.08)
-    eerie = _render_melody(eerie_notes, note_dur, duty=0.125, volume=0.10,
-                           attack=0.03, release=0.15)
-    bass = _render_bass(bass_notes, note_dur, volume=0.22)
-    drums = _render_drums(drum_pattern, note_dur, volume=0.06)
-
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['A3', 'R', 'C4', 'R', 'B3', 'R', 'A3', 'R',
+         'E3', 'R', 'F3', 'R', 'E3', 'R', 'R', 'R',
+         'A3', 'R', 'E4', 'R', 'D4', 'R', 'C4', 'B3',
+         'A3', 'R', 'G#3', 'R', 'A3', 'R', 'R', 'R'] * 2,
+        nd, duty=0.5, volume=0.25, attack=0.02, release=0.08)
+    eerie = _render_melody(
+        ['R', 'E5', 'R', 'R', 'R', 'C5', 'R', 'R',
+         'R', 'R', 'B4', 'R', 'R', 'R', 'A4', 'R',
+         'R', 'R', 'E5', 'R', 'R', 'R', 'R', 'D5',
+         'R', 'R', 'R', 'C5', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.125, volume=0.10, attack=0.03, release=0.15)
+    bass = _render_bass(
+        ['A1', 'A1', 'A1', 'A1', 'A1', 'A1', 'A1', 'A1',
+         'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1'] * 4,
+        nd, volume=0.22)
+    drums = _render_drums(
+        (['R', 'R', 'R', 'H', 'R', 'R', 'K', 'R'] * 2) * 4,
+        nd, volume=0.06)
     return _mix_tracks(melody, eerie, bass, drums)
 
 
-def _compose_combat():
-    """Intense combat music — fast, driving, urgent."""
+def _compose_dungeon_2():
+    """Dungeon B — dripping cavern, sparse and unsettling."""
+    bpm = 75
+    nd = 60.0 / bpm
+    # Sparse melody — mostly silence with occasional notes
+    melody = _render_melody(
+        ['R', 'R', 'R', 'R', 'E3', 'R', 'R', 'R',
+         'R', 'R', 'R', 'F3', 'R', 'R', 'R', 'R',
+         'R', 'R', 'G#3', 'R', 'R', 'R', 'R', 'R',
+         'A3', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.5, volume=0.22, attack=0.03, release=0.15)
+    # Drip-like high notes
+    drips = _render_melody(
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'E6',
+         'R', 'R', 'R', 'R', 'R', 'C6', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'A5', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, _triangle_wave, volume=0.08, attack=0.002, release=0.05)
+    # Deep rumbling bass
+    bass = _render_bass(
+        ['A1', 'A1', 'A1', 'A1', 'R', 'R', 'R', 'R',
+         'E1', 'E1', 'R', 'R', 'R', 'R', 'R', 'R',
+         'D1', 'D1', 'D1', 'D1', 'R', 'R', 'R', 'R',
+         'A1', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, volume=0.20)
+    return _mix_tracks(melody, drips, bass)
+
+
+def _compose_dungeon_3():
+    """Dungeon C — restless shadows, faster minor-key urgency."""
+    bpm = 95
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['E4', 'R', 'E4', 'D4', 'C4', 'R', 'B3', 'R',
+         'A3', 'R', 'B3', 'C4', 'D4', 'R', 'C4', 'B3',
+         'A3', 'R', 'R', 'R', 'E3', 'R', 'R', 'R',
+         'F3', 'R', 'G#3', 'R', 'A3', 'R', 'R', 'R'] * 2,
+        nd, duty=0.5, volume=0.24, attack=0.01, release=0.06)
+    counter = _render_melody(
+        ['R', 'R', 'A4', 'R', 'R', 'R', 'E4', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'C5', 'R', 'R', 'R', 'B4', 'R',
+         'A4', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.125, volume=0.10, attack=0.02, release=0.10)
+    bass = _render_bass(
+        ['A1', 'R', 'A1', 'R', 'R', 'R', 'E1', 'R',
+         'A1', 'R', 'R', 'R', 'D1', 'R', 'D1', 'R',
+         'A1', 'R', 'A1', 'R', 'R', 'R', 'E1', 'R',
+         'F1', 'R', 'G#1', 'R', 'A1', 'R', 'R', 'R'] * 2,
+        nd, volume=0.22)
+    drums = _render_drums(
+        (['K', 'R', 'H', 'R', 'R', 'R', 'H', 'R'] * 4) * 2,
+        nd, volume=0.07)
+    return _mix_tracks(melody, counter, bass, drums)
+
+
+# ── Combat variations ─────────────────────────────────────────
+
+def _compose_combat_1():
+    """Combat A — aggressive drive, original theme."""
     bpm = 170
-    note_dur = 60.0 / bpm
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        (['A4', 'A4', 'C5', 'A4', 'E4', 'E4', 'A4', 'R',
+          'G4', 'G4', 'A4', 'G4', 'E4', 'D4', 'E4', 'R',
+          'A4', 'C5', 'D5', 'E5', 'D5', 'C5', 'A4', 'R',
+          'G4', 'A4', 'G4', 'E4', 'D4', 'E4', 'A4', 'R']) * 2,
+        nd, duty=0.5, volume=0.30)
+    bass = _render_bass(
+        (['A2', 'R', 'A2', 'R', 'A2', 'R', 'A2', 'R',
+          'G2', 'R', 'G2', 'R', 'E2', 'R', 'E2', 'R',
+          'A2', 'R', 'C3', 'R', 'D3', 'R', 'E3', 'R',
+          'D3', 'R', 'C3', 'R', 'A2', 'R', 'A2', 'R']) * 2,
+        nd, volume=0.28)
+    drums = _render_drums(
+        (['K', 'H', 'K', 'H', 'S', 'H', 'K', 'H'] * 2) * 4,
+        nd, volume=0.12)
+    return _mix_tracks(melody, bass, drums)
 
-    # Melody: aggressive, punchy
-    phrase_a = [
-        'A4', 'A4', 'C5', 'A4', 'E4', 'E4', 'A4', 'R',
-        'G4', 'G4', 'A4', 'G4', 'E4', 'D4', 'E4', 'R',
-    ]
-    phrase_b = [
-        'A4', 'C5', 'D5', 'E5', 'D5', 'C5', 'A4', 'R',
-        'G4', 'A4', 'G4', 'E4', 'D4', 'E4', 'A4', 'R',
-    ]
-    melody_notes = (phrase_a + phrase_b) * 2
 
-    # Driving bass
-    bass_a = [
-        'A2', 'R', 'A2', 'R', 'A2', 'R', 'A2', 'R',
-        'G2', 'R', 'G2', 'R', 'E2', 'R', 'E2', 'R',
-    ]
-    bass_b = [
-        'A2', 'R', 'C3', 'R', 'D3', 'R', 'E3', 'R',
-        'D3', 'R', 'C3', 'R', 'A2', 'R', 'A2', 'R',
-    ]
-    bass_notes = (bass_a + bass_b) * 2
+def _compose_combat_2():
+    """Combat B — frantic chaos, higher intensity."""
+    bpm = 180
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['E5', 'D5', 'C5', 'B4', 'A4', 'R', 'A4', 'B4',
+         'C5', 'D5', 'E5', 'R', 'E5', 'D5', 'C5', 'R',
+         'A4', 'B4', 'C5', 'R', 'E4', 'R', 'A4', 'R',
+         'G4', 'A4', 'B4', 'C5', 'B4', 'A4', 'G4', 'R'] * 2,
+        nd, duty=0.5, volume=0.28)
+    counter = _render_melody(
+        ['R', 'R', 'E4', 'R', 'R', 'R', 'C4', 'R',
+         'R', 'R', 'A3', 'R', 'R', 'R', 'E4', 'R',
+         'R', 'R', 'C4', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'E4', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, duty=0.25, volume=0.14)
+    bass = _render_bass(
+        ['A2', 'A2', 'R', 'A2', 'A2', 'R', 'E2', 'R',
+         'A2', 'R', 'C3', 'R', 'A2', 'R', 'E2', 'R',
+         'A2', 'R', 'A2', 'R', 'D3', 'R', 'C3', 'R',
+         'A2', 'R', 'E2', 'R', 'A2', 'R', 'A2', 'R'] * 2,
+        nd, volume=0.26)
+    drums = _render_drums(
+        (['K', 'K', 'H', 'S', 'K', 'H', 'S', 'H'] * 2) * 4,
+        nd, volume=0.13)
+    return _mix_tracks(melody, counter, bass, drums)
 
-    # Fast drums
-    drum_bar = ['K', 'H', 'K', 'H', 'S', 'H', 'K', 'H'] * 2
-    drum_pattern = drum_bar * 4
 
-    melody = _render_melody(melody_notes, note_dur, duty=0.5, volume=0.30)
-    bass = _render_bass(bass_notes, note_dur, volume=0.28)
-    drums = _render_drums(drum_pattern, note_dur, volume=0.12)
-
+def _compose_combat_3():
+    """Combat C — heavy and menacing, slower crunch."""
+    bpm = 155
+    nd = 60.0 / bpm
+    melody = _render_melody(
+        ['A4', 'R', 'A4', 'R', 'C5', 'R', 'D5', 'R',
+         'E5', 'R', 'D5', 'R', 'C5', 'R', 'A4', 'R',
+         'G4', 'R', 'A4', 'R', 'G4', 'R', 'E4', 'R',
+         'D4', 'R', 'E4', 'R', 'A4', 'R', 'R', 'R'] * 2,
+        nd, duty=0.5, volume=0.30)
+    bass = _render_bass(
+        ['A2', 'A2', 'A2', 'R', 'A2', 'A2', 'A2', 'R',
+         'E2', 'E2', 'E2', 'R', 'E2', 'E2', 'E2', 'R',
+         'G2', 'G2', 'G2', 'R', 'A2', 'A2', 'A2', 'R',
+         'D2', 'D2', 'E2', 'E2', 'A2', 'R', 'A2', 'R'] * 2,
+        nd, volume=0.30)
+    drums = _render_drums(
+        (['K', 'R', 'K', 'R', 'S', 'R', 'K', 'S'] * 2) * 4,
+        nd, volume=0.14)
     return _mix_tracks(melody, bass, drums)
 
 
@@ -334,79 +529,199 @@ def _compose_combat():
 # ═══════════════════════════════════════════════════════════════
 
 class MusicManager:
-    """Manages procedurally-generated chiptune music for each game state."""
+    """Manages procedurally-generated chiptune music for each game state.
 
-    # Map state names to composer functions
+    Each area has 3 track variations. When a track restarts (after a silence
+    gap or on entering an area) a random variation is chosen so the music
+    doesn't feel repetitive. Intermittent tracks fade in/out and pause
+    between plays; continuous tracks (combat, title) loop one variation.
+    """
+
+    # Map state names to lists of composer functions (3 variations each).
+    # Title only has one variation.
     _COMPOSERS = {
-        "overworld": _compose_overworld,
-        "town":      _compose_town,
-        "dungeon":   _compose_dungeon,
-        "combat":    _compose_combat,
+        "title":     [_compose_title],
+        "overworld": [_compose_overworld_1, _compose_overworld_2,
+                      _compose_overworld_3],
+        "town":      [_compose_town_1, _compose_town_2, _compose_town_3],
+        "dungeon":   [_compose_dungeon_1, _compose_dungeon_2,
+                      _compose_dungeon_3],
+        "combat":    [_compose_combat_1, _compose_combat_2,
+                      _compose_combat_3],
     }
 
+    # How long (seconds) to wait in silence before replaying a track.
+    # Tracks not listed here loop continuously (e.g. combat, title).
+    _PAUSE_BETWEEN = {
+        "overworld": (8, 15),
+        "town":      (6, 12),
+        "dungeon":   (10, 18),
+    }
+
+    # Fade durations (ms) for tracks that fade in and out.
+    _FADE_IN_MS = 1200
+    _FADE_OUT_MS = 1500
+
     def __init__(self):
-        """Initialize the mixer and pre-generate all tracks."""
+        """Initialize the mixer and pre-generate all track variations."""
+        import random as _rng
+        self._rng = _rng
+
         # Ensure mixer is initialized with our sample rate (mono, 16-bit)
         if not pygame.mixer.get_init():
             pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=1,
                               buffer=1024)
 
-        self._sounds = {}      # track_name -> pygame.mixer.Sound
-        self._channel = None   # dedicated channel for music
-        self._current = None   # name of currently playing track
+        # track_name -> list of pygame.mixer.Sound (one per variation)
+        self._variations = {}
+        self._channel = None
+        self._current = None       # area name ("overworld", etc.)
+        self._current_idx = 0      # which variation is playing
         self._muted = False
 
-        # Pre-generate all music tracks
-        for name, composer in self._COMPOSERS.items():
-            wave = composer()
-            self._sounds[name] = _to_sound(wave)
+        # Intermittent playback state
+        self._paused = False
+        self._pause_timer = 0.0
+        self._playing_once = False
+
+        # Pre-generate all variations for every area
+        for name, composers in self._COMPOSERS.items():
+            sounds = []
+            for comp_fn in composers:
+                wave = comp_fn()
+                sounds.append(_to_sound(wave))
+            self._variations[name] = sounds
 
         # Reserve a channel for music playback
-        # Use last channel so game SFX can use the others
         num_channels = pygame.mixer.get_num_channels()
         if num_channels < 2:
             pygame.mixer.set_num_channels(4)
         self._channel = pygame.mixer.Channel(
             pygame.mixer.get_num_channels() - 1)
 
-    def play(self, track_name, fade_ms=500):
-        """Start playing a track, looping forever. Fades the old track out."""
+    # ── Helpers ─────────────────────────────────────────────────
+
+    def _is_intermittent(self, track_name):
+        """Return True if this track should play with silence gaps."""
+        return track_name in self._PAUSE_BETWEEN
+
+    def _pick_variation(self, track_name):
+        """Choose a random variation, avoiding the one that just played."""
+        sounds = self._variations.get(track_name, [])
+        if not sounds:
+            return None, 0
+        if len(sounds) == 1:
+            return sounds[0], 0
+        # Pick a different index than last time
+        choices = [i for i in range(len(sounds)) if i != self._current_idx]
+        idx = self._rng.choice(choices)
+        return sounds[idx], idx
+
+    def _start_pause(self):
+        """Enter a silence gap before replaying a different variation."""
+        bounds = self._PAUSE_BETWEEN.get(self._current)
+        if bounds:
+            lo, hi = bounds
+            self._pause_timer = self._rng.uniform(lo, hi)
+            self._paused = True
+            self._playing_once = False
+
+    # ── Public API ──────────────────────────────────────────────
+
+    def play(self, track_name, fade_ms=None):
+        """Start playing a random variation for the given area.
+
+        Intermittent tracks play once then pause; continuous tracks loop.
+        Always fades in.
+        """
+        if fade_ms is None:
+            fade_ms = self._FADE_IN_MS
+
+        # Reset intermittent state on track change
+        self._paused = False
+        self._pause_timer = 0.0
+        self._playing_once = False
+
         if self._muted:
             self._current = track_name
             return
         if track_name == self._current and self._channel.get_busy():
-            return  # already playing this track
+            return
 
-        sound = self._sounds.get(track_name)
+        sound, idx = self._pick_variation(track_name)
         if not sound:
             return
 
         if self._channel.get_busy():
-            self._channel.fadeout(fade_ms)
-            # Small delay not needed — fadeout is non-blocking, new play
-            # will queue after fade automatically via pygame
+            self._channel.fadeout(self._FADE_OUT_MS)
 
-        self._channel.play(sound, loops=-1, fade_ms=fade_ms)
         self._current = track_name
+        self._current_idx = idx
 
-    def stop(self, fade_ms=500):
-        """Stop any currently playing music."""
+        if self._is_intermittent(track_name):
+            self._channel.play(sound, loops=0, fade_ms=fade_ms)
+            self._playing_once = True
+        else:
+            self._channel.play(sound, loops=-1, fade_ms=fade_ms)
+            self._playing_once = False
+
+    def update(self, dt):
+        """Call every frame to manage intermittent playback.
+
+        After a one-shot track finishes: fade out → silence gap →
+        fade in a new random variation.
+        """
+        if self._muted or not self._current:
+            return
+
+        # Count down the silence gap
+        if self._paused:
+            self._pause_timer -= dt
+            if self._pause_timer <= 0:
+                self._paused = False
+                # Pick a *different* variation for variety
+                sound, idx = self._pick_variation(self._current)
+                if sound:
+                    self._current_idx = idx
+                    self._channel.play(sound, loops=0,
+                                       fade_ms=self._FADE_IN_MS)
+                    self._playing_once = True
+            return
+
+        # Detect end of a one-shot playback → start silence gap
+        if self._playing_once and not self._channel.get_busy():
+            self._start_pause()
+
+    def stop(self, fade_ms=None):
+        """Stop any currently playing music with a fade out."""
+        if fade_ms is None:
+            fade_ms = self._FADE_OUT_MS
         if self._channel and self._channel.get_busy():
             self._channel.fadeout(fade_ms)
         self._current = None
+        self._paused = False
+        self._playing_once = False
 
     def toggle_mute(self):
         """Toggle music on/off. Returns new muted state."""
         self._muted = not self._muted
         if self._muted:
             if self._channel:
-                self._channel.fadeout(300)
+                self._channel.fadeout(self._FADE_OUT_MS)
+            self._paused = False
+            self._playing_once = False
         else:
-            # Resume the current track
             if self._current:
-                sound = self._sounds.get(self._current)
+                sound, idx = self._pick_variation(self._current)
                 if sound:
-                    self._channel.play(sound, loops=-1, fade_ms=300)
+                    self._current_idx = idx
+                    if self._is_intermittent(self._current):
+                        self._channel.play(sound, loops=0,
+                                           fade_ms=self._FADE_IN_MS)
+                        self._playing_once = True
+                    else:
+                        self._channel.play(sound, loops=-1,
+                                           fade_ms=self._FADE_IN_MS)
         return self._muted
 
     @property
@@ -712,6 +1027,25 @@ def _gen_sfx_turn_undead():
     return np.concatenate([chord, sweep, _mix_tracks(burst, crackle)])
 
 
+def _gen_sfx_quest_complete():
+    """Triumphant fanfare — ascending arpeggio with sustain chord."""
+    # Rising arpeggio: C4 → E4 → G4 → C5 → E5
+    notes = ['C4', 'E4', 'G4', 'C5', 'E5']
+    arp = _render_melody(notes, 0.12, _square_wave, duty=0.25,
+                         volume=0.25, attack=0.005, release=0.08)
+    # Sustain chord: C5 + E5 + G5 (triumphant major chord)
+    chord_dur = 0.5
+    c5 = _square_wave(_n('C5'), chord_dur, duty=0.25) * 0.20
+    e5 = _square_wave(_n('E5'), chord_dur, duty=0.25) * 0.18
+    g5 = _square_wave(_n('G5'), chord_dur, duty=0.25) * 0.16
+    chord = _mix_tracks(_mix_tracks(c5, e5), g5)
+    chord = _envelope(chord, attack=0.02, release=0.25)
+    # Shimmering high octave
+    shimmer = _triangle_wave(_n('C6'), 0.3) * 0.10
+    shimmer = _envelope(shimmer, attack=0.01, release=0.20)
+    return np.concatenate([arp, _mix_tracks(chord, shimmer)])
+
+
 class SoundEffects:
     """Manages chiptune combat sound effects."""
 
@@ -737,6 +1071,7 @@ class SoundEffects:
         "lock_pick_fail":    _gen_sfx_lock_pick_fail,
         "shield":            _gen_sfx_shield,
         "turn_undead":       _gen_sfx_turn_undead,
+        "quest_complete":    _gen_sfx_quest_complete,
     }
 
     def __init__(self):

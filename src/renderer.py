@@ -428,7 +428,8 @@ class Renderer:
     _U3_TN_MAP_W = _U3_TN_COLS * _U3_TN_TS   # 800
     _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 544
 
-    def draw_town_u3(self, party, town_data, message=""):
+    def draw_town_u3(self, party, town_data, message="",
+                      quest_complete=False):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
@@ -464,6 +465,49 @@ class Renderer:
                 cx = nsc * ts + ts // 2
                 cy = nsr * ts + ts // 2
                 self._u3_draw_npc_sprite(npc, cx, cy)
+
+        # ── 2b. Shadow Crystal on innkeeper's counter (quest trophy) ──
+        if quest_complete:
+            import math
+            import time as _time
+            anim_t = _time.time()
+            for npc in town_data.npcs:
+                if npc.npc_type == "innkeeper":
+                    crystal_wc = npc.col
+                    crystal_wr = npc.row - 1  # counter tile above innkeeper
+                    csc = crystal_wc - off_c
+                    csr = crystal_wr - off_r
+                    if 0 <= csc < cols and 0 <= csr < rows:
+                        gcx = csc * ts + ts // 2
+                        gcy = csr * ts + ts // 2
+                        bob = int(2 * math.sin(anim_t * 2.5))
+                        # Small glow
+                        glow_r = int(8 + 2 * math.sin(anim_t * 3))
+                        glow_surf = pygame.Surface(
+                            (glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+                        glow_a = int(50 + 25 * math.sin(anim_t * 2))
+                        pygame.draw.circle(
+                            glow_surf, (120, 60, 200, glow_a),
+                            (glow_r, glow_r), glow_r)
+                        self.screen.blit(
+                            glow_surf,
+                            (gcx - glow_r, gcy + bob - glow_r))
+                        # Small diamond crystal
+                        sz = 5
+                        pts = [
+                            (gcx, gcy + bob - sz),
+                            (gcx + sz, gcy + bob),
+                            (gcx, gcy + bob + sz),
+                            (gcx - sz, gcy + bob),
+                        ]
+                        pulse = 0.15 * math.sin(anim_t * 4)
+                        cr = min(255, int(140 * (1 + pulse)))
+                        cb = min(255, int(220 * (1 + pulse)))
+                        pygame.draw.polygon(
+                            self.screen, (cr, 80, cb), pts)
+                        pygame.draw.polygon(
+                            self.screen, (200, 160, 255), pts, 1)
+                    break
 
         # ── 3. party sprite ──
         psc = party.col - off_c
@@ -720,6 +764,215 @@ class Renderer:
         hint = "[SPACE / ENTER] continue   [ESC] close"
         hint_surface = self.font_small.render(hint, True, (120, 120, 140))
         self.screen.blit(hint_surface, (box_x + 12, box_y + 36))
+
+    def draw_quest_complete_effect(self, effect):
+        """Draw the quest completion celebration animation overlay.
+
+        Three phases:
+        1. Crystal rises and glows at center screen
+        2. Crystal shatters into sparks, gold coins rain
+        3. QUEST COMPLETE banner with sparkles
+        """
+        import math
+
+        t = effect.timer
+        cx = SCREEN_WIDTH // 2
+        cy = SCREEN_HEIGHT // 2
+
+        # Semi-transparent overlay that darkens over time
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dark = min(180, int(t * 120))
+        overlay.fill((0, 0, 0, dark))
+        self.screen.blit(overlay, (0, 0))
+
+        # ── Phase 1 (0.0 - 1.5s): Crystal rises and glows ──
+        if t < 1.5:
+            phase = t / 1.5
+            # Crystal rises from bottom to center
+            crystal_y = int(SCREEN_HEIGHT - phase * (SCREEN_HEIGHT // 2 - 40))
+            crystal_x = cx
+
+            # Draw the Shadow Crystal — purple gem shape
+            glow_r = int(20 + 30 * phase)
+            glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+            pulse = 0.5 + 0.5 * math.sin(t * 8)
+            alpha = int((100 + 80 * pulse) * phase)
+            pygame.draw.circle(glow, (120, 60, 200, alpha),
+                               (glow_r, glow_r), glow_r)
+            self.screen.blit(glow,
+                             (crystal_x - glow_r, crystal_y - glow_r))
+
+            # Diamond shape
+            size = int(12 + 8 * phase)
+            points = [
+                (crystal_x, crystal_y - size),      # top
+                (crystal_x + size, crystal_y),       # right
+                (crystal_x, crystal_y + size),       # bottom
+                (crystal_x - size, crystal_y),       # left
+            ]
+            r = int(100 + 100 * pulse)
+            g = int(40 + 40 * pulse)
+            b = int(180 + 60 * pulse)
+            pygame.draw.polygon(self.screen, (r, g, b), points)
+            pygame.draw.polygon(self.screen, (200, 160, 255), points, 2)
+
+            # Inner highlight
+            inner_size = size // 2
+            inner_pts = [
+                (crystal_x, crystal_y - inner_size),
+                (crystal_x + inner_size, crystal_y),
+                (crystal_x, crystal_y + inner_size),
+                (crystal_x - inner_size, crystal_y),
+            ]
+            pygame.draw.polygon(self.screen, (180, 140, 255, 180), inner_pts)
+
+            # Rising sparkle trail
+            for i in range(6):
+                spark_t = (t * 3 + i * 0.5) % 2.0
+                sx = crystal_x + int(15 * math.sin(t * 4 + i))
+                sy = crystal_y + int(spark_t * 40)
+                spark_alpha = max(0, 255 - int(spark_t * 200))
+                if spark_alpha > 0:
+                    self.screen.set_at((sx, sy),
+                                       (200, 160, 255))
+                    self.screen.set_at((sx + 1, sy),
+                                       (200, 160, 255))
+
+        # ── Phase 2 (1.5 - 3.0s): Crystal shatters + gold coins rain ──
+        elif t < 3.0:
+            phase = (t - 1.5) / 1.5  # 0..1
+
+            # Explosion flash at start of phase
+            if phase < 0.15:
+                flash_alpha = int(200 * (1.0 - phase / 0.15))
+                flash = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                       pygame.SRCALPHA)
+                flash.fill((200, 160, 255, flash_alpha))
+                self.screen.blit(flash, (0, 0))
+
+            # Crystal shards flying outward
+            elapsed = t - 1.5
+            for shard in effect.shards:
+                sx = cx + int(shard["vx"] * elapsed)
+                sy = cy + int(shard["vy"] * elapsed + 100 * elapsed * elapsed)
+                # Fade out over time
+                fade = max(0.0, 1.0 - phase)
+                if fade > 0 and 0 <= sx < SCREEN_WIDTH and 0 <= sy < SCREEN_HEIGHT:
+                    s = shard["size"]
+                    c = shard["color"]
+                    fc = (int(c[0] * fade), int(c[1] * fade), int(c[2] * fade))
+                    pygame.draw.rect(self.screen, fc, (sx, sy, s, s))
+
+            # Gold coin rain
+            for coin in effect.coins:
+                coin_elapsed = elapsed - coin["delay"]
+                if coin_elapsed < 0:
+                    continue
+                coin_x = coin["x"] + int(10 * math.sin(coin_elapsed * 3))
+                coin_y = int(coin["speed"] * coin_elapsed)
+                if coin_y > SCREEN_HEIGHT:
+                    continue
+
+                # Spinning coin effect — alternating width
+                spin = math.sin(coin_elapsed * 8)
+                w = max(1, int(abs(spin) * 6))
+                h = 8
+                coin_color = (255, 220, 50) if spin > 0 else (200, 170, 30)
+                pygame.draw.ellipse(self.screen, coin_color,
+                                    (coin_x - w // 2, coin_y, w, h))
+                pygame.draw.ellipse(self.screen, (255, 255, 150),
+                                    (coin_x - w // 2, coin_y, w, h), 1)
+
+            # Gold amount text rising
+            gold_text = f"+{effect.reward_gold} GOLD"
+            gold_y = cy + 40 - int(phase * 60)
+            text_alpha = min(255, int(phase * 400))
+            if text_alpha > 0:
+                c = min(255, int(255 * min(1.0, phase * 2)))
+                self._u3_text(gold_text,
+                              cx - len(gold_text) * 5, gold_y,
+                              (c, c, int(c * 0.3)), self.font)
+
+        # ── Phase 3 (3.0 - 5.0s): QUEST COMPLETE banner + sparkles ──
+        else:
+            phase = (t - 3.0) / 2.0  # 0..1
+
+            # Banner fade in
+            banner_alpha = min(1.0, phase * 2)
+
+            # Banner background
+            banner_w = 500
+            banner_h = 120
+            bx = (SCREEN_WIDTH - banner_w) // 2
+            by = (SCREEN_HEIGHT - banner_h) // 2 - 40
+
+            banner_surf = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
+            ba = int(200 * banner_alpha)
+            banner_surf.fill((20, 10, 40, ba))
+            self.screen.blit(banner_surf, (bx, by))
+
+            # Ornate border (double line)
+            bc = int(200 * banner_alpha)
+            border_color = (bc, int(bc * 0.7), int(bc * 0.3))
+            pygame.draw.rect(self.screen, border_color,
+                             (bx, by, banner_w, banner_h), 2)
+            pygame.draw.rect(self.screen, border_color,
+                             (bx + 4, by + 4, banner_w - 8, banner_h - 8), 1)
+
+            # "QUEST COMPLETE!" text
+            title = "QUEST COMPLETE!"
+            pulse = 0.1 * math.sin(t * 3)
+            tr = min(255, int((255) * banner_alpha * (1 + pulse)))
+            tg = min(255, int((220) * banner_alpha * (1 + pulse)))
+            tb = min(255, int((60) * banner_alpha * (1 + pulse)))
+            tw = len(title) * 10
+            self._u3_text(title,
+                          cx - tw // 2, by + 16,
+                          (tr, tg, tb), self.font)
+
+            # Quest name
+            qname = "The Shadow Crystal"
+            qw = len(qname) * 8
+            qc = int(180 * banner_alpha)
+            self._u3_text(qname,
+                          cx - qw // 2, by + 45,
+                          (qc, qc, int(qc * 1.2)), self.font_med)
+
+            # Reward summary
+            reward_text = f"+{effect.reward_gold} Gold   +50 XP"
+            rw = len(reward_text) * 7
+            rc = int(200 * banner_alpha)
+            self._u3_text(reward_text,
+                          cx - rw // 2, by + 72,
+                          (rc, rc, int(rc * 0.4)), self.font_med)
+
+            # Item display hint
+            item_text = "The Shadow Crystal is now on display at the inn!"
+            iw = len(item_text) * 6
+            ic = int(140 * banner_alpha)
+            self._u3_text(item_text,
+                          cx - iw // 2, by + 95,
+                          (ic, int(ic * 0.8), ic), self.font_small)
+
+            # Celebration sparkles around the banner
+            for sparkle in effect.sparkles:
+                sp_x = sparkle["x"]
+                sp_y = sparkle["y"]
+                sp_phase = sparkle["phase"] + t * sparkle["speed"]
+                brightness = int((0.5 + 0.5 * math.sin(sp_phase)) * 255 * banner_alpha)
+                if brightness > 30:
+                    sc = (brightness, int(brightness * 0.85),
+                          int(brightness * 0.3))
+                    self.screen.set_at((sp_x, sp_y), sc)
+                    # Cross pattern for brighter sparkles
+                    if brightness > 150:
+                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            nx, ny = sp_x + dx, sp_y + dy
+                            if 0 <= nx < SCREEN_WIDTH and 0 <= ny < SCREEN_HEIGHT:
+                                self.screen.set_at(
+                                    (nx, ny),
+                                    (brightness // 2, brightness // 2,
+                                     brightness // 3))
 
     def draw_quest_choice_box(self, choices, cursor):
         """Draw a Y/N quest choice prompt at the bottom of the dialogue area."""
@@ -3006,6 +3259,166 @@ class Renderer:
     # PARTY SCREEN  –  Ultima III retro style (P key overlay)
     # ========================================================
 
+    def draw_title_screen(self, options, cursor, elapsed):
+        """Draw the title screen with ASCII art, menu options, and animation.
+
+        Parameters
+        ----------
+        options : list of dicts with 'label' keys
+        cursor  : which option is highlighted
+        elapsed : total seconds since title screen appeared (for animations)
+        """
+        import math
+        self.screen.fill((0, 0, 0))
+
+        # ── Starfield background ──
+        # Twinkling dots to set atmosphere
+        rng = [17, 53, 97, 131, 173, 211, 263, 307, 359, 401,
+               449, 491, 541, 587, 631, 677, 719, 761, 809, 853]
+        for i, seed in enumerate(rng):
+            sx = (seed * 7 + i * 41) % SCREEN_WIDTH
+            sy = (seed * 13 + i * 67) % (SCREEN_HEIGHT - 200)
+            # Twinkle: brightness oscillates per star
+            phase = elapsed * (0.5 + i * 0.15) + seed
+            brightness = int(60 + 60 * math.sin(phase))
+            brightness = max(20, min(140, brightness))
+            c = (brightness, brightness, brightness + 30)
+            self.screen.set_at((sx, sy), c)
+            if i % 3 == 0:
+                self.screen.set_at((sx + 1, sy), (c[0] // 2, c[1] // 2, c[2] // 2))
+
+        # ── ASCII Art Title ──
+        art = [
+            r"     ____  _____    _    _     __  __",
+            r"    |  _ \| ____|  / \  | |   |  \/  |",
+            r"    | |_) |  _|   / _ \ | |   | |\/| |",
+            r"    |  _ <| |___ / ___ \| |___| |  | |",
+            r"    |_| \_\_____/_/   \_\_____|_|  |_|",
+            r"",
+            r"              ___  _____",
+            r"             / _ \|  ___|",
+            r"            | | | | |_",
+            r"            | |_| |  _|",
+            r"             \___/|_|",
+            r"",
+            r"   ____ _   _    _    ____   _____        __",
+            r"  / ___| | | |  / \  |  _ \ / _ \ \      / /",
+            r"  \___ \ |_| | / _ \ | | | | | | \ \ /\ / / ",
+            r"   ___) |  _|/ ___ \| |_| | |_| |\ V  V /  ",
+            r"  |____/|_| /_/   \_\____/ \___/  \_/\_/   ",
+        ]
+
+        # Fade in effect for the title text
+        fade = min(1.0, elapsed / 2.0)
+
+        art_y = 30
+        for i, line in enumerate(art):
+            # Stagger each line's fade slightly
+            line_fade = min(1.0, max(0.0, fade - i * 0.03))
+            r = int(200 * line_fade)
+            g = int(120 * line_fade)
+            b = int(50 * line_fade)
+            # Glow effect: the title pulses gently
+            pulse = 0.15 * math.sin(elapsed * 1.5 + i * 0.2)
+            r = min(255, int(r * (1.0 + pulse)))
+            g = min(255, int(g * (1.0 + pulse)))
+            b = min(255, int(b * (1.0 + pulse)))
+            self._u3_text(line, 100, art_y + i * 16, (r, g, b), self.font_small)
+
+        # ── Subtitle ──
+        sub_fade = min(1.0, max(0.0, (elapsed - 1.5) / 1.0))
+        if sub_fade > 0:
+            sub_r = int(140 * sub_fade)
+            sub_g = int(140 * sub_fade)
+            sub_b = int(180 * sub_fade)
+            subtitle = "An Ultima III Tribute"
+            sw = len(subtitle) * 8  # approximate monospace width
+            self._u3_text(subtitle,
+                          SCREEN_WIDTH // 2 - sw // 2, art_y + len(art) * 16 + 12,
+                          (sub_r, sub_g, sub_b), self.font_med)
+
+        # ── Decorative separator ──
+        sep_y = art_y + len(art) * 16 + 40
+        sep_fade = min(1.0, max(0.0, (elapsed - 2.0) / 0.5))
+        if sep_fade > 0:
+            sep_color = (int(80 * sep_fade), int(60 * sep_fade), int(40 * sep_fade))
+            sep_text = "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~"
+            sw = len(sep_text) * 5
+            self._u3_text(sep_text,
+                          SCREEN_WIDTH // 2 - sw // 2, sep_y,
+                          sep_color, self.font_small)
+
+        # ── Menu options ──
+        menu_y = sep_y + 35
+        menu_fade = min(1.0, max(0.0, (elapsed - 2.5) / 1.0))
+        if menu_fade > 0:
+            # Panel behind menu
+            panel_w = 320
+            panel_h = 30 + len(options) * 40 + 20
+            panel_x = (SCREEN_WIDTH - panel_w) // 2
+            panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+            panel_surf.fill((20, 15, 30, int(180 * menu_fade)))
+            self.screen.blit(panel_surf, (panel_x, menu_y - 10))
+
+            # Border
+            border_alpha = int(120 * menu_fade)
+            pygame.draw.rect(self.screen,
+                             (100, 70, 40, border_alpha),
+                             (panel_x, menu_y - 10, panel_w, panel_h), 1)
+
+            for i, opt in enumerate(options):
+                y = menu_y + 10 + i * 40
+                selected = (i == cursor)
+
+                if selected:
+                    # Animated cursor arrow
+                    arrow_offset = int(3 * math.sin(elapsed * 4.0))
+                    arrow_x = panel_x + 16 + arrow_offset
+                    ar = int(255 * menu_fade)
+                    ag = int(200 * menu_fade)
+                    ab = int(60 * menu_fade)
+                    self._u3_text(">", arrow_x, y, (ar, ag, ab), self.font)
+
+                    # Highlighted label
+                    lr = int(255 * menu_fade)
+                    lg = int(255 * menu_fade)
+                    lb = int(100 * menu_fade)
+                    self._u3_text(opt["label"], panel_x + 40, y,
+                                  (lr, lg, lb), self.font)
+
+                    # Selection highlight bar
+                    bar = pygame.Surface((panel_w - 12, 24), pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, int(25 * menu_fade)))
+                    self.screen.blit(bar, (panel_x + 6, y - 2))
+                else:
+                    cr = int(160 * menu_fade)
+                    cg = int(160 * menu_fade)
+                    cb = int(160 * menu_fade)
+                    self._u3_text(opt["label"], panel_x + 40, y,
+                                  (cr, cg, cb), self.font)
+
+        # ── Bottom hints ──
+        hint_fade = min(1.0, max(0.0, (elapsed - 3.0) / 1.0))
+        if hint_fade > 0:
+            hint_color = (int(68 * hint_fade), int(68 * hint_fade),
+                          int(200 * hint_fade))
+            hint = "[UP/DOWN] SELECT   [ENTER] CHOOSE"
+            hw = len(hint) * 5
+            self._u3_text(hint,
+                          SCREEN_WIDTH // 2 - hw // 2,
+                          SCREEN_HEIGHT - 50,
+                          hint_color, self.font_small)
+
+            # Copyright / credits
+            cr_color = (int(60 * hint_fade), int(60 * hint_fade),
+                        int(80 * hint_fade))
+            credit = "Inspired by Ultima III: Exodus  (c) 1983 Origin Systems"
+            cw = len(credit) * 5
+            self._u3_text(credit,
+                          SCREEN_WIDTH // 2 - cw // 2,
+                          SCREEN_HEIGHT - 28,
+                          cr_color, self.font_small)
+
     def draw_settings_screen(self, settings, cursor):
         """Draw a full-screen settings overlay in Ultima III style.
 
@@ -3046,10 +3459,123 @@ class Renderer:
                 tx = panel_x + panel_w - 80
                 self._u3_text(f"[ {val_text} ]", tx, y, val_color, self.font)
 
+            # Value for action type
+            if setting['type'] == 'action':
+                # Draw a right arrow to indicate sub-screen
+                tx = panel_x + panel_w - 80
+                self._u3_text(">>>", tx, y,
+                              (255, 255, 0) if selected else (100, 100, 100),
+                              self.font)
+
         # Controls hint
         hint_y = panel_y + panel_h - 30
-        self._u3_text("[UP/DOWN] SELECT   [ENTER] TOGGLE   [M/ESC] CLOSE",
+        self._u3_text("[UP/DOWN] SELECT   [ENTER] CHOOSE   [M/ESC] CLOSE",
                       panel_x + 16, hint_y, (68, 68, 255), self.font_small)
+
+    def draw_save_load_screen(self, mode, slot_infos, cursor, message=None):
+        """Draw the save/load slot picker screen.
+
+        Parameters
+        ----------
+        mode : str
+            "save" or "load"
+        slot_infos : list
+            List of save-info dicts (or None for empty slots).
+        cursor : int
+            Which slot is currently selected (0-based).
+        message : str or None
+            Feedback message to display (e.g. "Game saved!").
+        """
+        import time as _time
+        self.screen.fill((0, 0, 0))
+
+        title = "SAVE GAME" if mode == "save" else "LOAD GAME"
+
+        # Title bar
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        self._u3_text(title, SCREEN_WIDTH // 2 - len(title) * 5, 8,
+                       (255, 170, 85), self.font)
+
+        # Slot panel
+        panel_w = 500
+        slot_h = 70
+        panel_h = 40 + len(slot_infos) * (slot_h + 8) + 60
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = 60
+
+        self._u3_panel(panel_x, panel_y, panel_w, panel_h)
+
+        for i, info in enumerate(slot_infos):
+            y = panel_y + 20 + i * (slot_h + 8)
+            selected = (i == cursor)
+
+            # Slot background highlight
+            if selected:
+                highlight = pygame.Surface((panel_w - 20, slot_h), pygame.SRCALPHA)
+                highlight.fill((60, 60, 120, 80))
+                self.screen.blit(highlight, (panel_x + 10, y))
+
+            # Slot border
+            border_color = (255, 255, 0) if selected else (80, 80, 100)
+            pygame.draw.rect(self.screen, border_color,
+                             (panel_x + 10, y, panel_w - 20, slot_h), 1)
+
+            prefix = "> " if selected else "  "
+            slot_num = i + 1
+
+            if info is None:
+                # Empty slot
+                self._u3_text(f"{prefix}SLOT {slot_num}  -  EMPTY",
+                              panel_x + 20, y + 10,
+                              (120, 120, 120), self.font)
+                if mode == "save":
+                    self._u3_text("(New save)",
+                                  panel_x + 20, y + 35,
+                                  (80, 80, 80), self.font_small)
+            else:
+                # Filled slot
+                names = ", ".join(info.get("party_names", []))
+                gold = info.get("gold", 0)
+                avg_lv = info.get("level_avg", 1)
+                ts = info.get("timestamp", 0)
+
+                # Format timestamp
+                try:
+                    dt_str = _time.strftime("%b %d %Y  %H:%M",
+                                           _time.localtime(ts))
+                except Exception:
+                    dt_str = "Unknown date"
+
+                label_color = (255, 255, 0) if selected else (200, 200, 200)
+                self._u3_text(f"{prefix}SLOT {slot_num}",
+                              panel_x + 20, y + 6, label_color, self.font)
+
+                # Date on the right
+                self._u3_text(dt_str, panel_x + panel_w - 200, y + 6,
+                              (150, 150, 200), self.font_small)
+
+                # Party names
+                self._u3_text(names, panel_x + 30, y + 28,
+                              (180, 200, 255), self.font_med)
+
+                # Gold and level
+                self._u3_text(f"Gold: {gold}   Avg Lv: {avg_lv:.0f}",
+                              panel_x + 30, y + 48,
+                              (200, 180, 100), self.font_small)
+
+        # Feedback message
+        if message:
+            msg_y = panel_y + panel_h - 55
+            self._u3_text(message,
+                          SCREEN_WIDTH // 2 - len(message) * 5, msg_y,
+                          (100, 255, 100), self.font)
+
+        # Controls hint
+        hint_y = panel_y + panel_h - 30
+        action_word = "SAVE" if mode == "save" else "LOAD"
+        self._u3_text(
+            f"[UP/DOWN] SELECT   [ENTER] {action_word}   [ESC] BACK",
+            panel_x + 16, hint_y, (68, 68, 255), self.font_small)
 
     def draw_party_screen_u3(self, party):
         """
@@ -3506,13 +4032,15 @@ class Renderer:
     # SHOP SCREEN
     # ========================================================
 
-    def draw_shop_u3(self, party, mode="buy", cursor_index=0, message=""):
+    def draw_shop_u3(self, party, mode="buy", cursor_index=0, message="",
+                      quest_complete=False):
         """
         Full-screen shop for buying and selling items.
 
         *mode*: "buy" or "sell"
         *cursor_index*: position in the active list
         *message*: transient feedback text (e.g. "Bought Sword!")
+        *quest_complete*: if True, show Shadow Crystal display case
         """
         from src.party import SHOP_INVENTORY, WEAPONS, ARMORS, ITEM_INFO, get_sell_price
 
@@ -3739,6 +4267,77 @@ class Renderer:
                     self._u3_text(line, rx, ry, self._U3_GRAY, fm)
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
+
+        # ── Shadow Crystal display case (quest trophy) ──
+        if quest_complete:
+            import math
+            import time as _time
+            anim_t = _time.time()
+
+            case_y = panel_y + panel_h - 120
+            case_w = right_w - 20
+            case_h = 80
+            case_x = right_x + 10
+
+            # Display case background
+            case_surf = pygame.Surface((case_w, case_h), pygame.SRCALPHA)
+            case_surf.fill((15, 8, 30, 200))
+            self.screen.blit(case_surf, (case_x, case_y))
+
+            # Ornate border
+            pygame.draw.rect(self.screen, (140, 80, 200),
+                             (case_x, case_y, case_w, case_h), 2)
+            pygame.draw.rect(self.screen, (80, 40, 120),
+                             (case_x + 2, case_y + 2,
+                              case_w - 4, case_h - 4), 1)
+
+            # Label
+            self._u3_text("ON DISPLAY", case_x + 8, case_y + 4,
+                          (180, 140, 220), self.font_small)
+
+            # Animated crystal gem in the display case
+            gem_cx = case_x + case_w // 2
+            gem_cy = case_y + case_h // 2 + 4
+            bob = int(3 * math.sin(anim_t * 2))
+
+            # Glow behind crystal
+            glow_r = int(18 + 4 * math.sin(anim_t * 3))
+            glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+            glow_alpha = int(60 + 30 * math.sin(anim_t * 2.5))
+            pygame.draw.circle(glow, (120, 60, 200, glow_alpha),
+                               (glow_r, glow_r), glow_r)
+            self.screen.blit(glow,
+                             (gem_cx - glow_r, gem_cy + bob - glow_r))
+
+            # Diamond-shaped crystal
+            size = 10
+            pulse = 0.15 * math.sin(anim_t * 4)
+            cr = min(255, int(140 * (1 + pulse)))
+            cg = min(255, int(80 * (1 + pulse)))
+            cb = min(255, int(220 * (1 + pulse)))
+            pts = [
+                (gem_cx, gem_cy + bob - size),
+                (gem_cx + size, gem_cy + bob),
+                (gem_cx, gem_cy + bob + size),
+                (gem_cx - size, gem_cy + bob),
+            ]
+            pygame.draw.polygon(self.screen, (cr, cg, cb), pts)
+            pygame.draw.polygon(self.screen, (200, 160, 255), pts, 1)
+
+            # Inner sparkle
+            inner = size // 2
+            ipts = [
+                (gem_cx, gem_cy + bob - inner),
+                (gem_cx + inner, gem_cy + bob),
+                (gem_cx, gem_cy + bob + inner),
+                (gem_cx - inner, gem_cy + bob),
+            ]
+            pygame.draw.polygon(self.screen, (220, 200, 255), ipts)
+
+            # Item name
+            self._u3_text("Shadow Crystal",
+                          gem_cx - 55, gem_cy + bob + size + 6,
+                          (180, 140, 255), self.font_small)
 
         # ── Gold display ──
         gold_y = panel_y + panel_h - 30

@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "timestamp": 1772318708.897125,
+  "state": "overworld",
+  "party": {
+    "col": 27,
+    "row": 20,
+    "gold": 50,
+    "members": [
+      {
+        "name": "Roland",
+        "class": "Fighter",
+        "race": "Dwarf",
+        "max_hp": 30,
+        "hp": 30,
+        "strength": 16,
+        "dexterity": 12,
+        "intelligence": 8,
+        "wisdom": 10,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Sword",
+          "left_hand": null,
+          "body": "Plate",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Mira",
+        "class": "Cleric",
+        "race": "Bobbit",
+        "max_hp": 22,
+        "hp": 22,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 10,
+        "wisdom": 18,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Mace",
+          "left_hand": null,
+          "body": "Chain",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Theron",
+        "class": "Wizard",
+        "race": "Fuzzy",
+        "max_hp": 14,
+        "hp": 14,
+        "strength": 6,
+        "dexterity": 14,
+        "intelligence": 20,
+        "wisdom": 8,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Dagger",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Sable",
+        "class": "Thief",
+        "race": "Elf",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 12,
+        "dexterity": 18,
+        "intelligence": 10,
+        "wisdom": 8,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Bow",
+          "left_hand": null,
+          "body": "Leather",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
+      }
+    ],
+    "shared_inventory": [
+      "Torch",
+      "Torch",
+      "Torch",
+      "Rock",
+      "Rock",
+      "Rock",
+      "Bow",
+      "Sword",
+      "Chain",
+      "Leather",
+      "Plate",
+      "Mace",
+      {
+        "name": "Arrows",
+        "charges": 20
+      },
+      "Healing Herb"
+    ],
+    "equipped": {
+      "light": {
+        "name": "Torch",
+        "charges": 150
+      },
+      "navigation": null,
+      "camping": null,
+      "special": null
+    },
+    "effects": {
+      "effect_1": "Detect Traps",
+      "effect_2": null,
+      "effect_3": null,
+      "effect_4": null
+    }
+  }
+}

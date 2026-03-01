@@ -1,13 +1,8 @@
 Purpose: to create a playable adventure from beginning to end with a simple version of the game systems
 
 MVP
-- Add 2 additional level 1 combat spells for each spellcaster
-- Optimize current 4 character classes
-- Add Save Game
-- Start Game from Settings Screen
-- Add effect to End Quest event
-- Calibrate gameplay (monsters, level 1)
 - Optional: Make encounters include multiple monsters (this one can get complicated, optional)
+- Calibrate gameplay (monsters, level 1)
 - Refine User Interface
 
 Full Game
