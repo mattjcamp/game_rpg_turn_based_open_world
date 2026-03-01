@@ -120,9 +120,9 @@ def _deserialize_party(data):
     # Shared inventory (already in correct format — strings and dicts)
     party.shared_inventory = list(data.get("shared_inventory", []))
 
-    # Party-level equipment slots
+    # Party-level equipment slots (includes "light" which is rendered in Effects)
     saved_eq = data.get("equipped", {})
-    for slot in party.PARTY_SLOTS:
+    for slot in list(party.equipped.keys()):
         entry = saved_eq.get(slot)
         party.equipped[slot] = entry  # None or {"name": ..., "charges": ...}
 

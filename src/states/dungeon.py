@@ -303,15 +303,16 @@ class DungeonState(BaseState):
     def _handle_party_inv_input(self, event):
         """Handle input for the shared party inventory screen.
 
-        The unified cursor covers 4 party equipment slots (indices 0-3)
-        followed by shared inventory items (indices 4+).
+        The unified cursor covers party equipment slots, effect slots,
+        a torch slot, and then shared inventory items.
         """
         party = self.game.party
         inv = party.shared_inventory
         members = party.members
         NUM_SLOTS = len(party.PARTY_SLOTS)
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        total_items = NUM_SLOTS + NUM_EFFECTS + len(inv)
+        TORCH_ROW = NUM_SLOTS + NUM_EFFECTS
+        total_items = NUM_SLOTS + NUM_EFFECTS + 1 + len(inv)  # +1 for torch
 
         # Examining an item — close on ESC/Enter/Space
         if self.examining_item is not None:
@@ -383,6 +384,8 @@ class DungeonState(BaseState):
         party = self.game.party
         NUM_SLOTS = len(party.PARTY_SLOTS)
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
+        TORCH_ROW = NUM_SLOTS + NUM_EFFECTS
+        STASH_START = TORCH_ROW + 1
         idx = self.party_inv_cursor
 
         if idx < NUM_SLOTS:
@@ -390,10 +393,6 @@ class DungeonState(BaseState):
             if chosen == "UNEQUIP":
                 party.party_unequip(slot)
                 self.party_inv_action_menu = False
-                # If the light slot was cleared, deactivate torch
-                if slot == "light":
-                    self.torch_active = False
-                    self.torch_steps = 0
             elif chosen == "EXAMINE":
                 item = party.get_equipped_name(slot)
                 if item:
@@ -410,15 +409,26 @@ class DungeonState(BaseState):
             elif chosen == "REMOVE":
                 party.set_effect(slot_key, None)
                 self.party_inv_action_menu = False
+        elif idx == TORCH_ROW:
+            # Acting on the torch slot
+            if chosen == "UNEQUIP":
+                party.party_unequip("light")
+                self.torch_active = False
+                self.torch_steps = 0
+                self.party_inv_action_menu = False
+            elif chosen == "EXAMINE":
+                item = party.get_equipped_name("light")
+                if item:
+                    self.examining_item = item
         else:
-            inv_idx = idx - NUM_SLOTS - NUM_EFFECTS
+            inv_idx = idx - STASH_START
             inv = party.shared_inventory
             if inv_idx < len(inv):
                 item_name = party.item_name(inv[inv_idx])
                 if chosen == "USE":
                     self._use_party_item(item_name, inv_idx)
                     self.party_inv_action_menu = False
-                    new_total = NUM_SLOTS + NUM_EFFECTS + len(party.shared_inventory)
+                    new_total = STASH_START + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen == "EXAMINE":
@@ -430,25 +440,33 @@ class DungeonState(BaseState):
                             party.give_item_to_member(inv_idx, mi)
                             break
                     self.party_inv_action_menu = False
-                    new_total = NUM_SLOTS + NUM_EFFECTS + len(party.shared_inventory)
+                    new_total = STASH_START + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
+                elif chosen == "EQUIP → TORCH":
+                    party.party_equip(item_name, "light")
+                    self.party_inv_action_menu = False
+                    new_total = STASH_START + len(party.shared_inventory)
+                    if self.party_inv_cursor >= new_total:
+                        self.party_inv_cursor = max(0, new_total - 1)
+                    # Activate torch in dungeon
+                    if party.get_equipped_name("light") == "Torch":
+                        self._activate_torch()
                 elif chosen.startswith("EQUIP → "):
                     slot = chosen.split("→ ", 1)[1].strip().lower()
                     party.party_equip(item_name, slot)
                     self.party_inv_action_menu = False
-                    new_total = NUM_SLOTS + NUM_EFFECTS + len(party.shared_inventory)
+                    new_total = STASH_START + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
-                    # If a torch was equipped to the light slot, activate it
-                    if slot == "light" and party.get_equipped_name("light") == "Torch":
-                        self._activate_torch()
 
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
         party = self.game.party
         NUM_SLOTS = len(party.PARTY_SLOTS)
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
+        TORCH_ROW = NUM_SLOTS + NUM_EFFECTS
+        STASH_START = TORCH_ROW + 1
         idx = self.party_inv_cursor
 
         if idx < NUM_SLOTS:
@@ -467,8 +485,13 @@ class DungeonState(BaseState):
             if current is not None:
                 options.append("REMOVE")
             return options
+        elif idx == TORCH_ROW:
+            item = party.get_equipped_name("light")
+            if item is None:
+                return []
+            return ["UNEQUIP", "EXAMINE"]
         else:
-            inv_idx = idx - NUM_SLOTS - NUM_EFFECTS
+            inv_idx = idx - STASH_START
             inv = party.shared_inventory
             if inv_idx >= len(inv):
                 return []
@@ -482,6 +505,8 @@ class DungeonState(BaseState):
                 if party.get_equipped_name(s) is None:
                     label = party.PARTY_SLOT_LABELS[s]
                     options.append(f"EQUIP → {label}")
+            if party.get_equipped_name("light") is None and item_name == "Torch":
+                options.append("EQUIP → TORCH")
             for mi, member in enumerate(self.game.party.members):
                 options.append(f"GIVE TO {member.name.upper()}")
             options.append("EXAMINE")

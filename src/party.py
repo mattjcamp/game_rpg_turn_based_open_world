@@ -492,14 +492,13 @@ class Party:
     """
 
     # Party-level equipment slot names and defaults
-    PARTY_SLOTS = ["light", "navigation", "camping", "special"]
+    PARTY_SLOTS = ["navigation", "camping", "special"]
     PARTY_SLOT_LABELS = {
-        "light": "LIGHT",
         "navigation": "NAVIGATION",
         "camping": "CAMPING",
         "special": "SPECIAL",
     }
-    PARTY_SLOT_DEFAULTS = {"light": None, "navigation": None,
+    PARTY_SLOT_DEFAULTS = {"navigation": None,
                            "camping": None, "special": None}
 
     # Party-level passive effect slots (4 slots)
@@ -621,8 +620,9 @@ class Party:
         self.gold = 100  # Shared party gold
         self.shared_inventory = []  # Party-wide item pool
 
-        # Party-level equipment: 4 utility slots
+        # Party-level equipment: utility slots + light (shown in effects)
         self.equipped = {s: None for s in self.PARTY_SLOTS}
+        self.equipped["light"] = None  # torch slot; rendered in Effects
 
         # Party-level passive effects: 4 effect slots
         self.effects = {s: None for s in self.EFFECT_SLOTS}
@@ -836,9 +836,9 @@ def create_default_party(start_col=None, start_row=None):
     # ── Party-level config ──
     party.gold = cfg.get("gold", 100)
 
-    # ── Party-level equipment slots from JSON ──
+    # ── Party-level equipment slots from JSON (includes "light") ──
     party_eq = cfg.get("party_equipped", {})
-    for slot in party.PARTY_SLOTS:
+    for slot in list(party.equipped.keys()):
         entry = party_eq.get(slot)
         if entry is not None:
             party.equipped[slot] = {

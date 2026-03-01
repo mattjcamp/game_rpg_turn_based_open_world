@@ -4632,6 +4632,29 @@ class Renderer:
 
             ty += row_h
 
+        # ── Torch slot (rendered in effects section) ──
+        torch_idx = NUM_SLOTS + NUM_EFFECTS   # index for the torch row
+        torch_name = party.get_equipped_name("light")
+        torch_charges = party.get_equipped_charges("light")
+        selected = (torch_idx == cursor_index)
+        prefix = "> " if selected else "  "
+        name_color = self._U3_WHITE if selected else self._U3_LTBLUE
+        self._u3_text(f"{prefix}TORCH:", tx, ty, name_color, fm)
+        if torch_name:
+            display = torch_name
+            if torch_charges is not None:
+                display = f"{torch_name} ({torch_charges})"
+            item_color = self._U3_WHITE if selected else (220, 220, 230)
+            self._u3_text(display, tx + 90, ty, item_color, fm)
+        else:
+            self._u3_text("-- EMPTY --", tx + 90, ty, (120, 120, 120), fm)
+        if selected:
+            sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+            sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+            sel_surf.fill((255, 255, 255, 25))
+            self.screen.blit(sel_surf, sel_rect)
+        ty += row_h
+
         # ── Divider between effects and stash ──
         ty += 6
         pygame.draw.line(self.screen, (60, 60, 80),
@@ -4652,7 +4675,7 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = NUM_SLOTS + NUM_EFFECTS
+            header_count = NUM_SLOTS + NUM_EFFECTS + 1  # +1 for torch row
             inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
@@ -4770,7 +4793,8 @@ class Renderer:
         sel_charges = None
         is_equip_slot = cursor_index < NUM_SLOTS
         is_effect_slot = (NUM_SLOTS <= cursor_index < NUM_SLOTS + NUM_EFFECTS)
-        header_count = NUM_SLOTS + NUM_EFFECTS
+        is_torch_slot = (cursor_index == NUM_SLOTS + NUM_EFFECTS)
+        header_count = NUM_SLOTS + NUM_EFFECTS + 1  # +1 for torch row
         if is_equip_slot:
             slot_key = party.PARTY_SLOTS[cursor_index]
             sel_item = party.get_equipped_name(slot_key)
@@ -4779,6 +4803,9 @@ class Renderer:
             eff_idx = cursor_index - NUM_SLOTS
             eff_slot_key = party.EFFECT_SLOTS[eff_idx]
             sel_item = party.get_effect(eff_slot_key)
+        elif is_torch_slot:
+            sel_item = party.get_equipped_name("light")
+            sel_charges = party.get_equipped_charges("light")
         elif cursor_index - header_count < len(inv):
             entry = inv[cursor_index - header_count]
             sel_item = party.item_name(entry)
@@ -4791,6 +4818,8 @@ class Renderer:
                 self._u3_text(f"EQUIPPED ({slot_label})", rx, ry, self._U3_ORANGE, fm)
             elif is_effect_slot:
                 self._u3_text("ACTIVE EFFECT", rx, ry, self._U3_ORANGE, fm)
+            elif is_torch_slot:
+                self._u3_text("EQUIPPED (TORCH)", rx, ry, self._U3_ORANGE, fm)
             else:
                 self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
             ry += 22
@@ -4846,6 +4875,10 @@ class Renderer:
             self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
         elif is_effect_slot:
             self._u3_text("EFFECT SLOT", rx, ry, self._U3_ORANGE, fm)
+            ry += 22
+            self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
+        elif is_torch_slot:
+            self._u3_text("TORCH SLOT", rx, ry, self._U3_ORANGE, fm)
             ry += 22
             self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
         else:
