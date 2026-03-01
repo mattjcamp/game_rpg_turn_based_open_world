@@ -1135,9 +1135,6 @@ class Renderer:
                 lbl += f":{charges:02d}"
             self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85), font=f)
         self._u3_text(f"POS:({party.col},{party.row})", 750, bar_y + 6, (220, 220, 220), font=f)
-        # Bottom line: controls
-        self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] QUIT",
-                      8, bar_y + 28, (200, 200, 255), font=f)
 
         # ── 6. floating message ──
         if message:
@@ -2946,23 +2943,28 @@ class Renderer:
             elif dice_b < 0:
                 dmg_str += f"{dice_b}"
             stat_line = f"AC:{ac_val}  {wpn_label}  DMG:{dmg_str}"
-            self._u3_text(stat_line, info_x, stat_y, self._U3_GRAY, self.font_small)
+            self._u3_text(stat_line, info_x, stat_y, (180, 210, 230), self.font_small)
 
-            # ── HP bar ──
+            # ── HP bar + numeric readout ──
             bar_y = row_top + 28
             hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
-            self._u3_draw_stat_bar(info_x, bar_y, bar_w, bar_h,
+            hp_bar_w = bar_w - 60  # leave room for numbers
+            self._u3_draw_stat_bar(info_x, bar_y, hp_bar_w, bar_h,
                                    member.hp, member.max_hp, hp_color)
-            self._u3_text("HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
+            hp_txt = f"{member.hp}/{member.max_hp}"
+            self._u3_text(hp_txt, info_x + hp_bar_w + 4, bar_y - 2,
+                          self._U3_WHITE, self.font_small)
 
-            # ── MP bar ──
+            # ── MP bar + numeric readout ──
             mp_y = bar_y + bar_h + 3
             mp_val = member.current_mp
             mp_max = member.max_mp
             if mp_max > 0:
-                self._u3_draw_stat_bar(info_x, mp_y, bar_w, bar_h,
+                self._u3_draw_stat_bar(info_x, mp_y, hp_bar_w, bar_h,
                                        mp_val, mp_max, (100, 100, 255))
-                self._u3_text("MP", info_x - 26, mp_y - 2, (200, 200, 200), self.font_small)
+                mp_txt = f"{mp_val}/{mp_max}"
+                self._u3_text(mp_txt, info_x + hp_bar_w + 4, mp_y - 2,
+                              self._U3_WHITE, self.font_small)
 
             # ── DEF / SHLD indicators ──
             indicator_y = row_top + 28
@@ -3105,14 +3107,28 @@ class Renderer:
                 dmg_str += f"{mon.damage_bonus}"
             atk_str = f"+{mon.attack_bonus}" if mon.attack_bonus >= 0 else f"{mon.attack_bonus}"
             stat_line = f"AC:{mon.ac}  ATK:{atk_str}  DMG:{dmg_str}"
-            self._u3_text(stat_line, info_x, stat_y, self._U3_GRAY, self.font_small)
+            self._u3_text(stat_line, info_x, stat_y, (210, 190, 170), self.font_small)
 
-            # ── HP bar ──
+            # ── HP bar + numeric readout (green→red like party panel) ──
             bar_y = row_top + 28
-            hp_color = (200, 40, 40) if mon.hp > mon.max_hp * 0.3 else self._U3_RED
-            self._u3_draw_stat_bar(info_x, bar_y, bar_w, bar_h,
+            hp_color = self._U3_GREEN if mon.hp > mon.max_hp * 0.3 else self._U3_RED
+            hp_bar_w = bar_w - 60  # leave room for numbers
+            self._u3_draw_stat_bar(info_x, bar_y, hp_bar_w, bar_h,
                                    mon.hp, mon.max_hp, hp_color)
-            self._u3_text("HP", info_x - 26, bar_y - 2, (200, 200, 200), self.font_small)
+            hp_txt = f"{mon.hp}/{mon.max_hp}"
+            self._u3_text(hp_txt, info_x + hp_bar_w + 4, bar_y - 2,
+                          self._U3_WHITE, self.font_small)
+
+            # ── MP bar + numeric readout (matches party panel layout) ──
+            mp_y = bar_y + bar_h + 3
+            mon_mp = getattr(mon, 'current_mp', 0)
+            mon_mp_max = getattr(mon, 'max_mp', 0)
+            if mon_mp_max > 0:
+                self._u3_draw_stat_bar(info_x, mp_y, hp_bar_w, bar_h,
+                                       mon_mp, mon_mp_max, (100, 100, 255))
+                mp_txt = f"{mon_mp}/{mon_mp_max}"
+                self._u3_text(mp_txt, info_x + hp_bar_w + 4, mp_y - 2,
+                              self._U3_WHITE, self.font_small)
 
             ty += 68  # row height per monster (matches party panel)
 
@@ -5260,6 +5276,99 @@ class Renderer:
 
         # ── Dismiss hint ──
         self._u3_text("[ESC] CLOSE", px + pw - 100, py + ph - 20,
+                      self._U3_BLUE, self.font_small)
+
+    def draw_overworld_help_overlay(self):
+        """Draw a full-screen overlay showing all overworld controls."""
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 200))
+        self.screen.blit(dim, (0, 0))
+
+        margin = 60
+        px, py = margin, margin
+        pw = SCREEN_WIDTH - margin * 2
+        ph = SCREEN_HEIGHT - margin * 2
+
+        pygame.draw.rect(self.screen, (12, 12, 24), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
+
+        self._u3_text("OVERWORLD CONTROLS", px + pw // 2 - 80, py + 10,
+                       self._U3_ORANGE, self.font)
+
+        f = self.font_small
+        lh = 18
+        col1_x = px + 20
+        col2_x = px + pw // 2 + 10
+        y = py + 40
+
+        # ── Left column ──
+        self._u3_text("MOVEMENT", col1_x, y, self._U3_LTBLUE, f)
+        y += lh + 4
+        lines_left = [
+            ("[W/A/S/D]", "Move on the map"),
+            ("[ARROWS]", "Move on the map"),
+        ]
+        for key, desc in lines_left:
+            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
+            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            y += lh
+
+        y += 8
+        self._u3_text("MENUS & SCREENS", col1_x, y, self._U3_LTBLUE, f)
+        y += lh + 4
+        lines_menus = [
+            ("[P]", "Open party / inventory"),
+            ("[L]", "Open game log"),
+            ("[H]", "Toggle this help screen"),
+            ("[ESC]", "Quit game"),
+        ]
+        for key, desc in lines_menus:
+            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
+            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            y += lh
+
+        # ── Right column ──
+        ry = py + 40
+        self._u3_text("INTERACTIONS", col2_x, ry, self._U3_LTBLUE, f)
+        ry += lh + 4
+        lines_interact = [
+            ("Walk into", "Enter towns and dungeons"),
+            ("Enemies", "Touch to start combat"),
+        ]
+        for key, desc in lines_interact:
+            self._u3_text(key, col2_x, ry, (200, 180, 120), f)
+            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ry += lh
+
+        ry += 8
+        self._u3_text("PARTY SCREEN", col2_x, ry, self._U3_LTBLUE, f)
+        ry += lh + 4
+        lines_party = [
+            ("[UP/DOWN]", "Select party member"),
+            ("[ENTER]", "View character details"),
+            ("[ESC]", "Close screen"),
+        ]
+        for key, desc in lines_party:
+            self._u3_text(key, col2_x, ry, self._U3_WHITE, f)
+            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ry += lh
+
+        ry += 8
+        self._u3_text("INFO BAR", col2_x, ry, self._U3_LTBLUE, f)
+        ry += lh + 4
+        lines_info = [
+            ("GOLD", "Your current gold amount"),
+            ("TERRAIN", "Tile type you're standing on"),
+            ("POS", "Your map coordinates"),
+        ]
+        for key, desc in lines_info:
+            self._u3_text(key, col2_x, ry, (200, 180, 120), f)
+            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ry += lh
+
+        # Footer
+        self._u3_text("[H / ESC] CLOSE",
+                      px + pw // 2 - 50, py + ph - 22,
                       self._U3_BLUE, self.font_small)
 
     def draw_combat_help_overlay(self):
