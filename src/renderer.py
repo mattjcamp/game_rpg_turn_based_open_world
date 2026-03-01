@@ -3717,6 +3717,164 @@ class Renderer:
                           SCREEN_HEIGHT - 28,
                           cr_color, self.font_small)
 
+    def draw_game_over_screen(self, options, cursor, elapsed):
+        """Draw a grim game-over screen with skull art and menu options.
+
+        Parameters
+        ----------
+        options : list of dicts with 'label' keys
+        cursor  : which option is highlighted
+        elapsed : total seconds since game over screen appeared
+        """
+        import math
+        self.screen.fill((0, 0, 0))
+
+        # ── Blood-red fog particles ──
+        rng = [23, 59, 101, 149, 191, 233, 277, 311, 367, 409,
+               457, 499, 547, 593, 641, 683, 727, 769, 811, 859]
+        for i, seed in enumerate(rng):
+            px = (seed * 11 + i * 37) % SCREEN_WIDTH
+            py = (seed * 7 + i * 53) % SCREEN_HEIGHT
+            # Slow drift
+            drift = math.sin(elapsed * 0.3 + seed * 0.1) * 20
+            px = int(px + drift) % SCREEN_WIDTH
+            phase = elapsed * (0.2 + i * 0.08) + seed
+            brightness = int(20 + 15 * math.sin(phase))
+            brightness = max(5, min(40, brightness))
+            self.screen.set_at((px, py), (brightness, 0, 0))
+            if i % 2 == 0:
+                self.screen.set_at(
+                    ((px + 1) % SCREEN_WIDTH, py),
+                    (brightness // 2, 0, 0))
+
+        # ── Skull ASCII Art ──
+        skull = [
+            "            ______",
+            "         .-'      '-.",
+            "        /            \\",
+            "       |              |",
+            "       |,  .-.  .-.  ,|",
+            "       | )(_o/  \\o_)( |",
+            "       |/     /\\     \\|",
+            "       (_     ^^     _)",
+            "        \\__|IIIIII|__/",
+            "         | \\IIIIII/ |",
+            "         \\          /",
+            "          '--------'",
+        ]
+
+        # Fade in the skull over 1.5 seconds
+        skull_fade = min(1.0, elapsed / 1.5)
+        skull_y = 60
+        for i, line in enumerate(skull):
+            line_fade = min(1.0, max(0.0, skull_fade - i * 0.04))
+            r = int(140 * line_fade)
+            g = int(20 * line_fade)
+            b = int(20 * line_fade)
+            # Subtle red pulse
+            pulse = 0.12 * math.sin(elapsed * 1.2 + i * 0.3)
+            r = min(255, int(r * (1.0 + pulse)))
+            sw = len(line) * 7
+            self._u3_text(line,
+                          SCREEN_WIDTH // 2 - sw // 2, skull_y + i * 16,
+                          (r, g, b), self.font)
+
+        # ── "GAME OVER" text ──
+        go_fade = min(1.0, max(0.0, (elapsed - 1.0) / 1.0))
+        if go_fade > 0:
+            go_text = "G A M E   O V E R"
+            pulse = 0.2 * math.sin(elapsed * 2.0)
+            gr = min(255, int((200 + 55 * pulse) * go_fade))
+            gg = int(30 * go_fade)
+            gb = int(30 * go_fade)
+            gw = len(go_text) * 9
+            self._u3_text(go_text,
+                          SCREEN_WIDTH // 2 - gw // 2,
+                          skull_y + len(skull) * 16 + 25,
+                          (gr, gg, gb), self.font)
+
+        # ── Epitaph text ──
+        ep_fade = min(1.0, max(0.0, (elapsed - 1.8) / 1.0))
+        if ep_fade > 0:
+            epitaph = "Your journey ends here... but perhaps not forever."
+            ec = int(100 * ep_fade)
+            ew = len(epitaph) * 6
+            self._u3_text(epitaph,
+                          SCREEN_WIDTH // 2 - ew // 2,
+                          skull_y + len(skull) * 16 + 55,
+                          (ec, max(0, ec - 20), max(0, ec - 10)),
+                          self.font_med)
+
+        # ── Separator ──
+        sep_fade = min(1.0, max(0.0, (elapsed - 2.0) / 0.5))
+        sep_y = skull_y + len(skull) * 16 + 85
+        if sep_fade > 0:
+            sep_color = (int(60 * sep_fade), int(15 * sep_fade),
+                         int(15 * sep_fade))
+            sep_text = "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~"
+            sw = len(sep_text) * 5
+            self._u3_text(sep_text,
+                          SCREEN_WIDTH // 2 - sw // 2, sep_y,
+                          sep_color, self.font_small)
+
+        # ── Menu options ──
+        menu_y = sep_y + 30
+        menu_fade = min(1.0, max(0.0, (elapsed - 2.0) / 1.0))
+        if menu_fade > 0:
+            # Dark panel behind menu
+            panel_w = 320
+            panel_h = 30 + len(options) * 40 + 20
+            panel_x = (SCREEN_WIDTH - panel_w) // 2
+            panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+            panel_surf.fill((30, 5, 5, int(180 * menu_fade)))
+            self.screen.blit(panel_surf, (panel_x, menu_y - 10))
+
+            # Blood-red border
+            border_alpha = int(120 * menu_fade)
+            pygame.draw.rect(self.screen,
+                             (120, 20, 20, border_alpha),
+                             (panel_x, menu_y - 10, panel_w, panel_h), 1)
+
+            for i, opt in enumerate(options):
+                y = menu_y + 10 + i * 40
+                selected = (i == cursor)
+
+                if selected:
+                    # Animated cursor
+                    arrow_offset = int(3 * math.sin(elapsed * 4.0))
+                    arrow_x = panel_x + 16 + arrow_offset
+                    ar = int(255 * menu_fade)
+                    ag = int(80 * menu_fade)
+                    ab = int(60 * menu_fade)
+                    self._u3_text(">", arrow_x, y, (ar, ag, ab), self.font)
+
+                    # Highlighted label
+                    self._u3_text(opt["label"], panel_x + 40, y,
+                                  (int(255 * menu_fade), int(200 * menu_fade),
+                                   int(100 * menu_fade)), self.font)
+
+                    # Red selection bar
+                    bar = pygame.Surface((panel_w - 12, 24), pygame.SRCALPHA)
+                    bar.fill((200, 40, 40, int(25 * menu_fade)))
+                    self.screen.blit(bar, (panel_x + 6, y - 2))
+                else:
+                    c = int(140 * menu_fade)
+                    self._u3_text(opt["label"], panel_x + 40, y,
+                                  (c, max(0, c - 20), max(0, c - 20)),
+                                  self.font)
+
+        # ── Bottom hint ──
+        hint_fade = min(1.0, max(0.0, (elapsed - 2.5) / 1.0))
+        if hint_fade > 0:
+            hint_color = (int(60 * hint_fade), int(30 * hint_fade),
+                          int(30 * hint_fade))
+            hint = "[UP/DOWN] SELECT   [ENTER] CHOOSE"
+            hw = len(hint) * 5
+            self._u3_text(hint,
+                          SCREEN_WIDTH // 2 - hw // 2,
+                          SCREEN_HEIGHT - 50,
+                          hint_color, self.font_small)
+
     def draw_settings_screen(self, settings, cursor):
         """Draw a full-screen settings overlay in Ultima III style.
 

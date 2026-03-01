@@ -90,6 +90,15 @@ class Game:
              "action": self._open_load_screen},
         ]
 
+        # --- Game Over screen ---
+        self.showing_game_over = False
+        self.game_over_cursor = 0
+        self.game_over_elapsed = 0.0
+        self.game_over_options = [
+            {"label": "LOAD GAME", "action": self._game_over_load},
+            {"label": "NEW GAME", "action": self._game_over_new},
+        ]
+
         # --- State machine ---
         self.states = {
             "overworld": OverworldState(self),
@@ -124,6 +133,29 @@ class Game:
         self.settings_cursor = 0
         # Flag so we know to return to title if ESC from load
         self._title_load_mode = True
+
+    # ── Game Over actions ────────────────────────────────────
+
+    def trigger_game_over(self):
+        """Show the game over screen (called by combat on total party wipe)."""
+        self.showing_game_over = True
+        self.game_over_cursor = 0
+        self.game_over_elapsed = 0.0
+        self.music.play("title")  # somber music
+
+    def _game_over_load(self):
+        """Open load screen from the game over screen."""
+        self.showing_game_over = False
+        self.showing_settings = True
+        self.settings_mode = "load"
+        self.save_load_cursor = 0
+        self.save_load_message = None
+        self._game_over_load_mode = True
+
+    def _game_over_new(self):
+        """Start a fresh game from the game over screen."""
+        self.showing_game_over = False
+        self._title_new_game()
 
     def _title_settings(self):
         """Open settings from the title screen."""
@@ -171,6 +203,22 @@ class Game:
         else:
             self.save_load_message = "No save in that slot!"
             self.save_load_msg_timer = 2.0
+
+    def _handle_game_over_input(self, event):
+        """Handle input on the game over screen."""
+        if event.type != pygame.KEYDOWN:
+            return
+        # Ignore input during the initial fade-in (first 2 seconds)
+        if self.game_over_elapsed < 2.0:
+            return
+        if event.key == pygame.K_UP:
+            self.game_over_cursor = (
+                (self.game_over_cursor - 1) % len(self.game_over_options))
+        elif event.key == pygame.K_DOWN:
+            self.game_over_cursor = (
+                (self.game_over_cursor + 1) % len(self.game_over_options))
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self.game_over_options[self.game_over_cursor]["action"]()
 
     def change_state(self, state_name):
         """Switch to a different game state."""
@@ -237,6 +285,11 @@ class Game:
                 self.showing_settings = False
                 self.showing_title = True
                 self.music.play("title")
+            # If we came from the game over screen, go back to game over
+            elif getattr(self, '_game_over_load_mode', False):
+                self._game_over_load_mode = False
+                self.showing_settings = False
+                self.showing_game_over = True
             else:
                 self.settings_mode = "main"
             self.save_load_message = None
@@ -253,10 +306,14 @@ class Game:
                 self._do_save(slot)
             else:
                 self._do_load(slot)
-                # If load succeeded from title, close everything
-                if getattr(self, '_title_load_mode', False) and self.save_load_message and "Loaded" in self.save_load_message:
-                    self._title_load_mode = False
-                    self.showing_settings = False
+                # If load succeeded from title or game over, close everything
+                if self.save_load_message and "Loaded" in self.save_load_message:
+                    if getattr(self, '_title_load_mode', False):
+                        self._title_load_mode = False
+                        self.showing_settings = False
+                    elif getattr(self, '_game_over_load_mode', False):
+                        self._game_over_load_mode = False
+                        self.showing_settings = False
 
     def run(self):
         """Main game loop."""
@@ -274,6 +331,10 @@ class Game:
                 for event in events:
                     self._handle_title_input(event)
                 self.title_elapsed += dt
+            elif self.showing_game_over:
+                for event in events:
+                    self._handle_game_over_input(event)
+                self.game_over_elapsed += dt
             elif self.showing_settings:
                 # Settings screen intercepts all input
                 for event in events:
@@ -316,7 +377,8 @@ class Game:
 
             # --- Update ---
             self.music.update(dt)
-            if not self.showing_settings and not self.showing_title:
+            if (not self.showing_settings and not self.showing_title
+                    and not self.showing_game_over):
                 self.current_state.update(dt)
                 self.camera.update(self.party.col, self.party.row)
 
@@ -326,6 +388,10 @@ class Game:
                 self.renderer.draw_title_screen(
                     self.title_options, self.title_cursor,
                     self.title_elapsed)
+            elif self.showing_game_over:
+                self.renderer.draw_game_over_screen(
+                    self.game_over_options, self.game_over_cursor,
+                    self.game_over_elapsed)
             elif self.showing_settings:
                 if self.settings_mode in ("save", "load"):
                     # Build slot info list for the renderer

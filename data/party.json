@@ -83,13 +83,6 @@
     }
   ],
 
-  "party_equipped": {
-    "light": { "name": "Torch", "charges": 150 },
-    "navigation": null,
-    "camping": null,
-    "special": null
-  },
-
   "party_effects": {
     "effect_1": null,
     "effect_2": null,

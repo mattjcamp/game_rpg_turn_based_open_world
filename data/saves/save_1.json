@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "timestamp": 1772318708.897125,
-  "state": "overworld",
+  "timestamp": 1772398424.737409,
+  "state": "town",
   "party": {
-    "col": 27,
+    "col": 19,
     "row": 20,
-    "gold": 50,
+    "gold": 11,
     "members": [
       {
         "name": "Roland",
@@ -18,11 +18,11 @@
         "intelligence": 8,
         "wisdom": 10,
         "level": 1,
-        "exp": 0,
+        "exp": 30,
         "equipped": {
-          "right_hand": "Sword",
+          "right_hand": "Club",
           "left_hand": null,
-          "body": "Plate",
+          "body": "Leather",
           "head": null
         },
         "inventory": [],
@@ -41,11 +41,11 @@
         "intelligence": 10,
         "wisdom": 18,
         "level": 1,
-        "exp": 0,
+        "exp": 30,
         "equipped": {
-          "right_hand": "Mace",
+          "right_hand": "Club",
           "left_hand": null,
-          "body": "Chain",
+          "body": "Leather",
           "head": null
         },
         "inventory": [],
@@ -64,7 +64,7 @@
         "intelligence": 20,
         "wisdom": 8,
         "level": 1,
-        "exp": 0,
+        "exp": 30,
         "equipped": {
           "right_hand": "Dagger",
           "left_hand": null,
@@ -87,9 +87,9 @@
         "intelligence": 10,
         "wisdom": 8,
         "level": 1,
-        "exp": 0,
+        "exp": 30,
         "equipped": {
-          "right_hand": "Bow",
+          "right_hand": null,
           "left_hand": null,
           "body": "Leather",
           "head": null
@@ -102,37 +102,34 @@
     ],
     "shared_inventory": [
       "Torch",
-      "Torch",
-      "Torch",
       "Rock",
       "Rock",
       "Rock",
-      "Bow",
-      "Sword",
-      "Chain",
-      "Leather",
-      "Plate",
-      "Mace",
+      "Healing Herb",
       {
-        "name": "Arrows",
-        "charges": 20
+        "name": "Camping Supplies",
+        "charges": 1
       },
-      "Healing Herb"
+      "Leather",
+      "Sword"
     ],
     "equipped": {
-      "light": {
-        "name": "Torch",
-        "charges": 150
-      },
       "navigation": null,
       "camping": null,
-      "special": null
+      "special": null,
+      "light": {
+        "name": "Torch",
+        "charges": 81
+      }
     },
     "effects": {
-      "effect_1": "Detect Traps",
+      "effect_1": "Torch",
       "effect_2": null,
       "effect_3": null,
       "effect_4": null
+    },
+    "clock": {
+      "total_minutes": 340
     }
   }
 }

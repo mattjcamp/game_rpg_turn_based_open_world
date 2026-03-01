@@ -2419,6 +2419,11 @@ class CombatState(BaseState):
                     )
 
         if not won:
+            # Check if this is a total party wipe
+            if not any(m.is_alive() for m in self.game.party.members):
+                self.game.trigger_game_over()
+                return
+            # Partial wipe — revive dead members with 1 HP
             for m in self.game.party.members:
                 if not m.is_alive():
                     m.hp = 1
