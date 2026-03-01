@@ -126,6 +126,10 @@ class OverworldState(BaseState):
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
+                from src.party import ITEM_INFO
+                info = ITEM_INFO.get(item_name, {})
+                if info.get("usable", False):
+                    options.append("USE")
                 if member.can_use_item(item_name):
                     valid_slots = member.get_valid_slots(item_name)
                     for s in valid_slots:
@@ -160,6 +164,11 @@ class OverworldState(BaseState):
             if chosen == "EXAMINE":
                 self.examining_item = self._get_item_at_cursor(member)
                 return
+            elif chosen == "USE":
+                inv_idx = idx - 4
+                if inv_idx < len(member.inventory):
+                    item_name = member.inventory[inv_idx]
+                    self._use_char_item(member, item_name, inv_idx)
             elif chosen == "UNEQUIP":
                 if idx < 4:
                     slot_keys = ["right_hand", "left_hand", "body", "head"]
@@ -192,19 +201,103 @@ class OverworldState(BaseState):
         elif event.key == pygame.K_ESCAPE:
             self.char_action_menu = False
 
+    def _use_char_item(self, member, item_name, inv_idx):
+        """Use a consumable item from a character's personal inventory."""
+        from src.party import ITEM_INFO
+        info = ITEM_INFO.get(item_name, {})
+        effect = info.get("effect", "")
+        power = info.get("power", 0)
+
+        if effect == "rest":
+            if member.hp <= 0:
+                self.message = f"{member.name} is unconscious!"
+                self.message_timer = 2500
+                return
+            hp_restore = max(1, int(member.max_hp * 0.35)) + random.randint(1, 8)
+            mp_restore = max(1, int(member.max_mp * 0.30)) + random.randint(1, 4)
+            old_hp, old_mp = member.hp, getattr(member, "current_mp", 0)
+            member.hp = min(member.max_hp, member.hp + hp_restore)
+            member.current_mp = min(member.max_mp, getattr(member, "current_mp", 0) + mp_restore)
+            actual_hp = member.hp - old_hp
+            actual_mp = member.current_mp - old_mp
+            self.game.game_log.append(
+                f"{member.name} rests using {item_name}. (+{actual_hp} HP, +{actual_mp} MP)")
+            self.message = f"{member.name}: +{actual_hp} HP, +{actual_mp} MP"
+            self.message_timer = 3000
+        elif effect == "heal_hp":
+            if member.hp <= 0:
+                self.message = f"{member.name} is unconscious!"
+                self.message_timer = 2500
+                return
+            missing = member.max_hp - member.hp
+            if missing <= 0:
+                self.message = f"{member.name} is already at full health!"
+                self.message_timer = 2500
+                return
+            heal = power + random.randint(1, 6)
+            member.hp = min(member.max_hp, member.hp + heal)
+            self.game.game_log.append(
+                f"{member.name} uses {item_name}. (+{heal} HP)")
+            self.message = f"{member.name}: +{heal} HP"
+            self.message_timer = 3000
+        elif effect == "heal_mp":
+            if member.hp <= 0:
+                self.message = f"{member.name} is unconscious!"
+                self.message_timer = 2500
+                return
+            missing = member.max_mp - getattr(member, "current_mp", 0)
+            if missing <= 0:
+                self.message = f"{member.name} is already at full mana!"
+                self.message_timer = 2500
+                return
+            restore = power + random.randint(1, 4)
+            member.current_mp = min(member.max_mp,
+                                    getattr(member, "current_mp", 0) + restore)
+            self.game.game_log.append(
+                f"{member.name} uses {item_name}. (+{restore} MP)")
+            self.message = f"{member.name}: +{restore} MP"
+            self.message_timer = 3000
+        elif effect == "cure_poison":
+            if getattr(member, "poisoned", False):
+                member.poisoned = False
+                self.game.game_log.append(f"{member.name}'s poison was cured!")
+                self.message = f"{member.name}: Poison cured!"
+                self.message_timer = 3000
+            else:
+                self.message = f"{member.name} is not poisoned!"
+                self.message_timer = 2500
+                return
+        else:
+            self.game.game_log.append(f"{member.name} used {item_name}.")
+            self.message = f"Used {item_name}"
+            self.message_timer = 2000
+
+        # Start use-item animation
+        anim_text = self.message or f"Used {item_name}"
+        self.use_item_anim = {
+            "effect": effect,
+            "timer": 1800,
+            "duration": 1800,
+            "text": anim_text,
+        }
+
+        # Remove the item from the character's inventory
+        if inv_idx < len(member.inventory):
+            member.inventory.pop(inv_idx)
+
     def _handle_party_inv_input(self, event):
         """Handle input for the shared party inventory screen.
 
-        The unified cursor covers party equipment slots, effect slots,
-        a torch slot, and then shared inventory items.
+        The unified cursor covers effect slots, a torch slot,
+        and then shared inventory items.
         """
         party = self.game.party
         inv = party.shared_inventory
         members = party.members
-        NUM_SLOTS = len(party.PARTY_SLOTS)
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        TORCH_ROW = NUM_SLOTS + NUM_EFFECTS
-        total_items = NUM_SLOTS + NUM_EFFECTS + 1 + len(inv)  # +1 for torch
+        TORCH_ROW = NUM_EFFECTS
+        STASH_START = TORCH_ROW + 1
+        total_items = STASH_START + len(inv)
 
         # Examining an item — close on ESC/Enter/Space
         if self.examining_item is not None:
@@ -222,7 +315,7 @@ class OverworldState(BaseState):
                 self.effect_cursor = (self.effect_cursor + 1) % len(self.effect_list)
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and self.effect_list:
                 chosen_eff = self.effect_list[self.effect_cursor]
-                eff_idx = self.party_inv_cursor - NUM_SLOTS
+                eff_idx = self.party_inv_cursor
                 slot_key = party.EFFECT_SLOTS[eff_idx]
                 party.set_effect(slot_key, chosen_eff["name"])
                 self.choosing_effect = False
@@ -274,26 +367,13 @@ class OverworldState(BaseState):
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
         party = self.game.party
-        NUM_SLOTS = len(party.PARTY_SLOTS)
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        TORCH_ROW = NUM_SLOTS + NUM_EFFECTS
+        TORCH_ROW = NUM_EFFECTS
         STASH_START = TORCH_ROW + 1
         idx = self.party_inv_cursor
 
-        if idx < NUM_SLOTS:
-            # Acting on an equipment slot
-            slot = party.PARTY_SLOTS[idx]
-            if chosen == "UNEQUIP":
-                party.party_unequip(slot)
-                self.party_inv_action_menu = False
-            elif chosen == "EXAMINE":
-                item = party.get_equipped_name(slot)
-                if item:
-                    self.examining_item = item
-        elif idx < NUM_SLOTS + NUM_EFFECTS:
-            # Acting on an effect slot
-            eff_idx = idx - NUM_SLOTS
-            slot_key = party.EFFECT_SLOTS[eff_idx]
+        if idx < NUM_EFFECTS:
+            slot_key = party.EFFECT_SLOTS[idx]
             if chosen == "ASSIGN EFFECT":
                 self.effect_list = party.get_available_effects()
                 self.effect_cursor = 0
@@ -311,7 +391,6 @@ class OverworldState(BaseState):
                 if item:
                     self.examining_item = item
         else:
-            # Acting on a shared inventory item
             inv_idx = idx - STASH_START
             inv = party.shared_inventory
             if inv_idx < len(inv):
@@ -340,32 +419,17 @@ class OverworldState(BaseState):
                     new_total = STASH_START + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
-                elif chosen.startswith("EQUIP → "):
-                    slot = chosen.split("→ ", 1)[1].strip().lower()
-                    party.party_equip(item_name, slot)
-                    self.party_inv_action_menu = False
-                    new_total = STASH_START + len(party.shared_inventory)
-                    if self.party_inv_cursor >= new_total:
-                        self.party_inv_cursor = max(0, new_total - 1)
 
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
         party = self.game.party
-        NUM_SLOTS = len(party.PARTY_SLOTS)
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        TORCH_ROW = NUM_SLOTS + NUM_EFFECTS
+        TORCH_ROW = NUM_EFFECTS
         STASH_START = TORCH_ROW + 1
         idx = self.party_inv_cursor
 
-        if idx < NUM_SLOTS:
-            slot = party.PARTY_SLOTS[idx]
-            item = party.get_equipped_name(slot)
-            if item is None:
-                return []
-            return ["UNEQUIP", "EXAMINE"]
-        elif idx < NUM_SLOTS + NUM_EFFECTS:
-            eff_idx = idx - NUM_SLOTS
-            slot_key = party.EFFECT_SLOTS[eff_idx]
+        if idx < NUM_EFFECTS:
+            slot_key = party.EFFECT_SLOTS[idx]
             current = party.get_effect(slot_key)
             options = []
             if party.get_available_effects():
@@ -389,10 +453,6 @@ class OverworldState(BaseState):
             info = ITEM_INFO.get(item_name, {})
             if info.get("usable", False):
                 options.append("USE")
-            for s in party.PARTY_SLOTS:
-                if party.get_equipped_name(s) is None:
-                    label = party.PARTY_SLOT_LABELS[s]
-                    options.append(f"EQUIP → {label}")
             if party.get_equipped_name("light") is None and item_name == "Torch":
                 options.append("EQUIP → TORCH")
             for mi, member in enumerate(self.game.party.members):

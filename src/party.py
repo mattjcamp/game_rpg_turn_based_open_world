@@ -151,11 +151,12 @@ class PartyMember:
             mp_gain = template.get("mp_per_level", 0)
 
             self.max_hp += hp_gain
-            self.hp = self.max_hp  # full heal on level up
+            self.hp = min(self.hp + hp_gain, self.max_hp)
 
             if mp_gain > 0:
                 self._bonus_mp += mp_gain
-                self._current_mp = self.max_mp  # full MP restore
+                self._current_mp = min(
+                    getattr(self, "_current_mp", 0) + mp_gain, self.max_mp)
 
             msg = f"{self.name} reached Level {self.level}! HP+{hp_gain}"
             if mp_gain > 0:

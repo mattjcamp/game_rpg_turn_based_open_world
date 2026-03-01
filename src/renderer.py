@@ -4536,7 +4536,6 @@ class Renderer:
         """
         from src.party import WEAPONS, ARMORS, ITEM_INFO
 
-        NUM_SLOTS = len(party.PARTY_SLOTS)
         fm = self.font_med
         f = self.font
         self.screen.fill(self._U3_BLACK)
@@ -4561,47 +4560,10 @@ class Renderer:
         row_h = 20
 
         # ═══════════════════════════════════════
-        # LEFT PANEL — Equipped slots + Item list
+        # LEFT PANEL — Effects + Torch + Item list
         # ═══════════════════════════════════════
         tx = left_x + 12
         ty = panel_y + 10
-
-        # ── Party equipment section ──
-        self._u3_text("PARTY EQUIPMENT", tx, ty, self._U3_ORANGE, fm)
-        ty += 24
-
-        for si, slot_key in enumerate(party.PARTY_SLOTS):
-            slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
-            item_name = party.get_equipped_name(slot_key)
-            charges = party.get_equipped_charges(slot_key)
-            selected = (si == cursor_index)
-            prefix = "> " if selected else "  "
-
-            name_color = self._U3_WHITE if selected else self._U3_LTBLUE
-            self._u3_text(f"{prefix}{slot_label}:", tx, ty, name_color, fm)
-
-            if item_name:
-                display = item_name
-                if charges is not None:
-                    display = f"{item_name} ({charges})"
-                item_color = self._U3_WHITE if selected else (220, 220, 230)
-                self._u3_text(display, tx + 120, ty, item_color, fm)
-            else:
-                self._u3_text("-- EMPTY --", tx + 120, ty, (120, 120, 120), fm)
-
-            if selected:
-                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
-                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
-                sel_surf.fill((255, 255, 255, 25))
-                self.screen.blit(sel_surf, sel_rect)
-
-            ty += row_h
-
-        # ── Divider between equipment and effects ──
-        ty += 6
-        pygame.draw.line(self.screen, (60, 60, 80),
-                         (tx, ty), (tx + left_w - 32, ty), 1)
-        ty += 8
 
         # ── Effects section ──
         self._u3_text("EFFECTS", tx, ty, self._U3_ORANGE, fm)
@@ -4610,8 +4572,7 @@ class Renderer:
         NUM_EFFECTS = len(party.EFFECT_SLOTS)
         for ei, slot_key in enumerate(party.EFFECT_SLOTS):
             effect = party.get_effect(slot_key)
-            global_ei = ei + NUM_SLOTS
-            selected = (global_ei == cursor_index)
+            selected = (ei == cursor_index)
             prefix = "> " if selected else "  "
 
             slot_num = f"{ei + 1}."
@@ -4633,7 +4594,7 @@ class Renderer:
             ty += row_h
 
         # ── Torch slot (rendered in effects section) ──
-        torch_idx = NUM_SLOTS + NUM_EFFECTS   # index for the torch row
+        torch_idx = NUM_EFFECTS   # index for the torch row
         torch_name = party.get_equipped_name("light")
         torch_charges = party.get_equipped_charges("light")
         selected = (torch_idx == cursor_index)
@@ -4675,7 +4636,7 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = NUM_SLOTS + NUM_EFFECTS + 1  # +1 for torch row
+            header_count = NUM_EFFECTS + 1  # effects + torch row
             inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
@@ -4791,17 +4752,11 @@ class Renderer:
         # ── Item detail section ──
         sel_item = None
         sel_charges = None
-        is_equip_slot = cursor_index < NUM_SLOTS
-        is_effect_slot = (NUM_SLOTS <= cursor_index < NUM_SLOTS + NUM_EFFECTS)
-        is_torch_slot = (cursor_index == NUM_SLOTS + NUM_EFFECTS)
-        header_count = NUM_SLOTS + NUM_EFFECTS + 1  # +1 for torch row
-        if is_equip_slot:
-            slot_key = party.PARTY_SLOTS[cursor_index]
-            sel_item = party.get_equipped_name(slot_key)
-            sel_charges = party.get_equipped_charges(slot_key)
-        elif is_effect_slot:
-            eff_idx = cursor_index - NUM_SLOTS
-            eff_slot_key = party.EFFECT_SLOTS[eff_idx]
+        is_effect_slot = (cursor_index < NUM_EFFECTS)
+        is_torch_slot = (cursor_index == NUM_EFFECTS)
+        header_count = NUM_EFFECTS + 1  # effects + torch row
+        if is_effect_slot:
+            eff_slot_key = party.EFFECT_SLOTS[cursor_index]
             sel_item = party.get_effect(eff_slot_key)
         elif is_torch_slot:
             sel_item = party.get_equipped_name("light")
@@ -4813,10 +4768,7 @@ class Renderer:
 
         # Show details of the selected item
         if sel_item:
-            if is_equip_slot:
-                slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
-                self._u3_text(f"EQUIPPED ({slot_label})", rx, ry, self._U3_ORANGE, fm)
-            elif is_effect_slot:
+            if is_effect_slot:
                 self._u3_text("ACTIVE EFFECT", rx, ry, self._U3_ORANGE, fm)
             elif is_torch_slot:
                 self._u3_text("EQUIPPED (TORCH)", rx, ry, self._U3_ORANGE, fm)
@@ -4868,11 +4820,6 @@ class Renderer:
                         line = test
                 if line:
                     self._u3_text(line, rx, ry, (180, 180, 200), fm)
-        elif is_equip_slot:
-            slot_label = party.PARTY_SLOT_LABELS.get(slot_key, slot_key.upper())
-            self._u3_text(f"{slot_label} SLOT", rx, ry, self._U3_ORANGE, fm)
-            ry += 22
-            self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
         elif is_effect_slot:
             self._u3_text("EFFECT SLOT", rx, ry, self._U3_ORANGE, fm)
             ry += 22
