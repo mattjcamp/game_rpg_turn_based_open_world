@@ -2,11 +2,15 @@
 Game timekeeping system.
 
 Tracks elapsed game-time as total minutes from a fixed epoch.
-Provides day-of-week, hour, minute, and 8-phase lunar cycle.
+Provides day-of-week, day-of-month, month, hour, minute, and
+8-phase lunar cycle.
 
-Default start: Sunday 12:00 PM (minute 0 of the epoch).
+Calendar follows the Britannian model:
+  12 months of 28 days each (336 days per year).
+  One full lunar cycle = 28 days = one month.
+
+Default start: Sunday 12:00 PM, 1st of January (minute 0 of epoch).
 Each overworld step advances time by 10 minutes.
-Full lunar cycle: 28 game-days.
 """
 
 _DAYS_OF_WEEK = [
@@ -20,6 +24,22 @@ _DAY_ABBREV = {
     "Saturday": "SAT",
 }
 
+# Britannian months (standard names, as used in the Ultima series)
+MONTHS = [
+    "January", "February", "March", "April",
+    "May", "June", "July", "August",
+    "September", "October", "November", "December",
+]
+
+_MONTH_ABBREV = [
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+]
+
+DAYS_PER_MONTH = 28
+MONTHS_PER_YEAR = 12
+DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR  # 336
+
 LUNAR_PHASES = [
     "New Moon",
     "Waxing Crescent",
@@ -31,11 +51,14 @@ LUNAR_PHASES = [
     "Waning Crescent",
 ]
 
-# Duration of one full lunar cycle in minutes (28 days)
-_LUNAR_CYCLE_MINUTES = 28 * 24 * 60
+# Duration of one full lunar cycle in minutes (28 days = 1 month)
+_LUNAR_CYCLE_MINUTES = DAYS_PER_MONTH * 24 * 60
 
 # Starting hour offset — epoch minute 0 = Sunday 12:00 PM
 _START_HOUR = 12
+
+# Minutes in a day
+_MINUTES_PER_DAY = 24 * 60
 
 
 class GameClock:
@@ -54,13 +77,13 @@ class GameClock:
 
     @property
     def _absolute_minutes(self):
-        """Minutes since midnight Sunday (includes start-hour offset)."""
+        """Minutes since midnight Sunday Jan 1 (includes start-hour offset)."""
         return self.total_minutes + _START_HOUR * 60
 
     @property
     def day_index(self):
-        """Days elapsed since epoch start (0-based)."""
-        return self._absolute_minutes // (24 * 60)
+        """Total days elapsed since epoch start (0-based)."""
+        return self._absolute_minutes // _MINUTES_PER_DAY
 
     @property
     def day_of_week(self):
@@ -75,23 +98,89 @@ class GameClock:
     @property
     def hour(self):
         """Current hour (0–23)."""
-        return (self._absolute_minutes % (24 * 60)) // 60
+        return (self._absolute_minutes % _MINUTES_PER_DAY) // 60
 
     @property
     def minute(self):
         """Current minute (0–59)."""
         return self._absolute_minutes % 60
 
+    # ── calendar (month / day-of-month / year) ────────────────
+
+    @property
+    def year(self):
+        """Current year (1-based)."""
+        return self.day_index // DAYS_PER_YEAR + 1
+
+    @property
+    def day_of_year(self):
+        """Day within the current year (0-based)."""
+        return self.day_index % DAYS_PER_YEAR
+
+    @property
+    def month_index(self):
+        """Current month as 0-based index (0 = January)."""
+        return self.day_of_year // DAYS_PER_MONTH
+
+    @property
+    def month_name(self):
+        """Current month name (e.g. 'January')."""
+        return MONTHS[self.month_index]
+
+    @property
+    def month_abbrev(self):
+        """Three-letter month abbreviation (e.g. 'JAN')."""
+        return _MONTH_ABBREV[self.month_index]
+
+    @property
+    def day_of_month(self):
+        """Day within the current month (1-based)."""
+        return (self.day_of_year % DAYS_PER_MONTH) + 1
+
+    # ── formatted strings ─────────────────────────────────────
+
     @property
     def time_str(self):
-        """Formatted time string, e.g. 'SUN 12:00PM'."""
+        """Formatted time, e.g. '12:00PM'."""
         h = self.hour
         m = self.minute
         period = "AM" if h < 12 else "PM"
         display_h = h % 12
         if display_h == 0:
             display_h = 12
-        return f"{self.day_abbrev} {display_h}:{m:02d}{period}"
+        return f"{display_h}:{m:02d}{period}"
+
+    @property
+    def date_str(self):
+        """Formatted date, e.g. 'JAN 1 SUN'."""
+        return f"{self.month_abbrev} {self.day_of_month} {self.day_abbrev}"
+
+    @property
+    def full_str(self):
+        """Full date+time, e.g. 'JAN 1 SUN 12:00PM'."""
+        return f"{self.date_str} {self.time_str}"
+
+    # ── time-of-day classification ────────────────────────────
+
+    @property
+    def is_night(self):
+        """True if between 8 PM and 5 AM."""
+        return self.hour >= 20 or self.hour < 5
+
+    @property
+    def is_dawn(self):
+        """True if between 5 AM and 7 AM."""
+        return 5 <= self.hour < 7
+
+    @property
+    def is_dusk(self):
+        """True if between 7 PM and 8 PM (19:00-20:00)."""
+        return 19 <= self.hour < 20
+
+    @property
+    def is_day(self):
+        """True if daytime (7 AM to 7 PM)."""
+        return 7 <= self.hour < 19
 
     # ── lunar phase ───────────────────────────────────────────
 

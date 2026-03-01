@@ -1143,41 +1143,48 @@ class Renderer:
 
         tile_name = tile_map.get_tile_name(party.col, party.row)
         f = self.font  # larger 16px font for readability
-
-        # Top line: moon icon + time, then game info
         clock = party.clock
-        moon_size = 24
-        moon_x = 8
-        moon_y = bar_y + 4
-        self._draw_moon_phase(moon_x, moon_y, moon_size,
-                              clock.lunar_phase_index)
-        time_x = moon_x + moon_size + 6
-        self._u3_text(clock.time_str, time_x, bar_y + 6,
-                      (180, 200, 255), font=f)
+        icon_sz = 20
+        row1_y = bar_y + 4
+        row2_y = bar_y + 30
 
-        self._u3_text(f"GOLD:{party.gold:05d}", 250, bar_y + 6, (255, 255, 0), font=f)
-        self._u3_text(f"TERRAIN:{tile_name}", 460, bar_y + 6, (200, 200, 255), font=f)
+        # ── Row 1: [moon][sun/moon] date+time  gold  terrain ──
+        x = 6
+        self._draw_moon_phase(x, row1_y, icon_sz, clock.lunar_phase_index)
+        x += icon_sz + 4
+        self._draw_sky_icon(x, row1_y, icon_sz, clock)
+        x += icon_sz + 8
+        self._u3_text(clock.full_str, x, row1_y + 2,
+                      (180, 200, 255), font=f)
+        self._u3_text(f"GOLD:{party.gold:05d}", 380, row1_y + 2,
+                      (255, 255, 0), font=f)
+        self._u3_text(f"TERRAIN:{tile_name}", 560, row1_y + 2,
+                      (200, 200, 255), font=f)
+        self._u3_text(f"POS:({party.col},{party.row})", 840, row1_y + 2,
+                      (220, 220, 220), font=f)
+
+        # ── Row 2: light info + unique tile text ──
         light_name = party.get_equipped_name("light")
+        row2_x = 8
         if light_name:
             charges = party.get_equipped_charges("light")
             lbl = f"LIGHT:{light_name.upper()}"
             if charges is not None:
                 lbl += f":{charges:02d}"
-            self._u3_text(lbl, 700, bar_y + 6, (255, 170, 85), font=f)
-        self._u3_text(f"POS:({party.col},{party.row})", 850, bar_y + 6, (220, 220, 220), font=f)
+            self._u3_text(lbl, row2_x, row2_y, (255, 170, 85),
+                          font=self.font_small)
+            row2_x += len(lbl) * 8 + 16
 
-        # ── 5b. unique tile description in second row ──
         if unique_text:
-            # Pulsing amber color for attention
-            pulse = (math.sin(unique_flash) + 1.0) * 0.5  # 0..1
+            pulse = (math.sin(unique_flash) + 1.0) * 0.5
             r = int(200 + 55 * pulse)
             g = int(170 + 60 * pulse)
             b = int(80 * (1.0 - pulse * 0.4))
-            # Truncate long text to fit
             display_text = unique_text
-            if len(display_text) > 90:
-                display_text = display_text[:87] + "..."
-            self._u3_text(display_text, 8, bar_y + 28,
+            max_chars = (SCREEN_WIDTH - row2_x - 8) // 7
+            if len(display_text) > max_chars:
+                display_text = display_text[:max_chars - 3] + "..."
+            self._u3_text(display_text, row2_x, row2_y,
                           (r, g, b), font=self.font_small)
 
         # ── 5c. sparkle effect on the map tile ──
@@ -1964,6 +1971,74 @@ class Renderer:
         """Draw a cached moon phase icon at (x, y)."""
         surfaces = self._get_moon_surfaces(size)
         self.screen.blit(surfaces[phase_index % 8], (x, y))
+
+    # ── helper: draw a sun or moon icon based on time of day ──
+
+    def _draw_sky_icon(self, x, y, size, clock):
+        """Draw a sun (day), crescent moon (night), or horizon icon (dawn/dusk)."""
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        cx, cy = size // 2, size // 2
+        r = size // 2 - 1
+
+        if clock.is_day:
+            # Bright sun: yellow circle with short rays
+            sun_r = r - 3
+            pygame.draw.circle(surf, (255, 220, 60), (cx, cy), sun_r)
+            # Rays
+            for i in range(8):
+                angle = i * (math.pi / 4)
+                inner = sun_r + 2
+                outer = r
+                x1 = cx + int(inner * math.cos(angle))
+                y1 = cy + int(inner * math.sin(angle))
+                x2 = cx + int(outer * math.cos(angle))
+                y2 = cy + int(outer * math.sin(angle))
+                pygame.draw.line(surf, (255, 200, 40), (x1, y1), (x2, y2), 1)
+        elif clock.is_night:
+            # Night crescent moon (small, silver)
+            pygame.draw.circle(surf, (180, 190, 210), (cx, cy), r - 2)
+            # Shadow to make crescent
+            pygame.draw.circle(surf, (0, 0, 0, 0), (cx + 4, cy - 2), r - 2)
+            shadow = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.circle(shadow, (20, 20, 40, 255),
+                               (cx + 4, cy - 2), r - 2)
+            surf.blit(shadow, (0, 0))
+            # Tiny stars
+            for sx, sy in [(3, 3), (size - 4, 5), (5, size - 5)]:
+                if 0 <= sx < size and 0 <= sy < size:
+                    surf.set_at((sx, sy), (200, 200, 255, 180))
+        elif clock.is_dawn:
+            # Dawn: horizon line with half-sun rising
+            horizon_y = cy + 3
+            # Orange-pink gradient glow
+            for gy in range(horizon_y, size):
+                alpha = int(120 * (1.0 - (gy - horizon_y) / (size - horizon_y)))
+                pygame.draw.line(surf, (255, 140, 60, alpha),
+                                 (0, gy), (size - 1, gy))
+            # Half-sun peeking above horizon
+            pygame.draw.circle(surf, (255, 200, 80), (cx, horizon_y), 5)
+            # Clip below horizon
+            clip = pygame.Surface((size, size - horizon_y), pygame.SRCALPHA)
+            clip.fill((0, 0, 0, 0))
+            surf.blit(clip, (0, horizon_y), special_flags=pygame.BLEND_RGBA_MIN)
+            # Re-draw horizon line
+            pygame.draw.line(surf, (255, 160, 80),
+                             (1, horizon_y), (size - 2, horizon_y), 1)
+        else:
+            # Dusk: horizon line with half-sun setting
+            horizon_y = cy + 3
+            for gy in range(horizon_y, size):
+                alpha = int(100 * (1.0 - (gy - horizon_y) / (size - horizon_y)))
+                pygame.draw.line(surf, (200, 80, 120, alpha),
+                                 (0, gy), (size - 1, gy))
+            pygame.draw.circle(surf, (220, 140, 60), (cx, horizon_y), 5)
+            clip = pygame.Surface((size, size - horizon_y), pygame.SRCALPHA)
+            clip.fill((0, 0, 0, 0))
+            surf.blit(clip, (0, horizon_y), special_flags=pygame.BLEND_RGBA_MIN)
+            pygame.draw.line(surf, (200, 100, 80),
+                             (1, horizon_y), (size - 2, horizon_y), 1)
+
+        self.screen.blit(surf, (x, y))
 
     # ==============================================================
     #  MAIN ENTRY POINT
