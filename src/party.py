@@ -628,6 +628,10 @@ class Party:
         # Party-level passive effects: 4 effect slots
         self.effects = {s: None for s in self.EFFECT_SLOTS}
 
+        # Game clock — tracks day, hour, lunar phase
+        from src.game_time import GameClock
+        self.clock = GameClock()
+
     def party_equip(self, item_name, slot):
         """Equip an item from shared inventory into a party slot.
 

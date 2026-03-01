@@ -1143,17 +1143,28 @@ class Renderer:
 
         tile_name = tile_map.get_tile_name(party.col, party.row)
         f = self.font  # larger 16px font for readability
-        # Top line: game info
-        self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0), font=f)
-        self._u3_text(f"TERRAIN:{tile_name}", 260, bar_y + 6, (200, 200, 255), font=f)
+
+        # Top line: moon icon + time, then game info
+        clock = party.clock
+        moon_size = 24
+        moon_x = 8
+        moon_y = bar_y + 4
+        self._draw_moon_phase(moon_x, moon_y, moon_size,
+                              clock.lunar_phase_index)
+        time_x = moon_x + moon_size + 6
+        self._u3_text(clock.time_str, time_x, bar_y + 6,
+                      (180, 200, 255), font=f)
+
+        self._u3_text(f"GOLD:{party.gold:05d}", 250, bar_y + 6, (255, 255, 0), font=f)
+        self._u3_text(f"TERRAIN:{tile_name}", 460, bar_y + 6, (200, 200, 255), font=f)
         light_name = party.get_equipped_name("light")
         if light_name:
             charges = party.get_equipped_charges("light")
             lbl = f"LIGHT:{light_name.upper()}"
             if charges is not None:
                 lbl += f":{charges:02d}"
-            self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85), font=f)
-        self._u3_text(f"POS:({party.col},{party.row})", 750, bar_y + 6, (220, 220, 220), font=f)
+            self._u3_text(lbl, 700, bar_y + 6, (255, 170, 85), font=f)
+        self._u3_text(f"POS:({party.col},{party.row})", 850, bar_y + 6, (220, 220, 220), font=f)
 
         # ── 5b. unique tile description in second row ──
         if unique_text:
@@ -1896,6 +1907,63 @@ class Renderer:
         c = color or self._U3_WHITE
         surf = f.render(text.upper(), True, c)
         self.screen.blit(surf, (x, y))
+
+    # ── helper: draw a procedural lunar phase icon ──
+
+    def _get_moon_surfaces(self, size):
+        """Return cached list of 8 pre-rendered moon phase surfaces."""
+        if hasattr(self, '_moon_cache') and self._moon_cache_size == size:
+            return self._moon_cache
+
+        r = size // 2
+        cx, cy = r, r
+        moon_color = (220, 220, 200)
+        shadow_color = (20, 20, 40)
+
+        # Build a circle mask once (True where inside circle)
+        mask = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.circle(mask, (255, 255, 255, 255), (cx, cy), r)
+
+        phases = []
+        for pi in range(8):
+            surf = pygame.Surface((size, size), pygame.SRCALPHA)
+
+            if pi == 0:
+                # New moon: dark circle with faint outline
+                pygame.draw.circle(surf, shadow_color, (cx, cy), r)
+                pygame.draw.circle(surf, (60, 60, 80), (cx, cy), r, 1)
+            elif pi == 4:
+                # Full moon: bright circle
+                pygame.draw.circle(surf, moon_color, (cx, cy), r)
+            else:
+                # Draw bright circle, then shadow ellipse, then clip
+                pygame.draw.circle(surf, moon_color, (cx, cy), r)
+                if pi in (1, 2, 3):
+                    # Waxing: shadow on the left side
+                    shadow_w = {1: r * 2, 2: r, 3: r // 2}[pi]
+                    shadow_rect = pygame.Rect(cx - r, cy - r, shadow_w, size)
+                else:
+                    # Waning: shadow on the right side
+                    shadow_w = {5: r // 2, 6: r, 7: r * 2}[pi]
+                    shadow_rect = pygame.Rect(cx + r - shadow_w, cy - r,
+                                              shadow_w, size)
+                pygame.draw.ellipse(surf, shadow_color, shadow_rect)
+                # Clip to circle: clear pixels outside the mask
+                for py_ in range(size):
+                    for px_ in range(size):
+                        if mask.get_at((px_, py_)).a == 0:
+                            surf.set_at((px_, py_), (0, 0, 0, 0))
+
+            phases.append(surf)
+
+        self._moon_cache = phases
+        self._moon_cache_size = size
+        return phases
+
+    def _draw_moon_phase(self, x, y, size, phase_index):
+        """Draw a cached moon phase icon at (x, y)."""
+        surfaces = self._get_moon_surfaces(size)
+        self.screen.blit(surfaces[phase_index % 8], (x, y))
 
     # ==============================================================
     #  MAIN ENTRY POINT

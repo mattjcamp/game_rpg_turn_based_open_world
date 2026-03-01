@@ -64,6 +64,7 @@ def _serialize_party(party):
         "shared_inventory": list(party.shared_inventory),
         "equipped": dict(party.equipped),
         "effects": dict(party.effects),
+        "clock": party.clock.to_dict(),
     }
 
 
@@ -130,6 +131,12 @@ def _deserialize_party(data):
     saved_eff = data.get("effects", {})
     for slot in party.EFFECT_SLOTS:
         party.effects[slot] = saved_eff.get(slot)
+
+    # Game clock
+    from src.game_time import GameClock
+    clock_data = data.get("clock")
+    if clock_data:
+        party.clock = GameClock.from_dict(clock_data)
 
     return party
 
