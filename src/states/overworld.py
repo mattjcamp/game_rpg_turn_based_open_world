@@ -15,7 +15,7 @@ from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
 )
 from src.dungeon_generator import generate_dungeon
-from src.monster import create_random_monster
+from src.monster import create_random_monster, create_encounter, create_monster
 
 
 # How many monsters roam the overworld at a time
@@ -363,7 +363,14 @@ class OverworldState(BaseState):
         party = self.game.party
 
         for _ in range(needed):
-            orc = create_random_monster("overworld")
+            # Pre-roll encounter template; use monster_party_tile for map sprite
+            enc = create_encounter("overworld")
+            orc = create_monster(enc["monster_party_tile"])
+            orc.encounter_template = {
+                "name": enc["name"],
+                "monster_names": [m.name for m in enc["monsters"]],
+                "monster_party_tile": enc["monster_party_tile"],
+            }
             placed = False
             for _attempt in range(60):
                 c = party.col + random.randint(-_SPAWN_MAX_DIST, _SPAWN_MAX_DIST)
@@ -558,7 +565,7 @@ class OverworldState(BaseState):
                 return
 
     def _start_orc_combat(self, orc):
-        """Start combat against TWO orcs (the contacted one + a reinforcement)."""
+        """Start combat against the contacted orc and any nearby orcs."""
         combat_state = self.game.states.get("combat")
         if not combat_state:
             return
@@ -571,9 +578,25 @@ class OverworldState(BaseState):
         if not fighter:
             return
 
-        # The primary orc is the one on the map
+        # Use the pre-assigned encounter template stored on the map monster.
+        # Fall back to a random encounter if not present.
+        tmpl = getattr(orc, "encounter_template", None)
+        if tmpl is None:
+            enc = create_encounter("overworld")
+            monsters = enc["monsters"]
+            enc_name = enc["name"]
+        else:
+            monsters = [create_monster(n) for n in tmpl["monster_names"]]
+            enc_name = tmpl["name"]
+        for m in monsters:
+            m.col = orc.col
+            m.row = orc.row
+
         self.game.sfx.play("encounter")
-        combat_state.start_combat(fighter, orc, source_state="overworld")
+        combat_state.start_combat(fighter, monsters,
+                                  source_state="overworld",
+                                  encounter_name=enc_name,
+                                  map_monster_refs=[orc])
         self.game.change_state("combat")
 
     # ── Tile events ───────────────────────────────────────────────

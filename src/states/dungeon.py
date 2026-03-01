@@ -784,7 +784,7 @@ class DungeonState(BaseState):
         return None
 
     def _start_combat(self, monster):
-        """Transition to combat state against the given monster."""
+        """Transition to combat state using an encounter template."""
         # Use the first alive party member as the fighter
         fighter = None
         for member in self.game.party.members:
@@ -794,10 +794,29 @@ class DungeonState(BaseState):
         if not fighter:
             return  # No alive party members (shouldn't happen)
 
+        # Use the pre-assigned encounter template stored on the map monster
+        # (set by dungeon_generator). Fall back to a random encounter if
+        # the monster doesn't have one (e.g. legacy save data).
+        from src.monster import create_encounter, create_monster
+        tmpl = getattr(monster, "encounter_template", None)
+        if tmpl is None:
+            enc = create_encounter("dungeon")
+            monsters = enc["monsters"]
+            enc_name = enc["name"]
+        else:
+            monsters = [create_monster(n) for n in tmpl["monster_names"]]
+            enc_name = tmpl["name"]
+        for m in monsters:
+            m.col = monster.col
+            m.row = monster.row
+
         combat_state = self.game.states.get("combat")
         if combat_state:
             self.game.sfx.play("encounter")
-            combat_state.start_combat(fighter, monster, source_state="dungeon")
+            combat_state.start_combat(fighter, monsters,
+                                      source_state="dungeon",
+                                      encounter_name=enc_name,
+                                      map_monster_refs=[monster])
             self.game.change_state("combat")
 
     def _attempt_lock_pick(self, col, row):

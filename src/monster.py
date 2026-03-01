@@ -182,6 +182,56 @@ def create_random_monster(table="dungeon"):
     return create_monster(weighted[0][0])
 
 
+# ── Encounter templates ─────────────────────────────────────────
+
+_ENCOUNTER_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "encounters.json")
+
+with open(_ENCOUNTER_PATH, "r") as f:
+    _ENCOUNTER_DATA = json.load(f)
+
+ENCOUNTERS = _ENCOUNTER_DATA.get("encounters", {})
+
+
+def create_encounter(area="dungeon"):
+    """Pick a random encounter template.
+
+    Returns a dict with keys:
+        name : str            — display name (e.g. "Goblin Ambush")
+        monsters : list       — list of Monster objects
+        monster_party_tile : str — monster name whose sprite represents
+                                   the group on the map
+    Uses weighted random selection from data/encounters.json.
+    """
+    pool = ENCOUNTERS.get(area, [])
+    if not pool:
+        m = create_random_monster(area)
+        return {"name": m.name, "monsters": [m],
+                "monster_party_tile": m.name}
+
+    total = sum(e.get("weight", 10) for e in pool)
+    roll = random.randint(1, total)
+    cumulative = 0
+    chosen = pool[0]
+    for entry in pool:
+        cumulative += entry.get("weight", 10)
+        if roll <= cumulative:
+            chosen = entry
+            break
+
+    enc_name = chosen.get("name", "Encounter")
+    party_tile = chosen.get("monster_party_tile", chosen["monsters"][0])
+    monsters = []
+    for name in chosen.get("monsters", []):
+        monsters.append(create_monster(name))
+    if not monsters:
+        m = create_random_monster(area)
+        return {"name": m.name, "monsters": [m],
+                "monster_party_tile": m.name}
+    return {"name": enc_name, "monsters": monsters,
+            "monster_party_tile": party_tile}
+
+
 # ── Legacy factory functions (for backward compatibility) ───────
 
 def create_giant_rat():

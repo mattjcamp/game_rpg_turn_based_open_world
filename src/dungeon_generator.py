@@ -18,7 +18,7 @@ from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
 )
-from src.monster import create_random_monster
+from src.monster import create_random_monster, create_encounter, create_monster
 
 
 class Room:
@@ -293,6 +293,10 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                 tmap.set_tile(tx, ty, TILE_TRAP)
 
     # --- Place monsters in rooms (not the entrance room) ---
+    # Each map monster represents an encounter group. We pre-roll the
+    # encounter template and use monster_party_tile for the map sprite.
+    # The full encounter data is stored on the monster so combat can
+    # use it instead of rolling a new random encounter.
     monsters = []
     for room in rooms[1:]:
         if random.random() < 0.5:  # 50% chance of a monster per room
@@ -303,9 +307,18 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             my += random.randint(-1, 1)
             # Make sure we're on a floor tile (not a chest/trap/stairs)
             if tmap.get_tile(mx, my) == TILE_DFLOOR:
-                monster = create_random_monster()
+                enc = create_encounter("dungeon")
+                # Create the map-visible monster using the party tile
+                monster = create_monster(enc["monster_party_tile"])
                 monster.col = mx
                 monster.row = my
+                # Stash encounter template (names only) so combat can
+                # recreate fresh monsters with full HP each fight
+                monster.encounter_template = {
+                    "name": enc["name"],
+                    "monster_names": [m.name for m in enc["monsters"]],
+                    "monster_party_tile": enc["monster_party_tile"],
+                }
                 monsters.append(monster)
 
     # --- Optional: place stairs down in the last (deepest) room ---

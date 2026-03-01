@@ -1855,7 +1855,9 @@ class Renderer:
                           throw_list=None, throw_cursor=0,
                           selected_throw=None,
                           use_item_list=None, use_item_cursor=0,
-                          selected_use_item=None):
+                          selected_use_item=None,
+                          monsters=None, monster_positions=None,
+                          encounter_name=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -1883,8 +1885,18 @@ class Renderer:
                     else:
                         self._u3_draw_floor_tile(px, py, ts, c, r)
 
-        # ── 2. sprites ──
-        if monster.is_alive():
+        # ── 2. monster sprites ──
+        if monsters and monster_positions:
+            for mon in monsters:
+                if not mon.is_alive():
+                    continue
+                mc, mr = monster_positions.get(mon, (0, 0))
+                if is_outdoor:
+                    self._u3_draw_orc_combat_sprite(mon, mx, my, ts, mc, mr)
+                else:
+                    self._u3_draw_monster_sprite(mon, mx, my, ts, mc, mr)
+        elif monster and monster.is_alive():
+            # Legacy single-monster fallback
             if is_outdoor:
                 self._u3_draw_orc_combat_sprite(monster, mx, my, ts,
                                                 monster_col, monster_row)
@@ -2024,9 +2036,12 @@ class Renderer:
             party_h = 138
 
         monster_y = 4 + party_h + 4
-        self._u3_monster_panel(monster, rx, monster_y, rw, 90,
-                               source_state=is_outdoor and "overworld" or "dungeon")
-        action_y = monster_y + 94
+        alive_monsters = [m for m in (monsters or []) if m.is_alive()] if monsters else ([monster] if monster and monster.is_alive() else [])
+        monster_panel_h = max(50, 28 + 28 * len(alive_monsters))
+        self._u3_monster_panel_multi(alive_monsters, rx, monster_y, rw, monster_panel_h,
+                                     source_state=is_outdoor and "overworld" or "dungeon",
+                                     encounter_name=encounter_name)
+        action_y = monster_y + monster_panel_h + 4
         arena_bottom = my + self._MAP_H
         action_h = arena_bottom - action_y
         self._u3_action_panel(phase, selected_action, is_adjacent,
@@ -3033,6 +3048,32 @@ class Renderer:
         stat_y = bar_y + bar_h + 3
         atk_text = f"ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
         self._u3_text(atk_text, info_x, stat_y, (200, 200, 200), self.font_small)
+
+    def _u3_monster_panel_multi(self, monsters, x, y, w, h,
+                               source_state="dungeon", encounter_name=None):
+        """Monster stats panel showing all alive monsters compactly."""
+        self._u3_panel(x, y, w, h)
+        f = self.font
+        tx = x + 8
+        ty = y + 6
+
+        label = encounter_name or ("ENEMY" if len(monsters) == 1 else "ENEMIES")
+        self._u3_text(label, tx, ty, self._U3_RED, f)
+        ty += 22
+
+        bar_w = w - 60
+        bar_h = 6
+
+        for mon in monsters:
+            # Name
+            self._u3_text(mon.name, tx, ty, self._U3_RED, self.font_small)
+            ac_text = f"AC:{mon.ac}"
+            self._u3_text(ac_text, x + w - 60, ty, self._U3_LTBLUE, self.font_small)
+            ty += 12
+            # HP bar
+            hp_color = (200, 40, 40) if mon.hp > mon.max_hp * 0.3 else self._U3_RED
+            self._u3_draw_stat_bar(tx, ty, bar_w, bar_h, mon.hp, mon.max_hp, hp_color)
+            ty += bar_h + 6
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None,
