@@ -1,41 +1,63 @@
 {
-  "_comment": "Spell definitions for Realm of Shadow. Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels.",
+  "_comment": "Spell definitions for Realm of Shadow based on Ultima III. Priest spells (A-N) use Wisdom for MP; Sorcerer spells (A-P) use Intelligence. Each spell has a letter code matching the original game. effect_value describes the spell's power formula. Targeting modes: directional_projectile, directional_ally, select_ally, select_enemy, auto_monster, auto_all_enemies, self, party.",
 
   "spells": [
+
     {
-      "id": "fireball",
-      "name": "Magic Dart",
-      "description": "Hurls an energy charged dark in a straight line, exploding on impact.",
-      "allowable_classes": ["Wizard"],
-      "casting_type": "sorcerer",
+      "_section": "=== PRIEST SPELLS (A through N) ===",
+      "id": "turn_undead",
+      "name": "Undead",
+      "letter": "A",
+      "description": "Channels divine wrath to instantly destroy skeletons and ghouls.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
       "min_level": 1,
-      "mp_cost": 5,
+      "mp_cost": 0,
       "duration": "instant",
-      "effect_type": "damage",
+      "effect_type": "undead_damage",
       "effect_value": {
-        "dice": "12d8",
-        "stat_bonus": "intelligence",
-        "min_damage": 1000
+        "hp_percent": 1.0,
+        "monster_tags": ["skeleton", "ghoul"]
       },
       "range": 99,
-      "targeting": "directional_projectile",
-      "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "targeting": "auto_monster",
+      "sfx": "turn_undead",
+      "hit_sfx": "holy_blast"
     },
     {
-      "id": "heal",
-      "name": "Minor Heal",
-      "description": "Sends a wave of healing energy toward an ally.",
-      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
+      "id": "priest_b_open",
+      "name": "Open",
+      "letter": "B",
+      "description": "Magically springs a chest open, disabling any traps within.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
       "casting_type": "priest",
       "min_level": 1,
       "mp_cost": 5,
       "duration": "instant",
+      "effect_type": "open_chest",
+      "effect_value": {},
+      "range": 1,
+      "targeting": "self",
+      "sfx": "unlock",
+      "hit_sfx": null
+    },
+    {
+      "id": "heal",
+      "name": "Heal",
+      "letter": "C",
+      "description": "Bathes an ally in restorative light, mending wounds.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 10,
+      "duration": "instant",
       "effect_type": "heal",
       "effect_value": {
-        "dice": "1d8",
+        "dice": "2d13",
+        "flat_bonus": 24,
         "stat_bonus": "wisdom",
-        "min_heal": 1
+        "min_heal": 25,
+        "max_heal": 50
       },
       "range": 2,
       "targeting": "directional_ally",
@@ -43,10 +65,558 @@
       "hit_sfx": null
     },
     {
+      "id": "priest_d_glow",
+      "name": "Glow",
+      "letter": "D",
+      "description": "Conjures a faint sphere of holy light to illuminate the darkness.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 15,
+      "duration": 10,
+      "effect_type": "light",
+      "effect_value": {
+        "radius": 2,
+        "light_level": "short"
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "glow",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_e_rise",
+      "name": "Rise",
+      "letter": "E",
+      "description": "Lifts the party upward through stone, emerging on the floor above.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 2,
+      "mp_cost": 20,
+      "duration": "instant",
+      "effect_type": "dungeon_rise",
+      "effect_value": {
+        "floors": 1,
+        "random_position": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_f_sink",
+      "name": "Sink",
+      "letter": "F",
+      "description": "Opens the ground beneath the party, dropping them to the floor below.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 2,
+      "mp_cost": 25,
+      "duration": "instant",
+      "effect_type": "dungeon_sink",
+      "effect_value": {
+        "floors": 1,
+        "random_position": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_g_move",
+      "name": "Move",
+      "letter": "G",
+      "description": "Warps the party to a random location on the current dungeon floor.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 3,
+      "mp_cost": 30,
+      "duration": "instant",
+      "effect_type": "dungeon_teleport",
+      "effect_value": {
+        "same_floor": true,
+        "random_position": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_h_cure",
+      "name": "Cure",
+      "letter": "H",
+      "description": "Purges venom from an ally's body, cleansing all poison effects.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 3,
+      "mp_cost": 35,
+      "duration": "instant",
+      "effect_type": "cure_poison",
+      "effect_value": {},
+      "range": 2,
+      "targeting": "select_ally",
+      "sfx": "cure",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_i_surface",
+      "name": "Surface",
+      "letter": "I",
+      "description": "Tears open a passage to the surface, whisking the party out of the dungeon.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 4,
+      "mp_cost": 40,
+      "duration": "instant",
+      "effect_type": "dungeon_surface",
+      "effect_value": {},
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_j_star",
+      "name": "Star",
+      "letter": "J",
+      "description": "Summons a brilliant star of divine light that illuminates a wide area for an extended time.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 4,
+      "mp_cost": 45,
+      "duration": 50,
+      "effect_type": "light",
+      "effect_value": {
+        "radius": 4,
+        "light_level": "long"
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "glow",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_k_great_heal",
+      "name": "Great Heal",
+      "letter": "K",
+      "description": "Floods an ally with powerful healing energy, restoring grievous wounds.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 5,
+      "mp_cost": 50,
+      "duration": "instant",
+      "effect_type": "heal",
+      "effect_value": {
+        "dice": "5d26",
+        "flat_bonus": 120,
+        "stat_bonus": "wisdom",
+        "min_heal": 125,
+        "max_heal": 250
+      },
+      "range": 2,
+      "targeting": "select_ally",
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_l_map",
+      "name": "Map",
+      "letter": "L",
+      "description": "Reveals the layout of the surrounding area through divine sight.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 5,
+      "mp_cost": 55,
+      "duration": "instant",
+      "effect_type": "reveal_map",
+      "effect_value": {},
+      "range": 0,
+      "targeting": "self",
+      "sfx": "reveal",
+      "hit_sfx": null
+    },
+    {
+      "id": "priest_m_banish",
+      "name": "Banish",
+      "letter": "M",
+      "description": "Calls down holy fire upon a single foe, destroying it utterly.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 6,
+      "mp_cost": 60,
+      "duration": "instant",
+      "effect_type": "instant_kill",
+      "effect_value": {
+        "target_count": 1
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "sfx": "fireball",
+      "hit_sfx": "holy_blast"
+    },
+    {
+      "id": "priest_n_raise",
+      "name": "Raise",
+      "letter": "N",
+      "description": "Beseeches the gods to return a fallen ally to life. May fail, turning the body to ash.",
+      "allowable_classes": ["Cleric", "Paladin", "Illusionist", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 7,
+      "mp_cost": 65,
+      "duration": "instant",
+      "effect_type": "resurrect",
+      "effect_value": {
+        "success_chance": 0.75,
+        "fail_result": "ash",
+        "stat_bonus": "wisdom"
+      },
+      "range": 1,
+      "targeting": "select_ally",
+      "sfx": "resurrect",
+      "hit_sfx": null
+    },
+
+    {
+      "_section": "=== SORCERER SPELLS (A through P) ===",
+      "id": "sorcerer_a_repond",
+      "name": "Repond",
+      "letter": "A",
+      "description": "Speaks a word of power that obliterates orcs, goblins, and trolls.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 0,
+      "duration": "instant",
+      "effect_type": "monster_kill",
+      "effect_value": {
+        "monster_tags": ["orc", "goblin", "troll"],
+        "instant_kill": true
+      },
+      "range": 99,
+      "targeting": "auto_all_enemies",
+      "sfx": "magic_burst",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "fireball",
+      "name": "Mittar",
+      "letter": "B",
+      "description": "Launches a crackling bolt of arcane energy at a foe.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "2d6",
+        "stat_bonus": "intelligence",
+        "stat_multiplier": 0.5,
+        "min_damage": 2
+      },
+      "range": 3,
+      "targeting": "directional_projectile",
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "sorcerer_c_lorum",
+      "name": "Lorum",
+      "letter": "C",
+      "description": "Conjures an orb of arcane light to pierce the dungeon gloom.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 10,
+      "duration": 10,
+      "effect_type": "light",
+      "effect_value": {
+        "radius": 2,
+        "light_level": "short"
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "glow",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_d_dor_acron",
+      "name": "Dor Acron",
+      "letter": "D",
+      "description": "Opens a rift in the floor, dropping the party one dungeon level deeper.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 15,
+      "duration": "instant",
+      "effect_type": "dungeon_sink",
+      "effect_value": {
+        "floors": 1,
+        "random_position": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_e_sur_acron",
+      "name": "Sur Acron",
+      "letter": "E",
+      "description": "Bends space to lift the party one dungeon level higher.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 2,
+      "mp_cost": 20,
+      "duration": "instant",
+      "effect_type": "dungeon_rise",
+      "effect_value": {
+        "floors": 1,
+        "random_position": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_f_fulgar",
+      "name": "Fulgar",
+      "letter": "F",
+      "description": "Hurls a concentrated bolt of lightning at a single enemy.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 2,
+      "mp_cost": 25,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "4d8",
+        "stat_bonus": "intelligence",
+        "stat_multiplier": 0.75,
+        "min_damage": 8
+      },
+      "range": 5,
+      "targeting": "select_enemy",
+      "sfx": "lightning",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "sorcerer_g_dag_acron",
+      "name": "Dag Acron",
+      "letter": "G",
+      "description": "Tears a momentary hole in the fabric of space, teleporting the party to a random surface location.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 3,
+      "mp_cost": 30,
+      "duration": "instant",
+      "effect_type": "surface_teleport",
+      "effect_value": {
+        "random_position": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "teleport",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_h_mentar",
+      "name": "Mentar",
+      "letter": "H",
+      "description": "Focuses raw psychic energy into a devastating mind blast against a single foe.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 3,
+      "mp_cost": 35,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "6d10",
+        "stat_bonus": "intelligence",
+        "stat_multiplier": 1.0,
+        "min_damage": 15
+      },
+      "range": 5,
+      "targeting": "select_enemy",
+      "sfx": "magic_burst",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "sorcerer_i_dag_lorum",
+      "name": "Dag Lorum",
+      "letter": "I",
+      "description": "Summons a persistent constellation of arcane light that illuminates the dungeon for a long time.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 4,
+      "mp_cost": 40,
+      "duration": 50,
+      "effect_type": "light",
+      "effect_value": {
+        "radius": 4,
+        "light_level": "long"
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "glow",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_j_fal_divi",
+      "name": "Fal Divi",
+      "letter": "J",
+      "description": "Bridges the arcane and divine, allowing the caster to invoke one Priest spell.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 4,
+      "mp_cost": 45,
+      "duration": "instant",
+      "effect_type": "spell_access",
+      "effect_value": {
+        "grants_type": "priest",
+        "spell_count": 1
+      },
+      "range": 0,
+      "targeting": "self",
+      "sfx": "magic_burst",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_k_noxum",
+      "name": "Noxum",
+      "letter": "K",
+      "description": "Releases a wave of toxic energy that sears every enemy on the battlefield.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 5,
+      "mp_cost": 50,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "4d12",
+        "stat_bonus": "intelligence",
+        "stat_multiplier": 0.5,
+        "min_damage": 10
+      },
+      "range": 99,
+      "targeting": "auto_all_enemies",
+      "sfx": "magic_burst",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "sorcerer_l_decorp",
+      "name": "Decorp",
+      "letter": "L",
+      "description": "Unravels the life force of a single creature, slaying it instantly.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 5,
+      "mp_cost": 55,
+      "duration": "instant",
+      "effect_type": "instant_kill",
+      "effect_value": {
+        "target_count": 1
+      },
+      "range": 5,
+      "targeting": "select_enemy",
+      "sfx": "death_spell",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "sorcerer_m_altair",
+      "name": "Altair",
+      "letter": "M",
+      "description": "Freezes the flow of time itself. All enemies are paralyzed for several turns.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 6,
+      "mp_cost": 60,
+      "duration": 3,
+      "effect_type": "time_stop",
+      "effect_value": {
+        "turns": 3
+      },
+      "range": 99,
+      "targeting": "auto_all_enemies",
+      "sfx": "time_stop",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_n_dag_mentar",
+      "name": "Dag Mentar",
+      "letter": "N",
+      "description": "Unleashes an overwhelming psychic shockwave that ravages all enemies.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 6,
+      "mp_cost": 65,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "8d12",
+        "stat_bonus": "intelligence",
+        "stat_multiplier": 1.0,
+        "min_damage": 25
+      },
+      "range": 99,
+      "targeting": "auto_all_enemies",
+      "sfx": "magic_burst",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "sorcerer_o_necorp",
+      "name": "Necorp",
+      "letter": "O",
+      "description": "Drains the vitality from every enemy, leaving them weakened and vulnerable.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 7,
+      "mp_cost": 70,
+      "duration": 5,
+      "effect_type": "debuff",
+      "effect_value": {
+        "stat_reduction": {
+          "strength": -5,
+          "dexterity": -5
+        },
+        "hp_percent_drain": 0.25
+      },
+      "range": 99,
+      "targeting": "auto_all_enemies",
+      "sfx": "death_spell",
+      "hit_sfx": null
+    },
+    {
+      "id": "sorcerer_p_lorumnar",
+      "name": "Lorumnar",
+      "letter": "P",
+      "description": "The forbidden spell. Channels the caster's full power to annihilate every enemy in existence.",
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 8,
+      "mp_cost": 75,
+      "duration": "instant",
+      "effect_type": "instant_kill",
+      "effect_value": {
+        "target_count": "all"
+      },
+      "range": 99,
+      "targeting": "auto_all_enemies",
+      "sfx": "death_spell",
+      "hit_sfx": "explosion"
+    },
+
+    {
+      "_section": "=== CUSTOM SPELLS (not in original Ultima III) ===",
       "id": "shield",
       "name": "Shield",
+      "letter": null,
       "description": "Conjures a magical barrier around an ally, boosting their armor.",
-      "allowable_classes": ["Wizard"],
+      "allowable_classes": ["Wizard", "Lark", "Alchemist", "Druid"],
       "casting_type": "sorcerer",
       "min_level": 1,
       "mp_cost": 5,
@@ -58,24 +628,6 @@
       "range": 5,
       "targeting": "select_ally",
       "sfx": "shield",
-      "hit_sfx": null
-    },
-    {
-      "id": "turn_undead",
-      "name": "Turn Undead",
-      "description": "Channels holy energy that sears undead creatures, stripping 75% of their life force.",
-      "allowable_classes": ["Cleric"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 8,
-      "duration": "instant",
-      "effect_type": "undead_damage",
-      "effect_value": {
-        "hp_percent": 0.75
-      },
-      "range": 99,
-      "targeting": "auto_monster",
-      "sfx": "turn_undead",
       "hit_sfx": null
     }
   ]
