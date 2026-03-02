@@ -1956,6 +1956,70 @@ class Renderer:
         surf = f.render(text.upper(), True, c)
         self.screen.blit(surf, (x, y))
 
+    # ── helper: scrollable list for action panels ──
+
+    def _u3_scrollable_list(self, tx, top_y, avail_h, font, items, cursor):
+        """Render a scrollable list within a fixed-height region.
+
+        *items* is a list of (label_str, is_selected_bool).
+        *cursor* is the currently selected index.
+        *avail_h* is the pixel height available for the list area.
+        Draws up/down scroll indicators when the list is clipped.
+        """
+        ROW_H = 24
+        ARROW_H = 16  # space reserved for a scroll arrow
+
+        total = len(items)
+        if total == 0:
+            return
+
+        # How many rows can we actually display?
+        max_visible = max(1, avail_h // ROW_H)
+
+        if total <= max_visible:
+            # Everything fits — no scrolling needed
+            for i, (label, sel) in enumerate(items):
+                iy = top_y + i * ROW_H
+                prefix = "> " if sel else "  "
+                color = self._U3_WHITE if sel else self._U3_LTBLUE
+                self._u3_text(prefix + label, tx, iy, color, font)
+            return
+
+        # Need scrolling — leave room for indicators
+        visible_rows = max(1, (avail_h - ARROW_H * 2) // ROW_H)
+
+        # Compute scroll offset: keep cursor roughly centred
+        scroll = cursor - visible_rows // 2
+        scroll = max(0, min(scroll, total - visible_rows))
+
+        show_up = scroll > 0
+        show_down = scroll + visible_rows < total
+
+        draw_y = top_y
+
+        # Up arrow
+        if show_up:
+            self._u3_text("    " + chr(0x25B2) + " more", tx, draw_y,
+                          self._U3_LTBLUE, self.font_small)
+            draw_y += ARROW_H
+
+        # Visible items
+        for vi in range(visible_rows):
+            idx = scroll + vi
+            if idx >= total:
+                break
+            label, sel = items[idx]
+            iy = draw_y + vi * ROW_H
+            prefix = "> " if sel else "  "
+            color = self._U3_WHITE if sel else self._U3_LTBLUE
+            self._u3_text(prefix + label, tx, iy, color, font)
+
+        # Down arrow
+        if show_down:
+            arrow_y = draw_y + visible_rows * ROW_H
+            self._u3_text("    " + chr(0x25BC) + " more", tx, arrow_y,
+                          self._U3_LTBLUE, self.font_small)
+
     # ── helper: draw a procedural lunar phase icon ──
 
     def _get_moon_surfaces(self, size):
@@ -3472,12 +3536,11 @@ class Renderer:
             self._u3_text(f"-- {name.upper()}'S TURN --", tx, ty, self._U3_ORANGE, f)
 
             if menu_actions:
-                for i, (action_id, label) in enumerate(menu_actions):
-                    iy = ty + 28 + i * 24
-                    selected = (i == selected_action)
-                    prefix = "> " if selected else "  "
-                    color = self._U3_WHITE if selected else self._U3_LTBLUE
-                    self._u3_text(prefix + label.upper(), tx, iy, color, f)
+                self._u3_scrollable_list(
+                    tx, ty + 28, h - 34, f,
+                    items=[(label.upper(), i == selected_action)
+                           for i, (_aid, label) in enumerate(menu_actions)],
+                    cursor=selected_action)
 
 
         elif phase == PHASE_SPELL_SELECT:
@@ -3486,12 +3549,11 @@ class Renderer:
             self._u3_text(f"-- {name.upper()}'S SPELLS --", tx, ty, self._U3_ORANGE, f)
 
             if spell_list:
-                for i, (spell_id, label, mp_cost) in enumerate(spell_list):
-                    iy = ty + 28 + i * 24
-                    sel = (i == spell_cursor)
-                    prefix = "> " if sel else "  "
-                    color = self._U3_WHITE if sel else self._U3_LTBLUE
-                    self._u3_text(prefix + label.upper(), tx, iy, color, f)
+                self._u3_scrollable_list(
+                    tx, ty + 28, h - 34, f,
+                    items=[(label.upper(), i == spell_cursor)
+                           for i, (_sid, label, _mp) in enumerate(spell_list)],
+                    cursor=spell_cursor)
             else:
                 self._u3_text("  NO SPELLS AVAILABLE", tx, ty + 28, (160, 160, 160), f)
 
@@ -3502,13 +3564,11 @@ class Renderer:
             self._u3_text(f"-- THROW ITEM --", tx, ty, self._U3_ORANGE, f)
 
             if throw_list:
-                for i, (item_name, count) in enumerate(throw_list):
-                    iy = ty + 28 + i * 24
-                    sel = (i == throw_cursor)
-                    prefix = "> " if sel else "  "
-                    color = self._U3_WHITE if sel else self._U3_LTBLUE
-                    label = f"{item_name.upper()} x{count}"
-                    self._u3_text(prefix + label, tx, iy, color, f)
+                self._u3_scrollable_list(
+                    tx, ty + 28, h - 34, f,
+                    items=[(f"{iname.upper()} x{cnt}", i == throw_cursor)
+                           for i, (iname, cnt) in enumerate(throw_list)],
+                    cursor=throw_cursor)
             else:
                 self._u3_text("  NO THROWABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
 
@@ -3519,13 +3579,11 @@ class Renderer:
             self._u3_text(f"-- USE ITEM --", tx, ty, self._U3_ORANGE, f)
 
             if use_item_list:
-                for i, (item_name, count, effect, power) in enumerate(use_item_list):
-                    iy = ty + 28 + i * 24
-                    sel = (i == use_item_cursor)
-                    prefix = "> " if sel else "  "
-                    color = self._U3_WHITE if sel else self._U3_LTBLUE
-                    label = f"{item_name.upper()} x{count}"
-                    self._u3_text(prefix + label, tx, iy, color, f)
+                self._u3_scrollable_list(
+                    tx, ty + 28, h - 34, f,
+                    items=[(f"{iname.upper()} x{cnt}", i == use_item_cursor)
+                           for i, (iname, cnt, _eff, _pow) in enumerate(use_item_list)],
+                    cursor=use_item_cursor)
             else:
                 self._u3_text("  NO USABLE ITEMS", tx, ty + 28, (160, 160, 160), f)
 
