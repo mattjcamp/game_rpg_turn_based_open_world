@@ -1,13 +1,13 @@
 {
-  "_comment": "Fighter class template. Fighters can use all weapons and all armor.",
+  "_comment": "Barbarian (Fighter + Thief). Tough melee fighter limited to light armor. No magic.",
 
   "allowed_weapons": "all",
-  "allowed_armor": "all",
+  "allowed_armor": ["cloth", "leather"],
 
-  "hp_per_level": 15,
+  "hp_per_level": 12,
   "mp_per_level": 0,
 
-  "range": 2,
+  "range": 3,
 
   "exp_per_level": 500,
 

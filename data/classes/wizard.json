@@ -1,13 +1,19 @@
 {
   "_comment": "Wizard class template. Wizards are limited to daggers and cloth.",
 
-  "allowed_weapons": ["Fists", "Dagger"],
-  "allowed_armor": ["Cloth"],
+  "allowed_weapons": ["fists", "dagger"],
+  "allowed_armor": ["cloth"],
 
   "hp_per_level": 4,
   "mp_per_level": 15,
 
   "range": 2,
 
-  "exp_per_level": 500
+  "exp_per_level": 500,
+
+  "allowed_races": ["human", "elf", "gnome"],
+
+  "spell_type": "sorcerer",
+
+  "mp_source": { "ability": "intelligence", "percentage": 100 }
 }

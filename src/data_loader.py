@@ -46,6 +46,8 @@ def load_items():
             entry["ammo"] = data["ammo"]
         if data.get("slots"):
             entry["slots"] = data["slots"]
+        if data.get("item_type"):
+            entry["item_type"] = data["item_type"]
         weapons[name] = entry
 
         # Description & icon (what ITEM_INFO needs)
@@ -72,6 +74,8 @@ def load_items():
         entry = {"evasion": data["evasion"]}
         if data.get("slots"):
             entry["slots"] = data["slots"]
+        if data.get("item_type"):
+            entry["item_type"] = data["item_type"]
         armors[name] = entry
 
         if "description" in data or "icon" in data:
@@ -121,3 +125,24 @@ def load_items():
             }
 
     return weapons, armors, item_info, shop_inventory
+
+
+def load_races():
+    """Load data/races.json and return a dict keyed by race name.
+
+    Each entry contains:
+      - description (str)
+      - stat_modifiers (dict of stat → int)
+      - effects (list of str)
+    """
+    raw = _load_json("races.json")
+    races = {}
+    for name, data in raw.items():
+        if name.startswith("_"):
+            continue  # skip _comment
+        races[name] = {
+            "description": data.get("description", ""),
+            "stat_modifiers": data.get("stat_modifiers", {}),
+            "effects": list(data.get("effects", [])),
+        }
+    return races

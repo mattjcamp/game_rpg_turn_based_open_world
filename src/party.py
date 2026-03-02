@@ -13,10 +13,13 @@ touching this code.
 import json
 import os
 
-from src.data_loader import load_items
+from src.data_loader import load_items, load_races
 
 # ── Load all item tables from data/items.json ─────────────────────
 WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
+
+# ── Load race definitions from data/races.json ────────────────────
+RACE_INFO = load_races()
 
 # ── Load party config from data/party.json ────────────────────────
 _PARTY_JSON = os.path.join(
@@ -51,15 +54,20 @@ def get_sell_price(item_name):
     return 5
 
 
+VALID_RACES = ("Human", "Dwarf", "Halfling", "Elf", "Gnome")
+
 class PartyMember:
     """A single character in the party."""
 
-    def __init__(self, name, char_class, race="Human",
+    VALID_GENDERS = ("Male", "Female")
+
+    def __init__(self, name, char_class, race="Human", gender="Male",
                  hp=20, strength=10, dexterity=10,
                  intelligence=10, wisdom=10, level=1):
         self.name = name
         self.char_class = char_class
         self.race = race
+        self.gender = gender
 
         self.max_hp = hp
         self.hp = hp
@@ -196,11 +204,41 @@ class PartyMember:
             else:
                 template[field] = set(raw)   # convert list → set
 
+        # Allowed races (None means all races allowed)
+        raw_races = data.get("allowed_races", "all")
+        if raw_races == "all":
+            template["allowed_races"] = None
+        else:
+            template["allowed_races"] = set(raw_races)
+
         # Scalar attributes with defaults
         template["hp_per_level"] = data.get("hp_per_level", 6)
         template["mp_per_level"] = data.get("mp_per_level", 0)
         template["range"] = data.get("range", 1)
         template["exp_per_level"] = data.get("exp_per_level", 500)
+        template["spell_type"] = data.get("spell_type", "none")
+
+        # mp_source: None for non-casters, or dict with percentage.
+        # Single-stat format:  {"ability": str, "percentage": int}
+        # Dual-stat format:    {"abilities": [str, str], "mode": "higher"|"lower", "percentage": int}
+        raw_mp_source = data.get("mp_source")
+        if raw_mp_source is not None:
+            if "abilities" in raw_mp_source:
+                template["mp_source"] = {
+                    "abilities": list(raw_mp_source["abilities"]),
+                    "mode": raw_mp_source["mode"],
+                    "percentage": raw_mp_source["percentage"],
+                }
+            else:
+                template["mp_source"] = {
+                    "ability": raw_mp_source["ability"],
+                    "percentage": raw_mp_source["percentage"],
+                }
+        else:
+            template["mp_source"] = None
+
+        # mp_regen_multiplier: how fast MP regenerates (default 1)
+        template["mp_regen_multiplier"] = data.get("mp_regen_multiplier", 1)
 
         cls._class_templates[key] = template
         return template
@@ -211,7 +249,11 @@ class PartyMember:
             return True
         tmpl = self._load_class_template(self.char_class)
         allowed = tmpl["allowed_weapons"]
-        return allowed is None or weapon_name in allowed
+        if allowed is None:
+            return True
+        weapon_data = WEAPONS.get(weapon_name, {})
+        item_type = weapon_data.get("item_type", weapon_name.lower())
+        return item_type in allowed
 
     def can_use_armor(self, armor_name):
         """Return True if this character's class can wear the named armor."""
@@ -219,13 +261,97 @@ class PartyMember:
             return True
         tmpl = self._load_class_template(self.char_class)
         allowed = tmpl["allowed_armor"]
-        return allowed is None or armor_name in allowed
+        if allowed is None:
+            return True
+        armor_data = ARMORS.get(armor_name, {})
+        item_type = armor_data.get("item_type", armor_name.lower())
+        return item_type in allowed
+
+    @classmethod
+    def allowed_races_for_class(cls, char_class):
+        """Return the set of allowed race keys for a class, or None for all."""
+        tmpl = cls._load_class_template(char_class)
+        return tmpl["allowed_races"]
+
+    @classmethod
+    def is_race_class_valid(cls, race, char_class):
+        """Return True if the given race is allowed for the given class."""
+        allowed = cls.allowed_races_for_class(char_class)
+        if allowed is None:
+            return True
+        return race.lower() in allowed
+
+    @property
+    def race_info(self):
+        """Return the full race data dict for this character's race."""
+        return RACE_INFO.get(self.race, {})
+
+    @property
+    def racial_effects(self):
+        """Return the list of innate racial effects for this character."""
+        return self.race_info.get("effects", [])
+
+    def has_racial_effect(self, effect):
+        """Return True if this character's race grants the given effect."""
+        return effect in self.racial_effects
+
+    @property
+    def racial_stat_modifiers(self):
+        """Return dict of stat → modifier from this character's race."""
+        return self.race_info.get("stat_modifiers", {})
 
     @property
     def range(self):
         """Attack range in tiles (from class template)."""
         tmpl = self._load_class_template(self.char_class)
         return tmpl["range"]
+
+    @property
+    def spell_type(self):
+        """Spell type for this class: 'none', 'priest', or 'sorcerer'."""
+        tmpl = self._load_class_template(self.char_class)
+        return tmpl["spell_type"]
+
+    @property
+    def can_cast(self):
+        """Return True if this character's class can cast spells."""
+        return self.spell_type != "none"
+
+    @property
+    def mp_source(self):
+        """Return mp_source dict or None for non-casters.
+
+        Dict has 'ability' (str) and 'percentage' (int 0-100).
+        """
+        tmpl = self._load_class_template(self.char_class)
+        return tmpl["mp_source"]
+
+    def calc_mp_from_source(self):
+        """Calculate MP contribution from the class mp_source.
+
+        Single-stat: stat * (percentage / 100).
+        Dual-stat:   pick higher or lower of two stats, then apply percentage.
+        Returns 0 for non-casters.
+        """
+        src = self.mp_source
+        if src is None:
+            return 0
+        if "abilities" in src:
+            # Dual-stat mode (e.g. Druid uses higher of INT/WIS)
+            values = [getattr(self, a, 0) for a in src["abilities"]]
+            if src["mode"] == "higher":
+                stat_value = max(values)
+            else:  # "lower"
+                stat_value = min(values)
+        else:
+            stat_value = getattr(self, src["ability"], 0)
+        return int(stat_value * src["percentage"] / 100)
+
+    @property
+    def mp_regen_multiplier(self):
+        """MP regeneration multiplier (e.g. 2 for Druid)."""
+        tmpl = self._load_class_template(self.char_class)
+        return tmpl["mp_regen_multiplier"]
 
     def can_use_item(self, item_name):
         """Return True if this character's class can equip the named item."""
@@ -374,12 +500,10 @@ class PartyMember:
     # ── Magic helpers ──────────────────────────────────────────
 
     def can_cast_priest(self):
-        cls = self.char_class.lower()
-        return cls in ("cleric", "paladin", "illusionist", "druid", "ranger")
+        return self.spell_type in ("priest", "both")
 
     def can_cast_sorcerer(self):
-        cls = self.char_class.lower()
-        return cls in ("wizard", "lark", "alchemist", "druid", "ranger")
+        return self.spell_type in ("sorcerer", "both")
 
     # ── Equipment management ──────────────────────────────────
 
@@ -854,6 +978,7 @@ def create_default_party(start_col=None, start_row=None):
             name=char_cfg["name"],
             char_class=char_cfg["class"],
             race=char_cfg.get("race", "Human"),
+            gender=char_cfg.get("gender", "Male"),
             hp=char_cfg.get("hp", 20),
             strength=char_cfg.get("strength", 10),
             dexterity=char_cfg.get("dexterity", 10),

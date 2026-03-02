@@ -1,5 +1,4 @@
 
-- Work on randomized quest system
-- Work on scripted quest system
+- Work on world
 - Build more character classes, items, spells, monsters
-- Add character creation/party composition
+- Add character creation/party composition screen
