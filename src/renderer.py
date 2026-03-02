@@ -6037,3 +6037,609 @@ class Renderer:
             if scroll_offset < max_scroll:
                 self._u3_text("^ MORE ^", px + pw // 2 - 30,
                               content_y, self._U3_LTBLUE, self.font_small)
+
+    # ── Character Creation Screen ─────────────────────────────────
+
+    def draw_char_create_screen(self, game):
+        """Draw the character creation wizard screen.
+
+        Reads creation state from game._cc_* attributes.
+        """
+        from src.party import VALID_RACES, RACE_INFO
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+        step = game._cc_step
+        elapsed = game._cc_elapsed
+
+        # Background: dark with subtle starfield
+        self.screen.fill((5, 5, 15))
+        import random
+        rng = random.Random(42)
+        for _ in range(30):
+            sx = rng.randint(0, sw)
+            sy = rng.randint(0, sh)
+            bright = 40 + int(20 * math.sin(elapsed * 0.8 + sx * 0.01))
+            bright = max(0, min(255, bright))
+            self.screen.set_at((sx, sy), (bright, bright, bright + 20))
+
+        # Title bar
+        title_text = "~ CHARACTER CREATION ~"
+        t_surf = self.font.render(title_text, True, (200, 150, 60))
+        self.screen.blit(t_surf, (sw // 2 - t_surf.get_width() // 2, 16))
+
+        # Step indicator
+        steps = ["NAME", "RACE", "GENDER", "CLASS", "STATS", "CONFIRM"]
+        step_map = {"name": 0, "race": 1, "gender": 2, "class": 3,
+                    "stats": 4, "confirm": 5, "done": 5}
+        current_step_idx = step_map.get(step, 0)
+        step_y = 44
+        step_total_w = len(steps) * 90
+        step_x0 = sw // 2 - step_total_w // 2
+        for i, s in enumerate(steps):
+            x = step_x0 + i * 90
+            if i < current_step_idx:
+                color = (60, 140, 60)   # completed
+            elif i == current_step_idx:
+                color = (255, 200, 60)  # current
+            else:
+                color = (60, 60, 80)    # future
+            self._u3_text(s, x, step_y, color, self.font_small)
+            if i < len(steps) - 1:
+                self._u3_text(">", x + 70, step_y, (60, 60, 80),
+                              self.font_small)
+
+        # Main content panel
+        px, py, pw, ph = 80, 72, sw - 160, sh - 130
+        self._u3_panel(px, py, pw, ph)
+
+        cx = px + 20   # content left margin
+        cy = py + 16   # content top margin
+
+        # ── NAME ENTRY ──
+        if step == "name":
+            self._u3_text("ENTER THY NAME:", cx, cy, (140, 140, 180))
+            # Name field with blinking cursor
+            name_display = game._cc_name
+            blink = int(elapsed * 2) % 2 == 0
+            if blink:
+                name_display += "_"
+            name_surf = self.font.render(name_display, True, (255, 255, 255))
+            # Draw name in a bordered box
+            name_box = pygame.Rect(cx, cy + 30, pw - 40, 28)
+            pygame.draw.rect(self.screen, (20, 20, 40), name_box)
+            pygame.draw.rect(self.screen, (100, 100, 160), name_box, 1)
+            self.screen.blit(name_surf, (cx + 8, cy + 34))
+            self._u3_text("(MAX 12 CHARACTERS)", cx, cy + 70,
+                          (80, 80, 100), self.font_small)
+            self._u3_text("[ENTER] NEXT   [ESC] BACK", cx, cy + ph - 60,
+                          (68, 68, 200), self.font_small)
+
+        # ── RACE SELECTION ──
+        elif step == "race":
+            self._u3_text("CHOOSE THY RACE:", cx, cy, (140, 140, 180))
+            for i, race in enumerate(VALID_RACES):
+                ry = cy + 30 + i * 36
+                if i == game._cc_race_cursor:
+                    # Selection bar
+                    bar = pygame.Rect(cx, ry - 2, pw - 40, 30)
+                    pygame.draw.rect(self.screen, (30, 30, 60), bar)
+                    pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
+                    arrow_x = cx + 4
+                    bob = int(math.sin(elapsed * 4) * 3)
+                    self._u3_text(">", arrow_x + bob, ry,
+                                  (255, 200, 60))
+                    self._u3_text(race, cx + 20, ry, (255, 255, 100))
+                    # Show race info on the right
+                    info = RACE_INFO.get(race, {})
+                    desc = info.get("description", "")
+                    effects = info.get("effects", [])
+                    mods = info.get("stat_modifiers", {})
+                    info_x = cx + pw // 2
+                    self._u3_text("DESCRIPTION:", info_x, cy + 30,
+                                  (120, 120, 160), self.font_small)
+                    # Word-wrap description
+                    words = desc.split()
+                    lines, line = [], ""
+                    for w in words:
+                        if len(line) + len(w) + 1 > 36:
+                            lines.append(line)
+                            line = w
+                        else:
+                            line = (line + " " + w).strip()
+                    if line:
+                        lines.append(line)
+                    for li, l in enumerate(lines[:4]):
+                        self._u3_text(l, info_x, cy + 46 + li * 14,
+                                      (160, 160, 180), self.font_small)
+                    # Stat mods
+                    mod_y = cy + 110
+                    self._u3_text("STAT MODIFIERS:", info_x, mod_y,
+                                  (120, 120, 160), self.font_small)
+                    for j, (stat, val) in enumerate(mods.items()):
+                        sign = "+" if val >= 0 else ""
+                        col = ((100, 200, 100) if val > 0
+                               else (200, 100, 100) if val < 0
+                               else (120, 120, 120))
+                        self._u3_text(
+                            f"{stat[:3].upper()}: {sign}{val}",
+                            info_x + (j % 2) * 100,
+                            mod_y + 16 + (j // 2) * 16,
+                            col, self.font_small)
+                    # Effects
+                    if effects:
+                        eff_y = mod_y + 56
+                        self._u3_text("INNATE EFFECTS:", info_x, eff_y,
+                                      (120, 120, 160), self.font_small)
+                        for ei, e in enumerate(effects):
+                            self._u3_text(
+                                e.replace("_", " "),
+                                info_x, eff_y + 16 + ei * 14,
+                                (180, 160, 100), self.font_small)
+                else:
+                    self._u3_text(race, cx + 20, ry, (120, 120, 140))
+            self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
+                          cx, cy + ph - 60, (68, 68, 200), self.font_small)
+
+        # ── GENDER SELECTION ──
+        elif step == "gender":
+            from src.party import PartyMember
+            self._u3_text("CHOOSE THY GENDER:", cx, cy, (140, 140, 180))
+            for i, gender in enumerate(PartyMember.VALID_GENDERS):
+                gy = cy + 30 + i * 36
+                if i == game._cc_gender_cursor:
+                    bar = pygame.Rect(cx, gy - 2, pw // 2, 30)
+                    pygame.draw.rect(self.screen, (30, 30, 60), bar)
+                    pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
+                    bob = int(math.sin(elapsed * 4) * 3)
+                    self._u3_text(">", cx + 4 + bob, gy, (255, 200, 60))
+                    self._u3_text(gender, cx + 20, gy, (255, 255, 100))
+                else:
+                    self._u3_text(gender, cx + 20, gy, (120, 120, 140))
+            # Show summary so far
+            sum_x = cx + pw // 2
+            self._u3_text("SUMMARY:", sum_x, cy + 30,
+                          (120, 120, 160), self.font_small)
+            self._u3_text(f"NAME:  {game._cc_name}", sum_x, cy + 50,
+                          (180, 180, 200), self.font_small)
+            self._u3_text(f"RACE:  {game._cc_selected_race()}", sum_x,
+                          cy + 66, (180, 180, 200), self.font_small)
+            self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
+                          cx, cy + ph - 60, (68, 68, 200), self.font_small)
+
+        # ── CLASS SELECTION ──
+        elif step == "class":
+            from src.party import PartyMember as _PM
+            valid = game._cc_valid_classes_for_race()
+            self._u3_text("CHOOSE THY CLASS:", cx, cy, (140, 140, 180))
+            # List classes (scrollable if needed)
+            visible = min(len(valid), 11)
+            scroll = max(0, game._cc_class_cursor - visible + 1)
+            for i in range(scroll, min(scroll + visible, len(valid))):
+                draw_i = i - scroll
+                cly = cy + 30 + draw_i * 28
+                cls_name = valid[i]
+                if i == game._cc_class_cursor:
+                    bar = pygame.Rect(cx, cly - 2, pw // 2 - 20, 24)
+                    pygame.draw.rect(self.screen, (30, 30, 60), bar)
+                    pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
+                    bob = int(math.sin(elapsed * 4) * 3)
+                    self._u3_text(">", cx + 4 + bob, cly, (255, 200, 60))
+                    self._u3_text(cls_name, cx + 20, cly, (255, 255, 100))
+                    # Show class info on the right
+                    tmpl = _PM._load_class_template(cls_name)
+                    info_x = cx + pw // 2
+                    self._u3_text("CLASS INFO:", info_x, cy + 30,
+                                  (120, 120, 160), self.font_small)
+                    spell = tmpl.get("spell_type", "none")
+                    hp_lv = tmpl.get("hp_per_level", 0)
+                    mp_lv = tmpl.get("mp_per_level", 0)
+                    rng = tmpl.get("range", 1)
+                    self._u3_text(f"HP/LVL:     {hp_lv}", info_x,
+                                  cy + 50, (160, 200, 160), self.font_small)
+                    self._u3_text(f"MP/LVL:     {mp_lv}", info_x,
+                                  cy + 66, (160, 160, 200), self.font_small)
+                    self._u3_text(f"SPELL TYPE: {spell.upper()}", info_x,
+                                  cy + 82, (180, 160, 100), self.font_small)
+                    self._u3_text(f"RANGE:      {rng}", info_x,
+                                  cy + 98, (160, 160, 160), self.font_small)
+                    # Weapon/armor access
+                    wpn = tmpl.get("allowed_weapons")
+                    arm = tmpl.get("allowed_armor")
+                    wpn_str = "ALL" if wpn is None else ", ".join(
+                        sorted(wpn))
+                    arm_str = "ALL" if arm is None else ", ".join(
+                        sorted(arm))
+                    self._u3_text("WEAPONS:", info_x, cy + 122,
+                                  (120, 120, 160), self.font_small)
+                    # Word-wrap
+                    for wi, chunk in enumerate(
+                            [wpn_str[j:j+30]
+                             for j in range(0, len(wpn_str), 30)]):
+                        self._u3_text(chunk, info_x, cy + 136 + wi * 14,
+                                      (160, 160, 180), self.font_small)
+                    arm_y = cy + 136 + (len(wpn_str) // 30 + 1) * 14 + 4
+                    self._u3_text("ARMOR:", info_x, arm_y,
+                                  (120, 120, 160), self.font_small)
+                    for ai, chunk in enumerate(
+                            [arm_str[j:j+30]
+                             for j in range(0, len(arm_str), 30)]):
+                        self._u3_text(chunk, info_x,
+                                      arm_y + 14 + ai * 14,
+                                      (160, 160, 180), self.font_small)
+                else:
+                    self._u3_text(cls_name, cx + 20, cly, (120, 120, 140))
+            self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
+                          cx, cy + ph - 60, (68, 68, 200), self.font_small)
+
+        # ── STAT ALLOCATION ──
+        elif step == "stats":
+            remaining = game._cc_points_remaining
+            self._u3_text("DISTRIBUTE THY ATTRIBUTES:", cx, cy,
+                          (140, 140, 180))
+            pts_col = ((100, 200, 100) if remaining > 0
+                       else (200, 200, 60))
+            self._u3_text(f"POINTS REMAINING: {remaining}", cx,
+                          cy + 18, pts_col, self.font_small)
+            for i, stat_key in enumerate(game._cc_stat_names):
+                sy = cy + 48 + i * 40
+                val = game._cc_stats[stat_key]
+                label = stat_key[:3].upper()
+                if i == game._cc_stat_cursor:
+                    bar = pygame.Rect(cx, sy - 4, pw - 40, 34)
+                    pygame.draw.rect(self.screen, (30, 30, 60), bar)
+                    pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
+                    bob = int(math.sin(elapsed * 4) * 3)
+                    self._u3_text(">", cx + 4 + bob, sy,
+                                  (255, 200, 60))
+                    self._u3_text(f"{label}:", cx + 20, sy,
+                                  (255, 255, 100))
+                else:
+                    self._u3_text(f"{label}:", cx + 20, sy,
+                                  (120, 120, 140))
+                # Value with bar
+                self._u3_text(f"{val:2d}", cx + 70, sy, (255, 255, 255))
+                # Visual bar
+                bar_x = cx + 110
+                bar_w = int((val - 5) / 20 * 200)
+                bar_bg = pygame.Rect(bar_x, sy + 2, 200, 12)
+                bar_fill = pygame.Rect(bar_x, sy + 2, bar_w, 12)
+                pygame.draw.rect(self.screen, (20, 20, 40), bar_bg)
+                bar_color = ((80, 160, 80) if val >= 15
+                             else (160, 160, 80) if val >= 10
+                             else (160, 80, 80))
+                if bar_w > 0:
+                    pygame.draw.rect(self.screen, bar_color, bar_fill)
+                pygame.draw.rect(self.screen, (60, 60, 100), bar_bg, 1)
+                # Min/max labels
+                self._u3_text("5", bar_x - 2, sy + 16,
+                              (60, 60, 80), self.font_small)
+                self._u3_text("25", bar_x + 194, sy + 16,
+                              (60, 60, 80), self.font_small)
+            # Summary on the right
+            sum_x = cx + pw // 2 + 40
+            self._u3_text("SUMMARY:", sum_x, cy + 48,
+                          (120, 120, 160), self.font_small)
+            self._u3_text(f"NAME:   {game._cc_name}", sum_x, cy + 68,
+                          (180, 180, 200), self.font_small)
+            self._u3_text(f"RACE:   {game._cc_selected_race()}", sum_x,
+                          cy + 84, (180, 180, 200), self.font_small)
+            self._u3_text(f"GENDER: {game._cc_selected_gender()}", sum_x,
+                          cy + 100, (180, 180, 200), self.font_small)
+            self._u3_text(f"CLASS:  {game._cc_selected_class()}", sum_x,
+                          cy + 116, (180, 180, 200), self.font_small)
+            # Hints
+            hint = "[LEFT/RIGHT] ADJUST   [UP/DOWN] SELECT STAT"
+            self._u3_text(hint, cx, cy + ph - 76,
+                          (68, 68, 200), self.font_small)
+            if remaining == 0:
+                self._u3_text("[ENTER] NEXT   [ESC] BACK", cx,
+                              cy + ph - 60, (68, 68, 200), self.font_small)
+            else:
+                self._u3_text(
+                    "SPEND ALL POINTS TO CONTINUE   [ESC] BACK",
+                    cx, cy + ph - 60, (140, 100, 60), self.font_small)
+
+        # ── CONFIRM ──
+        elif step == "confirm":
+            self._u3_text("CONFIRM THY CHARACTER:", cx, cy,
+                          (140, 140, 180))
+            # Full summary
+            dy = cy + 30
+            self._u3_text(f"NAME:   {game._cc_name}", cx, dy,
+                          (255, 255, 255))
+            self._u3_text(f"RACE:   {game._cc_selected_race()}",
+                          cx, dy + 20, (255, 255, 255))
+            self._u3_text(f"GENDER: {game._cc_selected_gender()}",
+                          cx, dy + 40, (255, 255, 255))
+            self._u3_text(f"CLASS:  {game._cc_selected_class()}",
+                          cx, dy + 60, (255, 255, 255))
+            dy += 90
+            for stat_key in game._cc_stat_names:
+                val = game._cc_stats[stat_key]
+                self._u3_text(
+                    f"{stat_key[:3].upper()}: {val:2d}",
+                    cx, dy, (200, 200, 220))
+                dy += 18
+            # Confirm/cancel buttons
+            btn_y = dy + 30
+            for i, label in enumerate(["CREATE", "CANCEL"]):
+                by = btn_y + i * 36
+                if i == game._cc_confirm_cursor:
+                    bar = pygame.Rect(cx, by - 2, 200, 30)
+                    pygame.draw.rect(self.screen, (30, 30, 60), bar)
+                    pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
+                    bob = int(math.sin(elapsed * 4) * 3)
+                    self._u3_text(">", cx + 4 + bob, by, (255, 200, 60))
+                    self._u3_text(label, cx + 20, by, (255, 255, 100))
+                else:
+                    self._u3_text(label, cx + 20, by, (120, 120, 140))
+            self._u3_text("[UP/DOWN] SELECT   [ENTER] CHOOSE   [ESC] BACK",
+                          cx, cy + ph - 60, (68, 68, 200), self.font_small)
+
+        # ── DONE ──
+        elif step == "done":
+            self._u3_text("CHARACTER CREATED!", cx, cy + 40,
+                          (100, 200, 100))
+            self._u3_text(
+                f"{game._cc_name} THE {game._cc_selected_race().upper()}"
+                f" {game._cc_selected_class().upper()}"
+                f" HAS JOINED THE ROSTER.",
+                cx, cy + 70, (180, 180, 200), self.font_small)
+            self._u3_text(
+                f"ROSTER: {len(game.party.roster)}/{game.party.MAX_ROSTER}",
+                cx, cy + 100, (140, 140, 160), self.font_small)
+            self._u3_text("[ANY KEY] RETURN TO TITLE",
+                          cx, cy + ph - 60, (68, 68, 200), self.font_small)
+
+        # ── Feedback message overlay ──
+        if game._cc_message and game._cc_msg_timer > 0:
+            msg_surf = self.font.render(game._cc_message, True,
+                                        (255, 220, 100))
+            mx = sw // 2 - msg_surf.get_width() // 2
+            self.screen.blit(msg_surf, (mx, sh - 40))
+
+    # ── Party Formation Screen ────────────────────────────────────
+
+    def draw_form_party_screen(self, game):
+        """Draw the party formation screen.
+
+        Shows the roster on the left with checkboxes, and a detail
+        panel for the highlighted character on the right.
+        """
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+        elapsed = game._fp_elapsed
+        roster = game.party.roster
+
+        # Background
+        self.screen.fill((5, 5, 15))
+        import random
+        rng = random.Random(42)
+        for _ in range(30):
+            sx = rng.randint(0, sw)
+            sy = rng.randint(0, sh)
+            bright = 40 + int(20 * math.sin(elapsed * 0.8 + sx * 0.01))
+            bright = max(0, min(255, bright))
+            self.screen.set_at((sx, sy), (bright, bright, bright + 20))
+
+        # Title
+        title = "~ FORM THY PARTY ~"
+        t_surf = self.font.render(title, True, (200, 150, 60))
+        self.screen.blit(t_surf, (sw // 2 - t_surf.get_width() // 2, 16))
+
+        # Selection count
+        count = len(game._fp_selected)
+        count_col = ((100, 200, 100) if 1 <= count <= 4
+                     else (200, 100, 100))
+        self._u3_text(f"SELECTED: {count}/4", sw // 2 - 40, 40,
+                      count_col, self.font_small)
+
+        # Main panel
+        px, py, pw, ph = 40, 60, sw - 80, sh - 110
+        self._u3_panel(px, py, pw, ph)
+
+        # Empty roster message
+        if not roster:
+            self._u3_text("NO CHARACTERS IN ROSTER!", px + 20, py + 40,
+                          (200, 100, 100))
+            self._u3_text("CREATE CHARACTERS FIRST.",
+                          px + 20, py + 66, (140, 140, 160))
+            self._u3_text("[ESC] RETURN TO TITLE",
+                          px + 20, py + ph - 40, (68, 68, 200),
+                          self.font_small)
+            return
+
+        # ── Roster list (left side) ──
+        roster_x = px + 12
+        roster_y = py + 12
+        roster_w = pw // 2 - 20
+        visible = 12
+        scroll = game._fp_scroll
+        cursor = game._fp_cursor
+
+        self._u3_text("ROSTER", roster_x + 4, roster_y,
+                      (140, 140, 180), self.font_small)
+        roster_y += 18
+
+        for vi in range(visible):
+            idx = scroll + vi
+            if idx >= len(roster):
+                break
+            m = roster[idx]
+            ry = roster_y + vi * 38
+            selected = idx in game._fp_selected
+            is_cursor = idx == cursor
+
+            # Row background
+            if is_cursor:
+                row_rect = pygame.Rect(roster_x, ry - 2, roster_w, 34)
+                pygame.draw.rect(self.screen, (25, 25, 50), row_rect)
+                pygame.draw.rect(self.screen, (80, 80, 180), row_rect, 1)
+
+            # Checkbox
+            cb_x = roster_x + 4
+            cb_rect = pygame.Rect(cb_x, ry + 2, 14, 14)
+            pygame.draw.rect(self.screen, (40, 40, 60), cb_rect)
+            pygame.draw.rect(self.screen, (100, 100, 140), cb_rect, 1)
+            if selected:
+                # Draw checkmark
+                pygame.draw.line(self.screen, (100, 220, 100),
+                                 (cb_x + 2, ry + 9),
+                                 (cb_x + 5, ry + 13), 2)
+                pygame.draw.line(self.screen, (100, 220, 100),
+                                 (cb_x + 5, ry + 13),
+                                 (cb_x + 12, ry + 4), 2)
+
+            # Name and class
+            name_x = roster_x + 24
+            if is_cursor:
+                bob = int(math.sin(elapsed * 4) * 3)
+                self._u3_text(">", roster_x + 16 + bob, ry,
+                              (255, 200, 60), self.font_small)
+                name_col = (255, 255, 100)
+                class_col = (200, 200, 140)
+            elif selected:
+                name_col = (180, 220, 180)
+                class_col = (140, 180, 140)
+            else:
+                name_col = (140, 140, 160)
+                class_col = (100, 100, 120)
+
+            self._u3_text(m.name, name_x + 6, ry, name_col,
+                          self.font_small)
+            info_str = f"LV{m.level} {m.race} {m.char_class}"
+            self._u3_text(info_str, name_x + 6, ry + 15, class_col,
+                          self.font_small)
+
+            # Party slot number if selected
+            if selected:
+                slot_list = sorted(game._fp_selected)
+                slot_num = slot_list.index(idx) + 1
+                self._u3_text(str(slot_num),
+                              roster_x + roster_w - 18, ry + 4,
+                              (100, 200, 100))
+
+        # Scroll indicators
+        if scroll > 0:
+            self._u3_text("^ MORE ^", roster_x + roster_w // 2 - 30,
+                          roster_y - 4, (68, 68, 200), self.font_small)
+        if scroll + visible < len(roster):
+            self._u3_text("v MORE v",
+                          roster_x + roster_w // 2 - 30,
+                          roster_y + visible * 38 - 4,
+                          (68, 68, 200), self.font_small)
+
+        # ── Detail panel (right side) ──
+        detail_x = px + pw // 2 + 4
+        detail_y = py + 12
+        detail_w = pw // 2 - 16
+
+        if 0 <= cursor < len(roster):
+            m = roster[cursor]
+            self._u3_text("CHARACTER DETAIL", detail_x, detail_y,
+                          (140, 140, 180), self.font_small)
+            dy = detail_y + 22
+
+            self._u3_text(f"NAME:   {m.name}", detail_x, dy,
+                          (255, 255, 255), self.font_small)
+            dy += 18
+            self._u3_text(f"RACE:   {m.race}", detail_x, dy,
+                          (200, 200, 220), self.font_small)
+            dy += 18
+            self._u3_text(f"GENDER: {m.gender}", detail_x, dy,
+                          (200, 200, 220), self.font_small)
+            dy += 18
+            self._u3_text(f"CLASS:  {m.char_class}", detail_x, dy,
+                          (200, 200, 220), self.font_small)
+            dy += 18
+            self._u3_text(f"LEVEL:  {m.level}", detail_x, dy,
+                          (200, 200, 220), self.font_small)
+            dy += 24
+
+            # Stats with bars
+            stats = [("STR", m.strength), ("DEX", m.dexterity),
+                     ("INT", m.intelligence), ("WIS", m.wisdom)]
+            for label, val in stats:
+                self._u3_text(f"{label}: {val:2d}", detail_x, dy,
+                              (180, 180, 200), self.font_small)
+                bar_x = detail_x + 80
+                bar_w = int(val / 25 * 140)
+                bar_bg = pygame.Rect(bar_x, dy + 2, 140, 10)
+                bar_fill = pygame.Rect(bar_x, dy + 2,
+                                       min(bar_w, 140), 10)
+                pygame.draw.rect(self.screen, (20, 20, 40), bar_bg)
+                bar_color = ((80, 160, 80) if val >= 15
+                             else (160, 160, 80) if val >= 10
+                             else (160, 80, 80))
+                if bar_w > 0:
+                    pygame.draw.rect(self.screen, bar_color, bar_fill)
+                pygame.draw.rect(self.screen, (60, 60, 100), bar_bg, 1)
+                dy += 20
+
+            dy += 8
+            self._u3_text(f"HP: {m.hp}/{m.max_hp}", detail_x, dy,
+                          (200, 120, 120), self.font_small)
+            dy += 16
+            # Spell type
+            spell = m.spell_type
+            if spell != "none":
+                self._u3_text(f"MAGIC:  {spell.upper()}", detail_x, dy,
+                              (160, 140, 200), self.font_small)
+                dy += 16
+            # Equipment
+            dy += 8
+            self._u3_text("EQUIPMENT:", detail_x, dy,
+                          (120, 120, 160), self.font_small)
+            dy += 16
+            for slot_key in ("right_hand", "left_hand", "body", "head"):
+                item = m.equipped.get(slot_key)
+                if item:
+                    slot_label = slot_key.replace("_", " ").upper()
+                    self._u3_text(f"  {slot_label}: {item}",
+                                  detail_x, dy,
+                                  (160, 160, 180), self.font_small)
+                    dy += 14
+
+            # Racial effects
+            effects = m.racial_effects
+            if effects:
+                dy += 8
+                self._u3_text("RACIAL EFFECTS:", detail_x, dy,
+                              (120, 120, 160), self.font_small)
+                dy += 16
+                for e in effects:
+                    self._u3_text(f"  {e.replace('_', ' ').upper()}",
+                                  detail_x, dy,
+                                  (180, 160, 100), self.font_small)
+                    dy += 14
+
+        # ── Current party preview at bottom ──
+        preview_y = py + ph - 52
+        self._u3_text("CURRENT PARTY:", px + 12, preview_y,
+                      (140, 140, 180), self.font_small)
+        preview_y += 16
+        if game._fp_selected:
+            slot_list = sorted(game._fp_selected)
+            for si, idx in enumerate(slot_list):
+                if 0 <= idx < len(roster):
+                    pm = roster[idx]
+                    tag = f"{si + 1}. {pm.name} ({pm.char_class})"
+                    self._u3_text(tag,
+                                  px + 12 + si * (pw // 4),
+                                  preview_y,
+                                  (180, 220, 180), self.font_small)
+        else:
+            self._u3_text("(NONE SELECTED)", px + 12, preview_y,
+                          (120, 80, 80), self.font_small)
+
+        # ── Controls hint ──
+        hint_y = py + ph + 6
+        self._u3_text(
+            "[UP/DOWN] BROWSE   [SPACE] TOGGLE   "
+            "[ENTER] CONFIRM   [ESC] BACK",
+            px + 12, hint_y, (68, 68, 200), self.font_small)
+
+        # ── Feedback message ──
+        if game._fp_message and game._fp_msg_timer > 0:
+            msg_surf = self.font.render(game._fp_message, True,
+                                        (255, 220, 100))
+            mx = sw // 2 - msg_surf.get_width() // 2
+            self.screen.blit(msg_surf, (mx, sh - 30))

@@ -1,5 +1,5 @@
 {
-  "_comment": "Party configuration for Realm of Shadow. Edit this file to change starting characters, position, gold, and shared inventory without touching code.",
+  "_comment": "Roster and party configuration for Realm of Shadow. Characters are stored in the roster; the active_party selects which 4 (by index) form the adventuring party.",
 
   "start_position": {
     "col": 14,
@@ -8,7 +8,7 @@
 
   "gold": 25,
 
-  "characters": [
+  "roster": [
     {
       "name": "Roland",
       "class": "Fighter",
@@ -86,6 +86,8 @@
       "inventory": []
     }
   ],
+
+  "active_party": [0, 1, 2, 3],
 
   "party_effects": {
     "effect_1": null,

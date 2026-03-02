@@ -750,10 +750,14 @@ class Party:
 
     # ── Constructor ───────────────────────────────────────────
 
+    MAX_ROSTER = 20
+
     def __init__(self, start_col, start_row):
         self.col = start_col
         self.row = start_row
-        self.members = []
+        self.roster = []            # All created characters (up to MAX_ROSTER)
+        self.active_indices = []    # Indices into roster for the active party
+        self.members = []           # The active party (up to 4, refs into roster)
         self.gold = 100  # Shared party gold
         self.shared_inventory = []  # Party-wide item pool
 
@@ -936,6 +940,32 @@ class Party:
             return True
         return False
 
+    def add_to_roster(self, member):
+        """Add a character to the roster (max MAX_ROSTER).
+
+        Returns the roster index, or -1 if full.
+        """
+        if len(self.roster) >= self.MAX_ROSTER:
+            return -1
+        self.roster.append(member)
+        return len(self.roster) - 1
+
+    def set_active_party(self, indices):
+        """Set the active party from roster indices (max 4).
+
+        Replaces self.members with the selected roster characters.
+        """
+        self.active_indices = list(indices[:4])
+        self.members = [self.roster[i] for i in self.active_indices
+                        if 0 <= i < len(self.roster)]
+
+    def get_roster_index(self, member):
+        """Return the roster index for a given party member, or -1."""
+        try:
+            return self.roster.index(member)
+        except ValueError:
+            return -1
+
     def try_move(self, dcol, drow, tile_map):
         """
         Attempt to move the party by (dcol, drow).
@@ -957,12 +987,45 @@ class Party:
         return [m for m in self.members if m.is_alive()]
 
 
+def _build_member_from_cfg(char_cfg):
+    """Build a PartyMember from a character config dict.
+
+    Used by both create_default_party() and the save/load system.
+    """
+    member = PartyMember(
+        name=char_cfg["name"],
+        char_class=char_cfg["class"],
+        race=char_cfg.get("race", "Human"),
+        gender=char_cfg.get("gender", "Male"),
+        hp=char_cfg.get("hp", 20),
+        strength=char_cfg.get("strength", 10),
+        dexterity=char_cfg.get("dexterity", 10),
+        intelligence=char_cfg.get("intelligence", 10),
+        wisdom=char_cfg.get("wisdom", 10),
+        level=char_cfg.get("level", 1),
+    )
+    # Equipment slots
+    equip = char_cfg.get("equipped", {})
+    member.equipped = {
+        "right_hand": equip.get("right_hand", "Fists"),
+        "left_hand": equip.get("left_hand"),
+        "body": equip.get("body", "Cloth"),
+        "head": equip.get("head"),
+    }
+    member._sync_legacy_fields()
+
+    # Personal inventory
+    for item in char_cfg.get("inventory", []):
+        member.inventory.append(item)
+
+    return member
+
+
 def create_default_party(start_col=None, start_row=None):
     """Create a party from data/party.json configuration.
 
-    Characters, equipment, personal inventories, party position, gold,
-    and shared inventory are all loaded from the JSON file so the game
-    can be tweaked without touching code.
+    Characters are loaded into a roster; the active_party indices
+    select which characters form the adventuring party.
     If start_col/start_row are provided they override the JSON values.
     """
     cfg = _load_party_config()
@@ -972,35 +1035,20 @@ def create_default_party(start_col=None, start_row=None):
         start_row = cfg["start_position"]["row"]
     party = Party(start_col, start_row)
 
-    # ── Build party members from JSON ──
-    for char_cfg in cfg.get("characters", []):
-        member = PartyMember(
-            name=char_cfg["name"],
-            char_class=char_cfg["class"],
-            race=char_cfg.get("race", "Human"),
-            gender=char_cfg.get("gender", "Male"),
-            hp=char_cfg.get("hp", 20),
-            strength=char_cfg.get("strength", 10),
-            dexterity=char_cfg.get("dexterity", 10),
-            intelligence=char_cfg.get("intelligence", 10),
-            wisdom=char_cfg.get("wisdom", 10),
-            level=char_cfg.get("level", 1),
-        )
-        # Equipment slots
-        equip = char_cfg.get("equipped", {})
-        member.equipped = {
-            "right_hand": equip.get("right_hand", "Fists"),
-            "left_hand": equip.get("left_hand"),
-            "body": equip.get("body", "Cloth"),
-            "head": equip.get("head"),
-        }
-        member._sync_legacy_fields()
+    # ── Build roster from JSON ──
+    # Support both new "roster" key and legacy "characters" key
+    roster_cfg = cfg.get("roster", cfg.get("characters", []))
+    for char_cfg in roster_cfg:
+        member = _build_member_from_cfg(char_cfg)
+        party.add_to_roster(member)
 
-        # Personal inventory
-        for item in char_cfg.get("inventory", []):
-            member.inventory.append(item)
-
-        party.add_member(member)
+    # ── Select active party from roster ──
+    active = cfg.get("active_party")
+    if active is not None:
+        party.set_active_party(active)
+    else:
+        # Legacy fallback: all roster members are active (up to 4)
+        party.set_active_party(list(range(min(4, len(party.roster)))))
 
     # ── Party-level config ──
     party.gold = cfg.get("gold", 100)

@@ -38,6 +38,7 @@ def _serialize_member(member):
         "name": member.name,
         "class": member.char_class,
         "race": member.race,
+        "gender": member.gender,
         "max_hp": member.max_hp,
         "hp": member.hp,
         "strength": member.strength,
@@ -60,6 +61,9 @@ def _serialize_party(party):
         "col": party.col,
         "row": party.row,
         "gold": party.gold,
+        "roster": [_serialize_member(m) for m in party.roster],
+        "active_party": list(party.active_indices),
+        # Legacy "members" kept for backward compat with older saves
         "members": [_serialize_member(m) for m in party.members],
         "shared_inventory": list(party.shared_inventory),
         "equipped": dict(party.equipped),
@@ -74,6 +78,7 @@ def _deserialize_member(data):
         name=data["name"],
         char_class=data["class"],
         race=data.get("race", "Human"),
+        gender=data.get("gender", "Male"),
         hp=data.get("max_hp", 20),
         strength=data.get("strength", 10),
         dexterity=data.get("dexterity", 10),
@@ -113,10 +118,20 @@ def _deserialize_party(data):
     party = Party(data.get("col", 30), data.get("row", 11))
     party.gold = data.get("gold", 100)
 
-    # Rebuild members
-    for member_data in data.get("members", []):
-        member = _deserialize_member(member_data)
-        party.add_member(member)
+    # Rebuild roster and active party
+    if "roster" in data:
+        # New format: full roster + active indices
+        for member_data in data["roster"]:
+            member = _deserialize_member(member_data)
+            party.add_to_roster(member)
+        active = data.get("active_party", list(range(min(4, len(party.roster)))))
+        party.set_active_party(active)
+    else:
+        # Legacy format: only active members, no roster
+        for member_data in data.get("members", []):
+            member = _deserialize_member(member_data)
+            party.add_to_roster(member)
+        party.set_active_party(list(range(len(party.roster))))
 
     # Shared inventory (already in correct format — strings and dicts)
     party.shared_inventory = list(data.get("shared_inventory", []))
