@@ -100,13 +100,32 @@
         "head": null
       },
       "inventory": []
+    },
+    {
+      "name": "Thoran Goon",
+      "class": "Barbarian",
+      "race": "Dwarf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 22,
+      "dexterity": 10,
+      "intelligence": 9,
+      "wisdom": 9,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
     }
   ],
   "active_party": [
     0,
-    1,
     2,
-    4
+    4,
+    5
   ],
   "party_effects": {
     "effect_1": null,

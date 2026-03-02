@@ -132,32 +132,73 @@ class Renderer:
         return None
 
     def _load_class_sprites(self):
-        """Load character class sprites from example_graphics/ folder."""
+        """Load character class sprites.
+
+        Primary source: larger Amiga-style sprites in example_graphics/.
+        Fallback: U4 16×16 tile sprites in src/assets/u4_tiles/ for any
+        class that doesn't have an Amiga sprite.  The U4 tiles are scaled
+        to 32×32 so they're comparable in size to the Amiga sprites.
+        """
         import os
         sprite_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "example_graphics")
 
-        # Map class names to sprite filenames
+        # Primary sprites (Amiga-style, ~28-34 px)
         sprite_files = {
-            "fighter":  "Ultima3_AMI_sprite_fighter.png",
-            "cleric":   "Ultima3_AMI_sprite_cleric.png",
-            "wizard":   "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
-            "alchemist":"Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
-            "illusionist":"Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
-            "thief":    "Ultima3_AMI_sprite_thief.png",
-            "barbarian":"Ultima3_AMI_sprite_barbarian.png",
+            "fighter":     "Ultima3_AMI_sprite_fighter.png",
+            "cleric":      "Ultima3_AMI_sprite_cleric.png",
+            "wizard":      "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
+            "alchemist":   "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
+            "illusionist": "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
+            "thief":       "Ultima3_AMI_sprite_thief.png",
+            "barbarian":   "Ultima3_AMI_sprite_barbarian.png",
+        }
+
+        # U4 tile fallbacks for classes without Amiga sprites.
+        # Maps class name -> filename in src/assets/u4_tiles/
+        u4_tile_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "src", "assets", "u4_tiles")
+        u4_class_tiles = {
+            "druid":       "druid.png",        # R2 C3 – red-robed druid
+            "paladin":     "paladin.png",       # R2 C5 – green-caped paladin
+            "ranger":      "ranger.png",        # R2 C6 – orange-clad ranger
+            "lark":        "bard.png",          # R2 C1 – bard (closest to lark)
         }
 
         self._class_sprites = {}       # class name -> original-size surface
         self._class_sprites_big = {}   # class name -> scaled up for party screen
+
+        # Load primary Amiga sprites
         for cls_name, filename in sprite_files.items():
             path = os.path.join(sprite_dir, filename)
             if os.path.exists(path):
                 img = pygame.image.load(path).convert_alpha()
                 self._class_sprites[cls_name] = img
-                # Scale up 3x for the party screen (~ 84-102 x 96px)
                 big = pygame.transform.scale(
                     img, (img.get_width() * 3, img.get_height() * 3))
+                self._class_sprites_big[cls_name] = big
+
+        # Load U4 tile sprites for any class still missing
+        for cls_name, filename in u4_class_tiles.items():
+            if cls_name in self._class_sprites:
+                continue  # already loaded from primary source
+            path = os.path.join(u4_tile_dir, filename)
+            if os.path.exists(path):
+                raw = pygame.image.load(path).convert_alpha()
+                # Make black pixels transparent (U4 tiles use black bg)
+                raw = raw.convert_alpha()
+                w, h = raw.get_size()
+                for px in range(w):
+                    for py in range(h):
+                        r, g, b, a = raw.get_at((px, py))
+                        if r == 0 and g == 0 and b == 0:
+                            raw.set_at((px, py), (0, 0, 0, 0))
+                # Scale 16×16 → 32×32 to match game tile size
+                scaled = pygame.transform.scale(raw, (32, 32))
+                self._class_sprites[cls_name] = scaled
+                # 3× big version (32 → 96) for party screen
+                big = pygame.transform.scale(raw, (96, 96))
                 self._class_sprites_big[cls_name] = big
 
         # Create a white-tinted fighter sprite for the party map marker.
