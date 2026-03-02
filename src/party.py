@@ -36,6 +36,48 @@ def _load_party_config():
         return json.load(f)
 
 
+def _roster_member_to_json(member):
+    """Serialize a PartyMember into the party.json roster entry format."""
+    return {
+        "name": member.name,
+        "class": member.char_class,
+        "race": member.race,
+        "gender": member.gender,
+        "hp": member.max_hp,
+        "strength": member.strength,
+        "dexterity": member.dexterity,
+        "intelligence": member.intelligence,
+        "wisdom": member.wisdom,
+        "level": member.level,
+        "equipped": {
+            "right_hand": member.equipped.get("right_hand"),
+            "left_hand": member.equipped.get("left_hand"),
+            "body": member.equipped.get("body"),
+            "head": member.equipped.get("head"),
+        },
+        "inventory": list(member.inventory),
+    }
+
+
+def save_roster(party):
+    """Persist the current roster and active_party back to data/party.json.
+
+    Preserves non-roster fields (start_position, gold, party_effects,
+    inventory, comments) from the existing file and only updates the
+    roster and active_party arrays.
+    """
+    # Read current file so we preserve game-default fields
+    cfg = _load_party_config()
+
+    # Update roster and active party
+    cfg["roster"] = [_roster_member_to_json(m) for m in party.roster]
+    cfg["active_party"] = list(party.active_indices)
+
+    with open(_PARTY_JSON, "w") as f:
+        json.dump(cfg, f, indent=2)
+        f.write("\n")
+
+
 def _load_effects_config():
     """Load effect definitions from data/effects.json."""
     with open(_EFFECTS_JSON, "r") as f:

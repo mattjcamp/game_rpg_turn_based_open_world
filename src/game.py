@@ -8,7 +8,9 @@ import pygame
 
 from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TITLE, COLOR_BLACK
 from src.tile_map import create_test_map
-from src.party import create_default_party, PartyMember, Party, VALID_RACES, RACE_INFO
+from src.party import (create_default_party, _load_party_config,
+                       save_roster, PartyMember, Party,
+                       VALID_RACES, RACE_INFO)
 from src.camera import Camera
 from src.renderer import Renderer
 from src.states.overworld import OverworldState
@@ -125,8 +127,48 @@ class Game:
     # ── Title screen actions ────────────────────────────────────
 
     def _title_new_game(self):
-        """Start a fresh new game from the title screen."""
-        self.party = create_default_party()
+        """Start a fresh new game from the title screen.
+
+        If the player has already created characters and formed a party
+        via the CREATE CHARACTER / FORM PARTY screens, those selections
+        are preserved.  Only game-level state (position, gold, inventory,
+        quests) is reset to defaults from party.json.
+
+        Falls back to the full default party if no active members exist.
+        """
+        if self.party.members:
+            # Player already formed a party — keep roster & active members,
+            # but reset game-level state for a fresh start.
+            cfg = _load_party_config()
+            start = cfg.get("start_position", {})
+            self.party.col = start.get("col", 14)
+            self.party.row = start.get("row", 16)
+            self.party.gold = cfg.get("gold", 100)
+
+            # Reset shared inventory to defaults
+            self.party.shared_inventory = []
+            for entry in cfg.get("inventory", []):
+                item_name = entry["item"]
+                charges = entry.get("charges")
+                if charges is not None:
+                    self.party.inv_add(item_name, charges=charges)
+                else:
+                    self.party.shared_inventory.append(item_name)
+
+            # Reset party-level equipment and effects
+            for slot in list(self.party.equipped.keys()):
+                self.party.equipped[slot] = None
+            for slot in self.party.EFFECT_SLOTS:
+                self.party.effects[slot] = None
+
+            # Reset each active member's HP to full and clear personal inv
+            for m in self.party.members:
+                m.hp = m.max_hp
+                m.inventory = []
+        else:
+            # No active party formed — use the default from party.json
+            self.party = create_default_party()
+
         self.quest = None
         self.house_quest = None
         self.showing_title = False
@@ -259,6 +301,9 @@ class Game:
             self._cc_message = "Roster is full! (max 20)"
             self._cc_msg_timer = 2.0
             return
+        # Persist the updated roster to data/party.json so the new
+        # character is available across all future game sessions.
+        save_roster(self.party)
         self._cc_message = f"{self._cc_name} joins the roster!"
         self._cc_msg_timer = 2.0
         self._cc_step = "done"
@@ -420,6 +465,8 @@ class Game:
             return
         indices = sorted(self._fp_selected)
         self.party.set_active_party(indices)
+        # Persist active party selection so it's remembered across sessions.
+        save_roster(self.party)
         self._fp_message = "Party formed!"
         self._fp_msg_timer = 1.5
         self.showing_form_party = False

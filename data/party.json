@@ -1,13 +1,10 @@
 {
   "_comment": "Roster and party configuration for Realm of Shadow. Characters are stored in the roster; the active_party selects which 4 (by index) form the adventuring party.",
-
   "start_position": {
     "col": 14,
     "row": 16
   },
-
   "gold": 25,
-
   "roster": [
     {
       "name": "Roland",
@@ -84,25 +81,61 @@
         "head": null
       },
       "inventory": []
+    },
+    {
+      "name": "hyperbolic",
+      "class": "Ranger",
+      "race": "Human",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 14,
+      "intelligence": 11,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
     }
   ],
-
-  "active_party": [0, 1, 2, 3],
-
+  "active_party": [
+    0,
+    1,
+    2,
+    4
+  ],
   "party_effects": {
     "effect_1": null,
     "effect_2": null,
     "effect_3": null,
     "effect_4": null
   },
-
   "inventory": [
-    { "item": "Torch" },
-    { "item": "Torch" },
-    { "item": "Rock" },
-    { "item": "Rock" },
-    { "item": "Rock" },
-    { "item": "Healing Herb" },
-    { "item": "Camping Supplies", "charges": 1 }
+    {
+      "item": "Torch"
+    },
+    {
+      "item": "Torch"
+    },
+    {
+      "item": "Rock"
+    },
+    {
+      "item": "Rock"
+    },
+    {
+      "item": "Rock"
+    },
+    {
+      "item": "Healing Herb"
+    },
+    {
+      "item": "Camping Supplies",
+      "charges": 1
+    }
   ]
 }
