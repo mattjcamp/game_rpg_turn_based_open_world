@@ -1,0 +1,19 @@
+{
+  "_comment": "Barbarian (Fighter + Thief). Tough melee fighter limited to light armor. No magic.",
+
+  "allowed_weapons": "all",
+  "allowed_armor": ["cloth", "leather"],
+
+  "hp_per_level": 12,
+  "mp_per_level": 0,
+
+  "range": 3,
+
+  "exp_per_level": 500,
+
+  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
+
+  "spell_type": "none",
+
+  "mp_source": null
+}

@@ -1,0 +1,19 @@
+{
+  "_comment": "A woodsman who can use light weapons and armor and knows healing magic.",
+
+  "allowed_weapons": ["fists", "dagger", "club", "sling", "bow", "sword"],
+  "allowed_armor": ["cloth", "leather", "chain"],
+
+  "hp_per_level": 15,
+  "mp_per_level": 0,
+
+  "range": 2,
+
+  "exp_per_level": 500,
+
+  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
+
+  "spell_type": "priest",
+
+  "mp_source": { "ability": "wisdom", "percentage": 50 }
+}

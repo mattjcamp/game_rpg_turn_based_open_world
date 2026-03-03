@@ -1,0 +1,106 @@
+{
+  "_comment": "Effect definitions for Realm of Shadow. Each effect can be slotted into one of the party's 4 effect slots. Duration is a step count or 'permanent'. Requirements use ALL-match logic: every listed field must be satisfied. For class/race, the party must have a member of that class/race. For max_level, the party's highest level must be at or below that value.",
+
+  "effects": [
+    {
+      "id": "night_vision",
+      "name": "Night Vision",
+      "description": "The party can see in darkness without a torch.",
+      "duration": "permanent",
+      "requirements": {
+        "class": "Wizard",
+        "min_level": 2
+      }
+    },
+    {
+      "id": "detect_traps",
+      "name": "Detect Traps",
+      "description": "Traps are revealed before the party steps on them.",
+      "duration": "permanent",
+      "requirements": {
+        "class": "Thief",
+        "min_level": 1
+      }
+    },
+    {
+      "id": "swift_travel",
+      "name": "Swift Travel",
+      "description": "The party moves faster on the overworld.",
+      "duration": "permanent",
+      "requirements": {
+        "race": "Elf",
+        "min_level": 3
+      }
+    },
+    {
+      "id": "iron_skin",
+      "name": "Iron Skin",
+      "description": "All party members gain bonus armor class in combat.",
+      "duration": 200,
+      "requirements": {
+        "class": "Fighter",
+        "min_level": 4
+      }
+    },
+    {
+      "id": "keen_eyes",
+      "name": "Keen Eyes",
+      "description": "Hidden items and secret passages are revealed.",
+      "duration": "permanent",
+      "requirements": {
+        "class": "Thief",
+        "min_level": 3
+      }
+    },
+    {
+      "id": "blessed_aura",
+      "name": "Blessed Aura",
+      "description": "Party members slowly regenerate HP while exploring.",
+      "duration": 150,
+      "requirements": {
+        "class": "Cleric",
+        "min_level": 2
+      }
+    },
+    {
+      "id": "arcane_sight",
+      "name": "Arcane Sight",
+      "description": "Magical items glow, revealing their properties.",
+      "duration": "permanent",
+      "requirements": {
+        "class": "Wizard",
+        "min_level": 4
+      }
+    },
+    {
+      "id": "stone_resolve",
+      "name": "Stone Resolve",
+      "description": "Dwarven fortitude protects the party from poison.",
+      "duration": "permanent",
+      "requirements": {
+        "race": "Dwarf",
+        "min_level": 2
+      }
+    },
+    {
+      "id": "light_feet",
+      "name": "Light Feet",
+      "description": "The party makes less noise, reducing random encounters.",
+      "duration": "permanent",
+      "requirements": {
+        "race": "Bobbit",
+        "min_level": 1
+      }
+    },
+    {
+      "id": "battle_cry",
+      "name": "Battle Cry",
+      "description": "The first attack each combat deals bonus damage.",
+      "duration": 100,
+      "requirements": {
+        "class": "Fighter",
+        "min_level": 2
+      }
+    }
+  ]
+}

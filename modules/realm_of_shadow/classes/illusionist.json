@@ -1,0 +1,19 @@
+{
+  "_comment": "Illusionist (Cleric + Thief). Sneaky priest caster with light weapons and armor.",
+
+  "allowed_weapons": ["fists", "dagger", "club", "mace"],
+  "allowed_armor": ["cloth", "leather"],
+
+  "hp_per_level": 5,
+  "mp_per_level": 5,
+
+  "range": 3,
+
+  "exp_per_level": 500,
+
+  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
+
+  "spell_type": "priest",
+
+  "mp_source": { "ability": "wisdom", "percentage": 50 }
+}

@@ -1,0 +1,106 @@
+{
+  "_comment": "Spell definitions for Realm of Shadow. Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels. usable_in lists the game screens where the spell can be cast: 'battle', 'overworld', 'town', 'dungeon'.",
+
+  "spells": [
+    {
+      "id": "fireball",
+      "name": "Magic Dart",
+      "description": "Hurls an energy charged dark in a straight line, exploding on impact.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "2d8",
+        "stat_bonus": "intelligence",
+        "min_damage": 1
+      },
+      "range": 99,
+      "targeting": "directional_projectile",
+      "usable_in": ["battle"],
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
+    },
+    {
+      "id": "heal",
+      "name": "Minor Heal",
+      "description": "Sends a wave of healing energy toward an ally.",
+      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": "instant",
+      "effect_type": "heal",
+      "effect_value": {
+        "dice": "1d8",
+        "stat_bonus": "wisdom",
+        "min_heal": 1
+      },
+      "range": 2,
+      "targeting": "directional_ally",
+      "usable_in": ["battle", "overworld", "town", "dungeon"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+    {
+      "id": "shield",
+      "name": "Shield",
+      "description": "Conjures a magical barrier around an ally, boosting their armor.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": 3,
+      "effect_type": "ac_buff",
+      "effect_value": {
+        "ac_bonus": 2
+      },
+      "range": 5,
+      "targeting": "select_ally",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
+      "id": "turn_undead",
+      "name": "Turn Undead",
+      "description": "Channels holy energy that sears undead creatures, stripping 75% of their life force.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 8,
+      "duration": "instant",
+      "effect_type": "undead_damage",
+      "effect_value": {
+        "hp_percent": 0.75
+      },
+      "range": 99,
+      "targeting": "auto_monster",
+      "usable_in": ["battle"],
+      "sfx": "turn_undead",
+      "hit_sfx": null
+    },
+    {
+      "id": "push",
+      "name": "Push",
+      "description": "Emits a wave of divine force that drives nearby monsters away from the party.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 2,
+      "duration": 1000,
+      "effect_type": "repel_monsters",
+      "effect_value": {
+        "radius": 5,
+        "push_distance": 3
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["overworld"],
+      "sfx": "magic_burst",
+      "hit_sfx": null
+    }
+  ]
+}

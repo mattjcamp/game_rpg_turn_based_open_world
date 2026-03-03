@@ -1,0 +1,19 @@
+{
+  "_comment": "Fighter class template. Fighters can use all weapons and all armor.",
+
+  "allowed_weapons": "all",
+  "allowed_armor": "all",
+
+  "hp_per_level": 15,
+  "mp_per_level": 0,
+
+  "range": 2,
+
+  "exp_per_level": 500,
+
+  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
+
+  "spell_type": "none",
+
+  "mp_source": null
+}

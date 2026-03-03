@@ -1,0 +1,53 @@
+{
+  "_comment": "Dungeon definition for Elara's House. Values from dungeon_generator.py generate_house_dungeon().",
+
+  "id": "house_dungeon",
+  "name": "Elara's House",
+  "description": "A small house with a cellar hiding a family heirloom.",
+  "generator": "house_dungeon",
+
+  "levels": [
+    {
+      "level": 1,
+      "name": "Elara's House - Ground Floor",
+      "width": 24,
+      "height": 18,
+      "generation": {
+        "algorithm": "rooms_and_corridors",
+        "min_rooms": 4,
+        "max_rooms": 5,
+        "room_min_size": 3,
+        "room_max_size": 5,
+        "seed": null
+      },
+      "place_stairs_down": true,
+      "place_artifact": false,
+      "place_doors": true,
+      "chest_chance": 0.6,
+      "trap_chance": 0.35,
+      "monster_chance": 0.5,
+      "encounter_area": "house_basement"
+    },
+    {
+      "level": 2,
+      "name": "Elara's House - Basement",
+      "width": 20,
+      "height": 15,
+      "generation": {
+        "algorithm": "rooms_and_corridors",
+        "min_rooms": 3,
+        "max_rooms": 4,
+        "room_min_size": 3,
+        "room_max_size": 5,
+        "seed": null
+      },
+      "place_stairs_down": false,
+      "place_artifact": true,
+      "place_doors": true,
+      "chest_chance": 0.6,
+      "trap_chance": 0.35,
+      "monster_chance": 0.5,
+      "encounter_area": "house_basement"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 """
-Data loader – reads JSON config files from the data/ folder and
-populates the game's runtime dictionaries.
+Data loader – reads JSON config files from a module directory or
+the default ``data/`` folder and populates the game's runtime
+dictionaries.
 
-This keeps all game-balance numbers in editable text files while
-the rest of the code continues to use the same dict lookups as before.
+All public load functions accept an optional *data_dir* parameter.
+When omitted they fall back to the project-level ``data/`` folder.
 """
 
 import json
@@ -14,20 +15,29 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = os.path.join(_PROJECT_ROOT, "data")
 
 
-def _load_json(filename):
-    """Load and return a parsed JSON file from the data/ folder."""
+def _load_json(filename, data_dir=None):
+    """Load and return a parsed JSON file.
+
+    If *data_dir* is given the file is looked up there first; if it
+    doesn't exist, the default ``data/`` folder is used as a fallback.
+    """
+    if data_dir is not None:
+        mod_path = os.path.join(data_dir, filename)
+        if os.path.isfile(mod_path):
+            with open(mod_path, "r") as f:
+                return json.load(f)
+    # Fallback to default data/ directory
     path = os.path.join(_DATA_DIR, filename)
     with open(path, "r") as f:
         return json.load(f)
 
 
-def load_items():
-    """Load data/items.json and return (WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY).
+def load_items(data_dir=None):
+    """Load items.json and return (WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY).
 
-    Each returned dict matches the format the rest of the code expects,
-    so this is a drop-in replacement for the old hardcoded tables.
+    Looks in *data_dir* first (if given), then falls back to ``data/``.
     """
-    raw = _load_json("items.json")
+    raw = _load_json("items.json", data_dir)
 
     weapons = {}
     armors = {}
@@ -127,15 +137,12 @@ def load_items():
     return weapons, armors, item_info, shop_inventory
 
 
-def load_races():
-    """Load data/races.json and return a dict keyed by race name.
+def load_races(data_dir=None):
+    """Load races.json and return a dict keyed by race name.
 
-    Each entry contains:
-      - description (str)
-      - stat_modifiers (dict of stat → int)
-      - effects (list of str)
+    Looks in *data_dir* first (if given), then falls back to ``data/``.
     """
-    raw = _load_json("races.json")
+    raw = _load_json("races.json", data_dir)
     races = {}
     for name, data in raw.items():
         if name.startswith("_"):

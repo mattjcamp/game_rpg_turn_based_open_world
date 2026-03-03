@@ -3669,14 +3669,15 @@ class Renderer:
     # PARTY SCREEN  –  Ultima III retro style (P key overlay)
     # ========================================================
 
-    def draw_title_screen(self, options, cursor, elapsed):
+    def draw_title_screen(self, options, cursor, elapsed, module_info=None):
         """Draw the title screen with ASCII art, menu options, and animation.
 
         Parameters
         ----------
-        options : list of dicts with 'label' keys
-        cursor  : which option is highlighted
-        elapsed : total seconds since title screen appeared (for animations)
+        options     : list of dicts with 'label' keys
+        cursor      : which option is highlighted
+        elapsed     : total seconds since title screen appeared (for animations)
+        module_info : optional string like "Module: Realm of Shadow v1.0.0"
         """
         import math
         self.screen.fill((0, 0, 0))
@@ -3819,6 +3820,16 @@ class Renderer:
                           SCREEN_HEIGHT - 50,
                           hint_color, self.font_small)
 
+            # Active module indicator
+            if module_info:
+                mod_color = (int(90 * hint_fade), int(80 * hint_fade),
+                             int(50 * hint_fade))
+                mw = len(module_info) * 5
+                self._u3_text(module_info,
+                              SCREEN_WIDTH // 2 - mw // 2,
+                              SCREEN_HEIGHT - 70,
+                              mod_color, self.font_small)
+
             # Copyright / credits
             cr_color = (int(60 * hint_fade), int(60 * hint_fade),
                         int(80 * hint_fade))
@@ -3828,6 +3839,176 @@ class Renderer:
                           SCREEN_WIDTH // 2 - cw // 2,
                           SCREEN_HEIGHT - 28,
                           cr_color, self.font_small)
+
+    def draw_module_screen(self, modules, cursor, active_path):
+        """Draw the module selection / browser screen.
+
+        Parameters
+        ----------
+        modules     : list of module info dicts (id, name, author, description, version, path)
+        cursor      : which module is highlighted
+        active_path : path of the currently active module (for checkmark indicator)
+        """
+        import math
+        self.screen.fill((0, 0, 0))
+
+        fm = self.font_med
+        f = self.font
+        fs = self.font_small
+
+        # ── Header ──
+        self._u3_text("MODULES", SCREEN_WIDTH // 2 - 40, 20, self._U3_ORANGE, f)
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (80, 50), (SCREEN_WIDTH - 80, 50), 1)
+
+        if not modules:
+            self._u3_text("No modules found in modules/ directory.",
+                          SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2,
+                          (180, 100, 100), fm)
+            self._u3_text("[ESC] Back",
+                          SCREEN_WIDTH // 2 - 40, SCREEN_HEIGHT - 50,
+                          (100, 100, 200), fs)
+            return
+
+        # ── Layout: left panel (module list) + right panel (detail) ──
+        left_x = 40
+        left_w = 320
+        right_x = left_x + left_w + 30
+        right_w = SCREEN_WIDTH - right_x - 40
+        panel_y = 65
+        panel_h = SCREEN_HEIGHT - 130
+
+        # Left panel background
+        left_surf = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+        left_surf.fill((20, 15, 30, 180))
+        self.screen.blit(left_surf, (left_x, panel_y))
+        pygame.draw.rect(self.screen, (80, 60, 40),
+                         (left_x, panel_y, left_w, panel_h), 1)
+
+        # Right panel background
+        right_surf = pygame.Surface((right_w, panel_h), pygame.SRCALPHA)
+        right_surf.fill((20, 15, 30, 180))
+        self.screen.blit(right_surf, (right_x, panel_y))
+        pygame.draw.rect(self.screen, (80, 60, 40),
+                         (right_x, panel_y, right_w, panel_h), 1)
+
+        # ── Module list (left panel) ──
+        self._u3_text("AVAILABLE", left_x + 12, panel_y + 8,
+                      self._U3_ORANGE, fs)
+        row_h = 36
+        list_y = panel_y + 30
+
+        # Scrolling
+        max_visible = (panel_h - 40) // row_h
+        scroll_top = 0
+        if len(modules) > max_visible:
+            scroll_top = max(0, min(cursor - max_visible // 2,
+                                    len(modules) - max_visible))
+
+        for vi, mi in enumerate(range(scroll_top,
+                                      min(scroll_top + max_visible,
+                                          len(modules)))):
+            mod = modules[mi]
+            y = list_y + vi * row_h
+            selected = (mi == cursor)
+            is_active = (mod["path"] == active_path)
+
+            # Selection highlight bar
+            if selected:
+                bar = pygame.Surface((left_w - 4, row_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (left_x + 2, y - 2))
+
+            # Cursor arrow
+            prefix = "> " if selected else "  "
+            name_color = self._U3_WHITE if selected else (180, 180, 180)
+
+            # Active module gets a green checkmark
+            marker = ""
+            if is_active:
+                marker = " *"
+
+            self._u3_text(f"{prefix}{mod['name']}{marker}",
+                          left_x + 10, y, name_color, fm)
+
+            # Version in small text
+            ver_color = (100, 100, 120) if not selected else (140, 140, 160)
+            self._u3_text(f"v{mod['version']}", left_x + 10, y + 18,
+                          ver_color, fs)
+
+        # Scroll indicators
+        if scroll_top > 0:
+            self._u3_text("^", left_x + left_w // 2 - 4, list_y - 8,
+                          (120, 120, 140), fs)
+        if scroll_top + max_visible < len(modules):
+            self._u3_text("v", left_x + left_w // 2 - 4,
+                          list_y + max_visible * row_h - 4,
+                          (120, 120, 140), fs)
+
+        # ── Detail panel (right) ──
+        if 0 <= cursor < len(modules):
+            mod = modules[cursor]
+            dy = panel_y + 12
+
+            # Module name
+            self._u3_text(mod["name"], right_x + 16, dy, self._U3_WHITE, f)
+            dy += 28
+
+            # Author
+            self._u3_text(f"by {mod['author']}", right_x + 16, dy,
+                          (160, 160, 180), fm)
+            dy += 22
+
+            # Version
+            self._u3_text(f"Version {mod['version']}", right_x + 16, dy,
+                          (120, 120, 140), fs)
+            dy += 22
+
+            # Active status
+            if mod["path"] == active_path:
+                self._u3_text("ACTIVE", right_x + 16, dy,
+                              self._U3_GREEN, fm)
+            else:
+                self._u3_text("NOT SELECTED", right_x + 16, dy,
+                              (120, 100, 80), fm)
+            dy += 28
+
+            # Separator
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (right_x + 16, dy),
+                             (right_x + right_w - 16, dy), 1)
+            dy += 14
+
+            # Description — word wrap
+            desc = mod.get("description", "")
+            if desc:
+                max_chars = (right_w - 40) // 7  # approx chars per line
+                words = desc.split()
+                line = ""
+                for word in words:
+                    test = f"{line} {word}".strip()
+                    if len(test) > max_chars:
+                        self._u3_text(line, right_x + 16, dy,
+                                      (180, 180, 200), fm)
+                        dy += 18
+                        line = word
+                    else:
+                        line = test
+                if line:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 18
+
+            # Module ID (for debugging / reference)
+            dy += 16
+            self._u3_text(f"ID: {mod['id']}", right_x + 16, dy,
+                          (80, 80, 100), fs)
+
+        # ── Footer hints ──
+        hint_y = SCREEN_HEIGHT - 45
+        hint_color = (68, 68, 200)
+        self._u3_text("[UP/DOWN] Browse   [ENTER] Select   [ESC] Back",
+                      SCREEN_WIDTH // 2 - 180, hint_y, hint_color, fs)
 
     def draw_game_over_screen(self, options, cursor, elapsed):
         """Draw a grim game-over screen with skull art and menu options.

@@ -1,0 +1,403 @@
+{
+  "_comment": "Item definitions for Realm of Shadow. Edit this file to add, remove, or tweak items without touching code.",
+
+  "weapons": {
+    "Fists": {
+      "power": 0,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "Bare knuckles. Not much, but always available.",
+      "icon": "gloves",
+      "item_type": "fists",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Dagger": {
+      "power": 1,
+      "ranged": false,
+      "melee": true,
+      "throwable": true,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A short, light blade. Good for melee and throwing.",
+      "icon": "dagger",
+      "item_type": "dagger",
+      "buy": 20,
+      "sell": 10,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Rock": {
+      "power": 1,
+      "ranged": true,
+      "melee": false,
+      "throwable": true,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A smooth river rock",
+      "icon": "rock",
+      "item_type": "rock",
+      "buy": 0,
+      "sell": 0,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Club": {
+      "power": 1,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A simple wooden club. Cheap but sturdy.",
+      "icon": "mace",
+      "item_type": "club",
+      "buy": 20,
+      "sell": 10,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Mace": {
+      "power": 2,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A heavy flanged club, favored by clerics.",
+      "icon": "mace",
+      "item_type": "mace",
+      "buy": 40,
+      "sell": 20,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Sling": {
+      "power": 3,
+      "ranged": true,
+      "ammo": "Stones",
+      "slots": ["right_hand", "left_hand"],
+      "description": "A simple ranged weapon that hurls stones.",
+      "icon": "bow",
+      "item_type": "sling",
+      "buy": 60,
+      "sell": 30,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Axe": {
+      "power": 4,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A single-headed battle axe. Reliable and brutal.",
+      "icon": "axe",
+      "item_type": "axe",
+      "buy": 80,
+      "sell": 40,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Sword": {
+      "power": 5,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A well-balanced longsword. Standard fighter fare.",
+      "icon": "sword",
+      "item_type": "sword",
+      "buy": 120,
+      "sell": 60,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Spear": {
+      "power": 6,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A long thrusting weapon with good reach.",
+      "icon": "spear",
+      "item_type": "spear",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Broad Axe": {
+      "power": 7,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A massive double-headed axe. Devastating blows.",
+      "icon": "axe",
+      "item_type": "axe",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Bow": {
+      "power": 7,
+      "ranged": true,
+      "ammo": "Arrows",
+      "slots": ["right_hand", "left_hand"],
+      "description": "A sturdy longbow. Excellent at range.",
+      "icon": "bow",
+      "item_type": "bow",
+      "buy": 150,
+      "sell": 75,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Iron Sword": {
+      "power": 8,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A finely forged iron blade. Sharp and durable.",
+      "icon": "sword",
+      "item_type": "sword",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Gloves": {
+      "power": 8,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "Enchanted gauntlets that strike with magic force.",
+      "icon": "gloves",
+      "item_type": "gloves",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Halberd": {
+      "power": 9,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A polearm combining axe and spear. Fearsome reach.",
+      "icon": "halberd",
+      "item_type": "halberd",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Silver Bow": {
+      "power": 9,
+      "ranged": true,
+      "ammo": "Arrows",
+      "slots": ["right_hand", "left_hand"],
+      "description": "A silver-inlaid bow. Deadly against the undead.",
+      "icon": "bow",
+      "item_type": "bow",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Sun Sword": {
+      "power": 10,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "A radiant blade infused with solar energy.",
+      "icon": "sword",
+      "item_type": "sword",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Mystic Sword": {
+      "power": 10,
+      "ranged": false,
+      "slots": ["right_hand", "left_hand"],
+      "description": "An ancient blade pulsing with arcane power.",
+      "icon": "sword",
+      "item_type": "sword",
+      "party_can_equip": false,
+      "character_can_equip": true
+    }
+  },
+
+  "armors": {
+    "Cloth": {
+      "evasion": 50,
+      "slots": ["body"],
+      "description": "Simple cloth garments. Minimal protection.",
+      "icon": "armor_light",
+      "item_type": "cloth",
+      "buy": 20,
+      "sell": 10,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Leather": {
+      "evasion": 56,
+      "slots": ["body"],
+      "description": "Toughened leather armor. Light and flexible.",
+      "icon": "armor_light",
+      "item_type": "leather",
+      "buy": 50,
+      "sell": 25,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Chain": {
+      "evasion": 58,
+      "slots": ["body"],
+      "description": "Interlocking metal rings. Good all-round defense.",
+      "icon": "armor_heavy",
+      "item_type": "chain",
+      "buy": 120,
+      "sell": 60,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Plate": {
+      "evasion": 60,
+      "slots": ["body"],
+      "description": "Heavy steel plates. Excellent protection.",
+      "icon": "armor_heavy",
+      "item_type": "plate",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "+2 Chain": {
+      "evasion": 62,
+      "slots": ["body"],
+      "description": "Enchanted chainmail. Magically reinforced links.",
+      "icon": "armor_heavy",
+      "item_type": "chain",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "+2 Plate": {
+      "evasion": 64,
+      "slots": ["body"],
+      "description": "Enchanted plate armor. Nearly impenetrable.",
+      "icon": "armor_heavy",
+      "item_type": "plate",
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Exotic": {
+      "evasion": 67,
+      "slots": ["body"],
+      "description": "Mysterious armor of unknown origin. Supreme defense.",
+      "icon": "armor_heavy",
+      "item_type": "exotic",
+      "party_can_equip": false,
+      "character_can_equip": true
+    }
+  },
+
+  "general": {
+    "Healing Herb": {
+      "description": "A fragrant herb that restores a small amount of HP.",
+      "icon": "herb",
+      "item_type": "herb",
+      "usable": true,
+      "effect": "heal_hp",
+      "power": 15,
+      "buy": 15,
+      "sell": 7,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Antidote": {
+      "description": "A bitter tincture that cures poison.",
+      "icon": "potion",
+      "item_type": "antidote",
+      "usable": true,
+      "effect": "cure_poison",
+      "buy": 10,
+      "sell": 5,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Torch": {
+      "description": "A wooden torch. Lights the way in dark places.",
+      "icon": "torch",
+      "item_type": "torch",
+      "charges": 150,
+      "buy": 5,
+      "sell": 2,
+      "party_can_equip": true,
+      "character_can_equip": false
+    },
+    "Arrows": {
+      "description": "A bundle of arrows for bows.",
+      "icon": "ammo",
+      "item_type": "ammo",
+      "charges": 10,
+      "stackable": true,
+      "buy": 5,
+      "sell": 2,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Stones": {
+      "description": "A pouch of smooth stones for slings.",
+      "icon": "ammo",
+      "item_type": "ammo",
+      "charges": 10,
+      "stackable": true,
+      "buy": 3,
+      "sell": 1,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Rope": {
+      "description": "A sturdy hemp rope. Useful for climbing.",
+      "icon": "rope",
+      "item_type": "rope",
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Holy Water": {
+      "description": "Blessed water from a sacred spring. Burns the undead.",
+      "icon": "holy",
+      "item_type": "holy_water",
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Scroll of Fire": {
+      "description": "A single-use scroll containing a fire spell.",
+      "icon": "scroll",
+      "item_type": "scroll",
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Mana Potion": {
+      "description": "A shimmering blue liquid that restores magic points.",
+      "icon": "potion",
+      "item_type": "potion",
+      "usable": true,
+      "effect": "heal_mp",
+      "power": 10,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Lockpick": {
+      "description": "A set of fine tools for opening locked chests.",
+      "icon": "tool",
+      "item_type": "lockpick",
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Smoke Bomb": {
+      "description": "A small bomb that creates a blinding cloud.",
+      "icon": "bomb",
+      "item_type": "bomb",
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Shadow Crystal": {
+      "description": "A pulsing dark crystal radiating ancient power. The innkeeper seeks this.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Family Heirloom": {
+      "description": "A delicate silver locket engraved with a family crest. It belongs to Elara.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Camping Supplies": {
+      "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
+      "icon": "tool",
+      "item_type": "camping_supplies",
+      "usable": true,
+      "effect": "rest",
+      "power": 0,
+      "charges": 3,
+      "buy": 25,
+      "sell": 12,
+      "party_can_equip": false,
+      "character_can_equip": false
+    }
+  }
+}

@@ -20,6 +20,7 @@ from src.states.combat import CombatState
 from src.town_generator import generate_town
 from src.music import MusicManager, SoundEffects
 from src.save_load import save_game, load_game, get_save_info, NUM_SAVE_SLOTS
+from src.module_loader import load_module_data
 
 
 class Game:
@@ -75,8 +76,19 @@ class Game:
             {"label": "CREATE CHARACTER", "action": self._title_create_char},
             {"label": "FORM PARTY", "action": self._title_form_party},
             {"label": "LOAD GAME", "action": self._title_load_game},
+            {"label": "MODULES", "action": self._title_modules},
             {"label": "SETTINGS", "action": self._title_settings},
         ]
+
+        # --- Module selection screen ---
+        self.showing_modules = False
+        self.module_cursor = 0
+        self.module_list = []  # populated when screen opens
+        from src.module_loader import get_default_module_path
+        self.active_module_path = get_default_module_path()
+        self.active_module_name = "Realm of Shadow"
+        self.active_module_version = "1.0.0"
+        self.module_manifest = None  # populated on new game start
 
         # --- Character creation screen ---
         self.showing_char_create = False
@@ -129,6 +141,9 @@ class Game:
     def _title_new_game(self):
         """Start a fresh new game from the title screen.
 
+        Loads all game data from the active module (with fallback to
+        default data/ for any missing files), then initialises the party.
+
         If the player has already created characters and formed a party
         via the CREATE CHARACTER / FORM PARTY screens, those selections
         are preserved.  Only game-level state (position, gold, inventory,
@@ -136,6 +151,19 @@ class Game:
 
         Falls back to the full default party if no active members exist.
         """
+        # ── Load module data (items, races, monsters, etc.) ──
+        if self.active_module_path:
+            self.module_manifest = load_module_data(self.active_module_path)
+
+        # ── Regenerate the overworld map from module config ──
+        overworld_cfg = None
+        if self.module_manifest:
+            overworld_cfg = self.module_manifest.get("_overworld_cfg")
+        self.tile_map = create_test_map(
+            overworld_cfg=overworld_cfg,
+            data_dir=self.active_module_path)
+        self.camera = Camera(self.tile_map.width, self.tile_map.height)
+
         if self.party.members:
             # Player already formed a party — keep roster & active members,
             # but reset game-level state for a fresh start.
@@ -515,6 +543,48 @@ class Game:
         self.settings_cursor = 0
         self._title_settings_mode = True
 
+    # ── Module selection ──────────────────────────────────────
+
+    def _title_modules(self):
+        """Open the module browser from the title screen."""
+        from src.module_loader import scan_modules
+        self.module_list = scan_modules()
+        self.module_cursor = 0
+        # Pre-select the currently active module
+        for i, mod in enumerate(self.module_list):
+            if mod["path"] == self.active_module_path:
+                self.module_cursor = i
+                break
+        self.showing_title = False
+        self.showing_modules = True
+
+    def _handle_module_input(self, event):
+        """Handle input on the module selection screen."""
+        if event.type != pygame.KEYDOWN:
+            return
+        if not self.module_list:
+            # No modules found — ESC or Enter returns to title
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                self.showing_modules = False
+                self.showing_title = True
+            return
+        if event.key == pygame.K_UP:
+            self.module_cursor = (
+                (self.module_cursor - 1) % len(self.module_list))
+        elif event.key == pygame.K_DOWN:
+            self.module_cursor = (
+                (self.module_cursor + 1) % len(self.module_list))
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            selected = self.module_list[self.module_cursor]
+            self.active_module_path = selected["path"]
+            self.active_module_name = selected["name"]
+            self.active_module_version = selected["version"]
+            self.showing_modules = False
+            self.showing_title = True
+        elif event.key == pygame.K_ESCAPE:
+            self.showing_modules = False
+            self.showing_title = True
+
     # ── Music / settings helpers ────────────────────────────────
 
     def _toggle_music(self):
@@ -697,6 +767,9 @@ class Game:
                     self._fp_msg_timer -= dt
                     if self._fp_msg_timer <= 0:
                         self._fp_message = None
+            elif self.showing_modules:
+                for event in events:
+                    self._handle_module_input(event)
             elif self.showing_game_over:
                 for event in events:
                     self._handle_game_over_input(event)
@@ -746,20 +819,26 @@ class Game:
             if (not self.showing_settings and not self.showing_title
                     and not self.showing_game_over
                     and not self.showing_char_create
-                    and not self.showing_form_party):
+                    and not self.showing_form_party
+                    and not self.showing_modules):
                 self.current_state.update(dt)
                 self.camera.update(self.party.col, self.party.row)
 
             # --- Draw ---
             self.screen.fill(COLOR_BLACK)
             if self.showing_title:
+                mod_info = f"Module: {self.active_module_name} v{self.active_module_version}"
                 self.renderer.draw_title_screen(
                     self.title_options, self.title_cursor,
-                    self.title_elapsed)
+                    self.title_elapsed, module_info=mod_info)
             elif self.showing_char_create:
                 self.renderer.draw_char_create_screen(self)
             elif self.showing_form_party:
                 self.renderer.draw_form_party_screen(self)
+            elif self.showing_modules:
+                self.renderer.draw_module_screen(
+                    self.module_list, self.module_cursor,
+                    self.active_module_path)
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

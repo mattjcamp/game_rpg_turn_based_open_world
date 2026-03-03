@@ -10,14 +10,18 @@ import json
 import os
 import random
 
+from src.data_loader import _load_json
+
+# ── Default data directory ────────────────────────────────────────
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DEFAULT_DATA_DIR = os.path.join(_PROJECT_ROOT, "data")
+
+# ── Active module data directory (None = use defaults) ────────────
+_module_data_dir = None
 
 # ── Load monster data from JSON ─────────────────────────────────
 
-_DATA_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "monsters.json")
-
-with open(_DATA_PATH, "r") as f:
-    _MONSTER_DATA = json.load(f)
+_MONSTER_DATA = _load_json("monsters.json")
 
 MONSTERS = _MONSTER_DATA["monsters"]
 SPAWN_TABLES = _MONSTER_DATA.get("spawn_tables", {})
@@ -184,11 +188,7 @@ def create_random_monster(table="dungeon"):
 
 # ── Encounter templates ─────────────────────────────────────────
 
-_ENCOUNTER_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "encounters.json")
-
-with open(_ENCOUNTER_PATH, "r") as f:
-    _ENCOUNTER_DATA = json.load(f)
+_ENCOUNTER_DATA = _load_json("encounters.json")
 
 ENCOUNTERS = _ENCOUNTER_DATA.get("encounters", {})
 
@@ -230,6 +230,23 @@ def create_encounter(area="dungeon"):
                 "monster_party_tile": m.name}
     return {"name": enc_name, "monsters": monsters,
             "monster_party_tile": party_tile}
+
+
+def reload_module_data(module_data_dir=None):
+    """Reload monster and encounter data from a module directory.
+
+    If *module_data_dir* is None, reloads from the default ``data/`` folder.
+    """
+    global MONSTERS, SPAWN_TABLES, ENCOUNTERS, _module_data_dir
+
+    _module_data_dir = module_data_dir
+
+    monster_data = _load_json("monsters.json", module_data_dir)
+    MONSTERS = monster_data["monsters"]
+    SPAWN_TABLES = monster_data.get("spawn_tables", {})
+
+    encounter_data = _load_json("encounters.json", module_data_dir)
+    ENCOUNTERS = encounter_data.get("encounters", {})
 
 
 # ── Legacy factory functions (for backward compatibility) ───────

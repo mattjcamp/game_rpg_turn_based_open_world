@@ -13,7 +13,14 @@ touching this code.
 import json
 import os
 
-from src.data_loader import load_items, load_races
+from src.data_loader import load_items, load_races, _load_json
+
+# ── Default data directory ────────────────────────────────────────
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DEFAULT_DATA_DIR = os.path.join(_PROJECT_ROOT, "data")
+
+# ── Active module data directory (None = use defaults) ────────────
+_module_data_dir = None
 
 # ── Load all item tables from data/items.json ─────────────────────
 WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
@@ -22,20 +29,22 @@ WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
 RACE_INFO = load_races()
 
 # ── Load party config from data/party.json ────────────────────────
-_PARTY_JSON = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "party.json")
+_PARTY_JSON = os.path.join(_DEFAULT_DATA_DIR, "party.json")
 
 # ── Load effect definitions from data/effects.json ───────────────
-_EFFECTS_JSON = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "effects.json")
+_EFFECTS_JSON = os.path.join(_DEFAULT_DATA_DIR, "effects.json")
 
 # ── Load spell definitions from data/spells.json ─────────────────
-_SPELLS_JSON = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "spells.json")
+_SPELLS_JSON = os.path.join(_DEFAULT_DATA_DIR, "spells.json")
 
 
 def _load_party_config():
-    """Load party configuration from data/party.json."""
+    """Load party configuration from the active module or default data/party.json."""
+    if _module_data_dir is not None:
+        mod_path = os.path.join(_module_data_dir, "party.json")
+        if os.path.isfile(mod_path):
+            with open(mod_path, "r") as f:
+                return json.load(f)
     with open(_PARTY_JSON, "r") as f:
         return json.load(f)
 
@@ -64,8 +73,10 @@ def _roster_member_to_json(member):
 
 
 def save_roster(party):
-    """Persist the current roster and active_party back to data/party.json.
+    """Persist the current roster and active_party back to party.json.
 
+    Saves to the active module's party.json if one is set,
+    otherwise to the default data/party.json.
     Preserves non-roster fields (start_position, gold, party_effects,
     inventory, comments) from the existing file and only updates the
     roster and active_party arrays.
@@ -77,15 +88,21 @@ def save_roster(party):
     cfg["roster"] = [_roster_member_to_json(m) for m in party.roster]
     cfg["active_party"] = list(party.active_indices)
 
-    with open(_PARTY_JSON, "w") as f:
+    # Determine save path: module dir if set, else default
+    save_path = _PARTY_JSON
+    if _module_data_dir is not None:
+        mod_path = os.path.join(_module_data_dir, "party.json")
+        if os.path.isfile(mod_path):
+            save_path = mod_path
+
+    with open(save_path, "w") as f:
         json.dump(cfg, f, indent=2)
         f.write("\n")
 
 
 def _load_effects_config():
-    """Load effect definitions from data/effects.json."""
-    with open(_EFFECTS_JSON, "r") as f:
-        return json.load(f)
+    """Load effect definitions from the active module or data/effects.json."""
+    return _load_json("effects.json", _module_data_dir)
 
 
 # Pre-load effect definitions at import time
@@ -93,13 +110,40 @@ EFFECTS_DATA = _load_effects_config().get("effects", [])
 
 
 def _load_spells_config():
-    """Load spell definitions from data/spells.json."""
-    with open(_SPELLS_JSON, "r") as f:
-        return json.load(f)
+    """Load spell definitions from the active module or data/spells.json."""
+    return _load_json("spells.json", _module_data_dir)
 
 
 # Pre-load spell definitions at import time (keyed by spell id)
 SPELLS_DATA = {s["id"]: s for s in _load_spells_config().get("spells", [])}
+
+
+def reload_module_data(module_data_dir=None):
+    """Reload all party-related data from a module directory.
+
+    If *module_data_dir* is None, reloads from the default ``data/`` folder.
+    This re-assigns the module-level globals so every module that imported
+    them (WEAPONS, ARMORS, etc.) picks up the new values on next access.
+
+    Also clears the class-template cache so classes are re-read from the
+    module directory.
+    """
+    global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY
+    global RACE_INFO, EFFECTS_DATA, SPELLS_DATA
+    global _module_data_dir
+
+    _module_data_dir = module_data_dir
+
+    # Reload items, races
+    WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items(module_data_dir)
+    RACE_INFO = load_races(module_data_dir)
+
+    # Reload effects and spells
+    EFFECTS_DATA = _load_effects_config().get("effects", [])
+    SPELLS_DATA = {s["id"]: s for s in _load_spells_config().get("spells", [])}
+
+    # Clear class template cache so they reload from the module directory
+    PartyMember._class_templates.clear()
 
 
 def get_sell_price(item_name):
@@ -239,17 +283,30 @@ class PartyMember:
 
     @classmethod
     def _load_class_template(cls, class_name):
-        """Load and cache a class template from data/classes/<name>.json."""
+        """Load and cache a class template from classes/<name>.json.
+
+        Checks the active module's ``classes/`` subdirectory first,
+        then falls back to the default ``data/classes/`` directory.
+        """
         key = class_name.lower()
         if key in cls._class_templates:
             return cls._class_templates[key]
 
-        path = os.path.join("data", "classes", f"{key}.json")
-        if os.path.isfile(path):
-            with open(path, "r") as fh:
-                data = json.load(fh)
-        else:
-            data = {}  # unknown class — allow everything
+        data = None
+        # Try module directory first
+        if _module_data_dir is not None:
+            mod_path = os.path.join(_module_data_dir, "classes", f"{key}.json")
+            if os.path.isfile(mod_path):
+                with open(mod_path, "r") as fh:
+                    data = json.load(fh)
+        # Fallback to default data/classes/
+        if data is None:
+            path = os.path.join(_DEFAULT_DATA_DIR, "classes", f"{key}.json")
+            if os.path.isfile(path):
+                with open(path, "r") as fh:
+                    data = json.load(fh)
+            else:
+                data = {}  # unknown class — allow everything
 
         # Normalise into sets (or None for "all")
         template = {}

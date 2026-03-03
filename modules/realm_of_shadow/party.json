@@ -1,0 +1,179 @@
+{
+  "_comment": "Roster and party configuration for Realm of Shadow. Characters are stored in the roster; the active_party selects which 4 (by index) form the adventuring party.",
+  "start_position": {
+    "col": 14,
+    "row": 16
+  },
+  "gold": 25,
+  "roster": [
+    {
+      "name": "Roland",
+      "class": "Fighter",
+      "race": "Dwarf",
+      "gender": "Male",
+      "hp": 30,
+      "strength": 16,
+      "dexterity": 12,
+      "intelligence": 8,
+      "wisdom": 10,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Club",
+        "left_hand": null,
+        "body": "Leather",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Mira",
+      "class": "Cleric",
+      "race": "Bobbit",
+      "gender": "Female",
+      "hp": 22,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 10,
+      "wisdom": 18,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Club",
+        "left_hand": null,
+        "body": "Leather",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Theron",
+      "class": "Wizard",
+      "race": "Fuzzy",
+      "gender": "Male",
+      "hp": 14,
+      "strength": 6,
+      "dexterity": 14,
+      "intelligence": 20,
+      "wisdom": 8,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Dagger",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Sable",
+      "class": "Thief",
+      "race": "Elf",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 12,
+      "dexterity": 18,
+      "intelligence": 10,
+      "wisdom": 8,
+      "level": 1,
+      "equipped": {
+        "right_hand": null,
+        "left_hand": null,
+        "body": "Leather",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "hyperbolic",
+      "class": "Ranger",
+      "race": "Human",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 14,
+      "intelligence": 11,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "Thoran Goon",
+      "class": "Barbarian",
+      "race": "Dwarf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 22,
+      "dexterity": 10,
+      "intelligence": 9,
+      "wisdom": 9,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
+    },
+    {
+      "name": "test guy",
+      "class": "Barbarian",
+      "race": "Halfling",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 15,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
+    }
+  ],
+  "active_party": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "party_effects": {
+    "effect_1": null,
+    "effect_2": null,
+    "effect_3": null,
+    "effect_4": null
+  },
+  "inventory": [
+    {
+      "item": "Torch"
+    },
+    {
+      "item": "Torch"
+    },
+    {
+      "item": "Rock"
+    },
+    {
+      "item": "Rock"
+    },
+    {
+      "item": "Rock"
+    },
+    {
+      "item": "Healing Herb"
+    },
+    {
+      "item": "Camping Supplies",
+      "charges": 1
+    }
+  ]
+}
