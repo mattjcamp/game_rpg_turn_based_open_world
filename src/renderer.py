@@ -3979,29 +3979,32 @@ class Renderer:
                              (right_x + right_w - 16, dy), 1)
             dy += 14
 
-            # Description — word wrap
+            # Description — pixel-accurate word wrap within panel
             desc = mod.get("description", "")
+            max_pixel_w = right_w - 36  # 16px padding each side + margin
+            desc_bottom = panel_y + panel_h - 40  # leave room for ID
             if desc:
-                max_chars = (right_w - 40) // 7  # approx chars per line
                 words = desc.split()
                 line = ""
                 for word in words:
                     test = f"{line} {word}".strip()
-                    if len(test) > max_chars:
-                        self._u3_text(line, right_x + 16, dy,
-                                      (180, 180, 200), fm)
+                    tw, _ = fm.size(test.upper())
+                    if tw > max_pixel_w and line:
+                        if dy < desc_bottom:
+                            self._u3_text(line, right_x + 16, dy,
+                                          (180, 180, 200), fm)
                         dy += 18
                         line = word
                     else:
                         line = test
-                if line:
+                if line and dy < desc_bottom:
                     self._u3_text(line, right_x + 16, dy,
                                   (180, 180, 200), fm)
                     dy += 18
 
             # Module ID (for debugging / reference)
-            dy += 16
-            self._u3_text(f"ID: {mod['id']}", right_x + 16, dy,
+            id_y = max(dy + 16, panel_y + panel_h - 28)
+            self._u3_text(f"ID: {mod['id']}", right_x + 16, id_y,
                           (80, 80, 100), fs)
 
         # ── Footer hints ──

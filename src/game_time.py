@@ -195,6 +195,33 @@ class GameClock:
         """Current lunar phase as a human-readable string."""
         return LUNAR_PHASES[self.lunar_phase_index]
 
+    # ── factory methods ─────────────────────────────────────────
+
+    @classmethod
+    def from_date(cls, year=1, month=1, day=1, hour=12, minute=0):
+        """Create a GameClock set to a specific calendar date and time.
+
+        Parameters
+        ----------
+        year   : int — 1-based year number (default 1)
+        month  : int — 1-based month (1 = January, default 1)
+        day    : int — 1-based day of month (default 1)
+        hour   : int — hour in 24-h format (default 12 = noon)
+        minute : int — minute within the hour (default 0)
+
+        The returned clock's total_minutes is computed so that the
+        derived properties (.year, .month_index, .day_of_month, .hour,
+        .minute) all return the requested values.
+        """
+        # Convert the calendar date to an absolute day index (0-based)
+        day_index = ((year - 1) * DAYS_PER_YEAR
+                     + (month - 1) * DAYS_PER_MONTH
+                     + (day - 1))
+        # Convert to absolute minutes then subtract the epoch offset
+        absolute_minutes = day_index * _MINUTES_PER_DAY + hour * 60 + minute
+        total = absolute_minutes - _START_HOUR * 60
+        return cls(total_minutes=max(0, total))
+
     # ── serialization ─────────────────────────────────────────
 
     def to_dict(self):

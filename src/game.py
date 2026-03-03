@@ -197,6 +197,19 @@ class Game:
             # No active party formed — use the default from party.json
             self.party = create_default_party()
 
+        # ── Set starting time from module config ──
+        if self.module_manifest:
+            start_time = self.module_manifest.get("settings", {}).get("start_time")
+            if start_time:
+                from src.game_time import GameClock
+                self.party.clock = GameClock.from_date(
+                    year=start_time.get("year", 1),
+                    month=start_time.get("month", 1),
+                    day=start_time.get("day", 1),
+                    hour=start_time.get("hour", 12),
+                    minute=start_time.get("minute", 0),
+                )
+
         self.quest = None
         self.house_quest = None
         self.showing_title = False

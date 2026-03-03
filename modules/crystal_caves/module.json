@@ -16,7 +16,15 @@
     "viewport_cols": 30,
     "viewport_rows": 26,
     "max_party_size": 4,
-    "max_roster_size": 20
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 10,
+      "day": 1,
+      "hour": 21,
+      "minute": 0,
+      "_comment": "Adventure begins at night on the 1st of October"
+    }
   },
 
   "data": {},
