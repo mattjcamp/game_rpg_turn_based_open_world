@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "timestamp": 1772419425.913609,
+  "timestamp": 1772545140.1467881,
   "state": "overworld",
   "party": {
-    "col": 13,
-    "row": 12,
+    "col": 14,
+    "row": 16,
     "gold": 25,
     "roster": [
       {
@@ -66,7 +66,7 @@
         "dexterity": 14,
         "intelligence": 20,
         "wisdom": 8,
-        "level": 10,
+        "level": 1,
         "exp": 0,
         "equipped": {
           "right_hand": "Dagger",
@@ -150,13 +150,37 @@
         "current_mp": null,
         "bonus_mp": 0,
         "ammo": {}
+      },
+      {
+        "name": "test guy",
+        "class": "Barbarian",
+        "race": "Halfling",
+        "gender": "Female",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 15,
+        "wisdom": 15,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
       }
     ],
     "active_party": [
       0,
+      1,
       2,
-      4,
-      5
+      3
     ],
     "members": [
       {
@@ -170,6 +194,30 @@
         "dexterity": 12,
         "intelligence": 8,
         "wisdom": 10,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Club",
+          "left_hand": null,
+          "body": "Leather",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Mira",
+        "class": "Cleric",
+        "race": "Bobbit",
+        "gender": "Female",
+        "max_hp": 22,
+        "hp": 22,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 10,
+        "wisdom": 18,
         "level": 1,
         "exp": 0,
         "equipped": {
@@ -208,46 +256,22 @@
         "ammo": {}
       },
       {
-        "name": "hyperbolic",
-        "class": "Ranger",
-        "race": "Human",
-        "gender": "Male",
+        "name": "Sable",
+        "class": "Thief",
+        "race": "Elf",
+        "gender": "Female",
         "max_hp": 20,
         "hp": 20,
-        "strength": 10,
-        "dexterity": 14,
-        "intelligence": 11,
-        "wisdom": 15,
+        "strength": 12,
+        "dexterity": 18,
+        "intelligence": 10,
+        "wisdom": 8,
         "level": 1,
         "exp": 0,
         "equipped": {
-          "right_hand": "Fists",
+          "right_hand": null,
           "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": null,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "Thoran Goon",
-        "class": "Barbarian",
-        "race": "Dwarf",
-        "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 22,
-        "dexterity": 10,
-        "intelligence": 9,
-        "wisdom": 9,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": "Fists",
-          "left_hand": null,
-          "body": "Cloth",
+          "body": "Leather",
           "head": null
         },
         "inventory": [],
@@ -281,7 +305,7 @@
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 50
+      "total_minutes": 79200
     }
   }
 }

@@ -24,6 +24,27 @@
       "hit_sfx": "explosion"
     },
     {
+      "id": "magic_arrow",
+      "name": "Magic Arrow",
+      "description": "Conjures a piercing bolt of arcane energy that streaks toward a chosen foe.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 8,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "4d8",
+        "stat_bonus": "intelligence",
+        "min_damage": 1
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "usable_in": ["battle"],
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
+    },
+    {
       "id": "heal",
       "name": "Minor Heal",
       "description": "Sends a wave of healing energy toward an ally.",

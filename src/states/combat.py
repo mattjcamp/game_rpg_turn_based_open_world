@@ -889,13 +889,22 @@ class CombatState(BaseState):
             # Check targeting mode for the selected spell
             spell_data = SPELLS_DATA.get(spell_id, {})
             targeting = spell_data.get("targeting", "directional_projectile")
-            if targeting == "select_ally":
+            if targeting in ("select_ally", "select_enemy"):
                 # Enter free-cursor target selection mode
                 f = self.active_fighter
                 if f:
-                    col, row = self.fighter_positions.get(f, (3, 5))
-                    self.shield_target_col = col
-                    self.shield_target_row = row
+                    if targeting == "select_enemy" and self.monsters:
+                        # Start cursor on the first alive monster
+                        for m in self.monsters:
+                            if m.is_alive():
+                                pos = self.monster_positions.get(m)
+                                if pos:
+                                    self.shield_target_col, self.shield_target_row = pos
+                                    break
+                    else:
+                        col, row = self.fighter_positions.get(f, (3, 5))
+                        self.shield_target_col = col
+                        self.shield_target_row = row
                 self.phase = PHASE_SHIELD_TARGET
             elif targeting == "auto_monster":
                 # Auto-targeting spell — cast immediately on the monster
@@ -910,11 +919,11 @@ class CombatState(BaseState):
             self.selected_spell = None
 
     def _handle_shield_target_input(self, event):
-        """Handle input during free-cursor target selection (e.g. Shield spell).
+        """Handle input during free-cursor target selection.
 
-        Arrow keys move the selection box around the arena.
-        Enter confirms the target if an alive ally occupies the cell.
-        Escape cancels back to spell selection.
+        Works for both ally-targeting spells (Shield) and enemy-targeting
+        spells (Magic Arrow).  Arrow keys move the selection box around
+        the arena.  Enter confirms the target.  Escape cancels.
         """
         if event.key == pygame.K_UP:
             self.shield_target_row = max(1, self.shield_target_row - 1)
@@ -925,29 +934,46 @@ class CombatState(BaseState):
         elif event.key == pygame.K_RIGHT:
             self.shield_target_col = min(ARENA_COLS - 2, self.shield_target_col + 1)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            # Check if an alive ally is at the cursor position
             f = self.active_fighter
-            target = None
-            for member in self.fighters:
-                if member is f or not member.is_alive():
-                    continue
-                mc, mr = self.fighter_positions.get(member, (-1, -1))
-                if mc == self.shield_target_col and mr == self.shield_target_row:
-                    target = member
-                    break
-            if target:
-                # Check range from caster
-                spell = SPELLS_DATA.get(self.selected_spell, {})
-                spell_range = spell.get("range", 99)
-                caster_col, caster_row = self.fighter_positions.get(f, (0, 0))
-                dist = max(abs(self.shield_target_col - caster_col),
-                           abs(self.shield_target_row - caster_row))
-                if dist > spell_range:
-                    self.combat_log.append("Target is out of range!")
+            spell = SPELLS_DATA.get(self.selected_spell, {})
+            targeting = spell.get("targeting", "select_ally")
+
+            if targeting == "select_enemy":
+                # Look for an alive monster at the cursor position
+                target = self._get_monster_at(
+                    self.shield_target_col, self.shield_target_row)
+                if target and target.is_alive():
+                    spell_range = spell.get("range", 99)
+                    caster_col, caster_row = self.fighter_positions.get(f, (0, 0))
+                    dist = max(abs(self.shield_target_col - caster_col),
+                               abs(self.shield_target_row - caster_row))
+                    if dist > spell_range:
+                        self.combat_log.append("Target is out of range!")
+                    else:
+                        self._cast_targeted_damage_spell(f, target)
                 else:
-                    self._cast_shield_on_target(target)
+                    self.combat_log.append("No enemy at that position!")
             else:
-                self.combat_log.append("No ally at that position!")
+                # Ally targeting (Shield, etc.)
+                target = None
+                for member in self.fighters:
+                    if member is f or not member.is_alive():
+                        continue
+                    mc, mr = self.fighter_positions.get(member, (-1, -1))
+                    if mc == self.shield_target_col and mr == self.shield_target_row:
+                        target = member
+                        break
+                if target:
+                    spell_range = spell.get("range", 99)
+                    caster_col, caster_row = self.fighter_positions.get(f, (0, 0))
+                    dist = max(abs(self.shield_target_col - caster_col),
+                               abs(self.shield_target_row - caster_row))
+                    if dist > spell_range:
+                        self.combat_log.append("Target is out of range!")
+                    else:
+                        self._cast_shield_on_target(target)
+                else:
+                    self.combat_log.append("No ally at that position!")
         elif event.key == pygame.K_ESCAPE:
             # Cancel back to spell selection
             self.phase = PHASE_SPELL_SELECT
@@ -1811,6 +1837,87 @@ class CombatState(BaseState):
         self.combat_log.append(
             f"{f.name} casts SHIELD on {target.name}! (+{ac_bonus} AC for {duration} turns, -{mp_cost} MP)"
         )
+
+    def _cast_targeted_damage_spell(self, caster, target):
+        """Cast a targeted damage spell on a specific monster.
+
+        Reads dice, stat bonus, and MP cost from the selected spell's
+        JSON data so this works generically for any ``select_enemy``
+        damage spell (Magic Arrow, etc.).
+        """
+        spell = SPELLS_DATA.get(self.selected_spell, {})
+        mp_cost = spell.get("mp_cost", 5)
+        spell_name = spell.get("name", "Spell").upper()
+
+        # Check casting ability
+        casting_type = spell.get("casting_type", "sorcerer")
+        if casting_type == "sorcerer" and not caster.can_cast_sorcerer():
+            self.combat_log.append(f"{caster.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+        if casting_type == "priest" and not caster.can_cast_priest():
+            self.combat_log.append(f"{caster.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if caster.current_mp < mp_cost:
+            self.combat_log.append(
+                f"{caster.name} doesn't have enough MP! (need {mp_cost})")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Deduct MP
+        caster.current_mp -= mp_cost
+
+        # Parse dice from effect_value (e.g. "4d8")
+        ev = spell.get("effect_value", {})
+        dice_str = ev.get("dice", "1d4")
+        parts = dice_str.lower().split("d")
+        num_dice = int(parts[0]) if len(parts) == 2 else 1
+        die_sides = int(parts[1]) if len(parts) == 2 else 4
+
+        # Roll damage
+        damage = sum(random.randint(1, die_sides) for _ in range(num_dice))
+
+        # Add stat bonus
+        stat_bonus = ev.get("stat_bonus")
+        if stat_bonus == "intelligence":
+            damage += caster.int_mod
+        elif stat_bonus == "wisdom":
+            damage += caster.wis_mod
+        elif stat_bonus == "strength":
+            damage += caster.str_mod
+
+        min_damage = ev.get("min_damage", 1)
+        damage = max(min_damage, damage)
+
+        # Apply damage
+        target.hp = max(0, target.hp - damage)
+
+        # Visual and audio feedback — reuse fireball explosion effect
+        mc, mr = self.monster_positions.get(target, (0, 0))
+        self.fireball_explosions.append(FireballExplosion(mc, mr))
+        self.hit_effects.append(HitEffect(mc, mr, damage))
+
+        sfx = spell.get("sfx", "fireball")
+        hit_sfx = spell.get("hit_sfx", "explosion")
+        if sfx:
+            self.game.sfx.play(sfx)
+        if hit_sfx:
+            self.game.sfx.play(hit_sfx)
+
+        self.combat_log.append(
+            f"{caster.name} casts {spell_name} on {target.name} "
+            f"for {damage} damage! (-{mp_cost} MP)"
+        )
+
+        self._check_monster_death(target)
+        self.phase = PHASE_FIREBALL
+        self.selected_spell = None
 
     def _tick_shield_buffs(self):
         """Decrement shield buff durations at the end of each full round.
