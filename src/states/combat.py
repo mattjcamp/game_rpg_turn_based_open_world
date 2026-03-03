@@ -60,6 +60,8 @@ PHASE_USE_ITEM     = "use_item"      # choosing an item to use
 PHASE_EQUIP       = "equip"          # character sheet / equip screen
 PHASE_CHARM       = "charm"          # charm person animation playing
 PHASE_SLEEP       = "sleep"          # sleep spell animation playing
+PHASE_TELEPORT    = "teleport"       # misty step teleport animation
+PHASE_INVISIBILITY = "invisibility"  # invisibility spell animation
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -352,6 +354,52 @@ class SleepEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class TeleportEffect:
+    """A silvery mist effect for Misty Step — plays at both origin and destination."""
+
+    DURATION = 1.0  # seconds
+
+    def __init__(self, from_col, from_row, to_col, to_row):
+        self.from_col = from_col
+        self.from_row = from_row
+        self.to_col = to_col
+        self.to_row = to_row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class InvisibilityEffect:
+    """A shimmer/fade animation when a character turns invisible."""
+
+    DURATION = 1.0  # seconds
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
 
@@ -450,6 +498,13 @@ class CombatState(BaseState):
         # Sleep effects
         self.sleep_effects = []       # active SleepEffect objects
         self.sleep_buffs = {}         # Monster -> turns_left
+
+        # Teleport effects
+        self.teleport_effects = []    # active TeleportEffect objects
+
+        # Invisibility effects
+        self.invisibility_effects = []    # active InvisibilityEffect objects
+        self.invisibility_buffs = {}      # member -> turns_left
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -584,6 +639,9 @@ class CombatState(BaseState):
         self.charm_buffs = {}
         self.sleep_effects = []
         self.sleep_buffs = {}
+        self.teleport_effects = []
+        self.invisibility_effects = []
+        self.invisibility_buffs = {}
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -792,7 +850,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY):
             return
 
         # Equip screen handles its own input
@@ -963,7 +1021,7 @@ class CombatState(BaseState):
             # Check targeting mode for the selected spell
             spell_data = SPELLS_DATA.get(spell_id, {})
             targeting = spell_data.get("targeting", "directional_projectile")
-            if targeting in ("select_ally", "select_enemy"):
+            if targeting in ("select_ally", "select_enemy", "select_tile"):
                 # Enter free-cursor target selection mode
                 f = self.active_fighter
                 if f:
@@ -980,6 +1038,9 @@ class CombatState(BaseState):
                         self.shield_target_col = col
                         self.shield_target_row = row
                 self.phase = PHASE_SHIELD_TARGET
+            elif targeting == "self":
+                # Self-targeting spell — cast immediately on the caster
+                self._cast_self_spell(spell_id)
             elif targeting == "auto_monster":
                 # Auto-targeting spell — cast immediately on the monster
                 self._cast_auto_monster_spell(spell_id)
@@ -1012,11 +1073,28 @@ class CombatState(BaseState):
             spell = SPELLS_DATA.get(self.selected_spell, {})
             targeting = spell.get("targeting", "select_ally")
 
-            if targeting == "select_enemy":
+            if targeting == "select_tile":
+                # Tile targeting (Misty Step teleport, etc.)
+                tc = self.shield_target_col
+                tr = self.shield_target_row
+                if self._is_arena_wall(tc, tr):
+                    self.combat_log.append("Can't teleport into a wall!")
+                elif self._is_monster_tile(tc, tr):
+                    self.combat_log.append("A monster is in the way!")
+                elif self._is_occupied_by_ally(tc, tr, exclude=f):
+                    self.combat_log.append("An ally is standing there!")
+                else:
+                    if spell.get("effect_type") == "teleport":
+                        self._cast_misty_step(f, tc, tr)
+                    else:
+                        self.combat_log.append("Unknown tile spell!")
+            elif targeting == "select_enemy":
                 # Look for an alive monster at the cursor position
                 target = self._get_monster_at(
                     self.shield_target_col, self.shield_target_row)
                 if target and target.is_alive():
+                    # Enemy-targeting spells break invisibility
+                    self._break_invisibility(f)
                     spell_range = spell.get("range", 99)
                     caster_col, caster_row = self.fighter_positions.get(f, (0, 0))
                     dist = max(abs(self.shield_target_col - caster_col),
@@ -1209,6 +1287,16 @@ class CombatState(BaseState):
     def _execute_directed_action(self, dcol, drow):
         """Execute the chosen action in the given direction."""
         action = self.directing_action
+
+        # Offensive actions break invisibility
+        f = self.active_fighter
+        if f and action in (ACTION_ATTACK, ACTION_RANGED, ACTION_THROW):
+            self._break_invisibility(f)
+        elif f and action == ACTION_CAST:
+            # Offensive directional spells (fireball) break invisibility;
+            # heal does not
+            if self.selected_spell != "heal":
+                self._break_invisibility(f)
 
         if action == ACTION_MOVE:
             self._try_arena_move(dcol, drow)
@@ -2111,6 +2199,93 @@ class CombatState(BaseState):
                 self.combat_log.append(
                     f"{monster.name} wakes up!")
 
+    def _tick_invisibility_buffs(self):
+        """Decrement invisibility durations at the end of each full round."""
+        expired = []
+        for member, turns_left in self.invisibility_buffs.items():
+            turns_left -= 1
+            self.invisibility_buffs[member] = turns_left
+            if turns_left <= 0:
+                expired.append(member)
+        for member in expired:
+            del self.invisibility_buffs[member]
+            if member.is_alive():
+                self.combat_log.append(
+                    f"{member.name}'s invisibility fades away.")
+
+    def _break_invisibility(self, member):
+        """Break invisibility when the member attacks or casts offensively."""
+        if member in self.invisibility_buffs:
+            del self.invisibility_buffs[member]
+            self.combat_log.append(
+                f"{member.name} breaks invisibility!")
+
+    # ── Self-targeting spell dispatch ────────────────────────────
+
+    def _cast_self_spell(self, spell_id):
+        """Dispatch self-targeting spells that affect the caster."""
+        spell = SPELLS_DATA.get(spell_id, {})
+        effect_type = spell.get("effect_type", "")
+
+        if effect_type == "invisibility":
+            self._cast_invisibility()
+        else:
+            # Unknown self-spell — cancel safely
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+
+    def _cast_invisibility(self):
+        """Cast Invisibility — the caster becomes invisible for several turns.
+
+        Invisible characters are ignored by monster AI.  Attacking or casting
+        an offensive spell breaks the effect immediately.
+        """
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell_id = self.selected_spell
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Invisibility")
+        mp_cost = spell.get("mp_cost", 5)
+
+        # Check if already invisible
+        if f in self.invisibility_buffs:
+            self.combat_log.append(f"{f.name} is already invisible!")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        duration = spell.get("duration", 5)
+        if isinstance(duration, str):
+            duration = 5
+
+        self.invisibility_buffs[f] = duration
+
+        self.combat_log.append(
+            f"{f.name} casts {spell_name}! (-{mp_cost} MP)")
+        self.combat_log.append(
+            f"{f.name} fades from sight! ({duration} turns)")
+
+        # Create the visual effect
+        col, row = self.fighter_positions.get(f, (0, 0))
+        self.invisibility_effects.append(InvisibilityEffect(col, row))
+        self.selected_spell = None
+        self.phase = PHASE_INVISIBILITY
+        sfx = spell.get("sfx")
+        if sfx:
+            self.game.sfx.play(sfx)
+
     # ── Auto-monster spell dispatch ──────────────────────────────
 
     def _cast_auto_monster_spell(self, spell_id):
@@ -2397,6 +2572,40 @@ class CombatState(BaseState):
             if sfx:
                 self.game.sfx.play(sfx)
 
+    def _cast_misty_step(self, caster, dest_col, dest_row):
+        """Cast Misty Step — teleport the caster to a chosen empty tile.
+
+        The caster vanishes from their current position and reappears at
+        the destination in a swirl of silvery mist.
+        """
+        spell_id = self.selected_spell
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Misty Step")
+        mp_cost = spell.get("mp_cost", 5)
+
+        # Deduct MP
+        caster.current_mp -= mp_cost
+
+        # Record origin for the animation
+        from_col, from_row = self.fighter_positions.get(caster, (0, 0))
+
+        # Move the caster
+        self.fighter_positions[caster] = (dest_col, dest_row)
+
+        self.combat_log.append(
+            f"{caster.name} casts {spell_name}! (-{mp_cost} MP)")
+        self.combat_log.append(
+            f"{caster.name} vanishes and reappears across the battlefield!")
+
+        # Create the teleport animation
+        self.teleport_effects.append(
+            TeleportEffect(from_col, from_row, dest_col, dest_row))
+        self.selected_spell = None
+        self.phase = PHASE_TELEPORT
+        sfx = spell.get("sfx")
+        if sfx:
+            self.game.sfx.play(sfx)
+
     def _apply_use_item(self, item_name, effect, power):
         """Apply a consumable item's effect and consume it."""
         f = self.active_fighter
@@ -2536,6 +2745,7 @@ class CombatState(BaseState):
             self._tick_range_buffs()
             self._tick_charm_buffs()
             self._tick_sleep_buffs()
+            self._tick_invisibility_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
@@ -2565,11 +2775,14 @@ class CombatState(BaseState):
             self.phase_timer = 600
             return
 
-        # Find closest alive fighter
+        # Find closest alive, visible fighter
         best_dist = 999
         best_target = None
         for member in self.fighters:
             if not member.is_alive():
+                continue
+            # Invisible fighters are ignored by monsters
+            if member in self.invisibility_buffs:
                 continue
             col, row = self.fighter_positions[member]
             dist = max(abs(col - mc), abs(row - mr))
@@ -2578,15 +2791,20 @@ class CombatState(BaseState):
                 best_target = member
 
         if not best_target:
-            # No alive fighters — shouldn't happen but handle gracefully
+            # No visible fighters — monster is confused, skip turn
+            self.combat_log.append(
+                f"{mon.name} looks around confused...")
             self.active_monster_idx += 1
-            self._monster_turn()
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 500
             return
 
-        # Check adjacency to any alive fighter
+        # Check adjacency to any alive, visible fighter
         adjacent_targets = []
         for member in self.fighters:
             if not member.is_alive():
+                continue
+            if member in self.invisibility_buffs:
                 continue
             col, row = self.fighter_positions[member]
             if max(abs(col - mc), abs(row - mr)) == 1:
@@ -2941,6 +3159,28 @@ class CombatState(BaseState):
             return
         self.sleep_effects = [fx for fx in self.sleep_effects if fx.alive]
 
+        # Update teleport effects
+        for fx in self.teleport_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_TELEPORT:
+            if all(not fx.alive for fx in self.teleport_effects):
+                self.teleport_effects = []
+                self._end_fighter_turn()
+            return
+        self.teleport_effects = [fx for fx in self.teleport_effects if fx.alive]
+
+        # Update invisibility effects
+        for fx in self.invisibility_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_INVISIBILITY:
+            if all(not fx.alive for fx in self.invisibility_effects):
+                self.invisibility_effects = []
+                self._end_fighter_turn()
+            return
+        self.invisibility_effects = [fx for fx in self.invisibility_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -3163,6 +3403,9 @@ class CombatState(BaseState):
             charm_effects=self.charm_effects,
             sleep_effects=self.sleep_effects,
             sleep_buffs=self.sleep_buffs,
+            teleport_effects=self.teleport_effects,
+            invisibility_effects=self.invisibility_effects,
+            invisibility_buffs=self.invisibility_buffs,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,

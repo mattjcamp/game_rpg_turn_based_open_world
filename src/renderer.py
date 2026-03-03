@@ -2187,6 +2187,9 @@ class Renderer:
                           charm_effects=None,
                           sleep_effects=None,
                           sleep_buffs=None,
+                          teleport_effects=None,
+                          invisibility_effects=None,
+                          invisibility_buffs=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2258,8 +2261,16 @@ class Renderer:
                     continue
                 col, row = fighter_positions.get(member, (3, 5))
                 is_active = (member is active_fighter)
-                self._u3_draw_party_member_sprite(
-                    mx, my, ts, col, row, member, is_active)
+                # Invisible members are semi-transparent with pulsing alpha
+                if invisibility_buffs and member in invisibility_buffs:
+                    ticks = pygame.time.get_ticks()
+                    invis_alpha = int(40 + 25 * math.sin(ticks * 0.004))
+                    self._u3_draw_party_member_sprite(
+                        mx, my, ts, col, row, member, is_active,
+                        alpha=invis_alpha)
+                else:
+                    self._u3_draw_party_member_sprite(
+                        mx, my, ts, col, row, member, is_active)
 
             # Draw persistent shield bubbles over buffed fighters
             if shield_buffs:
@@ -2381,6 +2392,18 @@ class Renderer:
                 if fx.alive:
                     self._u3_draw_sleep_effect(mx, my, ts, fx)
 
+        # ── 2m. teleport effects ──
+        if teleport_effects:
+            for fx in teleport_effects:
+                if fx.alive:
+                    self._u3_draw_teleport_effect(mx, my, ts, fx)
+
+        # ── 2n. invisibility effects ──
+        if invisibility_effects:
+            for fx in invisibility_effects:
+                if fx.alive:
+                    self._u3_draw_invisibility_effect(mx, my, ts, fx)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
@@ -2397,7 +2420,8 @@ class Renderer:
                                         defending_map or {},
                                         rx, 4, rw, party_h,
                                         shield_buffs=shield_buffs or {},
-                                        range_buffs=range_buffs or {})
+                                        range_buffs=range_buffs or {},
+                                        invisibility_buffs=invisibility_buffs or {})
         else:
             self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138,
                                    shield_buffs=shield_buffs or {})
@@ -2633,9 +2657,10 @@ class Renderer:
     }
 
     def _u3_draw_party_member_sprite(self, ax, ay, ts, col, row,
-                                      member, is_active):
+                                      member, is_active, alpha=255):
         """Draw a party member on the combat arena using loaded sprite.
-        Active member gets a highlight ring. Falls back to stick figure."""
+        Active member gets a highlight ring. Falls back to stick figure.
+        alpha < 255 renders the sprite semi-transparent (for invisibility)."""
         cx = ax + col * ts + ts // 2
         cy = ay + row * ts + ts // 2
 
@@ -2648,18 +2673,38 @@ class Renderer:
             # Center the sprite on the tile
             sx = cx - sprite.get_width() // 2
             sy = cy - sprite.get_height() // 2
-            self.screen.blit(sprite, (sx, sy))
+            if alpha < 255:
+                ghost = sprite.copy()
+                ghost.set_alpha(alpha)
+                self.screen.blit(ghost, (sx, sy))
+            else:
+                self.screen.blit(sprite, (sx, sy))
         else:
             # Fallback: stick figure
             BLU = (120, 120, 255)
-            pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)
-            pygame.draw.line(self.screen, color, (cx, cy - 5), (cx, cy + 4), 2)
-            pygame.draw.line(self.screen, color, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
-            pygame.draw.line(self.screen, color, (cx, cy + 4), (cx - 5, cy + 12), 2)
-            pygame.draw.line(self.screen, color, (cx, cy + 4), (cx + 5, cy + 12), 2)
-            pygame.draw.line(self.screen, BLU, (cx + 6, cy - 8), (cx + 6, cy + 2), 2)
-            pygame.draw.rect(self.screen, BLU,
-                             pygame.Rect(cx - 10, cy - 5, 4, 7))
+            if alpha < 255:
+                # Draw to a temp surface for transparency
+                sw, sh = ts + 20, ts + 30
+                temp = pygame.Surface((sw, sh), pygame.SRCALPHA)
+                ox, oy = sw // 2, sh // 2  # local center
+                pygame.draw.circle(temp, (*color, alpha), (ox, oy - 9), 4)
+                pygame.draw.line(temp, (*color, alpha), (ox, oy - 5), (ox, oy + 4), 2)
+                pygame.draw.line(temp, (*color, alpha), (ox - 6, oy - 2), (ox + 6, oy - 2), 2)
+                pygame.draw.line(temp, (*color, alpha), (ox, oy + 4), (ox - 5, oy + 12), 2)
+                pygame.draw.line(temp, (*color, alpha), (ox, oy + 4), (ox + 5, oy + 12), 2)
+                pygame.draw.line(temp, (*BLU, alpha), (ox + 6, oy - 8), (ox + 6, oy + 2), 2)
+                pygame.draw.rect(temp, (*BLU, alpha),
+                                 pygame.Rect(ox - 10, oy - 5, 4, 7))
+                self.screen.blit(temp, (cx - sw // 2, cy - sh // 2))
+            else:
+                pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)
+                pygame.draw.line(self.screen, color, (cx, cy - 5), (cx, cy + 4), 2)
+                pygame.draw.line(self.screen, color, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
+                pygame.draw.line(self.screen, color, (cx, cy + 4), (cx - 5, cy + 12), 2)
+                pygame.draw.line(self.screen, color, (cx, cy + 4), (cx + 5, cy + 12), 2)
+                pygame.draw.line(self.screen, BLU, (cx + 6, cy - 8), (cx + 6, cy + 2), 2)
+                pygame.draw.rect(self.screen, BLU,
+                                 pygame.Rect(cx - 10, cy - 5, 4, 7))
 
         # Active-turn indicator: orange box around sprite + downward arrow above
         if is_active:
@@ -2675,6 +2720,8 @@ class Renderer:
 
         # Name label below
         name_surf = self.font_small.render(member.name[0].upper(), True, color)
+        if alpha < 255:
+            name_surf.set_alpha(alpha)
         self.screen.blit(name_surf, (cx - 3, cy + 14))
 
     # ==============================================================
@@ -3450,6 +3497,186 @@ class Renderer:
                 self.screen.blit(puff_surf,
                                  (cx - puff_r - 2, cy - puff_r - 2))
 
+    def _u3_draw_teleport_effect(self, ax, ay, ts, fx):
+        """Draw Misty Step teleport — silvery mist at origin fading out, then
+        coalescing at the destination.
+
+        Phase 1 (0–0.4): Swirling silver mist at origin, caster fades out
+        Phase 2 (0.4–0.7): Streaking silver particles travel from origin to dest
+        Phase 3 (0.7–1.0): Silver mist coalesces at destination, caster appears
+        """
+        p = fx.progress  # 0 → 1
+
+        from_cx = int(ax + fx.from_col * ts + ts // 2)
+        from_cy = int(ay + fx.from_row * ts + ts // 2)
+        to_cx = int(ax + fx.to_col * ts + ts // 2)
+        to_cy = int(ay + fx.to_row * ts + ts // 2)
+
+        SILVER = (200, 210, 230)
+        LIGHT_SILVER = (220, 230, 245)
+        MIST_BLUE = (150, 180, 220)
+        WHITE = (255, 255, 255)
+
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.4:
+            # Phase 1: swirling silver mist at origin
+            sub_p = p / 0.4
+            num_particles = int(8 + sub_p * 12)
+            expand = 1.0 + sub_p * 0.5
+            for i in range(num_particles):
+                angle = (ticks * 0.005 + i * 0.45) % (2 * math.pi)
+                r = ts * 0.3 * expand + math.sin(ticks * 0.008 + i) * 3
+                sx = from_cx + int(math.cos(angle) * r)
+                sy = from_cy + int(math.sin(angle) * r)
+                alpha = int(160 * (1.0 - sub_p * 0.5))
+                spark_r = max(1, int(3 - sub_p))
+                s = pygame.Surface((spark_r * 2 + 2, spark_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                color = SILVER if i % 2 == 0 else MIST_BLUE
+                pygame.draw.circle(s, (*color, alpha),
+                                   (spark_r + 1, spark_r + 1), spark_r)
+                self.screen.blit(s, (sx - spark_r - 1, sy - spark_r - 1))
+
+            # Fading glow at origin
+            glow_r = int(ts * 0.5)
+            glow_alpha = int(80 * (1.0 - sub_p))
+            if glow_alpha > 5:
+                glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                            pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (*LIGHT_SILVER, glow_alpha),
+                                   (glow_r + 2, glow_r + 2), glow_r)
+                self.screen.blit(glow_surf,
+                                 (from_cx - glow_r - 2, from_cy - glow_r - 2))
+
+        elif p < 0.7:
+            # Phase 2: streaking particles from origin to destination
+            sub_p = (p - 0.4) / 0.3
+            num_streaks = 6
+            for i in range(num_streaks):
+                t = (sub_p + i * 0.12) % 1.0
+                # Particle position along the line
+                px = from_cx + int((to_cx - from_cx) * t)
+                py = from_cy + int((to_cy - from_cy) * t)
+                # Add slight wobble
+                wobble = math.sin(ticks * 0.01 + i * 2.0) * 4
+                px += int(wobble)
+                py += int(math.cos(ticks * 0.01 + i * 1.5) * 3)
+                streak_alpha = int(200 * (1.0 - abs(t - 0.5) * 2))
+                streak_r = max(1, 3 - int(abs(t - 0.5) * 4))
+                s = pygame.Surface((streak_r * 2 + 2, streak_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                color = WHITE if i % 3 == 0 else SILVER
+                pygame.draw.circle(s, (*color, streak_alpha),
+                                   (streak_r + 1, streak_r + 1), streak_r)
+                self.screen.blit(s, (px - streak_r - 1, py - streak_r - 1))
+
+        else:
+            # Phase 3: silver mist coalescing at destination
+            sub_p = (p - 0.7) / 0.3
+            num_particles = int(12 * (1.0 - sub_p * 0.5))
+            contract = 1.0 - sub_p * 0.7
+            for i in range(num_particles):
+                angle = (ticks * 0.006 + i * 0.5) % (2 * math.pi)
+                r = ts * 0.4 * contract + math.sin(ticks * 0.007 + i) * 2
+                sx = to_cx + int(math.cos(angle) * r)
+                sy = to_cy + int(math.sin(angle) * r)
+                alpha = int(180 * (1.0 - sub_p * 0.8))
+                spark_r = max(1, int(3 * (1.0 - sub_p * 0.5)))
+                s = pygame.Surface((spark_r * 2 + 2, spark_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                color = LIGHT_SILVER if i % 2 == 0 else SILVER
+                pygame.draw.circle(s, (*color, alpha),
+                                   (spark_r + 1, spark_r + 1), spark_r)
+                self.screen.blit(s, (sx - spark_r - 1, sy - spark_r - 1))
+
+            # Brightening glow at destination
+            glow_r = int(ts * 0.5 * (1.0 - sub_p * 0.3))
+            glow_alpha = int(60 + 40 * sub_p)
+            glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                        pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*WHITE, min(glow_alpha, 120)),
+                               (glow_r + 2, glow_r + 2), glow_r)
+            self.screen.blit(glow_surf,
+                             (to_cx - glow_r - 2, to_cy - glow_r - 2))
+
+    def _u3_draw_invisibility_effect(self, ax, ay, ts, fx):
+        """Draw the Invisibility casting effect — character shimmers and fades.
+
+        Phase 1 (0–0.4): Silvery-white sparkles swirl inward around the caster
+        Phase 2 (0.4–0.7): Body shimmers with refractive light distortion
+        Phase 3 (0.7–1.0): Caster fades to near-transparent with a soft glow
+        """
+        p = fx.progress  # 0 → 1
+
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+
+        SILVER_WHITE = (220, 230, 250)
+        LIGHT_CYAN = (180, 220, 255)
+        PALE_BLUE = (160, 190, 240)
+
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.4:
+            # Phase 1: sparkles swirl inward
+            sub_p = p / 0.4
+            num_sparkles = int(10 + sub_p * 8)
+            contract = 1.0 - sub_p * 0.6
+            for i in range(num_sparkles):
+                angle = (ticks * 0.006 + i * 0.5) % (2 * math.pi)
+                r = ts * 0.5 * contract
+                sx = cx + int(math.cos(angle) * r)
+                sy = cy + int(math.sin(angle) * r)
+                alpha = int(180 * (0.5 + 0.5 * math.sin(ticks * 0.01 + i)))
+                spark_r = max(1, int(2.5 - sub_p))
+                s = pygame.Surface((spark_r * 2 + 2, spark_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                color = SILVER_WHITE if i % 2 == 0 else LIGHT_CYAN
+                pygame.draw.circle(s, (*color, alpha),
+                                   (spark_r + 1, spark_r + 1), spark_r)
+                self.screen.blit(s, (sx - spark_r - 1, sy - spark_r - 1))
+
+        elif p < 0.7:
+            # Phase 2: shimmering distortion around the caster
+            sub_p = (p - 0.4) / 0.3
+            for i in range(6):
+                shimmer_angle = ticks * 0.008 + i * 1.05
+                sr = ts * 0.25 + math.sin(ticks * 0.005 + i) * 4
+                sx = cx + int(math.cos(shimmer_angle) * sr)
+                sy = cy + int(math.sin(shimmer_angle) * sr)
+                shimmer_alpha = int(120 * (1.0 - sub_p * 0.5))
+                dot_r = max(1, 3)
+                s = pygame.Surface((dot_r * 2 + 2, dot_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                pygame.draw.circle(s, (*PALE_BLUE, shimmer_alpha),
+                                   (dot_r + 1, dot_r + 1), dot_r)
+                self.screen.blit(s, (sx - dot_r - 1, sy - dot_r - 1))
+
+            # Central glow
+            glow_r = int(ts * 0.4)
+            glow_alpha = int(50 + 30 * sub_p)
+            glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                        pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*SILVER_WHITE, glow_alpha),
+                               (glow_r + 2, glow_r + 2), glow_r)
+            self.screen.blit(glow_surf,
+                             (cx - glow_r - 2, cy - glow_r - 2))
+
+        else:
+            # Phase 3: fade out with residual glow
+            sub_p = (p - 0.7) / 0.3
+            fade = 1.0 - sub_p
+            glow_r = int(ts * 0.35 * fade)
+            glow_alpha = int(60 * fade)
+            if glow_r > 0 and glow_alpha > 5:
+                glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                            pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (*LIGHT_CYAN, glow_alpha),
+                                   (glow_r + 2, glow_r + 2), glow_r)
+                self.screen.blit(glow_surf,
+                                 (cx - glow_r - 2, cy - glow_r - 2))
+
     def _u3_draw_target_cursor(self, ax, ay, ts, col, row):
         """Draw a pulsing blue selection box at (col, row) on the arena."""
         ticks = pygame.time.get_ticks()
@@ -3572,7 +3799,8 @@ class Renderer:
 
     def _u3_party_combat_panel(self, fighters, active_fighter,
                                 defending_map, x, y, w, h,
-                                shield_buffs=None, range_buffs=None):
+                                shield_buffs=None, range_buffs=None,
+                                invisibility_buffs=None):
         """Party roster with character sprites and HP/MP bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -3666,6 +3894,9 @@ class Renderer:
                 indicator_y += 12
             if range_buffs and range_buffs.get(member):
                 self._u3_text("FAST", x + w - 44, indicator_y, (80, 255, 120), self.font_small)
+                indicator_y += 12
+            if invisibility_buffs and invisibility_buffs.get(member):
+                self._u3_text("INVIS", x + w - 48, indicator_y, (180, 200, 255), self.font_small)
 
             # ── Ammo indicator for throwable weapons ──
             if member.is_throwable_weapon():
