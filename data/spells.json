@@ -30,7 +30,7 @@
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
       "min_level": 1,
-      "mp_cost": 8,
+      "mp_cost": 5,
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
@@ -91,7 +91,7 @@
       "allowable_classes": ["Cleric"],
       "casting_type": "priest",
       "min_level": 1,
-      "mp_cost": 8,
+      "mp_cost": 5,
       "duration": "instant",
       "effect_type": "undead_damage",
       "effect_value": {
@@ -104,13 +104,33 @@
       "hit_sfx": null
     },
     {
+      "id": "charm_person",
+      "name": "Charm Person",
+      "description": "Weaves an enchantment that bends the will of a humanoid creature, causing it to leave the fight peacefully.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": "instant",
+      "effect_type": "charm",
+      "effect_value": {
+        "save_dc_stat": "intelligence",
+        "save_dc_base": 10
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
       "id": "push",
       "name": "Push",
       "description": "Emits a wave of divine force that drives nearby monsters away from the party.",
       "allowable_classes": ["Cleric"],
       "casting_type": "priest",
       "min_level": 1,
-      "mp_cost": 2,
+      "mp_cost": 5,
       "duration": 1000,
       "effect_type": "repel_monsters",
       "effect_value": {

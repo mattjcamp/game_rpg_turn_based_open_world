@@ -34,7 +34,7 @@ class Monster:
     def __init__(self, name, hp, ac, attack_bonus,
                  damage_dice=1, damage_sides=4, damage_bonus=0,
                  xp_reward=25, gold_reward=10, color=(200, 50, 50),
-                 tile=None, undead=False, terrain="land"):
+                 tile=None, undead=False, humanoid=False, terrain="land"):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -48,7 +48,9 @@ class Monster:
         self.color = color   # Fallback color for procedural rendering
         self.tile = tile     # Filename in src/assets/ (e.g. "orc_f1.png")
         self.undead = undead  # True for undead creatures (skeleton, zombie, etc.)
+        self.humanoid = humanoid  # True for humanoid creatures (orc, goblin, etc.)
         self.terrain = terrain  # "land" or "sea" — restricts where this monster can move
+        self.charmed = False    # True when under Charm Person — fights for the player
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -173,6 +175,7 @@ def create_monster(name):
         color=tuple(data.get("color", [200, 50, 50])),
         tile=data.get("tile"),
         undead=data.get("undead", False),
+        humanoid=data.get("humanoid", False),
         terrain=data.get("terrain", "land"),
     )
 

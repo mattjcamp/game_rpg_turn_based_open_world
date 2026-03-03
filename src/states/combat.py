@@ -58,6 +58,7 @@ PHASE_SPELL_SELECT = "spell_select"  # choosing a spell from the list
 PHASE_THROW_SELECT = "throw_select"  # choosing an item to throw
 PHASE_USE_ITEM     = "use_item"      # choosing an item to use
 PHASE_EQUIP       = "equip"          # character sheet / equip screen
+PHASE_CHARM       = "charm"          # charm person animation playing
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -304,6 +305,29 @@ class TurnUndeadEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class CharmEffect:
+    """A swirling pink/purple enchantment spiral around the target monster."""
+
+    DURATION = 1.4  # seconds
+
+    def __init__(self, col, row, success=True):
+        self.col = col
+        self.row = row
+        self.success = success  # True = charmed, False = resisted
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
 
@@ -392,6 +416,10 @@ class CombatState(BaseState):
 
         # Turn Undead effects
         self.turn_undead_effects = []  # active TurnUndeadEffect objects
+
+        # Charm Person effects
+        self.charm_effects = []       # active CharmEffect objects
+        self.charm_target = None      # Monster being charmed (removed when anim ends)
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -520,6 +548,8 @@ class CombatState(BaseState):
         self.shield_effects = []
         self.shield_buffs = {}
         self.turn_undead_effects = []
+        self.charm_effects = []
+        self.charm_target = None
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -721,7 +751,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM):
             return
 
         # Equip screen handles its own input
@@ -952,6 +982,8 @@ class CombatState(BaseState):
                                abs(self.shield_target_row - caster_row))
                     if dist > spell_range:
                         self.combat_log.append("Target is out of range!")
+                    elif spell.get("effect_type") == "charm":
+                        self._cast_charm_person(f, target)
                     else:
                         self._cast_targeted_damage_spell(f, target)
                 else:
@@ -2024,6 +2056,115 @@ class CombatState(BaseState):
             if not target.is_alive():
                 self._on_monster_killed(target)
 
+    # ── Charm Person casting ─────────────────────────────────────────
+
+    def _cast_charm_person(self, caster, target):
+        """Cast Charm Person — charms a humanoid monster to fight for the party.
+
+        The target must be humanoid.  The monster gets a Wisdom save
+        against a DC based on the caster's Intelligence.  On a failed
+        save the monster is charmed and will attack other monsters on
+        its turns.  On a successful save the spell has no effect but
+        still costs MP.
+        """
+        spell = SPELLS_DATA.get(self.selected_spell, {})
+        mp_cost = spell.get("mp_cost", 5)
+        spell_name = spell.get("name", "Charm Person").upper()
+
+        # Check casting ability
+        casting_type = spell.get("casting_type", "sorcerer")
+        if casting_type == "sorcerer" and not caster.can_cast_sorcerer():
+            self.combat_log.append(f"{caster.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+        if casting_type == "priest" and not caster.can_cast_priest():
+            self.combat_log.append(f"{caster.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if caster.current_mp < mp_cost:
+            self.combat_log.append(
+                f"{caster.name} doesn't have enough MP! (need {mp_cost})")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Must be humanoid
+        if not getattr(target, "humanoid", False):
+            self.combat_log.append(
+                f"{target.name} is not humanoid — {spell_name} has no effect!")
+            # Still costs the turn but not MP
+            self.selected_spell = None
+            self._end_fighter_turn()
+            return
+
+        # Already charmed?
+        if getattr(target, "charmed", False):
+            self.combat_log.append(
+                f"{target.name} is already charmed!")
+            self.selected_spell = None
+            self._end_fighter_turn()
+            return
+
+        # Deduct MP
+        caster.current_mp -= mp_cost
+
+        # Calculate save DC: base + caster's Intelligence modifier
+        ev = spell.get("effect_value", {})
+        dc_base = ev.get("save_dc_base", 10)
+        dc_stat = ev.get("save_dc_stat", "intelligence")
+        if dc_stat == "intelligence":
+            save_dc = dc_base + caster.int_mod
+        elif dc_stat == "wisdom":
+            save_dc = dc_base + caster.wis_mod
+        else:
+            save_dc = dc_base
+
+        # Monster Wisdom save (use attack_bonus as a rough save bonus)
+        save_roll = roll_d20()
+        save_bonus = max(0, target.attack_bonus - 2)  # rough Wis save
+        save_total = save_roll + save_bonus
+
+        mc, mr = self.monster_positions.get(target, (0, 0))
+
+        if save_total >= save_dc:
+            # Monster resisted!
+            self.combat_log.append(
+                f"{caster.name} casts {spell_name} on {target.name}! (-{mp_cost} MP)")
+            self.combat_log.append(
+                f"{target.name} resists! (save {save_roll}+{save_bonus}="
+                f"{save_total} vs DC {save_dc})")
+            self.charm_effects.append(CharmEffect(mc, mr, success=False))
+            self.charm_target = None
+            self.selected_spell = None
+            self.phase = PHASE_CHARM
+            sfx = spell.get("sfx")
+            if sfx:
+                self.game.sfx.play(sfx)
+        else:
+            # Charmed! Monster switches sides and attacks other monsters
+            self.combat_log.append(
+                f"{caster.name} casts {spell_name} on {target.name}! (-{mp_cost} MP)")
+            self.combat_log.append(
+                f"{target.name} is CHARMED! (save {save_roll}+{save_bonus}="
+                f"{save_total} vs DC {save_dc})")
+            self.combat_log.append(
+                f"{target.name} turns against its allies!")
+            target.charmed = True
+            # Zero out rewards — charmed monsters don't give XP/gold
+            target.xp_reward = 0
+            target.gold_reward = 0
+            self.charm_effects.append(CharmEffect(mc, mr, success=True))
+            self.charm_target = target
+            self.selected_spell = None
+            self.phase = PHASE_CHARM
+            sfx = spell.get("sfx")
+            if sfx:
+                self.game.sfx.play(sfx)
+
     def _apply_use_item(self, item_name, effect, power):
         """Apply a consumable item's effect and consume it."""
         f = self.active_fighter
@@ -2176,6 +2317,11 @@ class CombatState(BaseState):
         mon = self.monsters[self.active_monster_idx]
         mc, mr = self.monster_positions.get(mon, (0, 0))
 
+        # ── Charmed monster: attacks other (non-charmed) monsters ──
+        if getattr(mon, "charmed", False):
+            self._charmed_monster_turn(mon)
+            return
+
         # Find closest alive fighter
         best_dist = 999
         best_target = None
@@ -2321,6 +2467,144 @@ class CombatState(BaseState):
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 800
 
+    # ── Charmed monster AI ─────────────────────────────────────────
+
+    def _charmed_monster_turn(self, mon):
+        """A charmed monster targets the closest non-charmed enemy monster."""
+        mc, mr = self.monster_positions.get(mon, (0, 0))
+
+        # Find alive, non-charmed monsters as targets
+        enemies = [m for m in self.monsters
+                   if m is not mon and m.is_alive() and not getattr(m, "charmed", False)]
+
+        if not enemies:
+            # No enemies left — charmed monster just idles
+            self.combat_log.append(
+                f"{mon.name} (charmed) looks around peacefully.")
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 500
+            return
+
+        # Find closest enemy monster
+        best_dist = 999
+        best_target = None
+        for enemy in enemies:
+            ec, er = self.monster_positions.get(enemy, (0, 0))
+            dist = max(abs(ec - mc), abs(er - mr))
+            if dist < best_dist:
+                best_dist = dist
+                best_target = enemy
+
+        # Check adjacency to any enemy monster
+        adjacent = []
+        for enemy in enemies:
+            ec, er = self.monster_positions.get(enemy, (0, 0))
+            if max(abs(ec - mc), abs(er - mr)) == 1:
+                adjacent.append(enemy)
+
+        if adjacent:
+            target = random.choice(adjacent)
+            self._charmed_monster_attack(mon, target)
+        else:
+            # Move toward closest enemy monster
+            self._charmed_monster_move_toward(mon, best_target)
+            self.combat_log.append(
+                f"{mon.name} (charmed) moves toward {best_target.name}...")
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 500
+
+    def _charmed_monster_move_toward(self, monster, target_monster):
+        """Move a charmed monster one step toward a target monster."""
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        tc, tr = self.monster_positions.get(target_monster, (0, 0))
+
+        best_dist = max(abs(mc - tc), abs(mr - tr))
+        candidates = []
+
+        for dcol, drow in [
+            (0, -1), (0, 1), (-1, 0), (1, 0),
+            (-1, -1), (-1, 1), (1, -1), (1, 1),
+        ]:
+            nc, nr = mc + dcol, mr + drow
+            # Check occupied by fighter
+            occupied = False
+            for m in self.fighters:
+                if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
+                    occupied = True
+                    break
+            if occupied:
+                continue
+            # Check occupied by another alive monster (can't stack)
+            for other in self.monsters:
+                if other is monster or not other.is_alive():
+                    continue
+                if self.monster_positions.get(other) == (nc, nr):
+                    occupied = True
+                    break
+            if occupied:
+                continue
+            if self._is_arena_wall(nc, nr):
+                continue
+            dist = max(abs(nc - tc), abs(nr - tr))
+            if dist < best_dist:
+                candidates = [(nc, nr)]
+                best_dist = dist
+            elif dist == best_dist:
+                candidates.append((nc, nr))
+
+        if candidates:
+            nc, nr = random.choice(candidates)
+            self.monster_positions[monster] = (nc, nr)
+
+    def _charmed_monster_attack(self, attacker, target):
+        """A charmed monster attacks another (non-charmed) monster."""
+        hit, roll, total, crit = roll_attack(
+            attacker.attack_bonus, target.ac
+        )
+
+        if crit:
+            self.combat_log.append(
+                f"{attacker.name} (charmed) → {target.name}: "
+                f"rolls {roll} — CRITICAL HIT!")
+            self.game.sfx.play("critical")
+        elif hit:
+            self.combat_log.append(
+                f"{attacker.name} (charmed) → {target.name}: "
+                f"rolls {roll} ({format_modifier(attacker.attack_bonus)}) "
+                f"= {total} vs AC {target.ac} — Hit!")
+            self.game.sfx.play("explosion")
+        else:
+            self.combat_log.append(
+                f"{attacker.name} (charmed) → {target.name}: "
+                f"rolls {roll} ({format_modifier(attacker.attack_bonus)}) "
+                f"= {total} vs AC {target.ac} — Miss!")
+            self.game.sfx.play("miss")
+
+        if hit:
+            damage = roll_damage(
+                attacker.damage_dice,
+                attacker.damage_sides,
+                attacker.damage_bonus,
+                critical=crit,
+            )
+            target.hp = max(0, target.hp - damage)
+            self.combat_log.append(
+                f"{attacker.name} deals {damage} damage to {target.name}!")
+
+            # Spawn hit effect on the target monster
+            tc, tr = self.monster_positions.get(target, (0, 0))
+            self.hit_effects.append(HitEffect(tc, tr, damage))
+
+        if not target.is_alive():
+            self._on_monster_killed(target)
+
+        # Check if all non-charmed monsters are dead
+        if self._all_monsters_dead():
+            self._trigger_victory()
+        else:
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 800
+
     # ── Phase machine ────────────────────────────────────────────
 
     def update(self, dt):
@@ -2383,6 +2667,22 @@ class CombatState(BaseState):
             return
         self.turn_undead_effects = [fx for fx in self.turn_undead_effects if fx.alive]
 
+        # Update charm effects
+        for fx in self.charm_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_CHARM:
+            if all(not fx.alive for fx in self.charm_effects):
+                self.charm_effects = []
+                self.charm_target = None
+                # Check if all non-charmed monsters are dead
+                if self._all_monsters_dead():
+                    self._trigger_victory()
+                else:
+                    self._end_fighter_turn()
+            return
+        self.charm_effects = [fx for fx in self.charm_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -2443,8 +2743,15 @@ class CombatState(BaseState):
     # ── Monster death & victory helpers ─────────────────────────
 
     def _all_monsters_dead(self):
-        """True if every monster in the encounter is dead."""
-        return all(not m.is_alive() for m in self.monsters)
+        """True if every non-charmed monster in the encounter is dead.
+
+        Charmed monsters fight for the party, so they don't count as
+        enemies for the purpose of the victory check.
+        """
+        for m in self.monsters:
+            if m.is_alive() and not getattr(m, "charmed", False):
+                return False
+        return True
 
     def _on_monster_killed(self, monster):
         """Log a monster's death. Does NOT trigger victory — caller checks."""
@@ -2584,6 +2891,7 @@ class CombatState(BaseState):
             shield_target_col=self.shield_target_col,
             shield_target_row=self.shield_target_row,
             turn_undead_effects=self.turn_undead_effects,
+            charm_effects=self.charm_effects,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,

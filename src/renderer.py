@@ -2183,6 +2183,7 @@ class Renderer:
                           shield_target_col=0,
                           shield_target_row=0,
                           turn_undead_effects=None,
+                          charm_effects=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2231,6 +2232,9 @@ class Renderer:
                     self._u3_draw_orc_combat_sprite(mon, mx, my, ts, mc, mr)
                 else:
                     self._u3_draw_monster_sprite(mon, mx, my, ts, mc, mr)
+                # Draw charmed indicator (pink glow + hearts)
+                if getattr(mon, "charmed", False):
+                    self._u3_draw_charmed_indicator(mx, my, ts, mc, mr)
         elif monster and monster.is_alive():
             # Legacy single-monster fallback
             if is_outdoor:
@@ -2349,6 +2353,12 @@ class Renderer:
             for fx in turn_undead_effects:
                 if fx.alive:
                     self._u3_draw_turn_undead_effect(mx, my, ts, fx)
+
+        # ── 2k. charm effects ──
+        if charm_effects:
+            for fx in charm_effects:
+                if fx.alive:
+                    self._u3_draw_charm_effect(mx, my, ts, fx)
 
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
@@ -3099,6 +3109,149 @@ class Renderer:
                     self.screen.blit(spark_surf,
                                      (sx - s_size - 1, sy - s_size - 1))
 
+    def _u3_draw_charmed_indicator(self, ax, ay, ts, col, row):
+        """Draw a pulsing pink glow and floating hearts over a charmed monster."""
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ax + row * ts + ts // 2)
+        # Correct y base from ax to ay
+        cy = int(ay + row * ts + ts // 2)
+
+        PINK = (255, 120, 200)
+        MAGENTA = (220, 60, 180)
+
+        # Pulsing pink glow around the monster
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.004)
+        glow_r = int(ts // 2 + 2)
+        glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                    pygame.SRCALPHA)
+        alpha = int(40 + 30 * pulse)
+        pygame.draw.circle(glow_surf, (*PINK, alpha),
+                           (glow_r + 2, glow_r + 2), glow_r)
+        self.screen.blit(glow_surf,
+                         (cx - glow_r - 2, cy - glow_r - 2))
+
+        # Small floating hearts above the monster
+        for i in range(2):
+            h_phase = (ticks * 0.002 + i * 1.5) % 2.0
+            if h_phase < 1.0:
+                hx = cx + int(math.sin(h_phase * 3.14 + i) * 5)
+                hy = cy - ts // 2 - int(h_phase * 8) - i * 4
+                h_size = max(1, int(2 * (1.0 - h_phase)))
+                h_alpha = int(180 * (1.0 - h_phase))
+                if h_alpha > 10:
+                    h_surf = pygame.Surface((h_size * 2 + 2, h_size * 2 + 2),
+                                             pygame.SRCALPHA)
+                    pygame.draw.circle(h_surf, (*MAGENTA, h_alpha),
+                                       (h_size + 1, h_size + 1), h_size)
+                    self.screen.blit(h_surf,
+                                     (hx - h_size - 1, hy - h_size - 1))
+
+    def _u3_draw_charm_effect(self, ax, ay, ts, fx):
+        """Draw the Charm Person enchantment — swirling pink/purple spirals.
+
+        Phase 1 (0–0.3): Pink sparkles gather around the target
+        Phase 2 (0.3–0.7): Swirling enchantment spiral tightens
+        Phase 3 (0.7–1.0): Flash (pink for success, red puff for resist) + fade
+        """
+        p = fx.progress  # 0 → 1
+
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+
+        PINK = (255, 120, 200)
+        PURPLE = (180, 80, 220)
+        MAGENTA = (220, 60, 180)
+        RESIST_RED = (255, 80, 80)
+
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: pink sparkles gathering
+            sub_p = p / 0.3
+            num_sparks = int(6 + sub_p * 6)
+            for i in range(num_sparks):
+                angle = math.radians(i * (360 / num_sparks) + ticks * 0.2)
+                dist = int(20 - sub_p * 12)
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                s_size = max(1, int(3 * sub_p))
+                alpha = int(160 * sub_p)
+                spark_surf = pygame.Surface((s_size * 2 + 2, s_size * 2 + 2),
+                                            pygame.SRCALPHA)
+                color = PINK if i % 2 == 0 else PURPLE
+                pygame.draw.circle(spark_surf, (*color, alpha),
+                                   (s_size + 1, s_size + 1), s_size)
+                self.screen.blit(spark_surf,
+                                 (sx - s_size - 1, sy - s_size - 1))
+
+        elif p < 0.7:
+            # Phase 2: swirling enchantment spiral
+            sub_p = (p - 0.3) / 0.4
+            num_orbs = 8
+            for i in range(num_orbs):
+                base_angle = i * (360 / num_orbs)
+                spin = ticks * 0.3 + sub_p * 360
+                angle = math.radians(base_angle + spin)
+                dist = int(14 - sub_p * 6)
+                ox = cx + int(math.cos(angle) * dist)
+                oy = cy + int(math.sin(angle) * dist)
+                o_size = max(1, int(2 + sub_p * 2))
+                alpha = int(200 * (0.5 + 0.5 * math.sin(sub_p * 10 + i)))
+                alpha = max(0, min(255, alpha))
+                orb_surf = pygame.Surface((o_size * 2 + 2, o_size * 2 + 2),
+                                           pygame.SRCALPHA)
+                color = MAGENTA if i % 2 == 0 else PURPLE
+                pygame.draw.circle(orb_surf, (*color, alpha),
+                                   (o_size + 1, o_size + 1), o_size)
+                self.screen.blit(orb_surf,
+                                 (ox - o_size - 1, oy - o_size - 1))
+            # Central glow
+            glow_r = int(6 + sub_p * 4)
+            glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                        pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*PINK, int(100 * sub_p)),
+                               (glow_r + 2, glow_r + 2), glow_r)
+            self.screen.blit(glow_surf,
+                             (cx - glow_r - 2, cy - glow_r - 2))
+
+        else:
+            # Phase 3: result flash + fade
+            sub_p = (p - 0.7) / 0.3
+            fade = 1.0 - sub_p
+
+            if fx.success:
+                # Pink/magenta burst — charmed!
+                burst_r = int(10 + sub_p * 18)
+                burst_surf = pygame.Surface((burst_r * 2 + 4, burst_r * 2 + 4),
+                                             pygame.SRCALPHA)
+                pygame.draw.circle(burst_surf, (*PINK, int(160 * fade)),
+                                   (burst_r + 2, burst_r + 2), burst_r)
+                self.screen.blit(burst_surf,
+                                 (cx - burst_r - 2, cy - burst_r - 2))
+                # Heart-like sparkles floating up
+                for i in range(4):
+                    hx = cx + int(math.sin(ticks * 0.005 + i * 1.5) * 8)
+                    hy = cy - int(sub_p * 20) - i * 5
+                    h_size = max(1, int(3 * fade))
+                    h_alpha = int(200 * fade)
+                    if h_alpha > 10:
+                        h_surf = pygame.Surface((h_size * 2 + 2, h_size * 2 + 2),
+                                                 pygame.SRCALPHA)
+                        pygame.draw.circle(h_surf, (*MAGENTA, h_alpha),
+                                           (h_size + 1, h_size + 1), h_size)
+                        self.screen.blit(h_surf,
+                                         (hx - h_size - 1, hy - h_size - 1))
+            else:
+                # Red puff — resisted
+                puff_r = int(8 + sub_p * 10)
+                puff_surf = pygame.Surface((puff_r * 2 + 4, puff_r * 2 + 4),
+                                            pygame.SRCALPHA)
+                pygame.draw.circle(puff_surf, (*RESIST_RED, int(120 * fade)),
+                                   (puff_r + 2, puff_r + 2), puff_r)
+                self.screen.blit(puff_surf,
+                                 (cx - puff_r - 2, cy - puff_r - 2))
+
     def _u3_draw_target_cursor(self, ax, ay, ts, col, row):
         """Draw a pulsing blue selection box at (col, row) on the arena."""
         ticks = pygame.time.get_ticks()
@@ -3434,8 +3587,17 @@ class Renderer:
 
             # ── Name (to the right of sprite) ──
             info_x = tx + sprite_size + 6
-            name_color = self._U3_RED if mon.is_alive() else (120, 40, 40)
-            self._u3_text(mon.name, info_x, row_top, name_color, f)
+            is_charmed = getattr(mon, "charmed", False)
+            if is_charmed:
+                name_color = (255, 120, 200)  # Pink for charmed
+                display_name = f"{mon.name} (Ally)"
+            elif mon.is_alive():
+                name_color = self._U3_RED
+                display_name = mon.name
+            else:
+                name_color = (120, 40, 40)
+                display_name = mon.name
+            self._u3_text(display_name, info_x, row_top, name_color, f)
 
             # ── Stat line: AC, damage dice, attack bonus ──
             stat_y = row_top + 16
