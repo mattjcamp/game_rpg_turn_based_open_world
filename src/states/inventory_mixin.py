@@ -274,15 +274,42 @@ class InventoryMixin:
 
     # ── Party stash screen ─────────────────────────────────────
 
-    # Index of the CAST row in the unified cursor (right after effect slots)
+    # Index of the CAST row in the unified cursor (right after effect rows)
     def _stash_layout(self):
-        """Return (NUM_EFFECTS, CAST_INDEX, STASH_START, total_items)."""
+        """Return (NUM_EFFECT_ROWS, CAST_INDEX, STASH_START, total_items).
+
+        NUM_EFFECT_ROWS counts active effects + available (unassigned) effects.
+        """
         party = self.game.party
-        n = len(party.EFFECT_SLOTS)
+        n = len(self._all_effect_rows())
         cast_idx = n                        # one row for CAST
         stash_start = cast_idx + 1
         total = stash_start + len(party.shared_inventory)
         return n, cast_idx, stash_start, total
+
+    def _active_effects(self):
+        """Return a list of (slot_key, effect_name) for non-empty effect slots."""
+        party = self.game.party
+        return [(s, party.get_effect(s)) for s in party.EFFECT_SLOTS
+                if party.get_effect(s) is not None]
+
+    def _available_effects(self):
+        """Return a list of effect dicts the party qualifies for but hasn't slotted."""
+        return self.game.party.get_available_effects()
+
+    def _all_effect_rows(self):
+        """Build the combined effect list: active first, then available.
+
+        Returns a list of tuples:
+          ('active', slot_key, effect_name)   — currently slotted
+          ('available', effect_dict)          — can be assigned
+        """
+        rows = []
+        for slot_key, eff_name in self._active_effects():
+            rows.append(('active', slot_key, eff_name))
+        for eff in self._available_effects():
+            rows.append(('available', eff))
+        return rows
 
     def _handle_party_inv_input(self, event):
         """Handle input for the shared party inventory screen.
@@ -304,23 +331,6 @@ class InventoryMixin:
                 self.examining_item = None
             return
 
-        # Effect chooser is open
-        if self.choosing_effect:
-            if event.key == pygame.K_ESCAPE:
-                self.choosing_effect = False
-            elif event.key == pygame.K_UP and self.effect_list:
-                self.effect_cursor = (self.effect_cursor - 1) % len(self.effect_list)
-            elif event.key == pygame.K_DOWN and self.effect_list:
-                self.effect_cursor = (self.effect_cursor + 1) % len(self.effect_list)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and self.effect_list:
-                chosen_eff = self.effect_list[self.effect_cursor]
-                eff_idx = self.party_inv_cursor
-                slot_key = party.EFFECT_SLOTS[eff_idx]
-                party.set_effect(slot_key, chosen_eff["name"])
-                self._on_effect_assigned(chosen_eff["name"])
-                self.choosing_effect = False
-            return
-
         # Action menu is open
         if self.party_inv_action_menu:
             options = self._get_party_inv_action_options()
@@ -340,13 +350,42 @@ class InventoryMixin:
                 self.party_inv_action_menu = False
             return
 
-        # Browsing unified list (effect slots + CAST + inventory)
+        # Browsing unified list (active effects + CAST + inventory)
         if event.key == pygame.K_UP and total_items > 0:
             self.party_inv_cursor = (self.party_inv_cursor - 1) % total_items
         elif event.key == pygame.K_DOWN and total_items > 0:
             self.party_inv_cursor = (self.party_inv_cursor + 1) % total_items
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and total_items > 0:
-            if self.party_inv_cursor == CAST_INDEX:
+            idx = self.party_inv_cursor
+            if idx < NUM_EFFECTS:
+                # Effect row — toggle: remove if active, assign if available
+                all_rows = self._all_effect_rows()
+                if idx < len(all_rows):
+                    row = all_rows[idx]
+                    if row[0] == 'active':
+                        # Remove the active effect
+                        slot_key, eff_name = row[1], row[2]
+                        self._on_effect_removed(eff_name)
+                        party.set_effect(slot_key, None)
+                    else:
+                        # Assign available effect to first free slot
+                        eff_dict = row[1]
+                        eff_name = eff_dict["name"]
+                        assigned = False
+                        for slot_key in party.EFFECT_SLOTS:
+                            if party.get_effect(slot_key) is None:
+                                party.set_effect(slot_key, eff_name)
+                                self._on_effect_assigned(eff_name)
+                                assigned = True
+                                break
+                        if not assigned:
+                            self.show_message(
+                                "All effect slots are full!", 2000)
+                    # Adjust cursor if needed after change
+                    new_n, _, _, new_total = self._stash_layout()
+                    if self.party_inv_cursor >= new_total and new_total > 0:
+                        self.party_inv_cursor = new_total - 1
+            elif idx == CAST_INDEX:
                 # Open spell casting overlay
                 spells = self._build_castable_spells()
                 self.spell_list_items = spells
@@ -379,17 +418,8 @@ class InventoryMixin:
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
-            slot_key = party.EFFECT_SLOTS[idx]
-            if chosen == "ASSIGN EFFECT":
-                self.effect_list = party.get_available_effects()
-                self.effect_cursor = 0
-                self.choosing_effect = True
-                self.party_inv_action_menu = False
-            elif chosen == "REMOVE":
-                removed = party.get_effect(slot_key)
-                self._on_effect_removed(removed)
-                party.set_effect(slot_key, None)
-                self.party_inv_action_menu = False
+            # Effect rows are handled directly by Enter (remove), not action menu
+            self.party_inv_action_menu = False
         elif idx == CAST_INDEX:
             # CAST row — handled by browsing Enter, not by action menu
             self.party_inv_action_menu = False
@@ -434,14 +464,8 @@ class InventoryMixin:
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
-            slot_key = party.EFFECT_SLOTS[idx]
-            current = party.get_effect(slot_key)
-            options = []
-            if party.get_available_effects():
-                options.append("ASSIGN EFFECT")
-            if current is not None:
-                options.append("REMOVE")
-            return options
+            # Effect rows — no action menu; Enter removes directly
+            return []
         elif idx == CAST_INDEX:
             # No action menu for the CAST row — Enter opens spell list directly
             return []

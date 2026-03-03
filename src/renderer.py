@@ -4950,7 +4950,7 @@ class Renderer:
         - Normal: browse items with cursor, Enter to open action menu.
         - action_menu: choose from context-sensitive options.
         """
-        from src.party import WEAPONS, ARMORS, ITEM_INFO
+        from src.party import WEAPONS, ARMORS, ITEM_INFO, EFFECTS_DATA
 
         fm = self.font_med
         f = self.font
@@ -4981,38 +4981,54 @@ class Renderer:
         tx = left_x + 12
         ty = panel_y + 10
 
-        # ── Effects section ──
+        # ── Effects section (active + available effects) ──
         self._u3_text("EFFECTS", tx, ty, self._U3_ORANGE, fm)
         ty += 24
 
-        NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        for ei, slot_key in enumerate(party.EFFECT_SLOTS):
-            effect = party.get_effect(slot_key)
-            selected = (ei == cursor_index)
-            prefix = "> " if selected else "  "
+        # Build combined list: active effects first, then available
+        active_effects = [(s, party.get_effect(s)) for s in party.EFFECT_SLOTS
+                          if party.get_effect(s) is not None]
+        available_effects = party.get_available_effects()
+        all_effect_rows = []
+        for slot_key, eff_name in active_effects:
+            all_effect_rows.append(('active', slot_key, eff_name))
+        for eff in available_effects:
+            all_effect_rows.append(('available', eff))
+        NUM_EFFECTS = len(all_effect_rows)
 
-            slot_num = f"{ei + 1}."
-            name_color = self._U3_WHITE if selected else self._U3_LTBLUE
-            self._u3_text(f"{prefix}{slot_num}", tx, ty, name_color, fm)
-
-            if effect:
-                eff_color = self._U3_WHITE if selected else (220, 220, 230)
-                display_eff = effect
-                if effect == "Torch":
-                    torch_charges = party.get_equipped_charges("light")
-                    if torch_charges is not None:
-                        display_eff = f"Torch ({torch_charges})"
-                self._u3_text(display_eff, tx + 40, ty, eff_color, fm)
-            else:
-                self._u3_text("-- EMPTY --", tx + 40, ty, (120, 120, 120), fm)
-
-            if selected:
-                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
-                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
-                sel_surf.fill((255, 255, 255, 25))
-                self.screen.blit(sel_surf, sel_rect)
-
+        if not all_effect_rows:
+            self._u3_text("  (NONE)", tx, ty, (120, 120, 120), fm)
             ty += row_h
+        else:
+            for ei, row in enumerate(all_effect_rows):
+                selected = (ei == cursor_index)
+                prefix = "> " if selected else "  "
+
+                if row[0] == 'active':
+                    _slot_key, effect = row[1], row[2]
+                    eff_color = self._U3_WHITE if selected else (220, 220, 230)
+                    display_eff = effect
+                    if effect == "Torch":
+                        torch_charges = party.get_equipped_charges("light")
+                        if torch_charges is not None:
+                            display_eff = f"Torch ({torch_charges})"
+                    # Active marker
+                    self._u3_text(f"{prefix}{display_eff}", tx, ty, eff_color, fm)
+                    # Small green dot to indicate active
+                    pygame.draw.circle(self.screen, self._U3_GREEN,
+                                       (tx + left_w - 30, ty + row_h // 2), 4)
+                else:
+                    eff_dict = row[1]
+                    eff_color = (150, 150, 170) if not selected else (200, 200, 220)
+                    self._u3_text(f"{prefix}{eff_dict['name']}", tx, ty, eff_color, fm)
+
+                if selected:
+                    sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                    sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                    sel_surf.fill((255, 255, 255, 25))
+                    self.screen.blit(sel_surf, sel_rect)
+
+                ty += row_h
 
         # ── Divider ──
         ty += 6
@@ -5172,15 +5188,23 @@ class Renderer:
         # ── Item detail section ──
         sel_item = None
         sel_charges = None
-        is_effect_slot = (cursor_index < NUM_EFFECTS)
+        is_effect_row = (cursor_index < NUM_EFFECTS)
+        is_active_effect = False
+        is_available_effect = False
+        effect_row_data = None
+        if is_effect_row and cursor_index < len(all_effect_rows):
+            effect_row_data = all_effect_rows[cursor_index]
+            if effect_row_data[0] == 'active':
+                is_active_effect = True
+                sel_item = effect_row_data[2]
+                if sel_item == "Torch":
+                    sel_charges = party.get_equipped_charges("light")
+            else:
+                is_available_effect = True
         is_cast_row = (cursor_index == CAST_INDEX)
         header_count = NUM_EFFECTS + 1  # effects + CAST row
-        if is_effect_slot:
-            eff_slot_key = party.EFFECT_SLOTS[cursor_index]
-            sel_item = party.get_effect(eff_slot_key)
-            # Show torch charges when effect is Torch
-            if sel_item == "Torch":
-                sel_charges = party.get_equipped_charges("light")
+        if is_active_effect:
+            pass  # sel_item already set above
         elif is_cast_row:
             pass  # no item detail for the CAST row
         elif cursor_index - header_count < len(inv):
@@ -5190,7 +5214,7 @@ class Renderer:
 
         # Show details of the selected item
         if sel_item:
-            if is_effect_slot:
+            if is_active_effect:
                 self._u3_text("ACTIVE EFFECT", rx, ry, self._U3_ORANGE, fm)
             else:
                 self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
@@ -5222,12 +5246,19 @@ class Renderer:
                 ry += 18
                 self._u3_text(f"CHARGES: {sel_charges}", rx, ry, (255, 170, 85), fm)
 
-            # Description
+            # Description — check item info first, then effect definitions
             info = ITEM_INFO.get(sel_item)
+            desc = None
             if info and info.get("desc"):
-                ry += 24
                 desc = info["desc"]
-                # Word-wrap description
+            elif is_active_effect:
+                # Look up in EFFECTS_DATA for non-item effects
+                for edef in EFFECTS_DATA:
+                    if edef["name"] == sel_item:
+                        desc = edef.get("description", "")
+                        break
+            if desc:
+                ry += 24
                 words = desc.split()
                 line = ""
                 for word in words:
@@ -5240,6 +5271,9 @@ class Renderer:
                         line = test
                 if line:
                     self._u3_text(line, rx, ry, (180, 180, 200), fm)
+            if is_active_effect:
+                ry += 20
+                self._u3_text("ENTER to remove", rx, ry, (200, 100, 100), fm)
         elif is_cast_row:
             self._u3_text("CAST SPELL", rx, ry, self._U3_GREEN, fm)
             ry += 22
@@ -5248,10 +5282,36 @@ class Renderer:
             self._u3_text("available spells for", rx, ry, (180, 180, 200), fm)
             ry += 16
             self._u3_text("the current location.", rx, ry, (180, 180, 200), fm)
-        elif is_effect_slot:
-            self._u3_text("EFFECT SLOT", rx, ry, self._U3_ORANGE, fm)
+        elif is_available_effect and effect_row_data:
+            eff_dict = effect_row_data[1]
+            self._u3_text("AVAILABLE EFFECT", rx, ry, self._U3_LTBLUE, fm)
             ry += 22
-            self._u3_text("(EMPTY)", rx, ry, (120, 120, 120), fm)
+            self._u3_text(eff_dict["name"], rx, ry, self._U3_WHITE, f)
+            ry += 24
+            # Show description
+            desc = eff_dict.get("description", "")
+            if desc:
+                words = desc.split()
+                line = ""
+                for word in words:
+                    test = f"{line} {word}".strip()
+                    if len(test) > 28:
+                        self._u3_text(line, rx, ry, (180, 180, 200), fm)
+                        ry += 16
+                        line = word
+                    else:
+                        line = test
+                if line:
+                    self._u3_text(line, rx, ry, (180, 180, 200), fm)
+                ry += 20
+            # Show requirements
+            reqs = eff_dict.get("requirements", {})
+            if reqs:
+                for rk, rv in reqs.items():
+                    self._u3_text(f"{rk.upper()}: {rv}", rx, ry, (160, 160, 180), fm)
+                    ry += 16
+            ry += 8
+            self._u3_text("ENTER to assign", rx, ry, self._U3_GREEN, fm)
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
 
@@ -5284,39 +5344,6 @@ class Renderer:
                 prefix = "> " if sel else "  "
                 col = self._U3_WHITE if sel else self._U3_LTBLUE
                 self._u3_text(f"{prefix}{opt_text}", popup_x + 10, oy, col, fm)
-                if sel:
-                    hl = pygame.Rect(popup_x + 4, oy - 1, popup_w - 8, 20)
-                    hl_s = pygame.Surface((hl.w, hl.h), pygame.SRCALPHA)
-                    hl_s.fill((255, 255, 255, 25))
-                    self.screen.blit(hl_s, hl)
-                oy += 22
-
-        # ── Effect chooser popup ──
-        if choosing_effect and effect_list:
-            efl = effect_list
-            popup_w = 340
-            popup_h = 28 + len(efl) * 22 + 8
-            popup_x = SCREEN_WIDTH // 2 - popup_w // 2
-            popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
-
-            pygame.draw.rect(self.screen, (20, 20, 40),
-                             (popup_x, popup_y, popup_w, popup_h))
-            pygame.draw.rect(self.screen, self._U3_ORANGE,
-                             (popup_x, popup_y, popup_w, popup_h), 2)
-
-            self._u3_text("ASSIGN EFFECT", popup_x + 10, popup_y + 6,
-                          self._U3_ORANGE, fm)
-            oy = popup_y + 28
-            for ei, eff in enumerate(efl):
-                sel = (ei == effect_cursor)
-                prefix = "> " if sel else "  "
-                col = self._U3_WHITE if sel else self._U3_LTBLUE
-                dur = eff["duration"]
-                dur_str = "PERM" if dur == "permanent" else f"{dur} steps"
-                self._u3_text(f"{prefix}{eff['name']}", popup_x + 10, oy,
-                              col, fm)
-                self._u3_text(dur_str, popup_x + popup_w - 100, oy,
-                              (160, 160, 180), self.font_small)
                 if sel:
                     hl = pygame.Rect(popup_x + 4, oy - 1, popup_w - 8, 20)
                     hl_s = pygame.Surface((hl.w, hl.h), pygame.SRCALPHA)
@@ -5383,9 +5410,6 @@ class Renderer:
                 self._u3_text(
                     "[ESC] BACK",
                     8, bar_y + 5, self._U3_BLUE)
-        elif choosing_effect:
-            self._u3_text("[UP/DN] SELECT  [ENTER] ASSIGN  [ESC] CANCEL",
-                          8, bar_y + 5, self._U3_BLUE)
         elif action_menu:
             self._u3_text("[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
                           8, bar_y + 5, self._U3_BLUE)
