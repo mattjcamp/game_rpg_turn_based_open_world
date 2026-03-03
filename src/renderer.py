@@ -1179,6 +1179,13 @@ class Renderer:
             self._draw_push_spell_wave(push_anim, repel_effect,
                                        party, ts, cols, rows, off_c, off_r)
 
+        # ── 3c. Time-of-day darkness overlay ──
+        clock = party.clock
+        if not clock.is_day:
+            has_light = party.get_equipped_name("light") is not None
+            self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
+                                          has_light=has_light)
+
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
                          pygame.Rect(0, 0, self._U3_OW_MAP_W, self._U3_OW_MAP_H), 2)
@@ -5386,6 +5393,85 @@ class Renderer:
             self._u3_text(
                 "[UP/DN] SELECT  [ENTER] ACTION  [1-4] CHARACTER  [ESC] BACK",
                 8, bar_y + 5, self._U3_BLUE)
+
+    # ═══════════════════════════════════════════════════════════════
+    # TIME-OF-DAY DARKNESS OVERLAY  (drawn on overworld map)
+    # ═══════════════════════════════════════════════════════════════
+
+    def _draw_overworld_darkness(self, clock, party_sc, party_sr, ts, cols, rows,
+                                 has_light=False):
+        """Overlay darkness on the overworld map based on the time of day.
+
+        During dusk/dawn the map is lightly dimmed with a warm/cool tint
+        and a generous visibility radius around the party.  At night a
+        deeper darkness closes in, leaving only a small lit circle around
+        the party.  Having an equipped light source (torch) expands the
+        visible radius at night.
+
+        Parameters
+        ----------
+        clock : GameClock
+        party_sc, party_sr : int
+            Party position in *screen-tile* coordinates.
+        ts : int
+            Tile size in pixels.
+        cols, rows : int
+            Visible tile grid dimensions.
+        has_light : bool
+            Whether the party has an active light source equipped.
+        """
+        # Determine darkness parameters based on time phase.
+        # light_radius = how many tiles around party stay fully lit.
+        # fade_tiles   = gradient band width in tiles.
+        # max_alpha    = darkness level for tiles beyond the lit area.
+        # tint         = (R, G, B) colour tint blended into the darkness.
+        if clock.is_dusk:
+            light_radius = 10.0
+            fade_tiles = 4.0
+            max_alpha = 100
+            tint = (20, 10, 40)       # warm purple dusk
+        elif clock.is_dawn:
+            light_radius = 10.0
+            fade_tiles = 4.0
+            max_alpha = 80
+            tint = (40, 20, 10)       # warm orange dawn
+        elif clock.is_night:
+            # Night is pitch black except for one tile around the party.
+            # A torch expands visibility to a few more tiles.
+            light_bonus = 3.0 if has_light else 0.0
+            light_radius = 1.0 + light_bonus
+            fade_tiles = 1.5
+            max_alpha = 255                        # completely dark
+            tint = (0, 0, 0)                       # pure black
+        else:
+            return  # daytime — nothing to draw
+
+        fog = pygame.Surface((cols * ts, rows * ts), pygame.SRCALPHA)
+
+        fade_end = light_radius + fade_tiles
+
+        for sr in range(rows):
+            for sc in range(cols):
+                dx = sc - party_sc
+                dy = sr - party_sr
+                dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist <= light_radius:
+                    continue  # fully lit
+                elif dist >= fade_end:
+                    alpha = max_alpha
+                else:
+                    t = (dist - light_radius) / fade_tiles
+                    alpha = int(max_alpha * t)
+
+                alpha = max(0, min(255, alpha))
+                r = tint[0]
+                g = tint[1]
+                b = tint[2]
+                rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
+                fog.fill((r, g, b, alpha), rect)
+
+        self.screen.blit(fog, (0, 0))
 
     # ═══════════════════════════════════════════════════════════════
     # PUSH SPELL EXPANDING-WAVE ANIMATION  (drawn on overworld map)
