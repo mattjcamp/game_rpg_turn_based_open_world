@@ -33,6 +33,9 @@ class Renderer:
         self._load_class_sprites()
         self._load_tile_sheet()
 
+        # Action panel expand/collapse animation (0.0 = normal, 1.0 = full)
+        self._action_panel_expand = 0.0
+
     def _load_tile_sheet(self):
         """Load U3TilesE.gif and extract individual 16x16 tiles, scaled to 32x32."""
         import os
@@ -2190,6 +2193,8 @@ class Renderer:
                           teleport_effects=None,
                           invisibility_effects=None,
                           invisibility_buffs=None,
+                          animate_dead_effects=None,
+                          summon_buffs=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2404,14 +2409,54 @@ class Renderer:
                 if fx.alive:
                     self._u3_draw_invisibility_effect(mx, my, ts, fx)
 
+        # ── 2o. animate dead effects ──
+        if animate_dead_effects:
+            for fx in animate_dead_effects:
+                if fx.alive:
+                    self._u3_draw_animate_dead_effect(mx, my, ts, fx)
+
+        # ── 2p. summoned skeleton indicators ──
+        if summon_buffs and monsters and monster_positions:
+            for mon, turns_left in summon_buffs.items():
+                if mon.is_alive() and mon in monster_positions:
+                    sc, sr = monster_positions[mon]
+                    self._u3_draw_summon_indicator(mx, my, ts, sc, sr,
+                                                   turns_left)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
                                      self._MAP_W + 4, self._MAP_H + 4), 2)
 
-        # ── 4. right-hand panels ──
+        # ── 4. right-hand panels (with animated action panel expansion) ──
         rx = self._RPANEL_X
         rw = self._RPANEL_W
+        arena_bottom = my + self._MAP_H
+
+        # Determine if we're in a player-interactive phase
+        from src.states.combat import (
+            PHASE_PLAYER as _PP, PHASE_PLAYER_DIR as _PPD,
+            PHASE_SPELL_SELECT as _PSS, PHASE_THROW_SELECT as _PTS,
+            PHASE_USE_ITEM as _PUI, PHASE_SHIELD_TARGET as _PST,
+        )
+        _player_phases = (_PP, _PPD, _PSS, _PTS, _PUI, _PST)
+        is_player_phase = phase in _player_phases
+
+        # Animate expand/collapse (smooth ease-out interpolation)
+        expand_speed = 5.0  # rate of transition per second
+        dt_anim = 1.0 / max(self.screen.get_width(), 30)  # approximate dt
+        # Use pygame clock for consistent animation
+        dt_anim = pygame.time.get_ticks() * 0.001  # we'll use a fixed step
+        if is_player_phase:
+            self._action_panel_expand = min(1.0,
+                self._action_panel_expand + 0.08)
+        else:
+            self._action_panel_expand = max(0.0,
+                self._action_panel_expand - 0.08)
+
+        # Ease function for smooth animation
+        t = self._action_panel_expand
+        ease_t = t * t * (3.0 - 2.0 * t)  # smoothstep
 
         # Party roster panel (shows all 4 members with sprites and bars)
         party_h = 300
@@ -2433,10 +2478,17 @@ class Renderer:
         self._u3_monster_panel_multi(alive_monsters, rx, monster_y, rw, monster_panel_h,
                                      source_state=is_outdoor and "overworld" or "dungeon",
                                      encounter_name=encounter_name,
-                                     sleep_buffs=sleep_buffs)
-        action_y = monster_y + monster_panel_h + 4
-        arena_bottom = my + self._MAP_H
+                                     sleep_buffs=sleep_buffs,
+                                     summon_buffs=summon_buffs)
+
+        # Calculate normal (collapsed) and expanded action panel positions
+        normal_action_y = monster_y + monster_panel_h + 4
+        expanded_action_y = 4  # top of the right panel area
+        action_y = int(normal_action_y + (expanded_action_y - normal_action_y) * ease_t)
         action_h = arena_bottom - action_y
+
+        # When expanding, draw action panel OVER the other panels
+        # (it will naturally cover them since it's drawn after)
         self._u3_action_panel(phase, selected_action, is_adjacent,
                               rx, action_y, rw, action_h,
                               active_fighter=active_fighter,
@@ -3677,6 +3729,121 @@ class Renderer:
                 self.screen.blit(glow_surf,
                                  (cx - glow_r - 2, cy - glow_r - 2))
 
+    def _u3_draw_animate_dead_effect(self, ax, ay, ts, fx):
+        """Draw Animate Dead — dark bones/earth rising from the ground.
+
+        Phase 1 (0–0.3): Dark green/brown particles bubble up from below
+        Phase 2 (0.3–0.7): Bone fragments swirl upward forming a shape
+        Phase 3 (0.7–1.0): Dark flash as the skeleton solidifies
+        """
+        p = fx.progress  # 0 → 1
+
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+
+        DARK_GREEN = (40, 80, 30)
+        BONE_WHITE = (200, 200, 180)
+        EARTH_BROWN = (80, 60, 30)
+        SICKLY_GREEN = (80, 160, 60)
+
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: dark particles bubbling up from below
+            sub_p = p / 0.3
+            num = int(6 + sub_p * 10)
+            for i in range(num):
+                bx = cx + int(math.sin(ticks * 0.004 + i * 1.1) * ts * 0.3)
+                rise = sub_p * ts * 0.6
+                by = cy + ts // 2 - int(rise * (i / max(num, 1)))
+                alpha = int(140 * sub_p)
+                r = max(1, int(2 + math.sin(i + ticks * 0.005)))
+                s = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+                color = EARTH_BROWN if i % 2 == 0 else DARK_GREEN
+                pygame.draw.circle(s, (*color, alpha),
+                                   (r + 1, r + 1), r)
+                self.screen.blit(s, (bx - r - 1, by - r - 1))
+
+        elif p < 0.7:
+            # Phase 2: bone fragments swirl upward
+            sub_p = (p - 0.3) / 0.4
+            num_bones = int(8 + sub_p * 6)
+            for i in range(num_bones):
+                angle = (ticks * 0.005 + i * 0.7) % (2 * math.pi)
+                shrink = 1.0 - sub_p * 0.6
+                r = ts * 0.35 * shrink
+                bx = cx + int(math.cos(angle) * r)
+                by = cy - int(sub_p * ts * 0.3) + int(math.sin(angle) * r * 0.5)
+                alpha = int(200 * (0.5 + 0.5 * sub_p))
+                bone_r = max(1, int(2.5))
+                s = pygame.Surface((bone_r * 2 + 2, bone_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                color = BONE_WHITE if i % 3 != 0 else SICKLY_GREEN
+                pygame.draw.circle(s, (*color, alpha),
+                                   (bone_r + 1, bone_r + 1), bone_r)
+                self.screen.blit(s, (bx - bone_r - 1, by - bone_r - 1))
+
+            # Central glow
+            glow_r = int(ts * 0.3)
+            glow_alpha = int(40 + 30 * sub_p)
+            glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                        pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*SICKLY_GREEN, glow_alpha),
+                               (glow_r + 2, glow_r + 2), glow_r)
+            self.screen.blit(glow_surf,
+                             (cx - glow_r - 2, cy - glow_r - 2))
+
+        else:
+            # Phase 3: dark flash as skeleton solidifies
+            sub_p = (p - 0.7) / 0.3
+            fade = 1.0 - sub_p
+
+            # Sickly green burst
+            burst_r = int(ts * 0.4 + sub_p * ts * 0.2)
+            burst_alpha = int(80 * fade)
+            if burst_r > 0 and burst_alpha > 5:
+                burst_surf = pygame.Surface((burst_r * 2 + 4, burst_r * 2 + 4),
+                                             pygame.SRCALPHA)
+                pygame.draw.circle(burst_surf, (*SICKLY_GREEN, burst_alpha),
+                                   (burst_r + 2, burst_r + 2), burst_r)
+                self.screen.blit(burst_surf,
+                                 (cx - burst_r - 2, cy - burst_r - 2))
+
+            # Bone-white flash in center
+            flash_r = int(ts * 0.25 * fade)
+            flash_alpha = int(120 * fade)
+            if flash_r > 0 and flash_alpha > 5:
+                flash_surf = pygame.Surface((flash_r * 2 + 4, flash_r * 2 + 4),
+                                             pygame.SRCALPHA)
+                pygame.draw.circle(flash_surf, (*BONE_WHITE, flash_alpha),
+                                   (flash_r + 2, flash_r + 2), flash_r)
+                self.screen.blit(flash_surf,
+                                 (cx - flash_r - 2, cy - flash_r - 2))
+
+    def _u3_draw_summon_indicator(self, ax, ay, ts, col, row, turns_left):
+        """Draw a subtle green glow around a summoned skeleton ally."""
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ay + row * ts + ts // 2)
+
+        SUMMON_GREEN = (80, 180, 80)
+
+        # Pulsing green glow
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.004)
+        glow_r = int(ts // 2 + 2)
+        glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                    pygame.SRCALPHA)
+        # Flicker when about to expire
+        if turns_left <= 2:
+            flicker = int(abs(math.sin(ticks * 0.015)) * 40)
+            alpha = int(20 + flicker * pulse)
+        else:
+            alpha = int(30 + 20 * pulse)
+        pygame.draw.circle(glow_surf, (*SUMMON_GREEN, alpha),
+                           (glow_r + 2, glow_r + 2), glow_r)
+        self.screen.blit(glow_surf,
+                         (cx - glow_r - 2, cy - glow_r - 2))
+
     def _u3_draw_target_cursor(self, ax, ay, ts, col, row):
         """Draw a pulsing blue selection box at (col, row) on the arena."""
         ticks = pygame.time.get_ticks()
@@ -3988,7 +4155,7 @@ class Renderer:
 
     def _u3_monster_panel_multi(self, monsters, x, y, w, h,
                                source_state="dungeon", encounter_name=None,
-                               sleep_buffs=None):
+                               sleep_buffs=None, summon_buffs=None):
         """Monster stats panel matching the party panel format with sprites and bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -4021,8 +4188,12 @@ class Renderer:
             # ── Name (to the right of sprite) ──
             info_x = tx + sprite_size + 6
             is_charmed = getattr(mon, "charmed", False)
+            is_summoned = (summon_buffs and mon in summon_buffs) if summon_buffs else False
             is_sleeping = (sleep_buffs and mon in sleep_buffs) if sleep_buffs else False
-            if is_charmed:
+            if is_summoned:
+                name_color = (120, 220, 140)  # Green for summoned
+                display_name = f"{mon.name} (Summon)"
+            elif is_charmed:
                 name_color = (255, 120, 200)  # Pink for charmed
                 display_name = f"{mon.name} (Ally)"
             elif is_sleeping:

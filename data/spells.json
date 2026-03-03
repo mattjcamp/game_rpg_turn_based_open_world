@@ -143,6 +143,30 @@
       "hit_sfx": null
     },
     {
+      "id": "animate_dead",
+      "name": "Animate Dead",
+      "description": "Raises a skeleton from the earth to fight for the caster.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": 5,
+      "effect_type": "summon_skeleton",
+      "effect_value": {
+        "skeleton_hp": 12,
+        "skeleton_ac": 11,
+        "skeleton_attack": 3,
+        "skeleton_dmg_dice": 1,
+        "skeleton_dmg_sides": 6,
+        "skeleton_dmg_bonus": 0
+      },
+      "range": 99,
+      "targeting": "select_tile",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
       "id": "invisibility",
       "name": "Invisibility",
       "description": "The caster bends light around themselves, becoming invisible to enemies.",

@@ -16,6 +16,7 @@ import pygame
 
 from src.states.base_state import BaseState
 from src.party import SPELLS_DATA
+from src.monster import Monster
 
 
 class _DualLog(list):
@@ -62,6 +63,7 @@ PHASE_CHARM       = "charm"          # charm person animation playing
 PHASE_SLEEP       = "sleep"          # sleep spell animation playing
 PHASE_TELEPORT    = "teleport"       # misty step teleport animation
 PHASE_INVISIBILITY = "invisibility"  # invisibility spell animation
+PHASE_ANIMATE_DEAD = "animate_dead"  # animate dead summoning animation
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -400,6 +402,28 @@ class InvisibilityEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class AnimateDeadEffect:
+    """A dark green/black rising-from-the-ground animation for summoning a skeleton."""
+
+    DURATION = 1.4  # seconds
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
 
@@ -505,6 +529,10 @@ class CombatState(BaseState):
         # Invisibility effects
         self.invisibility_effects = []    # active InvisibilityEffect objects
         self.invisibility_buffs = {}      # member -> turns_left
+
+        # Animate Dead effects
+        self.animate_dead_effects = []    # active AnimateDeadEffect objects
+        self.summon_buffs = {}            # Monster -> turns_left (summoned allies)
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -642,6 +670,8 @@ class CombatState(BaseState):
         self.teleport_effects = []
         self.invisibility_effects = []
         self.invisibility_buffs = {}
+        self.animate_dead_effects = []
+        self.summon_buffs = {}
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -850,7 +880,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD):
             return
 
         # Equip screen handles its own input
@@ -1086,6 +1116,8 @@ class CombatState(BaseState):
                 else:
                     if spell.get("effect_type") == "teleport":
                         self._cast_misty_step(f, tc, tr)
+                    elif spell.get("effect_type") == "summon_skeleton":
+                        self._cast_animate_dead(f, tc, tr)
                     else:
                         self.combat_log.append("Unknown tile spell!")
             elif targeting == "select_enemy":
@@ -2286,6 +2318,93 @@ class CombatState(BaseState):
         if sfx:
             self.game.sfx.play(sfx)
 
+    def _cast_animate_dead(self, caster, dest_col, dest_row):
+        """Cast Animate Dead — summon a skeleton ally at the chosen tile.
+
+        Creates a new Skeleton monster flagged as ``charmed`` so it uses
+        the existing charmed-monster AI to fight enemy monsters.  Tracked
+        separately in ``summon_buffs`` so it crumbles when the duration
+        expires (rather than reverting to hostile like a charmed monster
+        would).
+        """
+        spell_id = self.selected_spell
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Animate Dead")
+        mp_cost = spell.get("mp_cost", 5)
+
+        # Check MP
+        if caster.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({caster.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        caster.current_mp -= mp_cost
+
+        # Build the skeleton from spell data
+        ev = spell.get("effect_value", {})
+        skeleton = Monster(
+            name="Skeleton Ally",
+            hp=ev.get("skeleton_hp", 12),
+            ac=ev.get("skeleton_ac", 11),
+            attack_bonus=ev.get("skeleton_attack", 3),
+            damage_dice=ev.get("skeleton_dmg_dice", 1),
+            damage_sides=ev.get("skeleton_dmg_sides", 6),
+            damage_bonus=ev.get("skeleton_dmg_bonus", 0),
+            xp_reward=0,
+            gold_reward=0,
+            color=(200, 200, 180),
+            tile="skeleton_f1.png",
+            undead=True,
+            humanoid=False,
+        )
+        skeleton.charmed = True  # fights for the party
+
+        # Add to the combat roster
+        self.monsters.append(skeleton)
+        self.monster_positions[skeleton] = (dest_col, dest_row)
+
+        # Track duration
+        duration = spell.get("duration", 5)
+        if isinstance(duration, str):
+            duration = 5
+        self.summon_buffs[skeleton] = duration
+
+        self.combat_log.append(
+            f"{caster.name} casts {spell_name}! (-{mp_cost} MP)")
+        self.combat_log.append(
+            f"A skeleton claws its way out of the ground! ({duration} turns)")
+
+        # Create the animation
+        self.animate_dead_effects.append(
+            AnimateDeadEffect(dest_col, dest_row))
+        self.selected_spell = None
+        self.phase = PHASE_ANIMATE_DEAD
+        sfx = spell.get("sfx")
+        if sfx:
+            self.game.sfx.play(sfx)
+
+    def _tick_summon_buffs(self):
+        """Decrement summon durations at the end of each full round.
+
+        When a summon expires the skeleton crumbles to dust (killed).
+        """
+        expired = []
+        for monster, turns_left in self.summon_buffs.items():
+            turns_left -= 1
+            self.summon_buffs[monster] = turns_left
+            if turns_left <= 0:
+                expired.append(monster)
+        for monster in expired:
+            del self.summon_buffs[monster]
+            if monster.is_alive():
+                monster.hp = 0
+                monster.charmed = False
+                self.combat_log.append(
+                    f"{monster.name} crumbles to dust!")
+
     # ── Auto-monster spell dispatch ──────────────────────────────
 
     def _cast_auto_monster_spell(self, spell_id):
@@ -2746,6 +2865,7 @@ class CombatState(BaseState):
             self._tick_charm_buffs()
             self._tick_sleep_buffs()
             self._tick_invisibility_buffs()
+            self._tick_summon_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
@@ -3181,6 +3301,17 @@ class CombatState(BaseState):
             return
         self.invisibility_effects = [fx for fx in self.invisibility_effects if fx.alive]
 
+        # Update animate dead effects
+        for fx in self.animate_dead_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_ANIMATE_DEAD:
+            if all(not fx.alive for fx in self.animate_dead_effects):
+                self.animate_dead_effects = []
+                self._end_fighter_turn()
+            return
+        self.animate_dead_effects = [fx for fx in self.animate_dead_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -3406,6 +3537,8 @@ class CombatState(BaseState):
             teleport_effects=self.teleport_effects,
             invisibility_effects=self.invisibility_effects,
             invisibility_buffs=self.invisibility_buffs,
+            animate_dead_effects=self.animate_dead_effects,
+            summon_buffs=self.summon_buffs,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,
