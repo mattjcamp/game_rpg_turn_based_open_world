@@ -1,12 +1,15 @@
 """
-Map representation and a hardcoded test map for initial development.
+Map representation and procedural overworld generator.
 
 The map is a 2D grid of tile IDs (see settings.py for tile definitions).
-Later, this will be replaced/augmented by procedural generation.
+The overworld is generated fresh each new game using layered value-noise
+terrain with an island mask, rivers, paths, and hand-placed landmarks.
 """
 
 import json
+import math
 import os
+import random
 
 from src.settings import *
 
@@ -103,132 +106,280 @@ def load_unique_tiles():
     return data.get("unique_tiles", {})
 
 
-def create_test_map():
+# ═══════════════════════════════════════════════════════════════════
+# Value-noise helpers (no external dependencies)
+# ═══════════════════════════════════════════════════════════════════
+
+def _hash2d(x, y, seed=0):
+    """Fast integer hash → float in [0, 1)."""
+    n = x * 374761393 + y * 668265263 + seed * 1274126177
+    n = (n ^ (n >> 13)) * 1274126177
+    n = n ^ (n >> 16)
+    return (n & 0x7FFFFFFF) / 0x7FFFFFFF
+
+
+def _smooth_noise(x, y, seed=0):
+    """Bilinearly interpolated value noise at fractional coords."""
+    ix, iy = int(math.floor(x)), int(math.floor(y))
+    fx, fy = x - ix, y - iy
+    # Smoothstep
+    fx = fx * fx * (3 - 2 * fx)
+    fy = fy * fy * (3 - 2 * fy)
+    n00 = _hash2d(ix, iy, seed)
+    n10 = _hash2d(ix + 1, iy, seed)
+    n01 = _hash2d(ix, iy + 1, seed)
+    n11 = _hash2d(ix + 1, iy + 1, seed)
+    nx0 = n00 + (n10 - n00) * fx
+    nx1 = n01 + (n11 - n01) * fx
+    return nx0 + (nx1 - nx0) * fy
+
+
+def _fbm(x, y, octaves=4, seed=0):
+    """Fractal Brownian Motion — layered value noise in [0, 1)."""
+    value = 0.0
+    amp = 0.5
+    freq = 1.0
+    for i in range(octaves):
+        value += amp * _smooth_noise(x * freq, y * freq, seed + i * 31)
+        amp *= 0.5
+        freq *= 2.0
+    return value
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Procedural overworld generator
+# ═══════════════════════════════════════════════════════════════════
+
+_MAP_W = 40
+_MAP_H = 30
+
+# Fixed landmark positions that the quest system depends on.
+_TOWN_POS = (10, 14)
+_DUNGEON_POS = (30, 8)
+_HOUSE_DUNGEON_POS = (7, 10)
+_START_POS = (14, 16)
+
+
+def create_test_map(seed=None):
+    """Generate a procedural 40×30 island overworld.
+
+    Each call produces a different layout (unless a fixed *seed* is given).
+    Key landmarks (town, dungeons, start position) are placed at fixed
+    coordinates so the quest system and party start location still work.
     """
-    Create a small handcrafted test map for initial development.
+    if seed is None:
+        seed = random.randint(0, 2 ** 31)
 
-    This is a 40x30 island map with some variety:
-    - Ocean border
-    - Grassland interior
-    - A mountain range
-    - A forest
-    - A town
-    - A dungeon entrance
-    - A river with a bridge
-    - Unique tiles scattered for lore and interaction
-    """
-    W = 40
-    H = 30
-    tmap = TileMap(W, H, default_tile=TILE_GRASS)
+    tmap = TileMap(_MAP_W, _MAP_H, default_tile=TILE_GRASS)
 
-    # --- Ocean border (3 tiles thick on each side) ---
-    for row in range(H):
-        for col in range(W):
-            # Distance from each edge
-            dist_edge = min(col, row, W - 1 - col, H - 1 - row)
-            if dist_edge < 3:
-                tmap.set_tile(col, row, TILE_WATER)
-            elif dist_edge == 3:
-                # Sandy beaches at the shoreline
-                tmap.set_tile(col, row, TILE_SAND)
+    # ── 1. Generate elevation / moisture noise fields ──
+    elev = [[0.0] * _MAP_W for _ in range(_MAP_H)]
+    moist = [[0.0] * _MAP_W for _ in range(_MAP_H)]
+    scale = 0.12  # noise zoom
 
-    # --- Mountain range (upper-right area) ---
-    for row in range(6, 12):
-        for col in range(25, 34):
-            if (col + row) % 3 != 0:  # Irregular shape
-                tmap.set_tile(col, row, TILE_MOUNTAIN)
+    for r in range(_MAP_H):
+        for c in range(_MAP_W):
+            elev[r][c] = _fbm(c * scale, r * scale, octaves=5, seed=seed)
+            moist[r][c] = _fbm(c * scale + 100, r * scale + 100,
+                                octaves=3, seed=seed + 7)
 
-    # --- Forest (lower-left area) ---
-    for row in range(18, 25):
-        for col in range(6, 16):
-            if (col * row) % 5 != 0:  # Irregular shape
-                tmap.set_tile(col, row, TILE_FOREST)
+    # ── 2. Island mask — force ocean at edges, land in centre ──
+    for r in range(_MAP_H):
+        for c in range(_MAP_W):
+            nx = (c / (_MAP_W - 1)) * 2 - 1   # -1..1
+            ny = (r / (_MAP_H - 1)) * 2 - 1
+            # Elliptical distance (wider map → squash y less)
+            d = math.sqrt(nx * nx * 0.9 + ny * ny * 1.1)
+            # Generous gradient: land covers most of the interior
+            mask = max(0.0, 1.0 - d * 0.95)
+            # Blend: keep most of the noise, just taper edges to ocean
+            elev[r][c] = elev[r][c] * (0.35 + 0.65 * mask) - (1.0 - mask) * 0.15
 
-    # --- River running north-south through the middle ---
-    river_col = 20
-    for row in range(4, 26):
-        # River meanders a bit
-        offset = (row % 7) // 3
-        tmap.set_tile(river_col + offset, row, TILE_WATER)
+    # ── 3. Classify terrain from elevation + moisture ──
+    for r in range(_MAP_H):
+        for c in range(_MAP_W):
+            e = elev[r][c]
+            m = moist[r][c]
+            if e < 0.10:
+                tmap.set_tile(c, r, TILE_WATER)
+            elif e < 0.16:
+                tmap.set_tile(c, r, TILE_SAND)
+            elif e > 0.42:
+                tmap.set_tile(c, r, TILE_MOUNTAIN)
+            elif e > 0.28 and m > 0.42:
+                tmap.set_tile(c, r, TILE_FOREST)
+            elif m > 0.52 and e > 0.18:
+                tmap.set_tile(c, r, TILE_FOREST)
+            # else: stays TILE_GRASS
 
-    # --- Bridge across the river ---
-    bridge_row = 15
-    offset = (bridge_row % 7) // 3
-    tmap.set_tile(river_col + offset, bridge_row, TILE_BRIDGE)
+    # ── 4. Carve a meandering river ──
+    _carve_river(tmap, seed)
 
-    # --- Path from town to dungeon ---
-    for col in range(10, 20):
-        tmap.set_tile(col, 14, TILE_PATH)
-    for col in range(21, 30):
-        tmap.set_tile(col, 14, TILE_PATH)
-    # Path going north to dungeon
-    for row in range(8, 14):
-        tmap.set_tile(30, row, TILE_PATH)
+    # ── 5. Place fixed landmarks ──
+    # Clear a small walkable area around each landmark
+    for pos in [_TOWN_POS, _DUNGEON_POS, _HOUSE_DUNGEON_POS, _START_POS]:
+        _clear_area(tmap, pos[0], pos[1], radius=2)
 
-    # --- Town (left side of map) ---
-    tmap.set_tile(10, 14, TILE_TOWN)
+    tmap.set_tile(*_TOWN_POS, TILE_TOWN)
+    tmap.set_tile(*_DUNGEON_POS, TILE_DUNGEON)
+    tmap.set_tile(*_HOUSE_DUNGEON_POS, TILE_DUNGEON)
 
-    # --- Dungeon entrance (right side, in the mountains) ---
-    tmap.set_tile(30, 8, TILE_DUNGEON)
+    # ── 6. Path from town to dungeon ──
+    _carve_path(tmap, _TOWN_POS, _DUNGEON_POS, seed)
+    # Short path from Elara NPC area toward house dungeon
+    _carve_path(tmap, (8, 12), _HOUSE_DUNGEON_POS, seed + 99)
+    # Path from start toward town
+    _carve_path(tmap, _START_POS, _TOWN_POS, seed + 42)
 
-    # --- House dungeon (near town, introductory quest) ---
-    tmap.set_tile(7, 10, TILE_DUNGEON)
+    # ── 7. Ensure start position is grass ──
+    tmap.set_tile(_START_POS[0], _START_POS[1], TILE_GRASS)
 
-    # --- Place unique tiles ---
+    # ── 8. Place unique tiles ──
     unique_defs = load_unique_tiles()
-    _place_unique_tiles(tmap, unique_defs)
+    _place_unique_tiles(tmap, unique_defs, seed)
 
     return tmap
 
 
-def _place_unique_tiles(tmap, unique_defs):
-    """Place unique tiles on the test map at hand-picked locations."""
-    # Placements: (tile_id, col, row)
-    placements = [
-        # Near the town on the path — signpost
-        ("signpost",            12, 14),
-        # Shrine south of the path, easy to find early
-        ("ancient_shrine",      15, 17),
-        # War memorial along the path
-        ("war_memorial",        18, 14),
-        # Whispering stones in open grass north of path
-        ("whispering_stones",   16, 10),
-        # Old campfire between town and river
-        ("old_campfire",        17, 12),
-        # Fairy ring deep in the forest
-        ("fairy_ring",          9,  21),
-        # Hermit in the forest
-        ("hermit_camp",         12, 22),
-        # Enchanted spring in forest clearing
-        ("enchanted_spring",    8,  19),
-        # Oracle pool deeper in forest
-        ("oracle_pool",         10, 23),
-        # Forgotten grave on the beach
-        ("forgotten_grave",     5,  15),
-        # Dragon bones on the eastern sand
-        ("dragon_bones",        35, 20),
-        # Sunken shipwreck on the southern sand coast
-        ("sunken_shipwreck",    20, 27),
-        # Wandering ghost near the mountains
-        ("wandering_ghost",     24, 13),
-        # Merchant wagon on the path to dungeon
-        ("merchant_wagon",      25, 14),
-        # Bandit cache hidden in the forest
-        ("bandit_cache",        14, 20),
-        # Shadow mark — quest trigger in open grass
-        ("shadow_mark",         22, 18),
-        # Ancient battlefield in the wide grass east of river
-        ("ancient_battlefield", 28, 18),
-        # Moongate near the mountains
-        ("moongate",            33, 13),
-        # Cursed well in grass near forest edge
-        ("cursed_well",         7,  17),
-        # Poison swamp south-east area
-        ("poison_swamp",        30, 22),
-        # Elara — worried woman near town who gives the house quest
-        ("elara_npc",           8,  12),
+def _clear_area(tmap, cx, cy, radius=2):
+    """Set tiles in a small radius to TILE_GRASS so landmarks are reachable."""
+    for dr in range(-radius, radius + 1):
+        for dc in range(-radius, radius + 1):
+            c, r = cx + dc, cy + dr
+            if 0 <= c < tmap.width and 0 <= r < tmap.height:
+                tid = tmap.get_tile(c, r)
+                if tid in (TILE_WATER, TILE_MOUNTAIN):
+                    tmap.set_tile(c, r, TILE_GRASS)
+
+
+def _carve_river(tmap, seed):
+    """Carve a meandering river from top to bottom across the map."""
+    rng = random.Random(seed + 333)
+    col = _MAP_W // 2 + rng.randint(-4, 4)
+
+    for row in range(4, _MAP_H - 4):
+        # Meander
+        col += rng.choice([-1, 0, 0, 1])
+        col = max(6, min(_MAP_W - 7, col))
+        tmap.set_tile(col, row, TILE_WATER)
+        # Occasionally widen
+        if rng.random() < 0.3:
+            tmap.set_tile(col + 1, row, TILE_WATER)
+
+    # Place a bridge roughly in the middle
+    bridge_row = _MAP_H // 2 + rng.randint(-2, 2)
+    # Find the river column at that row
+    for c in range(_MAP_W):
+        if tmap.get_tile(c, bridge_row) == TILE_WATER:
+            tmap.set_tile(c, bridge_row, TILE_BRIDGE)
+            break
+
+
+def _carve_path(tmap, start, end, seed):
+    """Carve a winding path between two points.
+
+    Uses a simple walk that moves toward the goal with occasional jitter,
+    overwriting non-water tiles with TILE_PATH.
+    """
+    rng = random.Random(seed)
+    cx, cy = start
+    ex, ey = end
+
+    visited = set()
+    max_steps = abs(ex - cx) + abs(ey - cy) + 30
+
+    for _ in range(max_steps):
+        if (cx, cy) == (ex, ey):
+            break
+        visited.add((cx, cy))
+
+        # Set tile to path if it's walkable (don't overwrite water/mountain)
+        tid = tmap.get_tile(cx, cy)
+        if tid not in (TILE_WATER, TILE_MOUNTAIN, TILE_TOWN, TILE_DUNGEON,
+                       TILE_BRIDGE):
+            tmap.set_tile(cx, cy, TILE_PATH)
+
+        # Move toward target with some noise
+        dx = ex - cx
+        dy = ey - cy
+
+        if rng.random() < 0.25:
+            # Random jitter step
+            cx += rng.choice([-1, 0, 1])
+            cy += rng.choice([-1, 0, 1])
+        else:
+            # Move toward goal (prefer longer axis)
+            if abs(dx) >= abs(dy):
+                cx += (1 if dx > 0 else -1)
+            else:
+                cy += (1 if dy > 0 else -1)
+
+        cx = max(4, min(_MAP_W - 5, cx))
+        cy = max(4, min(_MAP_H - 5, cy))
+
+    # Set the final tile
+    tid = tmap.get_tile(ex, ey)
+    if tid not in (TILE_WATER, TILE_MOUNTAIN, TILE_TOWN, TILE_DUNGEON):
+        tmap.set_tile(ex, ey, TILE_PATH)
+
+
+def _place_unique_tiles(tmap, unique_defs, seed):
+    """Place unique tiles at random walkable locations.
+
+    Some tiles (Elara, signpost) are placed near fixed landmarks.
+    Others are scattered across the island on walkable terrain.
+    """
+    rng = random.Random(seed + 777)
+
+    # Tiles that must be placed near specific landmarks
+    fixed_placements = {
+        "elara_npc":     (8, 12),
+        "signpost":      (12, 14),
+    }
+
+    # All unique tile IDs we want to place
+    scatter_tiles = [
+        "ancient_shrine", "war_memorial", "whispering_stones",
+        "old_campfire", "fairy_ring", "hermit_camp",
+        "enchanted_spring", "oracle_pool", "forgotten_grave",
+        "dragon_bones", "sunken_shipwreck", "wandering_ghost",
+        "merchant_wagon", "bandit_cache", "shadow_mark",
+        "ancient_battlefield", "moongate", "cursed_well",
+        "poison_swamp",
     ]
 
-    for tile_id, col, row in placements:
+    # Place fixed ones first
+    for tile_id, (c, r) in fixed_placements.items():
         if tile_id in unique_defs:
-            tmap.place_unique(col, row, tile_id, unique_defs[tile_id])
+            # Ensure the tile is walkable
+            _clear_area(tmap, c, r, radius=1)
+            tmap.place_unique(c, r, tile_id, unique_defs[tile_id])
+
+    # Build a list of candidate walkable positions
+    occupied = set(fixed_placements.values())
+    occupied.add(_TOWN_POS)
+    occupied.add(_DUNGEON_POS)
+    occupied.add(_HOUSE_DUNGEON_POS)
+    occupied.add(_START_POS)
+
+    candidates = []
+    for r in range(5, _MAP_H - 5):
+        for c in range(5, _MAP_W - 5):
+            if (c, r) in occupied:
+                continue
+            if tmap.is_walkable(c, r):
+                candidates.append((c, r))
+
+    rng.shuffle(candidates)
+
+    # Place scatter tiles at random walkable spots
+    idx = 0
+    for tile_id in scatter_tiles:
+        if tile_id not in unique_defs:
+            continue
+        if idx >= len(candidates):
+            break
+        c, r = candidates[idx]
+        idx += 1
+        tmap.place_unique(c, r, tile_id, unique_defs[tile_id])
+        occupied.add((c, r))
