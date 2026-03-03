@@ -85,6 +85,25 @@
       "hit_sfx": null
     },
     {
+      "id": "long_shanks",
+      "name": "Long Shanks",
+      "description": "Enchants an ally's legs with unnatural speed, greatly extending their movement range for 5 turns.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": 5,
+      "effect_type": "range_buff",
+      "effect_value": {
+        "range_bonus": 6
+      },
+      "range": 99,
+      "targeting": "select_ally",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
       "id": "turn_undead",
       "name": "Turn Undead",
       "description": "Channels holy energy that sears undead creatures, stripping 75% of their life force.",

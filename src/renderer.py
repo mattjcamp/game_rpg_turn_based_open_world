@@ -2180,6 +2180,7 @@ class Renderer:
                           heal_effects=None,
                           shield_effects=None,
                           shield_buffs=None,
+                          range_buffs=None,
                           shield_target_col=0,
                           shield_target_row=0,
                           turn_undead_effects=None,
@@ -2261,6 +2262,14 @@ class Renderer:
                         sc, sr = fighter_positions[member]
                         self._u3_draw_shield_bubble(mx, my, ts, sc, sr,
                                                     buff["turns_left"])
+
+            # Draw range buff indicators (green speed lines) over buffed fighters
+            if range_buffs:
+                for member, buff in range_buffs.items():
+                    if member.is_alive() and member in fighter_positions:
+                        sc, sr = fighter_positions[member]
+                        self._u3_draw_range_buff_indicator(
+                            mx, my, ts, sc, sr, buff["turns_left"])
         else:
             # Fallback: single player sprite
             self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
@@ -2375,7 +2384,8 @@ class Renderer:
             self._u3_party_combat_panel(fighters, active_fighter,
                                         defending_map or {},
                                         rx, 4, rw, party_h,
-                                        shield_buffs=shield_buffs or {})
+                                        shield_buffs=shield_buffs or {},
+                                        range_buffs=range_buffs or {})
         else:
             self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138,
                                    shield_buffs=shield_buffs or {})
@@ -2955,6 +2965,54 @@ class Renderer:
         self.screen.blit(shine_surf,
                          (cx - radius - 2, cy - radius - 2))
 
+    def _u3_draw_range_buff_indicator(self, ax, ay, ts, col, row, turns_left):
+        """Draw a green speed-lines aura around a character with Long Shanks.
+
+        Small green arrows/lines sweep upward around the character to
+        indicate enhanced movement.  Flickers when about to expire.
+        """
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ay + row * ts + ts // 2)
+
+        # Flicker when about to expire
+        if turns_left <= 1:
+            flicker = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(ticks * 0.02))
+        else:
+            flicker = 1.0
+
+        GREEN = (80, 255, 120)
+        BRIGHT_GREEN = (140, 255, 180)
+
+        # Pulsing green glow at feet
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.005)
+        glow_r = int(ts * 0.35)
+        glow_alpha = int((30 + 20 * pulse) * flicker)
+        glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                    pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (*GREEN, glow_alpha),
+                           (glow_r + 2, glow_r + 2), glow_r)
+        self.screen.blit(glow_surf,
+                         (cx - glow_r - 2, cy - glow_r - 2))
+
+        # Speed lines sweeping upward on both sides
+        num_lines = 4
+        for i in range(num_lines):
+            phase = ((ticks * 0.004 + i * 0.5) % 2.0)
+            if phase > 1.0:
+                continue
+            side = -1 if i % 2 == 0 else 1
+            lx = cx + side * int(ts * 0.3)
+            ly_start = cy + int(ts * 0.3) - int(phase * ts * 0.6)
+            ly_end = ly_start - int(4 + phase * 3)
+            line_alpha = int(180 * (1.0 - phase) * flicker)
+            if line_alpha > 10:
+                line_surf = pygame.Surface((3, abs(ly_end - ly_start) + 2),
+                                           pygame.SRCALPHA)
+                pygame.draw.line(line_surf, (*BRIGHT_GREEN, line_alpha),
+                                 (1, abs(ly_end - ly_start)), (1, 0), 2)
+                self.screen.blit(line_surf, (lx - 1, min(ly_start, ly_end)))
+
     def _u3_draw_turn_undead_effect(self, ax, ay, ts, fx):
         """Draw the Turn Undead holy blast — a radiant wave of golden-white
         light expanding from the caster and engulfing the monster.
@@ -3374,7 +3432,7 @@ class Renderer:
 
     def _u3_party_combat_panel(self, fighters, active_fighter,
                                 defending_map, x, y, w, h,
-                                shield_buffs=None):
+                                shield_buffs=None, range_buffs=None):
         """Party roster with character sprites and HP/MP bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -3465,6 +3523,9 @@ class Renderer:
                 indicator_y += 12
             if shield_buffs and shield_buffs.get(member):
                 self._u3_text("SHLD", x + w - 44, indicator_y, (100, 180, 255), self.font_small)
+                indicator_y += 12
+            if range_buffs and range_buffs.get(member):
+                self._u3_text("FAST", x + w - 44, indicator_y, (80, 255, 120), self.font_small)
 
             # ── Ammo indicator for throwable weapons ──
             if member.is_throwable_weapon():

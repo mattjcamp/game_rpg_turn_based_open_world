@@ -409,6 +409,7 @@ class CombatState(BaseState):
         # Shield effects
         self.shield_effects = []      # active ShieldEffect objects
         self.shield_buffs = {}        # member -> {"ac_bonus": int, "turns_left": int}
+        self.range_buffs = {}         # member -> {"range_bonus": int, "turns_left": int}
 
         # Shield target selection cursor
         self.shield_target_col = 0
@@ -548,6 +549,7 @@ class CombatState(BaseState):
         self.heal_effects = []
         self.shield_effects = []
         self.shield_buffs = {}
+        self.range_buffs = {}
         self.turn_undead_effects = []
         self.charm_effects = []
         self.charm_target = None
@@ -613,9 +615,16 @@ class CombatState(BaseState):
         """Add a log entry for whose turn it is and reset move budget."""
         f = self.active_fighter
         if f:
-            self.moves_remaining = f.range
+            base_range = f.range
+            bonus = 0
+            rb = self.range_buffs.get(f)
+            if rb:
+                bonus = rb["range_bonus"]
+            self.moves_remaining = base_range + bonus
             ranged_hint = " [RANGED]" if f.is_ranged(self.game.party) else ""
-            self.combat_log.append(f"-- {f.name}'s turn --{ranged_hint}")
+            speed_hint = f" [+{bonus} MOVE]" if bonus else ""
+            self.combat_log.append(
+                f"-- {f.name}'s turn --{ranged_hint}{speed_hint}")
         self._rebuild_menu()
 
     def _rebuild_menu(self):
@@ -1007,6 +1016,8 @@ class CombatState(BaseState):
                                abs(self.shield_target_row - caster_row))
                     if dist > spell_range:
                         self.combat_log.append("Target is out of range!")
+                    elif spell.get("effect_type") == "range_buff":
+                        self._cast_range_buff_on_target(target)
                     else:
                         self._cast_shield_on_target(target)
                 else:
@@ -1875,6 +1886,52 @@ class CombatState(BaseState):
             f"{f.name} casts SHIELD on {target.name}! (+{ac_bonus} AC for {duration} turns, -{mp_cost} MP)"
         )
 
+    def _cast_range_buff_on_target(self, target):
+        """Cast Long Shanks (range buff) on a specific ally."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell = SPELLS_DATA[self.selected_spell]
+        mp_cost = spell["mp_cost"]
+        spell_name = spell.get("name", "Long Shanks").upper()
+
+        # Check casting ability
+        if not f.can_cast_sorcerer():
+            self.combat_log.append(f"{f.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"{f.name} doesn't have enough MP! (need {mp_cost})")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Apply range buff
+        range_bonus = spell["effect_value"].get("range_bonus", 6)
+        duration = spell.get("duration", 5)
+        if isinstance(duration, str):
+            duration = 5
+        self.range_buffs[target] = {
+            "range_bonus": range_bonus, "turns_left": duration}
+
+        # Reuse shield visual effect (green-tinted via the renderer later)
+        tcol, trow = self.fighter_positions.get(target, (3, 5))
+        self.shield_effects.append(ShieldEffect(tcol, trow, 0))
+
+        self.phase = PHASE_SHIELD
+        self.game.sfx.play("shield")
+        self.combat_log.append(
+            f"{f.name} casts {spell_name} on {target.name}! "
+            f"(+{range_bonus} move for {duration} turns, -{mp_cost} MP)")
+
     def _cast_targeted_damage_spell(self, caster, target):
         """Cast a targeted damage spell on a specific monster.
 
@@ -1973,6 +2030,19 @@ class CombatState(BaseState):
                 )
         for member in expired:
             del self.shield_buffs[member]
+
+    def _tick_range_buffs(self):
+        """Decrement range buff durations at the end of each full round."""
+        expired = []
+        for member, buff in self.range_buffs.items():
+            buff["turns_left"] -= 1
+            if buff["turns_left"] <= 0:
+                expired.append(member)
+                self.combat_log.append(
+                    f"{member.name}'s Long Shanks wears off."
+                )
+        for member in expired:
+            del self.range_buffs[member]
 
     def _tick_charm_buffs(self):
         """Decrement charm durations at the end of each full round.
@@ -2326,6 +2396,7 @@ class CombatState(BaseState):
             for m in self.fighters:
                 self.defending[m] = False
             self._tick_shield_buffs()
+            self._tick_range_buffs()
             self._tick_charm_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
@@ -2914,6 +2985,7 @@ class CombatState(BaseState):
             heal_effects=self.heal_effects,
             shield_effects=self.shield_effects,
             shield_buffs=self.shield_buffs,
+            range_buffs=self.range_buffs,
             shield_target_col=self.shield_target_col,
             shield_target_row=self.shield_target_row,
             turn_undead_effects=self.turn_undead_effects,
