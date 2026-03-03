@@ -106,12 +106,12 @@
     {
       "id": "charm_person",
       "name": "Charm Person",
-      "description": "Weaves an enchantment that bends the will of a humanoid creature, causing it to leave the fight peacefully.",
+      "description": "Weaves an enchantment that bends the will of a humanoid creature, turning it against its allies for 5 turns.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
       "min_level": 1,
       "mp_cost": 5,
-      "duration": "instant",
+      "duration": 5,
       "effect_type": "charm",
       "effect_value": {
         "save_dc_stat": "intelligence",

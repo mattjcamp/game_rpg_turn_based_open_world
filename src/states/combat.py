@@ -420,6 +420,7 @@ class CombatState(BaseState):
         # Charm Person effects
         self.charm_effects = []       # active CharmEffect objects
         self.charm_target = None      # Monster being charmed (removed when anim ends)
+        self.charm_buffs = {}         # Monster -> turns_left
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -550,6 +551,7 @@ class CombatState(BaseState):
         self.turn_undead_effects = []
         self.charm_effects = []
         self.charm_target = None
+        self.charm_buffs = {}
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -1972,6 +1974,24 @@ class CombatState(BaseState):
         for member in expired:
             del self.shield_buffs[member]
 
+    def _tick_charm_buffs(self):
+        """Decrement charm durations at the end of each full round.
+
+        When a charm expires the monster reverts to hostile.
+        """
+        expired = []
+        for monster, turns_left in self.charm_buffs.items():
+            turns_left -= 1
+            self.charm_buffs[monster] = turns_left
+            if turns_left <= 0:
+                expired.append(monster)
+        for monster in expired:
+            del self.charm_buffs[monster]
+            if monster.is_alive():
+                monster.charmed = False
+                self.combat_log.append(
+                    f"The charm on {monster.name} wears off!")
+
     # ── Auto-monster spell dispatch ──────────────────────────────
 
     def _cast_auto_monster_spell(self, spell_id):
@@ -2151,9 +2171,14 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{target.name} is CHARMED! (save {save_roll}+{save_bonus}="
                 f"{save_total} vs DC {save_dc})")
+            # Track duration from spell data (default 5 turns)
+            duration = spell.get("duration", 5)
+            if isinstance(duration, str):
+                duration = 5  # fallback if "instant"
             self.combat_log.append(
-                f"{target.name} turns against its allies!")
+                f"{target.name} turns against its allies! ({duration} turns)")
             target.charmed = True
+            self.charm_buffs[target] = duration
             # Zero out rewards — charmed monsters don't give XP/gold
             target.xp_reward = 0
             target.gold_reward = 0
@@ -2301,6 +2326,7 @@ class CombatState(BaseState):
             for m in self.fighters:
                 self.defending[m] = False
             self._tick_shield_buffs()
+            self._tick_charm_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
