@@ -143,6 +143,27 @@
       "hit_sfx": null
     },
     {
+      "id": "sleep",
+      "name": "Sleep",
+      "description": "Lulls a weak-minded creature into a deep magical slumber.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": 5,
+      "effect_type": "sleep",
+      "effect_value": {
+        "max_target_hp": 20,
+        "save_dc_stat": "intelligence",
+        "save_dc_base": 10
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
       "id": "push",
       "name": "Push",
       "description": "Emits a wave of divine force that drives nearby monsters away from the party.",

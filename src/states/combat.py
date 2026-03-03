@@ -59,6 +59,7 @@ PHASE_THROW_SELECT = "throw_select"  # choosing an item to throw
 PHASE_USE_ITEM     = "use_item"      # choosing an item to use
 PHASE_EQUIP       = "equip"          # character sheet / equip screen
 PHASE_CHARM       = "charm"          # charm person animation playing
+PHASE_SLEEP       = "sleep"          # sleep spell animation playing
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -328,6 +329,29 @@ class CharmEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class SleepEffect:
+    """A soft blue/purple mist descending over the target monster."""
+
+    DURATION = 1.2  # seconds
+
+    def __init__(self, col, row, success=True):
+        self.col = col
+        self.row = row
+        self.success = success  # True = asleep, False = resisted
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
 
@@ -422,6 +446,10 @@ class CombatState(BaseState):
         self.charm_effects = []       # active CharmEffect objects
         self.charm_target = None      # Monster being charmed (removed when anim ends)
         self.charm_buffs = {}         # Monster -> turns_left
+
+        # Sleep effects
+        self.sleep_effects = []       # active SleepEffect objects
+        self.sleep_buffs = {}         # Monster -> turns_left
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -554,6 +582,8 @@ class CombatState(BaseState):
         self.charm_effects = []
         self.charm_target = None
         self.charm_buffs = {}
+        self.sleep_effects = []
+        self.sleep_buffs = {}
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -762,7 +792,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP):
             return
 
         # Equip screen handles its own input
@@ -995,6 +1025,8 @@ class CombatState(BaseState):
                         self.combat_log.append("Target is out of range!")
                     elif spell.get("effect_type") == "charm":
                         self._cast_charm_person(f, target)
+                    elif spell.get("effect_type") == "sleep":
+                        self._cast_sleep_spell(f, target)
                     else:
                         self._cast_targeted_damage_spell(f, target)
                 else:
@@ -2062,6 +2094,23 @@ class CombatState(BaseState):
                 self.combat_log.append(
                     f"The charm on {monster.name} wears off!")
 
+    def _tick_sleep_buffs(self):
+        """Decrement sleep durations at the end of each full round.
+
+        When sleep expires the monster wakes up and acts normally.
+        """
+        expired = []
+        for monster, turns_left in self.sleep_buffs.items():
+            turns_left -= 1
+            self.sleep_buffs[monster] = turns_left
+            if turns_left <= 0:
+                expired.append(monster)
+        for monster in expired:
+            del self.sleep_buffs[monster]
+            if monster.is_alive():
+                self.combat_log.append(
+                    f"{monster.name} wakes up!")
+
     # ── Auto-monster spell dispatch ──────────────────────────────
 
     def _cast_auto_monster_spell(self, spell_id):
@@ -2260,6 +2309,94 @@ class CombatState(BaseState):
             if sfx:
                 self.game.sfx.play(sfx)
 
+    def _cast_sleep_spell(self, caster, target):
+        """Cast Sleep — puts a low-level monster to sleep for several turns.
+
+        Only works on monsters whose max HP is at or below the spell's
+        ``max_target_hp`` threshold.  The monster gets a Wisdom save to resist.
+        Sleeping monsters skip their turns until the effect wears off or they
+        are damaged (damage breaks sleep).
+        """
+        spell_id = self.selected_spell
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Sleep")
+        mp_cost = spell.get("mp_cost", 5)
+
+        # Check if monster is already asleep
+        if target in self.sleep_buffs:
+            self.combat_log.append(f"{target.name} is already asleep!")
+            return
+
+        # Check max HP threshold — only works on low-level monsters
+        ev = spell.get("effect_value", {})
+        max_hp_threshold = ev.get("max_target_hp", 20)
+        if target.max_hp > max_hp_threshold:
+            self.combat_log.append(
+                f"{caster.name} casts {spell_name}... but {target.name} "
+                f"is too powerful! (HP {target.max_hp} > {max_hp_threshold})")
+            caster.current_mp -= mp_cost
+            mc, mr = self.monster_positions.get(target, (0, 0))
+            self.sleep_effects.append(SleepEffect(mc, mr, success=False))
+            self.selected_spell = None
+            self.phase = PHASE_SLEEP
+            sfx = spell.get("sfx")
+            if sfx:
+                self.game.sfx.play(sfx)
+            return
+
+        # Deduct MP
+        caster.current_mp -= mp_cost
+
+        # Calculate save DC: base + caster's Intelligence modifier
+        dc_base = ev.get("save_dc_base", 10)
+        dc_stat = ev.get("save_dc_stat", "intelligence")
+        if dc_stat == "intelligence":
+            save_dc = dc_base + caster.int_mod
+        elif dc_stat == "wisdom":
+            save_dc = dc_base + caster.wis_mod
+        else:
+            save_dc = dc_base
+
+        # Monster Wisdom save
+        save_roll = roll_d20()
+        save_bonus = max(0, target.attack_bonus - 2)
+        save_total = save_roll + save_bonus
+
+        mc, mr = self.monster_positions.get(target, (0, 0))
+
+        if save_total >= save_dc:
+            # Monster resisted!
+            self.combat_log.append(
+                f"{caster.name} casts {spell_name} on {target.name}! (-{mp_cost} MP)")
+            self.combat_log.append(
+                f"{target.name} resists! (save {save_roll}+{save_bonus}="
+                f"{save_total} vs DC {save_dc})")
+            self.sleep_effects.append(SleepEffect(mc, mr, success=False))
+            self.selected_spell = None
+            self.phase = PHASE_SLEEP
+            sfx = spell.get("sfx")
+            if sfx:
+                self.game.sfx.play(sfx)
+        else:
+            # Asleep!
+            duration = spell.get("duration", 5)
+            if isinstance(duration, str):
+                duration = 5
+            self.combat_log.append(
+                f"{caster.name} casts {spell_name} on {target.name}! (-{mp_cost} MP)")
+            self.combat_log.append(
+                f"{target.name} falls ASLEEP! (save {save_roll}+{save_bonus}="
+                f"{save_total} vs DC {save_dc})")
+            self.combat_log.append(
+                f"{target.name} will sleep for {duration} turns.")
+            self.sleep_buffs[target] = duration
+            self.sleep_effects.append(SleepEffect(mc, mr, success=True))
+            self.selected_spell = None
+            self.phase = PHASE_SLEEP
+            sfx = spell.get("sfx")
+            if sfx:
+                self.game.sfx.play(sfx)
+
     def _apply_use_item(self, item_name, effect, power):
         """Apply a consumable item's effect and consume it."""
         f = self.active_fighter
@@ -2398,6 +2535,7 @@ class CombatState(BaseState):
             self._tick_shield_buffs()
             self._tick_range_buffs()
             self._tick_charm_buffs()
+            self._tick_sleep_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
@@ -2417,6 +2555,14 @@ class CombatState(BaseState):
         # ── Charmed monster: attacks other (non-charmed) monsters ──
         if getattr(mon, "charmed", False):
             self._charmed_monster_turn(mon)
+            return
+
+        # ── Sleeping monster: skip turn entirely ──
+        if mon in self.sleep_buffs:
+            self.combat_log.append(f"{mon.name} is fast asleep... Zzz")
+            self.active_monster_idx += 1
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 600
             return
 
         # Find closest alive fighter
@@ -2780,6 +2926,21 @@ class CombatState(BaseState):
             return
         self.charm_effects = [fx for fx in self.charm_effects if fx.alive]
 
+        # Update sleep effects
+        for fx in self.sleep_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_SLEEP:
+            if all(not fx.alive for fx in self.sleep_effects):
+                self.sleep_effects = []
+                # Check if all non-charmed monsters are dead
+                if self._all_monsters_dead():
+                    self._trigger_victory()
+                else:
+                    self._end_fighter_turn()
+            return
+        self.sleep_effects = [fx for fx in self.sleep_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -2854,8 +3015,18 @@ class CombatState(BaseState):
         """Log a monster's death. Does NOT trigger victory — caller checks."""
         self.combat_log.append(f"{monster.name} is defeated!")
 
+    def _wake_monster(self, monster):
+        """Wake a sleeping monster (e.g. when it takes damage)."""
+        if monster in self.sleep_buffs:
+            del self.sleep_buffs[monster]
+            self.combat_log.append(
+                f"{monster.name} is jolted awake by the attack!")
+
     def _check_monster_death(self, target):
         """After damaging a monster, check if it died and if combat is over."""
+        if target and target.is_alive():
+            # Damage wakes sleeping monsters
+            self._wake_monster(target)
         if target and not target.is_alive():
             self._on_monster_killed(target)
         if self._all_monsters_dead():
@@ -2990,6 +3161,8 @@ class CombatState(BaseState):
             shield_target_row=self.shield_target_row,
             turn_undead_effects=self.turn_undead_effects,
             charm_effects=self.charm_effects,
+            sleep_effects=self.sleep_effects,
+            sleep_buffs=self.sleep_buffs,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,

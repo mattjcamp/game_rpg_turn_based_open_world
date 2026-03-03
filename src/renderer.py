@@ -2185,6 +2185,8 @@ class Renderer:
                           shield_target_row=0,
                           turn_undead_effects=None,
                           charm_effects=None,
+                          sleep_effects=None,
+                          sleep_buffs=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2236,6 +2238,10 @@ class Renderer:
                 # Draw charmed indicator (pink glow + hearts)
                 if getattr(mon, "charmed", False):
                     self._u3_draw_charmed_indicator(mx, my, ts, mc, mr)
+                # Draw sleep indicator (Zzz floating above)
+                if sleep_buffs and mon in sleep_buffs:
+                    self._u3_draw_sleep_indicator(mx, my, ts, mc, mr,
+                                                  sleep_buffs[mon])
         elif monster and monster.is_alive():
             # Legacy single-monster fallback
             if is_outdoor:
@@ -2369,6 +2375,12 @@ class Renderer:
                 if fx.alive:
                     self._u3_draw_charm_effect(mx, my, ts, fx)
 
+        # ── 2l. sleep effects ──
+        if sleep_effects:
+            for fx in sleep_effects:
+                if fx.alive:
+                    self._u3_draw_sleep_effect(mx, my, ts, fx)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
@@ -2396,7 +2408,8 @@ class Renderer:
         monster_panel_h = max(50, 28 + 68 * len(alive_monsters))
         self._u3_monster_panel_multi(alive_monsters, rx, monster_y, rw, monster_panel_h,
                                      source_state=is_outdoor and "overworld" or "dungeon",
-                                     encounter_name=encounter_name)
+                                     encounter_name=encounter_name,
+                                     sleep_buffs=sleep_buffs)
         action_y = monster_y + monster_panel_h + 4
         arena_bottom = my + self._MAP_H
         action_h = arena_bottom - action_y
@@ -3310,6 +3323,133 @@ class Renderer:
                 self.screen.blit(puff_surf,
                                  (cx - puff_r - 2, cy - puff_r - 2))
 
+    def _u3_draw_sleep_indicator(self, ax, ay, ts, col, row, turns_left):
+        """Draw floating 'Zzz' letters above a sleeping monster with a blue glow."""
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ay + row * ts + ts // 2)
+
+        SLEEP_BLUE = (100, 140, 255)
+        DEEP_BLUE = (60, 80, 200)
+
+        # Pulsing blue glow around the monster
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.003)
+        glow_r = int(ts // 2 + 2)
+        glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                    pygame.SRCALPHA)
+        alpha = int(30 + 25 * pulse)
+        pygame.draw.circle(glow_surf, (*DEEP_BLUE, alpha),
+                           (glow_r + 2, glow_r + 2), glow_r)
+        self.screen.blit(glow_surf,
+                         (cx - glow_r - 2, cy - glow_r - 2))
+
+        # Floating "Z" letters drifting upward
+        for i in range(3):
+            z_phase = (ticks * 0.0015 + i * 0.8) % 2.0
+            if z_phase < 1.5:
+                z_progress = z_phase / 1.5
+                zx = cx + int(math.sin(z_progress * 2.5 + i * 1.2) * 6) + (i - 1) * 4
+                zy = cy - ts // 2 - int(z_progress * 14) - i * 3
+                z_alpha = int(200 * (1.0 - z_progress * 0.7))
+                z_size = max(6, 10 - i * 2)
+                if z_alpha > 20:
+                    z_font = self.font_small
+                    z_text = "Z"
+                    z_surf = z_font.render(z_text, True, (*SLEEP_BLUE,))
+                    z_overlay = pygame.Surface(z_surf.get_size(), pygame.SRCALPHA)
+                    z_overlay.fill((0, 0, 0, 0))
+                    z_overlay.blit(z_surf, (0, 0))
+                    z_overlay.set_alpha(z_alpha)
+                    self.screen.blit(z_overlay, (zx, zy))
+
+    def _u3_draw_sleep_effect(self, ax, ay, ts, fx):
+        """Draw the Sleep spell effect — soft blue/purple mist descending.
+
+        Phase 1 (0–0.3): Blue sparkles drift down around the target
+        Phase 2 (0.3–0.7): Swirling blue mist envelops the target
+        Phase 3 (0.7–1.0): Flash (blue glow for success, fizzle for resist) + fade
+        """
+        p = fx.progress  # 0 → 1
+
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+
+        LIGHT_BLUE = (140, 180, 255)
+        DEEP_BLUE = (60, 80, 220)
+        SOFT_PURPLE = (120, 100, 200)
+        RESIST_RED = (255, 80, 80)
+
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: blue sparkles drifting down
+            sub_p = p / 0.3
+            num_sparkles = int(6 + sub_p * 10)
+            for i in range(num_sparkles):
+                angle = (ticks * 0.003 + i * 0.7) % (2 * math.pi)
+                r = ts * 0.6 * (1.0 - sub_p * 0.4)
+                sx = cx + int(math.cos(angle) * r)
+                sy = cy - ts // 2 + int(sub_p * ts * 0.8) + int(math.sin(angle + i) * 3)
+                spark_alpha = int(120 + 80 * math.sin(ticks * 0.01 + i))
+                spark_r = max(1, int(2 - sub_p))
+                s = pygame.Surface((spark_r * 2 + 2, spark_r * 2 + 2),
+                                    pygame.SRCALPHA)
+                pygame.draw.circle(s, (*LIGHT_BLUE, spark_alpha),
+                                   (spark_r + 1, spark_r + 1), spark_r)
+                self.screen.blit(s, (sx - spark_r - 1, sy - spark_r - 1))
+
+        elif p < 0.7:
+            # Phase 2: blue mist enveloping
+            sub_p = (p - 0.3) / 0.4
+            mist_r = int(ts * 0.5 + sub_p * ts * 0.2)
+            mist_alpha = int(60 + 40 * sub_p)
+            mist_surf = pygame.Surface((mist_r * 2 + 4, mist_r * 2 + 4),
+                                        pygame.SRCALPHA)
+            pygame.draw.circle(mist_surf, (*DEEP_BLUE, mist_alpha),
+                               (mist_r + 2, mist_r + 2), mist_r)
+            self.screen.blit(mist_surf,
+                             (cx - mist_r - 2, cy - mist_r - 2))
+
+            # Inner swirl
+            for i in range(4):
+                swirl_angle = ticks * 0.005 + i * 1.57 + sub_p * 3
+                sr = mist_r * (0.3 + 0.3 * sub_p)
+                sx = cx + int(math.cos(swirl_angle) * sr)
+                sy = cy + int(math.sin(swirl_angle) * sr)
+                dot_r = max(1, int(3 - sub_p * 2))
+                dot_alpha = int(140 * (1.0 - sub_p * 0.3))
+                dot_surf = pygame.Surface((dot_r * 2 + 2, dot_r * 2 + 2),
+                                           pygame.SRCALPHA)
+                pygame.draw.circle(dot_surf, (*SOFT_PURPLE, dot_alpha),
+                                   (dot_r + 1, dot_r + 1), dot_r)
+                self.screen.blit(dot_surf, (sx - dot_r - 1, sy - dot_r - 1))
+
+        else:
+            # Phase 3: result flash + fade
+            sub_p = (p - 0.7) / 0.3
+            fade = 1.0 - sub_p
+
+            if fx.success:
+                # Blue glow settling — monster falls asleep
+                glow_r = int(ts * 0.6 - sub_p * ts * 0.2)
+                glow_alpha = int(100 * fade)
+                if glow_r > 0 and glow_alpha > 5:
+                    glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                                pygame.SRCALPHA)
+                    pygame.draw.circle(glow_surf, (*DEEP_BLUE, glow_alpha),
+                                       (glow_r + 2, glow_r + 2), glow_r)
+                    self.screen.blit(glow_surf,
+                                     (cx - glow_r - 2, cy - glow_r - 2))
+            else:
+                # Red fizzle puff — resisted
+                puff_r = int(6 + sub_p * 8)
+                puff_surf = pygame.Surface((puff_r * 2 + 4, puff_r * 2 + 4),
+                                            pygame.SRCALPHA)
+                pygame.draw.circle(puff_surf, (*RESIST_RED, int(100 * fade)),
+                                   (puff_r + 2, puff_r + 2), puff_r)
+                self.screen.blit(puff_surf,
+                                 (cx - puff_r - 2, cy - puff_r - 2))
+
     def _u3_draw_target_cursor(self, ax, ay, ts, col, row):
         """Draw a pulsing blue selection box at (col, row) on the arena."""
         ticks = pygame.time.get_ticks()
@@ -3616,7 +3756,8 @@ class Renderer:
         self._u3_text(atk_text, info_x, stat_y, (200, 200, 200), self.font_small)
 
     def _u3_monster_panel_multi(self, monsters, x, y, w, h,
-                               source_state="dungeon", encounter_name=None):
+                               source_state="dungeon", encounter_name=None,
+                               sleep_buffs=None):
         """Monster stats panel matching the party panel format with sprites and bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -3649,9 +3790,13 @@ class Renderer:
             # ── Name (to the right of sprite) ──
             info_x = tx + sprite_size + 6
             is_charmed = getattr(mon, "charmed", False)
+            is_sleeping = (sleep_buffs and mon in sleep_buffs) if sleep_buffs else False
             if is_charmed:
                 name_color = (255, 120, 200)  # Pink for charmed
                 display_name = f"{mon.name} (Ally)"
+            elif is_sleeping:
+                name_color = (120, 140, 220)  # Blue for sleeping
+                display_name = f"{mon.name} (Zzz)"
             elif mon.is_alive():
                 name_color = self._U3_RED
                 display_name = mon.name
