@@ -1150,6 +1150,11 @@ class Renderer:
                     py = usr * ts
                     self.screen.blit(sprite, (px, py))
 
+        # ── 1c. seasonal snow overlay (winter months) ──
+        clock = party.clock
+        if clock.month_index in (0, 1, 11):  # Jan, Feb, Dec
+            self._draw_snow_overlay(tile_map, ts, cols, rows, off_c, off_r, clock)
+
         # ── 2. overworld monster sprites ──
         if overworld_monsters:
             for mon in overworld_monsters:
@@ -5605,6 +5610,75 @@ class Renderer:
     # ═══════════════════════════════════════════════════════════════
     # TIME-OF-DAY DARKNESS OVERLAY  (drawn on overworld map)
     # ═══════════════════════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════════════════════
+    # SEASONAL WEATHER OVERLAYS
+    # ═══════════════════════════════════════════════════════════════
+
+    # Tile types that receive snow coverage
+    _SNOW_TILES = None  # lazily populated from settings on first call
+
+    def _draw_snow_overlay(self, tile_map, ts, cols, rows, off_c, off_r, clock):
+        """Scatter subtle white pixel flecks over eligible overworld tiles.
+
+        Called during winter months (December, January, February).
+        Draws only individual 1px white dots — no washes or tints —
+        so the underlying tile art stays clearly visible.
+
+        Parameters
+        ----------
+        tile_map : TileMap
+        ts       : int — tile size in pixels
+        cols, rows : int — visible grid dimensions
+        off_c, off_r : int — camera offset in world-tile coords
+        clock    : GameClock
+        """
+        # Lazy-init the set of tile IDs that receive snow
+        if self._SNOW_TILES is None:
+            from src.settings import (
+                TILE_GRASS, TILE_FOREST, TILE_MOUNTAIN,
+                TILE_PATH, TILE_SAND, TILE_BRIDGE,
+            )
+            Renderer._SNOW_TILES = frozenset([
+                TILE_GRASS, TILE_FOREST, TILE_MOUNTAIN,
+                TILE_PATH, TILE_SAND, TILE_BRIDGE,
+            ])
+
+        month = clock.month_index  # 0=Jan, 11=Dec
+        # More flecks in deep winter, fewer at the edges
+        if month == 0:     # January
+            flecks_per_tile = 6
+        elif month == 1:   # February
+            flecks_per_tile = 4
+        elif month == 11:  # December
+            flecks_per_tile = 3
+        else:
+            return  # not winter
+
+        snow = pygame.Surface((cols * ts, rows * ts), pygame.SRCALPHA)
+
+        for sr in range(rows):
+            for sc in range(cols):
+                wc = sc + off_c
+                wr = sr + off_r
+                tid = tile_map.get_tile(wc, wr)
+                if tid not in self._SNOW_TILES:
+                    continue
+
+                px = sc * ts
+                py = sr * ts
+                seed = wc * 374761 + wr * 668265
+
+                for i in range(flecks_per_tile):
+                    s = seed + i * 7919
+                    h = ((s ^ (s >> 13)) * 1274126177) & 0x7FFFFFFF
+                    sz = 1 + (h >> 4) % 3  # 1px, 2px, or 3px flecks
+                    dx = h % (ts - sz - 1) + 1
+                    dy = (h >> 10) % (ts - sz - 1) + 1
+                    a = 220 + (h >> 20) % 36  # alpha 220-255
+                    snow.fill((255, 255, 255, a), (px + dx, py + dy, sz, sz))
+
+        self.screen.blit(snow, (0, 0))
 
     def _draw_overworld_darkness(self, clock, party_sc, party_sr, ts, cols, rows,
                                  has_light=False):
