@@ -11,6 +11,7 @@ import os
 import random
 
 from src.data_loader import _load_json
+from src.settings import TILE_WATER
 
 # ── Default data directory ────────────────────────────────────────
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -33,7 +34,7 @@ class Monster:
     def __init__(self, name, hp, ac, attack_bonus,
                  damage_dice=1, damage_sides=4, damage_bonus=0,
                  xp_reward=25, gold_reward=10, color=(200, 50, 50),
-                 tile=None, undead=False):
+                 tile=None, undead=False, terrain="land"):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -47,6 +48,7 @@ class Monster:
         self.color = color   # Fallback color for procedural rendering
         self.tile = tile     # Filename in src/assets/ (e.g. "orc_f1.png")
         self.undead = undead  # True for undead creatures (skeleton, zombie, etc.)
+        self.terrain = terrain  # "land" or "sea" — restricts where this monster can move
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -54,6 +56,18 @@ class Monster:
 
     def is_alive(self):
         return self.hp > 0
+
+    def _can_enter(self, col, row, tile_map):
+        """Return True if this monster's terrain allows it onto (col, row).
+
+        Sea creatures can only move on water tiles.  Land creatures use
+        the normal walkability check (which already excludes water).
+        """
+        if not (0 <= col < tile_map.width and 0 <= row < tile_map.height):
+            return False
+        if self.terrain == "sea":
+            return tile_map.get_tile(col, row) == TILE_WATER
+        return tile_map.is_walkable(col, row)
 
     def try_move_toward(self, target_col, target_row, tile_map,
                         occupied_positions):
@@ -69,7 +83,7 @@ class Monster:
         target_col, target_row : int
             Where the party is standing.
         tile_map : TileMap
-            Used for walkability checks.
+            Used for walkability / terrain checks.
         occupied_positions : set of (col, row)
             Tiles already occupied by other monsters (prevents stacking).
         """
@@ -94,7 +108,7 @@ class Monster:
 
         for mc, mr in moves:
             nc, nr = self.col + mc, self.row + mr
-            if (tile_map.is_walkable(nc, nr)
+            if (self._can_enter(nc, nr, tile_map)
                     and (nc, nr) != (target_col, target_row)
                     and (nc, nr) not in occupied_positions):
                 self.col = nc
@@ -112,7 +126,7 @@ class Monster:
         Parameters
         ----------
         tile_map : TileMap
-            Used for walkability checks.
+            Used for walkability / terrain checks.
         occupied_positions : set of (col, row)
             Tiles already occupied by other monsters.
         party_col, party_row : int or None
@@ -127,7 +141,7 @@ class Monster:
 
         for dc, dr in directions:
             nc, nr = self.col + dc, self.row + dr
-            if not tile_map.is_walkable(nc, nr):
+            if not self._can_enter(nc, nr, tile_map):
                 continue
             if (nc, nr) in occupied_positions:
                 continue
@@ -159,6 +173,7 @@ def create_monster(name):
         color=tuple(data.get("color", [200, 50, 50])),
         tile=data.get("tile"),
         undead=data.get("undead", False),
+        terrain=data.get("terrain", "land"),
     )
 
 
@@ -193,8 +208,17 @@ _ENCOUNTER_DATA = _load_json("encounters.json")
 ENCOUNTERS = _ENCOUNTER_DATA.get("encounters", {})
 
 
-def create_encounter(area="dungeon"):
-    """Pick a random encounter template.
+def create_encounter(area="dungeon", terrain="land"):
+    """Pick a random encounter template matching *terrain*.
+
+    Parameters
+    ----------
+    area : str
+        Encounter pool key (``"overworld"``, ``"dungeon"``, etc.).
+    terrain : str
+        ``"land"`` or ``"sea"``.  Only encounters whose ``"terrain"``
+        field matches are eligible.  Encounters without the field
+        default to ``"land"``.
 
     Returns a dict with keys:
         name : str            — display name (e.g. "Goblin Ambush")
@@ -203,8 +227,14 @@ def create_encounter(area="dungeon"):
                                    the group on the map
     Uses weighted random selection from data/encounters.json.
     """
-    pool = ENCOUNTERS.get(area, [])
+    all_pool = ENCOUNTERS.get(area, [])
+    # Filter by terrain
+    pool = [e for e in all_pool if e.get("terrain", "land") == terrain]
     if not pool:
+        # No encounters for this terrain — return None so caller can skip
+        if terrain != "land":
+            return None
+        # Fallback for land if no templates at all
         m = create_random_monster(area)
         return {"name": m.name, "monsters": [m],
                 "monster_party_tile": m.name}

@@ -15,6 +15,7 @@ from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
+    TILE_WATER,
 )
 from src.dungeon_generator import generate_dungeon, generate_house_dungeon
 from src.monster import create_random_monster, create_encounter, create_monster
@@ -88,22 +89,34 @@ class OverworldState(InventoryMixin, BaseState):
     # ── Orc spawning ──────────────────────────────────────────────
 
     def _spawn_orcs(self):
-        """Top-up roaming orcs to _MAX_OVERWORLD_ORCS."""
-        alive = [m for m in self.overworld_monsters if m.is_alive()]
-        self.overworld_monsters = alive
-        needed = _MAX_OVERWORLD_ORCS - len(alive)
+        """Top-up roaming orcs to _MAX_OVERWORLD_ORCS.
+
+        Each candidate position is classified as ``"land"`` or ``"sea"``
+        based on the tile type, and the encounter template is chosen to
+        match.  Sea encounters can only appear on water tiles, and land
+        encounters can only appear on walkable land tiles.
+
+        Also prunes any monster that has somehow ended up on a water tile
+        (safety net for movement edge-cases or legacy state).
+        """
         tile_map = self.game.tile_map
         party = self.game.party
 
+        # Keep only alive monsters that are NOT standing on invalid terrain.
+        # Land monsters on water tiles are removed as a safety net.
+        valid = []
+        for m in self.overworld_monsters:
+            if not m.is_alive():
+                continue
+            tile_id = tile_map.get_tile(m.col, m.row)
+            if getattr(m, "terrain", "land") != "sea" and tile_id == TILE_WATER:
+                continue  # land monster on water — remove it
+            valid.append(m)
+        self.overworld_monsters = valid
+
+        needed = _MAX_OVERWORLD_ORCS - len(valid)
+
         for _ in range(needed):
-            # Pre-roll encounter template; use monster_party_tile for map sprite
-            enc = create_encounter("overworld")
-            orc = create_monster(enc["monster_party_tile"])
-            orc.encounter_template = {
-                "name": enc["name"],
-                "monster_names": [m.name for m in enc["monsters"]],
-                "monster_party_tile": enc["monster_party_tile"],
-            }
             placed = False
             for _attempt in range(60):
                 c = party.col + random.randint(-_SPAWN_MAX_DIST, _SPAWN_MAX_DIST)
@@ -111,12 +124,35 @@ class OverworldState(InventoryMixin, BaseState):
                 dist = max(abs(c - party.col), abs(r - party.row))
                 if dist < _SPAWN_MIN_DIST:
                     continue
-                if (0 <= c < tile_map.width and 0 <= r < tile_map.height
-                        and tile_map.is_walkable(c, r)):
-                    orc.col = c
-                    orc.row = r
-                    placed = True
-                    break
+                if not (0 <= c < tile_map.width and 0 <= r < tile_map.height):
+                    continue
+
+                # Determine terrain at this position
+                tile_id = tile_map.get_tile(c, r)
+                if tile_id == TILE_WATER:
+                    terrain = "sea"
+                else:
+                    # Land monsters require a walkable tile
+                    if not tile_map.is_walkable(c, r):
+                        continue
+                    terrain = "land"
+
+                # Pick an encounter matching this terrain
+                enc = create_encounter("overworld", terrain=terrain)
+                if enc is None:
+                    # No encounters defined for this terrain — skip
+                    continue
+
+                orc = create_monster(enc["monster_party_tile"])
+                orc.encounter_template = {
+                    "name": enc["name"],
+                    "monster_names": [m.name for m in enc["monsters"]],
+                    "monster_party_tile": enc["monster_party_tile"],
+                }
+                orc.col = c
+                orc.row = r
+                placed = True
+                break
             if placed:
                 self.overworld_monsters.append(orc)
 
@@ -400,13 +436,13 @@ class OverworldState(InventoryMixin, BaseState):
             dir_x = (1 if dx > 0 else (-1 if dx < 0 else 0))
             dir_y = (1 if dy > 0 else (-1 if dy < 0 else 0))
 
-            # Push step by step
+            # Push step by step (terrain-aware so sea creatures stay in
+            # water and land creatures stay on land)
             occupied.discard((mon.col, mon.row))
             for _step in range(push_distance):
                 nc = mon.col + dir_x
                 nr = mon.row + dir_y
-                if (0 <= nc < tile_map.width and 0 <= nr < tile_map.height
-                        and tile_map.is_walkable(nc, nr)
+                if (mon._can_enter(nc, nr, tile_map)
                         and (nc, nr) not in occupied
                         and (nc, nr) != (party.col, party.row)):
                     mon.col = nc
@@ -720,7 +756,9 @@ class OverworldState(InventoryMixin, BaseState):
                 effect_cursor=self.effect_cursor,
                 showing_spell_list=self.showing_spell_list,
                 spell_list_items=self.spell_list_items,
-                spell_list_cursor=self.spell_list_cursor)
+                spell_list_cursor=self.spell_list_cursor,
+                choosing_heal_target=self.choosing_heal_target,
+                heal_target_cursor=self.heal_target_cursor)
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:

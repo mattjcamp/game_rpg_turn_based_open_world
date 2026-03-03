@@ -631,6 +631,9 @@ class CombatState(BaseState):
         fighter_class = fighter.char_class.strip()
         fighter_level = getattr(fighter, "level", 1)
         for spell_id, spell in SPELLS_DATA.items():
+            # Check usable_in — only show spells that work in battle
+            if "battle" not in spell.get("usable_in", []):
+                continue
             # Check class requirement
             allowed = [c.lower() for c in spell.get("allowable_classes", [])]
             if fighter_class.lower() not in allowed:
@@ -1915,9 +1918,13 @@ class CombatState(BaseState):
             f"for {damage} damage! (-{mp_cost} MP)"
         )
 
-        self._check_monster_death(target)
-        self.phase = PHASE_FIREBALL
         self.selected_spell = None
+
+        # _check_monster_death sets PHASE_VICTORY if all monsters are dead,
+        # or calls _end_fighter_turn() otherwise.  Do NOT overwrite the phase
+        # afterwards — damage is already resolved inline (unlike the regular
+        # fireball which needs PHASE_FIREBALL to wait for the projectile).
+        self._check_monster_death(target)
 
     def _tick_shield_buffs(self):
         """Decrement shield buff durations at the end of each full round.

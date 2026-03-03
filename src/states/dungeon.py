@@ -862,7 +862,9 @@ class DungeonState(InventoryMixin, BaseState):
                 effect_cursor=self.effect_cursor,
                 showing_spell_list=self.showing_spell_list,
                 spell_list_items=self.spell_list_items,
-                spell_list_cursor=self.spell_list_cursor)
+                spell_list_cursor=self.spell_list_cursor,
+                choosing_heal_target=self.choosing_heal_target,
+                heal_target_cursor=self.heal_target_cursor)
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:

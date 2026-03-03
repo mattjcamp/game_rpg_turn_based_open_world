@@ -5128,7 +5128,9 @@ class Renderer:
                                  effect_cursor=0,
                                  showing_spell_list=False,
                                  spell_list_items=None,
-                                 spell_list_cursor=0):
+                                 spell_list_cursor=0,
+                                 choosing_heal_target=False,
+                                 heal_target_cursor=0):
         """
         Full-screen shared party inventory with party equipment slots.
 
@@ -5587,10 +5589,50 @@ class Renderer:
                         self.screen.blit(hl_s, hl)
                     oy += 22
 
+        # ── Heal target selection popup ──
+        if choosing_heal_target:
+            members = party.members
+            popup_w = 320
+            popup_h = 28 + len(members) * 22 + 8
+            popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+            popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+            pygame.draw.rect(self.screen, (20, 20, 40),
+                             (popup_x, popup_y, popup_w, popup_h))
+            pygame.draw.rect(self.screen, self._U3_GREEN,
+                             (popup_x, popup_y, popup_w, popup_h), 2)
+
+            self._u3_text("HEAL WHO?", popup_x + 10, popup_y + 6,
+                          self._U3_ORANGE, fm)
+            oy = popup_y + 28
+            for mi, m in enumerate(members):
+                sel = (mi == heal_target_cursor)
+                prefix = "> " if sel else "  "
+                hp_str = f"{m.hp}/{m.max_hp}HP"
+                if not m.is_alive():
+                    hp_str = "DEAD"
+                label = f"{prefix}{m.name}  {hp_str}"
+                col = self._U3_WHITE if sel else self._U3_LTBLUE
+                if not m.is_alive():
+                    col = self._U3_RED if sel else (140, 60, 60)
+                self._u3_text(label, popup_x + 10, oy, col, fm)
+                if sel:
+                    hl = pygame.Rect(popup_x + 4, oy - 1,
+                                     popup_w - 8, 20)
+                    hl_s = pygame.Surface((hl.w, hl.h),
+                                          pygame.SRCALPHA)
+                    hl_s.fill((255, 255, 255, 25))
+                    self.screen.blit(hl_s, hl)
+                oy += 22
+
         # ── Bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        if showing_spell_list:
+        if choosing_heal_target:
+            self._u3_text(
+                "[UP/DN] SELECT  [ENTER] HEAL  [ESC] CANCEL",
+                8, bar_y + 5, self._U3_BLUE)
+        elif showing_spell_list:
             if spell_list_items:
                 self._u3_text(
                     "[UP/DN] SELECT  [ENTER] CAST  [ESC] CANCEL",

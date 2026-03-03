@@ -1,65 +1,75 @@
 {
-  "_comment": "Encounter templates for Realm of Shadow. Each encounter defines a group of monsters the party will face. monster_party_tile is the monster whose sprite represents the group on the overworld/dungeon map.",
+  "_comment": "Encounter templates for Realm of Shadow. Each encounter defines a group of monsters the party will face. monster_party_tile is the monster whose sprite represents the group on the overworld/dungeon map. 'terrain' is 'land' (default) or 'sea'; sea encounters only spawn on water tiles.",
 
   "encounters": {
     "dungeon": [
       {
         "name": "Rat Nest",
         "weight": 30,
+        "terrain": "land",
         "monster_party_tile": "Giant Rat",
         "monsters": ["Giant Rat", "Giant Rat", "Giant Rat"]
       },
       {
         "name": "Goblin Ambush",
         "weight": 30,
+        "terrain": "land",
         "monster_party_tile": "Goblin",
         "monsters": ["Goblin", "Goblin", "Goblin"]
       },
       {
         "name": "Goblin Raiders",
         "weight": 20,
+        "terrain": "land",
         "monster_party_tile": "Goblin",
         "monsters": ["Goblin", "Goblin", "Wolf"]
       },
       {
         "name": "Skeleton Patrol",
         "weight": 25,
+        "terrain": "land",
         "monster_party_tile": "Skeleton",
         "monsters": ["Skeleton", "Skeleton"]
       },
       {
         "name": "Undead Horde",
         "weight": 15,
+        "terrain": "land",
         "monster_party_tile": "Skeleton",
         "monsters": ["Skeleton", "Zombie", "Zombie"]
       },
       {
         "name": "Wolf Pack",
         "weight": 20,
+        "terrain": "land",
         "monster_party_tile": "Wolf",
         "monsters": ["Wolf", "Wolf"]
       },
       {
         "name": "Dark Coven",
         "weight": 10,
+        "terrain": "land",
         "monster_party_tile": "Dark Mage",
         "monsters": ["Dark Mage", "Skeleton", "Skeleton"]
       },
       {
         "name": "Troll Den",
         "weight": 5,
+        "terrain": "land",
         "monster_party_tile": "Troll",
         "monsters": ["Troll"]
       },
       {
         "name": "Troll and Minions",
         "weight": 5,
+        "terrain": "land",
         "monster_party_tile": "Troll",
         "monsters": ["Troll", "Goblin", "Goblin"]
       },
       {
         "name": "Mixed Patrol",
         "weight": 15,
+        "terrain": "land",
         "monster_party_tile": "Orc",
         "monsters": ["Orc", "Skeleton", "Giant Rat"]
       }
@@ -69,36 +79,42 @@
       {
         "name": "Orc Warband",
         "weight": 30,
+        "terrain": "land",
         "monster_party_tile": "Orc",
         "monsters": ["Orc", "Orc", "Orc"]
       },
       {
         "name": "Orc Scouts",
         "weight": 25,
+        "terrain": "land",
         "monster_party_tile": "Orc",
         "monsters": ["Orc", "Orc"]
       },
       {
         "name": "Wolf Pack",
         "weight": 25,
+        "terrain": "land",
         "monster_party_tile": "Wolf",
         "monsters": ["Wolf", "Wolf", "Wolf"]
       },
       {
         "name": "Goblin Raiding Party",
         "weight": 25,
+        "terrain": "land",
         "monster_party_tile": "Goblin",
         "monsters": ["Goblin", "Goblin", "Goblin"]
       },
       {
         "name": "Orc with Wolves",
         "weight": 15,
+        "terrain": "land",
         "monster_party_tile": "Orc",
         "monsters": ["Orc", "Wolf", "Wolf"]
       },
       {
         "name": "Lone Troll",
         "weight": 5,
+        "terrain": "land",
         "monster_party_tile": "Troll",
         "monsters": ["Troll"]
       }
@@ -108,24 +124,28 @@
       {
         "name": "Rat Infestation",
         "weight": 40,
+        "terrain": "land",
         "monster_party_tile": "Giant Rat",
         "monsters": ["Giant Rat", "Giant Rat"]
       },
       {
         "name": "Cellar Rats",
         "weight": 30,
+        "terrain": "land",
         "monster_party_tile": "Giant Rat",
         "monsters": ["Giant Rat"]
       },
       {
         "name": "Stray Goblin",
         "weight": 20,
+        "terrain": "land",
         "monster_party_tile": "Goblin",
         "monsters": ["Goblin"]
       },
       {
         "name": "Goblin Squatters",
         "weight": 10,
+        "terrain": "land",
         "monster_party_tile": "Goblin",
         "monsters": ["Goblin", "Giant Rat"]
       }

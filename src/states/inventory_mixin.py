@@ -55,6 +55,13 @@ class InventoryMixin:
         self.spell_list_items = []       # [(spell_id, label, mp_cost, member_idx)]
         self.spell_list_cursor = 0
 
+        # Heal target selection (choosing which party member to heal)
+        self.choosing_heal_target = False
+        self.heal_target_cursor = 0
+        # Stored spell info while picking a target:
+        # (spell_id, cost, member_index, spell_data_dict)
+        self.pending_heal_spell = None
+
         # Game log overlay
         self.showing_log = False
         self.log_scroll = 0
@@ -319,6 +326,11 @@ class InventoryMixin:
         party = self.game.party
         inv = party.shared_inventory
         NUM_EFFECTS, CAST_INDEX, STASH_START, total_items = self._stash_layout()
+
+        # Heal target selection overlay is open — delegate input
+        if self.choosing_heal_target:
+            self._handle_heal_target_input(event)
+            return
 
         # Spell list overlay is open — delegate input
         if self.showing_spell_list:
@@ -675,6 +687,72 @@ class InventoryMixin:
         elif event.key in (pygame.K_ESCAPE, pygame.K_c):
             self.showing_spell_list = False
 
+    # ── Heal target selection ────────────────────────────────────
+
+    def _handle_heal_target_input(self, event):
+        """Handle input while the heal-target chooser is open."""
+        party = self.game.party
+        n = len(party.members)
+        if event.key == pygame.K_UP:
+            self.heal_target_cursor = (self.heal_target_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self.heal_target_cursor = (self.heal_target_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._apply_heal_to_target(self.heal_target_cursor)
+            self.choosing_heal_target = False
+            self.pending_heal_spell = None
+            self.showing_spell_list = False
+        elif event.key in (pygame.K_ESCAPE, pygame.K_c):
+            # Cancel — MP was already refunded
+            self.choosing_heal_target = False
+            self.pending_heal_spell = None
+
+    def _apply_heal_to_target(self, target_index):
+        """Roll healing dice and apply HP to the chosen party member."""
+        if not self.pending_heal_spell:
+            return
+        spell_id, cost, caster_index, spell = self.pending_heal_spell
+        party = self.game.party
+        caster = party.members[caster_index]
+        target = party.members[target_index]
+        spell_name = spell.get("name", spell_id)
+
+        # Check the caster still has enough MP (in case something changed)
+        if caster.current_mp < cost:
+            self.show_message(
+                f"{caster.name} doesn't have enough MP!", 2000)
+            return
+
+        # Deduct MP now that the target is confirmed
+        caster.current_mp -= cost
+
+        if not target.is_alive():
+            self.show_message(
+                f"{target.name} is dead — heal cannot help!", 2000)
+            return
+
+        missing = target.max_hp - target.hp
+        if missing <= 0:
+            self.show_message(
+                f"{caster.name} casts {spell_name}! "
+                f"{target.name} is already at full health.", 3000)
+            return
+
+        ev = spell.get("effect_value", {})
+        dice_str = ev.get("dice", "1d8")
+        parts = dice_str.split("d")
+        num_dice = int(parts[0]) if len(parts) == 2 else 1
+        die_size = int(parts[1]) if len(parts) == 2 else 8
+        heal = sum(random.randint(1, die_size) for _ in range(num_dice))
+        heal += ev.get("flat_bonus", 0)
+        min_heal = ev.get("min_heal", 1)
+        max_heal = ev.get("max_heal", 9999)
+        heal = max(min_heal, min(heal, max_heal))
+        target.hp = min(target.max_hp, target.hp + heal)
+        self.show_message(
+            f"{caster.name} casts {spell_name}! "
+            f"{target.name} healed for {heal} HP.", 3000)
+
     def _cast_exploration_spell(self, spell_id, cost, member_index):
         """Cast a spell from the exploration stash screen."""
         from src.party import SPELLS_DATA
@@ -701,37 +779,14 @@ class InventoryMixin:
                 f"{member.name} casts {spell_name}! Monsters flee!", 3000)
 
         elif effect_type == "heal":
-            ev = spell.get("effect_value", {})
-            # Heal the most wounded alive member
-            best = None
-            best_missing = 0
-            for m in party.members:
-                if not m.is_alive():
-                    continue
-                missing = m.max_hp - m.hp
-                if missing > best_missing:
-                    best_missing = missing
-                    best = m
-            if best and best_missing > 0:
-                # Roll healing dice
-                dice_str = ev.get("dice", "1d8")
-                parts = dice_str.split("d")
-                num_dice = int(parts[0]) if len(parts) == 2 else 1
-                die_size = int(parts[1]) if len(parts) == 2 else 8
-                heal = sum(
-                    random.randint(1, die_size) for _ in range(num_dice))
-                heal += ev.get("flat_bonus", 0)
-                min_heal = ev.get("min_heal", 1)
-                max_heal = ev.get("max_heal", 9999)
-                heal = max(min_heal, min(heal, max_heal))
-                best.hp = min(best.max_hp, best.hp + heal)
-                self.show_message(
-                    f"{member.name} casts {spell_name}! "
-                    f"{best.name} healed for {heal} HP.", 3000)
-            else:
-                self.show_message(
-                    f"{member.name} casts {spell_name}! "
-                    f"Everyone is at full health.", 3000)
+            # Refund MP — it will be re-deducted when the player confirms
+            # a target (or stays refunded if they cancel).
+            member.current_mp = member.current_mp + cost
+            # Enter target selection mode so the player picks who to heal
+            self.pending_heal_spell = (spell_id, cost, member_index, spell)
+            self.heal_target_cursor = 0
+            self.choosing_heal_target = True
+            return  # don't close the inventory overlay yet
 
         elif effect_type == "cure_poison":
             cured = False
