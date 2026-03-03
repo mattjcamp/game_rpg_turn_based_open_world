@@ -6,6 +6,7 @@ towns, dungeons, and random encounters. It's the "hub" state of
 the game.
 """
 
+import math
 import random
 
 import pygame
@@ -53,6 +54,14 @@ class OverworldState(InventoryMixin, BaseState):
 
         # Message queued by combat state on return
         self.pending_combat_message = None
+
+        # Push spell expanding-wave animation
+        # dict with keys: timer, duration, max_radius
+        self.push_spell_anim = None
+
+        # Lingering repel effect: monsters flee for N movement steps
+        # dict with keys: steps_remaining, radius
+        self.repel_effect = None
 
     def enter(self):
         if self.pending_combat_message:
@@ -281,14 +290,32 @@ class OverworldState(InventoryMixin, BaseState):
         return None
 
     def _move_monsters(self):
-        """Each alive orc wanders randomly, but pursues if within 6 tiles."""
+        """Each alive orc wanders randomly, but pursues if within 6 tiles.
+
+        While a repel effect is active, monsters inside its radius flee
+        *away* from the party instead of pursuing.
+        """
         party = self.game.party
         alive = [m for m in self.overworld_monsters if m.is_alive()]
         occupied = {(m.col, m.row) for m in alive}
+
+        repel = self.repel_effect  # may be None
+
         for mon in alive:
             occupied.discard((mon.col, mon.row))
-            dist = abs(mon.col - party.col) + abs(mon.row - party.row)
-            if dist <= 6:
+            cheb = max(abs(mon.col - party.col), abs(mon.row - party.row))
+
+            # If repel effect is active and monster is within radius, flee
+            if repel and cheb <= repel["radius"]:
+                # Move away: target is opposite direction from party
+                flee_col = mon.col + (mon.col - party.col)
+                flee_row = mon.row + (mon.row - party.row)
+                mon.try_move_toward(
+                    flee_col, flee_row,
+                    self.game.tile_map,
+                    occupied,
+                )
+            elif abs(mon.col - party.col) + abs(mon.row - party.row) <= 6:
                 mon.try_move_toward(
                     party.col, party.row,
                     self.game.tile_map,
@@ -303,6 +330,12 @@ class OverworldState(InventoryMixin, BaseState):
                 )
             occupied.add((mon.col, mon.row))
 
+        # Tick down the lingering repel effect (one step per party move)
+        if repel:
+            repel["steps_remaining"] -= 1
+            if repel["steps_remaining"] <= 0:
+                self.repel_effect = None
+
     def _check_monster_contact(self):
         """If an orc is adjacent to the party, start combat."""
         party = self.game.party
@@ -312,6 +345,75 @@ class OverworldState(InventoryMixin, BaseState):
             if abs(mon.col - party.col) + abs(mon.row - party.row) == 1:
                 self._start_orc_combat(mon)
                 return
+
+    # ── Push spell (repel monsters) ───────────────────────────
+
+    def _on_spell_repel_monsters(self, radius, push_distance, duration=0):
+        """Push all overworld monsters within *radius* tiles away from the
+        party, moving them *push_distance* steps in the opposite direction.
+        Also triggers an expanding-wave animation on the map.
+
+        If *duration* > 0 the repel effect lingers: for that many movement
+        steps, all monsters within the radius will flee instead of pursuing.
+        """
+        self._push_monsters_away(radius, push_distance)
+
+        # Set up lingering repel effect that lasts *duration* movement steps.
+        # The visual animation is tied to this effect's lifetime.
+        if duration > 0:
+            self.repel_effect = {
+                "steps_remaining": duration,
+                "total_steps": duration,
+                "radius": radius,
+            }
+
+        # Start the initial expanding-wave burst animation
+        burst_ms = 1200
+        self.push_spell_anim = {
+            "burst_timer": burst_ms,
+            "burst_duration": burst_ms,
+            "max_radius": radius,
+            "elapsed_ms": 0.0,       # total ms since cast (for pulsing)
+        }
+
+        self.game.sfx.play("magic_burst")
+
+    def _push_monsters_away(self, radius, push_distance):
+        """Immediately push all monsters within *radius* tiles away from
+        the party by up to *push_distance* steps."""
+        party = self.game.party
+        tile_map = self.game.tile_map
+
+        occupied = {(m.col, m.row) for m in self.overworld_monsters
+                    if m.is_alive()}
+
+        for mon in self.overworld_monsters:
+            if not mon.is_alive():
+                continue
+            dx = mon.col - party.col
+            dy = mon.row - party.row
+            dist = max(abs(dx), abs(dy))  # Chebyshev distance
+            if dist > radius or dist == 0:
+                continue
+
+            # Normalise direction away from party
+            dir_x = (1 if dx > 0 else (-1 if dx < 0 else 0))
+            dir_y = (1 if dy > 0 else (-1 if dy < 0 else 0))
+
+            # Push step by step
+            occupied.discard((mon.col, mon.row))
+            for _step in range(push_distance):
+                nc = mon.col + dir_x
+                nr = mon.row + dir_y
+                if (0 <= nc < tile_map.width and 0 <= nr < tile_map.height
+                        and tile_map.is_walkable(nc, nr)
+                        and (nc, nr) not in occupied
+                        and (nc, nr) != (party.col, party.row)):
+                    mon.col = nc
+                    mon.row = nr
+                else:
+                    break
+            occupied.add((mon.col, mon.row))
 
     def _start_orc_combat(self, orc):
         """Start combat against the contacted orc and any nearby orcs."""
@@ -583,6 +685,18 @@ class OverworldState(InventoryMixin, BaseState):
             if self.use_item_anim["timer"] <= 0:
                 self.use_item_anim = None
 
+        # Push spell animation — lives as long as the repel effect is active
+        if self.push_spell_anim:
+            anim = self.push_spell_anim
+            anim["elapsed_ms"] += dt_ms
+            if anim["burst_timer"] > 0:
+                anim["burst_timer"] -= dt_ms
+                if anim["burst_timer"] < 0:
+                    anim["burst_timer"] = 0
+            # Clear the animation only when the repel effect is also gone
+            if not self.repel_effect and anim["burst_timer"] <= 0:
+                self.push_spell_anim = None
+
         # Unique tile discovery animation
         if self.unique_tile_timer > 0:
             self.unique_tile_timer -= dt_ms
@@ -603,7 +717,10 @@ class OverworldState(InventoryMixin, BaseState):
                 action_options=action_opts,
                 choosing_effect=self.choosing_effect,
                 effect_list=self.effect_list,
-                effect_cursor=self.effect_cursor)
+                effect_cursor=self.effect_cursor,
+                showing_spell_list=self.showing_spell_list,
+                spell_list_items=self.spell_list_items,
+                spell_list_cursor=self.spell_list_cursor)
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:
@@ -631,6 +748,8 @@ class OverworldState(InventoryMixin, BaseState):
             unique_text=self.unique_tile_text,
             unique_flash=self.unique_tile_flash,
             unique_pos=self.unique_tile_pos,
+            push_anim=self.push_spell_anim,
+            repel_effect=self.repel_effect,
         )
         if self.showing_help:
             renderer.draw_overworld_help_overlay()

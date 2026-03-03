@@ -29,6 +29,10 @@ _PARTY_JSON = os.path.join(
 _EFFECTS_JSON = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "effects.json")
 
+# ── Load spell definitions from data/spells.json ─────────────────
+_SPELLS_JSON = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "spells.json")
+
 
 def _load_party_config():
     """Load party configuration from data/party.json."""
@@ -86,6 +90,16 @@ def _load_effects_config():
 
 # Pre-load effect definitions at import time
 EFFECTS_DATA = _load_effects_config().get("effects", [])
+
+
+def _load_spells_config():
+    """Load spell definitions from data/spells.json."""
+    with open(_SPELLS_JSON, "r") as f:
+        return json.load(f)
+
+
+# Pre-load spell definitions at import time (keyed by spell id)
+SPELLS_DATA = {s["id"]: s for s in _load_spells_config().get("spells", [])}
 
 
 def get_sell_price(item_name):

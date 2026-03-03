@@ -1,5 +1,5 @@
 {
-  "_comment": "Spell definitions for Realm of Shadow. Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels.",
+  "_comment": "Spell definitions for Realm of Shadow. Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels. usable_in lists the game screens where the spell can be cast: 'battle', 'overworld', 'town', 'dungeon'.",
 
   "spells": [
     {
@@ -19,6 +19,7 @@
       },
       "range": 99,
       "targeting": "directional_projectile",
+      "usable_in": ["battle"],
       "sfx": "fireball",
       "hit_sfx": "explosion"
     },
@@ -39,6 +40,7 @@
       },
       "range": 2,
       "targeting": "directional_ally",
+      "usable_in": ["battle", "overworld", "town", "dungeon"],
       "sfx": "heal",
       "hit_sfx": null
     },
@@ -57,6 +59,7 @@
       },
       "range": 5,
       "targeting": "select_ally",
+      "usable_in": ["battle"],
       "sfx": "shield",
       "hit_sfx": null
     },
@@ -75,7 +78,28 @@
       },
       "range": 99,
       "targeting": "auto_monster",
+      "usable_in": ["battle"],
       "sfx": "turn_undead",
+      "hit_sfx": null
+    },
+    {
+      "id": "push",
+      "name": "Push",
+      "description": "Emits a wave of divine force that drives nearby monsters away from the party.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 2,
+      "duration": 10,
+      "effect_type": "repel_monsters",
+      "effect_value": {
+        "radius": 5,
+        "push_distance": 3
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["overworld"],
+      "sfx": "magic_burst",
       "hit_sfx": null
     }
   ]

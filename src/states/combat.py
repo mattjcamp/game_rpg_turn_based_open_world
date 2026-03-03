@@ -15,6 +15,7 @@ import os
 import pygame
 
 from src.states.base_state import BaseState
+from src.party import SPELLS_DATA
 
 
 class _DualLog(list):
@@ -32,17 +33,7 @@ from src.combat_engine import (
     format_modifier,
 )
 
-# ── Load spell definitions from JSON ──────────────────────────────
-_SPELLS_JSON = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "data", "spells.json",
-)
-
-def _load_spells():
-    with open(_SPELLS_JSON, "r") as f:
-        return json.load(f).get("spells", [])
-
-SPELLS_DATA = {s["id"]: s for s in _load_spells()}
+# SPELLS_DATA is imported from src.party (shared across combat and exploration)
 
 
 # ── Arena constants ──────────────────────────────────────────────

@@ -50,6 +50,11 @@ class InventoryMixin:
         # Use-item animation overlay
         self.use_item_anim = None
 
+        # Spell casting overlay
+        self.showing_spell_list = False
+        self.spell_list_items = []       # [(spell_id, label, mp_cost, member_idx)]
+        self.spell_list_cursor = 0
+
         # Game log overlay
         self.showing_log = False
         self.log_scroll = 0
@@ -269,16 +274,29 @@ class InventoryMixin:
 
     # ── Party stash screen ─────────────────────────────────────
 
+    # Index of the CAST row in the unified cursor (right after effect slots)
+    def _stash_layout(self):
+        """Return (NUM_EFFECTS, CAST_INDEX, STASH_START, total_items)."""
+        party = self.game.party
+        n = len(party.EFFECT_SLOTS)
+        cast_idx = n                        # one row for CAST
+        stash_start = cast_idx + 1
+        total = stash_start + len(party.shared_inventory)
+        return n, cast_idx, stash_start, total
+
     def _handle_party_inv_input(self, event):
         """Handle input for the shared party inventory screen.
 
-        The unified cursor covers effect slots and then shared inventory items.
+        The unified cursor covers effect slots, a CAST row, then stash items.
         """
         party = self.game.party
         inv = party.shared_inventory
-        NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        STASH_START = NUM_EFFECTS
-        total_items = STASH_START + len(inv)
+        NUM_EFFECTS, CAST_INDEX, STASH_START, total_items = self._stash_layout()
+
+        # Spell list overlay is open — delegate input
+        if self.showing_spell_list:
+            self._handle_spell_list_input(event)
+            return
 
         # Examining an item — close on ESC/Enter/Space
         if self.examining_item is not None:
@@ -322,16 +340,23 @@ class InventoryMixin:
                 self.party_inv_action_menu = False
             return
 
-        # Browsing unified list (effect slots + inventory)
+        # Browsing unified list (effect slots + CAST + inventory)
         if event.key == pygame.K_UP and total_items > 0:
             self.party_inv_cursor = (self.party_inv_cursor - 1) % total_items
         elif event.key == pygame.K_DOWN and total_items > 0:
             self.party_inv_cursor = (self.party_inv_cursor + 1) % total_items
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and total_items > 0:
-            options = self._get_party_inv_action_options()
-            if options:
-                self.party_inv_action_menu = True
-                self.party_inv_action_cursor = 0
+            if self.party_inv_cursor == CAST_INDEX:
+                # Open spell casting overlay
+                spells = self._build_castable_spells()
+                self.spell_list_items = spells
+                self.spell_list_cursor = 0
+                self.showing_spell_list = True
+            else:
+                options = self._get_party_inv_action_options()
+                if options:
+                    self.party_inv_action_menu = True
+                    self.party_inv_action_cursor = 0
         elif event.key == pygame.K_ESCAPE:
             self.showing_party_inv = False
         elif event.key == pygame.K_p:
@@ -350,8 +375,7 @@ class InventoryMixin:
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
         party = self.game.party
-        NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        STASH_START = NUM_EFFECTS
+        NUM_EFFECTS, CAST_INDEX, STASH_START, _ = self._stash_layout()
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
@@ -366,7 +390,10 @@ class InventoryMixin:
                 self._on_effect_removed(removed)
                 party.set_effect(slot_key, None)
                 self.party_inv_action_menu = False
-        else:
+        elif idx == CAST_INDEX:
+            # CAST row — handled by browsing Enter, not by action menu
+            self.party_inv_action_menu = False
+        elif idx >= STASH_START:
             inv_idx = idx - STASH_START
             inv = party.shared_inventory
             if inv_idx < len(inv):
@@ -403,8 +430,7 @@ class InventoryMixin:
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
         party = self.game.party
-        NUM_EFFECTS = len(party.EFFECT_SLOTS)
-        STASH_START = NUM_EFFECTS
+        NUM_EFFECTS, CAST_INDEX, STASH_START, _ = self._stash_layout()
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
@@ -416,7 +442,10 @@ class InventoryMixin:
             if current is not None:
                 options.append("REMOVE")
             return options
-        else:
+        elif idx == CAST_INDEX:
+            # No action menu for the CAST row — Enter opens spell list directly
+            return []
+        elif idx >= STASH_START:
             inv_idx = idx - STASH_START
             inv = party.shared_inventory
             if inv_idx >= len(inv):
@@ -545,3 +574,225 @@ class InventoryMixin:
             party.inv_consume_charge(item_name)
         else:
             party.inv_remove(item_name)
+
+    # ── Spell casting from party stash ────────────────────────────
+
+    def _get_screen_context(self):
+        """Return the usable_in tag for the current game state."""
+        from src.states.overworld import OverworldState
+        from src.states.town import TownState
+        from src.states.dungeon import DungeonState
+        if isinstance(self, OverworldState):
+            return "overworld"
+        elif isinstance(self, TownState):
+            return "town"
+        elif isinstance(self, DungeonState):
+            return "dungeon"
+        return None
+
+    def _build_castable_spells(self):
+        """Build a list of spells castable from the party stash screen.
+
+        Filters by current screen context, class, level, MP, and alive status.
+        Returns a list of (spell_id, label, mp_cost, member_index) tuples.
+        """
+        from src.party import SPELLS_DATA
+        context = self._get_screen_context()
+        if context is None:
+            return []
+
+        party = self.game.party
+        result = []
+        for mi, member in enumerate(party.members):
+            if not member.is_alive():
+                continue
+            if not member.can_cast:
+                continue
+            member_class = member.char_class.strip().lower()
+            member_level = getattr(member, "level", 1)
+            for spell_id, spell in SPELLS_DATA.items():
+                # Check screen context
+                if context not in spell.get("usable_in", []):
+                    continue
+                # Check class requirement
+                allowed = [c.lower() for c in spell.get("allowable_classes", [])]
+                if member_class not in allowed:
+                    continue
+                # Check level requirement
+                if member_level < spell.get("min_level", 1):
+                    continue
+                # Check MP
+                cost = spell["mp_cost"]
+                if member.current_mp < cost:
+                    continue
+                label = f"{member.name}: {spell['name']} ({cost}MP)"
+                result.append((spell_id, label, cost, mi))
+        return result
+
+    def _handle_spell_list_input(self, event):
+        """Handle input while the spell list overlay is open."""
+        if not self.spell_list_items:
+            if event.key in (pygame.K_ESCAPE, pygame.K_c,
+                             pygame.K_RETURN, pygame.K_SPACE):
+                self.showing_spell_list = False
+            return
+
+        if event.key == pygame.K_UP:
+            self.spell_list_cursor = (
+                (self.spell_list_cursor - 1) % len(self.spell_list_items))
+        elif event.key == pygame.K_DOWN:
+            self.spell_list_cursor = (
+                (self.spell_list_cursor + 1) % len(self.spell_list_items))
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            spell_id, _label, cost, mi = (
+                self.spell_list_items[self.spell_list_cursor])
+            self._cast_exploration_spell(spell_id, cost, mi)
+            self.showing_spell_list = False
+        elif event.key in (pygame.K_ESCAPE, pygame.K_c):
+            self.showing_spell_list = False
+
+    def _cast_exploration_spell(self, spell_id, cost, member_index):
+        """Cast a spell from the exploration stash screen."""
+        from src.party import SPELLS_DATA
+        party = self.game.party
+        member = party.members[member_index]
+        spell = SPELLS_DATA.get(spell_id)
+        if spell is None:
+            return
+
+        # Deduct MP
+        member.current_mp = member.current_mp - cost
+
+        effect_type = spell.get("effect_type", "")
+        spell_name = spell.get("name", spell_id)
+
+        if effect_type == "repel_monsters":
+            radius = spell.get("effect_value", {}).get("radius", 5)
+            push_dist = spell.get("effect_value", {}).get("push_distance", 3)
+            duration = spell.get("duration", 0)
+            self._on_spell_repel_monsters(radius, push_dist, duration)
+            # Close the inventory so the player sees the wave on the map
+            self.showing_party_inv = False
+            self.show_message(
+                f"{member.name} casts {spell_name}! Monsters flee!", 3000)
+
+        elif effect_type == "heal":
+            ev = spell.get("effect_value", {})
+            # Heal the most wounded alive member
+            best = None
+            best_missing = 0
+            for m in party.members:
+                if not m.is_alive():
+                    continue
+                missing = m.max_hp - m.hp
+                if missing > best_missing:
+                    best_missing = missing
+                    best = m
+            if best and best_missing > 0:
+                # Roll healing dice
+                dice_str = ev.get("dice", "1d8")
+                parts = dice_str.split("d")
+                num_dice = int(parts[0]) if len(parts) == 2 else 1
+                die_size = int(parts[1]) if len(parts) == 2 else 8
+                heal = sum(
+                    random.randint(1, die_size) for _ in range(num_dice))
+                heal += ev.get("flat_bonus", 0)
+                min_heal = ev.get("min_heal", 1)
+                max_heal = ev.get("max_heal", 9999)
+                heal = max(min_heal, min(heal, max_heal))
+                best.hp = min(best.max_hp, best.hp + heal)
+                self.show_message(
+                    f"{member.name} casts {spell_name}! "
+                    f"{best.name} healed for {heal} HP.", 3000)
+            else:
+                self.show_message(
+                    f"{member.name} casts {spell_name}! "
+                    f"Everyone is at full health.", 3000)
+
+        elif effect_type == "cure_poison":
+            cured = False
+            for m in party.members:
+                if getattr(m, "poisoned", False):
+                    m.poisoned = False
+                    self.show_message(
+                        f"{member.name} casts {spell_name}! "
+                        f"{m.name}'s poison was cured!", 3000)
+                    cured = True
+                    break
+            if not cured:
+                self.show_message(
+                    f"{member.name} casts {spell_name}! "
+                    f"Nobody is poisoned.", 3000)
+
+        elif effect_type == "resurrect":
+            ev = spell.get("effect_value", {})
+            # Find first dead (non-ash) member
+            target = None
+            for m in party.members:
+                if m.hp <= 0 and not getattr(m, "is_ash", False):
+                    target = m
+                    break
+            if target:
+                chance = ev.get("success_chance", 0.75)
+                if random.random() < chance:
+                    target.hp = max(1, target.max_hp // 4)
+                    self.show_message(
+                        f"{member.name} casts {spell_name}! "
+                        f"{target.name} returns to life!", 3000)
+                else:
+                    target.is_ash = True
+                    self.show_message(
+                        f"{member.name} casts {spell_name}... "
+                        f"{target.name} crumbles to ash!", 3000)
+            else:
+                self.show_message(
+                    f"{member.name} casts {spell_name}! "
+                    f"No fallen allies to raise.", 3000)
+
+        elif effect_type == "light":
+            ev = spell.get("effect_value", {})
+            duration = spell.get("duration", 10)
+            self._on_spell_light(ev.get("radius", 2),
+                                 ev.get("light_level", "short"),
+                                 duration)
+            self.show_message(
+                f"{member.name} casts {spell_name}! "
+                f"The area is illuminated.", 3000)
+
+        elif effect_type == "reveal_map":
+            self._on_spell_reveal_map()
+            self.show_message(
+                f"{member.name} casts {spell_name}! "
+                f"The surroundings are revealed.", 3000)
+
+        elif effect_type in ("dungeon_rise", "dungeon_sink",
+                             "dungeon_teleport", "dungeon_surface",
+                             "surface_teleport"):
+            self._on_spell_dungeon_nav(effect_type,
+                                       spell.get("effect_value", {}))
+            self.show_message(
+                f"{member.name} casts {spell_name}!", 3000)
+
+        else:
+            # Fallback for unimplemented spell effects
+            self.show_message(
+                f"{member.name} casts {spell_name}! "
+                f"(Effect not yet implemented)", 3000)
+
+    # ── Spell effect hooks (overridden by concrete states) ────────
+
+    def _on_spell_repel_monsters(self, radius, push_distance, duration=0):
+        """Called when a repel_monsters spell is cast. Override in states."""
+        pass
+
+    def _on_spell_light(self, radius, light_level, duration):
+        """Called when a light spell is cast. Override in dungeon state."""
+        pass
+
+    def _on_spell_reveal_map(self):
+        """Called when a reveal_map spell is cast. Override in states."""
+        pass
+
+    def _on_spell_dungeon_nav(self, effect_type, effect_value):
+        """Called for dungeon navigation spells. Override in dungeon state."""
+        pass

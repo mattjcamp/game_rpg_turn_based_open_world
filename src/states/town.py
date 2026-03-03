@@ -657,7 +657,10 @@ class TownState(InventoryMixin, BaseState):
                 action_options=action_opts,
                 choosing_effect=self.choosing_effect,
                 effect_list=self.effect_list,
-                effect_cursor=self.effect_cursor)
+                effect_cursor=self.effect_cursor,
+                showing_spell_list=self.showing_spell_list,
+                spell_list_items=self.spell_list_items,
+                spell_list_cursor=self.spell_list_cursor)
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:

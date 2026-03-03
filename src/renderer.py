@@ -27,9 +27,9 @@ class Renderer:
 
     def __init__(self, screen):
         self.screen = screen
-        self.font = pygame.font.SysFont("monospace", 16)
-        self.font_med = pygame.font.SysFont("monospace", 14)
-        self.font_small = pygame.font.SysFont("monospace", 12)
+        self.font = pygame.font.SysFont("monospace", 18)
+        self.font_med = pygame.font.SysFont("monospace", 16)
+        self.font_small = pygame.font.SysFont("monospace", 14)
         self._load_class_sprites()
         self._load_tile_sheet()
 
@@ -1095,7 +1095,8 @@ class Renderer:
     _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 672
 
     def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None,
-                          unique_text="", unique_flash=0.0, unique_pos=None):
+                          unique_text="", unique_flash=0.0, unique_pos=None,
+                          push_anim=None, repel_effect=None):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -1172,6 +1173,11 @@ class Renderer:
             cx = psc * ts + ts // 2
             cy = psr * ts + ts // 2
             self._u3_draw_overworld_party(cx, cy, party)
+
+        # ── 3b. Push spell expanding-wave animation ──
+        if push_anim:
+            self._draw_push_spell_wave(push_anim, repel_effect,
+                                       party, ts, cols, rows, off_c, off_r)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -1921,14 +1927,14 @@ class Renderer:
 
     # ── Retro colour palette (C64 / Apple II inspired) ──
     _U3_BLACK  = (0, 0, 0)
-    _U3_BLUE   = (68, 68, 255)
-    _U3_LTBLUE = (160, 160, 255)   # brighter blue for readable text
+    _U3_BLUE   = (90, 90, 255)
+    _U3_LTBLUE = (180, 180, 255)   # brighter blue for readable text
     _U3_WHITE  = (255, 255, 255)
-    _U3_ORANGE = (255, 170, 85)
-    _U3_GREEN  = (0, 170, 0)
-    _U3_DKGRN  = (0, 102, 0)
-    _U3_RED    = (200, 60, 60)
-    _U3_GRAY   = (136, 136, 136)
+    _U3_ORANGE = (255, 185, 100)
+    _U3_GREEN  = (0, 200, 0)
+    _U3_DKGRN  = (0, 130, 0)
+    _U3_RED    = (220, 70, 70)
+    _U3_GRAY   = (170, 170, 170)
     _U3_BRICK1 = (102, 51, 85)
     _U3_BRICK2 = (68, 34, 68)
 
@@ -4923,7 +4929,10 @@ class Renderer:
                                  action_menu=False, action_cursor=0,
                                  action_options=None,
                                  choosing_effect=False, effect_list=None,
-                                 effect_cursor=0):
+                                 effect_cursor=0,
+                                 showing_spell_list=False,
+                                 spell_list_items=None,
+                                 spell_list_cursor=0):
         """
         Full-screen shared party inventory with party equipment slots.
 
@@ -4998,7 +5007,29 @@ class Renderer:
 
             ty += row_h
 
-        # ── Divider between effects and stash ──
+        # ── Divider ──
+        ty += 6
+        pygame.draw.line(self.screen, (60, 60, 80),
+                         (tx, ty), (tx + left_w - 32, ty), 1)
+        ty += 8
+
+        # ── CAST row ──
+        CAST_INDEX = NUM_EFFECTS
+        cast_selected = (cursor_index == CAST_INDEX)
+        cast_prefix = "> " if cast_selected else "  "
+        cast_color = self._U3_WHITE if cast_selected else self._U3_GREEN
+        self._u3_text(f"{cast_prefix}CAST SPELL", tx, ty, cast_color, fm)
+        # Show a small hint on the right when selected
+        if cast_selected:
+            self._u3_text("ENTER", tx + left_w - 100, ty,
+                          self._U3_GREEN, self.font_small)
+            sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+            sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+            sel_surf.fill((255, 255, 255, 25))
+            self.screen.blit(sel_surf, sel_rect)
+        ty += row_h
+
+        # ── Divider ──
         ty += 6
         pygame.draw.line(self.screen, (60, 60, 80),
                          (tx, ty), (tx + left_w - 32, ty), 1)
@@ -5018,7 +5049,7 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = NUM_EFFECTS
+            header_count = NUM_EFFECTS + 1  # effects + CAST row
             inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
@@ -5135,13 +5166,16 @@ class Renderer:
         sel_item = None
         sel_charges = None
         is_effect_slot = (cursor_index < NUM_EFFECTS)
-        header_count = NUM_EFFECTS
+        is_cast_row = (cursor_index == CAST_INDEX)
+        header_count = NUM_EFFECTS + 1  # effects + CAST row
         if is_effect_slot:
             eff_slot_key = party.EFFECT_SLOTS[cursor_index]
             sel_item = party.get_effect(eff_slot_key)
             # Show torch charges when effect is Torch
             if sel_item == "Torch":
                 sel_charges = party.get_equipped_charges("light")
+        elif is_cast_row:
+            pass  # no item detail for the CAST row
         elif cursor_index - header_count < len(inv):
             entry = inv[cursor_index - header_count]
             sel_item = party.item_name(entry)
@@ -5199,6 +5233,14 @@ class Renderer:
                         line = test
                 if line:
                     self._u3_text(line, rx, ry, (180, 180, 200), fm)
+        elif is_cast_row:
+            self._u3_text("CAST SPELL", rx, ry, self._U3_GREEN, fm)
+            ry += 22
+            self._u3_text("Press ENTER to view", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("available spells for", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("the current location.", rx, ry, (180, 180, 200), fm)
         elif is_effect_slot:
             self._u3_text("EFFECT SLOT", rx, ry, self._U3_ORANGE, fm)
             ry += 22
@@ -5275,18 +5317,212 @@ class Renderer:
                     self.screen.blit(hl_s, hl)
                 oy += 22
 
+        # ── Spell list popup ──
+        if showing_spell_list:
+            spells = spell_list_items or []
+            if not spells:
+                popup_w = 280
+                popup_h = 60
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+                pygame.draw.rect(self.screen, (20, 20, 40),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, self._U3_LTBLUE,
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+                self._u3_text("CAST SPELL", popup_x + 10, popup_y + 6,
+                              self._U3_ORANGE, fm)
+                self._u3_text("NO SPELLS AVAILABLE",
+                              popup_x + 10, popup_y + 30,
+                              self._U3_GRAY, fm)
+            else:
+                max_label = max((len(s[1]) for s in spells), default=0)
+                popup_w = max(320, max_label * 9 + 40)
+                popup_h = 28 + len(spells) * 22 + 8
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+                pygame.draw.rect(self.screen, (20, 20, 40),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, self._U3_GREEN,
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+
+                self._u3_text("CAST SPELL", popup_x + 10, popup_y + 6,
+                              self._U3_ORANGE, fm)
+                oy = popup_y + 28
+                for si, (spell_id, label, cost, mi) in enumerate(spells):
+                    sel = (si == spell_list_cursor)
+                    prefix = "> " if sel else "  "
+                    col = self._U3_WHITE if sel else self._U3_LTBLUE
+                    self._u3_text(f"{prefix}{label}",
+                                  popup_x + 10, oy, col, fm)
+                    if sel:
+                        hl = pygame.Rect(popup_x + 4, oy - 1,
+                                         popup_w - 8, 20)
+                        hl_s = pygame.Surface((hl.w, hl.h),
+                                              pygame.SRCALPHA)
+                        hl_s.fill((255, 255, 255, 25))
+                        self.screen.blit(hl_s, hl)
+                    oy += 22
+
         # ── Bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        if choosing_effect:
+        if showing_spell_list:
+            if spell_list_items:
+                self._u3_text(
+                    "[UP/DN] SELECT  [ENTER] CAST  [ESC] CANCEL",
+                    8, bar_y + 5, self._U3_BLUE)
+            else:
+                self._u3_text(
+                    "[ESC] BACK",
+                    8, bar_y + 5, self._U3_BLUE)
+        elif choosing_effect:
             self._u3_text("[UP/DN] SELECT  [ENTER] ASSIGN  [ESC] CANCEL",
                           8, bar_y + 5, self._U3_BLUE)
         elif action_menu:
             self._u3_text("[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
                           8, bar_y + 5, self._U3_BLUE)
         else:
-            self._u3_text("[UP/DN] SELECT  [ENTER] ACTION  [1-4] CHARACTER  [ESC] BACK",
-                          8, bar_y + 5, self._U3_BLUE)
+            self._u3_text(
+                "[UP/DN] SELECT  [ENTER] ACTION  [1-4] CHARACTER  [ESC] BACK",
+                8, bar_y + 5, self._U3_BLUE)
+
+    # ═══════════════════════════════════════════════════════════════
+    # PUSH SPELL EXPANDING-WAVE ANIMATION  (drawn on overworld map)
+    # ═══════════════════════════════════════════════════════════════
+
+    def _draw_push_spell_wave(self, anim, repel_effect,
+                              party, ts, cols, rows, off_c, off_r):
+        """Draw the Push spell visual effect on the overworld map.
+
+        Two phases:
+        1. **Burst** – concentric rings expand outward from the party
+           (plays during the first ~1.2 s after casting).
+        2. **Aura** – a pulsing ring at the repel radius that persists for
+           the full spell duration, gradually fading as steps run out.
+        """
+        max_radius_tiles = anim["max_radius"]
+        elapsed = anim.get("elapsed_ms", 0.0)
+        burst_timer = anim.get("burst_timer", 0)
+        burst_dur = anim.get("burst_duration", 1200)
+
+        # Party screen position (centre of tile)
+        psc = party.col - off_c
+        psr = party.row - off_r
+        cx = psc * ts + ts // 2
+        cy = psr * ts + ts // 2
+
+        map_w = cols * ts
+        map_h = rows * ts
+        surf = pygame.Surface((map_w, map_h), pygame.SRCALPHA)
+
+        max_px = max_radius_tiles * ts
+
+        # ── Phase 1: initial expanding burst ──
+        if burst_timer > 0:
+            progress = 1.0 - (burst_timer / burst_dur)  # 0 → 1
+
+            # Concentric expanding rings
+            num_rings = 4
+            for i in range(num_rings):
+                ring_delay = i * 0.15
+                if progress <= ring_delay:
+                    continue
+                ring_progress = (progress - ring_delay) / (1.0 - ring_delay)
+                ring_progress = max(0.0, min(1.0, ring_progress))
+
+                ring_r = int(ring_progress * max_px)
+                if ring_r < 2:
+                    continue
+
+                alpha_base = int(200 * (1.0 - ring_progress * 0.7))
+                if progress > 0.7:
+                    alpha_base = int(
+                        alpha_base * (1.0 - (progress - 0.7) / 0.3))
+                alpha_base = max(0, min(255, alpha_base))
+                if alpha_base <= 0:
+                    continue
+
+                brightness = 1.0 - (i * 0.15)
+                color = (int(255 * brightness),
+                         int(220 * brightness),
+                         int(80 * brightness),
+                         alpha_base)
+                thickness = max(2, 4 - i)
+                pygame.draw.circle(surf, color, (cx, cy), ring_r, thickness)
+
+            # Radial rays
+            num_rays = 8
+            for j in range(num_rays):
+                angle = (j / num_rays) * math.pi * 2
+                ray_progress = max(0.0, min(1.0, progress * 1.2))
+                ray_len = int(ray_progress * max_px)
+                if ray_len < 4:
+                    continue
+                ray_alpha = int(120 * (1.0 - progress))
+                if ray_alpha <= 0:
+                    continue
+                ex = cx + int(math.cos(angle) * ray_len)
+                ey = cy + int(math.sin(angle) * ray_len)
+                steps = max(1, ray_len // 6)
+                for s in range(steps):
+                    t = s / steps
+                    px = int(cx + (ex - cx) * t)
+                    py = int(cy + (ey - cy) * t)
+                    dot_alpha = int(ray_alpha * (1.0 - t * 0.6))
+                    dot_r = max(1, int(3 * (1.0 - t * 0.5)))
+                    pygame.draw.circle(
+                        surf, (255, 230, 120, dot_alpha),
+                        (px, py), dot_r)
+
+        # ── Phase 2: persistent pulsing aura (while repel effect active) ──
+        if repel_effect:
+            remaining = repel_effect["steps_remaining"]
+            total = repel_effect.get("total_steps", remaining)
+            life_frac = remaining / max(1, total)  # 1 → 0 over lifetime
+
+            # Pulsing phase driven by wall-clock elapsed time
+            pulse = (math.sin(elapsed * 0.005) + 1.0) * 0.5  # 0-1 oscillation
+
+            # Outer boundary ring — pulsing alpha, fading with remaining steps
+            base_alpha = int(100 * life_frac)
+            ring_alpha = int(base_alpha * (0.5 + 0.5 * pulse))
+            ring_alpha = max(0, min(255, ring_alpha))
+            if ring_alpha > 0:
+                color = (255, 220, 80, ring_alpha)
+                pygame.draw.circle(surf, color, (cx, cy), max_px, 2)
+
+            # Inner pulsing filled glow
+            glow_alpha = int(30 * life_frac * (0.4 + 0.6 * pulse))
+            glow_alpha = max(0, min(255, glow_alpha))
+            if glow_alpha > 0:
+                glow_color = (255, 230, 120, glow_alpha)
+                pygame.draw.circle(surf, glow_color, (cx, cy), max_px)
+
+            # Orbiting sparkle dots along the radius
+            num_dots = 6
+            orbit_speed = elapsed * 0.002
+            for k in range(num_dots):
+                angle = orbit_speed + (k / num_dots) * math.pi * 2
+                dx = int(math.cos(angle) * max_px)
+                dy = int(math.sin(angle) * max_px)
+                dot_alpha = int(160 * life_frac * (0.5 + 0.5 * pulse))
+                dot_alpha = max(0, min(255, dot_alpha))
+                if dot_alpha > 0:
+                    pygame.draw.circle(
+                        surf, (255, 255, 200, dot_alpha),
+                        (cx + dx, cy + dy), 3)
+
+            # Steps remaining indicator text
+            steps_text = f"PUSH: {remaining}"
+            txt_surf = self.font_small.render(steps_text, True,
+                                              (255, 220, 80))
+            txt_alpha = int(200 * life_frac)
+            txt_surf.set_alpha(txt_alpha)
+            surf.blit(txt_surf, (cx - txt_surf.get_width() // 2,
+                                 cy - max_px - 18))
+
+        self.screen.blit(surf, (0, 0))
 
     # ═══════════════════════════════════════════════════════════════
     # USE-ITEM ANIMATION OVERLAY  (drawn on top of party inventory)
