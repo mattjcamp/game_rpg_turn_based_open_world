@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "timestamp": 1772545140.1467881,
+  "timestamp": 1772629774.5514722,
   "state": "overworld",
   "party": {
-    "col": 14,
-    "row": 16,
+    "col": 13,
+    "row": 15,
     "gold": 25,
     "roster": [
       {
@@ -104,58 +104,10 @@
         "ammo": {}
       },
       {
-        "name": "hyperbolic",
-        "class": "Ranger",
+        "name": "test3",
+        "class": "Alchemist",
         "race": "Human",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 10,
-        "dexterity": 14,
-        "intelligence": 11,
-        "wisdom": 15,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": "Fists",
-          "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": null,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "Thoran Goon",
-        "class": "Barbarian",
-        "race": "Dwarf",
-        "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 22,
-        "dexterity": 10,
-        "intelligence": 9,
-        "wisdom": 9,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": "Fists",
-          "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": null,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "test guy",
-        "class": "Barbarian",
-        "race": "Halfling",
-        "gender": "Female",
         "max_hp": 20,
         "hp": 20,
         "strength": 10,
@@ -179,8 +131,8 @@
     "active_party": [
       0,
       1,
-      2,
-      3
+      3,
+      4
     ],
     "members": [
       {
@@ -232,30 +184,6 @@
         "ammo": {}
       },
       {
-        "name": "Theron",
-        "class": "Wizard",
-        "race": "Fuzzy",
-        "gender": "Male",
-        "max_hp": 14,
-        "hp": 14,
-        "strength": 6,
-        "dexterity": 14,
-        "intelligence": 20,
-        "wisdom": 8,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": "Dagger",
-          "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": null,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
         "name": "Sable",
         "class": "Thief",
         "race": "Elf",
@@ -278,6 +206,30 @@
         "current_mp": null,
         "bonus_mp": 0,
         "ammo": {}
+      },
+      {
+        "name": "test3",
+        "class": "Alchemist",
+        "race": "Human",
+        "gender": "Male",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 15,
+        "wisdom": 15,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
       }
     ],
     "shared_inventory": [
@@ -289,6 +241,30 @@
       "Healing Herb",
       {
         "name": "Camping Supplies",
+        "charges": 1
+      },
+      {
+        "name": "Lockpick",
+        "charges": 5
+      },
+      {
+        "name": "Moonpetal",
+        "charges": 3
+      },
+      {
+        "name": "Spring Water",
+        "charges": 3
+      },
+      {
+        "name": "Glowcap Mushroom",
+        "charges": 2
+      },
+      {
+        "name": "Serpent Root",
+        "charges": 2
+      },
+      {
+        "name": "Brimite Ore",
         "charges": 1
       }
     ],
@@ -305,7 +281,7 @@
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 79200
+      "total_minutes": 100460
     }
   }
 }

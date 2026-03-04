@@ -83,27 +83,8 @@
       "inventory": []
     },
     {
-      "name": "Alco",
+      "name": "test3",
       "class": "Alchemist",
-      "race": "Halfling",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 19,
-      "wisdom": 11,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": []
-    },
-    {
-      "name": "Test",
-      "class": "Lark",
       "race": "Human",
       "gender": "Male",
       "hp": 20,
@@ -119,14 +100,14 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/u4_tiles/knight_f1.png"
+      "sprite": "src/assets/u4_tiles/healer_alt_f1.png"
     }
   ],
   "active_party": [
     0,
     1,
     3,
-    5
+    4
   ],
   "party_effects": {
     "effect_1": null,

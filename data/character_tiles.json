@@ -27,9 +27,19 @@
       "file": "example_graphics/Ultima3_AMI_sprite_barbarian.png"
     },
     {
-      "name": "Mage",
+      "name": "Alchemist",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/healer_alt_f1.png"
+    },
+    {
+      "name": "Illusionist",
       "source": "u4",
       "file": "src/assets/u4_tiles/mage.png"
+    },
+    {
+      "name": "Druid",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/druid.png"
     },
     {
       "name": "Paladin",
@@ -42,19 +52,24 @@
       "file": "src/assets/u4_tiles/ranger.png"
     },
     {
+      "name": "Lark",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/bard.png"
+    },
+    {
       "name": "Ranger Alt",
       "source": "u4",
       "file": "src/assets/u4_tiles/ranger_alt.png"
     },
     {
+      "name": "Mage",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/mage.png"
+    },
+    {
       "name": "Bard",
       "source": "u4",
       "file": "src/assets/u4_tiles/bard.png"
-    },
-    {
-      "name": "Druid",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/druid.png"
     },
     {
       "name": "Monk",

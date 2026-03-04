@@ -162,7 +162,7 @@ class Renderer:
             os.path.dirname(os.path.dirname(__file__)),
             "src", "assets", "u4_tiles")
         u4_class_tiles = {
-            "alchemist":   "tinker.png",        # red/black tinkerer
+            "alchemist":   "healer_alt_f1.png", # alchemist tile
             "illusionist": "mage.png",           # blue-robed mage
             "druid":       "druid.png",          # red-robed druid
             "paladin":     "paladin.png",        # green-caped paladin

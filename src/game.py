@@ -73,12 +73,12 @@ class Game:
         self.title_elapsed = 0.0        # for animations
         self.title_options = [
             {"label": "START NEW GAME", "action": self._title_new_game},
-            {"label": "CREATE CHARACTER", "action": self._title_create_char},
             {"label": "FORM PARTY", "action": self._title_form_party},
             {"label": "SAVE GAME", "action": self._title_save_game},
             {"label": "LOAD GAME", "action": self._title_load_game},
             {"label": "MODULES", "action": self._title_modules},
             {"label": "SETTINGS", "action": self._title_settings},
+            {"label": "QUIT GAME", "action": self._title_quit},
         ]
 
         # --- Module selection screen ---
@@ -696,6 +696,10 @@ class Game:
         self.settings_mode = "main"
         self.settings_cursor = 0
         self._title_settings_mode = True
+
+    def _title_quit(self):
+        """Quit the game."""
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     # ── Module selection ──────────────────────────────────────
 
