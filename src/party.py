@@ -118,6 +118,15 @@ def _load_spells_config():
 SPELLS_DATA = {s["id"]: s for s in _load_spells_config().get("spells", [])}
 
 
+def _load_potions_config():
+    """Load potion recipe definitions from the active module or data/potions.json."""
+    return _load_json("potions.json", _module_data_dir)
+
+
+# Pre-load potion recipes at import time
+POTIONS_DATA = _load_potions_config()
+
+
 def reload_module_data(module_data_dir=None):
     """Reload all party-related data from a module directory.
 
@@ -129,7 +138,7 @@ def reload_module_data(module_data_dir=None):
     module directory.
     """
     global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY
-    global RACE_INFO, EFFECTS_DATA, SPELLS_DATA
+    global RACE_INFO, EFFECTS_DATA, SPELLS_DATA, POTIONS_DATA
     global _module_data_dir
 
     _module_data_dir = module_data_dir
@@ -141,6 +150,7 @@ def reload_module_data(module_data_dir=None):
     # Reload effects and spells
     EFFECTS_DATA = _load_effects_config().get("effects", [])
     SPELLS_DATA = {s["id"]: s for s in _load_spells_config().get("spells", [])}
+    POTIONS_DATA = _load_potions_config()
 
     # Clear class template cache so they reload from the module directory
     PartyMember._class_templates.clear()

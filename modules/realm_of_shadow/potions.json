@@ -1,0 +1,87 @@
+{
+  "_comment": "Potion recipes for the Alchemist crafting system. Each recipe requires reagents from the party stash and an INT check (d20 + INT mod >= dc).",
+
+  "recipes": {
+    "Healing Potion": {
+      "name": "Healing Potion",
+      "description": "A ruby-red elixir that mends wounds.",
+      "reagents": {
+        "Moonpetal": 1,
+        "Spring Water": 1
+      },
+      "dc": 10,
+      "result_item": "Healing Potion",
+      "result_count": 1,
+      "category": "restoration"
+    },
+    "Mana Potion": {
+      "name": "Mana Potion",
+      "description": "A shimmering blue draught that restores magical energy.",
+      "reagents": {
+        "Glowcap Mushroom": 1,
+        "Spring Water": 1
+      },
+      "dc": 10,
+      "result_item": "Mana Potion",
+      "result_count": 1,
+      "category": "restoration"
+    },
+    "Antidote": {
+      "name": "Antidote",
+      "description": "A bitter tincture that neutralizes poison.",
+      "reagents": {
+        "Serpent Root": 1,
+        "Spring Water": 1
+      },
+      "dc": 8,
+      "result_item": "Antidote",
+      "result_count": 1,
+      "category": "restoration"
+    },
+    "Fire Oil": {
+      "name": "Fire Oil",
+      "description": "A volatile oil that can be thrown to create a burst of flame.",
+      "reagents": {
+        "Brimite Ore": 1,
+        "Glowcap Mushroom": 1
+      },
+      "dc": 12,
+      "result_item": "Fire Oil",
+      "result_count": 1,
+      "category": "offensive"
+    },
+    "Elixir of Strength": {
+      "name": "Elixir of Strength",
+      "description": "A thick crimson brew that temporarily boosts physical might.",
+      "reagents": {
+        "Moonpetal": 1,
+        "Serpent Root": 1,
+        "Brimite Ore": 1
+      },
+      "dc": 14,
+      "result_item": "Elixir of Strength",
+      "result_count": 1,
+      "category": "enhancement"
+    },
+    "Elixir of Warding": {
+      "name": "Elixir of Warding",
+      "description": "A silver-tinged potion that hardens the skin against blows.",
+      "reagents": {
+        "Moonpetal": 2,
+        "Spring Water": 1
+      },
+      "dc": 14,
+      "result_item": "Elixir of Warding",
+      "result_count": 1,
+      "category": "enhancement"
+    }
+  },
+
+  "reagents": [
+    "Moonpetal",
+    "Glowcap Mushroom",
+    "Serpent Root",
+    "Brimite Ore",
+    "Spring Water"
+  ]
+}

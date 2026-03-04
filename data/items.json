@@ -402,6 +402,110 @@
       "sell": 12,
       "party_can_equip": false,
       "character_can_equip": false
+    },
+
+    "Moonpetal": {
+      "description": "A luminous flower petal that glows faintly in the dark. Prized by alchemists.",
+      "icon": "herb",
+      "item_type": "reagent",
+      "stackable": true,
+      "charges": 1,
+      "buy": 12,
+      "sell": 5,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Glowcap Mushroom": {
+      "description": "A blue-capped fungus that pulses with arcane energy.",
+      "icon": "herb",
+      "item_type": "reagent",
+      "stackable": true,
+      "charges": 1,
+      "buy": 10,
+      "sell": 4,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Serpent Root": {
+      "description": "A twisted root with potent cleansing properties.",
+      "icon": "herb",
+      "item_type": "reagent",
+      "stackable": true,
+      "charges": 1,
+      "buy": 8,
+      "sell": 3,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Brimite Ore": {
+      "description": "A volatile mineral that smolders with inner heat.",
+      "icon": "tool",
+      "item_type": "reagent",
+      "stackable": true,
+      "charges": 1,
+      "buy": 15,
+      "sell": 7,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Spring Water": {
+      "description": "Pure water from a mountain spring. Essential for brewing.",
+      "icon": "potion",
+      "item_type": "reagent",
+      "stackable": true,
+      "charges": 1,
+      "buy": 3,
+      "sell": 1,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+
+    "Healing Potion": {
+      "description": "A ruby-red elixir that mends wounds. Restores a large amount of HP.",
+      "icon": "potion",
+      "item_type": "potion",
+      "usable": true,
+      "effect": "heal_hp",
+      "power": 30,
+      "buy": 40,
+      "sell": 20,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Fire Oil": {
+      "description": "A volatile oil that creates a burst of flame when thrown.",
+      "icon": "potion",
+      "item_type": "throwable",
+      "throwable": true,
+      "power": 20,
+      "buy": 35,
+      "sell": 15,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Elixir of Strength": {
+      "description": "A thick crimson brew. Grants +2 STR for the next combat.",
+      "icon": "potion",
+      "item_type": "potion",
+      "usable": true,
+      "effect": "buff_strength",
+      "power": 2,
+      "buy": 60,
+      "sell": 30,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Elixir of Warding": {
+      "description": "A silver-tinged potion. Grants +2 AC for the next combat.",
+      "icon": "potion",
+      "item_type": "potion",
+      "usable": true,
+      "effect": "buff_ac",
+      "power": 2,
+      "buy": 60,
+      "sell": 30,
+      "party_can_equip": false,
+      "character_can_equip": false
     }
   }
 }

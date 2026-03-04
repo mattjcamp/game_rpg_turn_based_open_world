@@ -758,7 +758,11 @@ class OverworldState(InventoryMixin, BaseState):
                 spell_list_items=self.spell_list_items,
                 spell_list_cursor=self.spell_list_cursor,
                 choosing_heal_target=self.choosing_heal_target,
-                heal_target_cursor=self.heal_target_cursor)
+                heal_target_cursor=self.heal_target_cursor,
+                showing_brew_list=self.showing_brew_list,
+                brew_list_items=self.brew_list_items,
+                brew_list_cursor=self.brew_list_cursor,
+                brew_result_msg=self.brew_result_msg)
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:

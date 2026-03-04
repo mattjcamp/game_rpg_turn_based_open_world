@@ -6689,7 +6689,11 @@ class Renderer:
                                  spell_list_items=None,
                                  spell_list_cursor=0,
                                  choosing_heal_target=False,
-                                 heal_target_cursor=0):
+                                 heal_target_cursor=0,
+                                 showing_brew_list=False,
+                                 brew_list_items=None,
+                                 brew_list_cursor=0,
+                                 brew_result_msg=None):
         """
         Full-screen shared party inventory with party equipment slots.
 
@@ -6705,6 +6709,7 @@ class Renderer:
         fm = self.font_med
         f = self.font
         self.screen.fill(self._U3_BLACK)
+        self._last_party = party
 
         # ── Title bar ──
         self._u3_panel(0, 0, SCREEN_WIDTH, 30)
@@ -6802,6 +6807,21 @@ class Renderer:
             self.screen.blit(sel_surf, sel_rect)
         ty += row_h
 
+        # ── BREW row ──
+        BREW_INDEX = NUM_EFFECTS + 1
+        brew_selected = (cursor_index == BREW_INDEX)
+        brew_prefix = "> " if brew_selected else "  "
+        brew_color = self._U3_WHITE if brew_selected else (180, 120, 255)
+        self._u3_text(f"{brew_prefix}BREW POTIONS", tx, ty, brew_color, fm)
+        if brew_selected:
+            self._u3_text("ENTER", tx + left_w - 100, ty,
+                          (180, 120, 255), self.font_small)
+            sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+            sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+            sel_surf.fill((255, 255, 255, 25))
+            self.screen.blit(sel_surf, sel_rect)
+        ty += row_h
+
         # ── Divider ──
         ty += 6
         pygame.draw.line(self.screen, (60, 60, 80),
@@ -6822,7 +6842,7 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = NUM_EFFECTS + 1  # effects + CAST row
+            header_count = NUM_EFFECTS + 2  # effects + CAST row + BREW row
             inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
@@ -7148,6 +7168,139 @@ class Renderer:
                         self.screen.blit(hl_s, hl)
                     oy += 22
 
+        # ── Brew list popup ──
+        if showing_brew_list:
+            recipes = brew_list_items or []
+            if not recipes:
+                popup_w = 280
+                popup_h = 60
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+                pygame.draw.rect(self.screen, (20, 20, 40),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, (180, 120, 255),
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+                self._u3_text("BREW POTIONS", popup_x + 10, popup_y + 6,
+                              self._U3_ORANGE, fm)
+                self._u3_text("NO RECIPES AVAILABLE",
+                              popup_x + 10, popup_y + 30,
+                              self._U3_GRAY, fm)
+            else:
+                # Left side: recipe list, Right side: recipe detail
+                popup_w = 520
+                popup_h = max(200, 32 + len(recipes) * 22 + 80)
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+                pygame.draw.rect(self.screen, (20, 20, 40),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, (180, 120, 255),
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+
+                self._u3_text("BREW POTIONS", popup_x + 10, popup_y + 6,
+                              self._U3_ORANGE, fm)
+
+                # Recipe list on the left
+                oy = popup_y + 30
+                list_w = 220
+                for ri, (recipe_id, recipe_data, can_brew) in enumerate(recipes):
+                    sel = (ri == brew_list_cursor)
+                    prefix = "> " if sel else "  "
+                    if can_brew:
+                        col = self._U3_WHITE if sel else self._U3_GREEN
+                    else:
+                        col = (120, 120, 120) if not sel else (160, 160, 160)
+                    self._u3_text(f"{prefix}{recipe_id}",
+                                  popup_x + 10, oy, col, fm)
+                    if sel:
+                        hl = pygame.Rect(popup_x + 4, oy - 1,
+                                         list_w - 8, 20)
+                        hl_s = pygame.Surface((hl.w, hl.h),
+                                              pygame.SRCALPHA)
+                        hl_s.fill((255, 255, 255, 25))
+                        self.screen.blit(hl_s, hl)
+                    oy += 22
+
+                # Vertical divider
+                div_x = popup_x + list_w
+                pygame.draw.line(self.screen, (60, 60, 80),
+                                 (div_x, popup_y + 28),
+                                 (div_x, popup_y + popup_h - 8), 1)
+
+                # Detail panel on the right
+                if recipes:
+                    _rid, sel_recipe, sel_can = recipes[brew_list_cursor]
+                    dx = div_x + 12
+                    dy = popup_y + 32
+
+                    self._u3_text(sel_recipe.get("name", _rid), dx, dy,
+                                  self._U3_WHITE, fm)
+                    dy += 20
+
+                    # Description (word-wrapped)
+                    desc = sel_recipe.get("description", "")
+                    max_desc_w = popup_w - list_w - 28
+                    line = ""
+                    for word in desc.split():
+                        test = f"{line} {word}".strip()
+                        tw = fm.size(test)[0]
+                        if tw > max_desc_w and line:
+                            self._u3_text(line, dx, dy, (180, 180, 200), fm)
+                            dy += 16
+                            line = word
+                        else:
+                            line = test
+                    if line:
+                        self._u3_text(line, dx, dy, (180, 180, 200), fm)
+                        dy += 20
+
+                    # DC requirement
+                    dc = sel_recipe.get("dc", 10)
+                    self._u3_text(f"DC: {dc}", dx, dy, (200, 200, 140), fm)
+                    dy += 20
+
+                    # Reagents needed
+                    self._u3_text("REAGENTS:", dx, dy, self._U3_ORANGE, fm)
+                    dy += 18
+                    reagents = sel_recipe.get("reagents", {})
+                    party = self._last_party  # set below
+                    for rname, rqty in reagents.items():
+                        # Count how many the party has
+                        have = 0
+                        if party:
+                            for entry in party.shared_inventory:
+                                if party.item_name(entry) == rname:
+                                    ch = party.item_charges(entry)
+                                    have += ch if ch is not None else 1
+                        have_color = self._U3_GREEN if have >= rqty else self._U3_RED
+                        self._u3_text(f"  {rname}: {have}/{rqty}",
+                                      dx, dy, have_color, fm)
+                        dy += 16
+
+                    # Can brew indicator
+                    dy += 8
+                    if sel_can:
+                        self._u3_text("[ENTER] BREW", dx, dy,
+                                      self._U3_GREEN, fm)
+                    else:
+                        self._u3_text("MISSING REAGENTS", dx, dy,
+                                      self._U3_RED, fm)
+
+        # ── Brew result message ──
+        if brew_result_msg:
+            msg_w = max(280, fm.size(brew_result_msg)[0] + 40)
+            msg_h = 50
+            msg_x = SCREEN_WIDTH // 2 - msg_w // 2
+            msg_y = SCREEN_HEIGHT // 2 - msg_h // 2
+            pygame.draw.rect(self.screen, (20, 20, 40),
+                             (msg_x, msg_y, msg_w, msg_h))
+            # Color border based on success/failure
+            border_col = self._U3_GREEN if "Success" in brew_result_msg else self._U3_RED
+            pygame.draw.rect(self.screen, border_col,
+                             (msg_x, msg_y, msg_w, msg_h), 2)
+            self._u3_text(brew_result_msg, msg_x + 10, msg_y + 16,
+                          self._U3_WHITE, fm)
+
         # ── Heal target selection popup ──
         if choosing_heal_target:
             members = party.members
@@ -7191,6 +7344,15 @@ class Renderer:
             self._u3_text(
                 "[UP/DN] SELECT  [ENTER] HEAL  [ESC] CANCEL",
                 8, bar_y + 5, self._U3_BLUE)
+        elif showing_brew_list:
+            if brew_list_items:
+                self._u3_text(
+                    "[UP/DN] SELECT  [ENTER] BREW  [ESC] CANCEL",
+                    8, bar_y + 5, self._U3_BLUE)
+            else:
+                self._u3_text(
+                    "[ESC] BACK",
+                    8, bar_y + 5, self._U3_BLUE)
         elif showing_spell_list:
             if spell_list_items:
                 self._u3_text(

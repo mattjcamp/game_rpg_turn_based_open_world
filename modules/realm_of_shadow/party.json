@@ -178,6 +178,26 @@
     {
       "item": "Lockpick",
       "charges": 5
+    },
+    {
+      "item": "Moonpetal",
+      "charges": 3
+    },
+    {
+      "item": "Spring Water",
+      "charges": 3
+    },
+    {
+      "item": "Glowcap Mushroom",
+      "charges": 2
+    },
+    {
+      "item": "Serpent Root",
+      "charges": 2
+    },
+    {
+      "item": "Brimite Ore",
+      "charges": 1
     }
   ]
 }

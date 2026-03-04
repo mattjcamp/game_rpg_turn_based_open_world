@@ -66,6 +66,13 @@ class InventoryMixin:
         self.showing_log = False
         self.log_scroll = 0
 
+        # Potion crafting overlay
+        self.showing_brew_list = False
+        self.brew_list_items = []     # [(recipe_id, recipe_data, can_brew)]
+        self.brew_list_cursor = 0
+        self.brew_result_msg = None   # message shown after a brew attempt
+        self.brew_result_timer = 0
+
     # ── Messages ───────────────────────────────────────────────
 
     def show_message(self, text, duration_ms=2000):
@@ -283,16 +290,25 @@ class InventoryMixin:
 
     # Index of the CAST row in the unified cursor (right after effect rows)
     def _stash_layout(self):
-        """Return (NUM_EFFECT_ROWS, CAST_INDEX, STASH_START, total_items).
+        """Return (NUM_EFFECT_ROWS, CAST_INDEX, BREW_INDEX, STASH_START, total_items).
 
         NUM_EFFECT_ROWS counts active effects + available (unassigned) effects.
+        BREW_INDEX is the row for BREW POTIONS (only if an Alchemist is alive).
         """
         party = self.game.party
         n = len(self._all_effect_rows())
         cast_idx = n                        # one row for CAST
-        stash_start = cast_idx + 1
+        brew_idx = cast_idx + 1             # one row for BREW
+        stash_start = brew_idx + 1
         total = stash_start + len(party.shared_inventory)
-        return n, cast_idx, stash_start, total
+        return n, cast_idx, brew_idx, stash_start, total
+
+    def _has_alchemist(self):
+        """Return the first alive Alchemist in the party, or None."""
+        for m in self.game.party.members:
+            if m.is_alive() and m.char_class == "Alchemist":
+                return m
+        return None
 
     def _active_effects(self):
         """Return a list of (slot_key, effect_name) for non-empty effect slots."""
@@ -325,7 +341,7 @@ class InventoryMixin:
         """
         party = self.game.party
         inv = party.shared_inventory
-        NUM_EFFECTS, CAST_INDEX, STASH_START, total_items = self._stash_layout()
+        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, total_items = self._stash_layout()
 
         # Heal target selection overlay is open — delegate input
         if self.choosing_heal_target:
@@ -335,6 +351,11 @@ class InventoryMixin:
         # Spell list overlay is open — delegate input
         if self.showing_spell_list:
             self._handle_spell_list_input(event)
+            return
+
+        # Brew list overlay is open — delegate input
+        if self.showing_brew_list:
+            self._handle_brew_list_input(event)
             return
 
         # Examining an item — close on ESC/Enter/Space
@@ -394,7 +415,7 @@ class InventoryMixin:
                             self.show_message(
                                 "All effect slots are full!", 2000)
                     # Adjust cursor if needed after change
-                    new_n, _, _, new_total = self._stash_layout()
+                    new_n, _, _, _, new_total = self._stash_layout()
                     if self.party_inv_cursor >= new_total and new_total > 0:
                         self.party_inv_cursor = new_total - 1
             elif idx == CAST_INDEX:
@@ -403,6 +424,9 @@ class InventoryMixin:
                 self.spell_list_items = spells
                 self.spell_list_cursor = 0
                 self.showing_spell_list = True
+            elif idx == BREW_INDEX:
+                # Open potion crafting overlay
+                self._open_brew_list()
             else:
                 options = self._get_party_inv_action_options()
                 if options:
@@ -426,7 +450,7 @@ class InventoryMixin:
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
         party = self.game.party
-        NUM_EFFECTS, CAST_INDEX, STASH_START, _ = self._stash_layout()
+        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _ = self._stash_layout()
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
@@ -472,7 +496,7 @@ class InventoryMixin:
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
         party = self.game.party
-        NUM_EFFECTS, CAST_INDEX, STASH_START, _ = self._stash_layout()
+        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _ = self._stash_layout()
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
@@ -892,3 +916,140 @@ class InventoryMixin:
     def _on_spell_dungeon_nav(self, effect_type, effect_value):
         """Called for dungeon navigation spells. Override in dungeon state."""
         pass
+
+    # ── Potion Crafting System ─────────────────────────────────────
+
+    def _open_brew_list(self):
+        """Open the potion crafting overlay with the recipe list."""
+        from src.party import POTIONS_DATA
+
+        alchemist = self._has_alchemist()
+        if not alchemist:
+            self.show_message("No alchemist in the party!", 2000)
+            return
+
+        recipes = POTIONS_DATA.get("recipes", {})
+        if not recipes:
+            self.show_message("No recipes known!", 2000)
+            return
+
+        party = self.game.party
+        brew_list = []
+        for recipe_id, recipe in recipes.items():
+            can_brew = self._check_reagents(recipe, party)
+            brew_list.append((recipe_id, recipe, can_brew))
+
+        self.brew_list_items = brew_list
+        self.brew_list_cursor = 0
+        self.brew_result_msg = None
+        self.brew_result_timer = 0
+        self.showing_brew_list = True
+
+    def _check_reagents(self, recipe, party):
+        """Check if the party has all required reagents for a recipe."""
+        for reagent_name, qty_needed in recipe.get("reagents", {}).items():
+            available = party.inv_get_charges(reagent_name)
+            # Also count non-charged entries
+            if available <= 0:
+                count = sum(1 for e in party.shared_inventory
+                            if party.item_name(e) == reagent_name
+                            and party.item_charges(e) is None)
+                available = count
+            if available < qty_needed:
+                return False
+        return True
+
+    def _consume_reagents(self, recipe, party):
+        """Consume all reagents for a recipe from the party stash."""
+        for reagent_name, qty_needed in recipe.get("reagents", {}).items():
+            for _ in range(qty_needed):
+                # Try consuming a charge first (stackable reagents)
+                if not party.inv_consume_charge(reagent_name):
+                    # Fall back to removing a plain item entry
+                    party.inv_remove(reagent_name)
+
+    def _handle_brew_list_input(self, event):
+        """Handle input for the potion crafting overlay."""
+        # If showing a result message, any key dismisses it
+        if self.brew_result_msg:
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
+                self.brew_result_msg = None
+                # Refresh the brew list in case reagents changed
+                self._refresh_brew_list()
+            return
+
+        items = self.brew_list_items
+        if not items:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                self.showing_brew_list = False
+            return
+
+        if event.key == pygame.K_UP:
+            self.brew_list_cursor = (self.brew_list_cursor - 1) % len(items)
+        elif event.key == pygame.K_DOWN:
+            self.brew_list_cursor = (self.brew_list_cursor + 1) % len(items)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            recipe_id, recipe, can_brew = items[self.brew_list_cursor]
+            if can_brew:
+                self._attempt_brew(recipe_id, recipe)
+            else:
+                self.brew_result_msg = "Missing reagents!"
+        elif event.key == pygame.K_ESCAPE:
+            self.showing_brew_list = False
+
+    def _refresh_brew_list(self):
+        """Refresh the brew list to reflect current reagent counts."""
+        from src.party import POTIONS_DATA
+        recipes = POTIONS_DATA.get("recipes", {})
+        party = self.game.party
+        brew_list = []
+        for recipe_id, recipe in recipes.items():
+            can_brew = self._check_reagents(recipe, party)
+            brew_list.append((recipe_id, recipe, can_brew))
+        self.brew_list_items = brew_list
+        if self.brew_list_cursor >= len(brew_list):
+            self.brew_list_cursor = max(0, len(brew_list) - 1)
+
+    def _attempt_brew(self, recipe_id, recipe):
+        """Attempt to brew a potion. Consumes reagents, then INT check."""
+        party = self.game.party
+        alchemist = self._has_alchemist()
+        if not alchemist:
+            self.brew_result_msg = "No alchemist available!"
+            return
+
+        # Double-check reagents before consuming
+        if not self._check_reagents(recipe, party):
+            self.brew_result_msg = "Missing reagents!"
+            return
+
+        # Consume the reagents
+        self._consume_reagents(recipe, party)
+
+        # INT check: d20 + INT modifier >= DC
+        dc = recipe.get("dc", 10)
+        int_mod = alchemist.get_modifier(alchemist.intelligence)
+        roll = random.randint(1, 20)
+        total = roll + int_mod
+
+        result_item = recipe.get("result_item", recipe_id)
+        result_count = recipe.get("result_count", 1)
+
+        if total >= dc:
+            # Success — add the crafted item
+            for _ in range(result_count):
+                party.inv_add(result_item)
+            self.brew_result_msg = (
+                f"Success! {alchemist.name} rolled {roll} "
+                f"(+{int_mod}) = {total} vs DC {dc}. "
+                f"Brewed {result_item}!"
+            )
+            self.game.sfx.play("heal")
+        else:
+            # Failure — reagents wasted
+            self.brew_result_msg = (
+                f"Failed! {alchemist.name} rolled {roll} "
+                f"(+{int_mod}) = {total} vs DC {dc}. "
+                f"The reagents are ruined."
+            )
+            self.game.sfx.play("miss")

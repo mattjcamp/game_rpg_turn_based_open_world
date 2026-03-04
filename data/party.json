@@ -160,10 +160,10 @@
     }
   ],
   "active_party": [
-    0,
     1,
     2,
-    3
+    3,
+    7
   ],
   "party_effects": {
     "effect_1": null,
@@ -197,6 +197,26 @@
     {
       "item": "Lockpick",
       "charges": 5
+    },
+    {
+      "item": "Moonpetal",
+      "charges": 3
+    },
+    {
+      "item": "Spring Water",
+      "charges": 3
+    },
+    {
+      "item": "Glowcap Mushroom",
+      "charges": 2
+    },
+    {
+      "item": "Serpent Root",
+      "charges": 2
+    },
+    {
+      "item": "Brimite Ore",
+      "charges": 1
     }
   ]
 }
