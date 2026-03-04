@@ -2256,7 +2256,7 @@ class CombatState(BaseState):
             fc, fr = self.fighter_positions.get(member, (-99, -99))
             dist = max(abs(fc - tc), abs(fr - tr))
             if dist <= radius:
-                member.current_hp = max(0, member.current_hp - damage)
+                member.hp = max(0, member.hp - damage)
                 self.combat_log.append(
                     f"  {member.name} takes {damage} fire damage!")
                 self.hit_effects.append(HitEffect(fc, fr, damage))
@@ -2385,7 +2385,7 @@ class CombatState(BaseState):
                 continue
             fc, fr = self.fighter_positions.get(member, (-99, -99))
             if (fc, fr) in bolt_set:
-                member.current_hp = max(0, member.current_hp - damage)
+                member.hp = max(0, member.hp - damage)
                 self.combat_log.append(
                     f"  Lightning strikes {member.name} for {damage} damage!")
                 self.hit_effects.append(HitEffect(fc, fr, damage))
