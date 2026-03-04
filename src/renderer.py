@@ -152,8 +152,6 @@ class Renderer:
             "fighter":     "Ultima3_AMI_sprite_fighter.png",
             "cleric":      "Ultima3_AMI_sprite_cleric.png",
             "wizard":      "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
-            "alchemist":   "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
-            "illusionist": "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
             "thief":       "Ultima3_AMI_sprite_thief.png",
             "barbarian":   "Ultima3_AMI_sprite_barbarian.png",
         }
@@ -164,10 +162,12 @@ class Renderer:
             os.path.dirname(os.path.dirname(__file__)),
             "src", "assets", "u4_tiles")
         u4_class_tiles = {
-            "druid":       "druid.png",        # R2 C3 – red-robed druid
-            "paladin":     "paladin.png",       # R2 C5 – green-caped paladin
-            "ranger":      "ranger.png",        # R2 C6 – orange-clad ranger
-            "lark":        "bard.png",          # R2 C1 – bard (closest to lark)
+            "alchemist":   "tinker.png",        # red/black tinkerer
+            "illusionist": "mage.png",           # blue-robed mage
+            "druid":       "druid.png",          # red-robed druid
+            "paladin":     "paladin.png",        # green-caped paladin
+            "ranger":      "ranger.png",         # orange-clad ranger
+            "lark":        "bard.png",           # bard (closest to lark)
         }
 
         self._class_sprites = {}       # class name -> original-size surface

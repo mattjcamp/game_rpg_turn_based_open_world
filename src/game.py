@@ -802,10 +802,9 @@ class Game:
                     if event.type != pygame.KEYDOWN:
                         continue
                     if event.key == pygame.K_m:
-                        self.showing_settings = True
-                        self.settings_cursor = 0
-                        self.settings_mode = "main"
-                        self.save_load_message = None
+                        self.showing_title = True
+                        self.title_cursor = 0
+                        self.music.play("title")
                         break
                     # 1-4 opens/switches character sheet if the state supports it
                     num = {pygame.K_1: 0, pygame.K_2: 1,
