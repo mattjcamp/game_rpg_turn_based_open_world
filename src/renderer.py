@@ -1412,7 +1412,8 @@ class Renderer:
 
     def draw_dungeon_u3(self, party, dungeon_data, message="",
                          visible_tiles=None, torch_steps=-1,
-                         level_label=None, detected_traps=None):
+                         level_label=None, detected_traps=None,
+                         door_unlock_anim=None, door_interact=None):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -1489,6 +1490,11 @@ class Renderer:
         self._u3_dungeon_fog(psc, psr, cols, rows, ts,
                               visible_tiles=visible_tiles, off_c=off_c, off_r=off_r)
 
+        # ── 4b. door unlock animation ──
+        if door_unlock_anim:
+            self._u3_draw_door_unlock_anim(door_unlock_anim, off_c, off_r,
+                                            cols, rows, ts)
+
         # ── 5. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
                          pygame.Rect(0, 0, self._U3_DG_MAP_W, self._U3_DG_MAP_H), 2)
@@ -1534,7 +1540,230 @@ class Renderer:
             pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
             self.screen.blit(surf, rect)
 
+        # ── 8. door interaction prompt ──
+        if door_interact:
+            self._u3_draw_door_interact(door_interact, off_c, off_r, ts)
+
     # ── dungeon tile rendering ─────────────────────────────
+
+    # ── door unlock animation & interaction prompt ───────────
+
+    def _u3_draw_door_unlock_anim(self, anim, off_c, off_r, cols, rows, ts):
+        """Draw the door-unlock animation: iron bands snap, lock shatters, door swings open.
+
+        Four phases:
+        1. (0.0-0.2) Lock shakes and glows — thief is working the pick
+        2. (0.2-0.5) Lock shatters — sparks fly outward
+        3. (0.5-0.8) Iron bands crack and fall away with flash
+        4. (0.8-1.0) Door swings open — planks lighten to regular door color
+        """
+        import math
+
+        col, row = anim["col"], anim["row"]
+        sc = col - off_c
+        sr = row - off_r
+        if not (0 <= sc < cols and 0 <= sr < rows):
+            return
+
+        px = sc * ts
+        py = sr * ts
+        cx = px + ts // 2
+        cy = py + ts // 2
+
+        duration = anim["duration"]
+        elapsed = duration - anim["timer"]
+        p = max(0.0, min(1.0, elapsed / duration))
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.2:
+            # Phase 1: Lock shakes and glows
+            sub_p = p / 0.2
+            shake_x = int(2 * math.sin(ticks * 0.04) * (1.0 - sub_p * 0.5))
+            shake_y = int(1 * math.cos(ticks * 0.05))
+
+            # Draw the locked door with shake offset
+            door_rect = pygame.Rect(px + 5 + shake_x, py + 2 + shake_y,
+                                    ts - 10, ts - 4)
+            pygame.draw.rect(self.screen, (0, 0, 0),
+                             pygame.Rect(px, py, ts, ts))
+            pygame.draw.rect(self.screen, (60, 38, 18), door_rect)
+            # Iron bands
+            for dy_frac in (4, ts // 2, ts - 8):
+                pygame.draw.line(self.screen, (100, 100, 110),
+                                 (px + 5 + shake_x, py + dy_frac + shake_y),
+                                 (px + ts - 5 + shake_x, py + dy_frac + shake_y), 2)
+
+            # Glowing keyhole (pulsing orange/yellow)
+            glow = int(180 + 75 * sub_p * math.sin(ticks * 0.02))
+            glow = max(0, min(255, glow))
+            pygame.draw.circle(self.screen, (glow, glow // 2, 0),
+                               (cx + shake_x, cy + shake_y), 4)
+
+        elif p < 0.5:
+            # Phase 2: Lock shatters — sparks fly outward
+            sub_p = (p - 0.2) / 0.3
+
+            # Draw door (no shake now)
+            pygame.draw.rect(self.screen, (0, 0, 0),
+                             pygame.Rect(px, py, ts, ts))
+            door_rect = pygame.Rect(px + 5, py + 2, ts - 10, ts - 4)
+            pygame.draw.rect(self.screen, (60, 38, 18), door_rect)
+            # Iron bands still visible but dimming
+            band_bright = int(110 * (1.0 - sub_p * 0.5))
+            for dy_frac in (4, ts // 2, ts - 8):
+                pygame.draw.line(self.screen, (band_bright, band_bright, band_bright + 10),
+                                 (px + 5, py + dy_frac),
+                                 (px + ts - 5, py + dy_frac), 2)
+
+            # Sparks flying outward from the lock position
+            num_sparks = 8
+            for i in range(num_sparks):
+                angle = (i / num_sparks) * 6.283 + ticks * 0.003
+                dist = ts * 0.3 * sub_p + ts * 0.1
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                spark_alpha = max(0.0, 1.0 - sub_p)
+                bright = int(255 * spark_alpha)
+                if bright > 20:
+                    pygame.draw.circle(self.screen,
+                                       (bright, bright // 2, 0),
+                                       (sx, sy), max(1, int(2 * spark_alpha)))
+
+            # Bright flash at center
+            flash = int(200 * max(0.0, 1.0 - sub_p * 2))
+            if flash > 10:
+                pygame.draw.circle(self.screen, (flash, flash, flash // 2),
+                                   (cx, cy), max(1, int(5 * (1.0 - sub_p))))
+
+        elif p < 0.8:
+            # Phase 3: Iron bands crack and fall — door color transitions
+            sub_p = (p - 0.5) / 0.3
+
+            pygame.draw.rect(self.screen, (0, 0, 0),
+                             pygame.Rect(px, py, ts, ts))
+
+            # Door wood color transitions from dark locked to lighter open
+            r_col = int(60 + 30 * sub_p)
+            g_col = int(38 + 17 * sub_p)
+            b_col = int(18 + 7 * sub_p)
+            door_rect = pygame.Rect(px + 5, py + 2, ts - 10, ts - 4)
+            pygame.draw.rect(self.screen, (r_col, g_col, b_col), door_rect)
+
+            # Iron band fragments falling
+            band_alpha = max(0.0, 1.0 - sub_p * 1.5)
+            if band_alpha > 0.05:
+                band_b = int(100 * band_alpha)
+                fall_offset = int(sub_p * ts * 0.3)
+                for dy_frac in (4, ts // 2, ts - 8):
+                    # Fragments fall downward and spread apart
+                    y_off = py + dy_frac + fall_offset
+                    spread = int(sub_p * 4)
+                    if band_b > 5:
+                        pygame.draw.line(self.screen, (band_b, band_b, band_b + 10),
+                                         (px + 5 - spread, y_off),
+                                         (px + ts // 2 - 2, y_off), 2)
+                        pygame.draw.line(self.screen, (band_b, band_b, band_b + 10),
+                                         (px + ts // 2 + 2, y_off),
+                                         (px + ts - 5 + spread, y_off), 2)
+
+            # Plank lines start appearing
+            plank_alpha = sub_p
+            if plank_alpha > 0.1:
+                plank_b = int(60 * plank_alpha)
+                for dy in range(4, ts - 6, 6):
+                    pygame.draw.line(self.screen, (plank_b, int(plank_b * 0.58), int(plank_b * 0.25)),
+                                     (px + 7, py + dy), (px + ts - 7, py + dy), 1)
+
+        else:
+            # Phase 4: Door is now open — draw as regular door with gentle glow
+            sub_p = (p - 0.8) / 0.2
+
+            pygame.draw.rect(self.screen, (0, 0, 0),
+                             pygame.Rect(px, py, ts, ts))
+            door_rect = pygame.Rect(px + 6, py + 2, ts - 12, ts - 4)
+            pygame.draw.rect(self.screen, (90, 55, 25), door_rect)
+            # Plank lines
+            for dy in range(4, ts - 6, 6):
+                pygame.draw.line(self.screen, (60, 35, 15),
+                                 (px + 7, py + dy), (px + ts - 7, py + dy), 1)
+            # Handle
+            pygame.draw.circle(self.screen, (255, 255, 0), (cx + 4, cy), 2)
+            pygame.draw.rect(self.screen, (60, 35, 15), door_rect, 1)
+
+            # Fading golden glow around the opened door
+            glow_f = 1.0 - sub_p
+            glow_bright = int(120 * glow_f)
+            if glow_bright > 5:
+                glow_surf = pygame.Surface((ts + 8, ts + 8), pygame.SRCALPHA)
+                glow_surf.fill((glow_bright, int(glow_bright * 0.85), 0,
+                                int(40 * glow_f)))
+                self.screen.blit(glow_surf, (px - 4, py - 4))
+
+    def _u3_draw_door_interact(self, interact, off_c, off_r, ts):
+        """Draw the locked-door interaction prompt panel near the door.
+
+        Shows a small panel with a title and selectable options.
+        """
+        col, row = interact["col"], interact["row"]
+        cursor = interact["cursor"]
+        options = interact["options"]
+
+        # Position the panel at center of screen
+        panel_w = 280
+        line_h = 22
+        panel_h = 30 + line_h * len(options) + 10
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - panel_h) // 2 - 30
+
+        # Dark panel with border
+        self._u3_panel(panel_x, panel_y, panel_w, panel_h)
+
+        # Title
+        self._u3_text("LOCKED DOOR", panel_x + 10, panel_y + 8,
+                       (255, 200, 100), self.font)
+
+        # Options
+        oy = panel_y + 30
+        for i, (label, action_key) in enumerate(options):
+            is_selected = (i == cursor)
+            if is_selected:
+                # Highlight bar
+                highlight = pygame.Rect(panel_x + 4, oy - 1,
+                                        panel_w - 8, line_h)
+                pygame.draw.rect(self.screen, (40, 40, 80), highlight)
+
+                # Arrow indicator
+                self._u3_text(">", panel_x + 10, oy,
+                              (255, 220, 100), self.font_small)
+
+            # Determine color based on action availability
+            if action_key in ("no_picks", "no_thief"):
+                color = (120, 100, 100)  # greyed out
+            elif is_selected:
+                color = (255, 255, 255)
+            else:
+                color = (180, 180, 200)
+
+            self._u3_text(label.upper(), panel_x + 26, oy, color,
+                          self.font_small)
+            oy += line_h
+
+        # Hint text
+        self._u3_text("[ENTER] SELECT  [ESC] LEAVE",
+                       panel_x + 10, oy + 2, (80, 80, 140), self.font_small)
+
+        # Draw a pulsing indicator on the locked door tile
+        sc = col - off_c
+        sr = row - off_r
+        ticks = pygame.time.get_ticks()
+        import math
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.005)
+        alpha = int(50 + 40 * pulse)
+        door_px = sc * ts
+        door_py = sr * ts
+        glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        glow_surf.fill((255, 180, 60, alpha))
+        self.screen.blit(glow_surf, (door_px, door_py))
 
     def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr):
         """Draw a single dungeon tile in Ultima III style."""

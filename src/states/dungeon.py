@@ -45,6 +45,16 @@ class DungeonState(InventoryMixin, BaseState):
         # Track if we've already entered (so re-entry from combat doesn't reset position)
         self._entered = False
 
+        # ── Locked door interaction prompt ──
+        self.door_interact_active = False
+        self.door_interact_col = 0
+        self.door_interact_row = 0
+        self.door_interact_cursor = 0
+        self.door_interact_options = []  # list of (label, action_key)
+
+        # ── Door unlock animation ──
+        self.door_unlock_anim = None  # {"col", "row", "timer", "duration"}
+
     def enter_dungeon(self, dungeon_data, overworld_col, overworld_row):
         """
         Set up the dungeon state with dungeon-specific data.
@@ -130,6 +140,11 @@ class DungeonState(InventoryMixin, BaseState):
                         self.log_scroll += 3
                     elif event.key == pygame.K_DOWN:
                         self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
+                # ── Door interaction prompt input ──
+                if self.door_interact_active:
+                    self._handle_door_interact_input(event)
                     return
 
                 # ── Party inventory screen input ──
@@ -233,8 +248,10 @@ class DungeonState(InventoryMixin, BaseState):
                         self.party_inv_member = 0
                         return
 
-        # If showing party screen, character detail, or party inventory, block movement
-        if self.showing_party or self.showing_char_detail is not None or self.showing_party_inv:
+        # If showing party screen, character detail, party inventory, or door prompt, block movement
+        if (self.showing_party or self.showing_char_detail is not None
+                or self.showing_party_inv or self.door_interact_active
+                or self.door_unlock_anim):
             return
 
         # Movement
@@ -267,10 +284,10 @@ class DungeonState(InventoryMixin, BaseState):
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
-        # Check for locked door — thief attempts to pick the lock
+        # Check for locked door — show interaction prompt
         tile_id = self.dungeon_data.tile_map.get_tile(target_col, target_row)
         if tile_id == TILE_LOCKED_DOOR:
-            self._attempt_lock_pick(target_col, target_row)
+            self._show_door_interact(target_col, target_row)
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
@@ -579,6 +596,101 @@ class DungeonState(InventoryMixin, BaseState):
                                       map_monster_refs=[monster])
             self.game.change_state("combat")
 
+    # ── Locked door interaction ─────────────────────────────────────
+
+    def _show_door_interact(self, col, row):
+        """Show an interaction prompt when the party encounters a locked door."""
+        party = self.game.party
+
+        self.door_interact_col = col
+        self.door_interact_row = row
+        self.door_interact_cursor = 0
+
+        # Build available options based on party state
+        options = []
+
+        # Check if there's an alive Thief with lockpicks
+        thief = None
+        for m in party.members:
+            if m.is_alive() and m.char_class == "Thief":
+                thief = m
+                break
+
+        picks = party.inv_get_charges("Lockpick")
+        if thief and picks > 0:
+            options.append((f"Pick Lock ({thief.name}, {picks} picks)", "pick"))
+        elif thief and picks <= 0:
+            options.append(("Pick Lock (no lockpicks!)", "no_picks"))
+        elif thief is None:
+            options.append(("Pick Lock (no thief!)", "no_thief"))
+
+        # TODO: could add "Use Key" option if keys are implemented
+
+        options.append(("Leave", "leave"))
+
+        self.door_interact_options = options
+        self.door_interact_active = True
+
+    def _handle_door_interact_input(self, event):
+        """Handle UP/DOWN/ENTER navigation of the door interaction prompt."""
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.door_interact_cursor = (
+                (self.door_interact_cursor - 1)
+                % len(self.door_interact_options)
+            )
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.door_interact_cursor = (
+                (self.door_interact_cursor + 1)
+                % len(self.door_interact_options)
+            )
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            _, action = self.door_interact_options[self.door_interact_cursor]
+            self._resolve_door_interact(action)
+        elif event.key == pygame.K_ESCAPE:
+            self._close_door_interact()
+
+    def _resolve_door_interact(self, action):
+        """Execute the chosen door interaction action."""
+        if action == "pick":
+            self._close_door_interact()
+            self._attempt_lock_pick(self.door_interact_col,
+                                    self.door_interact_row)
+        elif action == "no_picks":
+            self._close_door_interact()
+            thief = self._find_thief()
+            self.show_message(
+                f"{thief.name} has no lockpicks left!", 2000)
+        elif action == "no_thief":
+            self._close_door_interact()
+            self.show_message("You need a thief to pick the lock!", 2000)
+        else:
+            # "leave" or unknown
+            self._close_door_interact()
+
+    def _close_door_interact(self):
+        """Dismiss the door interaction prompt."""
+        self.door_interact_active = False
+        self.door_interact_options = []
+        self.door_interact_cursor = 0
+
+    def _get_door_interact_state(self):
+        """Return the current door interaction state for the renderer, or None."""
+        if not self.door_interact_active:
+            return None
+        return {
+            "col": self.door_interact_col,
+            "row": self.door_interact_row,
+            "cursor": self.door_interact_cursor,
+            "options": self.door_interact_options,
+        }
+
+    def _find_thief(self):
+        """Return the first alive Thief in the party, or None."""
+        for m in self.game.party.members:
+            if m.is_alive() and m.char_class == "Thief":
+                return m
+        return None
+
     def _attempt_lock_pick(self, col, row):
         """Thief attempts to pick a locked door. DEX saving throw: d20 + DEX mod >= 12.
 
@@ -586,13 +698,7 @@ class DungeonState(InventoryMixin, BaseState):
         (success or failure).  If no lockpicks remain the attempt is blocked.
         """
         party = self.game.party
-
-        # Find an alive Thief
-        thief = None
-        for m in party.members:
-            if m.is_alive() and m.char_class == "Thief":
-                thief = m
-                break
+        thief = self._find_thief()
 
         if thief is None:
             self.show_message("The door is locked. You need a thief!", 2000)
@@ -611,8 +717,13 @@ class DungeonState(InventoryMixin, BaseState):
 
         roll = random.randint(1, 20) + thief.get_modifier(thief.dexterity)
         if roll >= 12:
-            # Success — unlock the door
-            self.dungeon_data.tile_map.set_tile(col, row, TILE_DDOOR)
+            # Success — play unlock animation, then convert to open door
+            self.door_unlock_anim = {
+                "col": col,
+                "row": row,
+                "timer": 1200,      # total animation time in ms
+                "duration": 1200,
+            }
             self.game.sfx.play("lock_pick_success")
             self.show_message(
                 f"{thief.name} picked the lock! "
@@ -870,6 +981,16 @@ class DungeonState(InventoryMixin, BaseState):
             if self.use_item_anim["timer"] <= 0:
                 self.use_item_anim = None
 
+        # Tick door unlock animation
+        if self.door_unlock_anim:
+            self.door_unlock_anim["timer"] -= dt_ms
+            if self.door_unlock_anim["timer"] <= 0:
+                # Animation finished — convert the tile to an open door
+                col = self.door_unlock_anim["col"]
+                row = self.door_unlock_anim["row"]
+                self.dungeon_data.tile_map.set_tile(col, row, TILE_DDOOR)
+                self.door_unlock_anim = None
+
     def draw(self, renderer):
         """Draw the dungeon in Ultima III style."""
         if self.showing_party_inv:
@@ -918,6 +1039,8 @@ class DungeonState(InventoryMixin, BaseState):
             torch_steps=self.torch_steps if (self.torch_active or self._has_torch_equipped()) else -1,
             level_label=level_label,
             detected_traps=self.dungeon_data.detected_traps,
+            door_unlock_anim=self.door_unlock_anim,
+            door_interact=self._get_door_interact_state(),
         )
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
