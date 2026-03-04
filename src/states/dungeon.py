@@ -357,6 +357,11 @@ class DungeonState(InventoryMixin, BaseState):
             else:
                 self.show_message("Your torch has burned out!", 2500)
 
+    def _on_spell_magic_light(self, steps):
+        """Override: activate the torch system using the Light spell's step count."""
+        self.torch_active = True
+        self.torch_steps = steps
+
     def _compute_visible_tiles(self):
         """Compute the set of (col, row) world tiles visible to the party.
 

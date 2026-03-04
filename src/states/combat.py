@@ -67,6 +67,9 @@ PHASE_ANIMATE_DEAD = "animate_dead"  # animate dead summoning animation
 PHASE_AOE_FIREBALL = "aoe_fireball"  # AoE fireball projectile in flight
 PHASE_AOE_EXPLOSION = "aoe_explosion"  # AoE fireball explosion expanding
 PHASE_LIGHTNING_BOLT = "lightning_bolt"  # lightning bolt crackling along its path
+PHASE_CURE_POISON = "cure_poison"        # cure poison cleansing animation
+PHASE_BLESS = "bless"                    # bless party-wide buff animation
+PHASE_CURSE = "curse"                    # curse debuff animation on enemy
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -485,6 +488,72 @@ class AoeExplosionEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class BlessEffect:
+    """A golden radiance expanding from the caster to all allies."""
+
+    DURATION = 1.0  # seconds
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class CurseEffect:
+    """A dark purple miasma settling on a cursed enemy."""
+
+    DURATION = 1.0  # seconds
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class CurePoisonEffect:
+    """A green-to-white cleansing glow over a cured ally."""
+
+    DURATION = 1.0  # seconds
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class LightningBoltEffect:
     """A crackling bolt of lightning along a straight line of tiles.
 
@@ -630,6 +699,15 @@ class CombatState(BaseState):
         # Lightning Bolt effects
         self.lightning_bolt_effects = []  # active LightningBoltEffect objects
 
+        # Cure Poison effects
+        self.cure_poison_effects = []    # active CurePoisonEffect objects
+
+        # Bless / Curse
+        self.bless_effects = []          # active BlessEffect objects
+        self.bless_buffs = {}            # member -> {"attack_bonus": int, "turns_left": int}
+        self.curse_effects = []          # active CurseEffect objects
+        self.curse_buffs = {}            # Monster -> {"ac_penalty": int, "attack_penalty": int, "turns_left": int}
+
         # Callback info for returning to source state
         self.source_state = "dungeon"
 
@@ -772,6 +850,11 @@ class CombatState(BaseState):
         self.aoe_explosions = []
         self._pending_aoe_fireball = None
         self.lightning_bolt_effects = []
+        self.cure_poison_effects = []
+        self.bless_effects = []
+        self.bless_buffs = {}
+        self.curse_effects = []
+        self.curse_buffs = {}
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -980,7 +1063,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT, PHASE_CURE_POISON, PHASE_BLESS, PHASE_CURSE):
             return
 
         # Equip screen handles its own input
@@ -1243,6 +1326,8 @@ class CombatState(BaseState):
                         self._cast_charm_person(f, target)
                     elif spell.get("effect_type") == "sleep":
                         self._cast_sleep_spell(f, target)
+                    elif spell.get("effect_type") == "curse":
+                        self._cast_curse(f, target)
                     else:
                         self._cast_targeted_damage_spell(f, target)
                 else:
@@ -1266,6 +1351,10 @@ class CombatState(BaseState):
                         self.combat_log.append("Target is out of range!")
                     elif spell.get("effect_type") == "range_buff":
                         self._cast_range_buff_on_target(target)
+                    elif spell.get("effect_type") == "cure_poison":
+                        self._cast_cure_poison(target)
+                    elif spell.get("effect_type") in ("heal", "major_heal"):
+                        self._cast_heal_on_target(target)
                     else:
                         self._cast_shield_on_target(target)
                 else:
@@ -1459,8 +1548,6 @@ class CombatState(BaseState):
             # Dispatch based on selected spell
             if self.selected_spell == "fireball":
                 self._fire_fireball(dcol, drow)
-            elif self.selected_spell == "heal":
-                self._cast_heal(dcol, drow)
             elif self.selected_spell == "lightning_bolt":
                 self._fire_lightning_bolt(dcol, drow)
             else:
@@ -1771,7 +1858,14 @@ class CombatState(BaseState):
         # Roll attack
         self.defending[f] = False
         atk_bonus = f.get_attack_bonus()
-        hit, roll, total, crit = roll_attack(atk_bonus, target.ac)
+        bless = self.bless_buffs.get(f)
+        if bless:
+            atk_bonus += bless["attack_bonus"]
+        target_ac = target.ac
+        curse = self.curse_buffs.get(target)
+        if curse:
+            target_ac -= curse["ac_penalty"]
+        hit, roll, total, crit = roll_attack(atk_bonus, target_ac)
 
         if crit:
             self.combat_log.append(
@@ -1781,13 +1875,13 @@ class CombatState(BaseState):
         elif hit:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target.ac} — Hit!"
+                f"= {total} vs AC {target_ac} — Hit!"
             )
             self.game.sfx.play("sword_hit")
         else:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target.ac} — Miss!"
+                f"= {total} vs AC {target_ac} — Miss!"
             )
             self.game.sfx.play("miss")
 
@@ -1890,7 +1984,14 @@ class CombatState(BaseState):
 
         self.defending[f] = False
         atk_bonus = f.get_attack_bonus()
-        hit, roll, total, crit = roll_attack(atk_bonus, target.ac)
+        bless = self.bless_buffs.get(f)
+        if bless:
+            atk_bonus += bless["attack_bonus"]
+        target_ac = target.ac
+        curse = self.curse_buffs.get(target)
+        if curse:
+            target_ac -= curse["ac_penalty"]
+        hit, roll, total, crit = roll_attack(atk_bonus, target_ac)
 
         if crit:
             self.combat_log.append(
@@ -1900,13 +2001,13 @@ class CombatState(BaseState):
         elif hit:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target.ac} — Hit!"
+                f"= {total} vs AC {target_ac} — Hit!"
             )
             self.game.sfx.play("sword_hit")
         else:
             self.combat_log.append(
                 f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target.ac} — Miss!"
+                f"= {total} vs AC {target_ac} — Miss!"
             )
             self.game.sfx.play("miss")
 
@@ -2307,7 +2408,11 @@ class CombatState(BaseState):
     # ── Heal casting ──────────────────────────────────────────────
 
     def _cast_heal(self, dcol, drow):
-        """Cast a heal in the given direction. Targets the first ally in that line."""
+        """Cast a heal in the given direction. Targets the first ally in that line.
+
+        Works for both Minor Heal (heal) and Major Heal (major_heal) by
+        looking up the selected spell's data for MP cost and dice.
+        """
         f = self.active_fighter
         if not f:
             return
@@ -2319,9 +2424,15 @@ class CombatState(BaseState):
             self.directing_action = None
             return
 
+        # Look up the selected spell (works for heal and major_heal)
+        spell_id = self.selected_spell or "heal"
+        spell = SPELLS_DATA.get(spell_id, SPELLS_DATA.get("heal", {}))
+        spell_name = spell.get("name", "Heal")
+        mp_cost = spell.get("mp_cost", HEAL_MP_COST)
+
         # Check MP
-        if f.current_mp < HEAL_MP_COST:
-            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {HEAL_MP_COST})")
+        if f.current_mp < mp_cost:
+            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {mp_cost})")
             self.phase = PHASE_PLAYER
             self.directing_action = None
             return
@@ -2329,7 +2440,7 @@ class CombatState(BaseState):
         col, row = self.fighter_positions[f]
 
         # Ray-trace in the chosen direction to find the first alive ally (capped by range)
-        spell_range = SPELLS_DATA["heal"].get("range", 99)
+        spell_range = spell.get("range", 99)
         target = None
         tc, tr = col + dcol, row + drow
         steps = 0
@@ -2354,12 +2465,27 @@ class CombatState(BaseState):
             return
 
         # Deduct MP
-        f.current_mp -= HEAL_MP_COST
+        f.current_mp -= mp_cost
 
-        # Calculate heal amount: 1d8 + WIS modifier
-        wis_mod = f.wis_mod
-        heal_amount = random.randint(1, 8) + wis_mod
-        heal_amount = max(1, heal_amount)
+        # Calculate heal amount from spell data
+        ev = spell.get("effect_value", {})
+        dice_count = ev.get("dice_count", 1)
+        dice_sides = ev.get("dice_sides", 8)
+        stat_bonus = ev.get("stat_bonus", "wisdom")
+        min_heal = ev.get("min_heal", 1)
+
+        if stat_bonus == "wisdom":
+            bonus = f.wis_mod
+        elif stat_bonus == "intelligence":
+            bonus = f.int_mod
+        else:
+            bonus = 0
+
+        heal_amount = 0
+        for _ in range(dice_count):
+            heal_amount += random.randint(1, dice_sides)
+        heal_amount += bonus
+        heal_amount = max(min_heal, heal_amount)
 
         # Apply healing (cap at max HP)
         old_hp = target.hp
@@ -2373,8 +2499,340 @@ class CombatState(BaseState):
         self.phase = PHASE_HEAL
         self.game.sfx.play("heal")
         self.combat_log.append(
-            f"{f.name} casts HEAL on {target.name}! (+{actual_heal} HP, -{HEAL_MP_COST} MP)"
+            f"{f.name} casts {spell_name} on {target.name}! (+{actual_heal} HP, -{mp_cost} MP)"
         )
+
+    def _cast_heal_on_target(self, target):
+        """Cast a heal spell on a specific ally chosen via the selection cursor.
+
+        Works for both Minor Heal and Major Heal by reading the selected
+        spell's data for MP cost, dice, and stat bonus.
+        """
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell_id = self.selected_spell or "heal"
+        spell = SPELLS_DATA.get(spell_id, SPELLS_DATA.get("heal", {}))
+        spell_name = spell.get("name", "Heal")
+        mp_cost = spell.get("mp_cost", 5)
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast healing spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Calculate heal amount from spell data
+        ev = spell.get("effect_value", {})
+        dice_count = ev.get("dice_count", 1)
+        dice_sides = ev.get("dice_sides", 8)
+        stat_bonus = ev.get("stat_bonus", "wisdom")
+        min_heal = ev.get("min_heal", 1)
+
+        if stat_bonus == "wisdom":
+            bonus = f.wis_mod
+        elif stat_bonus == "intelligence":
+            bonus = f.int_mod
+        else:
+            bonus = 0
+
+        heal_amount = 0
+        for _ in range(dice_count):
+            heal_amount += random.randint(1, dice_sides)
+        heal_amount += bonus
+        heal_amount = max(min_heal, heal_amount)
+
+        # Apply healing (cap at max HP)
+        old_hp = target.hp
+        target.hp = min(target.max_hp, target.hp + heal_amount)
+        actual_heal = target.hp - old_hp
+
+        # Spawn heal effect over the target
+        tcol, trow = self.fighter_positions.get(target, (3, 5))
+        self.heal_effects.append(HealEffect(tcol, trow, actual_heal))
+
+        self.phase = PHASE_HEAL
+        self.game.sfx.play("heal")
+        self.combat_log.append(
+            f"{f.name} casts {spell_name} on {target.name}! (+{actual_heal} HP, -{mp_cost} MP)"
+        )
+        self.selected_spell = None
+
+    def _cast_mass_heal(self):
+        """Cast Mass Heal — heals ALL alive party members at once.
+
+        Self-targeting spell that radiates healing energy from the caster.
+        Spawns a HealEffect on every healed ally (and the caster) simultaneously.
+        """
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell_id = self.selected_spell or "mass_heal"
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Mass Heal")
+        mp_cost = spell.get("mp_cost", 14)
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast healing spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Calculate heal from spell data
+        ev = spell.get("effect_value", {})
+        dice_count = ev.get("dice_count", 2)
+        dice_sides = ev.get("dice_sides", 8)
+        stat_bonus = ev.get("stat_bonus", "wisdom")
+        min_heal = ev.get("min_heal", 1)
+
+        if stat_bonus == "wisdom":
+            bonus = f.wis_mod
+        elif stat_bonus == "intelligence":
+            bonus = f.int_mod
+        else:
+            bonus = 0
+
+        # Roll once — everyone gets the same heal
+        heal_amount = 0
+        for _ in range(dice_count):
+            heal_amount += random.randint(1, dice_sides)
+        heal_amount += bonus
+        heal_amount = max(min_heal, heal_amount)
+
+        self.combat_log.append(
+            f"{f.name} casts {spell_name}! (-{mp_cost} MP)")
+
+        # Heal every alive party member (including the caster)
+        for member in self.fighters:
+            if not member.is_alive():
+                continue
+            old_hp = member.hp
+            member.hp = min(member.max_hp, member.hp + heal_amount)
+            actual = member.hp - old_hp
+            if actual > 0:
+                mc, mr = self.fighter_positions.get(member, (3, 5))
+                self.heal_effects.append(HealEffect(mc, mr, actual))
+                self.combat_log.append(
+                    f"  {member.name} is healed for {actual} HP!")
+
+        self.phase = PHASE_HEAL
+        self.game.sfx.play("heal")
+        self.selected_spell = None
+
+    def _cast_cure_poison(self, target):
+        """Cast Cure Poison on a selected ally, removing the poisoned condition."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell_id = self.selected_spell or "cure_poison"
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Cure Poison")
+        mp_cost = spell.get("mp_cost", 6)
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast cleansing spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Check if target is actually poisoned
+        if not getattr(target, "poisoned", False):
+            self.combat_log.append(f"{target.name} is not poisoned!")
+            self.selected_spell = None
+            self.phase = PHASE_SPELL_SELECT
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Cure the poison
+        target.poisoned = False
+
+        # Spawn cleansing effect
+        tc, tr = self.fighter_positions.get(target, (3, 5))
+        self.cure_poison_effects.append(CurePoisonEffect(tc, tr))
+
+        self.phase = PHASE_CURE_POISON
+        self.game.sfx.play("heal")
+        self.combat_log.append(
+            f"{f.name} casts {spell_name} on {target.name}! (-{mp_cost} MP)")
+        self.combat_log.append(
+            f"{target.name}'s poison has been cleansed!")
+        self.selected_spell = None
+
+    # ── Bless casting ──────────────────────────────────────────────
+
+    def _cast_bless(self):
+        """Cast Bless — party-wide attack buff for several turns."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell_id = self.selected_spell or "bless"
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Bless")
+        mp_cost = spell.get("mp_cost", 8)
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast divine spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        duration = spell.get("duration", 5)
+        if isinstance(duration, str):
+            duration = 5
+        ev = spell.get("effect_value", {})
+        attack_bonus = ev.get("attack_bonus", 2)
+
+        # Apply bless buff to all alive fighters
+        for member in self.fighters:
+            if member.is_alive():
+                self.bless_buffs[member] = {
+                    "attack_bonus": attack_bonus,
+                    "turns_left": duration,
+                }
+                mc, mr = self.fighter_positions.get(member, (0, 0))
+                self.bless_effects.append(BlessEffect(mc, mr))
+
+        self.phase = PHASE_BLESS
+        self.game.sfx.play("shield")
+        self.combat_log.append(
+            f"{f.name} casts {spell_name}! (-{mp_cost} MP)")
+        self.combat_log.append(
+            f"All allies gain +{attack_bonus} attack for {duration} turns!")
+        self.selected_spell = None
+
+    def _tick_bless_buffs(self):
+        """Decrement bless buff durations at end of each round."""
+        expired = []
+        for member, buff in self.bless_buffs.items():
+            buff["turns_left"] -= 1
+            if buff["turns_left"] <= 0:
+                expired.append(member)
+        for member in expired:
+            del self.bless_buffs[member]
+            if member.is_alive():
+                self.combat_log.append(
+                    f"{member.name}'s blessing fades.")
+
+    # ── Curse casting ──────────────────────────────────────────────
+
+    def _cast_curse(self, caster, target):
+        """Cast Curse — debuff a single enemy's AC and attack for several turns."""
+        f = caster
+        if not f:
+            return
+
+        spell_id = self.selected_spell or "curse"
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Curse")
+        mp_cost = spell.get("mp_cost", 7)
+
+        # Check if character can cast priest spells
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast divine spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        duration = spell.get("duration", 5)
+        if isinstance(duration, str):
+            duration = 5
+        ev = spell.get("effect_value", {})
+        ac_penalty = ev.get("ac_penalty", 2)
+        attack_penalty = ev.get("attack_penalty", 2)
+
+        # Apply curse debuff to target monster
+        self.curse_buffs[target] = {
+            "ac_penalty": ac_penalty,
+            "attack_penalty": attack_penalty,
+            "turns_left": duration,
+        }
+
+        tc, tr = self.monster_positions.get(target, (0, 0))
+        self.curse_effects.append(CurseEffect(tc, tr))
+
+        self.phase = PHASE_CURSE
+        self.game.sfx.play("shield")
+        self.combat_log.append(
+            f"{f.name} casts {spell_name} on {target.name}! (-{mp_cost} MP)")
+        self.combat_log.append(
+            f"{target.name} is cursed! (-{ac_penalty} AC, -{attack_penalty} ATK "
+            f"for {duration} turns)")
+        self.selected_spell = None
+
+    def _tick_curse_buffs(self):
+        """Decrement curse debuff durations at end of each round."""
+        expired = []
+        for monster, buff in self.curse_buffs.items():
+            buff["turns_left"] -= 1
+            if buff["turns_left"] <= 0:
+                expired.append(monster)
+        for monster in expired:
+            del self.curse_buffs[monster]
+            if monster.is_alive():
+                self.combat_log.append(
+                    f"{monster.name}'s curse lifts.")
 
     # ── Shield casting ─────────────────────────────────────────────
 
@@ -2642,6 +3100,10 @@ class CombatState(BaseState):
 
         if effect_type == "invisibility":
             self._cast_invisibility()
+        elif effect_type == "mass_heal":
+            self._cast_mass_heal()
+        elif effect_type == "bless":
+            self._cast_bless()
         else:
             # Unknown self-spell — cancel safely
             self.phase = PHASE_PLAYER
@@ -3247,6 +3709,8 @@ class CombatState(BaseState):
             self._tick_sleep_buffs()
             self._tick_invisibility_buffs()
             self._tick_summon_buffs()
+            self._tick_bless_buffs()
+            self._tick_curse_buffs()
             self.active_idx = 0
             while (self.active_idx < len(self.fighters)
                    and not self.fighters[self.active_idx].is_alive()):
@@ -3372,8 +3836,13 @@ class CombatState(BaseState):
         if shield:
             player_ac += shield["ac_bonus"]
 
+        monster_atk = monster.attack_bonus
+        curse = self.curse_buffs.get(monster)
+        if curse:
+            monster_atk -= curse["attack_penalty"]
+
         hit, roll, total, crit = roll_attack(
-            monster.attack_bonus, player_ac
+            monster_atk, player_ac
         )
 
         ac_display = f"AC {player_ac}"
@@ -3602,6 +4071,39 @@ class CombatState(BaseState):
                 self._end_fighter_turn()
             return
         self.heal_effects = [fx for fx in self.heal_effects if fx.alive]
+
+        # Update cure poison effects
+        for fx in self.cure_poison_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_CURE_POISON:
+            if all(not fx.alive for fx in self.cure_poison_effects):
+                self.cure_poison_effects = []
+                self._end_fighter_turn()
+            return
+        self.cure_poison_effects = [fx for fx in self.cure_poison_effects if fx.alive]
+
+        # Update bless effects
+        for fx in self.bless_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_BLESS:
+            if all(not fx.alive for fx in self.bless_effects):
+                self.bless_effects = []
+                self._end_fighter_turn()
+            return
+        self.bless_effects = [fx for fx in self.bless_effects if fx.alive]
+
+        # Update curse effects
+        for fx in self.curse_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_CURSE:
+            if all(not fx.alive for fx in self.curse_effects):
+                self.curse_effects = []
+                self._end_fighter_turn()
+            return
+        self.curse_effects = [fx for fx in self.curse_effects if fx.alive]
 
         # Update shield effects
         for fx in self.shield_effects:
@@ -3970,6 +4472,11 @@ class CombatState(BaseState):
             aoe_fireball_effects=self.aoe_fireball_effects,
             aoe_explosions=self.aoe_explosions,
             lightning_bolt_effects=self.lightning_bolt_effects,
+            cure_poison_effects=self.cure_poison_effects,
+            bless_effects=self.bless_effects,
+            bless_buffs=self.bless_buffs,
+            curse_effects=self.curse_effects,
+            curse_buffs=self.curse_buffs,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,

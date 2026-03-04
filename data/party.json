@@ -138,13 +138,32 @@
         "head": null
       },
       "inventory": []
+    },
+    {
+      "name": "Bubbles",
+      "class": "Alchemist",
+      "race": "Halfling",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 20,
+      "wisdom": 10,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": []
     }
   ],
   "active_party": [
     0,
     1,
     2,
-    3
+    7
   ],
   "party_effects": {
     "effect_1": null,

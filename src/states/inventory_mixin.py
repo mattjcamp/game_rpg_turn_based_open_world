@@ -739,10 +739,14 @@ class InventoryMixin:
             return
 
         ev = spell.get("effect_value", {})
-        dice_str = ev.get("dice", "1d8")
-        parts = dice_str.split("d")
-        num_dice = int(parts[0]) if len(parts) == 2 else 1
-        die_size = int(parts[1]) if len(parts) == 2 else 8
+        if "dice_count" in ev:
+            num_dice = ev.get("dice_count", 1)
+            die_size = ev.get("dice_sides", 8)
+        else:
+            dice_str = ev.get("dice", "1d8")
+            parts = dice_str.split("d")
+            num_dice = int(parts[0]) if len(parts) == 2 else 1
+            die_size = int(parts[1]) if len(parts) == 2 else 8
         heal = sum(random.randint(1, die_size) for _ in range(num_dice))
         heal += ev.get("flat_bonus", 0)
         min_heal = ev.get("min_heal", 1)
@@ -778,7 +782,7 @@ class InventoryMixin:
             self.show_message(
                 f"{member.name} casts {spell_name}! Monsters flee!", 3000)
 
-        elif effect_type == "heal":
+        elif effect_type in ("heal", "major_heal"):
             # Refund MP — it will be re-deducted when the player confirms
             # a target (or stays refunded if they cancel).
             member.current_mp = member.current_mp + cost
@@ -838,6 +842,15 @@ class InventoryMixin:
                 f"{member.name} casts {spell_name}! "
                 f"The area is illuminated.", 3000)
 
+        elif effect_type == "magic_light":
+            ev = spell.get("effect_value", {})
+            steps = ev.get("steps", 100)
+            self._on_spell_magic_light(steps)
+            self.showing_party_inv = False
+            self.show_message(
+                f"{member.name} casts {spell_name}! "
+                f"A radiant orb illuminates the way.", 3000)
+
         elif effect_type == "reveal_map":
             self._on_spell_reveal_map()
             self.show_message(
@@ -866,6 +879,10 @@ class InventoryMixin:
 
     def _on_spell_light(self, radius, light_level, duration):
         """Called when a light spell is cast. Override in dungeon state."""
+        pass
+
+    def _on_spell_magic_light(self, steps):
+        """Called when a magic_light spell is cast. Override in dungeon state."""
         pass
 
     def _on_spell_reveal_map(self):

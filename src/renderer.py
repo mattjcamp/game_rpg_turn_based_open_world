@@ -2199,6 +2199,11 @@ class Renderer:
                           aoe_fireball_effects=None,
                           aoe_explosions=None,
                           lightning_bolt_effects=None,
+                          cure_poison_effects=None,
+                          bless_effects=None,
+                          bless_buffs=None,
+                          curse_effects=None,
+                          curse_buffs=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2445,6 +2450,24 @@ class Renderer:
                 if fx.alive:
                     self._u3_draw_lightning_bolt(mx, my, ts, fx)
 
+        # ── 2t. cure poison effects ──
+        if cure_poison_effects:
+            for fx in cure_poison_effects:
+                if fx.alive:
+                    self._u3_draw_cure_poison_effect(mx, my, ts, fx)
+
+        # ── 2u. bless effects ──
+        if bless_effects:
+            for fx in bless_effects:
+                if fx.alive:
+                    self._u3_draw_bless_effect(mx, my, ts, fx)
+
+        # ── 2v. curse effects ──
+        if curse_effects:
+            for fx in curse_effects:
+                if fx.alive:
+                    self._u3_draw_curse_effect(mx, my, ts, fx)
+
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
                          pygame.Rect(mx - 2, my - 2,
@@ -2488,7 +2511,8 @@ class Renderer:
                                         rx, 4, rw, party_h,
                                         shield_buffs=shield_buffs or {},
                                         range_buffs=range_buffs or {},
-                                        invisibility_buffs=invisibility_buffs or {})
+                                        invisibility_buffs=invisibility_buffs or {},
+                                        bless_buffs=bless_buffs or {})
         else:
             self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138,
                                    shield_buffs=shield_buffs or {})
@@ -2501,7 +2525,8 @@ class Renderer:
                                      source_state=is_outdoor and "overworld" or "dungeon",
                                      encounter_name=encounter_name,
                                      sleep_buffs=sleep_buffs,
-                                     summon_buffs=summon_buffs)
+                                     summon_buffs=summon_buffs,
+                                     curse_buffs=curse_buffs)
 
         # Calculate normal (collapsed) and expanded action panel positions
         normal_action_y = monster_y + monster_panel_h + 4
@@ -3264,6 +3289,212 @@ class Renderer:
         for i in range(len(points) - 1):
             pygame.draw.line(self.screen, color,
                              points[i], points[i + 1], width)
+
+    def _u3_draw_cure_poison_effect(self, ax, ay, ts, fx):
+        """Draw a cleansing cure-poison effect — green toxin rising out, replaced by white purity.
+
+        Three phases:
+        1. (0.0-0.3) Green poison bubbles rise out of the target
+        2. (0.3-0.7) White/gold cleansing glow intensifies
+        3. (0.7-1.0) Gentle sparkle fade-out
+        """
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: Green poison bubbles rise out
+            sub_p = p / 0.3
+            # Rising green particles
+            for i in range(6):
+                angle = i * 1.047  # ~60 degrees apart
+                rise = sub_p * ts * 0.8
+                bx = cx + int(math.cos(angle + ticks * 0.005) * ts * 0.3)
+                by = cy - int(rise) + int(math.sin(ticks * 0.008 + i) * 3)
+                bubble_r = max(1, int(3 * (1.0 - sub_p)))
+                g_val = int(200 * (1.0 - sub_p))
+                if g_val > 10:
+                    pygame.draw.circle(self.screen, (30, g_val, 30),
+                                       (bx, by), bubble_r)
+
+            # Green glow fading away from target
+            glow_r = int(ts * 0.4)
+            glow_alpha = 1.0 - sub_p
+            green = int(150 * glow_alpha)
+            if green > 5:
+                pygame.draw.circle(self.screen, (20, green, 20),
+                                   (cx, cy), glow_r, 2)
+
+        elif p < 0.7:
+            # Phase 2: White/gold cleansing glow
+            sub_p = (p - 0.3) / 0.4
+            glow_r = int(ts * 0.5 * (0.6 + 0.4 * sub_p))
+            flicker = 0.8 + 0.2 * math.sin(ticks * 0.015)
+
+            # Inner white glow
+            inner_r = max(2, int(glow_r * 0.5 * flicker))
+            pygame.draw.circle(self.screen, (255, 255, 240),
+                               (cx, cy), inner_r)
+
+            # Gold ring
+            gold_r = int(glow_r * flicker)
+            pygame.draw.circle(self.screen, (255, 215, 80),
+                               (cx, cy), gold_r, 2)
+
+            # Outer white ring
+            pygame.draw.circle(self.screen, (220, 255, 220),
+                               (cx, cy), int(glow_r * 1.2), 1)
+
+        else:
+            # Phase 3: Sparkle fade-out
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+
+            # Fading sparkles
+            for i in range(4):
+                angle = ticks * 0.004 + i * 1.57
+                dist = ts * 0.3 * (1.0 + sub_p * 0.5)
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                bright = int(220 * alpha_f)
+                if bright > 10:
+                    pygame.draw.circle(self.screen,
+                                       (bright, bright, bright // 2),
+                                       (sx, sy), max(1, int(2 * alpha_f)))
+
+            # Fading center glow
+            center_bright = int(180 * alpha_f)
+            if center_bright > 5:
+                pygame.draw.circle(self.screen,
+                                   (center_bright, center_bright, center_bright // 2),
+                                   (cx, cy), max(1, int(ts * 0.2 * alpha_f)))
+
+    def _u3_draw_bless_effect(self, ax, ay, ts, fx):
+        """Draw a golden blessing aura — expanding rings of light with sparkles.
+
+        Three phases:
+        1. (0.0-0.3) Golden pillar of light descends from above
+        2. (0.3-0.7) Expanding golden rings radiate outward
+        3. (0.7-1.0) Gentle golden sparkle fade-out
+        """
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: Golden pillar of light descends
+            sub_p = p / 0.3
+            beam_top = cy - int(ts * 1.5 * (1.0 - sub_p))
+            beam_w = max(2, int(ts * 0.15))
+            bright = int(255 * sub_p)
+            if bright > 10:
+                pygame.draw.line(self.screen, (bright, int(bright * 0.84), 0),
+                                 (cx, beam_top), (cx, cy), beam_w)
+                # Inner white core
+                pygame.draw.line(self.screen, (bright, bright, int(bright * 0.6)),
+                                 (cx, beam_top), (cx, cy), max(1, beam_w // 2))
+
+        elif p < 0.7:
+            # Phase 2: Expanding golden rings
+            sub_p = (p - 0.3) / 0.4
+            for ring_i in range(3):
+                ring_p = (sub_p + ring_i * 0.15) % 1.0
+                ring_r = int(ts * 0.2 + ts * 0.6 * ring_p)
+                alpha_f = max(0.0, 1.0 - ring_p)
+                gold = int(220 * alpha_f)
+                if gold > 10:
+                    pygame.draw.circle(self.screen, (gold, int(gold * 0.85), 0),
+                                       (cx, cy), ring_r, 2)
+            # Central warm glow
+            flicker = 0.8 + 0.2 * math.sin(ticks * 0.012)
+            glow_r = max(2, int(ts * 0.3 * flicker))
+            pygame.draw.circle(self.screen, (255, 215, 80),
+                               (cx, cy), glow_r)
+
+        else:
+            # Phase 3: Golden sparkle fade-out
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+            for i in range(5):
+                angle = ticks * 0.005 + i * 1.257
+                dist = ts * 0.4 * (1.0 + sub_p * 0.3)
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                bright = int(200 * alpha_f)
+                if bright > 10:
+                    pygame.draw.circle(self.screen, (bright, int(bright * 0.84), 0),
+                                       (sx, sy), max(1, int(2 * alpha_f)))
+            # Fading center glow
+            center_b = int(160 * alpha_f)
+            if center_b > 5:
+                pygame.draw.circle(self.screen, (center_b, int(center_b * 0.84), 0),
+                                   (cx, cy), max(1, int(ts * 0.15 * alpha_f)))
+
+    def _u3_draw_curse_effect(self, ax, ay, ts, fx):
+        """Draw a dark malediction — purple/black energy spiraling inward onto the target.
+
+        Three phases:
+        1. (0.0-0.3) Dark tendrils spiral inward from edges
+        2. (0.3-0.7) Pulsing dark aura with purple flashes
+        3. (0.7-1.0) Aura shrinks and brands the target
+        """
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: Dark tendrils spiral inward
+            sub_p = p / 0.3
+            for i in range(6):
+                angle = ticks * 0.006 + i * 1.047
+                dist = ts * 0.8 * (1.0 - sub_p)
+                tx_pos = cx + int(math.cos(angle) * dist)
+                ty_pos = cy + int(math.sin(angle) * dist)
+                bright = int(120 * sub_p)
+                pygame.draw.line(self.screen, (bright, 0, int(bright * 1.5)),
+                                 (tx_pos, ty_pos), (cx, cy), max(1, int(2 * sub_p)))
+
+        elif p < 0.7:
+            # Phase 2: Pulsing dark aura with purple flashes
+            sub_p = (p - 0.3) / 0.4
+            pulse = 0.7 + 0.3 * math.sin(ticks * 0.015)
+            aura_r = int(ts * 0.5 * pulse)
+
+            # Dark core
+            pygame.draw.circle(self.screen, (40, 0, 60),
+                               (cx, cy), max(2, int(aura_r * 0.5)))
+            # Purple ring
+            pygame.draw.circle(self.screen, (140, 40, 200),
+                               (cx, cy), aura_r, 2)
+            # Outer dark ring
+            pygame.draw.circle(self.screen, (80, 0, 120),
+                               (cx, cy), int(aura_r * 1.3), 1)
+
+            # Occasional purple spark
+            if (ticks // 80) % 3 == 0:
+                spark_angle = random.random() * 6.28
+                spark_dist = random.randint(2, int(ts * 0.4))
+                sx = cx + int(math.cos(spark_angle) * spark_dist)
+                sy = cy + int(math.sin(spark_angle) * spark_dist)
+                pygame.draw.circle(self.screen, (180, 60, 255),
+                                   (sx, sy), 2)
+
+        else:
+            # Phase 3: Aura shrinks and brands
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+            aura_r = max(2, int(ts * 0.4 * alpha_f))
+
+            pygame.draw.circle(self.screen, (int(100 * alpha_f), 0, int(150 * alpha_f)),
+                               (cx, cy), aura_r, 2)
+            # Fading purple center
+            core_b = int(80 * alpha_f)
+            if core_b > 5:
+                pygame.draw.circle(self.screen, (core_b, 0, int(core_b * 1.5)),
+                                   (cx, cy), max(1, int(aura_r * 0.4)))
 
     def _u3_draw_heal_effect(self, ax, ay, ts, fx):
         """Draw a healing glow — green sparkles rising upward with heal number."""
@@ -4287,7 +4518,8 @@ class Renderer:
     def _u3_party_combat_panel(self, fighters, active_fighter,
                                 defending_map, x, y, w, h,
                                 shield_buffs=None, range_buffs=None,
-                                invisibility_buffs=None):
+                                invisibility_buffs=None,
+                                bless_buffs=None):
         """Party roster with character sprites and HP/MP bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -4384,6 +4616,9 @@ class Renderer:
                 indicator_y += 12
             if invisibility_buffs and invisibility_buffs.get(member):
                 self._u3_text("INVIS", x + w - 48, indicator_y, (180, 200, 255), self.font_small)
+                indicator_y += 12
+            if bless_buffs and bless_buffs.get(member):
+                self._u3_text("BLSS", x + w - 44, indicator_y, (255, 215, 80), self.font_small)
 
             # ── Ammo indicator for throwable weapons ──
             if member.is_throwable_weapon():
@@ -4475,7 +4710,8 @@ class Renderer:
 
     def _u3_monster_panel_multi(self, monsters, x, y, w, h,
                                source_state="dungeon", encounter_name=None,
-                               sleep_buffs=None, summon_buffs=None):
+                               sleep_buffs=None, summon_buffs=None,
+                               curse_buffs=None):
         """Monster stats panel matching the party panel format with sprites and bars."""
         self._u3_panel(x, y, w, h)
         f = self.font
@@ -4510,6 +4746,7 @@ class Renderer:
             is_charmed = getattr(mon, "charmed", False)
             is_summoned = (summon_buffs and mon in summon_buffs) if summon_buffs else False
             is_sleeping = (sleep_buffs and mon in sleep_buffs) if sleep_buffs else False
+            is_cursed = (curse_buffs and mon in curse_buffs) if curse_buffs else False
             if is_summoned:
                 name_color = (120, 220, 140)  # Green for summoned
                 display_name = f"{mon.name} (Summon)"
@@ -4519,6 +4756,9 @@ class Renderer:
             elif is_sleeping:
                 name_color = (120, 140, 220)  # Blue for sleeping
                 display_name = f"{mon.name} (Zzz)"
+            elif is_cursed and mon.is_alive():
+                name_color = (180, 80, 200)  # Purple for cursed
+                display_name = f"{mon.name} (Cursed)"
             elif mon.is_alive():
                 name_color = self._U3_RED
                 display_name = mon.name

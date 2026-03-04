@@ -83,8 +83,69 @@
         "min_heal": 1
       },
       "range": 2,
-      "targeting": "directional_ally",
+      "targeting": "select_ally",
       "usable_in": ["battle", "overworld", "town", "dungeon"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+    {
+      "id": "major_heal",
+      "name": "Major Heal",
+      "description": "Channels a powerful wave of restorative energy toward an ally, mending grievous wounds.",
+      "allowable_classes": ["Cleric", "Paladin"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 10,
+      "duration": "instant",
+      "effect_type": "major_heal",
+      "effect_value": {
+        "dice_count": 3,
+        "dice_sides": 8,
+        "stat_bonus": "wisdom",
+        "min_heal": 1
+      },
+      "range": 4,
+      "targeting": "select_ally",
+      "usable_in": ["battle"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+    {
+      "id": "mass_heal",
+      "name": "Mass Heal",
+      "description": "A burst of divine light radiates from the caster, restoring health to all nearby allies.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 14,
+      "duration": "instant",
+      "effect_type": "mass_heal",
+      "effect_value": {
+        "dice_count": 2,
+        "dice_sides": 8,
+        "stat_bonus": "wisdom",
+        "min_heal": 1
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["battle"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+    {
+      "id": "cure_poison",
+      "name": "Cure Poison",
+      "description": "Draws the venom from an ally's body with a cleansing prayer, removing the poisoned condition.",
+      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 6,
+      "duration": "instant",
+      "effect_type": "cure_poison",
+      "effect_value": {},
+      "range": 99,
+      "targeting": "select_ally",
+      "usable_in": ["battle"],
       "sfx": "heal",
       "hit_sfx": null
     },
@@ -265,6 +326,64 @@
       "usable_in": ["battle"],
       "sfx": "fireball",
       "hit_sfx": "explosion"
+    },
+    {
+      "id": "bless",
+      "name": "Bless",
+      "description": "Invokes a divine blessing that empowers all allies, granting them greater accuracy in battle.",
+      "allowable_classes": ["Cleric", "Paladin"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 8,
+      "duration": 5,
+      "effect_type": "bless",
+      "effect_value": {
+        "attack_bonus": 2
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
+      "id": "curse",
+      "name": "Curse",
+      "description": "Calls down a dark malediction on an enemy, weakening its defenses and dulling its attacks.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 7,
+      "duration": 5,
+      "effect_type": "curse",
+      "effect_value": {
+        "ac_penalty": 2,
+        "attack_penalty": 2
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+    {
+      "id": "light",
+      "name": "Light",
+      "description": "Conjures a radiant orb of divine light that illuminates the darkest passages for the party.",
+      "allowable_classes": ["Cleric", "Paladin", "Druid"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 4,
+      "duration": 100,
+      "effect_type": "magic_light",
+      "effect_value": {
+        "steps": 100
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["dungeon"],
+      "sfx": "heal",
+      "hit_sfx": null
     },
     {
       "id": "push",
