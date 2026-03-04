@@ -82,7 +82,7 @@
         "stat_bonus": "wisdom",
         "min_heal": 1
       },
-      "range": 2,
+      "range": 6,
       "targeting": "select_ally",
       "usable_in": ["battle", "overworld", "town", "dungeon"],
       "sfx": "heal",

@@ -15,5 +15,16 @@
 
   "spell_type": "sorcerer",
 
-  "mp_source": { "ability": "intelligence", "percentage": 50 }
+  "mp_source": { "ability": "intelligence", "percentage": 50 },
+
+  "abilities": [
+    {
+      "name": "Battle Song",
+      "description": "Inspires allies, granting bonus to attack rolls"
+    },
+    {
+      "name": "Lore",
+      "description": "Can identify magical items and ancient texts"
+    }
+  ]
 }

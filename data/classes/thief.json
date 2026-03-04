@@ -15,5 +15,20 @@
 
   "spell_type": "none",
 
-  "mp_source": null
+  "mp_source": null,
+
+  "abilities": [
+    {
+      "name": "Pick Locks",
+      "description": "Can pick locked doors and chests"
+    },
+    {
+      "name": "Detect Traps",
+      "description": "Can detect and disarm hidden traps"
+    },
+    {
+      "name": "Backstab",
+      "description": "Deals double damage when attacking from behind"
+    }
+  ]
 }

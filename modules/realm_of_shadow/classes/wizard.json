@@ -15,5 +15,16 @@
 
   "spell_type": "sorcerer",
 
-  "mp_source": { "ability": "intelligence", "percentage": 100 }
+  "mp_source": { "ability": "intelligence", "percentage": 100 },
+
+  "abilities": [
+    {
+      "name": "Arcane Focus",
+      "description": "Spell damage increased by Intelligence bonus"
+    },
+    {
+      "name": "Identify",
+      "description": "Can identify unknown magical items"
+    }
+  ]
 }

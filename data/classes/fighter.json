@@ -15,5 +15,16 @@
 
   "spell_type": "none",
 
-  "mp_source": null
+  "mp_source": null,
+
+  "abilities": [
+    {
+      "name": "Shield Wall",
+      "description": "Reduces incoming physical damage when wielding a shield"
+    },
+    {
+      "name": "Cleave",
+      "description": "Attacks can hit adjacent enemies"
+    }
+  ]
 }

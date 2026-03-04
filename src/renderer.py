@@ -6148,30 +6148,33 @@ class Renderer:
         hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
         self._u3_text("HIT POINTS", tx, ty, self._U3_LTBLUE, fm)
         ty += 18
-        bar_w = left_w - 100
+        bar_w = left_w - 28
         bar_h = 14
         self._u3_draw_stat_bar(tx, ty, bar_w, bar_h,
                                member.hp, member.max_hp, hp_color)
+        ty += bar_h + 2
         self._u3_text(
             f"{member.hp:04d} / {member.max_hp:04d}",
-            tx + bar_w + 8, ty, self._U3_WHITE, fm)
+            tx, ty, self._U3_WHITE, fm)
 
         # ── MP bar ──
-        ty += 24
+        ty += 22
         self._u3_text("MAGIC POINTS", tx, ty, self._U3_LTBLUE, fm)
         ty += 18
         if member.max_mp > 0:
             self._u3_draw_stat_bar(tx, ty, bar_w, bar_h,
                                    member.current_mp, member.max_mp, (100, 100, 255))
+            ty += bar_h + 2
             self._u3_text(
                 f"{member.current_mp:04d} / {member.max_mp:04d}",
-                tx + bar_w + 8, ty, self._U3_WHITE, fm)
+                tx, ty, self._U3_WHITE, fm)
         else:
             self._u3_draw_stat_bar(tx, ty, bar_w, bar_h, 0, 1, (60, 60, 60))
-            self._u3_text("---- / ----", tx + bar_w + 8, ty, (120, 120, 120), fm)
+            ty += bar_h + 2
+            self._u3_text("---- / ----", tx, ty, (120, 120, 120), fm)
 
         # ── Attributes with modifiers ──
-        ty += 30
+        ty += 24
         self._u3_text("ATTRIBUTES", tx, ty, self._U3_ORANGE, fm)
         ty += 20
         attrs = [
@@ -6194,6 +6197,53 @@ class Renderer:
         sc = self._U3_GREEN if member.is_alive() else self._U3_RED
         self._u3_text("STATUS:", tx, ty, self._U3_LTBLUE, fm)
         self._u3_text(status, tx + 78, ty, sc, fm)
+
+        # ── Abilities ──
+        ty += 26
+        abilities = member.abilities
+        if abilities:
+            self._u3_text("ABILITIES", tx, ty, self._U3_ORANGE, fm)
+            ty += 20
+            for ab in abilities:
+                ab_name = ab.get("name", "")
+                ab_desc = ab.get("description", "")
+                self._u3_text(ab_name, tx, ty, (220, 200, 140), fm)
+                ty += 15
+                self._u3_text(ab_desc, tx + 8, ty, (140, 140, 160),
+                              self.font_small)
+                ty += 16
+
+        # ── Available Spells ──
+        ty += 6
+        from src.party import SPELLS_DATA
+        char_class = member.char_class
+        char_level = member.level
+        available = [s for s in SPELLS_DATA.values()
+                     if char_class in s.get("allowable_classes", [])
+                     and char_level >= s.get("min_level", 1)]
+        if available:
+            self._u3_text("SPELLS", tx, ty, self._U3_ORANGE, fm)
+            ty += 20
+            # Sort by mp_cost then name
+            available.sort(key=lambda s: (s.get("mp_cost", 0), s["name"]))
+            spell_bottom = panel_y + panel_h - 8
+            for spell in available:
+                if ty + 16 > spell_bottom:
+                    self._u3_text("...", tx, ty, (120, 120, 140), fm)
+                    break
+                sname = spell["name"]
+                mp_cost = spell.get("mp_cost", 0)
+                castable = member.current_mp >= mp_cost
+                name_col = (180, 180, 255) if castable else (100, 100, 120)
+                cost_col = (140, 200, 140) if castable else (100, 100, 120)
+                self._u3_text(sname, tx, ty, name_col, fm)
+                cost_str = f"{mp_cost} MP"
+                self._u3_text(cost_str, tx + left_w - 80, ty, cost_col, fm)
+                ty += 16
+        else:
+            self._u3_text("SPELLS", tx, ty, self._U3_ORANGE, fm)
+            ty += 20
+            self._u3_text("-- NONE --", tx, ty, (120, 120, 120), fm)
 
         # ═══════════════════════════════════════════════
         # RIGHT PANEL — Interactive equip/inventory list

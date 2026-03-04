@@ -371,6 +371,9 @@ class PartyMember:
         # mp_regen_multiplier: how fast MP regenerates (default 1)
         template["mp_regen_multiplier"] = data.get("mp_regen_multiplier", 1)
 
+        # abilities: list of {"name": str, "description": str}
+        template["abilities"] = data.get("abilities", [])
+
         cls._class_templates[key] = template
         return template
 
@@ -447,6 +450,12 @@ class PartyMember:
     def can_cast(self):
         """Return True if this character's class can cast spells."""
         return self.spell_type != "none"
+
+    @property
+    def abilities(self):
+        """Return list of class abilities (each a dict with name and description)."""
+        tmpl = self._load_class_template(self.char_class)
+        return tmpl.get("abilities", [])
 
     @property
     def mp_source(self):

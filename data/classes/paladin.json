@@ -15,5 +15,20 @@
 
   "spell_type": "priest",
 
-  "mp_source": { "ability": "wisdom", "percentage": 50 }
+  "mp_source": { "ability": "wisdom", "percentage": 50 },
+
+  "abilities": [
+    {
+      "name": "Lay on Hands",
+      "description": "Can heal allies with a touch outside of combat"
+    },
+    {
+      "name": "Holy Aura",
+      "description": "Nearby undead take damage each turn"
+    },
+    {
+      "name": "Shield Wall",
+      "description": "Reduces incoming physical damage when wielding a shield"
+    }
+  ]
 }

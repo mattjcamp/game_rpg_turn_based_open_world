@@ -15,5 +15,20 @@
 
   "spell_type": "priest",
 
-  "mp_source": { "ability": "wisdom", "percentage": 50 }
+  "mp_source": { "ability": "wisdom", "percentage": 50 },
+
+  "abilities": [
+    {
+      "name": "Track",
+      "description": "Can detect nearby enemies in the overworld"
+    },
+    {
+      "name": "Forage",
+      "description": "Can find herbs and reagents while exploring"
+    },
+    {
+      "name": "Dual Wield",
+      "description": "Can equip a weapon in each hand"
+    }
+  ]
 }

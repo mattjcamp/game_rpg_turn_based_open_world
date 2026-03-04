@@ -15,5 +15,16 @@
 
   "spell_type": "priest",
 
-  "mp_source": { "ability": "wisdom", "percentage": 50 }
+  "mp_source": { "ability": "wisdom", "percentage": 50 },
+
+  "abilities": [
+    {
+      "name": "Mirage",
+      "description": "Can create illusions to distract enemies"
+    },
+    {
+      "name": "Detect Traps",
+      "description": "Can detect and disarm hidden traps"
+    }
+  ]
 }

@@ -17,5 +17,16 @@
 
   "mp_source": { "abilities": ["intelligence", "wisdom"], "mode": "higher", "percentage": 50 },
 
-  "mp_regen_multiplier": 2
+  "mp_regen_multiplier": 2,
+
+  "abilities": [
+    {
+      "name": "Nature's Blessing",
+      "description": "Regenerates HP slowly while outdoors"
+    },
+    {
+      "name": "Herbalism",
+      "description": "Can identify and use wild herbs for healing"
+    }
+  ]
 }

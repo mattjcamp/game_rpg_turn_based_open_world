@@ -15,5 +15,16 @@
 
   "spell_type": "priest",
 
-  "mp_source": { "ability": "wisdom", "percentage": 100 }
+  "mp_source": { "ability": "wisdom", "percentage": 100 },
+
+  "abilities": [
+    {
+      "name": "Turn Undead",
+      "description": "Channels holy energy to damage undead foes"
+    },
+    {
+      "name": "Divine Grace",
+      "description": "Healing spells receive a Wisdom bonus"
+    }
+  ]
 }
