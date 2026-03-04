@@ -71,7 +71,7 @@ class Game:
         self.showing_title = True
         self.title_cursor = 0
         self.title_elapsed = 0.0        # for animations
-        self.title_options = [
+        self._title_options_base = [
             {"label": "START NEW GAME", "action": self._title_new_game},
             {"label": "FORM PARTY", "action": self._title_form_party},
             {"label": "SAVE GAME", "action": self._title_save_game},
@@ -133,6 +133,15 @@ class Game:
 
         # Play title music (overrides the overworld music set by change_state)
         self.music.play("title")
+
+    @property
+    def title_options(self):
+        """Build title menu options, adding RETURN TO GAME when a game is active."""
+        if self.current_state is not None:
+            return ([{"label": "RETURN TO GAME",
+                       "action": self._title_return_to_game}]
+                    + self._title_options_base)
+        return self._title_options_base
 
     # ── Title screen actions ────────────────────────────────────
 
@@ -696,6 +705,10 @@ class Game:
         self.settings_mode = "main"
         self.settings_cursor = 0
         self._title_settings_mode = True
+
+    def _title_return_to_game(self):
+        """Return to the active game from the title screen."""
+        self.showing_title = False
 
     def _title_quit(self):
         """Quit the game."""

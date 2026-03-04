@@ -18,10 +18,10 @@
     "max_party_size": 4,
     "max_roster_size": 20,
     "start_time": {
-      "year": 1,
-      "month": 2,
-      "day": 28,
-      "hour": 12,
+      "year": 100,
+      "month": 11,
+      "day": 31,
+      "hour": 23,
       "minute": 0,
       "_comment": "Adventure begins at night on the 1st of October"
     }

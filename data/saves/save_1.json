@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "timestamp": 1772629774.5514722,
+  "timestamp": 1772630075.135804,
   "state": "overworld",
   "party": {
-    "col": 13,
-    "row": 15,
+    "col": 14,
+    "row": 16,
     "gold": 25,
     "roster": [
       {
@@ -27,7 +27,7 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
+        "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {}
       },
@@ -51,7 +51,7 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
+        "current_mp": 13,
         "bonus_mp": 0,
         "ammo": {}
       },
@@ -75,7 +75,7 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
+        "current_mp": 20,
         "bonus_mp": 0,
         "ammo": {}
       },
@@ -99,7 +99,7 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
+        "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {}
       },
@@ -131,8 +131,8 @@
     "active_party": [
       0,
       1,
-      3,
-      4
+      2,
+      3
     ],
     "members": [
       {
@@ -155,7 +155,7 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
+        "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {}
       },
@@ -179,7 +179,31 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
+        "current_mp": 13,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Theron",
+        "class": "Wizard",
+        "race": "Fuzzy",
+        "gender": "Male",
+        "max_hp": 14,
+        "hp": 14,
+        "strength": 6,
+        "dexterity": 14,
+        "intelligence": 20,
+        "wisdom": 8,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Dagger",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 20,
         "bonus_mp": 0,
         "ammo": {}
       },
@@ -203,37 +227,12 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": null,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "test3",
-        "class": "Alchemist",
-        "race": "Human",
-        "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 10,
-        "dexterity": 10,
-        "intelligence": 15,
-        "wisdom": 15,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": "Fists",
-          "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": null,
+        "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {}
       }
     ],
     "shared_inventory": [
-      "Torch",
       "Torch",
       "Rock",
       "Rock",
@@ -272,16 +271,19 @@
       "navigation": null,
       "camping": null,
       "special": null,
-      "light": null
+      "light": {
+        "name": "Torch",
+        "charges": 150
+      }
     },
     "effects": {
-      "effect_1": null,
+      "effect_1": "Torch",
       "effect_2": null,
       "effect_3": null,
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 100460
+      "total_minutes": 48306900
     }
   }
 }

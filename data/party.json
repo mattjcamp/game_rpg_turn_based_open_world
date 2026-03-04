@@ -99,15 +99,34 @@
         "body": "Cloth",
         "head": null
       },
+      "inventory": []
+    },
+    {
+      "name": "test5",
+      "class": "Druid",
+      "race": "Dwarf",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 15,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
       "inventory": [],
-      "sprite": "src/assets/u4_tiles/healer_alt_f1.png"
+      "sprite": "src/assets/u4_tiles/druid.png"
     }
   ],
   "active_party": [
     0,
     1,
-    3,
-    4
+    2,
+    5
   ],
   "party_effects": {
     "effect_1": null,
