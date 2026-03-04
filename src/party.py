@@ -870,18 +870,25 @@ class Party:
             self.shared_inventory.append(item_name)
 
     def inv_get_charges(self, item_name):
-        """Return the charges on the first inventory entry matching item_name, or 0."""
-        idx = self._find_inv_index(item_name)
-        if idx < 0:
-            return 0
-        entry = self.shared_inventory[idx]
-        ch = self.item_charges(entry)
-        return ch if ch is not None else 0
+        """Return total charges/count for all inventory entries matching item_name.
+
+        Dict entries contribute their ``charges`` value; plain-string entries
+        each count as 1 (they represent a single unit of that item).
+        Returns 0 when the item is not found at all.
+        """
+        total = 0
+        for entry in self.shared_inventory:
+            if self.item_name(entry) == item_name:
+                ch = self.item_charges(entry)
+                total += ch if ch is not None else 1
+        return total
 
     def inv_consume_charge(self, item_name):
         """Consume one charge from a stackable item. Returns True if successful.
 
-        Removes the entry entirely when charges reach 0.
+        For dict entries with charges, decrements the charge count and removes
+        the entry when it reaches 0.  For plain-string entries (single units),
+        removes the entry outright.
         """
         idx = self._find_inv_index(item_name)
         if idx < 0:
@@ -891,6 +898,10 @@ class Party:
             entry["charges"] -= 1
             if entry["charges"] <= 0:
                 self.shared_inventory.pop(idx)
+            return True
+        elif isinstance(entry, str):
+            # Plain string entry represents a single unit — remove it
+            self.shared_inventory.pop(idx)
             return True
         return False
 

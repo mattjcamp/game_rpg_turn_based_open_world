@@ -75,7 +75,7 @@
       "wisdom": 8,
       "level": 1,
       "equipped": {
-        "right_hand": null,
+        "right_hand": "Bow",
         "left_hand": null,
         "body": "Leather",
         "head": null
@@ -120,13 +120,33 @@
       },
       "inventory": [],
       "sprite": "src/assets/u4_tiles/druid.png"
+    },
+    {
+      "name": "Eyndrake",
+      "class": "Ranger",
+      "race": "Elf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 12,
+      "dexterity": 14,
+      "intelligence": 10,
+      "wisdom": 14,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Bow",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/u4_tiles/shepherd.png"
     }
   ],
   "active_party": [
     0,
     1,
     3,
-    5
+    6
   ],
   "party_effects": {
     "effect_1": null,
@@ -137,6 +157,9 @@
   "inventory": [
     {
       "item": "Torch"
+    },
+    {
+      "item": "Arrows"
     },
     {
       "item": "Torch"
