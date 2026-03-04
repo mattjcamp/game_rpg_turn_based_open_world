@@ -211,6 +211,10 @@ class PartyMember:
         # Ammo tracking for throwable weapons {weapon_name: count}
         self.ammo = {}
 
+        # Potion buffs — consumed at end of next combat
+        # Keys: "strength", "ac"; values: int bonus
+        self.potion_buffs = {}
+
     # ── Derived stats ──────────────────────────────────────────
 
     @property
@@ -509,13 +513,17 @@ class PartyMember:
         return self.get_modifier(self.wisdom)
 
     def get_ac(self):
-        """Armor class based on armor evasion + DEX modifier."""
+        """Armor class based on armor evasion + DEX modifier + potion buffs."""
         base = ARMORS.get(self.armor, {"evasion": 50})["evasion"]
-        return 10 + self.dex_mod + (base - 50) // 5
+        ac = 10 + self.dex_mod + (base - 50) // 5
+        ac += getattr(self, "potion_buffs", {}).get("ac", 0)
+        return ac
 
     def get_attack_bonus(self):
-        """Melee attack bonus: STR modifier (+ weapon bonus later)."""
-        return self.str_mod
+        """Melee attack bonus: STR modifier + potion buffs."""
+        bonus = self.str_mod
+        bonus += getattr(self, "potion_buffs", {}).get("strength", 0)
+        return bonus
 
     def get_weapon_power(self, weapon_name=None):
         """Return a weapon's power rating. Defaults to main-hand weapon."""
@@ -523,9 +531,11 @@ class PartyMember:
         return WEAPONS.get(wname, {"power": 0})["power"]
 
     def get_damage(self):
-        """Ultima III damage: weapon power + 1.5 * STR (min 1)."""
+        """Ultima III damage: weapon power + 1.5 * STR (min 1).
+        Includes potion buff bonus to strength."""
         wp = self.get_weapon_power()
-        return max(1, int(wp + 1.5 * self.strength))
+        str_total = self.strength + getattr(self, "potion_buffs", {}).get("strength", 0)
+        return max(1, int(wp + 1.5 * str_total))
 
     def get_damage_dice(self, weapon_name=None):
         """Return (count, sides, bonus) for weapon damage.

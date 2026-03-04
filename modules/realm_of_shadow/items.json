@@ -473,9 +473,11 @@
       "character_can_equip": false
     },
     "Fire Oil": {
-      "description": "A volatile oil that creates a burst of flame when thrown.",
+      "description": "A volatile oil that creates a burst of flame when thrown. Use in combat only.",
       "icon": "potion",
       "item_type": "throwable",
+      "usable": true,
+      "effect": "combat_only",
       "throwable": true,
       "power": 20,
       "buy": 35,

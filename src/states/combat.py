@@ -3620,6 +3620,42 @@ class CombatState(BaseState):
             )
             self._end_fighter_turn()
 
+        elif effect == "buff_strength":
+            buffs = getattr(f, "potion_buffs", {})
+            buffs["strength"] = buffs.get("strength", 0) + power
+            f.potion_buffs = buffs
+            self.combat_log.append(
+                f"{f.name} drinks {item_name}! (+{power} STR)"
+            )
+            self._end_fighter_turn()
+
+        elif effect == "buff_ac":
+            buffs = getattr(f, "potion_buffs", {})
+            buffs["ac"] = buffs.get("ac", 0) + power
+            f.potion_buffs = buffs
+            self.combat_log.append(
+                f"{f.name} drinks {item_name}! (+{power} AC)"
+            )
+            self._end_fighter_turn()
+
+        elif effect == "combat_only":
+            # Throwable items like Fire Oil — deal fire damage to all monsters
+            total_dmg = 0
+            for monster in list(self.monsters):
+                if monster.hp > 0:
+                    dmg = power + random.randint(1, 6)
+                    monster.hp -= dmg
+                    total_dmg += dmg
+                    if not monster.is_alive():
+                        self._on_monster_killed(monster)
+            self.combat_log.append(
+                f"{f.name} hurls {item_name}! Fire engulfs the battlefield! ({total_dmg} dmg)"
+            )
+            if self._all_monsters_dead():
+                self._trigger_victory()
+            else:
+                self._end_fighter_turn()
+
         else:
             # Unknown effect — just consume and end turn
             self.combat_log.append(
@@ -4408,6 +4444,11 @@ class CombatState(BaseState):
             for m in self.game.party.members:
                 if not m.is_alive():
                     m.hp = 1
+
+        # Clear potion buffs after combat (they last for one combat only)
+        for m in self.game.party.members:
+            if hasattr(m, "potion_buffs"):
+                m.potion_buffs = {}
 
         self.game.change_state(self.source_state)
 

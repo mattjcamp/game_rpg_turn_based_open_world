@@ -212,7 +212,10 @@ class InventoryMixin:
         effect = info.get("effect", "")
         power = info.get("power", 0)
 
-        if effect == "rest":
+        if effect == "combat_only":
+            self.show_message(f"{item_name} can only be used in combat!", 2500)
+            return
+        elif effect == "rest":
             if member.hp <= 0:
                 self.show_message(f"{member.name} is unconscious!", 2500)
                 return
@@ -269,6 +272,22 @@ class InventoryMixin:
             else:
                 self.show_message(f"{member.name} is not poisoned!", 2500)
                 return
+        elif effect == "buff_strength":
+            buffs = getattr(member, "potion_buffs", {})
+            buffs["strength"] = buffs.get("strength", 0) + power
+            member.potion_buffs = buffs
+            self.game.game_log.append(
+                f"{member.name} drinks {item_name}. (+{power} STR for next combat)")
+            self.show_message(
+                f"{member.name}: +{power} STR (next combat)", 3000)
+        elif effect == "buff_ac":
+            buffs = getattr(member, "potion_buffs", {})
+            buffs["ac"] = buffs.get("ac", 0) + power
+            member.potion_buffs = buffs
+            self.game.game_log.append(
+                f"{member.name} drinks {item_name}. (+{power} AC for next combat)")
+            self.show_message(
+                f"{member.name}: +{power} AC (next combat)", 3000)
         else:
             self.game.game_log.append(f"{member.name} used {item_name}.")
             self.show_message(f"Used {item_name}", 2000)
@@ -536,7 +555,10 @@ class InventoryMixin:
         effect = info.get("effect", "")
         power = info.get("power", 0)
 
-        if effect == "rest":
+        if effect == "combat_only":
+            self.show_message(f"{item_name} can only be used in combat!", 2500)
+            return
+        elif effect == "rest":
             total_hp = 0
             total_mp = 0
             for m in party.members:
@@ -612,6 +634,42 @@ class InventoryMixin:
             if not cured:
                 self.game.game_log.append("Nobody is poisoned!")
                 self.show_message("Nobody is poisoned!", 2500)
+                return
+        elif effect == "buff_strength":
+            # Apply to the first alive member
+            target = None
+            for m in party.members:
+                if m.is_alive():
+                    target = m
+                    break
+            if target:
+                buffs = getattr(target, "potion_buffs", {})
+                buffs["strength"] = buffs.get("strength", 0) + power
+                target.potion_buffs = buffs
+                self.game.game_log.append(
+                    f"{target.name} drinks {item_name}. (+{power} STR for next combat)")
+                self.show_message(
+                    f"{target.name}: +{power} STR (next combat)", 3000)
+            else:
+                self.show_message("No one is alive!", 2500)
+                return
+        elif effect == "buff_ac":
+            # Apply to the first alive member
+            target = None
+            for m in party.members:
+                if m.is_alive():
+                    target = m
+                    break
+            if target:
+                buffs = getattr(target, "potion_buffs", {})
+                buffs["ac"] = buffs.get("ac", 0) + power
+                target.potion_buffs = buffs
+                self.game.game_log.append(
+                    f"{target.name} drinks {item_name}. (+{power} AC for next combat)")
+                self.show_message(
+                    f"{target.name}: +{power} AC (next combat)", 3000)
+            else:
+                self.show_message("No one is alive!", 2500)
                 return
         else:
             self.game.game_log.append(f"Used {item_name}.")
