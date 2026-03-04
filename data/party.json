@@ -163,7 +163,7 @@
     0,
     1,
     2,
-    7
+    3
   ],
   "party_effects": {
     "effect_1": null,
@@ -193,6 +193,10 @@
     {
       "item": "Camping Supplies",
       "charges": 1
+    },
+    {
+      "item": "Lockpick",
+      "charges": 5
     }
   ]
 }

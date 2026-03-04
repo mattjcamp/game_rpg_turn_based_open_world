@@ -174,6 +174,10 @@
     {
       "item": "Camping Supplies",
       "charges": 1
+    },
+    {
+      "item": "Lockpick",
+      "charges": 5
     }
   ]
 }

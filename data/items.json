@@ -357,9 +357,13 @@
       "character_can_equip": false
     },
     "Lockpick": {
-      "description": "A set of fine tools for opening locked chests.",
+      "description": "A set of fine lockpicking tools. Consumed on each attempt.",
       "icon": "tool",
       "item_type": "lockpick",
+      "charges": 5,
+      "stackable": true,
+      "buy": 8,
+      "sell": 3,
       "party_can_equip": false,
       "character_can_equip": false
     },

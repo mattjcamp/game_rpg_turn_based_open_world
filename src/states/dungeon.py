@@ -580,7 +580,11 @@ class DungeonState(InventoryMixin, BaseState):
             self.game.change_state("combat")
 
     def _attempt_lock_pick(self, col, row):
-        """Thief attempts to pick a locked door. DEX saving throw: d20 + DEX mod >= 12."""
+        """Thief attempts to pick a locked door. DEX saving throw: d20 + DEX mod >= 12.
+
+        Consumes one Lockpick from the party's shared inventory on each attempt
+        (success or failure).  If no lockpicks remain the attempt is blocked.
+        """
         party = self.game.party
 
         # Find an alive Thief
@@ -594,18 +598,31 @@ class DungeonState(InventoryMixin, BaseState):
             self.show_message("The door is locked. You need a thief!", 2000)
             return
 
+        # Check for lockpicks in shared inventory
+        picks_left = party.inv_get_charges("Lockpick")
+        if picks_left <= 0:
+            self.show_message(
+                f"{thief.name} has no lockpicks left!", 2000)
+            return
+
+        # Consume one lockpick (whether the attempt succeeds or fails)
+        party.inv_consume_charge("Lockpick")
+        remaining = party.inv_get_charges("Lockpick")
+
         roll = random.randint(1, 20) + thief.get_modifier(thief.dexterity)
         if roll >= 12:
             # Success — unlock the door
             self.dungeon_data.tile_map.set_tile(col, row, TILE_DDOOR)
             self.game.sfx.play("lock_pick_success")
             self.show_message(
-                f"{thief.name} picked the lock!", 1800)
+                f"{thief.name} picked the lock! "
+                f"({remaining} picks left)", 1800)
         else:
             # Failure
             self.game.sfx.play("lock_pick_fail")
             self.show_message(
-                f"{thief.name} failed to pick the lock.", 1500)
+                f"{thief.name} failed to pick the lock. "
+                f"({remaining} picks left)", 1500)
 
     def _attempt_trap_detection(self):
         """If Detect Traps effect is active, the thief rolls to spot traps in view.
