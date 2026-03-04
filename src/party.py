@@ -51,7 +51,7 @@ def _load_party_config():
 
 def _roster_member_to_json(member):
     """Serialize a PartyMember into the party.json roster entry format."""
-    return {
+    data = {
         "name": member.name,
         "class": member.char_class,
         "race": member.race,
@@ -70,6 +70,9 @@ def _roster_member_to_json(member):
         },
         "inventory": list(member.inventory),
     }
+    if member.sprite:
+        data["sprite"] = member.sprite
+    return data
 
 
 def save_roster(party):
@@ -173,11 +176,12 @@ class PartyMember:
 
     def __init__(self, name, char_class, race="Human", gender="Male",
                  hp=20, strength=10, dexterity=10,
-                 intelligence=10, wisdom=10, level=1):
+                 intelligence=10, wisdom=10, level=1, sprite=None):
         self.name = name
         self.char_class = char_class
         self.race = race
         self.gender = gender
+        self.sprite = sprite  # custom tile file path (relative to project root)
 
         self.max_hp = hp
         self.hp = hp
@@ -1136,6 +1140,7 @@ def _build_member_from_cfg(char_cfg):
         intelligence=char_cfg.get("intelligence", 10),
         wisdom=char_cfg.get("wisdom", 10),
         level=char_cfg.get("level", 1),
+        sprite=char_cfg.get("sprite"),
     )
     # Equipment slots
     equip = char_cfg.get("equipped", {})

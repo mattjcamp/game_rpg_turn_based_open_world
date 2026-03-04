@@ -75,6 +75,7 @@ class Game:
             {"label": "START NEW GAME", "action": self._title_new_game},
             {"label": "CREATE CHARACTER", "action": self._title_create_char},
             {"label": "FORM PARTY", "action": self._title_form_party},
+            {"label": "SAVE GAME", "action": self._title_save_game},
             {"label": "LOAD GAME", "action": self._title_load_game},
             {"label": "MODULES", "action": self._title_modules},
             {"label": "SETTINGS", "action": self._title_settings},
@@ -96,6 +97,7 @@ class Game:
 
         # --- Party formation screen ---
         self.showing_form_party = False
+        self._fp_return_to_form_party = False
         self._fp_init()
 
         # --- Settings screen ---
@@ -108,10 +110,6 @@ class Game:
         self.settings_options = [
             {"label": "MUSIC", "value": True, "type": "toggle",
              "action": self._toggle_music},
-            {"label": "SAVE GAME", "value": None, "type": "action",
-             "action": self._open_save_screen},
-            {"label": "LOAD GAME", "value": None, "type": "action",
-             "action": self._open_load_screen},
         ]
 
         # --- Game Over screen ---
@@ -216,6 +214,16 @@ class Game:
         self.change_state("overworld")
         self.camera.update(self.party.col, self.party.row)
 
+    def _title_save_game(self):
+        """Open the save screen from the title."""
+        self.showing_title = False
+        self.showing_settings = True
+        self.settings_mode = "save"
+        self.save_load_cursor = 0
+        self.save_load_message = None
+        self.settings_cursor = 0
+        self._title_save_mode = True
+
     def _title_load_game(self):
         """Open the load screen from the title."""
         self.showing_title = False
@@ -254,18 +262,20 @@ class Game:
         """Open the character creation screen from the title."""
         self.showing_title = False
         self.showing_char_create = True
+        self._fp_return_to_form_party = False
         self._cc_init()
 
     # ── Character creation ─────────────────────────────────────
 
     def _cc_init(self):
         """Reset character creation state."""
-        # Steps: name, race, gender, class, stats, confirm
+        # Steps: name, race, gender, class, tile, stats, confirm
         self._cc_step = "name"
         self._cc_name = ""
         self._cc_race_cursor = 0
         self._cc_gender_cursor = 0
         self._cc_class_cursor = 0
+        self._cc_tile_cursor = 0
         self._cc_stat_cursor = 0
         self._cc_confirm_cursor = 0
         self._cc_elapsed = 0.0
@@ -279,6 +289,8 @@ class Game:
         self._cc_points_total = 50
         # Load available classes from disk
         self._cc_load_classes()
+        # Load available character tiles from config
+        self._cc_load_tiles()
 
     def _cc_load_classes(self):
         """Discover available classes from data/classes/*.json."""
@@ -291,6 +303,44 @@ class Game:
                 if fn.endswith(".json"):
                     name = fn[:-5].capitalize()
                     self._cc_classes.append(name)
+
+    def _cc_load_tiles(self):
+        """Load available character tiles from character_tiles.json."""
+        import os, json
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        # Try module directory first, then data/
+        tiles_path = None
+        if hasattr(self, 'active_module_path') and self.active_module_path:
+            mod_path = os.path.join(self.active_module_path,
+                                    "character_tiles.json")
+            if os.path.isfile(mod_path):
+                tiles_path = mod_path
+        if tiles_path is None:
+            tiles_path = os.path.join(project_root, "data",
+                                      "character_tiles.json")
+        self._cc_tiles = []  # list of {"name": ..., "file": ...}
+        if os.path.isfile(tiles_path):
+            try:
+                with open(tiles_path, "r") as f:
+                    data = json.load(f)
+                for entry in data.get("tiles", []):
+                    abs_path = os.path.join(project_root, entry["file"])
+                    if os.path.isfile(abs_path):
+                        self._cc_tiles.append({
+                            "name": entry["name"],
+                            "file": entry["file"],
+                        })
+            except (json.JSONDecodeError, OSError, KeyError):
+                pass
+        # If no tiles loaded, provide a minimal fallback
+        if not self._cc_tiles:
+            self._cc_tiles.append({"name": "Default", "file": ""})
+
+    def _cc_selected_tile(self):
+        """Return the file path for the currently selected tile."""
+        if self._cc_tile_cursor < len(self._cc_tiles):
+            return self._cc_tiles[self._cc_tile_cursor].get("file", "")
+        return ""
 
     @property
     def _cc_points_spent(self):
@@ -326,6 +376,7 @@ class Game:
 
     def _cc_finish(self):
         """Create the character and add to roster."""
+        tile_file = self._cc_selected_tile()
         member = PartyMember(
             name=self._cc_name,
             char_class=self._cc_selected_class(),
@@ -336,6 +387,7 @@ class Game:
             dexterity=self._cc_stats["dexterity"],
             intelligence=self._cc_stats["intelligence"],
             wisdom=self._cc_stats["wisdom"],
+            sprite=tile_file if tile_file else None,
         )
         idx = self.party.add_to_roster(member)
         if idx < 0:
@@ -356,25 +408,25 @@ class Game:
 
         step = self._cc_step
 
-        # Done step — any key returns to title
+        # Done step — any key returns to previous screen
         if step == "done":
-            self.showing_char_create = False
-            self.showing_title = True
+            self._cc_exit()
             return
 
         # ESC goes back one step (or to title from name)
         if event.key == pygame.K_ESCAPE:
             if step == "name":
-                self.showing_char_create = False
-                self.showing_title = True
+                self._cc_exit()
             elif step == "race":
                 self._cc_step = "name"
             elif step == "gender":
                 self._cc_step = "race"
             elif step == "class":
                 self._cc_step = "gender"
-            elif step == "stats":
+            elif step == "tile":
                 self._cc_step = "class"
+            elif step == "stats":
+                self._cc_step = "tile"
             elif step == "confirm":
                 self._cc_step = "stats"
             return
@@ -426,6 +478,27 @@ class Game:
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 # Store selected class name from filtered list
                 self._cc_classes_filtered = valid
+                self._cc_tile_cursor = 0
+                self._cc_step = "tile"
+            return
+
+        # ── Tile selection ──
+        if step == "tile":
+            tile_count = len(self._cc_tiles)
+            if event.key == pygame.K_LEFT:
+                self._cc_tile_cursor = (
+                    self._cc_tile_cursor - 1) % tile_count
+            elif event.key == pygame.K_RIGHT:
+                self._cc_tile_cursor = (
+                    self._cc_tile_cursor + 1) % tile_count
+            elif event.key == pygame.K_UP:
+                # Jump back by a row (6 tiles per row)
+                self._cc_tile_cursor = (
+                    self._cc_tile_cursor - 6) % tile_count
+            elif event.key == pygame.K_DOWN:
+                self._cc_tile_cursor = (
+                    self._cc_tile_cursor + 6) % tile_count
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 self._cc_step = "stats"
                 # Reset stats
                 self._cc_stats = {"strength": 10, "dexterity": 10,
@@ -463,9 +536,18 @@ class Game:
                 if self._cc_confirm_cursor == 0:  # CREATE
                     self._cc_finish()
                 else:  # CANCEL
-                    self.showing_char_create = False
-                    self.showing_title = True
+                    self._cc_exit()
             return
+
+    def _cc_exit(self):
+        """Exit character creation, returning to form party or title."""
+        self.showing_char_create = False
+        if getattr(self, '_fp_return_to_form_party', False):
+            self._fp_return_to_form_party = False
+            self.showing_form_party = True
+            self._fp_init()
+        else:
+            self.showing_title = True
 
     # ── Party formation ──────────────────────────────────────────
 
@@ -483,6 +565,7 @@ class Game:
         self._fp_message = None
         self._fp_msg_timer = 0.0
         self._fp_scroll = 0           # scroll offset for long rosters
+        self._fp_confirm_delete = False  # delete confirmation dialog
         # Pre-populate with current active party indices
         if hasattr(self, 'party') and self.party:
             self._fp_selected = set(self.party.active_indices)
@@ -517,10 +600,21 @@ class Game:
         """Handle input on the party formation screen."""
         if event.type != pygame.KEYDOWN:
             return
+
+        # ── Delete confirmation dialog ──
+        if self._fp_confirm_delete:
+            if event.key == pygame.K_y:
+                self._fp_do_delete()
+            elif event.key in (pygame.K_n, pygame.K_ESCAPE):
+                self._fp_confirm_delete = False
+            return
+
         roster_len = len(self.party.roster)
         if roster_len == 0:
-            # No characters — any key returns to title
-            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+            # No characters — C to create, or ESC/Enter/Space to return
+            if event.key == pygame.K_c:
+                self._fp_create_char()
+            elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self.showing_form_party = False
                 self.showing_title = True
             return
@@ -530,7 +624,6 @@ class Game:
             self.showing_title = True
         elif event.key == pygame.K_UP:
             self._fp_cursor = (self._fp_cursor - 1) % roster_len
-            # Adjust scroll
             visible = 12
             if self._fp_cursor < self._fp_scroll:
                 self._fp_scroll = self._fp_cursor
@@ -547,6 +640,54 @@ class Game:
             self._fp_toggle(self._fp_cursor)
         elif event.key == pygame.K_RETURN:
             self._fp_confirm()
+        elif event.key == pygame.K_d:
+            # Prompt delete confirmation
+            if 0 <= self._fp_cursor < roster_len:
+                self._fp_confirm_delete = True
+        elif event.key == pygame.K_c:
+            self._fp_create_char()
+
+    def _fp_create_char(self):
+        """Open character creation from the form party screen."""
+        self.showing_form_party = False
+        self.showing_char_create = True
+        self._fp_return_to_form_party = True  # flag to return here after
+        self._cc_init()
+
+    def _fp_do_delete(self):
+        """Delete the character at the current cursor position."""
+        self._fp_confirm_delete = False
+        roster = self.party.roster
+        idx = self._fp_cursor
+        if not (0 <= idx < len(roster)):
+            return
+        name = roster[idx].name
+        # Remove from selected set (adjust indices)
+        new_selected = set()
+        for si in self._fp_selected:
+            if si == idx:
+                continue  # removed
+            elif si > idx:
+                new_selected.add(si - 1)
+            else:
+                new_selected.add(si)
+        self._fp_selected = new_selected
+        # Remove from roster
+        del roster[idx]
+        # Also update active_indices on the party
+        self.party.active_indices = sorted(self._fp_selected)
+        self.party.members = [roster[i] for i in self.party.active_indices
+                              if 0 <= i < len(roster)]
+        # Adjust cursor
+        if self._fp_cursor >= len(roster) and len(roster) > 0:
+            self._fp_cursor = len(roster) - 1
+        elif len(roster) == 0:
+            self._fp_cursor = 0
+        # Save to disk
+        from src.party import save_roster
+        save_roster(self.party)
+        self._fp_message = f"{name} deleted."
+        self._fp_msg_timer = 1.5
 
     def _title_settings(self):
         """Open settings from the title screen."""
@@ -712,9 +853,14 @@ class Game:
     def _handle_save_load_input(self, event):
         """Handle input in the save/load slot picker."""
         if event.key == pygame.K_ESCAPE:
-            # If we came from the title screen load option, go back to title
+            # If we came from the title screen save/load option, go back to title
             if getattr(self, '_title_load_mode', False):
                 self._title_load_mode = False
+                self.showing_settings = False
+                self.showing_title = True
+                self.music.play("title")
+            elif getattr(self, '_title_save_mode', False):
+                self._title_save_mode = False
                 self.showing_settings = False
                 self.showing_title = True
                 self.music.play("title")

@@ -231,6 +231,25 @@ class Renderer:
             return self._class_sprites_big.get(key)
         return self._class_sprites.get(key)
 
+    def _get_member_sprite(self, member, big=False):
+        """Return the sprite for a party member, using custom tile if set.
+
+        Falls back to the class-based sprite if no custom tile exists.
+        """
+        if member.sprite:
+            raw = self._load_cc_tile(member.sprite)
+            if raw is not None:
+                target = (96, 96) if big else (32, 32)
+                # Cache scaled versions per (file, size) to avoid re-scaling
+                cache_key = (member.sprite, target)
+                if not hasattr(self, '_member_sprite_cache'):
+                    self._member_sprite_cache = {}
+                if cache_key not in self._member_sprite_cache:
+                    self._member_sprite_cache[cache_key] = (
+                        pygame.transform.scale(raw, target))
+                return self._member_sprite_cache[cache_key]
+        return self._get_class_sprite(member.char_class, big=big)
+
     def draw_map(self, tile_map, camera):
         """Draw the visible portion of the map."""
         for screen_row in range(VIEWPORT_ROWS):
@@ -2995,8 +3014,8 @@ class Renderer:
         color = self._CLASS_COLORS.get(member.char_class.lower(),
                                         self._U3_WHITE)
 
-        # Try to use loaded sprite
-        sprite = self._get_class_sprite(member.char_class, big=False)
+        # Try to use loaded sprite (custom tile or class default)
+        sprite = self._get_member_sprite(member, big=False)
         if sprite:
             # Center the sprite on the tile
             sx = cx - sprite.get_width() // 2
@@ -4768,7 +4787,7 @@ class Renderer:
             row_top = ty
 
             # ── Character sprite ──
-            sprite = self._get_class_sprite(member.char_class)
+            sprite = self._get_member_sprite(member)
             if sprite:
                 sx = tx
                 sy = row_top + 2
@@ -5306,7 +5325,7 @@ class Renderer:
             sub_r = int(140 * sub_fade)
             sub_g = int(140 * sub_fade)
             sub_b = int(180 * sub_fade)
-            subtitle = "An Ultima III Tribute"
+            subtitle = "A Classic RPG Adventure"
             sw = len(subtitle) * 8  # approximate monospace width
             self._u3_text(subtitle,
                           SCREEN_WIDTH // 2 - sw // 2, art_y + len(art) * 16 + 12,
@@ -5327,9 +5346,9 @@ class Renderer:
         menu_y = sep_y + 35
         menu_fade = min(1.0, max(0.0, (elapsed - 2.5) / 1.0))
         if menu_fade > 0:
-            # Panel behind menu
+            # Panel behind menu (extra height for module info + hint text)
             panel_w = 320
-            panel_h = 30 + len(options) * 40 + 20
+            panel_h = 30 + len(options) * 40 + 55
             panel_x = (SCREEN_WIDTH - panel_w) // 2
             panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
             panel_surf.fill((20, 15, 30, int(180 * menu_fade)))
@@ -5372,32 +5391,38 @@ class Renderer:
                     self._u3_text(opt["label"], panel_x + 40, y,
                                   (cr, cg, cb), self.font)
 
-        # ── Bottom hints ──
+        # ── Bottom info inside the menu panel ──
         hint_fade = min(1.0, max(0.0, (elapsed - 3.0) / 1.0))
-        if hint_fade > 0:
-            hint_color = (int(68 * hint_fade), int(68 * hint_fade),
-                          int(200 * hint_fade))
-            hint = "[UP/DOWN] SELECT   [ENTER] CHOOSE"
-            hw = len(hint) * 5
-            self._u3_text(hint,
-                          SCREEN_WIDTH // 2 - hw // 2,
-                          SCREEN_HEIGHT - 50,
-                          hint_color, self.font_small)
+        if hint_fade > 0 and menu_fade > 0:
+            # Position inside the panel, below the last menu option
+            info_y = menu_y + 10 + len(options) * 40 + 4
 
-            # Active module indicator
+            # Active module indicator — bright gold
             if module_info:
-                mod_color = (int(90 * hint_fade), int(80 * hint_fade),
-                             int(50 * hint_fade))
-                mw = len(module_info) * 5
+                mod_color = (int(200 * hint_fade), int(170 * hint_fade),
+                             int(80 * hint_fade))
+                mw, _ = self.font_med.size(module_info.upper())
                 self._u3_text(module_info,
-                              SCREEN_WIDTH // 2 - mw // 2,
-                              SCREEN_HEIGHT - 70,
-                              mod_color, self.font_small)
+                              panel_x + (panel_w - mw) // 2,
+                              info_y,
+                              mod_color, self.font_med)
+                info_y += 22
 
-            # Copyright / credits
+            # Hint text — bright blue
+            hint_color = (int(100 * hint_fade), int(100 * hint_fade),
+                          int(255 * hint_fade))
+            hint = "[UP/DOWN] Select  [ENTER] Choose"
+            hint_w, _ = self.font_med.size(hint.upper())
+            self._u3_text(hint,
+                          panel_x + (panel_w - hint_w) // 2,
+                          info_y,
+                          hint_color, self.font_med)
+
+        # ── Copyright / credits (below the panel) ──
+        if hint_fade > 0:
             cr_color = (int(60 * hint_fade), int(60 * hint_fade),
                         int(80 * hint_fade))
-            credit = "Inspired by Ultima III: Exodus  (c) 1983 Origin Systems"
+            credit = "Realm of Shadow  (c) 2026"
             cw = len(credit) * 5
             self._u3_text(credit,
                           SCREEN_WIDTH // 2 - cw // 2,
@@ -5925,7 +5950,7 @@ class Renderer:
             ty = cy + 8
 
             # Character sprite on the right side of the card
-            sprite = self._get_class_sprite(member.char_class, big=True)
+            sprite = self._get_member_sprite(member, big=True)
             if sprite:
                 sx = cx + card_w - sprite.get_width() - 10
                 sy = cy + (card_h - sprite.get_height()) // 2
@@ -6096,7 +6121,7 @@ class Renderer:
         ty = panel_y + 10
 
         # Large sprite
-        sprite = self._get_class_sprite(member.char_class, big=True)
+        sprite = self._get_member_sprite(member, big=True)
         if sprite:
             sx = left_x + left_w - sprite.get_width() - 14
             sy = ty
@@ -6910,7 +6935,7 @@ class Renderer:
             name_color = self._U3_WHITE if alive else self._U3_RED
 
             # Avatar sprite
-            sprite = self._get_class_sprite(member.char_class, big=False)
+            sprite = self._get_member_sprite(member, big=False)
             if sprite:
                 sx = rx
                 sy = cy + 2
@@ -7874,6 +7899,53 @@ class Renderer:
     # ITEM EXAMINATION OVERLAY
     # ═══════════════════════════════════════════════════════════════
 
+    # ── Character tile helpers ─────────────────────────────────
+
+    def _load_cc_tile(self, file_path):
+        """Load a character tile image by project-relative path.
+
+        Returns a pygame Surface or None. Results are cached in
+        ``self._cc_tile_cache``.
+        """
+        if not hasattr(self, '_cc_tile_cache'):
+            self._cc_tile_cache = {}
+        if file_path in self._cc_tile_cache:
+            return self._cc_tile_cache[file_path]
+        if not file_path:
+            self._cc_tile_cache[file_path] = None
+            return None
+        import os
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        abs_path = os.path.join(project_root, file_path)
+        if not os.path.isfile(abs_path):
+            self._cc_tile_cache[file_path] = None
+            return None
+        try:
+            raw = pygame.image.load(abs_path).convert_alpha()
+            # Make black pixels transparent (common for U4 tiles)
+            w, h = raw.get_size()
+            for px in range(w):
+                for py in range(h):
+                    r, g, b, a = raw.get_at((px, py))
+                    if r == 0 and g == 0 and b == 0 and a > 0:
+                        raw.set_at((px, py), (0, 0, 0, 0))
+            self._cc_tile_cache[file_path] = raw
+        except Exception:
+            self._cc_tile_cache[file_path] = None
+        return self._cc_tile_cache.get(file_path)
+
+    def _draw_cc_tile(self, file_path, cx, cy, size):
+        """Draw a character tile centered at (cx, cy) scaled to size."""
+        raw = self._load_cc_tile(file_path)
+        if raw is None:
+            # Fallback: draw a placeholder
+            pygame.draw.rect(self.screen, (60, 60, 80),
+                             (cx - size // 2, cy - size // 2, size, size))
+            self._u3_text("?", cx - 4, cy - 6, (120, 120, 140))
+            return
+        scaled = pygame.transform.scale(raw, (size, size))
+        self.screen.blit(scaled, (cx - size // 2, cy - size // 2))
+
     def _draw_item_icon(self, cx, cy, icon_type, size=64):
         """Draw a pixel-art icon for an item type, centered at (cx, cy)."""
         s = size
@@ -8638,15 +8710,16 @@ class Renderer:
         self.screen.blit(t_surf, (sw // 2 - t_surf.get_width() // 2, 16))
 
         # Step indicator
-        steps = ["NAME", "RACE", "GENDER", "CLASS", "STATS", "CONFIRM"]
+        steps = ["NAME", "RACE", "GENDER", "CLASS", "TILE", "STATS", "CONFIRM"]
         step_map = {"name": 0, "race": 1, "gender": 2, "class": 3,
-                    "stats": 4, "confirm": 5, "done": 5}
+                    "tile": 4, "stats": 5, "confirm": 6, "done": 6}
         current_step_idx = step_map.get(step, 0)
         step_y = 44
-        step_total_w = len(steps) * 90
+        step_spacing = 80
+        step_total_w = len(steps) * step_spacing
         step_x0 = sw // 2 - step_total_w // 2
         for i, s in enumerate(steps):
-            x = step_x0 + i * 90
+            x = step_x0 + i * step_spacing
             if i < current_step_idx:
                 color = (60, 140, 60)   # completed
             elif i == current_step_idx:
@@ -8655,8 +8728,8 @@ class Renderer:
                 color = (60, 60, 80)    # future
             self._u3_text(s, x, step_y, color, self.font_small)
             if i < len(steps) - 1:
-                self._u3_text(">", x + 70, step_y, (60, 60, 80),
-                              self.font_small)
+                self._u3_text(">", x + step_spacing - 10, step_y,
+                              (60, 60, 80), self.font_small)
 
         # Main content panel
         px, py, pw, ph = 80, 72, sw - 160, sh - 130
@@ -8841,6 +8914,94 @@ class Renderer:
             self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
                           cx, cy + ph - 60, (68, 68, 200), self.font_small)
 
+        # ── TILE SELECTION ──
+        elif step == "tile":
+            self._u3_text("CHOOSE THY APPEARANCE:", cx, cy, (140, 140, 180))
+            tiles = game._cc_tiles
+            tile_cursor = game._cc_tile_cursor
+            # Grid layout: 6 tiles per row, 80px cells
+            cols = 6
+            cell_w = 80
+            cell_h = 90
+            grid_x = cx + 10
+            grid_y = cy + 28
+            # Calculate visible rows
+            max_rows = (ph - 120) // cell_h
+            total_rows = (len(tiles) + cols - 1) // cols
+            cursor_row = tile_cursor // cols
+            scroll_row = max(0, min(cursor_row - max_rows // 2,
+                                    total_rows - max_rows))
+            if scroll_row < 0:
+                scroll_row = 0
+
+            for ti, tile in enumerate(tiles):
+                row = ti // cols
+                col = ti % cols
+                vis_row = row - scroll_row
+                if vis_row < 0 or vis_row >= max_rows:
+                    continue
+                tx = grid_x + col * cell_w
+                ty = grid_y + vis_row * cell_h
+                is_selected = (ti == tile_cursor)
+
+                # Cell background
+                if is_selected:
+                    sel_rect = pygame.Rect(tx - 2, ty - 2,
+                                           cell_w - 8, cell_h - 8)
+                    pygame.draw.rect(self.screen, (40, 30, 60), sel_rect)
+                    pygame.draw.rect(self.screen, (200, 160, 60),
+                                     sel_rect, 2)
+                # Load and draw the tile sprite
+                self._draw_cc_tile(tile["file"], tx + (cell_w - 8) // 2,
+                                   ty + 28, 56)
+                # Tile name below
+                name_col = ((255, 255, 100) if is_selected
+                            else (120, 120, 140))
+                name = tile["name"]
+                # Truncate long names
+                if len(name) > 10:
+                    name = name[:9] + "."
+                nw, _ = self.font_small.size(name.upper())
+                self._u3_text(name,
+                              tx + (cell_w - 8 - nw) // 2,
+                              ty + 58, name_col, self.font_small)
+
+            # Scroll indicators
+            if scroll_row > 0:
+                self._u3_text("^ MORE ^",
+                              grid_x + (cols * cell_w) // 2 - 30,
+                              grid_y - 10, (68, 68, 200), self.font_small)
+            if scroll_row + max_rows < total_rows:
+                self._u3_text("v MORE v",
+                              grid_x + (cols * cell_w) // 2 - 30,
+                              grid_y + max_rows * cell_h - 4,
+                              (68, 68, 200), self.font_small)
+
+            # Preview of selected tile on the right
+            if 0 <= tile_cursor < len(tiles):
+                sel_tile = tiles[tile_cursor]
+                preview_x = cx + pw - 160
+                preview_y = cy + 28
+                # Large preview with circle bg
+                circle_r = 52
+                pcx = preview_x + circle_r
+                pcy = preview_y + circle_r
+                pygame.draw.circle(self.screen, (30, 25, 50),
+                                   (pcx, pcy), circle_r)
+                pygame.draw.circle(self.screen, (80, 60, 120),
+                                   (pcx, pcy), circle_r, 1)
+                self._draw_cc_tile(sel_tile["file"], pcx, pcy, 80)
+                # Name below preview
+                pn = sel_tile["name"]
+                pnw, _ = self.font.size(pn.upper())
+                self._u3_text(pn, pcx - pnw // 2,
+                              preview_y + circle_r * 2 + 10,
+                              (255, 255, 255), self.font)
+
+            self._u3_text(
+                "[ARROWS] BROWSE   [ENTER] NEXT   [ESC] BACK",
+                cx, cy + ph - 60, (68, 68, 200), self.font_small)
+
         # ── STAT ALLOCATION ──
         elif step == "stats":
             remaining = game._cc_points_remaining
@@ -8913,6 +9074,19 @@ class Renderer:
         elif step == "confirm":
             self._u3_text("CONFIRM THY CHARACTER:", cx, cy,
                           (140, 140, 180))
+
+            # Selected tile preview on the right
+            tile_file = game._cc_selected_tile()
+            if tile_file:
+                preview_cx = cx + pw - 80
+                preview_cy = cy + 80
+                circle_r = 48
+                pygame.draw.circle(self.screen, (30, 25, 50),
+                                   (preview_cx, preview_cy), circle_r)
+                pygame.draw.circle(self.screen, (80, 60, 120),
+                                   (preview_cx, preview_cy), circle_r, 1)
+                self._draw_cc_tile(tile_file, preview_cx, preview_cy, 72)
+
             # Full summary
             dy = cy + 30
             self._u3_text(f"NAME:   {game._cc_name}", cx, dy,
@@ -9011,9 +9185,9 @@ class Renderer:
         if not roster:
             self._u3_text("NO CHARACTERS IN ROSTER!", px + 20, py + 40,
                           (200, 100, 100))
-            self._u3_text("CREATE CHARACTERS FIRST.",
+            self._u3_text("PRESS [C] TO CREATE A CHARACTER.",
                           px + 20, py + 66, (140, 140, 160))
-            self._u3_text("[ESC] RETURN TO TITLE",
+            self._u3_text("[C] CREATE CHARACTER   [ESC] RETURN TO TITLE",
                           px + 20, py + ph - 40, (68, 68, 200),
                           self.font_small)
             return
@@ -9030,40 +9204,49 @@ class Renderer:
                       (140, 140, 180), self.font_small)
         roster_y += 18
 
+        row_h = 42  # taller rows to fit sprite
         for vi in range(visible):
             idx = scroll + vi
             if idx >= len(roster):
                 break
             m = roster[idx]
-            ry = roster_y + vi * 38
+            ry = roster_y + vi * row_h
             selected = idx in game._fp_selected
             is_cursor = idx == cursor
 
             # Row background
             if is_cursor:
-                row_rect = pygame.Rect(roster_x, ry - 2, roster_w, 34)
+                row_rect = pygame.Rect(roster_x, ry - 2, roster_w, row_h - 4)
                 pygame.draw.rect(self.screen, (25, 25, 50), row_rect)
                 pygame.draw.rect(self.screen, (80, 80, 180), row_rect, 1)
 
             # Checkbox
             cb_x = roster_x + 4
-            cb_rect = pygame.Rect(cb_x, ry + 2, 14, 14)
+            cb_rect = pygame.Rect(cb_x, ry + 8, 14, 14)
             pygame.draw.rect(self.screen, (40, 40, 60), cb_rect)
             pygame.draw.rect(self.screen, (100, 100, 140), cb_rect, 1)
             if selected:
-                # Draw checkmark
                 pygame.draw.line(self.screen, (100, 220, 100),
-                                 (cb_x + 2, ry + 9),
-                                 (cb_x + 5, ry + 13), 2)
+                                 (cb_x + 2, ry + 15),
+                                 (cb_x + 5, ry + 19), 2)
                 pygame.draw.line(self.screen, (100, 220, 100),
-                                 (cb_x + 5, ry + 13),
-                                 (cb_x + 12, ry + 4), 2)
+                                 (cb_x + 5, ry + 19),
+                                 (cb_x + 12, ry + 10), 2)
+
+            # Character sprite (small, 32x32)
+            sprite = self._get_member_sprite(m, big=False)
+            sprite_w = 0
+            if sprite:
+                sx = roster_x + 22
+                sy = ry + (row_h - 4 - sprite.get_height()) // 2
+                self.screen.blit(sprite, (sx, sy))
+                sprite_w = sprite.get_width() + 4
 
             # Name and class
-            name_x = roster_x + 24
+            name_x = roster_x + 22 + sprite_w
             if is_cursor:
                 bob = int(math.sin(elapsed * 4) * 3)
-                self._u3_text(">", roster_x + 16 + bob, ry,
+                self._u3_text(">", roster_x + 16 + bob, ry + 4,
                               (255, 200, 60), self.font_small)
                 name_col = (255, 255, 100)
                 class_col = (200, 200, 140)
@@ -9074,10 +9257,10 @@ class Renderer:
                 name_col = (140, 140, 160)
                 class_col = (100, 100, 120)
 
-            self._u3_text(m.name, name_x + 6, ry, name_col,
+            self._u3_text(m.name, name_x + 6, ry + 4, name_col,
                           self.font_small)
             info_str = f"LV{m.level} {m.race} {m.char_class}"
-            self._u3_text(info_str, name_x + 6, ry + 15, class_col,
+            self._u3_text(info_str, name_x + 6, ry + 19, class_col,
                           self.font_small)
 
             # Party slot number if selected
@@ -9085,7 +9268,7 @@ class Renderer:
                 slot_list = sorted(game._fp_selected)
                 slot_num = slot_list.index(idx) + 1
                 self._u3_text(str(slot_num),
-                              roster_x + roster_w - 18, ry + 4,
+                              roster_x + roster_w - 18, ry + 10,
                               (100, 200, 100))
 
         # Scroll indicators
@@ -9095,7 +9278,7 @@ class Renderer:
         if scroll + visible < len(roster):
             self._u3_text("v MORE v",
                           roster_x + roster_w // 2 - 30,
-                          roster_y + visible * 38 - 4,
+                          roster_y + visible * row_h - 4,
                           (68, 68, 200), self.font_small)
 
         # ── Detail panel (right side) ──
@@ -9105,13 +9288,34 @@ class Renderer:
 
         if 0 <= cursor < len(roster):
             m = roster[cursor]
-            self._u3_text("CHARACTER DETAIL", detail_x, detail_y,
-                          (140, 140, 180), self.font_small)
-            dy = detail_y + 22
 
-            self._u3_text(f"NAME:   {m.name}", detail_x, dy,
-                          (255, 255, 255), self.font_small)
-            dy += 18
+            # ── Large character sprite at top of detail panel ──
+            sprite_big = self._get_member_sprite(m, big=True)
+            if sprite_big:
+                sprite_cx = detail_x + detail_w // 2
+                sprite_cy = detail_y + 4
+                sx = sprite_cx - sprite_big.get_width() // 2
+                # Background circle behind sprite
+                circle_r = sprite_big.get_width() // 2 + 8
+                pygame.draw.circle(self.screen, (30, 25, 50),
+                                   (sprite_cx, sprite_cy + sprite_big.get_height() // 2),
+                                   circle_r)
+                pygame.draw.circle(self.screen, (80, 60, 120),
+                                   (sprite_cx, sprite_cy + sprite_big.get_height() // 2),
+                                   circle_r, 1)
+                self.screen.blit(sprite_big, (sx, sprite_cy))
+                dy = sprite_cy + sprite_big.get_height() + 10
+            else:
+                self._u3_text("CHARACTER DETAIL", detail_x, detail_y,
+                              (140, 140, 180), self.font_small)
+                dy = detail_y + 22
+
+            # Character name centered
+            name_surf = self.font.render(m.name.upper(), True, (255, 255, 255))
+            self.screen.blit(name_surf,
+                             (detail_x + (detail_w - name_surf.get_width()) // 2, dy))
+            dy += 24
+
             self._u3_text(f"RACE:   {m.race}", detail_x, dy,
                           (200, 200, 220), self.font_small)
             dy += 18
@@ -9182,31 +9386,32 @@ class Renderer:
                                   (180, 160, 100), self.font_small)
                     dy += 14
 
-        # ── Current party preview at bottom ──
-        preview_y = py + ph - 52
-        self._u3_text("CURRENT PARTY:", px + 12, preview_y,
-                      (140, 140, 180), self.font_small)
-        preview_y += 16
-        if game._fp_selected:
-            slot_list = sorted(game._fp_selected)
-            for si, idx in enumerate(slot_list):
-                if 0 <= idx < len(roster):
-                    pm = roster[idx]
-                    tag = f"{si + 1}. {pm.name} ({pm.char_class})"
-                    self._u3_text(tag,
-                                  px + 12 + si * (pw // 4),
-                                  preview_y,
-                                  (180, 220, 180), self.font_small)
-        else:
-            self._u3_text("(NONE SELECTED)", px + 12, preview_y,
-                          (120, 80, 80), self.font_small)
+        # ── Delete confirmation overlay ──
+        if getattr(game, '_fp_confirm_delete', False):
+            overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 140))
+            self.screen.blit(overlay, (0, 0))
+            box_w, box_h = 360, 100
+            box_x = (sw - box_w) // 2
+            box_y = (sh - box_h) // 2
+            pygame.draw.rect(self.screen, (40, 20, 20),
+                             (box_x, box_y, box_w, box_h))
+            pygame.draw.rect(self.screen, (200, 80, 80),
+                             (box_x, box_y, box_w, box_h), 2)
+            del_name = roster[cursor].name if 0 <= cursor < len(roster) else "?"
+            self._u3_text(f"DELETE {del_name}?",
+                          box_x + 20, box_y + 16,
+                          (255, 120, 120), self.font)
+            self._u3_text("[Y] YES, DELETE   [N] CANCEL",
+                          box_x + 20, box_y + 56,
+                          (200, 200, 220), self.font_med)
 
         # ── Controls hint ──
         hint_y = py + ph + 6
         self._u3_text(
-            "[UP/DOWN] BROWSE   [SPACE] TOGGLE   "
-            "[ENTER] CONFIRM   [ESC] BACK",
-            px + 12, hint_y, (68, 68, 200), self.font_small)
+            "[UP/DN] BROWSE  [SPACE] TOGGLE  "
+            "[ENTER] CONFIRM  [C] CREATE  [D] DELETE  [ESC] BACK",
+            px + 4, hint_y, (68, 68, 200), self.font_small)
 
         # ── Feedback message ──
         if game._fp_message and game._fp_msg_timer > 0:
