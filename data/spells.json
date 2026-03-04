@@ -24,6 +24,29 @@
       "hit_sfx": "explosion"
     },
     {
+      "id": "fireball_aoe",
+      "name": "Fireball",
+      "description": "Hurls a massive ball of flame that detonates in a 3-tile radius, scorching everything — friend or foe — caught in the blast.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 8,
+      "duration": "instant",
+      "effect_type": "aoe_fireball",
+      "effect_value": {
+        "dice_count": 3,
+        "dice_sides": 8,
+        "stat_bonus": "intelligence",
+        "min_damage": 1,
+        "radius": 3
+      },
+      "range": 99,
+      "targeting": "select_tile",
+      "usable_in": ["battle"],
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
+    },
+    {
       "id": "magic_arrow",
       "name": "Magic Arrow",
       "description": "Conjures a piercing bolt of arcane energy that streaks toward a chosen foe.",
@@ -220,6 +243,28 @@
       "usable_in": ["battle"],
       "sfx": "shield",
       "hit_sfx": null
+    },
+    {
+      "id": "lightning_bolt",
+      "name": "Lightning Bolt",
+      "description": "Unleashes a searing bolt of lightning that streaks in a straight line, electrocuting everything in its path.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 1,
+      "mp_cost": 7,
+      "duration": "instant",
+      "effect_type": "lightning_bolt",
+      "effect_value": {
+        "dice_count": 4,
+        "dice_sides": 6,
+        "stat_bonus": "intelligence",
+        "min_damage": 1
+      },
+      "range": 99,
+      "targeting": "directional_projectile",
+      "usable_in": ["battle"],
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
     },
     {
       "id": "push",

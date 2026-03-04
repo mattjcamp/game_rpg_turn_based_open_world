@@ -9,6 +9,7 @@ just swap the draw_tile method.
 
 import math
 import os
+import random
 import pygame
 
 from src.combat_engine import format_modifier
@@ -2195,6 +2196,9 @@ class Renderer:
                           invisibility_buffs=None,
                           animate_dead_effects=None,
                           summon_buffs=None,
+                          aoe_fireball_effects=None,
+                          aoe_explosions=None,
+                          lightning_bolt_effects=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2422,6 +2426,24 @@ class Renderer:
                     sc, sr = monster_positions[mon]
                     self._u3_draw_summon_indicator(mx, my, ts, sc, sr,
                                                    turns_left)
+
+        # ── 2q. AoE fireball projectiles ──
+        if aoe_fireball_effects:
+            for fb in aoe_fireball_effects:
+                if fb.alive:
+                    self._u3_draw_aoe_fireball(mx, my, ts, fb)
+
+        # ── 2r. AoE explosions ──
+        if aoe_explosions:
+            for fx in aoe_explosions:
+                if fx.alive:
+                    self._u3_draw_aoe_explosion(mx, my, ts, fx)
+
+        # ── 2s. lightning bolt effects ──
+        if lightning_bolt_effects:
+            for fx in lightning_bolt_effects:
+                if fx.alive:
+                    self._u3_draw_lightning_bolt(mx, my, ts, fx)
 
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
@@ -2944,6 +2966,304 @@ class Renderer:
             if gray > 0:
                 pygame.draw.circle(self.screen, (gray, gray, gray), (cx, cy),
                                    int(radius * 1.3), 1)
+
+    def _u3_draw_aoe_fireball(self, ax, ay, ts, fb):
+        """Draw an AoE fireball projectile — larger, angrier fireball with trail."""
+        cx = int(ax + fb.current_col * ts + ts // 2)
+        cy = int(ay + fb.current_row * ts + ts // 2)
+
+        # Bigger, more aggressive pulsation
+        pulse = 1.0 + 0.4 * math.sin(fb.progress * 24)
+        radius = int(fb.radius * pulse)
+
+        # Core — bright white-yellow
+        pygame.draw.circle(self.screen, (255, 255, 220), (cx, cy), max(3, radius // 2))
+        # Inner glow — deep orange
+        pygame.draw.circle(self.screen, (255, 140, 20), (cx, cy), radius)
+        # Outer glow — angry red
+        pygame.draw.circle(self.screen, (255, 40, 10), (cx, cy), radius + 4, 3)
+        # Extra outer ring — dark red shimmer
+        pygame.draw.circle(self.screen, (180, 20, 0), (cx, cy), radius + 7, 2)
+
+        # Trail particles — more and brighter
+        dx = fb.end_col - fb.start_col
+        dy = fb.end_row - fb.start_row
+        for i in range(5):
+            t_offset = (i + 1) * 0.06
+            trail_prog = max(0, fb.progress - t_offset)
+            tx = int(ax + (fb.start_col + dx * trail_prog) * ts + ts // 2)
+            ty = int(ay + (fb.start_row + dy * trail_prog) * ts + ts // 2)
+            fade = max(0, 240 - i * 45)
+            tr = max(1, radius - i * 2)
+            pygame.draw.circle(self.screen, (fade, fade // 4, 0), (tx, ty), tr)
+
+    def _u3_draw_aoe_explosion(self, ax, ay, ts, fx):
+        """Draw a massive AoE explosion — expanding fire covering the blast radius.
+
+        Three phases:
+        1. (0.0-0.3) Flash and rapid expansion to full radius
+        2. (0.3-0.7) Roaring inferno at full size with flickering
+        3. (0.7-1.0) Fade out with smoke
+        """
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+
+        # Maximum visual radius = blast radius * tile size
+        max_radius = int(fx.radius * ts)
+        ticks = pygame.time.get_ticks()
+
+        if p < 0.3:
+            # Phase 1: Flash and rapid expansion
+            sub_p = p / 0.3
+            radius = int(8 + sub_p * max_radius)
+
+            # Bright white-yellow flash at the start
+            flash_alpha = max(0, 1.0 - sub_p * 2)
+            if flash_alpha > 0:
+                flash_r = int(radius * 0.6)
+                pygame.draw.circle(self.screen,
+                                   (255, 255, int(200 * flash_alpha)),
+                                   (cx, cy), flash_r)
+
+            # Expanding orange-red fireball
+            core_r = max(2, int(radius * 0.7))
+            pygame.draw.circle(self.screen, (255, 200, 50), (cx, cy), core_r)
+            pygame.draw.circle(self.screen, (255, 120, 20), (cx, cy), radius, 4)
+            pygame.draw.circle(self.screen, (220, 40, 10), (cx, cy),
+                               int(radius * 1.1), 3)
+
+        elif p < 0.7:
+            # Phase 2: Roaring inferno — full size with flickering
+            sub_p = (p - 0.3) / 0.4
+            radius = max_radius
+
+            # Flickering effect using sin waves at different frequencies
+            flicker1 = 0.8 + 0.2 * math.sin(ticks * 0.015)
+            flicker2 = 0.85 + 0.15 * math.sin(ticks * 0.023 + 1.5)
+
+            # Inner hot zone — bright yellow-orange
+            inner_r = int(radius * 0.5 * flicker1)
+            pygame.draw.circle(self.screen, (255, 220, 80), (cx, cy), inner_r)
+
+            # Main fire — orange
+            mid_r = int(radius * 0.75 * flicker2)
+            pygame.draw.circle(self.screen, (255, 140, 30), (cx, cy), mid_r)
+
+            # Outer fire ring — red
+            pygame.draw.circle(self.screen, (230, 60, 10), (cx, cy),
+                               int(radius * flicker1), 3)
+
+            # Scattered embers/sparks around the perimeter
+            for i in range(8):
+                angle = (ticks * 0.003 + i * 0.785)  # 8 evenly spaced
+                spark_dist = radius * (0.7 + 0.3 * math.sin(ticks * 0.01 + i))
+                sx = cx + int(math.cos(angle) * spark_dist)
+                sy = cy + int(math.sin(angle) * spark_dist)
+                spark_r = 2 + int(2 * math.sin(ticks * 0.02 + i * 0.5))
+                pygame.draw.circle(self.screen, (255, 200, 50), (sx, sy),
+                                   max(1, spark_r))
+
+        else:
+            # Phase 3: Fade out with smoke
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+            radius = int(max_radius * (1.0 + sub_p * 0.2))  # slightly expanding
+
+            # Fading red-orange
+            r_val = int(200 * alpha_f)
+            g_val = int(60 * alpha_f)
+            if r_val > 5:
+                fade_r = int(radius * 0.6 * alpha_f)
+                if fade_r > 0:
+                    pygame.draw.circle(self.screen, (r_val, g_val, 0),
+                                       (cx, cy), fade_r)
+
+            # Fading outer ring
+            ring_r = int(180 * alpha_f)
+            if ring_r > 5:
+                pygame.draw.circle(self.screen, (ring_r, ring_r // 4, 0),
+                                   (cx, cy), radius, 2)
+
+            # Smoke rings — gray, drifting outward
+            smoke_gray = int(80 * alpha_f)
+            if smoke_gray > 5:
+                smoke_r = int(radius * (1.0 + sub_p * 0.5))
+                pygame.draw.circle(self.screen, (smoke_gray, smoke_gray, smoke_gray),
+                                   (cx, cy), smoke_r, 1)
+                # Second smoke ring slightly offset
+                smoke_r2 = int(radius * (0.8 + sub_p * 0.6))
+                pygame.draw.circle(self.screen,
+                                   (smoke_gray // 2, smoke_gray // 2, smoke_gray // 2),
+                                   (cx, cy), smoke_r2, 1)
+
+    def _u3_draw_lightning_bolt(self, ax, ay, ts, fx):
+        """Draw a crackling lightning bolt along a line of tiles.
+
+        Three phases:
+        1. (0.0-0.2) Bolt appears tile-by-tile with a bright flash
+        2. (0.2-0.7) Full bolt crackles and arcs with electrical energy
+        3. (0.7-1.0) Bolt fades with residual sparks
+        """
+        p = fx.progress  # 0 → 1
+        tiles = fx.tiles
+        if not tiles:
+            return
+
+        ticks = pygame.time.get_ticks()
+        num_tiles = len(tiles)
+
+        if p < 0.2:
+            # Phase 1: bolt extends tile by tile
+            sub_p = p / 0.2
+            visible_count = max(1, int(sub_p * num_tiles))
+            visible_tiles = tiles[:visible_count]
+
+            # Bright white flash on the newest tile
+            if visible_tiles:
+                last_c, last_r = visible_tiles[-1]
+                flash_cx = int(ax + last_c * ts + ts // 2)
+                flash_cy = int(ay + last_r * ts + ts // 2)
+                pygame.draw.circle(self.screen, (255, 255, 255),
+                                   (flash_cx, flash_cy), ts // 2)
+
+            # Draw bolt segments between consecutive tiles
+            for i in range(len(visible_tiles)):
+                c, r = visible_tiles[i]
+                cx = int(ax + c * ts + ts // 2)
+                cy = int(ay + r * ts + ts // 2)
+
+                # Bright core on each tile
+                pygame.draw.circle(self.screen, (200, 200, 255),
+                                   (cx, cy), 4)
+
+                # Connect to previous tile with a jagged line
+                if i > 0:
+                    pc, pr = visible_tiles[i - 1]
+                    px = int(ax + pc * ts + ts // 2)
+                    py_ = int(ay + pr * ts + ts // 2)
+                    self._draw_jagged_line(px, py_, cx, cy,
+                                           (180, 180, 255), 2, ticks)
+
+        elif p < 0.7:
+            # Phase 2: full bolt crackles with arcs
+            sub_p = (p - 0.2) / 0.5
+
+            # Draw all segments with flickering brightness
+            for i in range(num_tiles):
+                c, r = tiles[i]
+                cx = int(ax + c * ts + ts // 2)
+                cy = int(ay + r * ts + ts // 2)
+
+                # Flickering glow per tile
+                flicker = 0.6 + 0.4 * math.sin(ticks * 0.02 + i * 1.3)
+                glow_r = int(ts * 0.4 * flicker)
+                bright = int(220 * flicker)
+
+                # Blue-white electrical glow
+                pygame.draw.circle(self.screen,
+                                   (bright // 2, bright // 2, bright),
+                                   (cx, cy), glow_r)
+                # Bright core
+                pygame.draw.circle(self.screen, (255, 255, 255),
+                                   (cx, cy), max(2, glow_r // 3))
+
+                # Connect to previous tile
+                if i > 0:
+                    pc, pr = tiles[i - 1]
+                    px = int(ax + pc * ts + ts // 2)
+                    py_ = int(ay + pr * ts + ts // 2)
+                    line_bright = int(255 * flicker)
+                    self._draw_jagged_line(px, py_, cx, cy,
+                                           (line_bright // 2, line_bright // 2, line_bright),
+                                           3, ticks)
+
+            # Random arc sparks branching off the bolt
+            for i in range(3):
+                idx = (ticks // 80 + i * 7) % num_tiles
+                bc, br = tiles[idx]
+                bx = int(ax + bc * ts + ts // 2)
+                by = int(ay + br * ts + ts // 2)
+                # Random offset for the spark
+                spark_dx = random.randint(-ts // 2, ts // 2)
+                spark_dy = random.randint(-ts // 2, ts // 2)
+                pygame.draw.line(self.screen, (150, 150, 255),
+                                 (bx, by),
+                                 (bx + spark_dx, by + spark_dy), 1)
+
+        else:
+            # Phase 3: fade out with residual sparks
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+
+            for i in range(num_tiles):
+                c, r = tiles[i]
+                cx = int(ax + c * ts + ts // 2)
+                cy = int(ay + r * ts + ts // 2)
+
+                # Fading glow
+                bright = int(150 * alpha_f)
+                if bright > 5:
+                    glow_r = int(ts * 0.3 * alpha_f)
+                    if glow_r > 0:
+                        pygame.draw.circle(self.screen,
+                                           (bright // 3, bright // 3, bright),
+                                           (cx, cy), glow_r)
+
+                # Connect to previous tile (fading)
+                if i > 0 and bright > 10:
+                    pc, pr = tiles[i - 1]
+                    px = int(ax + pc * ts + ts // 2)
+                    py_ = int(ay + pr * ts + ts // 2)
+                    self._draw_jagged_line(px, py_, cx, cy,
+                                           (bright // 3, bright // 3, bright),
+                                           max(1, int(2 * alpha_f)), ticks)
+
+            # Residual sparks — fewer as we fade
+            spark_count = max(0, int(4 * alpha_f))
+            for i in range(spark_count):
+                idx = (ticks // 120 + i * 5) % num_tiles
+                sc, sr = tiles[idx]
+                sx = int(ax + sc * ts + ts // 2)
+                sy = int(ay + sr * ts + ts // 2)
+                sdx = random.randint(-ts // 3, ts // 3)
+                sdy = random.randint(-ts // 3, ts // 3)
+                spark_bright = int(200 * alpha_f)
+                if spark_bright > 10:
+                    pygame.draw.line(self.screen,
+                                     (spark_bright // 2, spark_bright // 2, spark_bright),
+                                     (sx, sy), (sx + sdx, sy + sdy), 1)
+
+    def _draw_jagged_line(self, x1, y1, x2, y2, color, width, ticks):
+        """Draw a jagged/zigzag line between two points to simulate electricity."""
+        # Break the line into segments and offset the midpoints
+        segments = 4
+        points = [(x1, y1)]
+        for s in range(1, segments):
+            t = s / segments
+            mx = int(x1 + (x2 - x1) * t)
+            my = int(y1 + (y2 - y1) * t)
+            # Perpendicular offset for jaggedness
+            dx = x2 - x1
+            dy = y2 - y1
+            length = math.sqrt(dx * dx + dy * dy)
+            if length < 1:
+                points.append((mx, my))
+                continue
+            # Perpendicular direction
+            px = -dy / length
+            py_ = dx / length
+            # Offset oscillates based on time and segment index
+            offset = 3 * math.sin(ticks * 0.03 + s * 2.7)
+            mx += int(px * offset)
+            my += int(py_ * offset)
+            points.append((mx, my))
+        points.append((x2, y2))
+
+        # Draw the jagged line
+        for i in range(len(points) - 1):
+            pygame.draw.line(self.screen, color,
+                             points[i], points[i + 1], width)
 
     def _u3_draw_heal_effect(self, ax, ay, ts, fx):
         """Draw a healing glow — green sparkles rising upward with heal number."""

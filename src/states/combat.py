@@ -64,6 +64,9 @@ PHASE_SLEEP       = "sleep"          # sleep spell animation playing
 PHASE_TELEPORT    = "teleport"       # misty step teleport animation
 PHASE_INVISIBILITY = "invisibility"  # invisibility spell animation
 PHASE_ANIMATE_DEAD = "animate_dead"  # animate dead summoning animation
+PHASE_AOE_FIREBALL = "aoe_fireball"  # AoE fireball projectile in flight
+PHASE_AOE_EXPLOSION = "aoe_explosion"  # AoE fireball explosion expanding
+PHASE_LIGHTNING_BOLT = "lightning_bolt"  # lightning bolt crackling along its path
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -424,6 +427,91 @@ class AnimateDeadEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class AoeFireballEffect:
+    """An AoE fireball projectile traveling to a target tile."""
+
+    def __init__(self, start_col, start_row, end_col, end_row):
+        self.start_col = start_col
+        self.start_row = start_row
+        self.end_col = end_col
+        self.end_row = end_row
+        self.progress = 0.0  # 0 = start, 1 = arrived
+        self.alive = True
+        self.radius = 8  # base visual radius in pixels (bigger than normal fireball)
+
+    def update(self, dt):
+        dx = self.end_col - self.start_col
+        dy = self.end_row - self.start_row
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist < 0.01:
+            self.progress = 1.0
+            self.alive = False
+            return
+        tiles_per_sec = FIREBALL_SPEED / 32.0
+        self.progress += (tiles_per_sec / dist) * dt
+        if self.progress >= 1.0:
+            self.progress = 1.0
+            self.alive = False
+
+    @property
+    def current_col(self):
+        return self.start_col + (self.end_col - self.start_col) * self.progress
+
+    @property
+    def current_row(self):
+        return self.start_row + (self.end_row - self.start_row) * self.progress
+
+
+class AoeExplosionEffect:
+    """A massive expanding explosion covering a multi-tile radius."""
+
+    DURATION = 1.2  # seconds — longer than normal explosion for drama
+
+    def __init__(self, col, row, radius=3):
+        self.col = col
+        self.row = row
+        self.radius = radius
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
+class LightningBoltEffect:
+    """A crackling bolt of lightning along a straight line of tiles.
+
+    Unlike projectiles, the bolt appears all at once along its path and
+    crackles for its duration before dissipating.
+    """
+
+    DURATION = 1.0  # seconds
+
+    def __init__(self, tiles):
+        """*tiles* is a list of (col, row) tuples the bolt passes through."""
+        self.tiles = tiles  # ordered list of (col, row)
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        """0 = just appeared, 1 = done."""
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
 
@@ -533,6 +621,14 @@ class CombatState(BaseState):
         # Animate Dead effects
         self.animate_dead_effects = []    # active AnimateDeadEffect objects
         self.summon_buffs = {}            # Monster -> turns_left (summoned allies)
+
+        # AoE Fireball effects
+        self.aoe_fireball_effects = []    # active AoeFireballEffect projectiles
+        self.aoe_explosions = []          # active AoeExplosionEffect objects
+        self._pending_aoe_fireball = None # info dict while projectile is in flight
+
+        # Lightning Bolt effects
+        self.lightning_bolt_effects = []  # active LightningBoltEffect objects
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
@@ -672,6 +768,10 @@ class CombatState(BaseState):
         self.invisibility_buffs = {}
         self.animate_dead_effects = []
         self.summon_buffs = {}
+        self.aoe_fireball_effects = []
+        self.aoe_explosions = []
+        self._pending_aoe_fireball = None
+        self.lightning_bolt_effects = []
         self.showing_log = False
         self.log_scroll = 0
         self.showing_help = False
@@ -880,7 +980,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT):
             return
 
         # Equip screen handles its own input
@@ -1104,10 +1204,16 @@ class CombatState(BaseState):
             targeting = spell.get("targeting", "select_ally")
 
             if targeting == "select_tile":
-                # Tile targeting (Misty Step teleport, etc.)
+                # Tile targeting (Misty Step teleport, AoE Fireball, etc.)
                 tc = self.shield_target_col
                 tr = self.shield_target_row
-                if self._is_arena_wall(tc, tr):
+                if spell.get("effect_type") == "aoe_fireball":
+                    # AoE fireball can target any non-wall tile
+                    if self._is_arena_wall(tc, tr):
+                        self.combat_log.append("Can't target a wall!")
+                    else:
+                        self._cast_aoe_fireball(f, tc, tr)
+                elif self._is_arena_wall(tc, tr):
                     self.combat_log.append("Can't teleport into a wall!")
                 elif self._is_monster_tile(tc, tr):
                     self.combat_log.append("A monster is in the way!")
@@ -1355,6 +1461,8 @@ class CombatState(BaseState):
                 self._fire_fireball(dcol, drow)
             elif self.selected_spell == "heal":
                 self._cast_heal(dcol, drow)
+            elif self.selected_spell == "lightning_bolt":
+                self._fire_lightning_bolt(dcol, drow)
             else:
                 # Unknown spell — cancel safely
                 self.phase = PHASE_PLAYER
@@ -1922,6 +2030,279 @@ class CombatState(BaseState):
         self.hit_effects.append(HitEffect(mc, mr, damage))
 
         self._check_monster_death(target)
+
+    # ── AoE Fireball casting ─────────────────────────────────────
+
+    def _cast_aoe_fireball(self, caster, target_col, target_row):
+        """Cast AoE Fireball — fire a projectile to the selected tile.
+
+        When the projectile arrives, ``_resolve_aoe_fireball`` will deal
+        damage to ALL entities (monsters AND party members) within the
+        blast radius.
+        """
+        spell_id = self.selected_spell
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Fireball")
+        mp_cost = spell.get("mp_cost", 8)
+
+        # Check MP
+        if caster.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({caster.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        # Deduct MP
+        caster.current_mp -= mp_cost
+
+        # Break invisibility (offensive spell)
+        self._break_invisibility(caster)
+
+        # Fire projectile from caster to target tile
+        col, row = self.fighter_positions[caster]
+        fb = AoeFireballEffect(col, row, target_col, target_row)
+        self.aoe_fireball_effects.append(fb)
+        self.game.sfx.play("fireball")
+
+        ev = spell.get("effect_value", {})
+        self._pending_aoe_fireball = {
+            "fighter": caster,
+            "target_col": target_col,
+            "target_row": target_row,
+            "dice_count": ev.get("dice_count", 3),
+            "dice_sides": ev.get("dice_sides", 8),
+            "stat_bonus": ev.get("stat_bonus", "intelligence"),
+            "min_damage": ev.get("min_damage", 1),
+            "radius": ev.get("radius", 3),
+        }
+
+        self.combat_log.append(
+            f"{caster.name} casts {spell_name}! (-{mp_cost} MP)")
+        self.selected_spell = None
+        self.phase = PHASE_AOE_FIREBALL
+
+    def _resolve_aoe_fireball(self):
+        """Called when the AoE fireball projectile arrives at the target tile.
+
+        Spawns the massive explosion effect and deals damage to ALL monsters
+        and party members within ``radius`` tiles (Chebyshev distance) of the
+        impact point.  Friendly fire is very much intentional.
+        """
+        info = self._pending_aoe_fireball
+        self._pending_aoe_fireball = None
+
+        if not info:
+            self._end_fighter_turn()
+            return
+
+        caster = info["fighter"]
+        tc = info["target_col"]
+        tr = info["target_row"]
+        dice_count = info["dice_count"]
+        dice_sides = info["dice_sides"]
+        stat_bonus = info["stat_bonus"]
+        min_damage = info["min_damage"]
+        radius = info["radius"]
+
+        # Spawn the big explosion
+        self.aoe_explosions.append(AoeExplosionEffect(tc, tr, radius))
+        self.game.sfx.play("explosion")
+        self.phase = PHASE_AOE_EXPLOSION
+
+        # Calculate stat bonus
+        if stat_bonus == "intelligence":
+            bonus = caster.int_mod
+        elif stat_bonus == "wisdom":
+            bonus = caster.wis_mod
+        else:
+            bonus = 0
+
+        # Roll damage once — everyone in the blast takes the same damage
+        damage = 0
+        for _ in range(dice_count):
+            damage += random.randint(1, dice_sides)
+        damage += bonus
+        damage = max(min_damage, damage)
+
+        self.combat_log.append(
+            f"The fireball detonates for {damage} damage!")
+
+        # Track all killed so we can check victory/defeat after
+        monsters_hit = []
+        fighters_hit = []
+
+        # Damage ALL monsters in blast radius (Chebyshev distance)
+        for monster in list(self.monsters):
+            if not monster.is_alive():
+                continue
+            mc, mr = self.monster_positions.get(monster, (-99, -99))
+            dist = max(abs(mc - tc), abs(mr - tr))
+            if dist <= radius:
+                monster.hp = max(0, monster.hp - damage)
+                label = monster.name
+                if monster.charmed:
+                    label += " (ally)"
+                self.combat_log.append(
+                    f"  {label} takes {damage} fire damage!")
+                self.hit_effects.append(HitEffect(mc, mr, damage))
+                monsters_hit.append(monster)
+
+        # Damage ALL party members in blast radius
+        for member in list(self.fighters):
+            if not member.is_alive():
+                continue
+            fc, fr = self.fighter_positions.get(member, (-99, -99))
+            dist = max(abs(fc - tc), abs(fr - tr))
+            if dist <= radius:
+                member.current_hp = max(0, member.current_hp - damage)
+                self.combat_log.append(
+                    f"  {member.name} takes {damage} fire damage!")
+                self.hit_effects.append(HitEffect(fc, fr, damage))
+                fighters_hit.append(member)
+
+        # Process monster deaths
+        for monster in monsters_hit:
+            if not monster.is_alive():
+                self._on_monster_killed(monster)
+            else:
+                self._wake_monster(monster)
+
+        # Process fighter deaths
+        for member in fighters_hit:
+            if not member.is_alive():
+                self.combat_log.append(f"{member.name} has been slain!")
+
+        # NOTE: Victory/defeat is checked when the explosion animation ends
+        #       (in the update loop), not here.
+
+    # ── Lightning Bolt casting ───────────────────────────────────
+
+    def _fire_lightning_bolt(self, dcol, drow):
+        """Cast Lightning Bolt in the given direction.
+
+        Unlike a fireball, the bolt does NOT stop at the first target.
+        It traces a line from the caster to the arena wall and damages
+        EVERY entity (monster or party member) along its entire path.
+        """
+        f = self.active_fighter
+        if not f:
+            return
+
+        # Check if character can cast sorcerer spells
+        if not f.can_cast_sorcerer():
+            self.combat_log.append(f"{f.name} cannot cast spells!")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        spell = SPELLS_DATA.get("lightning_bolt", {})
+        mp_cost = spell.get("mp_cost", 7)
+
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"{f.name} doesn't have enough MP! (need {mp_cost})")
+            self.phase = PHASE_PLAYER
+            self.directing_action = None
+            return
+
+        # Deduct MP
+        f.current_mp -= mp_cost
+
+        # Break invisibility (offensive spell)
+        self._break_invisibility(f)
+
+        col, row = self.fighter_positions[f]
+
+        # Trace the full line from caster to arena wall
+        bolt_tiles = []
+        tc, tr = col + dcol, row + drow
+        while not self._is_arena_wall(tc, tr):
+            bolt_tiles.append((tc, tr))
+            tc += dcol
+            tr += drow
+
+        if not bolt_tiles:
+            # Facing directly into a wall
+            self.combat_log.append("The lightning crackles against the wall!")
+            self._end_fighter_turn()
+            return
+
+        # Create the bolt effect (appears all at once)
+        self.lightning_bolt_effects.append(LightningBoltEffect(bolt_tiles))
+        self.game.sfx.play("fireball")
+
+        self.combat_log.append(
+            f"{f.name} casts LIGHTNING BOLT! (-{mp_cost} MP)")
+
+        # Resolve damage immediately — the animation plays while damage is shown
+        ev = spell.get("effect_value", {})
+        dice_count = ev.get("dice_count", 4)
+        dice_sides = ev.get("dice_sides", 6)
+        stat_bonus = ev.get("stat_bonus", "intelligence")
+        min_damage = ev.get("min_damage", 1)
+
+        if stat_bonus == "intelligence":
+            bonus = f.int_mod
+        elif stat_bonus == "wisdom":
+            bonus = f.wis_mod
+        else:
+            bonus = 0
+
+        # Roll damage once — every target on the line takes the same damage
+        damage = 0
+        for _ in range(dice_count):
+            damage += random.randint(1, dice_sides)
+        damage += bonus
+        damage = max(min_damage, damage)
+
+        bolt_set = set(bolt_tiles)
+
+        # Damage all monsters on the bolt path
+        monsters_hit = []
+        for monster in list(self.monsters):
+            if not monster.is_alive():
+                continue
+            mc, mr = self.monster_positions.get(monster, (-99, -99))
+            if (mc, mr) in bolt_set:
+                monster.hp = max(0, monster.hp - damage)
+                label = monster.name
+                if monster.charmed:
+                    label += " (ally)"
+                self.combat_log.append(
+                    f"  Lightning strikes {label} for {damage} damage!")
+                self.hit_effects.append(HitEffect(mc, mr, damage))
+                monsters_hit.append(monster)
+
+        # Damage all party members on the bolt path (friendly fire!)
+        fighters_hit = []
+        for member in list(self.fighters):
+            if member is f:
+                continue  # caster is not on the bolt path
+            if not member.is_alive():
+                continue
+            fc, fr = self.fighter_positions.get(member, (-99, -99))
+            if (fc, fr) in bolt_set:
+                member.current_hp = max(0, member.current_hp - damage)
+                self.combat_log.append(
+                    f"  Lightning strikes {member.name} for {damage} damage!")
+                self.hit_effects.append(HitEffect(fc, fr, damage))
+                fighters_hit.append(member)
+
+        # Process deaths
+        for monster in monsters_hit:
+            if not monster.is_alive():
+                self._on_monster_killed(monster)
+            else:
+                self._wake_monster(monster)
+
+        for member in fighters_hit:
+            if not member.is_alive():
+                self.combat_log.append(f"{member.name} has been slain!")
+
+        # Phase controls the animation — victory/defeat checked when it ends
+        self.phase = PHASE_LIGHTNING_BOLT
 
     # ── Heal casting ──────────────────────────────────────────────
 
@@ -3312,6 +3693,53 @@ class CombatState(BaseState):
             return
         self.animate_dead_effects = [fx for fx in self.animate_dead_effects if fx.alive]
 
+        # Update AoE fireball projectile
+        for fx in self.aoe_fireball_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_AOE_FIREBALL:
+            if all(not fx.alive for fx in self.aoe_fireball_effects):
+                self.aoe_fireball_effects = []
+                self._resolve_aoe_fireball()
+            return
+        self.aoe_fireball_effects = [fx for fx in self.aoe_fireball_effects if fx.alive]
+
+        # Update AoE explosions
+        for fx in self.aoe_explosions:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_AOE_EXPLOSION:
+            if all(not fx.alive for fx in self.aoe_explosions):
+                self.aoe_explosions = []
+                # Check victory/defeat after the explosion animation
+                if self._all_monsters_dead():
+                    self._trigger_victory()
+                elif not any(m.is_alive() for m in self.fighters):
+                    self.phase = PHASE_DEFEAT
+                    self.phase_timer = 2500
+                else:
+                    self._end_fighter_turn()
+            return
+        self.aoe_explosions = [fx for fx in self.aoe_explosions if fx.alive]
+
+        # Update lightning bolt effects
+        for fx in self.lightning_bolt_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_LIGHTNING_BOLT:
+            if all(not fx.alive for fx in self.lightning_bolt_effects):
+                self.lightning_bolt_effects = []
+                # Check victory/defeat after the bolt animation
+                if self._all_monsters_dead():
+                    self._trigger_victory()
+                elif not any(m.is_alive() for m in self.fighters):
+                    self.phase = PHASE_DEFEAT
+                    self.phase_timer = 2500
+                else:
+                    self._end_fighter_turn()
+            return
+        self.lightning_bolt_effects = [fx for fx in self.lightning_bolt_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -3539,6 +3967,9 @@ class CombatState(BaseState):
             invisibility_buffs=self.invisibility_buffs,
             animate_dead_effects=self.animate_dead_effects,
             summon_buffs=self.summon_buffs,
+            aoe_fireball_effects=self.aoe_fireball_effects,
+            aoe_explosions=self.aoe_explosions,
+            lightning_bolt_effects=self.lightning_bolt_effects,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,
