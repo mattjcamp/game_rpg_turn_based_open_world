@@ -83,16 +83,6 @@
       }
     },
     {
-      "id": "light_feet",
-      "name": "Light Feet",
-      "description": "The party makes less noise, reducing random encounters.",
-      "duration": "permanent",
-      "requirements": {
-        "race": "Bobbit",
-        "min_level": 1
-      }
-    },
-    {
       "id": "battle_cry",
       "name": "Battle Cry",
       "description": "The first attack each combat deals bonus damage.",

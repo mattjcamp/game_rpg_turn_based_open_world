@@ -6901,8 +6901,9 @@ class Renderer:
         self._u3_text("PARTY  [1-4]", rx, ry, self._U3_ORANGE, fm)
         ry += 20
 
-        char_card_h = 50
+        char_card_h = 76
         sprite_w = 36  # space reserved for avatar
+        fs = self.font_small
         for mi, member in enumerate(party.members):
             cy = ry
             alive = member.is_alive()
@@ -6912,7 +6913,7 @@ class Renderer:
             sprite = self._get_class_sprite(member.char_class, big=False)
             if sprite:
                 sx = rx
-                sy = cy + (char_card_h - sprite.get_height()) // 2
+                sy = cy + 2
                 if not alive:
                     dark = sprite.copy()
                     dark.fill((80, 80, 80), special_flags=pygame.BLEND_RGB_MULT)
@@ -6922,30 +6923,41 @@ class Renderer:
 
             # Text starts after avatar
             tx2 = rx + sprite_w
+            bar_full_w = right_w - sprite_w - 16
 
-            # Number + name + class
-            self._u3_text(f"{mi+1}", tx2, cy, self._U3_BLUE, fm)
-            self._u3_text(member.name, tx2 + 16, cy, name_color, fm)
-            cls_short = member.char_class[:3].upper()
-            self._u3_text(cls_short, rx + right_w - 60, cy, self._U3_LTBLUE, fm)
+            # Number + name
+            self._u3_text(f"{mi+1}", tx2, cy - 2, self._U3_WHITE, f)
+            self._u3_text(member.name, tx2 + 18, cy, name_color, fm)
+
+            # Class, Race, Gender — compact line
+            cy += 16
+            info_str = f"{member.char_class}  {member.race}  {member.gender}"
+            self._u3_text(info_str, tx2, cy, (150, 150, 170), fs)
+
+            # Level + HP/MP numbers
+            cy += 13
+            lvl_str = f"LVL {member.level}"
+            hp_str = f"HP {member.hp}/{member.max_hp}"
+            mp_cur = member.current_mp
+            mp_max = member.max_mp
+            mp_str = f"MP {mp_cur}/{mp_max}" if mp_max > 0 else "MP ---"
+            stats_str = f"{lvl_str}   {hp_str}   {mp_str}"
+            self._u3_text(stats_str, tx2, cy, (180, 180, 200), fs)
 
             # HP bar
-            cy += 16
+            cy += 14
             hp_frac = member.hp / member.max_hp if member.max_hp > 0 else 0
             hp_color = self._U3_GREEN if hp_frac > 0.3 else self._U3_RED
-            bar_w_px = right_w - sprite_w - 80
-            self._u3_text("HP", tx2, cy, (180, 180, 200), self.font_small)
-            self._u3_draw_stat_bar(tx2 + 22, cy + 1, bar_w_px, 10,
+            self._u3_draw_stat_bar(tx2, cy + 1, bar_full_w, 7,
                                    member.hp, member.max_hp, hp_color)
-            self._u3_text(f"{member.hp}/{member.max_hp}",
-                          tx2 + 22 + bar_w_px + 4, cy, (200, 200, 210), self.font_small)
 
-            # Weapon summary
-            cy += 14
-            rw_name = member.equipped.get("right_hand") or "---"
-            lw_name = member.equipped.get("left_hand") or "---"
-            equip_str = f"R:{rw_name}  L:{lw_name}"
-            self._u3_text(equip_str, tx2 + 4, cy, (160, 160, 180), self.font_small)
+            # MP bar
+            cy += 11
+            if mp_max > 0:
+                mp_frac = mp_cur / mp_max
+                mp_color = self._U3_LTBLUE if mp_frac > 0.3 else (180, 80, 80)
+                self._u3_draw_stat_bar(tx2, cy + 1, bar_full_w, 7,
+                                       mp_cur, mp_max, mp_color)
 
             ry += char_card_h
 
@@ -6972,12 +6984,15 @@ class Renderer:
             else:
                 is_available_effect = True
         is_cast_row = (cursor_index == CAST_INDEX)
-        header_count = NUM_EFFECTS + 1  # effects + CAST row
+        is_brew_row = (cursor_index == BREW_INDEX)
+        header_count = NUM_EFFECTS + 2  # effects + CAST row + BREW row
         if is_active_effect:
             pass  # sel_item already set above
-        elif is_cast_row:
-            pass  # no item detail for the CAST row
-        elif cursor_index - header_count < len(inv):
+        elif is_available_effect:
+            pass  # handled separately below with effect detail display
+        elif is_cast_row or is_brew_row:
+            pass  # no item detail for the CAST/BREW rows
+        elif cursor_index >= header_count and cursor_index - header_count < len(inv):
             entry = inv[cursor_index - header_count]
             sel_item = party.item_name(entry)
             sel_charges = party.item_charges(entry)
@@ -6989,8 +7004,29 @@ class Renderer:
             else:
                 self._u3_text("SELECTED", rx, ry, self._U3_ORANGE, fm)
             ry += 22
-            self._u3_text(sel_item, rx, ry, self._U3_WHITE, f)
-            ry += 24
+
+            # Draw item icon
+            icon_size = 48
+            icon_info = ITEM_INFO.get(sel_item, {})
+            icon_type = icon_info.get("icon", "tool")
+            # Draw icon centered at the left of the detail area
+            icon_cx = rx + icon_size // 2 + 4
+            icon_cy = ry + icon_size // 2
+            # Background circle behind the icon
+            pygame.draw.circle(self.screen, (30, 30, 55),
+                               (icon_cx, icon_cy), icon_size // 2 + 6)
+            pygame.draw.circle(self.screen, (60, 60, 90),
+                               (icon_cx, icon_cy), icon_size // 2 + 6, 2)
+            self._draw_item_icon(icon_cx, icon_cy, icon_type, icon_size)
+
+            # Item name to the right of the icon
+            name_x = rx + icon_size + 18
+            self._u3_text(sel_item, name_x, ry + 4, self._U3_WHITE, f)
+            # Charges under the name if applicable
+            if sel_charges is not None:
+                self._u3_text(f"x{sel_charges}", name_x, ry + 24,
+                              (255, 170, 85), fm)
+            ry += icon_size + 12
 
             # Item stats
             if sel_item in ARMORS:
@@ -7010,11 +7046,6 @@ class Renderer:
                 self._u3_text("SLOT: RIGHT HAND", rx, ry, (180, 180, 180), fm)
             else:
                 self._u3_text("TYPE: GENERAL ITEM", rx, ry, self._U3_LTBLUE, fm)
-
-            # Charges (for equipped items with charges)
-            if sel_charges is not None:
-                ry += 18
-                self._u3_text(f"CHARGES: {sel_charges}", rx, ry, (255, 170, 85), fm)
 
             # Description — check item info first, then effect definitions
             info = ITEM_INFO.get(sel_item)
@@ -7052,6 +7083,48 @@ class Renderer:
             self._u3_text("available spells for", rx, ry, (180, 180, 200), fm)
             ry += 16
             self._u3_text("the current location.", rx, ry, (180, 180, 200), fm)
+        elif is_brew_row:
+            self._u3_text("BREW POTIONS", rx, ry, (180, 120, 255), fm)
+            ry += 22
+            # Draw a potion icon
+            icon_size = 48
+            icon_cx = rx + icon_size // 2 + 4
+            icon_cy = ry + icon_size // 2
+            pygame.draw.circle(self.screen, (30, 30, 55),
+                               (icon_cx, icon_cy), icon_size // 2 + 6)
+            pygame.draw.circle(self.screen, (80, 50, 120),
+                               (icon_cx, icon_cy), icon_size // 2 + 6, 2)
+            self._draw_item_icon(icon_cx, icon_cy, "potion", icon_size)
+            # Text to the right of the icon
+            name_x = rx + icon_size + 18
+            self._u3_text("Alchemy", name_x, ry + 4, self._U3_WHITE, f)
+            ry += icon_size + 12
+            # Check if an alchemist is available
+            has_alchemist = False
+            for m in party.members:
+                if m.is_alive() and m.char_class == "Alchemist":
+                    has_alchemist = True
+                    break
+            if has_alchemist:
+                self._u3_text("Press ENTER to browse", rx, ry, (180, 180, 200), fm)
+                ry += 16
+                self._u3_text("potion recipes. Your", rx, ry, (180, 180, 200), fm)
+                ry += 16
+                self._u3_text("Alchemist can brew", rx, ry, (180, 180, 200), fm)
+                ry += 16
+                self._u3_text("potions from reagents", rx, ry, (180, 180, 200), fm)
+                ry += 16
+                self._u3_text("in the party stash.", rx, ry, (180, 180, 200), fm)
+                ry += 24
+                self._u3_text("Requires INT check", rx, ry, (200, 200, 140), fm)
+            else:
+                self._u3_text("No Alchemist in the", rx, ry, (180, 120, 120), fm)
+                ry += 16
+                self._u3_text("party. You need an", rx, ry, (180, 120, 120), fm)
+                ry += 16
+                self._u3_text("Alchemist to brew", rx, ry, (180, 120, 120), fm)
+                ry += 16
+                self._u3_text("potions.", rx, ry, (180, 120, 120), fm)
         elif is_available_effect and effect_row_data:
             eff_dict = effect_row_data[1]
             self._u3_text("AVAILABLE EFFECT", rx, ry, self._U3_LTBLUE, fm)
@@ -8076,6 +8149,38 @@ class Renderer:
             # Facet lines
             pygame.draw.line(self.screen, WHITE, (cx, cy - 16), (cx, cy + 16), 1)
             pygame.draw.line(self.screen, WHITE, (cx - 14, cy), (cx + 14, cy), 1)
+
+        elif icon_type == "rock":
+            # Rough stone shape
+            pts = [(cx - 10, cy + 8), (cx - 14, cy - 2), (cx - 6, cy - 12),
+                   (cx + 4, cy - 14), (cx + 14, cy - 4), (cx + 10, cy + 10)]
+            pygame.draw.polygon(self.screen, (140, 130, 120), pts)
+            pygame.draw.polygon(self.screen, (100, 95, 85), pts, 2)
+            # Crack detail
+            pygame.draw.line(self.screen, (100, 95, 85), (cx - 4, cy - 8), (cx + 2, cy + 4), 1)
+
+        elif icon_type == "ammo":
+            # Arrow / quiver
+            for i in range(3):
+                ox = -6 + i * 6
+                # Shaft
+                pygame.draw.line(self.screen, BROWN, (cx + ox, cy + hs - 8), (cx + ox, cy - hs + 8), 2)
+                # Arrowhead
+                pts = [(cx + ox, cy - hs + 4), (cx + ox - 3, cy - hs + 10), (cx + ox + 3, cy - hs + 10)]
+                pygame.draw.polygon(self.screen, STEEL, pts)
+                # Fletching
+                pygame.draw.line(self.screen, RED, (cx + ox - 2, cy + hs - 10), (cx + ox, cy + hs - 6), 1)
+                pygame.draw.line(self.screen, RED, (cx + ox + 2, cy + hs - 10), (cx + ox, cy + hs - 6), 1)
+
+        elif icon_type == "artifact":
+            # Glowing orb on a pedestal
+            # Pedestal
+            pygame.draw.rect(self.screen, DARK_STEEL, (cx - 6, cy + 4, 12, 10))
+            pygame.draw.rect(self.screen, STEEL, (cx - 10, cy + 12, 20, 4))
+            # Orb
+            pygame.draw.circle(self.screen, PURPLE, (cx, cy - 4), 10)
+            pygame.draw.circle(self.screen, (200, 140, 255), (cx - 3, cy - 7), 3)
+            pygame.draw.circle(self.screen, (220, 200, 255), (cx, cy - 4), 10, 2)
 
         else:
             # Unknown — draw a question mark box

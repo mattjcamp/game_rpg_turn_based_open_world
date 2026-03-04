@@ -1,3 +1,3 @@
-- Make potion crafting system for the alchemist class(on the party level)
+
 - World building system
 - Build world
