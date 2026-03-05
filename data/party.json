@@ -64,150 +64,12 @@
       "inventory": []
     },
     {
-      "name": "Sable",
-      "class": "Thief",
-      "race": "Elf",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 12,
-      "dexterity": 18,
-      "intelligence": 10,
-      "wisdom": 8,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Bow",
-        "left_hand": null,
-        "body": "Leather",
-        "head": null
-      },
-      "inventory": []
-    },
-    {
-      "name": "test3",
-      "class": "Alchemist",
-      "race": "Human",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": []
-    },
-    {
-      "name": "test5",
+      "name": "test",
       "class": "Druid",
-      "race": "Dwarf",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/u4_tiles/druid.png"
-    },
-    {
-      "name": "Eyndrake",
-      "class": "Ranger",
-      "race": "Elf",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 12,
-      "dexterity": 14,
-      "intelligence": 10,
-      "wisdom": 14,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Bow",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/u4_tiles/shepherd.png"
-    },
-    {
-      "name": "Lark",
-      "class": "Lark",
-      "race": "Elf",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/u4_tiles/bard.png"
-    },
-    {
-      "name": "Other",
-      "class": "Illusionist",
-      "race": "Dwarf",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/u4_tiles/guard_f1.png"
-    },
-    {
-      "name": "Bilbo",
-      "class": "Barbarian",
       "race": "Halfling",
       "gender": "Male",
       "hp": 20,
       "strength": 10,
-      "dexterity": 18,
-      "intelligence": 11,
-      "wisdom": 11,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "example_graphics/Ultima3_AMI_sprite_barbarian.png"
-    },
-    {
-      "name": "Gnomy",
-      "class": "Druid",
-      "race": "Gnome",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 10,
       "dexterity": 10,
       "intelligence": 15,
       "wisdom": 15,
@@ -219,14 +81,14 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/u4_tiles/ranger.png"
+      "sprite": "src/assets/u4_tiles/ranger_alt.png"
     }
   ],
   "active_party": [
     0,
-    3,
-    9,
-    10
+    1,
+    2,
+    3
   ],
   "party_effects": {
     "effect_1": null,
