@@ -36,6 +36,33 @@
       "spawn_weight": 35,
       "tile": "skeleton_f1.png"
     },
+    "Skeleton Archer": {
+      "description": "A skeletal bowman that fires arrows from a distance.",
+      "undead": true,
+      "humanoid": false,
+      "hp": 12,
+      "ac": 12,
+      "attack_bonus": 3,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 35,
+      "gold_min": 5,
+      "gold_max": 18,
+      "color": [220, 220, 200],
+      "spawn_weight": 20,
+      "tile": "skeleton_f1.png",
+      "ranged": {
+        "range": 6,
+        "attack_bonus": 4,
+        "damage_dice": 1,
+        "damage_sides": 6,
+        "damage_bonus": 0,
+        "projectile_color": [255, 255, 200],
+        "projectile_symbol": "-",
+        "label": "bone arrow"
+      }
+    },
     "Orc": {
       "description": "A brutal orc. Tough fight.",
       "undead": false,
@@ -51,7 +78,17 @@
       "gold_max": 30,
       "color": [80, 140, 60],
       "spawn_weight": 25,
-      "tile": "orc_f1.png"
+      "tile": "orc_f1.png",
+      "ranged": {
+        "range": 3,
+        "attack_bonus": 3,
+        "damage_dice": 1,
+        "damage_sides": 6,
+        "damage_bonus": 1,
+        "projectile_color": [180, 140, 80],
+        "projectile_symbol": "/",
+        "label": "javelin"
+      }
     },
     "Goblin": {
       "description": "A small, sneaky goblin. Attacks in groups.",
@@ -68,7 +105,17 @@
       "gold_max": 6,
       "color": [100, 160, 60],
       "spawn_weight": 40,
-      "tile": "goblin_f1.png"
+      "tile": "goblin_f1.png",
+      "ranged": {
+        "range": 4,
+        "attack_bonus": 2,
+        "damage_dice": 1,
+        "damage_sides": 3,
+        "damage_bonus": 0,
+        "projectile_color": [160, 140, 120],
+        "projectile_symbol": ".",
+        "label": "thrown rock"
+      }
     },
     "Zombie": {
       "description": "A shambling corpse. Slow but durable.",
@@ -119,7 +166,17 @@
       "gold_max": 35,
       "color": [100, 40, 140],
       "spawn_weight": 15,
-      "tile": "dark_mage_f1.png"
+      "tile": "dark_mage_f1.png",
+      "ranged": {
+        "range": 7,
+        "attack_bonus": 5,
+        "damage_dice": 2,
+        "damage_sides": 4,
+        "damage_bonus": 1,
+        "projectile_color": [160, 60, 220],
+        "projectile_symbol": "*",
+        "label": "dark bolt"
+      }
     },
     "Troll": {
       "description": "A massive brute with thick hide. Hits hard.",
@@ -142,6 +199,6 @@
 
   "spawn_tables": {
     "overworld": ["Giant Rat", "Orc", "Wolf", "Goblin"],
-    "dungeon": ["Giant Rat", "Skeleton", "Orc", "Goblin", "Zombie", "Wolf", "Dark Mage", "Troll"]
+    "dungeon": ["Giant Rat", "Skeleton", "Skeleton Archer", "Orc", "Goblin", "Zombie", "Wolf", "Dark Mage", "Troll"]
   }
 }

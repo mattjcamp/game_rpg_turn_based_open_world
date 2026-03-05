@@ -645,6 +645,7 @@ class CombatState(BaseState):
         # Projectile animation
         self.projectiles = []     # active Projectile objects
         self._pending_ranged = None  # deferred attack resolution after anim
+        self._pending_monster_ranged = None  # deferred monster ranged resolution
 
         # Melee / hit effects
         self.melee_effects = []   # active MeleeEffect objects
@@ -746,6 +747,13 @@ class CombatState(BaseState):
         """Return the alive monster adjacent in direction (dcol, drow), or None."""
         return self._get_monster_at(col + dcol, row + drow)
 
+    def _get_fighter_at(self, col, row):
+        """Return the alive party member at (col, row), or None."""
+        for member, (mc, mr) in self.fighter_positions.items():
+            if mc == col and mr == row and member.is_alive():
+                return member
+        return None
+
     def _is_occupied_by_ally(self, col, row, exclude=None):
         """True if another party member is standing on (col, row)."""
         for member, (mc, mr) in self.fighter_positions.items():
@@ -825,6 +833,7 @@ class CombatState(BaseState):
         self.combat_msg_timer = 0
         self.projectiles = []
         self._pending_ranged = None
+        self._pending_monster_ranged = None
         self.melee_effects = []
         self.hit_effects = []
         self._pending_melee = None
@@ -3814,6 +3823,9 @@ class CombatState(BaseState):
         if adjacent_targets:
             target = random.choice(adjacent_targets)
             self._monster_attack_player(mon, target)
+        elif mon.ranged and best_dist <= mon.ranged.get("range", 0):
+            # Monster can fire a ranged attack at the target
+            self._monster_fire_ranged(mon, best_target)
         else:
             self._monster_move_toward(mon, best_target)
             self.combat_log.append(f"{mon.name} moves closer...")
@@ -3931,6 +3943,150 @@ class CombatState(BaseState):
             self.game.sfx.play("defeat")
             self.combat_log.append("The party has been defeated!")
         else:
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 800
+
+    # ── Monster ranged attacks ──────────────────────────────────────
+
+    def _monster_fire_ranged(self, monster, target):
+        """Fire a ranged projectile from monster toward a party member."""
+        ranged = monster.ranged
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        tc, tr = self.fighter_positions.get(target, (0, 0))
+
+        # Direction from monster to target
+        dx = tc - mc
+        dy = tr - mr
+        # Normalise to cardinal/diagonal step
+        dcol = (1 if dx > 0 else -1) if dx != 0 else 0
+        drow = (1 if dy > 0 else -1) if dy != 0 else 0
+
+        # Trace ray from monster toward target — stop at first fighter or wall
+        sc, sr = mc + dcol, mr + drow
+        hit_target = None
+        end_col, end_row = mc, mr
+        steps = 0
+        max_range = ranged.get("range", 6)
+
+        while steps < max_range and not self._is_arena_wall(sc, sr):
+            fighter_hit = self._get_fighter_at(sc, sr)
+            if fighter_hit:
+                hit_target = fighter_hit
+                end_col, end_row = sc, sr
+                break
+            sc += dcol
+            sr += drow
+            steps += 1
+
+        if not hit_target:
+            # Arrow flies to last non-wall tile
+            end_col = sc - dcol
+            end_row = sr - drow
+            if end_col == mc and end_row == mr:
+                end_col = sc
+                end_row = sr
+
+        proj_color = tuple(ranged.get("projectile_color", [255, 100, 100]))
+        proj_symbol = ranged.get("projectile_symbol", "*")
+        label = ranged.get("label", "ranged attack")
+
+        proj = Projectile(mc, mr, end_col, end_row,
+                          color=proj_color, symbol=proj_symbol)
+        self.projectiles.append(proj)
+        self.game.sfx.play("arrow")
+
+        self._pending_monster_ranged = {
+            "monster": monster,
+            "hit_target": hit_target,
+            "label": label,
+        }
+
+        self.combat_log.append(f"{monster.name} fires {label}!")
+        self.phase = PHASE_PROJECTILE
+
+    def _resolve_monster_ranged(self):
+        """Called when a monster's ranged projectile arrives."""
+        info = self._pending_monster_ranged
+        self._pending_monster_ranged = None
+
+        if not info:
+            return
+
+        monster = info["monster"]
+        target = info["hit_target"]
+        label = info["label"]
+
+        if not target or not target.is_alive():
+            self.combat_log.append(
+                f"{monster.name}'s {label} misses the target!")
+            self.game.sfx.play("miss")
+            self.active_monster_idx += 1
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 500
+            return
+
+        # Roll attack using ranged stats
+        ranged = monster.ranged
+        ranged_atk = ranged.get("attack_bonus", monster.attack_bonus)
+        curse = self.curse_buffs.get(monster)
+        if curse:
+            ranged_atk -= curse["attack_penalty"]
+
+        player_ac = target.get_ac()
+        if self.defending.get(target, False):
+            player_ac += 2
+        shield = self.shield_buffs.get(target)
+        if shield:
+            player_ac += shield["ac_bonus"]
+
+        hit, roll, total, crit = roll_attack(ranged_atk, player_ac)
+
+        ac_display = f"AC {player_ac}"
+        if self.defending.get(target, False):
+            ac_display += " (def)"
+        if shield:
+            ac_display += " (shld)"
+
+        if crit:
+            self.combat_log.append(
+                f"{monster.name} → {target.name}: rolls {roll} — "
+                f"CRITICAL HIT with {label}!")
+            self.game.sfx.play("critical")
+        elif hit:
+            self.combat_log.append(
+                f"{monster.name} → {target.name}: rolls {roll} "
+                f"({format_modifier(ranged_atk)}) "
+                f"= {total} vs {ac_display} — Hit!")
+            self.game.sfx.play("player_hurt")
+        else:
+            self.combat_log.append(
+                f"{monster.name} → {target.name}: rolls {roll} "
+                f"({format_modifier(ranged_atk)}) "
+                f"= {total} vs {ac_display} — Miss!")
+            self.game.sfx.play("miss")
+
+        if hit:
+            r_dice = ranged.get("damage_dice", 1)
+            r_sides = ranged.get("damage_sides", 4)
+            r_bonus = ranged.get("damage_bonus", 0)
+            damage = roll_damage(r_dice, r_sides, r_bonus, critical=crit)
+            target.hp = max(0, target.hp - damage)
+            self.combat_log.append(
+                f"{monster.name} deals {damage} damage to "
+                f"{target.name} with {label}!")
+            tcol, trow = self.fighter_positions.get(target, (3, 5))
+            self.hit_effects.append(HitEffect(tcol, trow, damage))
+
+        if not target.is_alive():
+            self.combat_log.append(f"{target.name} has fallen!")
+
+        if not any(m.is_alive() for m in self.fighters):
+            self.phase = PHASE_DEFEAT
+            self.phase_timer = 2500
+            self.game.sfx.play("defeat")
+            self.combat_log.append("The party has been defeated!")
+        else:
+            self.active_monster_idx += 1
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 800
 
@@ -4298,7 +4454,10 @@ class CombatState(BaseState):
             # Check if all projectiles have arrived
             if all(not p.alive for p in self.projectiles):
                 self.projectiles = []
-                self._resolve_ranged()
+                if self._pending_monster_ranged:
+                    self._resolve_monster_ranged()
+                else:
+                    self._resolve_ranged()
             return
 
         # Update melee effects

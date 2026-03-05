@@ -34,7 +34,8 @@ class Monster:
     def __init__(self, name, hp, ac, attack_bonus,
                  damage_dice=1, damage_sides=4, damage_bonus=0,
                  xp_reward=25, gold_reward=10, color=(200, 50, 50),
-                 tile=None, undead=False, humanoid=False, terrain="land"):
+                 tile=None, undead=False, humanoid=False, terrain="land",
+                 ranged=None):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -51,6 +52,11 @@ class Monster:
         self.humanoid = humanoid  # True for humanoid creatures (orc, goblin, etc.)
         self.terrain = terrain  # "land" or "sea" — restricts where this monster can move
         self.charmed = False    # True when under Charm Person — fights for the player
+
+        # Ranged attack capability (None = melee only)
+        # Dict with: range, attack_bonus, damage_dice, damage_sides,
+        #            damage_bonus, projectile_color, projectile_symbol, label
+        self.ranged = ranged
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -177,6 +183,7 @@ def create_monster(name):
         undead=data.get("undead", False),
         humanoid=data.get("humanoid", False),
         terrain=data.get("terrain", "land"),
+        ranged=data.get("ranged"),
     )
 
 

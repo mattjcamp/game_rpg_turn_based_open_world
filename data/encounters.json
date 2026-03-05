@@ -46,11 +46,25 @@
         "monsters": ["Wolf", "Wolf"]
       },
       {
+        "name": "Skeleton Archers",
+        "weight": 18,
+        "terrain": "land",
+        "monster_party_tile": "Skeleton",
+        "monsters": ["Skeleton Archer", "Skeleton Archer"]
+      },
+      {
+        "name": "Undead Warband",
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Skeleton",
+        "monsters": ["Skeleton", "Skeleton Archer", "Zombie"]
+      },
+      {
         "name": "Dark Coven",
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Skeleton", "Skeleton"]
+        "monsters": ["Dark Mage", "Skeleton Archer", "Skeleton"]
       },
       {
         "name": "Troll Den",
