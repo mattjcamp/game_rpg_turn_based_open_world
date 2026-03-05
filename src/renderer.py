@@ -94,6 +94,36 @@ class Renderer:
                     self._monster_tiles[tile_file] = pygame.transform.scale(
                         raw, (dst_ts, dst_ts))
 
+        # ── Load NPC type sprites from VGA / U4 tiles ──
+        self._npc_sprites = {}  # npc_type -> pygame surface (32x32)
+        npc_sprite_map = {
+            "shopkeep":  "steele_tiles/vga_tinker_f1.png",
+            "innkeeper": "steele_tiles/vga_bard_f1.png",
+            "elder":     "steele_tiles/vga_lord_f1.png",
+        }
+        # Multiple villager sprites — picked by name hash at draw time
+        self._villager_sprites = []
+        villager_files = [
+            "steele_tiles/vga_citizen_f1.png",
+            "steele_tiles/vga_shepherd_f1.png",
+            "steele_tiles/vga_singing_bard_f1.png",
+            "steele_tiles/vga_guard_f1.png",
+            "steele_tiles/vga_beggar_f1.png",
+            "steele_tiles/vga_child_f1.png",
+        ]
+        for ntype, fname in npc_sprite_map.items():
+            npc_path = os.path.join(assets_dir, fname)
+            if os.path.exists(npc_path):
+                raw = pygame.image.load(npc_path).convert_alpha()
+                self._npc_sprites[ntype] = pygame.transform.scale(
+                    raw, (dst_ts, dst_ts))
+        for fname in villager_files:
+            vpath = os.path.join(assets_dir, fname)
+            if os.path.exists(vpath):
+                raw = pygame.image.load(vpath).convert_alpha()
+                self._villager_sprites.append(
+                    pygame.transform.scale(raw, (dst_ts, dst_ts)))
+
         # ── Unique tile sprite cache (loaded on demand) ──
         self._unique_tile_sprites = {}  # filename -> scaled surface
         self._assets_dir = assets_dir
@@ -454,38 +484,13 @@ class Renderer:
             self.screen.blit(text_surface, (x_offset, hud_y + 30 + i * 14))
 
     def draw_npcs(self, npcs, camera):
-        """Draw NPC sprites on the map (Ultima III stick-figure style)."""
+        """Draw NPC sprites on the map using per-type VGA tile sprites."""
         for npc in npcs:
             screen_col, screen_row = camera.world_to_screen(npc.col, npc.row)
             if 0 <= screen_col < VIEWPORT_COLS and 0 <= screen_row < VIEWPORT_ROWS:
                 cx = screen_col * TILE_SIZE + TILE_SIZE // 2
                 cy = screen_row * TILE_SIZE + TILE_SIZE // 2
-
-                # Body color based on NPC type
-                npc_colors = {
-                    "shopkeep": (200, 160, 60),
-                    "innkeeper": (60, 160, 200),
-                    "elder":     (180, 80, 200),
-                    "villager":  (100, 180, 100),
-                }
-                color = npc_colors.get(npc.npc_type, (100, 180, 100))
-
-                # Simple stick-figure, same proportions as the player
-                # Head
-                pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)
-                # Body
-                pygame.draw.line(self.screen, color, (cx, cy - 5), (cx, cy + 4), 2)
-                # Arms
-                pygame.draw.line(self.screen, color, (cx - 6, cy - 2), (cx + 6, cy - 2), 2)
-                # Legs
-                pygame.draw.line(self.screen, color, (cx, cy + 4), (cx - 5, cy + 12), 2)
-                pygame.draw.line(self.screen, color, (cx, cy + 4), (cx + 5, cy + 12), 2)
-                # Name tag (small, uppercase)
-                name_surf = self.font_small.render(npc.name.upper(), True, COLOR_WHITE)
-                name_rect = name_surf.get_rect(center=(cx, cy - 16))
-                bg = name_rect.inflate(4, 2)
-                pygame.draw.rect(self.screen, (0, 0, 0), bg)
-                self.screen.blit(name_surf, name_rect)
+                self._u3_draw_npc_sprite(npc, cx, cy)
 
     # ========================================================
     # TOWN  –  Ultima III retro style (sprite tiles)
@@ -758,13 +763,16 @@ class Renderer:
             pygame.draw.rect(self.screen, BLACK, rect)
 
     def _u3_draw_npc_sprite(self, npc, cx, cy):
-        """Draw an NPC on the town map using the tile sheet NPC sprite or stick figure."""
-        # Try to use the NPC sprite from the tile sheet (R3 C15)
-        npc_sprite = self._tile_sprites.get((3, 15))
-        if npc_sprite:
-            sx = cx - npc_sprite.get_width() // 2
-            sy = cy - npc_sprite.get_height() // 2
-            self.screen.blit(npc_sprite, (sx, sy))
+        """Draw an NPC on the town map using per-type VGA sprites."""
+        sprite = self._npc_sprites.get(npc.npc_type)
+        # Villagers rotate among several sprites based on name hash
+        if sprite is None and self._villager_sprites:
+            idx = hash(npc.name) % len(self._villager_sprites)
+            sprite = self._villager_sprites[idx]
+        if sprite:
+            sx = cx - sprite.get_width() // 2
+            sy = cy - sprite.get_height() // 2
+            self.screen.blit(sprite, (sx, sy))
         else:
             # Fallback: colored stick figure
             npc_colors = {

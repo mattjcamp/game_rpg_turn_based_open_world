@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "timestamp": 1772630075.135804,
+  "timestamp": 1772680554.483731,
   "state": "overworld",
   "party": {
     "col": 14,
@@ -27,87 +27,39 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 0,
+        "current_mp": null,
         "bonus_mp": 0,
         "ammo": {}
       },
       {
-        "name": "Mira",
-        "class": "Cleric",
-        "race": "Bobbit",
-        "gender": "Female",
-        "max_hp": 22,
-        "hp": 22,
-        "strength": 10,
-        "dexterity": 10,
-        "intelligence": 10,
-        "wisdom": 18,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": "Club",
-          "left_hand": null,
-          "body": "Leather",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": 13,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "Theron",
-        "class": "Wizard",
-        "race": "Fuzzy",
+        "name": "Ranger",
+        "class": "Ranger",
+        "race": "Human",
         "gender": "Male",
-        "max_hp": 14,
-        "hp": 14,
-        "strength": 6,
-        "dexterity": 14,
-        "intelligence": 20,
-        "wisdom": 8,
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 15,
+        "intelligence": 11,
+        "wisdom": 14,
         "level": 1,
         "exp": 0,
         "equipped": {
-          "right_hand": "Dagger",
+          "right_hand": "Fists",
           "left_hand": null,
           "body": "Cloth",
           "head": null
         },
         "inventory": [],
-        "current_mp": 20,
+        "current_mp": null,
         "bonus_mp": 0,
         "ammo": {}
       },
       {
-        "name": "Sable",
-        "class": "Thief",
+        "name": "Druid",
+        "class": "Druid",
         "race": "Elf",
         "gender": "Female",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 12,
-        "dexterity": 18,
-        "intelligence": 10,
-        "wisdom": 8,
-        "level": 1,
-        "exp": 0,
-        "equipped": {
-          "right_hand": null,
-          "left_hand": null,
-          "body": "Leather",
-          "head": null
-        },
-        "inventory": [],
-        "current_mp": 0,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "test3",
-        "class": "Alchemist",
-        "race": "Human",
-        "gender": "Male",
         "max_hp": 20,
         "hp": 20,
         "strength": 10,
@@ -126,32 +78,48 @@
         "current_mp": null,
         "bonus_mp": 0,
         "ammo": {}
-      }
-    ],
-    "active_party": [
-      0,
-      1,
-      2,
-      3
-    ],
-    "members": [
+      },
       {
-        "name": "Roland",
+        "name": "Thief",
+        "class": "Thief",
+        "race": "Halfling",
+        "gender": "Male",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 17,
+        "intelligence": 10,
+        "wisdom": 13,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": null,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Tank",
         "class": "Fighter",
         "race": "Dwarf",
         "gender": "Male",
-        "max_hp": 30,
-        "hp": 30,
-        "strength": 16,
-        "dexterity": 12,
-        "intelligence": 8,
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 20,
+        "dexterity": 10,
+        "intelligence": 10,
         "wisdom": 10,
         "level": 1,
         "exp": 0,
         "equipped": {
-          "right_hand": "Club",
+          "right_hand": "Crossbow",
           "left_hand": null,
-          "body": "Leather",
+          "body": "Cloth",
           "head": null
         },
         "inventory": [],
@@ -160,44 +128,44 @@
         "ammo": {}
       },
       {
-        "name": "Mira",
-        "class": "Cleric",
-        "race": "Bobbit",
+        "name": "Ranger",
+        "class": "Ranger",
+        "race": "Halfling",
         "gender": "Female",
-        "max_hp": 22,
-        "hp": 22,
-        "strength": 10,
-        "dexterity": 10,
-        "intelligence": 10,
-        "wisdom": 18,
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 11,
+        "dexterity": 16,
+        "intelligence": 11,
+        "wisdom": 12,
         "level": 1,
         "exp": 0,
         "equipped": {
-          "right_hand": "Club",
+          "right_hand": "Long Bow",
           "left_hand": null,
-          "body": "Leather",
+          "body": "Cloth",
           "head": null
         },
         "inventory": [],
-        "current_mp": 13,
+        "current_mp": 5,
         "bonus_mp": 0,
         "ammo": {}
       },
       {
-        "name": "Theron",
+        "name": "Wizard",
         "class": "Wizard",
-        "race": "Fuzzy",
-        "gender": "Male",
-        "max_hp": 14,
-        "hp": 14,
-        "strength": 6,
-        "dexterity": 14,
+        "race": "Elf",
+        "gender": "Female",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 10,
         "intelligence": 20,
-        "wisdom": 8,
+        "wisdom": 10,
         "level": 1,
         "exp": 0,
         "equipped": {
-          "right_hand": "Dagger",
+          "right_hand": "Fists",
           "left_hand": null,
           "body": "Cloth",
           "head": null
@@ -208,31 +176,136 @@
         "ammo": {}
       },
       {
-        "name": "Sable",
-        "class": "Thief",
-        "race": "Elf",
-        "gender": "Female",
+        "name": "Arial",
+        "class": "Alchemist",
+        "race": "Human",
+        "gender": "Male",
         "max_hp": 20,
         "hp": 20,
-        "strength": 12,
-        "dexterity": 18,
-        "intelligence": 10,
-        "wisdom": 8,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 18,
+        "wisdom": 12,
         "level": 1,
         "exp": 0,
         "equipped": {
-          "right_hand": null,
+          "right_hand": "Fists",
           "left_hand": null,
-          "body": "Leather",
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 18,
+        "bonus_mp": 0,
+        "ammo": {}
+      }
+    ],
+    "active_party": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "members": [
+      {
+        "name": "Tank",
+        "class": "Fighter",
+        "race": "Dwarf",
+        "gender": "Male",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 20,
+        "dexterity": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Crossbow",
+          "left_hand": null,
+          "body": "Cloth",
           "head": null
         },
         "inventory": [],
         "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {}
+      },
+      {
+        "name": "Ranger",
+        "class": "Ranger",
+        "race": "Halfling",
+        "gender": "Female",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 11,
+        "dexterity": 16,
+        "intelligence": 11,
+        "wisdom": 12,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Long Bow",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 5,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Wizard",
+        "class": "Wizard",
+        "race": "Elf",
+        "gender": "Female",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 20,
+        "wisdom": 10,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 20,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
+        "name": "Arial",
+        "class": "Alchemist",
+        "race": "Human",
+        "gender": "Male",
+        "max_hp": 20,
+        "hp": 20,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 18,
+        "wisdom": 12,
+        "level": 1,
+        "exp": 0,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 18,
+        "bonus_mp": 0,
+        "ammo": {}
       }
     ],
     "shared_inventory": [
+      "Torch",
       "Torch",
       "Rock",
       "Rock",
@@ -265,25 +338,35 @@
       {
         "name": "Brimite Ore",
         "charges": 1
-      }
+      },
+      {
+        "name": "Arrows",
+        "charges": 20
+      },
+      {
+        "name": "Bolts",
+        "charges": 20
+      },
+      "Short Bow"
     ],
     "equipped": {
       "navigation": null,
       "camping": null,
       "special": null,
-      "light": {
-        "name": "Torch",
-        "charges": 150
-      }
+      "light": null
     },
     "effects": {
-      "effect_1": "Torch",
+      "effect_1": null,
       "effect_2": null,
       "effect_3": null,
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 48306900
-    }
+      "total_minutes": 100440
+    },
+    "last_pickpocket_day": -1,
+    "last_tinker_day": -1,
+    "galadriels_light_steps": 0,
+    "last_galadriels_light_day": -1
   }
 }

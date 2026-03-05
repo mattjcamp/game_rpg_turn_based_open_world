@@ -130,6 +130,126 @@
       "name": "Brigand",
       "source": "assets",
       "file": "src/assets/pirate_brigand_f1.png"
+    },
+    {
+      "name": "Child",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/child_f1.png"
+    },
+    {
+      "name": "Beggar",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/beggar_f1.png"
+    },
+    {
+      "name": "Citizen",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/citizen_f1.png"
+    },
+    {
+      "name": "Guard Alt",
+      "source": "u4",
+      "file": "src/assets/u4_tiles/guard_npc.png"
+    },
+    {
+      "name": "Townsfolk",
+      "source": "assets",
+      "file": "src/assets/npc_townsfolk.png"
+    },
+    {
+      "name": "Lark Alt",
+      "source": "assets",
+      "file": "src/assets/lark_f1.png"
+    },
+    {
+      "name": "VGA Avatar",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_avatar_f1.png"
+    },
+    {
+      "name": "VGA Mage",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_mage_f1.png"
+    },
+    {
+      "name": "VGA Bard",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_bard_f1.png"
+    },
+    {
+      "name": "VGA Fighter",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_fighter_f1.png"
+    },
+    {
+      "name": "VGA Druid",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_druid_f1.png"
+    },
+    {
+      "name": "VGA Tinker",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_tinker_f1.png"
+    },
+    {
+      "name": "VGA Paladin",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_paladin_f1.png"
+    },
+    {
+      "name": "VGA Ranger",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_ranger_f1.png"
+    },
+    {
+      "name": "VGA Shepherd",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_shepherd_f1.png"
+    },
+    {
+      "name": "VGA Guard",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_guard_f1.png"
+    },
+    {
+      "name": "VGA Citizen",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_citizen_f1.png"
+    },
+    {
+      "name": "VGA Singing Bard",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_singing_bard_f1.png"
+    },
+    {
+      "name": "VGA Jester",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_jester_f1.png"
+    },
+    {
+      "name": "VGA Beggar",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_beggar_f1.png"
+    },
+    {
+      "name": "VGA Child",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_child_f1.png"
+    },
+    {
+      "name": "VGA Lord",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_lord_f1.png"
+    },
+    {
+      "name": "VGA Rogue",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_rogue_f1.png"
+    },
+    {
+      "name": "VGA Evil Mage",
+      "source": "vga",
+      "file": "src/assets/steele_tiles/vga_evil_mage_f1.png"
     }
   ]
 }

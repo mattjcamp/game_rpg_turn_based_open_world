@@ -84,13 +84,93 @@
       },
       "inventory": [],
       "sprite": "example_graphics/Ultima3_AMI_sprite_barbarian.png"
+    },
+    {
+      "name": "Tank",
+      "class": "Fighter",
+      "race": "Dwarf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 20,
+      "dexterity": 10,
+      "intelligence": 10,
+      "wisdom": 10,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/pirate_brigand_f1.png"
+    },
+    {
+      "name": "Ranger",
+      "class": "Ranger",
+      "race": "Halfling",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 11,
+      "dexterity": 16,
+      "intelligence": 11,
+      "wisdom": 12,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/steele_tiles/vga_rogue_f1.png"
+    },
+    {
+      "name": "Wizard",
+      "class": "Wizard",
+      "race": "Elf",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 20,
+      "wisdom": 10,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/steele_tiles/vga_avatar_f1.png"
+    },
+    {
+      "name": "Arial",
+      "class": "Alchemist",
+      "race": "Human",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 18,
+      "wisdom": 12,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/u4_tiles/ranger_alt.png"
     }
   ],
   "active_party": [
-    0,
-    1,
-    2,
-    3
+    4,
+    5,
+    6,
+    7
   ],
   "party_effects": {
     "effect_1": null,
