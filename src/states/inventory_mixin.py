@@ -82,7 +82,7 @@ class InventoryMixin:
         if text:
             self.game.game_log.append(text)
 
-    # ── Hook methods (overridden by DungeonState) ──────────────
+    # ── Hook methods (overridden by subclasses) ────────────────
 
     def _on_effect_assigned(self, effect_name):
         """Called after an effect is assigned to a slot."""
@@ -94,6 +94,13 @@ class InventoryMixin:
 
     def _on_item_equipped(self, item_name):
         """Called after a stash item is equipped into an effect slot."""
+        pass
+
+    def _start_pickpocket_targeting(self):
+        """Close the stash and enter pickpocket target selection on the map.
+
+        Overridden by TownState; default is a no-op.
+        """
         pass
 
     # ── Character inventory helpers ────────────────────────────
@@ -309,18 +316,30 @@ class InventoryMixin:
 
     # Index of the CAST row in the unified cursor (right after effect rows)
     def _stash_layout(self):
-        """Return (NUM_EFFECT_ROWS, CAST_INDEX, BREW_INDEX, STASH_START, total_items).
+        """Return (NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, total,
+                   PICK_INDEX, TINK_INDEX).
 
         NUM_EFFECT_ROWS counts active effects + available (unassigned) effects.
-        BREW_INDEX is the row for BREW POTIONS (only if an Alchemist is alive).
+        PICK_INDEX is -1 when the Pickpocket row is hidden.
+        TINK_INDEX is -1 when the Tinker row is hidden.
         """
         party = self.game.party
         n = len(self._all_effect_rows())
         cast_idx = n                        # one row for CAST
         brew_idx = cast_idx + 1             # one row for BREW
-        stash_start = brew_idx + 1
+        # Pickpocket row shows only when effect is active + adjacent NPC
+        pick_idx = -1
+        tink_idx = -1
+        next_idx = brew_idx + 1
+        if self._can_pickpocket():
+            pick_idx = next_idx
+            next_idx += 1
+        if self._can_tinker():
+            tink_idx = next_idx
+            next_idx += 1
+        stash_start = next_idx
         total = stash_start + len(party.shared_inventory)
-        return n, cast_idx, brew_idx, stash_start, total
+        return n, cast_idx, brew_idx, stash_start, total, pick_idx, tink_idx
 
     def _has_alchemist(self):
         """Return the first alive Alchemist in the party, or None."""
@@ -328,6 +347,266 @@ class InventoryMixin:
             if m.is_alive() and m.char_class == "Alchemist":
                 return m
         return None
+
+    # ── Pickpocket helpers ────────────────────────────────────
+
+    # Low-level loot table: (weight, item_name)
+    _PICKPOCKET_LOOT = [
+        (25, "Gold"),               # just some coins (special-cased below)
+        (20, "Healing Herb"),
+        (12, "Torch"),
+        (10, "Arrows"),
+        (10, "Antidote"),
+        (8,  "Lockpick"),
+        (5,  "Dagger"),
+        (4,  "Mana Potion"),
+        (3,  "Stones"),
+        (2,  "Smoke Bomb"),
+        (1,  "Holy Water"),
+    ]
+
+    def _get_adjacent_npc(self):
+        """Return an NPC adjacent to the party, or None.
+
+        Only works in TownState where town_data with NPCs is available.
+        """
+        town_data = getattr(self, "town_data", None)
+        if town_data is None:
+            return None
+        party = self.game.party
+        for dc in (-1, 0, 1):
+            for dr in (-1, 0, 1):
+                if dc == 0 and dr == 0:
+                    continue
+                npc = town_data.get_npc_at(party.col + dc, party.row + dr)
+                if npc is not None:
+                    return npc
+        return None
+
+    def _get_halfling(self):
+        """Return the first alive Halfling in the party, or None."""
+        for m in self.game.party.members:
+            if m.is_alive() and m.race == "Halfling":
+                return m
+        return None
+
+    def _can_pickpocket(self):
+        """True when an alive Halfling is in the party, at least one
+        NPC is adjacent, and the party hasn't pickpocketed today."""
+        if self._get_halfling() is None:
+            return False
+        # Once per day limit
+        party = self.game.party
+        if party.last_pickpocket_day == party.clock.day_index:
+            return False
+        return self._get_adjacent_npc() is not None
+
+    def _get_adjacent_npcs(self):
+        """Return a list of all NPCs adjacent to the party (8 directions)."""
+        town_data = getattr(self, "town_data", None)
+        if town_data is None:
+            return []
+        party = self.game.party
+        npcs = []
+        for dc in (-1, 0, 1):
+            for dr in (-1, 0, 1):
+                if dc == 0 and dr == 0:
+                    continue
+                npc = town_data.get_npc_at(party.col + dc, party.row + dr)
+                if npc is not None:
+                    npcs.append(npc)
+        return npcs
+
+    def _attempt_pickpocket(self, npc=None):
+        """Perform a pickpocket attempt against the given NPC.
+
+        Uses a DEX-based saving throw:
+          roll = d20 + halfling's DEX modifier
+          DC 12 = success, DC < 12 = failure (caught!)
+
+        On success: a random low-level item is added to shared inventory.
+        On failure: a small gold penalty and the NPC reacts.
+        """
+        halfling = self._get_halfling()
+        if npc is None:
+            npc = self._get_adjacent_npc()
+        if not halfling or not npc:
+            self.show_message("No one nearby to pickpocket!", 2000)
+            return
+
+        party = self.game.party
+
+        # Record that pickpocket was used today (win or lose)
+        party.last_pickpocket_day = party.clock.day_index
+
+        roll = random.randint(1, 20)
+        dex_mod = halfling.get_modifier(halfling.dexterity)
+        total = roll + dex_mod
+        dc = 12
+
+        if total >= dc:
+            # Success — pick a random item from the loot table
+            item = self._pick_loot()
+            if item == "Gold":
+                amount = random.randint(3, 15)
+                party.gold += amount
+                self.show_message(
+                    f"{halfling.name} pilfers {amount} gold from {npc.name}! "
+                    f"(d20:{roll}+{dex_mod}={total} vs DC{dc})", 3500)
+            else:
+                party.shared_inventory.append(item)
+                self.show_message(
+                    f"{halfling.name} steals a {item} from {npc.name}! "
+                    f"(d20:{roll}+{dex_mod}={total} vs DC{dc})", 3500)
+        else:
+            # Failure — caught! Lose some gold as a bribe/fine
+            fine = random.randint(5, 20)
+            actual_fine = min(fine, party.gold)
+            party.gold -= actual_fine
+            self.show_message(
+                f"{halfling.name} is caught by {npc.name}! Lost {actual_fine} gold. "
+                f"(d20:{roll}+{dex_mod}={total} vs DC{dc})", 3500)
+
+    def _pick_loot(self):
+        """Choose a random item from the pickpocket loot table."""
+        total_weight = sum(w for w, _ in self._PICKPOCKET_LOOT)
+        r = random.randint(1, total_weight)
+        cumulative = 0
+        for weight, item in self._PICKPOCKET_LOOT:
+            cumulative += weight
+            if r <= cumulative:
+                return item
+        return self._PICKPOCKET_LOOT[-1][1]  # fallback
+
+    # ── Tinker helpers ─────────────────────────────────────────
+
+    # Tiered loot tables keyed by minimum gnome level
+    _TINKER_LOOT_TIERS = [
+        # (min_level, [(weight, item_name), ...])
+        (1, [
+            (25, "Arrows"),
+            (20, "Stones"),
+            (15, "Torch"),
+            (15, "Lockpick"),
+            (10, "Dagger"),
+            (10, "Healing Herb"),
+            (5,  "Antidote"),
+        ]),
+        (4, [
+            (20, "Arrows"),
+            (15, "Mana Potion"),
+            (15, "Lockpick"),
+            (12, "Short Sword"),
+            (10, "Smoke Bomb"),
+            (10, "Holy Water"),
+            (8,  "Healing Herb"),
+            (5,  "Light Crossbow"),
+            (5,  "Shield"),
+        ]),
+        (7, [
+            (18, "Mana Potion"),
+            (15, "Holy Water"),
+            (12, "Smoke Bomb"),
+            (12, "Long Sword"),
+            (10, "Chain Mail"),
+            (10, "Steel Shield"),
+            (8,  "Magic Arrows"),
+            (8,  "Fire Bomb"),
+            (7,  "Enchanted Dagger"),
+        ]),
+    ]
+
+    def _get_gnome(self):
+        """Return the first alive Gnome in the party, or None."""
+        for m in self.game.party.members:
+            if m.is_alive() and m.race == "Gnome":
+                return m
+        return None
+
+    def _can_tinker(self):
+        """True when an alive Gnome is in the party and hasn't tinkered today."""
+        if self._get_gnome() is None:
+            return False
+        party = self.game.party
+        if party.last_tinker_day == party.clock.day_index:
+            return False
+        return True
+
+    def _get_tinker_loot_table(self, gnome_level):
+        """Return the best loot table the gnome qualifies for by level."""
+        best = self._TINKER_LOOT_TIERS[0][1]
+        for min_lvl, table in self._TINKER_LOOT_TIERS:
+            if gnome_level >= min_lvl:
+                best = table
+        return best
+
+    def _attempt_tinker(self):
+        """Perform a tinker attempt — the gnome crafts a random item.
+
+        Uses an INT-based roll:
+          roll = d20 + gnome's INT modifier
+          DC 8 = success (easy — gnomes are natural tinkerers!)
+
+        On success: a random item from the level-appropriate loot table.
+        On failure: the attempt is wasted with no item produced.
+        """
+        gnome = self._get_gnome()
+        if not gnome:
+            self.show_message("No Gnome in the party!", 2000)
+            return
+
+        party = self.game.party
+
+        # Record that tinker was used today (win or lose)
+        party.last_tinker_day = party.clock.day_index
+
+        roll = random.randint(1, 20)
+        int_mod = gnome.get_modifier(gnome.intelligence)
+        total = roll + int_mod
+        dc = 8
+
+        if total >= dc:
+            # Success — pick a random item from the level-appropriate table
+            table = self._get_tinker_loot_table(gnome.level)
+            total_weight = sum(w for w, _ in table)
+            r = random.randint(1, total_weight)
+            cumulative = 0
+            item = table[-1][1]
+            for weight, item_name in table:
+                cumulative += weight
+                if r <= cumulative:
+                    item = item_name
+                    break
+            party.shared_inventory.append(item)
+            msg = (f"{gnome.name} tinkers a {item}! "
+                   f"(d20:{roll}+{int_mod}={total} vs DC{dc})")
+            self.show_message(msg, 3500)
+
+            # Move cursor to the newly created item so its detail shows
+            _, _, _, stash_start, _, _, _ = self._stash_layout()
+            new_item_idx = len(party.shared_inventory) - 1
+            self.party_inv_cursor = stash_start + new_item_idx
+
+            # Trigger a crafting animation overlay
+            self.use_item_anim = {
+                "effect": "tinker",
+                "timer": 2000,
+                "duration": 2000,
+                "text": f"Crafted {item}!",
+            }
+        else:
+            # Failure — materials wasted
+            msg = (f"{gnome.name}'s tinkering fails... scraps everywhere! "
+                   f"(d20:{roll}+{int_mod}={total} vs DC{dc})")
+            self.show_message(msg, 3500)
+
+            # Trigger a failure animation
+            self.use_item_anim = {
+                "effect": "tinker_fail",
+                "timer": 1500,
+                "duration": 1500,
+                "text": "Tinkering failed!",
+            }
 
     def _active_effects(self):
         """Return a list of (slot_key, effect_name) for non-empty effect slots."""
@@ -360,7 +639,7 @@ class InventoryMixin:
         """
         party = self.game.party
         inv = party.shared_inventory
-        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, total_items = self._stash_layout()
+        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, total_items, PICK_INDEX, TINK_INDEX = self._stash_layout()
 
         # Heal target selection overlay is open — delegate input
         if self.choosing_heal_target:
@@ -434,7 +713,7 @@ class InventoryMixin:
                             self.show_message(
                                 "All effect slots are full!", 2000)
                     # Adjust cursor if needed after change
-                    new_n, _, _, _, new_total = self._stash_layout()
+                    new_n, _, _, _, new_total, _, _ = self._stash_layout()
                     if self.party_inv_cursor >= new_total and new_total > 0:
                         self.party_inv_cursor = new_total - 1
             elif idx == CAST_INDEX:
@@ -446,6 +725,12 @@ class InventoryMixin:
             elif idx == BREW_INDEX:
                 # Open potion crafting overlay
                 self._open_brew_list()
+            elif PICK_INDEX >= 0 and idx == PICK_INDEX:
+                # Close stash and enter pickpocket targeting mode on the map
+                self._start_pickpocket_targeting()
+            elif TINK_INDEX >= 0 and idx == TINK_INDEX:
+                # Gnome tinkers a random item on the spot
+                self._attempt_tinker()
             else:
                 options = self._get_party_inv_action_options()
                 if options:
@@ -469,7 +754,7 @@ class InventoryMixin:
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
         party = self.game.party
-        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _ = self._stash_layout()
+        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _, PICK_INDEX, TINK_INDEX = self._stash_layout()
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:
@@ -515,7 +800,7 @@ class InventoryMixin:
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
         party = self.game.party
-        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _ = self._stash_layout()
+        NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _, PICK_INDEX, TINK_INDEX = self._stash_layout()
         idx = self.party_inv_cursor
 
         if idx < NUM_EFFECTS:

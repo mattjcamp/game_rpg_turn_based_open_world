@@ -1012,7 +1012,8 @@ class DungeonState(InventoryMixin, BaseState):
                 showing_brew_list=self.showing_brew_list,
                 brew_list_items=self.brew_list_items,
                 brew_list_cursor=self.brew_list_cursor,
-                brew_result_msg=self.brew_result_msg)
+                brew_result_msg=self.brew_result_msg,
+                tinker_available=self._can_tinker())
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:

@@ -925,6 +925,11 @@ class Party:
         # Party-level passive effects: 4 effect slots
         self.effects = {s: None for s in self.EFFECT_SLOTS}
 
+        # Pickpocket cooldown: day_index of last attempt (-1 = never used)
+        self.last_pickpocket_day = -1
+        # Tinker cooldown: day_index of last attempt (-1 = never used)
+        self.last_tinker_day = -1
+
         # Game clock — tracks day, hour, lunar phase
         from src.game_time import GameClock
         self.clock = GameClock()

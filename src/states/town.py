@@ -110,6 +110,11 @@ class TownState(InventoryMixin, BaseState):
         # Quest completion celebration effect
         self.quest_complete_effect = None
 
+        # Pickpocket targeting mode
+        self.pickpocket_targeting = False
+        self.pickpocket_targets = []   # list of adjacent NPCs
+        self.pickpocket_cursor = 0     # index into pickpocket_targets
+
         # We'll save the overworld position so we can restore it on exit
         self.overworld_col = 0
         self.overworld_row = 0
@@ -140,6 +145,8 @@ class TownState(InventoryMixin, BaseState):
         """Called when leaving this state."""
         self.npc_dialogue_active = False
         self.npc_speaking = None
+        self.pickpocket_targeting = False
+        self.pickpocket_targets = []
 
     def handle_input(self, events, keys_pressed):
         """Handle movement and NPC interaction."""
@@ -162,6 +169,11 @@ class TownState(InventoryMixin, BaseState):
                 # ── Shop screen input ──
                 if self.showing_shop:
                     self._handle_shop_input(event)
+                    return
+
+                # ── Pickpocket targeting input ──
+                if self.pickpocket_targeting:
+                    self._handle_pickpocket_targeting_input(event)
                     return
 
                 # ── Party inventory screen input ──
@@ -341,6 +353,40 @@ class TownState(InventoryMixin, BaseState):
         )
         if tile_id == TILE_EXIT:
             self._exit_town()
+
+    # ── Pickpocket targeting ──────────────────────────────────
+
+    def _start_pickpocket_targeting(self):
+        """Close the stash and enter pickpocket target selection on the map."""
+        targets = self._get_adjacent_npcs()
+        if not targets:
+            self.show_message("No one nearby to pickpocket!", 2000)
+            return
+        self.showing_party_inv = False
+        self.showing_party = False
+        self.pickpocket_targeting = True
+        self.pickpocket_targets = targets
+        self.pickpocket_cursor = 0
+
+    def _handle_pickpocket_targeting_input(self, event):
+        """Handle arrow-key target selection for pickpocketing."""
+        targets = self.pickpocket_targets
+        if not targets:
+            self.pickpocket_targeting = False
+            return
+
+        if event.key in (pygame.K_LEFT, pygame.K_UP):
+            self.pickpocket_cursor = (self.pickpocket_cursor - 1) % len(targets)
+        elif event.key in (pygame.K_RIGHT, pygame.K_DOWN):
+            self.pickpocket_cursor = (self.pickpocket_cursor + 1) % len(targets)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            npc = targets[self.pickpocket_cursor]
+            self.pickpocket_targeting = False
+            self.pickpocket_targets = []
+            self._attempt_pickpocket(npc)
+        elif event.key == pygame.K_ESCAPE:
+            self.pickpocket_targeting = False
+            self.pickpocket_targets = []
 
     def _start_dialogue(self, npc):
         """Begin talking to an NPC, or open the shop for shopkeepers."""
@@ -666,7 +712,9 @@ class TownState(InventoryMixin, BaseState):
                 showing_brew_list=self.showing_brew_list,
                 brew_list_items=self.brew_list_items,
                 brew_list_cursor=self.brew_list_cursor,
-                brew_result_msg=self.brew_result_msg)
+                brew_result_msg=self.brew_result_msg,
+                pickpocket_available=self._can_pickpocket(),
+                tinker_available=self._can_tinker())
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:
@@ -697,6 +745,12 @@ class TownState(InventoryMixin, BaseState):
             message=msg,
             quest_complete=quest_complete,
         )
+        # Pickpocket targeting overlay
+        if self.pickpocket_targeting and self.pickpocket_targets:
+            renderer.draw_pickpocket_targeting(
+                self.game.party, self.town_data,
+                self.pickpocket_targets, self.pickpocket_cursor)
+
         # Quest completion celebration overlay
         if self.quest_complete_effect:
             renderer.draw_quest_complete_effect(self.quest_complete_effect)

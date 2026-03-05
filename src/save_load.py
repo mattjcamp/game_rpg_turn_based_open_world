@@ -69,6 +69,8 @@ def _serialize_party(party):
         "equipped": dict(party.equipped),
         "effects": dict(party.effects),
         "clock": party.clock.to_dict(),
+        "last_pickpocket_day": party.last_pickpocket_day,
+        "last_tinker_day": party.last_tinker_day,
     }
 
 
@@ -152,6 +154,11 @@ def _deserialize_party(data):
     clock_data = data.get("clock")
     if clock_data:
         party.clock = GameClock.from_dict(clock_data)
+
+    # Pickpocket cooldown
+    party.last_pickpocket_day = data.get("last_pickpocket_day", -1)
+    # Tinker cooldown
+    party.last_tinker_day = data.get("last_tinker_day", -1)
 
     return party
 

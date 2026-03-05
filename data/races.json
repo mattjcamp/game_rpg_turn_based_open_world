@@ -20,7 +20,7 @@
       "intelligence": 0,
       "wisdom": 1
     },
-    "effects": ["infravision", "poison_resistance"]
+    "effects": ["infravision"]
   },
 
   "Halfling": {
@@ -31,7 +31,7 @@
       "intelligence": 0,
       "wisdom": 1
     },
-    "effects": ["lucky", "stealth"]
+    "effects": ["pickpocket"]
   },
 
   "Elf": {
@@ -42,7 +42,7 @@
       "intelligence": 2,
       "wisdom": 0
     },
-    "effects": ["infravision", "magic_resistance"]
+    "effects": ["galadriel_light"]
   },
 
   "Gnome": {
@@ -53,6 +53,6 @@
       "intelligence": 2,
       "wisdom": 1
     },
-    "effects": ["infravision", "illusion_resistance"]
+    "effects": ["tinker"]
   }
 }

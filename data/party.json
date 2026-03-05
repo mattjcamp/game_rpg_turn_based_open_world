@@ -180,13 +180,53 @@
       },
       "inventory": [],
       "sprite": "src/assets/u4_tiles/guard_f1.png"
+    },
+    {
+      "name": "Bilbo",
+      "class": "Barbarian",
+      "race": "Halfling",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 18,
+      "intelligence": 11,
+      "wisdom": 11,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "example_graphics/Ultima3_AMI_sprite_barbarian.png"
+    },
+    {
+      "name": "Gnomy",
+      "class": "Druid",
+      "race": "Gnome",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 15,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/u4_tiles/ranger.png"
     }
   ],
   "active_party": [
-    5,
-    6,
-    7,
-    8
+    0,
+    1,
+    9,
+    10
   ],
   "party_effects": {
     "effect_1": null,

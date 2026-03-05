@@ -620,6 +620,91 @@ class Renderer:
             pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
             self.screen.blit(surf, rect)
 
+    def draw_pickpocket_targeting(self, party, town_data, targets, cursor_idx):
+        """Draw pickpocket targeting overlay on top of the town map.
+
+        Shows a pulsing selection cursor around the targeted NPC,
+        dim highlight on all other candidate NPCs, and a prompt bar.
+        """
+        import math as _math
+
+        ts = self._U3_TN_TS
+        cols = self._U3_TN_COLS
+        rows = self._U3_TN_ROWS
+        tile_map = town_data.tile_map
+
+        off_c = party.col - cols // 2
+        off_r = party.row - rows // 2
+        off_c = max(0, min(off_c, tile_map.width - cols))
+        off_r = max(0, min(off_r, tile_map.height - rows))
+
+        # Slight dim overlay over the whole map to focus attention
+        dim = pygame.Surface((self._U3_TN_MAP_W, self._U3_TN_MAP_H), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 60))
+        self.screen.blit(dim, (0, 0))
+
+        pulse = _math.sin(pygame.time.get_ticks() * 0.006)
+
+        for i, npc in enumerate(targets):
+            nsc = npc.col - off_c
+            nsr = npc.row - off_r
+            if not (0 <= nsc < cols and 0 <= nsr < rows):
+                continue
+            px = nsc * ts
+            py = nsr * ts
+            is_selected = (i == cursor_idx)
+
+            if is_selected:
+                # Pulsing yellow/gold selection box
+                alpha = int(140 + 80 * pulse)
+                sel_color = (255, 200, 50, alpha)
+                sel_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                sel_surf.fill((255, 200, 50, 40))
+                self.screen.blit(sel_surf, (px, py))
+                # Animated border
+                border_w = 2
+                pygame.draw.rect(self.screen, (255, 220, 80),
+                                 pygame.Rect(px, py, ts, ts), border_w)
+                # Corner accents (pulsing)
+                corner_len = int(6 + 2 * pulse)
+                c = (255, 255, 150)
+                # top-left
+                pygame.draw.line(self.screen, c, (px, py), (px + corner_len, py), 2)
+                pygame.draw.line(self.screen, c, (px, py), (px, py + corner_len), 2)
+                # top-right
+                pygame.draw.line(self.screen, c, (px + ts, py), (px + ts - corner_len, py), 2)
+                pygame.draw.line(self.screen, c, (px + ts, py), (px + ts, py + corner_len), 2)
+                # bottom-left
+                pygame.draw.line(self.screen, c, (px, py + ts), (px + corner_len, py + ts), 2)
+                pygame.draw.line(self.screen, c, (px, py + ts), (px, py + ts - corner_len), 2)
+                # bottom-right
+                pygame.draw.line(self.screen, c, (px + ts, py + ts), (px + ts - corner_len, py + ts), 2)
+                pygame.draw.line(self.screen, c, (px + ts, py + ts), (px + ts, py + ts - corner_len), 2)
+            else:
+                # Subtle white outline on non-selected candidates
+                pygame.draw.rect(self.screen, (150, 150, 150),
+                                 pygame.Rect(px, py, ts, ts), 1)
+
+        # ── Prompt bar at bottom of map ──
+        bar_y = self._U3_TN_MAP_H
+        target_npc = targets[cursor_idx] if cursor_idx < len(targets) else None
+        name = target_npc.name if target_npc else "???"
+        halfling = None
+        for m in party.members:
+            if m.is_alive() and m.race == "Halfling":
+                halfling = m
+                break
+        hname = halfling.name if halfling else "Halfling"
+
+        # Overwrite the controls line with targeting prompt
+        prompt_y = bar_y + 28
+        prompt_bg = pygame.Rect(0, prompt_y - 2, 960, 22)
+        pygame.draw.rect(self.screen, (0, 0, 0), prompt_bg)
+        self._u3_text(
+            f"PICKPOCKET: {hname} -> {name.upper()}   "
+            f"[ARROWS] SELECT  [ENTER] ATTEMPT  [ESC] CANCEL",
+            8, prompt_y, (220, 180, 50))
+
     def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr):
         """Draw a single town tile using sprite sheet art when available."""
         from src.settings import (
@@ -6826,7 +6911,9 @@ class Renderer:
                                  showing_brew_list=False,
                                  brew_list_items=None,
                                  brew_list_cursor=0,
-                                 brew_result_msg=None):
+                                 brew_result_msg=None,
+                                 pickpocket_available=False,
+                                 tinker_available=False):
         """
         Full-screen shared party inventory with party equipment slots.
 
@@ -6955,6 +7042,43 @@ class Renderer:
             self.screen.blit(sel_surf, sel_rect)
         ty += row_h
 
+        # ── PICKPOCKET row (only when available) ──
+        PICK_INDEX = -1
+        next_header = BREW_INDEX + 1
+        if pickpocket_available:
+            PICK_INDEX = next_header
+            next_header += 1
+            pick_selected = (cursor_index == PICK_INDEX)
+            pick_prefix = "> " if pick_selected else "  "
+            pick_color = self._U3_WHITE if pick_selected else (220, 180, 80)
+            self._u3_text(f"{pick_prefix}PICKPOCKET", tx, ty, pick_color, fm)
+            if pick_selected:
+                self._u3_text("ENTER", tx + left_w - 100, ty,
+                              (220, 180, 80), self.font_small)
+                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                sel_surf.fill((255, 255, 255, 25))
+                self.screen.blit(sel_surf, sel_rect)
+            ty += row_h
+
+        # ── TINKER row (only when available) ──
+        TINK_INDEX = -1
+        if tinker_available:
+            TINK_INDEX = next_header
+            next_header += 1
+            tink_selected = (cursor_index == TINK_INDEX)
+            tink_prefix = "> " if tink_selected else "  "
+            tink_color = self._U3_WHITE if tink_selected else (140, 200, 140)
+            self._u3_text(f"{tink_prefix}TINKER", tx, ty, tink_color, fm)
+            if tink_selected:
+                self._u3_text("ENTER", tx + left_w - 100, ty,
+                              (140, 200, 140), self.font_small)
+                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                sel_surf.fill((255, 255, 255, 25))
+                self.screen.blit(sel_surf, sel_rect)
+            ty += row_h
+
         # ── Divider ──
         ty += 6
         pygame.draw.line(self.screen, (60, 60, 80),
@@ -6975,7 +7099,7 @@ class Renderer:
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = NUM_EFFECTS + 2  # effects + CAST row + BREW row
+            header_count = next_header  # effects + CAST + BREW (+ PICKPOCKET/TINKER if shown)
             inv_cursor = cursor_index - header_count  # cursor relative to inventory
             if len(inv) > max_visible:
                 scroll_top = max(0, min(inv_cursor - max_visible // 2,
@@ -7118,13 +7242,15 @@ class Renderer:
                 is_available_effect = True
         is_cast_row = (cursor_index == CAST_INDEX)
         is_brew_row = (cursor_index == BREW_INDEX)
-        header_count = NUM_EFFECTS + 2  # effects + CAST row + BREW row
+        is_pick_row = (PICK_INDEX >= 0 and cursor_index == PICK_INDEX)
+        is_tink_row = (TINK_INDEX >= 0 and cursor_index == TINK_INDEX)
+        header_count = next_header  # effects + CAST + BREW (+ PICKPOCKET/TINKER if shown)
         if is_active_effect:
             pass  # sel_item already set above
         elif is_available_effect:
             pass  # handled separately below with effect detail display
-        elif is_cast_row or is_brew_row:
-            pass  # no item detail for the CAST/BREW rows
+        elif is_cast_row or is_brew_row or is_pick_row or is_tink_row:
+            pass  # no item detail for the CAST/BREW/PICK/TINK rows
         elif cursor_index >= header_count and cursor_index - header_count < len(inv):
             entry = inv[cursor_index - header_count]
             sel_item = party.item_name(entry)
@@ -7258,6 +7384,40 @@ class Renderer:
                 self._u3_text("Alchemist to brew", rx, ry, (180, 120, 120), fm)
                 ry += 16
                 self._u3_text("potions.", rx, ry, (180, 120, 120), fm)
+        elif is_pick_row:
+            self._u3_text("PICKPOCKET", rx, ry, (220, 180, 80), fm)
+            ry += 22
+            self._u3_text("Your Halfling's nimble", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("fingers can pilfer", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("items from a nearby", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("townsperson.", rx, ry, (180, 180, 200), fm)
+            ry += 24
+            self._u3_text("DEX saving throw", rx, ry, (200, 200, 140), fm)
+            ry += 16
+            self._u3_text("determines success.", rx, ry, (200, 200, 140), fm)
+            ry += 24
+            self._u3_text("Failure = gold fine!", rx, ry, (200, 100, 100), fm)
+        elif is_tink_row:
+            self._u3_text("TINKER", rx, ry, (140, 200, 140), fm)
+            ry += 22
+            self._u3_text("Your Gnome's clever", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("hands can craft items", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("from scraps and bits", rx, ry, (180, 180, 200), fm)
+            ry += 16
+            self._u3_text("found along the way.", rx, ry, (180, 180, 200), fm)
+            ry += 24
+            self._u3_text("INT saving throw", rx, ry, (200, 200, 140), fm)
+            ry += 16
+            self._u3_text("determines success.", rx, ry, (200, 200, 140), fm)
+            ry += 24
+            self._u3_text("Higher level = better", rx, ry, (140, 200, 140), fm)
+            ry += 16
+            self._u3_text("items!", rx, ry, (140, 200, 140), fm)
         elif is_available_effect and effect_row_data:
             eff_dict = effect_row_data[1]
             self._u3_text("AVAILABLE EFFECT", rx, ry, self._U3_LTBLUE, fm)
@@ -7912,6 +8072,14 @@ class Renderer:
             glow_color = (255, 255, 100)      # yellow glow
             particle_color = (255, 255, 200)
             text_color = (255, 255, 140)
+        elif effect == "tinker":
+            glow_color = (140, 200, 140)      # crafting green
+            particle_color = (180, 240, 140)
+            text_color = (140, 220, 140)
+        elif effect == "tinker_fail":
+            glow_color = (200, 100, 60)       # dull orange-red
+            particle_color = (180, 120, 80)
+            text_color = (200, 120, 100)
         else:
             glow_color = (200, 200, 200)
             particle_color = (255, 255, 255)
