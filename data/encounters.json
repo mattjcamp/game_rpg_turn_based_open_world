@@ -67,6 +67,20 @@
         "monsters": ["Dark Mage", "Skeleton Archer", "Skeleton"]
       },
       {
+        "name": "Orc Raiding Party",
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": ["Orc", "Orc", "Orc Shaman"]
+      },
+      {
+        "name": "Shaman's Guard",
+        "weight": 8,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": ["Orc Shaman", "Goblin", "Goblin"]
+      },
+      {
         "name": "Troll Den",
         "weight": 5,
         "terrain": "land",

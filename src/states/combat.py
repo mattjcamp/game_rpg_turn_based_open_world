@@ -30,8 +30,8 @@ class _DualLog(list):
         super().append(item)
         self._mirror.append(item)
 from src.combat_engine import (
-    roll_initiative, roll_attack, roll_damage, roll_d20,
-    format_modifier,
+    roll_initiative, roll_attack, roll_damage, roll_d20, roll_dice,
+    format_modifier, get_modifier,
 )
 
 # SPELLS_DATA is imported from src.party (shared across combat and exploration)
@@ -70,6 +70,7 @@ PHASE_LIGHTNING_BOLT = "lightning_bolt"  # lightning bolt crackling along its pa
 PHASE_CURE_POISON = "cure_poison"        # cure poison cleansing animation
 PHASE_BLESS = "bless"                    # bless party-wide buff animation
 PHASE_CURSE = "curse"                    # curse debuff animation on enemy
+PHASE_MONSTER_SPELL = "monster_spell"    # monster casting a spell-like ability
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -581,6 +582,48 @@ class LightningBoltEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class MonsterSpellEffect:
+    """A brief visual effect when a monster casts a spell-like ability.
+
+    Colour coded by spell type:
+        sleep  → purple/blue
+        curse  → dark red
+        heal   → green
+        poison → sickly green
+    """
+
+    DURATION = 1.0  # seconds
+
+    # Default colour per spell type
+    COLORS = {
+        "sleep":     (120,  80, 200),
+        "curse":     (200,  60,  60),
+        "heal_self": ( 60, 200,  80),
+        "heal_ally": ( 60, 200,  80),
+        "poison":    (100, 180,  40),
+    }
+
+    def __init__(self, col, row, spell_type="sleep", label="", success=True):
+        self.col = col
+        self.row = row
+        self.spell_type = spell_type
+        self.color = self.COLORS.get(spell_type, (200, 200, 200))
+        self.label = label
+        self.success = success
+        self.timer = self.DURATION
+        self.alive = True
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
 
@@ -646,6 +689,10 @@ class CombatState(BaseState):
         self.projectiles = []     # active Projectile objects
         self._pending_ranged = None  # deferred attack resolution after anim
         self._pending_monster_ranged = None  # deferred monster ranged resolution
+
+        # Monster spell effects
+        self.monster_spell_effects = []       # active MonsterSpellEffect objects
+        self._pending_monster_spell = None    # deferred spell resolution
 
         # Melee / hit effects
         self.melee_effects = []   # active MeleeEffect objects
@@ -834,6 +881,8 @@ class CombatState(BaseState):
         self.projectiles = []
         self._pending_ranged = None
         self._pending_monster_ranged = None
+        self.monster_spell_effects = []
+        self._pending_monster_spell = None
         self.melee_effects = []
         self.hit_effects = []
         self._pending_melee = None
@@ -922,19 +971,57 @@ class CombatState(BaseState):
         pass
 
     def _announce_turn(self):
-        """Add a log entry for whose turn it is and reset move budget."""
+        """Add a log entry for whose turn it is and reset move budget.
+
+        Also handles sleeping fighters (skip their turn) and poison
+        damage at the start of each fighter's turn.
+        """
         f = self.active_fighter
-        if f:
-            base_range = f.range
-            bonus = 0
-            rb = self.range_buffs.get(f)
-            if rb:
-                bonus = rb["range_bonus"]
-            self.moves_remaining = base_range + bonus
-            ranged_hint = " [RANGED]" if f.is_ranged(self.game.party) else ""
-            speed_hint = f" [+{bonus} MOVE]" if bonus else ""
+        if not f:
+            self._rebuild_menu()
+            return
+
+        # ── Sleeping fighter: skip turn, decrement sleep counter ──
+        if f in self.sleep_buffs:
+            self.combat_log.append(f"{f.name} is fast asleep... Zzz")
+            self.sleep_buffs[f] -= 1
+            if self.sleep_buffs[f] <= 0:
+                del self.sleep_buffs[f]
+                self.combat_log.append(f"{f.name} wakes up!")
+            self._end_fighter_turn()
+            return
+
+        # ── Poison tick: take damage at the start of the turn ──
+        if getattr(f, "poisoned", False):
+            dmg = getattr(f, "poison_damage", 2)
+            f.hp = max(0, f.hp - dmg)
+            f.poison_turns = getattr(f, "poison_turns", 0) - 1
             self.combat_log.append(
-                f"-- {f.name}'s turn --{ranged_hint}{speed_hint}")
+                f"{f.name} takes {dmg} poison damage! "
+                f"({f.hp}/{f.max_hp} HP)")
+            if f.poison_turns <= 0:
+                f.poisoned = False
+                self.combat_log.append(
+                    f"The poison wears off {f.name}.")
+            if not f.is_alive():
+                self.combat_log.append(f"{f.name} has fallen!")
+                if not any(m.is_alive() for m in self.fighters):
+                    self.phase = PHASE_DEFEAT
+                    self.phase_timer = 2500
+                    return
+                self._end_fighter_turn()
+                return
+
+        base_range = f.range
+        bonus = 0
+        rb = self.range_buffs.get(f)
+        if rb:
+            bonus = rb["range_bonus"]
+        self.moves_remaining = base_range + bonus
+        ranged_hint = " [RANGED]" if f.is_ranged(self.game.party) else ""
+        speed_hint = f" [+{bonus} MOVE]" if bonus else ""
+        self.combat_log.append(
+            f"-- {f.name}'s turn --{ranged_hint}{speed_hint}")
         self._rebuild_menu()
 
     def _rebuild_menu(self):
@@ -1072,7 +1159,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT, PHASE_CURE_POISON, PHASE_BLESS, PHASE_CURSE):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT, PHASE_CURE_POISON, PHASE_BLESS, PHASE_CURSE, PHASE_MONSTER_SPELL):
             return
 
         # Equip screen handles its own input
@@ -3065,19 +3152,23 @@ class CombatState(BaseState):
     def _tick_sleep_buffs(self):
         """Decrement sleep durations at the end of each full round.
 
-        When sleep expires the monster wakes up and acts normally.
+        Only decrements monster sleep entries here.  Fighter sleep is
+        decremented in ``_announce_turn`` so it doesn't double-tick.
         """
         expired = []
-        for monster, turns_left in self.sleep_buffs.items():
+        for entity, turns_left in self.sleep_buffs.items():
+            # Skip fighters — their sleep is ticked in _announce_turn
+            if entity in self.fighters:
+                continue
             turns_left -= 1
-            self.sleep_buffs[monster] = turns_left
+            self.sleep_buffs[entity] = turns_left
             if turns_left <= 0:
-                expired.append(monster)
-        for monster in expired:
-            del self.sleep_buffs[monster]
-            if monster.is_alive():
+                expired.append(entity)
+        for entity in expired:
+            del self.sleep_buffs[entity]
+            if entity.is_alive():
                 self.combat_log.append(
-                    f"{monster.name} wakes up!")
+                    f"{entity.name} wakes up!")
 
     def _tick_invisibility_buffs(self):
         """Decrement invisibility durations at the end of each full round."""
@@ -3821,8 +3912,14 @@ class CombatState(BaseState):
                 adjacent_targets.append(member)
 
         if adjacent_targets:
+            # Try spell even when adjacent (heal_self, curse, etc.)
+            if mon.spells and self._monster_try_spell(mon, best_target, best_dist):
+                return
             target = random.choice(adjacent_targets)
             self._monster_attack_player(mon, target)
+        elif mon.spells and self._monster_try_spell(mon, best_target, best_dist):
+            # Monster chose to cast a spell instead of attacking/moving
+            return
         elif mon.ranged and best_dist <= mon.ranged.get("range", 0):
             # Monster can fire a ranged attack at the target
             self._monster_fire_ranged(mon, best_target)
@@ -3933,6 +4030,8 @@ class CombatState(BaseState):
             # Spawn hit flash on the target party member
             tcol, trow = self.fighter_positions.get(target, (3, 5))
             self.hit_effects.append(HitEffect(tcol, trow, damage))
+            # Damage wakes sleeping fighters
+            self._wake_fighter(target)
 
         if not target.is_alive():
             self.combat_log.append(f"{target.name} has fallen!")
@@ -4076,6 +4175,8 @@ class CombatState(BaseState):
                 f"{target.name} with {label}!")
             tcol, trow = self.fighter_positions.get(target, (3, 5))
             self.hit_effects.append(HitEffect(tcol, trow, damage))
+            # Damage wakes sleeping fighters
+            self._wake_fighter(target)
 
         if not target.is_alive():
             self.combat_log.append(f"{target.name} has fallen!")
@@ -4089,6 +4190,256 @@ class CombatState(BaseState):
             self.active_monster_idx += 1
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 800
+
+    # ── Monster spell-like abilities ────────────────────────────────
+
+    def _monster_try_spell(self, monster, best_target, best_dist):
+        """Roll for each spell; if one fires, cast it and return True."""
+        import random as _rng
+
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+
+        # Shuffle spells so the order isn't always the same
+        candidates = list(monster.spells)
+        _rng.shuffle(candidates)
+
+        for spell in candidates:
+            # Cast chance — percentage chance the monster attempts this
+            if _rng.randint(1, 100) > spell.get("cast_chance", 30):
+                continue
+
+            stype = spell.get("type", "")
+            srange = spell.get("range", 99)
+
+            # ── heal_self — only when hurt ──
+            if stype == "heal_self":
+                if monster.hp < monster.max_hp:
+                    self._monster_cast_heal_self(monster, spell)
+                    return True
+                continue
+
+            # ── heal_ally — find a hurt allied monster in range ──
+            if stype == "heal_ally":
+                hurt_ally = self._find_hurt_ally(monster, srange)
+                if hurt_ally:
+                    self._monster_cast_heal_ally(monster, hurt_ally, spell)
+                    return True
+                continue
+
+            # ── Target must be in range for offensive spells ──
+            if best_dist > srange:
+                continue
+
+            # ── sleep — put a party member to sleep ──
+            if stype == "sleep":
+                target = self._pick_spell_target(monster, srange)
+                if target and target not in self.sleep_buffs:
+                    max_hp = spell.get("max_target_hp", 25)
+                    if target.max_hp <= max_hp:
+                        self._monster_cast_sleep(monster, target, spell)
+                        return True
+                continue
+
+            # ── curse — weaken a party member ──
+            if stype == "curse":
+                target = self._pick_spell_target(monster, srange)
+                if target and target not in self.curse_buffs:
+                    self._monster_cast_curse(monster, target, spell)
+                    return True
+                continue
+
+            # ── poison — poison a party member ──
+            if stype == "poison":
+                target = self._pick_spell_target(monster, srange)
+                if target and not getattr(target, "poisoned", False):
+                    self._monster_cast_poison(monster, target, spell)
+                    return True
+                continue
+
+        return False  # no spell was cast
+
+    def _pick_spell_target(self, monster, max_range):
+        """Pick a random alive, visible fighter within range."""
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        candidates = []
+        for member in self.fighters:
+            if not member.is_alive():
+                continue
+            if member in self.invisibility_buffs:
+                continue
+            fc, fr = self.fighter_positions[member]
+            dist = max(abs(fc - mc), abs(fr - mr))
+            if dist <= max_range:
+                candidates.append(member)
+        if candidates:
+            return random.choice(candidates)
+        return None
+
+    def _find_hurt_ally(self, monster, max_range):
+        """Find an alive ally monster in range that is below full HP."""
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        candidates = []
+        for m in self.monsters:
+            if m is monster or not m.is_alive():
+                continue
+            if getattr(m, "charmed", False):
+                continue
+            ac, ar = self.monster_positions.get(m, (0, 0))
+            dist = max(abs(ac - mc), abs(ar - mr))
+            if dist <= max_range and m.hp < m.max_hp:
+                candidates.append(m)
+        if candidates:
+            return random.choice(candidates)
+        return None
+
+    # ── Individual monster spell implementations ──
+
+    def _monster_cast_heal_self(self, monster, spell):
+        """Monster heals itself."""
+        dice = spell.get("heal_dice", 1)
+        sides = spell.get("heal_sides", 6)
+        bonus = spell.get("heal_bonus", 0)
+        heal = roll_dice(dice, sides) + bonus
+        old_hp = monster.hp
+        monster.hp = min(monster.max_hp, monster.hp + heal)
+        actual = monster.hp - old_hp
+
+        name = spell.get("name", "heal")
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        self.monster_spell_effects.append(
+            MonsterSpellEffect(mc, mr, "heal_self", name, success=True))
+
+        self.combat_log.append(
+            f"{monster.name} uses {name}! "
+            f"(heals {actual} HP, now {monster.hp}/{monster.max_hp})")
+
+        self.active_monster_idx += 1
+        self.phase = PHASE_MONSTER_SPELL
+        self.phase_timer = 1000
+
+    def _monster_cast_heal_ally(self, monster, target, spell):
+        """Monster heals an ally."""
+        dice = spell.get("heal_dice", 1)
+        sides = spell.get("heal_sides", 8)
+        bonus = spell.get("heal_bonus", 0)
+        heal = roll_dice(dice, sides) + bonus
+        old_hp = target.hp
+        target.hp = min(target.max_hp, target.hp + heal)
+        actual = target.hp - old_hp
+
+        name = spell.get("name", "heal")
+        tc, tr = self.monster_positions.get(target, (0, 0))
+        self.monster_spell_effects.append(
+            MonsterSpellEffect(tc, tr, "heal_ally", name, success=True))
+
+        self.combat_log.append(
+            f"{monster.name} casts {name} on {target.name}! "
+            f"(heals {actual} HP)")
+
+        self.active_monster_idx += 1
+        self.phase = PHASE_MONSTER_SPELL
+        self.phase_timer = 1000
+
+    def _monster_cast_sleep(self, monster, target, spell):
+        """Monster puts a party member to sleep."""
+        name = spell.get("name", "Sleep")
+        save_dc = spell.get("save_dc", 12)
+        duration = spell.get("duration", 3)
+
+        # Target gets a Wisdom save
+        save_roll = roll_d20()
+        wis_mod = get_modifier(target.wisdom)
+        save_total = save_roll + wis_mod
+
+        tc, tr = self.fighter_positions.get(target, (0, 0))
+
+        if save_total >= save_dc:
+            # Resisted
+            self.combat_log.append(
+                f"{monster.name} casts {name} on {target.name}!")
+            self.combat_log.append(
+                f"{target.name} saves ({save_roll}+{wis_mod}={save_total} "
+                f"vs DC {save_dc}) — Resisted!")
+            self.monster_spell_effects.append(
+                MonsterSpellEffect(tc, tr, "sleep", name, success=False))
+        else:
+            # Asleep!
+            self.sleep_buffs[target] = duration
+            self.combat_log.append(
+                f"{monster.name} casts {name} on {target.name}!")
+            self.combat_log.append(
+                f"{target.name} fails save ({save_roll}+{wis_mod}={save_total} "
+                f"vs DC {save_dc}) — Falls asleep for {duration} turns!")
+            self.monster_spell_effects.append(
+                MonsterSpellEffect(tc, tr, "sleep", name, success=True))
+
+        self.active_monster_idx += 1
+        self.phase = PHASE_MONSTER_SPELL
+        self.phase_timer = 1200
+
+    def _monster_cast_curse(self, monster, target, spell):
+        """Monster curses a party member, reducing AC and attack."""
+        name = spell.get("name", "Curse")
+        duration = spell.get("duration", 3)
+        ac_pen = spell.get("ac_penalty", 2)
+        atk_pen = spell.get("attack_penalty", 2)
+
+        self.curse_buffs[target] = {
+            "ac_penalty": ac_pen,
+            "attack_penalty": atk_pen,
+            "turns_left": duration,
+        }
+
+        tc, tr = self.fighter_positions.get(target, (0, 0))
+        self.monster_spell_effects.append(
+            MonsterSpellEffect(tc, tr, "curse", name, success=True))
+
+        self.combat_log.append(
+            f"{monster.name} casts {name} on {target.name}! "
+            f"(-{ac_pen} AC, -{atk_pen} ATK for {duration} turns)")
+
+        self.active_monster_idx += 1
+        self.phase = PHASE_MONSTER_SPELL
+        self.phase_timer = 1200
+
+    def _monster_cast_poison(self, monster, target, spell):
+        """Monster poisons a party member."""
+        name = spell.get("name", "Poison")
+        save_dc = spell.get("save_dc", 11)
+        dmg_per_turn = spell.get("damage_per_turn", 2)
+        duration = spell.get("duration", 4)
+
+        # CON-like save using the character's STR mod as proxy
+        save_roll = roll_d20()
+        str_mod = get_modifier(target.strength)
+        save_total = save_roll + str_mod
+
+        tc, tr = self.fighter_positions.get(target, (0, 0))
+
+        if save_total >= save_dc:
+            self.combat_log.append(
+                f"{monster.name} uses {name} on {target.name}!")
+            self.combat_log.append(
+                f"{target.name} saves ({save_roll}+{str_mod}={save_total} "
+                f"vs DC {save_dc}) — Resisted!")
+            self.monster_spell_effects.append(
+                MonsterSpellEffect(tc, tr, "poison", name, success=False))
+        else:
+            target.poisoned = True
+            target.poison_damage = dmg_per_turn
+            target.poison_turns = duration
+            self.combat_log.append(
+                f"{monster.name} uses {name} on {target.name}!")
+            self.combat_log.append(
+                f"{target.name} fails save ({save_roll}+{str_mod}={save_total} "
+                f"vs DC {save_dc}) — Poisoned! "
+                f"({dmg_per_turn} dmg/turn for {duration} turns)")
+            self.monster_spell_effects.append(
+                MonsterSpellEffect(tc, tr, "poison", name, success=True))
+
+        self.active_monster_idx += 1
+        self.phase = PHASE_MONSTER_SPELL
+        self.phase_timer = 1200
 
     # ── Charmed monster AI ─────────────────────────────────────────
 
@@ -4434,6 +4785,19 @@ class CombatState(BaseState):
             return
         self.lightning_bolt_effects = [fx for fx in self.lightning_bolt_effects if fx.alive]
 
+        # Update monster spell effects
+        for fx in self.monster_spell_effects:
+            if fx.alive:
+                fx.update(dt)
+        if self.phase == PHASE_MONSTER_SPELL:
+            if all(not fx.alive for fx in self.monster_spell_effects):
+                self.monster_spell_effects = []
+                # After monster spell animation, continue to next monster
+                self.phase = PHASE_MONSTER
+                self.phase_timer = 400
+            return
+        self.monster_spell_effects = [fx for fx in self.monster_spell_effects if fx.alive]
+
         # Update fireballs
         if self.phase == PHASE_FIREBALL:
             for fb in self.fireballs:
@@ -4517,6 +4881,13 @@ class CombatState(BaseState):
             del self.sleep_buffs[monster]
             self.combat_log.append(
                 f"{monster.name} is jolted awake by the attack!")
+
+    def _wake_fighter(self, fighter):
+        """Wake a sleeping party member (e.g. when they take damage)."""
+        if fighter in self.sleep_buffs:
+            del self.sleep_buffs[fighter]
+            self.combat_log.append(
+                f"{fighter.name} is jolted awake by the attack!")
 
     def _check_monster_death(self, target):
         """After damaging a monster, check if it died and if combat is over."""
@@ -4608,6 +4979,11 @@ class CombatState(BaseState):
         for m in self.game.party.members:
             if hasattr(m, "potion_buffs"):
                 m.potion_buffs = {}
+            # Clear poison status after combat
+            if getattr(m, "poisoned", False):
+                m.poisoned = False
+                m.poison_damage = 0
+                m.poison_turns = 0
 
         self.game.change_state(self.source_state)
 
@@ -4677,6 +5053,7 @@ class CombatState(BaseState):
             bless_buffs=self.bless_buffs,
             curse_effects=self.curse_effects,
             curse_buffs=self.curse_buffs,
+            monster_spell_effects=self.monster_spell_effects,
             is_warband=False,
             source_state=self.source_state,
             directing_action=self.directing_action,

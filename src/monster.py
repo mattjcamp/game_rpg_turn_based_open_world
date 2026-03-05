@@ -35,7 +35,7 @@ class Monster:
                  damage_dice=1, damage_sides=4, damage_bonus=0,
                  xp_reward=25, gold_reward=10, color=(200, 50, 50),
                  tile=None, undead=False, humanoid=False, terrain="land",
-                 ranged=None):
+                 ranged=None, spells=None):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -57,6 +57,10 @@ class Monster:
         # Dict with: range, attack_bonus, damage_dice, damage_sides,
         #            damage_bonus, projectile_color, projectile_symbol, label
         self.ranged = ranged
+
+        # Spell-like abilities (list of dicts, or None)
+        # Each: type, name, range, cast_chance, + type-specific fields
+        self.spells = spells or []
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -184,6 +188,7 @@ def create_monster(name):
         humanoid=data.get("humanoid", False),
         terrain=data.get("terrain", "land"),
         ranged=data.get("ranged"),
+        spells=data.get("spells"),
     )
 
 

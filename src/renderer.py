@@ -2679,6 +2679,7 @@ class Renderer:
                           bless_buffs=None,
                           curse_effects=None,
                           curse_buffs=None,
+                          monster_spell_effects=None,
                           is_warband=False, source_state="dungeon",
                           directing_action=None,
                           menu_actions=None,
@@ -2776,6 +2777,29 @@ class Renderer:
                         sc, sr = fighter_positions[member]
                         self._u3_draw_range_buff_indicator(
                             mx, my, ts, sc, sr, buff["turns_left"])
+
+            # Draw sleep indicator on sleeping fighters (Zzz)
+            if sleep_buffs:
+                for member in fighters:
+                    if member.is_alive() and member in sleep_buffs and member in fighter_positions:
+                        sc, sr = fighter_positions[member]
+                        self._u3_draw_sleep_indicator(mx, my, ts, sc, sr,
+                                                      sleep_buffs[member])
+
+            # Draw poison indicator on poisoned fighters (green tint)
+            for member in fighters:
+                if member.is_alive() and getattr(member, "poisoned", False) and member in fighter_positions:
+                    sc, sr = fighter_positions[member]
+                    self._u3_draw_poison_indicator(mx, my, ts, sc, sr,
+                                                   getattr(member, "poison_turns", 0))
+
+            # Draw curse indicator on cursed fighters
+            if curse_buffs:
+                for member in fighters:
+                    if member.is_alive() and member in curse_buffs and member in fighter_positions:
+                        sc, sr = fighter_positions[member]
+                        self._u3_draw_curse_indicator(mx, my, ts, sc, sr,
+                                                      curse_buffs[member].get("turns_left", 0))
         else:
             # Fallback: single player sprite
             self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
@@ -2942,6 +2966,12 @@ class Renderer:
             for fx in curse_effects:
                 if fx.alive:
                     self._u3_draw_curse_effect(mx, my, ts, fx)
+
+        # ── 2w. monster spell effects ──
+        if monster_spell_effects:
+            for fx in monster_spell_effects:
+                if fx.alive:
+                    self._u3_draw_monster_spell_effect(mx, my, ts, fx)
 
         # ── 3. arena blue border ──
         pygame.draw.rect(self.screen, self._U3_BLUE,
@@ -3971,6 +4001,73 @@ class Renderer:
                 pygame.draw.circle(self.screen, (core_b, 0, int(core_b * 1.5)),
                                    (cx, cy), max(1, int(aura_r * 0.4)))
 
+    def _u3_draw_monster_spell_effect(self, ax, ay, ts, fx):
+        """Draw a monster spell-like ability effect.
+
+        Colour-coded by spell type with a pulsing glow and label text.
+        Supports: sleep (purple), curse (red), heal (green), poison (sickly green).
+        """
+        cx = int(ax + fx.col * ts + ts // 2)
+        cy = int(ay + fx.row * ts + ts // 2)
+        p = fx.progress  # 0 → 1
+        ticks = pygame.time.get_ticks()
+        r, g, b = fx.color
+
+        if p < 0.3:
+            # Phase 1: expanding ring
+            sub_p = p / 0.3
+            radius = max(2, int(ts * 0.6 * sub_p))
+            pygame.draw.circle(self.screen, (r, g, b), (cx, cy), radius, 2)
+            # Inner glow
+            inner_r = max(1, int(radius * 0.4))
+            pygame.draw.circle(self.screen, (min(255, r + 60),
+                               min(255, g + 60), min(255, b + 60)),
+                               (cx, cy), inner_r)
+
+        elif p < 0.7:
+            # Phase 2: pulsing aura with sparkles
+            sub_p = (p - 0.3) / 0.4
+            pulse = 0.7 + 0.3 * math.sin(ticks * 0.012)
+            radius = max(2, int(ts * 0.5 * pulse))
+            # Outer ring
+            pygame.draw.circle(self.screen, (r, g, b), (cx, cy), radius, 2)
+            # Inner fill (dim)
+            dim_r = max(1, int(radius * 0.5))
+            pygame.draw.circle(self.screen, (r // 3, g // 3, b // 3),
+                               (cx, cy), dim_r)
+            # Sparkles
+            for i in range(4):
+                angle = ticks * 0.008 + i * 1.57
+                dist = random.randint(2, max(3, int(ts * 0.35)))
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                pygame.draw.circle(self.screen, (min(255, r + 80),
+                                   min(255, g + 80), min(255, b + 80)),
+                                   (sx, sy), 2)
+
+        else:
+            # Phase 3: fade out
+            sub_p = (p - 0.7) / 0.3
+            alpha_f = 1.0 - sub_p
+            radius = max(2, int(ts * 0.4 * alpha_f))
+            cr = int(r * alpha_f)
+            cg = int(g * alpha_f)
+            cb = int(b * alpha_f)
+            if cr + cg + cb > 10:
+                pygame.draw.circle(self.screen, (cr, cg, cb),
+                                   (cx, cy), radius, 2)
+
+        # Draw spell label above the effect
+        if p < 0.85:
+            label = fx.label
+            if not fx.success:
+                label += " - Resisted!"
+            font = self.font_small
+            txt = font.render(label, True, (r, g, b))
+            lx = cx - txt.get_width() // 2
+            ly = cy - ts // 2 - 12 - int(p * 8)
+            self.screen.blit(txt, (lx, ly))
+
     def _u3_draw_heal_effect(self, ax, ay, ts, fx):
         """Draw a healing glow — green sparkles rising upward with heal number."""
         cx = int(ax + fx.col * ts + ts // 2)
@@ -4486,6 +4583,58 @@ class Renderer:
                     z_overlay.blit(z_surf, (0, 0))
                     z_overlay.set_alpha(z_alpha)
                     self.screen.blit(z_overlay, (zx, zy))
+
+    def _u3_draw_poison_indicator(self, ax, ay, ts, col, row, turns_left):
+        """Draw a sickly green bubbling indicator above a poisoned fighter."""
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ay + row * ts + ts // 2)
+
+        POISON_GREEN = (80, 180, 40)
+        DARK_GREEN = (40, 100, 20)
+
+        # Pulsing green tint
+        pulse = 0.5 + 0.5 * math.sin(ticks * 0.005)
+        glow_r = int(ts // 2 + 2)
+        glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4),
+                                    pygame.SRCALPHA)
+        alpha = int(20 + 20 * pulse)
+        pygame.draw.circle(glow_surf, (*DARK_GREEN, alpha),
+                           (glow_r + 2, glow_r + 2), glow_r)
+        self.screen.blit(glow_surf,
+                         (cx - glow_r - 2, cy - glow_r - 2))
+
+        # Small bubbles rising
+        for i in range(3):
+            b_phase = (ticks * 0.002 + i * 0.7) % 2.0
+            if b_phase < 1.5:
+                b_progress = b_phase / 1.5
+                bx = cx + int(math.sin(b_progress * 3.0 + i * 1.5) * 5) + (i - 1) * 3
+                by = cy - ts // 2 - int(b_progress * 10) - i * 2
+                b_alpha = int(160 * (1.0 - b_progress * 0.7))
+                b_r = max(1, 3 - i)
+                if b_alpha > 20:
+                    bub_surf = pygame.Surface((b_r * 2 + 2, b_r * 2 + 2),
+                                              pygame.SRCALPHA)
+                    pygame.draw.circle(bub_surf, (*POISON_GREEN, b_alpha),
+                                       (b_r + 1, b_r + 1), b_r)
+                    self.screen.blit(bub_surf, (bx - b_r - 1, by - b_r - 1))
+
+    def _u3_draw_curse_indicator(self, ax, ay, ts, col, row, turns_left):
+        """Draw a dark purple swirl indicator above a cursed fighter."""
+        ticks = pygame.time.get_ticks()
+        cx = int(ax + col * ts + ts // 2)
+        cy = int(ay + row * ts + ts // 2)
+
+        CURSE_PURPLE = (140, 40, 200)
+
+        # Small rotating dark particles
+        for i in range(3):
+            angle = ticks * 0.004 + i * 2.09
+            dist = int(ts * 0.3)
+            px = cx + int(math.cos(angle) * dist)
+            py = cy - ts // 4 + int(math.sin(angle) * dist * 0.5)
+            pygame.draw.circle(self.screen, CURSE_PURPLE, (px, py), 2)
 
     def _u3_draw_sleep_effect(self, ax, ay, ts, fx):
         """Draw the Sleep spell effect — soft blue/purple mist descending.
