@@ -391,7 +391,8 @@ class DungeonState(InventoryMixin, BaseState):
         pc, pr = party.col, party.row
         visible = {(pc, pr)}
 
-        has_light = self.torch_active or self._has_torch_equipped()
+        has_light = (self.torch_active or self._has_torch_equipped()
+                     or party.has_effect("Infravision"))
         if not has_light:
             # Minimal visibility — just the 8 neighbours
             for dc in (-1, 0, 1):
@@ -1035,16 +1036,22 @@ class DungeonState(InventoryMixin, BaseState):
         level_label = None
         if self.quest_levels:
             level_label = f"LEVEL {self.current_level + 1}"
+        # Determine if infravision is providing the light (no torch active)
+        has_torch_light = self.torch_active or self._has_torch_equipped()
+        infravision_active = (not has_torch_light
+                              and self.game.party.has_effect("Infravision"))
+
         renderer.draw_dungeon_u3(
             self.game.party,
             self.dungeon_data,
             message=self.message,
             visible_tiles=visible,
-            torch_steps=self.torch_steps if (self.torch_active or self._has_torch_equipped()) else -1,
+            torch_steps=self.torch_steps if has_torch_light else -1,
             level_label=level_label,
             detected_traps=self.dungeon_data.detected_traps,
             door_unlock_anim=self.door_unlock_anim,
             door_interact=self._get_door_interact_state(),
+            infravision=infravision_active,
         )
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

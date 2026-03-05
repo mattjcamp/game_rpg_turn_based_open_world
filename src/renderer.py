@@ -1209,10 +1209,15 @@ class Renderer:
 
         # ── 3c. Time-of-day darkness overlay ──
         clock = party.clock
+        has_infravision = party.has_effect("Infravision")
         if not clock.is_day:
-            has_light = party.get_equipped_name("light") is not None
+            has_light = (party.get_equipped_name("light") is not None
+                         or has_infravision)
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
                                           has_light=has_light)
+            # Apply infravision red tint when it's the active light source
+            if has_infravision and party.get_equipped_name("light") is None:
+                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -1432,7 +1437,8 @@ class Renderer:
     def draw_dungeon_u3(self, party, dungeon_data, message="",
                          visible_tiles=None, torch_steps=-1,
                          level_label=None, detected_traps=None,
-                         door_unlock_anim=None, door_interact=None):
+                         door_unlock_anim=None, door_interact=None,
+                         infravision=False):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -1505,6 +1511,11 @@ class Renderer:
             cy = psr * ts + ts // 2
             self._u3_draw_overworld_party(cx, cy, party)
 
+        # ── 3b. infravision red/black tint ──
+        if infravision:
+            self._u3_infravision_tint(cols, rows, ts, visible_tiles,
+                                       off_c, off_r, psc, psr)
+
         # ── 4. fog of war ──
         self._u3_dungeon_fog(psc, psr, cols, rows, ts,
                               visible_tiles=visible_tiles, off_c=off_c, off_r=off_r)
@@ -1538,6 +1549,8 @@ class Renderer:
             torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
             lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:02d}"
             self._u3_text(lbl, 520, bar_y + 6, torch_color)
+        elif infravision:
+            self._u3_text("INFRAVISION", 520, bar_y + 6, (200, 40, 40))
         elif light_name:
             lbl = f"LIGHT:{light_name.upper()}"
             if light_charges is not None:
@@ -2126,6 +2139,51 @@ class Renderer:
                     fog.fill((0, 0, 0, alpha), rect)
 
         self.screen.blit(fog, (0, 0))
+
+    def _u3_infravision_tint(self, cols, rows, ts, visible_tiles,
+                              off_c, off_r, party_sc, party_sr):
+        """Apply a red/black infrared tint to the map area.
+
+        Converts pixels to grayscale, then maps luminance to a red channel
+        only — bright areas become bright red, dark areas stay black.
+        Gives the look of infrared goggles.
+        """
+        map_w = cols * ts
+        map_h = rows * ts
+
+        try:
+            import pygame.surfarray as surfarray
+            import numpy as np
+
+            # Grab the current screen pixels for the map area
+            map_rect = pygame.Rect(0, 0, map_w, map_h)
+            map_surf = self.screen.subsurface(map_rect).copy()
+            arr = surfarray.pixels3d(map_surf)  # shape (w, h, 3)
+
+            # Compute luminance (grayscale) using standard weights
+            # arr is (width, height, 3) with R=0, G=1, B=2
+            lum = (arr[:, :, 0].astype(np.float32) * 0.299
+                   + arr[:, :, 1].astype(np.float32) * 0.587
+                   + arr[:, :, 2].astype(np.float32) * 0.114)
+
+            # Map luminance to red channel; green/blue get a tiny fraction
+            # for a warm infrared feel rather than pure red monochrome
+            arr[:, :, 0] = np.clip(lum * 1.1, 0, 255).astype(np.uint8)
+            arr[:, :, 1] = np.clip(lum * 0.08, 0, 255).astype(np.uint8)
+            arr[:, :, 2] = np.clip(lum * 0.04, 0, 255).astype(np.uint8)
+
+            del arr  # release surfarray lock
+            self.screen.blit(map_surf, (0, 0))
+
+        except (ImportError, Exception):
+            # Fallback: simple red overlay with MULTIPLY-like blend
+            # Remove green/blue with a dark overlay, then tint red
+            tint = pygame.Surface((map_w, map_h), pygame.SRCALPHA)
+            tint.fill((0, 0, 0, 180))
+            self.screen.blit(tint, (0, 0))
+            red_wash = pygame.Surface((map_w, map_h), pygame.SRCALPHA)
+            red_wash.fill((180, 0, 0, 80))
+            self.screen.blit(red_wash, (0, 0))
 
     # ── dungeon right panel ────────────────────────────────
 

@@ -91,6 +91,15 @@
         "class": "Fighter",
         "min_level": 2
       }
+    },
+    {
+      "id": "infravision",
+      "name": "Infravision",
+      "description": "Dwarven eyes pierce the darkness, revealing the world in shades of red.",
+      "duration": "permanent",
+      "requirements": {
+        "race": "Dwarf"
+      }
     }
   ]
 }
