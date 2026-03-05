@@ -1,7 +1,7 @@
 {
   "_comment": "A woodsman who can use light weapons and armor and knows healing magic.",
 
-  "allowed_weapons": ["fists", "dagger", "club", "sling", "bow", "sword"],
+  "allowed_weapons": ["fists", "dagger", "club", "sling", "short_bow", "long_bow", "sword"],
   "allowed_armor": ["cloth", "leather", "chain"],
 
   "hp_per_level": 15,

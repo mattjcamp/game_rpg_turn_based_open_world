@@ -217,6 +217,31 @@
     {
       "item": "Brimite Ore",
       "charges": 1
+    },
+    {
+      "item": "Short Bow"
+    },
+    {
+      "item": "Long Bow"
+    },
+    {
+      "item": "Crossbow"
+    },
+    {
+      "item": "Arrows",
+      "charges": 10
+    },
+    {
+      "item": "Arrows",
+      "charges": 10
+    },
+    {
+      "item": "Bolts",
+      "charges": 10
+    },
+    {
+      "item": "Bolts",
+      "charges": 10
     }
   ]
 }

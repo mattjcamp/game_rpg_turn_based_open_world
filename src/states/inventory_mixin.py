@@ -500,8 +500,8 @@ class InventoryMixin:
             (10, "Smoke Bomb"),
             (10, "Holy Water"),
             (8,  "Healing Herb"),
-            (5,  "Light Crossbow"),
-            (5,  "Shield"),
+            (5,  "Short Bow"),
+            (5,  "Bolts"),
         ]),
         (7, [
             (18, "Mana Potion"),
@@ -510,9 +510,9 @@ class InventoryMixin:
             (12, "Long Sword"),
             (10, "Chain Mail"),
             (10, "Steel Shield"),
-            (8,  "Magic Arrows"),
+            (8,  "Bolts"),
             (8,  "Fire Bomb"),
-            (7,  "Enchanted Dagger"),
+            (7,  "Crossbow"),
         ]),
     ]
 

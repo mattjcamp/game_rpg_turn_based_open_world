@@ -1,5 +1,5 @@
 {
-  "_comment": "Alchemist (Wizard + Thief). Stealthy sorcerer limited to daggers and cloth.",
+  "_comment": "Alchemist (Wizard + Crafter). Stealthy sorcerer limited to daggers and cloth.",
 
   "allowed_weapons": ["fists", "dagger"],
   "allowed_armor": ["cloth"],
@@ -21,10 +21,6 @@
     {
       "name": "Brew Potions",
       "description": "Can craft potions from gathered reagents"
-    },
-    {
-      "name": "Poison Use",
-      "description": "Can apply poisons to weapons for extra damage"
     }
   ]
 }

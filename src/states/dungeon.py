@@ -892,7 +892,7 @@ class DungeonState(InventoryMixin, BaseState):
         ("Axe",           1),
         ("Sword",         1),
         ("Chain",         1),
-        ("Bow",           1),
+        ("Short Bow",     1),
     ]
 
     def _open_chest(self):

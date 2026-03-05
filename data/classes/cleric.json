@@ -21,10 +21,6 @@
     {
       "name": "Turn Undead",
       "description": "Channels holy energy to damage undead foes"
-    },
-    {
-      "name": "Divine Grace",
-      "description": "Healing spells receive a Wisdom bonus"
     }
   ]
 }

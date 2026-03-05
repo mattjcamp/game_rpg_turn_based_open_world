@@ -121,16 +121,42 @@
       "party_can_equip": false,
       "character_can_equip": true
     },
-    "Bow": {
+    "Short Bow": {
+      "power": 4,
+      "ranged": true,
+      "ammo": "Arrows",
+      "slots": ["right_hand", "left_hand"],
+      "description": "A compact bow suited for skirmishes. Quick to draw but modest range.",
+      "icon": "bow",
+      "item_type": "short_bow",
+      "buy": 60,
+      "sell": 30,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Long Bow": {
       "power": 7,
       "ranged": true,
       "ammo": "Arrows",
       "slots": ["right_hand", "left_hand"],
-      "description": "A sturdy longbow. Excellent at range.",
+      "description": "A tall, powerful bow with excellent range and accuracy.",
       "icon": "bow",
-      "item_type": "bow",
+      "item_type": "long_bow",
       "buy": 150,
       "sell": 75,
+      "party_can_equip": false,
+      "character_can_equip": true
+    },
+    "Crossbow": {
+      "power": 9,
+      "ranged": true,
+      "ammo": "Bolts",
+      "slots": ["right_hand", "left_hand"],
+      "description": "A mechanical marvel. Slow to reload but devastating force.",
+      "icon": "bow",
+      "item_type": "crossbow",
+      "buy": 250,
+      "sell": 125,
       "party_can_equip": false,
       "character_can_equip": true
     },
@@ -171,7 +197,7 @@
       "slots": ["right_hand", "left_hand"],
       "description": "A silver-inlaid bow. Deadly against the undead.",
       "icon": "bow",
-      "item_type": "bow",
+      "item_type": "long_bow",
       "party_can_equip": false,
       "character_can_equip": true
     },
@@ -311,6 +337,17 @@
       "stackable": true,
       "buy": 5,
       "sell": 2,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Bolts": {
+      "description": "Heavy crossbow bolts with iron tips.",
+      "icon": "ammo",
+      "item_type": "ammo",
+      "charges": 10,
+      "stackable": true,
+      "buy": 8,
+      "sell": 4,
       "party_can_equip": false,
       "character_can_equip": false
     },

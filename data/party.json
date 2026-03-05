@@ -26,48 +26,30 @@
       "inventory": []
     },
     {
-      "name": "Mira",
-      "class": "Cleric",
-      "race": "Bobbit",
-      "gender": "Female",
-      "hp": 22,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 10,
-      "wisdom": 18,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Club",
-        "left_hand": null,
-        "body": "Leather",
-        "head": null
-      },
-      "inventory": []
-    },
-    {
-      "name": "Theron",
-      "class": "Wizard",
-      "race": "Fuzzy",
+      "name": "Ranger",
+      "class": "Ranger",
+      "race": "Human",
       "gender": "Male",
-      "hp": 14,
-      "strength": 6,
-      "dexterity": 14,
-      "intelligence": 20,
-      "wisdom": 8,
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 15,
+      "intelligence": 11,
+      "wisdom": 14,
       "level": 1,
       "equipped": {
-        "right_hand": "Dagger",
+        "right_hand": "Fists",
         "left_hand": null,
         "body": "Cloth",
         "head": null
       },
-      "inventory": []
+      "inventory": [],
+      "sprite": "src/assets/u4_tiles/ranger.png"
     },
     {
-      "name": "test",
+      "name": "Druid",
       "class": "Druid",
-      "race": "Halfling",
-      "gender": "Male",
+      "race": "Elf",
+      "gender": "Female",
       "hp": 20,
       "strength": 10,
       "dexterity": 10,
@@ -81,7 +63,27 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/u4_tiles/ranger_alt.png"
+      "sprite": "src/assets/u4_tiles/villager_female.png"
+    },
+    {
+      "name": "Thief",
+      "class": "Thief",
+      "race": "Halfling",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 17,
+      "intelligence": 10,
+      "wisdom": 13,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "example_graphics/Ultima3_AMI_sprite_barbarian.png"
     }
   ],
   "active_party": [

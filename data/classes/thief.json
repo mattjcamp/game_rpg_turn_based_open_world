@@ -1,7 +1,7 @@
 {
   "_comment": "Thief class template. Thieves favor light weapons and light armor.",
 
-  "allowed_weapons": ["fists", "dagger", "club", "sling", "bow"],
+  "allowed_weapons": ["fists", "dagger", "club", "sling", "short_bow"],
   "allowed_armor": ["cloth", "leather"],
 
   "hp_per_level": 5,
