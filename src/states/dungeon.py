@@ -303,6 +303,8 @@ class DungeonState(InventoryMixin, BaseState):
             self._check_monster_contact()
             # Burn torch after each successful step
             self._tick_torch()
+            # Tick Galadriel's Light step counter
+            self._tick_galadriels_light()
         else:
             self.move_cooldown = MOVE_REPEAT_DELAY
 
@@ -374,6 +376,22 @@ class DungeonState(InventoryMixin, BaseState):
             else:
                 self.show_message("Your torch has burned out!", 2500)
 
+    def _tick_galadriels_light(self):
+        """Decrement Galadriel's Light step counter and auto-remove when expired."""
+        party = self.game.party
+        if not party.has_effect("Galadriel's Light"):
+            return
+        if party.galadriels_light_steps <= 0:
+            return
+        party.galadriels_light_steps -= 1
+        if party.galadriels_light_steps <= 0:
+            # Remove the effect from whichever slot it occupies
+            for slot_key in party.EFFECT_SLOTS:
+                if party.get_effect(slot_key) == "Galadriel's Light":
+                    party.set_effect(slot_key, None)
+                    break
+            self.show_message("Galadriel's Light fades away...", 3000)
+
     def _on_spell_magic_light(self, steps):
         """Override: activate the torch system using the Light spell's step count."""
         self.torch_active = True
@@ -392,7 +410,9 @@ class DungeonState(InventoryMixin, BaseState):
         visible = {(pc, pr)}
 
         has_light = (self.torch_active or self._has_torch_equipped()
-                     or party.has_effect("Infravision"))
+                     or party.has_effect("Infravision")
+                     or (party.has_effect("Galadriel's Light")
+                         and party.galadriels_light_steps > 0))
         if not has_light:
             # Minimal visibility — just the 8 neighbours
             for dc in (-1, 0, 1):
@@ -1037,13 +1057,17 @@ class DungeonState(InventoryMixin, BaseState):
         level_label = None
         if self.quest_levels:
             level_label = f"LEVEL {self.current_level + 1}"
-        # Determine if infravision is providing the light (no torch active)
+        # Determine if infravision or Galadriel's Light provides the light
         has_torch_light = self.torch_active or self._has_torch_equipped()
+        party = self.game.party
         infravision_active = (not has_torch_light
-                              and self.game.party.has_effect("Infravision"))
+                              and party.has_effect("Infravision"))
+        galadriels_active = (not has_torch_light and not infravision_active
+                             and party.has_effect("Galadriel's Light")
+                             and party.galadriels_light_steps > 0)
 
         renderer.draw_dungeon_u3(
-            self.game.party,
+            party,
             self.dungeon_data,
             message=self.message,
             visible_tiles=visible,
@@ -1053,6 +1077,7 @@ class DungeonState(InventoryMixin, BaseState):
             door_unlock_anim=self.door_unlock_anim,
             door_interact=self._get_door_interact_state(),
             infravision=infravision_active,
+            galadriels_light=galadriels_active,
         )
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

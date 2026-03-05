@@ -100,6 +100,15 @@
       "requirements": {
         "race": "Dwarf"
       }
+    },
+    {
+      "id": "galadriels_light",
+      "name": "Galadriel's Light",
+      "description": "Elven starlight illuminates the darkness with a soft blue radiance. Lasts 500 steps.",
+      "duration": 500,
+      "requirements": {
+        "race": "Elf"
+      }
     }
   ]
 }

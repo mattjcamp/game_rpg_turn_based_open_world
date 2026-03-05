@@ -929,6 +929,9 @@ class Party:
         self.last_pickpocket_day = -1
         # Tinker cooldown: day_index of last attempt (-1 = never used)
         self.last_tinker_day = -1
+        # Galadriel's Light: remaining steps (0 = inactive), day cooldown
+        self.galadriels_light_steps = 0
+        self.last_galadriels_light_day = -1
 
         # Game clock — tracks day, hour, lunar phase
         from src.game_time import GameClock
@@ -1032,6 +1035,10 @@ class Party:
             reqs = eff.get("requirements", {})
             if not self._meets_requirements(reqs):
                 continue
+            # Galadriel's Light: once per day cooldown
+            if eff["id"] == "galadriels_light":
+                if self.last_galadriels_light_day == self.clock.day_index:
+                    continue
             available.append(eff)
 
         # Offer Torch as an assignable effect if one is in the stash

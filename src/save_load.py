@@ -71,6 +71,8 @@ def _serialize_party(party):
         "clock": party.clock.to_dict(),
         "last_pickpocket_day": party.last_pickpocket_day,
         "last_tinker_day": party.last_tinker_day,
+        "galadriels_light_steps": party.galadriels_light_steps,
+        "last_galadriels_light_day": party.last_galadriels_light_day,
     }
 
 
@@ -159,6 +161,9 @@ def _deserialize_party(data):
     party.last_pickpocket_day = data.get("last_pickpocket_day", -1)
     # Tinker cooldown
     party.last_tinker_day = data.get("last_tinker_day", -1)
+    # Galadriel's Light
+    party.galadriels_light_steps = data.get("galadriels_light_steps", 0)
+    party.last_galadriels_light_day = data.get("last_galadriels_light_day", -1)
 
     return party
 

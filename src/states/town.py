@@ -343,8 +343,25 @@ class TownState(InventoryMixin, BaseState):
             party.row = target_row
             self.move_cooldown = MOVE_REPEAT_DELAY
             self._check_tile_events()
+            # Tick Galadriel's Light step counter
+            self._tick_galadriels_light()
         else:
             self.move_cooldown = MOVE_REPEAT_DELAY
+
+    def _tick_galadriels_light(self):
+        """Decrement Galadriel's Light step counter and auto-remove when expired."""
+        party = self.game.party
+        if not party.has_effect("Galadriel's Light"):
+            return
+        if party.galadriels_light_steps <= 0:
+            return
+        party.galadriels_light_steps -= 1
+        if party.galadriels_light_steps <= 0:
+            for slot_key in party.EFFECT_SLOTS:
+                if party.get_effect(slot_key) == "Galadriel's Light":
+                    party.set_effect(slot_key, None)
+                    break
+            self.show_message("Galadriel's Light fades away...", 3000)
 
     def _check_tile_events(self):
         """Check if the party stepped on a special tile."""

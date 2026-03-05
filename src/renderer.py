@@ -1295,14 +1295,25 @@ class Renderer:
         # ── 3c. Time-of-day darkness overlay ──
         clock = party.clock
         has_infravision = party.has_effect("Infravision")
+        has_galadriels = (party.has_effect("Galadriel's Light")
+                          and party.galadriels_light_steps > 0)
         if not clock.is_day:
             has_light = (party.get_equipped_name("light") is not None
-                         or has_infravision)
+                         or has_infravision or has_galadriels)
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
                                           has_light=has_light)
             # Apply infravision red tint when it's the active light source
             if has_infravision and party.get_equipped_name("light") is None:
                 self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
+            # Apply Galadriel's Light blue tint (when no torch or infravision)
+            elif (has_galadriels
+                  and party.get_equipped_name("light") is None
+                  and not has_infravision):
+                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr)
+        # Galadriel's Light blue tint also applies during day (subtle)
+        if has_galadriels and not has_infravision:
+            self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr,
+                                      subtle=True)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -1523,7 +1534,7 @@ class Renderer:
                          visible_tiles=None, torch_steps=-1,
                          level_label=None, detected_traps=None,
                          door_unlock_anim=None, door_interact=None,
-                         infravision=False):
+                         infravision=False, galadriels_light=False):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -1600,6 +1611,10 @@ class Renderer:
         if infravision:
             self._u3_infravision_tint(cols, rows, ts, visible_tiles,
                                        off_c, off_r, psc, psr)
+        # ── 3c. Galadriel's Light blue tint ──
+        elif galadriels_light:
+            self._u3_galadriels_tint(cols, rows, ts, visible_tiles,
+                                      off_c, off_r, psc, psr)
 
         # ── 4. fog of war ──
         self._u3_dungeon_fog(psc, psr, cols, rows, ts,
@@ -1636,6 +1651,10 @@ class Renderer:
             self._u3_text(lbl, 520, bar_y + 6, torch_color)
         elif infravision:
             self._u3_text("INFRAVISION", 520, bar_y + 6, (200, 40, 40))
+        elif galadriels_light:
+            gl_steps = party.galadriels_light_steps
+            gl_color = (120, 160, 255) if gl_steps > 50 else (200, 100, 100)
+            self._u3_text(f"STARLIGHT:{gl_steps:03d}", 520, bar_y + 6, gl_color)
         elif light_name:
             lbl = f"LIGHT:{light_name.upper()}"
             if light_charges is not None:
@@ -2269,6 +2288,63 @@ class Renderer:
             red_wash = pygame.Surface((map_w, map_h), pygame.SRCALPHA)
             red_wash.fill((180, 0, 0, 80))
             self.screen.blit(red_wash, (0, 0))
+
+    def _u3_galadriels_tint(self, cols, rows, ts, visible_tiles,
+                              off_c, off_r, party_sc, party_sr,
+                              subtle=False):
+        """Apply a soft blue tint to the map area for Galadriel's Light.
+
+        When *subtle* is True (daytime overworld), only a very light wash
+        is applied.  Otherwise, the effect shifts the colour balance toward
+        blue/white starlight.
+        """
+        map_w = cols * ts
+        map_h = rows * ts
+
+        try:
+            import pygame.surfarray as surfarray
+            import numpy as np
+
+            map_rect = pygame.Rect(0, 0, map_w, map_h)
+            map_surf = self.screen.subsurface(map_rect).copy()
+            arr = surfarray.pixels3d(map_surf)  # shape (w, h, 3)
+
+            if subtle:
+                # Daytime: very light blue wash — barely noticeable
+                arr[:, :, 0] = np.clip(arr[:, :, 0].astype(np.int16) - 8,
+                                        0, 255).astype(np.uint8)
+                arr[:, :, 1] = np.clip(arr[:, :, 1].astype(np.int16) - 4,
+                                        0, 255).astype(np.uint8)
+                arr[:, :, 2] = np.clip(arr[:, :, 2].astype(np.int16) + 18,
+                                        0, 255).astype(np.uint8)
+            else:
+                # Full starlight: shift toward cool blue/white
+                lum = (arr[:, :, 0].astype(np.float32) * 0.299
+                       + arr[:, :, 1].astype(np.float32) * 0.587
+                       + arr[:, :, 2].astype(np.float32) * 0.114)
+
+                # Keep some of the original colour, blend with blue-shifted lum
+                arr[:, :, 0] = np.clip(
+                    arr[:, :, 0] * 0.55 + lum * 0.25, 0, 255
+                ).astype(np.uint8)
+                arr[:, :, 1] = np.clip(
+                    arr[:, :, 1] * 0.55 + lum * 0.35, 0, 255
+                ).astype(np.uint8)
+                arr[:, :, 2] = np.clip(
+                    arr[:, :, 2] * 0.45 + lum * 0.65, 0, 255
+                ).astype(np.uint8)
+
+            del arr
+            self.screen.blit(map_surf, (0, 0))
+
+        except (ImportError, Exception):
+            # Fallback: simple blue overlay
+            tint = pygame.Surface((map_w, map_h), pygame.SRCALPHA)
+            if subtle:
+                tint.fill((40, 60, 140, 25))
+            else:
+                tint.fill((30, 50, 120, 70))
+            self.screen.blit(tint, (0, 0))
 
     # ── dungeon right panel ────────────────────────────────
 

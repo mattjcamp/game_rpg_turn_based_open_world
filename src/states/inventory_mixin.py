@@ -696,6 +696,9 @@ class InventoryMixin:
                     if row[0] == 'active':
                         # Remove the active effect
                         slot_key, eff_name = row[1], row[2]
+                        # Galadriel's Light: clear step counter on removal
+                        if eff_name == "Galadriel's Light":
+                            party.galadriels_light_steps = 0
                         self._on_effect_removed(eff_name)
                         party.set_effect(slot_key, None)
                     else:
@@ -706,6 +709,10 @@ class InventoryMixin:
                         for slot_key in party.EFFECT_SLOTS:
                             if party.get_effect(slot_key) is None:
                                 party.set_effect(slot_key, eff_name)
+                                # Galadriel's Light: init step counter + day cooldown
+                                if eff_dict.get("id") == "galadriels_light":
+                                    party.galadriels_light_steps = eff_dict.get("duration", 500)
+                                    party.last_galadriels_light_day = party.clock.day_index
                                 self._on_effect_assigned(eff_name)
                                 assigned = True
                                 break
