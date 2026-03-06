@@ -65,11 +65,11 @@
       "character_can_equip": true
     },
     "Sling": {
-      "power": 3,
+      "power": 2,
       "ranged": true,
       "ammo": "Stones",
       "slots": ["right_hand", "left_hand"],
-      "description": "A simple ranged weapon that hurls stones.",
+      "description": "A simple ranged weapon that hurls stones. Cheap but weak.",
       "icon": "bow",
       "item_type": "sling",
       "buy": 60,

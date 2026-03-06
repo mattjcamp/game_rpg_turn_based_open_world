@@ -223,8 +223,9 @@ _ENCOUNTER_DATA = _load_json("encounters.json")
 ENCOUNTERS = _ENCOUNTER_DATA.get("encounters", {})
 
 
-def create_encounter(area="dungeon", terrain="land"):
-    """Pick a random encounter template matching *terrain*.
+def create_encounter(area="dungeon", terrain="land",
+                     min_level=None, max_level=None):
+    """Pick a random encounter template matching *terrain* and level range.
 
     Parameters
     ----------
@@ -234,17 +235,27 @@ def create_encounter(area="dungeon", terrain="land"):
         ``"land"`` or ``"sea"``.  Only encounters whose ``"terrain"``
         field matches are eligible.  Encounters without the field
         default to ``"land"``.
+    min_level : int or None
+        If set, only encounters with ``"level" >= min_level`` are eligible.
+    max_level : int or None
+        If set, only encounters with ``"level" <= max_level`` are eligible.
 
     Returns a dict with keys:
         name : str            — display name (e.g. "Goblin Ambush")
         monsters : list       — list of Monster objects
         monster_party_tile : str — monster name whose sprite represents
                                    the group on the map
+        level : int           — encounter difficulty level (1-8)
     Uses weighted random selection from data/encounters.json.
     """
     all_pool = ENCOUNTERS.get(area, [])
     # Filter by terrain
     pool = [e for e in all_pool if e.get("terrain", "land") == terrain]
+    # Filter by level range
+    if min_level is not None:
+        pool = [e for e in pool if e.get("level", 1) >= min_level]
+    if max_level is not None:
+        pool = [e for e in pool if e.get("level", 1) <= max_level]
     if not pool:
         # No encounters for this terrain — return None so caller can skip
         if terrain != "land":
@@ -265,6 +276,7 @@ def create_encounter(area="dungeon", terrain="land"):
             break
 
     enc_name = chosen.get("name", "Encounter")
+    enc_level = chosen.get("level", 1)
     party_tile = chosen.get("monster_party_tile", chosen["monsters"][0])
     monsters = []
     for name in chosen.get("monsters", []):
@@ -272,9 +284,9 @@ def create_encounter(area="dungeon", terrain="land"):
     if not monsters:
         m = create_random_monster(area)
         return {"name": m.name, "monsters": [m],
-                "monster_party_tile": m.name}
+                "monster_party_tile": m.name, "level": 1}
     return {"name": enc_name, "monsters": monsters,
-            "monster_party_tile": party_tile}
+            "monster_party_tile": party_tile, "level": enc_level}
 
 
 def reload_module_data(module_data_dir=None):

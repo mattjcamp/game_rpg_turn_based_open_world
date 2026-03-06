@@ -533,7 +533,7 @@ Weapons determine your attack damage in combat. Each has a **power rating** that
 
 | Weapon | Power | Damage | Ammo | Buy | Classes |
 |--------|-------|--------|------|-----|---------|
-| Sling | 3 | 1d6 | Stones | 60g | Cleric, Thief, Ranger |
+| Sling | 2 | 1d4 | Stones | 60g | Cleric, Thief, Ranger |
 | Short Bow | 4 | 1d6 | Arrows | 60g | Thief, Ranger |
 | Long Bow | 7 | 1d8 | Arrows | 150g | Ranger |
 | Crossbow | 9 | 1d10 | Bolts | 250g | Fighter, Paladin |
@@ -795,6 +795,25 @@ HP: 30 | AC: 14 | Attack: +6 | Damage: 2d6+2
 Found in: Dungeons (rare), overworld (rare)
 
 > **Tip:** Focus fire on Trolls to overwhelm their regeneration. A Curse spell (-2 attack) can reduce their devastating damage output.
+
+---
+
+## Encounter Difficulty
+
+Every encounter in the game has a difficulty level from 1 to 8. Easy areas (like house basements) draw from low-level encounters, while dangerous regions feature high-level encounters with more monsters, spellcasters, and elite enemies.
+
+| Level | Typical Enemies | Example Encounters |
+|-------|----------------|-------------------|
+| 1 | Rats, lone goblins | Cellar Rats, Stray Goblin, Field Rats |
+| 2 | Goblin groups, wolf pairs | Goblin Ambush, Wolf Pack, Rat Swarm |
+| 3 | Skeletons, zombies, shamans | Skeleton Patrol, Shambling Dead, Shaman's Guard |
+| 4 | Orc pairs, undead mixes, wolf packs | Orc Scouts, Undead Warband, Mixed Patrol |
+| 5 | Orc warbands, dark mages, lone trolls | Orc Raiding Party, Dark Coven, Troll Den |
+| 6 | Large mixed groups, trolls with allies | Orc Siege, Troll and Minions, Cursed Battalion |
+| 7 | Troll pairs, mage covens, orc legions | Troll Warband, Dark Conclave, Necromancer's Guard |
+| 8 | Troll hordes, shadow armies, massed orcs | Shadow Army, Undead Apocalypse, Troll Kings |
+
+As a rule of thumb, your party should be around the encounter's level to have a fair fight. Encounters 2+ levels above your party are very dangerous, and encounters 2+ levels below are easy pickings.
 
 ---
 
