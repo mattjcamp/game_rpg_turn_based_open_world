@@ -31,6 +31,7 @@ TILE_DUNGEON  = 5
 TILE_PATH     = 6
 TILE_SAND     = 7
 TILE_BRIDGE   = 8
+TILE_DUNGEON_CLEARED = 9
 
 # ----- Town-interior tile IDs -----
 TILE_FLOOR    = 10
@@ -65,6 +66,7 @@ TILE_DEFS = {
     TILE_PATH:     {"color": (160, 140, 100), "walkable": True,  "name": "Path"},
     TILE_SAND:     {"color": (210, 190, 130), "walkable": True,  "name": "Sand"},
     TILE_BRIDGE:   {"color": (140, 100, 50),  "walkable": True,  "name": "Bridge"},
+    TILE_DUNGEON_CLEARED: {"color": (80, 70, 60), "walkable": True, "name": "Cleared Dungeon"},
     # Town-interior tiles
     TILE_FLOOR:    {"color": (160, 130, 100), "walkable": True,  "name": "Floor"},
     TILE_WALL:     {"color": (90, 70, 50),    "walkable": False, "name": "Wall"},

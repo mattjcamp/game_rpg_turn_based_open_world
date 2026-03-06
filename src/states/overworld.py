@@ -15,7 +15,7 @@ from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
-    TILE_WATER, TILE_MACHINE,
+    TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED,
 )
 from src.dungeon_generator import generate_dungeon, generate_house_dungeon
 from src.monster import create_random_monster, create_encounter, create_monster
@@ -635,6 +635,10 @@ class OverworldState(InventoryMixin, BaseState):
                     dungeon_data, pcol, prow
                 )
             self.game.change_state("dungeon")
+            return
+
+        elif tile_id == TILE_DUNGEON_CLEARED:
+            self.show_message("This dungeon has been cleared.", 1500)
             return
 
         elif tile_id == TILE_MACHINE:

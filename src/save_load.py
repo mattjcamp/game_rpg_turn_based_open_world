@@ -2,8 +2,8 @@
 Save and load game state to/from JSON files.
 
 Serializes the party (members, equipment, inventory, gold, position),
-party-level equipment and effects, and the current game state name.
-Save files are stored in data/saves/.
+party-level equipment and effects, module/quest state, and cleared
+dungeon positions.  Save files are stored in data/saves/.
 """
 
 import json
@@ -11,6 +11,7 @@ import os
 import time
 
 from src.party import Party, PartyMember
+from src.settings import TILE_DUNGEON_CLEARED
 
 # ── Save directory ────────────────────────────────────────────────
 _SAVE_DIR = os.path.join(
@@ -73,6 +74,42 @@ def _serialize_party(party):
         "last_tinker_day": party.last_tinker_day,
         "galadriels_light_steps": party.galadriels_light_steps,
         "last_galadriels_light_day": party.last_galadriels_light_day,
+    }
+
+
+def _serialize_key_dungeons(game):
+    """Serialize key dungeon quest state (status, position, metadata).
+
+    We do NOT serialize the DungeonData/level layouts — those are
+    regenerated from module data on load.  We only persist the quest
+    tracking state.
+    """
+    result = []
+    for (col, row), kd in getattr(game, "key_dungeons", {}).items():
+        result.append({
+            "col": col,
+            "row": row,
+            "dungeon_number": kd["dungeon_number"],
+            "name": kd["name"],
+            "key_name": kd["key_name"],
+            "status": kd["status"],
+            "artifact_name": kd.get("artifact_name", kd["key_name"]),
+            "current_level": kd.get("current_level", 0),
+        })
+    return result
+
+
+def _serialize_quest(quest):
+    """Serialize a quest dict (quest or house_quest), excluding DungeonData."""
+    if quest is None:
+        return None
+    return {
+        "status": quest.get("status", "active"),
+        "dungeon_col": quest.get("dungeon_col"),
+        "dungeon_row": quest.get("dungeon_row"),
+        "artifact_name": quest.get("artifact_name"),
+        "name": quest.get("name"),
+        "current_level": quest.get("current_level", 0),
     }
 
 
@@ -194,11 +231,35 @@ def save_game(slot, game):
                 state_name = name
                 break
 
+        # Collect cleared dungeon positions from the overworld tile map
+        cleared_dungeons = []
+        if hasattr(game, "tile_map") and game.tile_map is not None:
+            tm = game.tile_map
+            for r in range(tm.height):
+                for c in range(tm.width):
+                    if tm.get_tile(c, r) == TILE_DUNGEON_CLEARED:
+                        cleared_dungeons.append([c, r])
+
         save_data = {
-            "version": 1,
+            "version": 2,
             "timestamp": time.time(),
             "state": state_name,
             "party": _serialize_party(game.party),
+            "cleared_dungeons": cleared_dungeons,
+            # ── Module identification ──
+            "module_path": getattr(game, "active_module_path", None),
+            "module_name": getattr(game, "active_module_name", None),
+            "module_version": getattr(game, "active_module_version", None),
+            # ── Quest state ──
+            "key_dungeons": _serialize_key_dungeons(game),
+            "keys_inserted": getattr(game, "keys_inserted", 0),
+            "machine_col": getattr(game, "machine_col", None),
+            "machine_row": getattr(game, "machine_row", None),
+            "darkness_active": getattr(game, "darkness_active", False),
+            "quest": _serialize_quest(getattr(game, "quest", None)),
+            "house_quest": _serialize_quest(getattr(game, "house_quest", None)),
+            # ── Game log ──
+            "game_log": list(getattr(game, "game_log", [])),
         }
 
         path = _save_path(slot)
@@ -212,8 +273,8 @@ def save_game(slot, game):
 def load_game(slot, game):
     """Load game state from a numbered slot (1-based).
 
-    Restores party data (members, equipment, inventory, position, gold)
-    and switches to the saved game state.
+    Restores party data, module/quest state, overworld map, and cleared
+    dungeon positions, then switches to the overworld state.
 
     Parameters
     ----------
@@ -234,17 +295,169 @@ def load_game(slot, game):
         with open(path, "r") as f:
             save_data = json.load(f)
 
-        # Restore the party
+        # ── Restore module context ──────────────────────────────
+        # Reload module data so items, races, monsters, etc. match
+        saved_module = save_data.get("module_path")
+        if saved_module and os.path.isdir(saved_module):
+            game.active_module_path = saved_module
+            game.active_module_name = save_data.get(
+                "module_name", "Unknown Module")
+            game.active_module_version = save_data.get(
+                "module_version", "1.0.0")
+
+            from src.module_loader import load_module_data
+            game.module_manifest = load_module_data(saved_module)
+        else:
+            game.module_manifest = None
+
+        # ── Regenerate the overworld map from module config ─────
+        from src.tile_map import create_test_map
+        from src.camera import Camera
+
+        overworld_cfg = None
+        if game.module_manifest:
+            overworld_cfg = game.module_manifest.get("_overworld_cfg")
+
+        game.tile_map = create_test_map(
+            overworld_cfg=overworld_cfg,
+            data_dir=game.active_module_path if game.module_manifest else None)
+        game.camera = Camera(game.tile_map.width, game.tile_map.height)
+
+        # ── Restore the party ───────────────────────────────────
         game.party = _deserialize_party(save_data["party"])
 
-        # Switch to the saved game state (always return to overworld
-        # to avoid loading mid-combat or mid-dungeon complications)
+        # ── Restore cleared dungeon tiles ───────────────────────
+        for pos in save_data.get("cleared_dungeons", []):
+            c, r = pos
+            game.tile_map.set_tile(c, r, TILE_DUNGEON_CLEARED)
+
+        # ── Restore darkness effect ─────────────────────────────
+        game.darkness_active = save_data.get("darkness_active", False)
+
+        # ── Restore Keys of Shadow module state ─────────────────
+        game.keys_inserted = save_data.get("keys_inserted", 0)
+        game.machine_col = save_data.get("machine_col")
+        game.machine_row = save_data.get("machine_row")
+
+        # Regenerate key dungeon levels from module data, then
+        # restore quest statuses from the save file
+        _restore_key_dungeons(game, save_data)
+
+        # ── Restore standard quest and house quest ──────────────
+        _restore_quest(game, save_data, "quest")
+        _restore_quest(game, save_data, "house_quest")
+
+        # ── Restore game log ────────────────────────────────────
+        game.game_log = list(save_data.get("game_log", []))
+
+        # ── Reset transient state ───────────────────────────────
+        game.pending_combat_rewards = None
+
+        # ── Restore town (module-specific) ──────────────────────
+        if game.module_manifest:
+            prog = game.module_manifest.get("progression", {})
+            kd_list = prog.get("key_dungeons", [])
+            if kd_list:
+                from src.town_generator import generate_duskhollow
+                game.town_data = generate_duskhollow()
+
+        # ── Switch to overworld ─────────────────────────────────
         game.change_state("overworld")
         game.camera.update(game.party.col, game.party.row)
 
         return True
     except Exception:
         return False
+
+
+def _restore_key_dungeons(game, save_data):
+    """Regenerate key dungeon levels and restore quest statuses.
+
+    The dungeon layouts are regenerated fresh (they're procedural), but
+    the quest tracking state (status, current_level, etc.) is restored
+    from the save data.
+    """
+    from src.dungeon_generator import generate_keys_dungeon
+
+    saved_kds = save_data.get("key_dungeons", [])
+    if not saved_kds:
+        game.key_dungeons = {}
+        return
+
+    # Build a lookup from (col, row) to saved status
+    saved_lookup = {}
+    for skd in saved_kds:
+        key = (skd["col"], skd["row"])
+        saved_lookup[key] = skd
+
+    # If key_dungeons were already initialised (e.g. by module load on
+    # new game), update their statuses.  Otherwise, regenerate them.
+    if not getattr(game, "key_dungeons", {}):
+        game.key_dungeons = {}
+
+    # Regenerate dungeon levels for each saved key dungeon
+    for skd in saved_kds:
+        col, row = skd["col"], skd["row"]
+        dnum = skd["dungeon_number"]
+        name = skd.get("name", f"Key Dungeon {dnum}")
+        key_name = skd.get("key_name", f"Key {dnum}")
+        status = skd.get("status", "active")
+
+        # Regenerate the multi-floor dungeon
+        levels = generate_keys_dungeon(dnum, name=name)
+
+        game.key_dungeons[(col, row)] = {
+            "dungeon_number": dnum,
+            "name": name,
+            "key_name": key_name,
+            "levels": levels,
+            "current_level": skd.get("current_level", 0),
+            "status": status,
+            "dungeon_col": col,
+            "dungeon_row": row,
+            "artifact_name": skd.get("artifact_name", key_name),
+        }
+
+
+def _restore_quest(game, save_data, quest_attr):
+    """Restore a quest (quest or house_quest) from save data.
+
+    For quests with status 'active' or 'artifact_found', we regenerate
+    dungeon levels so the player can re-enter.  Completed quests just
+    need their status preserved.
+    """
+    saved_q = save_data.get(quest_attr)
+    if saved_q is None:
+        setattr(game, quest_attr, None)
+        return
+
+    status = saved_q.get("status", "active")
+    dcol = saved_q.get("dungeon_col")
+    drow = saved_q.get("dungeon_row")
+    artifact = saved_q.get("artifact_name", "Shadow Crystal")
+    name = saved_q.get("name")
+
+    quest = {
+        "status": status,
+        "dungeon_col": dcol,
+        "dungeon_row": drow,
+        "artifact_name": artifact,
+        "current_level": saved_q.get("current_level", 0),
+    }
+    if name:
+        quest["name"] = name
+
+    # Regenerate dungeon levels for active/in-progress quests
+    if status in ("active", "artifact_found") and dcol is not None:
+        from src.dungeon_generator import generate_dungeon, generate_house_dungeon
+        if quest_attr == "house_quest":
+            levels = generate_house_dungeon()
+            quest["levels"] = levels
+        else:
+            levels = [generate_dungeon(name or "Shadow Crystal Dungeon")]
+            quest["levels"] = levels
+
+    setattr(game, quest_attr, quest)
 
 
 def get_save_info(slot):
@@ -254,7 +467,8 @@ def get_save_info(slot):
     -------
     dict or None
         {"slot": int, "timestamp": float, "state": str,
-         "party_names": list[str], "gold": int, "level_avg": float}
+         "party_names": list[str], "gold": int, "level_avg": float,
+         "module_name": str or None}
     """
     path = _save_path(slot)
     if not os.path.isfile(path):
@@ -275,6 +489,7 @@ def get_save_info(slot):
             "party_names": names,
             "gold": party_data.get("gold", 0),
             "level_avg": avg_level,
+            "module_name": data.get("module_name"),
         }
     except Exception:
         return None

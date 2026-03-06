@@ -14,6 +14,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
+    TILE_DUNGEON_CLEARED,
 )
 
 
@@ -974,6 +975,15 @@ class DungeonState(InventoryMixin, BaseState):
 
         elif tile_id == TILE_PORTAL:
             # Portal whisks the party back to the overworld
+            # Mark quest as completed and change the overworld tile
+            active_q = self._get_active_quest()
+            if active_q and active_q.get("status") == "artifact_found":
+                active_q["status"] = "completed"
+            # Swap the dungeon tile on the overworld to show it's cleared
+            self.game.tile_map.set_tile(
+                self.overworld_col, self.overworld_row,
+                TILE_DUNGEON_CLEARED)
+
             self._entered = False
             self.pending_combat_message = None
             self.quest_levels = None

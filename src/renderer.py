@@ -20,6 +20,7 @@ from src.settings import (
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
+    TILE_DUNGEON_CLEARED,
 )
 
 
@@ -67,6 +68,7 @@ class Renderer:
             TILE_FOREST:   (0, 3),
             TILE_MOUNTAIN: (0, 4),
             TILE_DUNGEON:  (0, 5),
+            TILE_DUNGEON_CLEARED: (0, 5),   # same sprite, tinted by procedural overlay
             TILE_TOWN:     (0, 6),
             TILE_PATH:     (0, 2),
             TILE_CHEST:    (0, 9),
@@ -1903,13 +1905,24 @@ class Renderer:
         from src.settings import (
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
             TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
-            TILE_MACHINE, TILE_KEYSLOT,
+            TILE_MACHINE, TILE_KEYSLOT, TILE_DUNGEON_CLEARED,
         )
 
         # Try sprite sheet first
         sprite = self._get_tile_sprite(tile_id)
         if sprite:
             self.screen.blit(sprite, (px, py))
+            # Cleared dungeons get a dark tint overlay + "X" mark
+            if tile_id == TILE_DUNGEON_CLEARED:
+                overlay = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 120))
+                self.screen.blit(overlay, (px, py))
+                cx = px + ts // 2
+                cy = py + ts // 2
+                pygame.draw.line(self.screen, (160, 140, 100),
+                                 (cx - 5, cy - 5), (cx + 5, cy + 5), 2)
+                pygame.draw.line(self.screen, (160, 140, 100),
+                                 (cx + 5, cy - 5), (cx - 5, cy + 5), 2)
             return
 
         # Fallback: procedural drawing when sprites are unavailable
@@ -1982,6 +1995,17 @@ class Renderer:
             pygame.draw.circle(self.screen, (20, 0, 15), (cx, cy), 6)
             text = self.font_small.render("!", True, (255, 255, 0))
             self.screen.blit(text, (cx - 3, cy - 6))
+
+        elif tile_id == TILE_DUNGEON_CLEARED:
+            # Collapsed / cleared cave entrance — muted colours, "X" mark
+            pygame.draw.rect(self.screen, (40, 35, 30), rect)
+            pygame.draw.circle(self.screen, (55, 45, 40), (cx, cy), 10)
+            pygame.draw.circle(self.screen, (35, 30, 25), (cx, cy), 6)
+            # Draw an "X" to indicate cleared
+            pygame.draw.line(self.screen, (100, 90, 70),
+                             (cx - 5, cy - 5), (cx + 5, cy + 5), 2)
+            pygame.draw.line(self.screen, (100, 90, 70),
+                             (cx + 5, cy - 5), (cx - 5, cy + 5), 2)
 
         elif tile_id == TILE_PATH:
             # Dirt path
