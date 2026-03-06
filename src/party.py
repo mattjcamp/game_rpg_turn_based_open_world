@@ -267,20 +267,49 @@ class PartyMember:
         from the class template (default 500), but a race can override it
         via an ``exp_per_level`` field in races.json (e.g. Humans use 350).
 
+        HP gains are modified by STR modifier (minimum +1 total).
+        MP gains are modified by the class's casting stat modifier:
+          - Single-stat casters (Wizard→INT, Cleric→WIS, etc.)
+          - Dual-stat casters (Druid→higher of INT/WIS)
+        Non-caster classes get no MP bonus.
+
         Returns a list of message strings for each level gained.
         """
+        from src.combat_engine import get_modifier
+
         messages = []
         template = self._load_class_template(self.char_class)
         # Race override takes priority over class default
-        race_info = self.get_race_info()
+        race_info = self.race_info
         xp_per = race_info.get("exp_per_level", template["exp_per_level"])
         while self.exp >= self.level * xp_per:
             self.level += 1
-            hp_gain = template["hp_per_level"]
-            mp_gain = template["mp_per_level"]
+
+            # ── HP gain: base + STR modifier (minimum 1) ──
+            str_mod = get_modifier(self.strength)
+            hp_gain = max(1, template["hp_per_level"] + str_mod)
 
             self.max_hp += hp_gain
             self.hp = min(self.hp + hp_gain, self.max_hp)
+
+            # ── MP gain: base + casting-stat modifier (minimum 0) ──
+            base_mp = template["mp_per_level"]
+            mp_gain = 0
+            if base_mp > 0:
+                mp_source = template.get("mp_source")
+                cast_mod = 0
+                if mp_source:
+                    if "abilities" in mp_source:
+                        # Dual-stat (e.g. Druid: higher of INT/WIS)
+                        vals = [getattr(self, a, 10) for a in mp_source["abilities"]]
+                        if mp_source.get("mode") == "higher":
+                            cast_mod = get_modifier(max(vals))
+                        else:
+                            cast_mod = get_modifier(min(vals))
+                    elif "ability" in mp_source:
+                        # Single-stat (e.g. Wizard→INT, Cleric→WIS)
+                        cast_mod = get_modifier(getattr(self, mp_source["ability"], 10))
+                mp_gain = max(0, base_mp + cast_mod)
 
             if mp_gain > 0:
                 self._bonus_mp += mp_gain

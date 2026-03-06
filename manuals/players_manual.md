@@ -650,11 +650,12 @@ The standard XP-per-level is **500** for most races. **Humans** level faster, re
 
 ### What You Gain Per Level
 
-Each level-up grants:
+Each level-up grants HP and MP increases that scale with your attributes:
 
-- **HP increase** equal to your class's HP per level (e.g., Fighter gains 15 HP)
-- **MP increase** equal to your class's MP per level (e.g., Wizard gains 15 MP)
-- Level-ups are applied immediately — your HP and MP pools grow as soon as you qualify
+- **HP increase** — Your class's base HP per level plus your Strength modifier. A Fighter with 18 STR (+4 modifier) gains 15 + 4 = 19 HP per level. The minimum HP gain is always 1, even with a negative modifier.
+- **MP increase** — Your class's base MP per level plus a modifier from your casting stat. Which stat is used depends on the class: Wizards use Intelligence, Clerics use Wisdom, and hybrid casters like Paladins and Rangers use the higher of Intelligence or Wisdom. The minimum MP gain is 0 (you never lose MP on level-up). Non-casting classes with 0 base MP per level gain no MP regardless of stats.
+
+Level-ups are applied immediately — your HP and MP pools grow as soon as you qualify.
 
 ### XP Rewards by Monster
 
