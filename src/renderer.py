@@ -42,7 +42,7 @@ class Renderer:
         import os
         sheet_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "example_graphics", "U3TilesE.gif")
+            "research", "example_graphics", "U3TilesE.gif")
 
         self._tile_sprites = {}  # (row, col) -> 32x32 pygame surface
 
@@ -167,7 +167,7 @@ class Renderer:
         """
         import os
         sprite_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "example_graphics")
+            os.path.dirname(os.path.dirname(__file__)), "research", "example_graphics")
 
         # Primary sprites (Amiga-style, ~28-34 px)
         sprite_files = {
@@ -759,7 +759,7 @@ class Renderer:
                 self.screen.blit(sprite, (px, py))
                 return
 
-        # Procedural fallback for unmapped tiles
+        # Procedural fallback for unmapped / unloaded tiles
         BLACK = (0, 0, 0)
         BROWN = (140, 100, 50)
         ORANGE = (255, 170, 85)
@@ -768,9 +768,45 @@ class Renderer:
         rect = pygame.Rect(px, py, ts, ts)
         cx = px + ts // 2
         cy = py + ts // 2
+        seed = wc * 31 + wr * 17
 
-        if tile_id == TILE_COUNTER:
-            # Counter/table on black floor
+        if tile_id == TILE_FLOOR:
+            # Indoor floor — dark grey stone
+            base = 45 + (seed % 15)
+            pygame.draw.rect(self.screen, (base, base, base), rect)
+            # Subtle stone-slab lines
+            pygame.draw.line(self.screen, (base - 10, base - 10, base - 10),
+                             (px, py + ts // 2), (px + ts, py + ts // 2), 1)
+            pygame.draw.line(self.screen, (base - 10, base - 10, base - 10),
+                             (px + ts // 2, py), (px + ts // 2, py + ts), 1)
+
+        elif tile_id == TILE_WALL:
+            # Brick wall
+            pygame.draw.rect(self.screen, (120, 80, 50), rect)
+            for iy in range(0, ts, 8):
+                offset = 6 if (iy // 8) % 2 else 0
+                for ix in range(offset, ts, 12):
+                    brick = pygame.Rect(px + ix, py + iy, 10, 6)
+                    pygame.draw.rect(self.screen, (100, 65, 40), brick, 1)
+
+        elif tile_id == TILE_EXIT:
+            # Gate / exit — green field with archway
+            pygame.draw.rect(self.screen, (20, 100, 15), rect)
+            # Stone arch
+            arch_w = ts - 8
+            pygame.draw.rect(self.screen, (130, 130, 130),
+                             pygame.Rect(px + 4, py + 6, arch_w, ts - 6))
+            pygame.draw.rect(self.screen, (60, 60, 60),
+                             pygame.Rect(px + 8, py + 10, arch_w - 8, ts - 10))
+
+        elif tile_id == TILE_GRASS:
+            base_g = 100 + (seed % 30)
+            pygame.draw.rect(self.screen, (20, base_g, 15), rect)
+
+        elif tile_id == TILE_WATER:
+            pygame.draw.rect(self.screen, (15, 30, 120), rect)
+
+        elif tile_id == TILE_COUNTER:
             pygame.draw.rect(self.screen, BLACK, rect)
             top = pygame.Rect(px + 3, py + 8, ts - 6, ts - 14)
             pygame.draw.rect(self.screen, BROWN, top)
@@ -778,7 +814,6 @@ class Renderer:
             pygame.draw.circle(self.screen, YELLOW, (cx, cy), 3)
 
         elif tile_id == TILE_DOOR:
-            # Wooden door on black floor
             pygame.draw.rect(self.screen, BLACK, rect)
             door_rect = pygame.Rect(px + 7, py + 2, ts - 14, ts - 4)
             pygame.draw.rect(self.screen, (100, 65, 30), door_rect)
@@ -792,8 +827,12 @@ class Renderer:
             self._draw_keyslot_tile(px, py, ts, wc, wr, keys_inserted)
 
         else:
-            # Fallback: black
-            pygame.draw.rect(self.screen, BLACK, rect)
+            # Unknown tile — use TILE_DEFS color if available
+            tile_def = TILE_DEFS.get(tile_id)
+            if tile_def:
+                pygame.draw.rect(self.screen, tile_def["color"], rect)
+            else:
+                pygame.draw.rect(self.screen, BLACK, rect)
 
     def _draw_machine_tile(self, px, py, ts, wc, wr):
         """Draw one tile of the gnomish machine (part of a 3×3 structure).
@@ -1880,21 +1919,96 @@ class Renderer:
             self.screen.blit(sprite, (px, py))
             return
 
-        # Fallback: procedural drawing for tiles not in the sheet
+        # Fallback: procedural drawing when sprites are unavailable
         BLACK = (0, 0, 0)
         BROWN = (140, 100, 50)
-        SAND  = (180, 160, 80)
+        SAND_C = (180, 160, 80)
 
         rect = pygame.Rect(px, py, ts, ts)
+        cx = px + ts // 2
+        cy = py + ts // 2
         seed = wc * 31 + wr * 17
 
-        if tile_id == TILE_SAND:
+        if tile_id == TILE_GRASS:
+            # Green field with subtle variation
+            base_g = 100 + (seed % 30)
+            pygame.draw.rect(self.screen, (20, base_g, 15), rect)
+            # A few darker grass tufts
+            for i in range(3):
+                s = seed + i * 37
+                gx = px + (s * 7) % (ts - 4) + 2
+                gy = py + (s * 13) % (ts - 4) + 2
+                pygame.draw.line(self.screen, (10, base_g + 30, 10),
+                                 (gx, gy + 3), (gx, gy), 1)
+
+        elif tile_id == TILE_WATER:
+            # Blue water with wave highlights
+            pygame.draw.rect(self.screen, (15, 30, 120), rect)
+            t = pygame.time.get_ticks()
+            for i in range(2):
+                s = seed + i * 23
+                wx = px + (s * 11) % (ts - 8) + 4
+                wy = py + (s * 7) % (ts - 8) + 4
+                phase = (t * 0.002 + s) % 6.28
+                shimmer = int(30 + 20 * math.sin(phase))
+                pygame.draw.line(self.screen, (40 + shimmer, 80 + shimmer, 180),
+                                 (wx, wy), (wx + 6, wy), 1)
+
+        elif tile_id == TILE_FOREST:
+            # Dark green ground with tree shapes
+            pygame.draw.rect(self.screen, (10, 60, 10), rect)
+            # Simple tree: triangle crown + trunk
+            points = [(cx, cy - 10), (cx - 7, cy + 3), (cx + 7, cy + 3)]
+            pygame.draw.polygon(self.screen, (0, 100 + (seed % 30), 0), points)
+            pygame.draw.line(self.screen, (80, 50, 20),
+                             (cx, cy + 3), (cx, cy + 8), 2)
+
+        elif tile_id == TILE_MOUNTAIN:
+            # Grey mountain peak
+            pygame.draw.rect(self.screen, (60, 50, 40), rect)
+            points = [(cx, cy - 12), (cx - 10, cy + 8), (cx + 10, cy + 8)]
+            pygame.draw.polygon(self.screen, (140, 140, 140), points)
+            # Snow cap
+            snow = [(cx, cy - 12), (cx - 4, cy - 4), (cx + 4, cy - 4)]
+            pygame.draw.polygon(self.screen, (230, 230, 255), snow)
+
+        elif tile_id == TILE_TOWN:
+            # Green field with small house
+            pygame.draw.rect(self.screen, (20, 100, 15), rect)
+            roof = [(cx, cy - 9), (cx - 8, cy - 1), (cx + 8, cy - 1)]
+            pygame.draw.polygon(self.screen, (160, 60, 40), roof)
+            walls = pygame.Rect(cx - 6, cy - 1, 12, 9)
+            pygame.draw.rect(self.screen, (200, 180, 140), walls)
+            door = pygame.Rect(cx - 2, cy + 2, 4, 6)
+            pygame.draw.rect(self.screen, (80, 50, 20), door)
+
+        elif tile_id == TILE_DUNGEON:
+            # Dark ground with cave entrance
+            pygame.draw.rect(self.screen, (30, 25, 20), rect)
+            pygame.draw.circle(self.screen, (40, 10, 30), (cx, cy), 10)
+            pygame.draw.circle(self.screen, (20, 0, 15), (cx, cy), 6)
+            text = self.font_small.render("!", True, (255, 255, 0))
+            self.screen.blit(text, (cx - 3, cy - 6))
+
+        elif tile_id == TILE_PATH:
+            # Dirt path
+            base_g = 80 + (seed % 20)
+            pygame.draw.rect(self.screen, (base_g, base_g - 20, base_g - 40), rect)
+            # Pebble details
+            for i in range(3):
+                s = seed + i * 41
+                gx = px + (s * 9) % (ts - 4) + 2
+                gy = py + (s * 11) % (ts - 4) + 2
+                pygame.draw.circle(self.screen, (base_g + 20, base_g, base_g - 20),
+                                   (gx, gy), 1)
+
+        elif tile_id == TILE_SAND:
             pygame.draw.rect(self.screen, (25, 20, 5), rect)
             for i in range(4):
                 s = seed + i * 19
                 dx = (s * 7) % (ts - 6) + 3
                 dy = (s * 13) % (ts - 6) + 3
-                c = SAND if s % 2 else (150, 130, 60)
+                c = SAND_C if s % 2 else (150, 130, 60)
                 pygame.draw.rect(self.screen, c,
                                  pygame.Rect(px + dx, py + dy, 2, 2))
 
@@ -1910,12 +2024,16 @@ class Renderer:
             return
 
         elif tile_id == TILE_KEYSLOT:
-            # On overworld, draw keyslots with 0 keys (no state available)
             self._draw_keyslot_tile(px, py, ts, wc, wr, 0)
             return
 
         else:
-            pygame.draw.rect(self.screen, BLACK, rect)
+            # Unknown tile — use TILE_DEFS color if available
+            tile_def = TILE_DEFS.get(tile_id)
+            if tile_def:
+                pygame.draw.rect(self.screen, tile_def["color"], rect)
+            else:
+                pygame.draw.rect(self.screen, BLACK, rect)
 
     def _u3_draw_overworld_party(self, cx, cy, party=None):
         """Party map sprite — white-tinted fighter tile with torch effect."""
