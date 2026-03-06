@@ -21,6 +21,7 @@ from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
     TILE_DUNGEON_CLEARED,
+    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
 
 
@@ -2288,6 +2289,70 @@ class Renderer:
                         pygame.draw.circle(self.screen,
                                            (brightness, brightness, 200), (sx, sy), 1)
 
+        # ── 1d. animated glow on portal tiles ──
+        _ptl_pulse = 0.5 + 0.5 * _math.sin(_art_t * 0.005)
+        _ptl_ring  = 0.5 + 0.5 * _math.sin(_art_t * 0.0025)
+        for sr2 in range(rows):
+            for sc2 in range(cols):
+                wc2 = sc2 + off_c
+                wr2 = sr2 + off_r
+                if tile_map.get_tile(wc2, wr2) == TILE_PORTAL:
+                    if visible_tiles and (wc2, wr2) not in visible_tiles:
+                        continue
+                    pcx = sc2 * ts + ts // 2
+                    pcy = sr2 * ts + ts // 2
+                    # Pulsing cyan aura
+                    aura_alpha = int(40 + 50 * _ptl_pulse)
+                    aura_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                    aura_surf.fill((0, 180, 255, aura_alpha))
+                    self.screen.blit(aura_surf, (sc2 * ts, sr2 * ts))
+                    # Outer energy ring
+                    ring_r2 = int(10 + 4 * _ptl_ring)
+                    ring_surf2 = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                    pygame.draw.circle(ring_surf2, (0, 220, 255, int(90 * _ptl_pulse)),
+                                       (ts // 2, ts // 2), ring_r2, 2)
+                    self.screen.blit(ring_surf2, (sc2 * ts, sr2 * ts))
+                    # Orbiting energy motes (6 motes, cyan/white)
+                    for i in range(6):
+                        angle = _art_t * 0.004 + i * 1.0472  # 60 degrees apart
+                        m_r = 7 + 3 * _math.sin(_art_t * 0.005 + i * 0.8)
+                        mx = pcx + int(_math.cos(angle) * m_r)
+                        my = pcy + int(_math.sin(angle) * m_r)
+                        bright = int(160 + 95 * _ptl_pulse)
+                        col_mote = (bright // 2, bright, 255) if i % 2 == 0 else (bright, bright, 255)
+                        pygame.draw.circle(self.screen, col_mote, (mx, my), 1)
+
+        # ── 1e. animated torch light glow ──
+        # Wall torches cast a warm flickering light on nearby floor tiles
+        _torch_flicker = 0.6 + 0.4 * _math.sin(_art_t * 0.008)
+        _torch_flicker2 = 0.6 + 0.4 * _math.sin(_art_t * 0.011 + 1.5)
+        _torch_radius = 3  # tiles of light radius
+        for sr2 in range(rows):
+            for sc2 in range(cols):
+                wc2 = sc2 + off_c
+                wr2 = sr2 + off_r
+                if tile_map.get_tile(wc2, wr2) == TILE_WALL_TORCH:
+                    if visible_tiles and (wc2, wr2) not in visible_tiles:
+                        continue
+                    # Light up surrounding tiles in a radius
+                    for dr in range(-_torch_radius, _torch_radius + 1):
+                        for dc in range(-_torch_radius, _torch_radius + 1):
+                            dist = abs(dr) + abs(dc)
+                            if dist == 0 or dist > _torch_radius:
+                                continue
+                            nsc = sc2 + dc
+                            nsr = sr2 + dr
+                            if 0 <= nsc < cols and 0 <= nsr < rows:
+                                # Use alternating flicker for variety
+                                flk = _torch_flicker if (dc + dr) % 2 == 0 else _torch_flicker2
+                                # Intensity falls off with distance
+                                intensity = (1.0 - dist / (_torch_radius + 1)) * flk
+                                alpha = int(35 * intensity)
+                                if alpha > 0:
+                                    glow_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                                    glow_s.fill((255, 160, 50, alpha))
+                                    self.screen.blit(glow_s, (nsc * ts, nsr * ts))
+
         # ── 2. monster sprites (only within visible tiles) ──
         for monster in dungeon_data.monsters:
             if not monster.is_alive():
@@ -2996,6 +3061,111 @@ class Renderer:
             # Pillar highlights
             pygame.draw.rect(self.screen, (140, 140, 160),
                              pygame.Rect(px + 3, py + 3, ts - 6, 5), 1)
+
+        elif tile_id == TILE_PUDDLE:
+            # Dark water puddle on dungeon floor
+            pygame.draw.rect(self.screen, palette["floor_base"], rect)
+            # Puddle shape — irregular oval
+            puddle_w = ts - 8 + (seed % 5)
+            puddle_h = ts - 14 + (seed % 4)
+            puddle_rect = pygame.Rect(cx - puddle_w // 2, cy - puddle_h // 2,
+                                      puddle_w, puddle_h)
+            # Dark blue water
+            pygame.draw.ellipse(self.screen, (20, 35, 60), puddle_rect)
+            pygame.draw.ellipse(self.screen, (30, 50, 80), puddle_rect, 1)
+            # Animated shimmer highlight
+            import math as _mp
+            t = pygame.time.get_ticks()
+            shimmer = 0.5 + 0.5 * _mp.sin(t * 0.003 + seed)
+            sh_x = cx - 3 + int(shimmer * 4)
+            sh_y = cy - 2
+            sh_alpha = int(40 + 40 * shimmer)
+            sh_surf = pygame.Surface((6, 2), pygame.SRCALPHA)
+            sh_surf.fill((120, 160, 220, sh_alpha))
+            self.screen.blit(sh_surf, (sh_x, sh_y))
+
+        elif tile_id == TILE_MOSS:
+            # Mossy stone floor
+            pygame.draw.rect(self.screen, palette["floor_base"], rect)
+            # Floor texture underneath
+            detail_col = palette["floor_detail"]
+            if seed % 3 == 0:
+                dx = (seed * 7) % (ts - 6) + 3
+                dy = (seed * 13) % (ts - 6) + 3
+                pygame.draw.rect(self.screen, detail_col,
+                                 pygame.Rect(px + dx, py + dy, 2, 1))
+            # Moss patches — several small green clumps
+            moss_colors = [(30, 70, 25), (20, 55, 18), (40, 80, 30),
+                           (25, 60, 20)]
+            for i in range(4 + seed % 3):
+                s = seed * 7 + i * 37
+                mx = (s * 11) % (ts - 6) + 3
+                my = (s * 17) % (ts - 6) + 3
+                mw = 2 + s % 3
+                mh = 1 + s % 2
+                mc = moss_colors[i % len(moss_colors)]
+                pygame.draw.rect(self.screen, mc,
+                                 pygame.Rect(px + mx, py + my, mw, mh))
+            # Occasional tiny tendril
+            if seed % 4 == 0:
+                tx = px + (seed * 3) % (ts - 4) + 2
+                ty = py + (seed * 9) % (ts - 8) + 4
+                pygame.draw.line(self.screen, (35, 75, 28),
+                                 (tx, ty), (tx + 2, ty - 3), 1)
+
+        elif tile_id == TILE_WALL_TORCH:
+            # Wall tile with mounted torch — animated flame
+            # Draw the wall base first (same as DWALL)
+            pygame.draw.rect(self.screen, palette["wall_base"], rect)
+            bricks = palette["wall_bricks"]
+            mortar = palette["wall_mortar"]
+            for iy in range(0, ts, 8):
+                offset = 5 if (iy // 8) % 2 else 0
+                for ix in range(offset, ts, 11):
+                    s = (wc * 7 + wr * 13 + ix + iy) % 5
+                    if s < 2:
+                        bc = bricks[0]
+                    elif s < 4:
+                        bc = bricks[1]
+                    else:
+                        bc = bricks[2]
+                    brick = pygame.Rect(px + ix, py + iy, 9, 6)
+                    pygame.draw.rect(self.screen, bc, brick)
+                    pygame.draw.rect(self.screen, mortar, brick, 1)
+            # Torch bracket — small brown mounting
+            bracket_x = cx - 2
+            bracket_y = cy + 2
+            pygame.draw.rect(self.screen, (100, 70, 30),
+                             pygame.Rect(bracket_x, bracket_y, 4, 6))
+            pygame.draw.rect(self.screen, (70, 45, 15),
+                             pygame.Rect(bracket_x, bracket_y, 4, 6), 1)
+            # Animated flame
+            import math as _mt
+            t = pygame.time.get_ticks()
+            flicker = _mt.sin(t * 0.012 + wc * 3.7 + wr * 5.3)
+            flicker2 = _mt.sin(t * 0.019 + wc * 2.1 + wr * 7.1)
+            # Outer flame (orange-red, larger)
+            flame_h = 8 + int(flicker * 2)
+            flame_w = 5 + int(flicker2)
+            flame_top = bracket_y - flame_h
+            flame_pts = [
+                (cx, flame_top),                        # tip
+                (cx - flame_w // 2, bracket_y),         # bottom-left
+                (cx + flame_w // 2, bracket_y),         # bottom-right
+            ]
+            pygame.draw.polygon(self.screen, (220, 120, 30), flame_pts)
+            # Inner flame (bright yellow, smaller)
+            inner_h = flame_h - 3
+            inner_w = max(1, flame_w - 3)
+            inner_pts = [
+                (cx + int(flicker), flame_top + 2),
+                (cx - inner_w // 2, bracket_y - 1),
+                (cx + inner_w // 2, bracket_y - 1),
+            ]
+            pygame.draw.polygon(self.screen, (255, 230, 80), inner_pts)
+            # Tiny bright core
+            pygame.draw.circle(self.screen, (255, 255, 200),
+                               (cx, bracket_y - 2), 2)
 
         else:
             # Fallback: black

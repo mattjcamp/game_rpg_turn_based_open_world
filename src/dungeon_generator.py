@@ -17,6 +17,7 @@ from src.tile_map import TileMap
 from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
+    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
 from src.monster import create_random_monster, create_encounter, create_monster
 
@@ -151,7 +152,8 @@ def _place_locked_doors(tmap, rooms):
     Skip the first room (entrance room with stairs).
     """
     PASSABLE = {TILE_DFLOOR, TILE_DDOOR, TILE_STAIRS, TILE_CHEST,
-                TILE_TRAP, TILE_STAIRS_DOWN, TILE_ARTIFACT}
+                TILE_TRAP, TILE_STAIRS_DOWN, TILE_ARTIFACT,
+                TILE_PUDDLE, TILE_MOSS}
 
     # Build set of tiles belonging to each room
     room_tile_sets = []
@@ -199,6 +201,91 @@ def _place_locked_doors(tmap, rooms):
         if len(entrances) == 1:
             ec, er = entrances[0]
             tmap.set_tile(ec, er, TILE_LOCKED_DOOR)
+
+
+def _place_decorations(tmap, rooms, width, height):
+    """Sprinkle cosmetic decorations: puddles, moss, and wall torches."""
+
+    # --- Wall torches: place on wall tiles that border a floor tile ---
+    # Torches are spaced out so they don't cluster; aim for ~1 per room.
+    torch_candidates = []
+    for room in rooms:
+        # Check wall tiles along room edges
+        for x in range(room.x - 1, room.x + room.w + 1):
+            for y in [room.y - 1, room.y + room.h]:
+                if 0 <= x < width and 0 <= y < height:
+                    if tmap.get_tile(x, y) == TILE_DWALL:
+                        # Must have a floor neighbor (so the light has
+                        # somewhere to shine)
+                        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                            nx, ny = x + dx, y + dy
+                            if tmap.get_tile(nx, ny) == TILE_DFLOOR:
+                                torch_candidates.append((x, y))
+                                break
+        for y in range(room.y - 1, room.y + room.h + 1):
+            for x in [room.x - 1, room.x + room.w]:
+                if 0 <= x < width and 0 <= y < height:
+                    if tmap.get_tile(x, y) == TILE_DWALL:
+                        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                            nx, ny = x + dx, y + dy
+                            if tmap.get_tile(nx, ny) == TILE_DFLOOR:
+                                torch_candidates.append((x, y))
+                                break
+
+    # Deduplicate and space them out (min 4 tiles apart)
+    random.shuffle(torch_candidates)
+    placed_torches = []
+    for tc, tr in torch_candidates:
+        too_close = False
+        for ptc, ptr in placed_torches:
+            if abs(tc - ptc) + abs(tr - ptr) < 4:
+                too_close = True
+                break
+        if not too_close:
+            tmap.set_tile(tc, tr, TILE_WALL_TORCH)
+            placed_torches.append((tc, tr))
+            # Limit to roughly 1-2 per room
+            if len(placed_torches) >= len(rooms) * 2:
+                break
+
+    # --- Puddles: small water patches on floor tiles ---
+    # Prefer tiles away from room centers, near corridors
+    floor_tiles = []
+    for y in range(height):
+        for x in range(width):
+            if tmap.get_tile(x, y) == TILE_DFLOOR:
+                floor_tiles.append((x, y))
+    num_puddles = max(2, len(rooms) // 2)
+    random.shuffle(floor_tiles)
+    puddles_placed = 0
+    for fx, fy in floor_tiles:
+        if puddles_placed >= num_puddles:
+            break
+        # Prefer tiles that have at least 2 wall neighbors (corners, corridors)
+        wall_count = sum(
+            1 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]
+            if tmap.get_tile(fx + dx, fy + dy) == TILE_DWALL
+        )
+        if wall_count >= 1 and random.random() < 0.4:
+            tmap.set_tile(fx, fy, TILE_PUDDLE)
+            puddles_placed += 1
+
+    # --- Moss: grows on floor tiles adjacent to walls ---
+    num_moss = max(3, len(rooms))
+    random.shuffle(floor_tiles)
+    moss_placed = 0
+    for fx, fy in floor_tiles:
+        if moss_placed >= num_moss:
+            break
+        if tmap.get_tile(fx, fy) != TILE_DFLOOR:
+            continue  # may have been turned into puddle
+        wall_count = sum(
+            1 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]
+            if tmap.get_tile(fx + dx, fy + dy) in (TILE_DWALL, TILE_WALL_TORCH)
+        )
+        if wall_count >= 1 and random.random() < 0.35:
+            tmap.set_tile(fx, fy, TILE_MOSS)
+            moss_placed += 1
 
 
 def generate_dungeon(name="The Depths", width=40, height=30,
@@ -340,6 +427,9 @@ def generate_dungeon(name="The Depths", width=40, height=30,
 
     # --- Place locked doors on rooms with single-tile entrances ---
     _place_locked_doors(tmap, rooms)
+
+    # --- Place cosmetic decorations (puddles, moss, wall torches) ---
+    _place_decorations(tmap, rooms, width, total_height)
 
     # Entry point is on the stairs
     entry_col = stairs_col

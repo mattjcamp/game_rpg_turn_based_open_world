@@ -53,6 +53,10 @@ TILE_PORTAL   = 28
 TILE_LOCKED_DOOR = 29
 TILE_MACHINE = 30
 TILE_KEYSLOT = 31
+# Decorative dungeon tiles
+TILE_PUDDLE    = 32
+TILE_MOSS      = 33
+TILE_WALL_TORCH = 34
 
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
@@ -86,6 +90,10 @@ TILE_DEFS = {
     TILE_LOCKED_DOOR: {"color": (100, 60, 30), "walkable": False, "name": "Locked Door"},
     TILE_MACHINE: {"color": (160, 80, 200), "walkable": True, "name": "Machine"},
     TILE_KEYSLOT: {"color": (100, 60, 160), "walkable": False, "name": "Key Slot"},
+    # Decorative dungeon tiles
+    TILE_PUDDLE:     {"color": (30, 50, 70),   "walkable": True,  "name": "Puddle"},
+    TILE_MOSS:       {"color": (25, 55, 22),   "walkable": True,  "name": "Moss"},
+    TILE_WALL_TORCH: {"color": (160, 120, 40), "walkable": False, "name": "Wall Torch"},
 }
 
 # ----- Colors (UI) -----

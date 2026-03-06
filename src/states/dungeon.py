@@ -14,7 +14,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
-    TILE_DUNGEON_CLEARED,
+    TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS,
 )
 
 
@@ -1061,7 +1061,7 @@ class DungeonState(InventoryMixin, BaseState):
                        (1, -1), (1, 1), (-1, 1), (-1, -1)]:
             nc, nr = col + dc, row + dr
             if 0 <= nc < tmap.width and 0 <= nr < tmap.height:
-                if tmap.get_tile(nc, nr) == TILE_DFLOOR:
+                if tmap.get_tile(nc, nr) in (TILE_DFLOOR, TILE_PUDDLE, TILE_MOSS):
                     tmap.set_tile(nc, nr, TILE_PORTAL)
                     return
         # Fallback: place it right where the artifact was (already floor)
