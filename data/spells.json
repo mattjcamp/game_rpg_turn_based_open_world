@@ -424,6 +424,27 @@
       "usable_in": ["battle"],
       "sfx": "heal",
       "hit_sfx": null
+    },
+
+    {
+      "id": "knock",
+      "name": "Knock",
+      "description": "Sends a pulse of arcane force into a lock's mechanism, rattling tumblers and wards alike.",
+      "allowable_classes": ["Wizard", "Alchemist", "Druid"],
+      "casting_type": "sorcerer",
+      "min_level": 2,
+      "mp_cost": 7,
+      "duration": "instant",
+      "effect_type": "knock",
+      "effect_value": {
+        "save_dc_base": 12,
+        "save_stat": "intelligence"
+      },
+      "range": 1,
+      "targeting": "self",
+      "usable_in": ["dungeon"],
+      "sfx": "lock_pick_success",
+      "hit_sfx": null
     }
   ]
 }

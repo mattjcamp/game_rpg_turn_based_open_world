@@ -651,6 +651,19 @@ class DungeonState(InventoryMixin, BaseState):
         elif thief is None:
             options.append(("Pick Lock (no thief!)", "no_thief"))
 
+        # Check if there's a caster who can cast Knock
+        knock_caster = self._find_knock_caster()
+        if knock_caster:
+            from src.party import SPELLS_DATA
+            knock_spell = SPELLS_DATA.get("knock", {})
+            mp_cost = knock_spell.get("mp_cost", 7)
+            if knock_caster.mp >= mp_cost:
+                options.append(
+                    (f"Cast Knock ({knock_caster.name}, {mp_cost} MP)", "knock"))
+            else:
+                options.append(
+                    ("Cast Knock (insufficient MP)", "no_knock_mp"))
+
         # TODO: could add "Use Key" option if keys are implemented
 
         options.append(("Leave", "leave"))
@@ -690,6 +703,16 @@ class DungeonState(InventoryMixin, BaseState):
         elif action == "no_thief":
             self._close_door_interact()
             self.show_message("You need a thief to pick the lock!", 2000)
+        elif action == "knock":
+            self._close_door_interact()
+            self._attempt_knock_spell(self.door_interact_col,
+                                      self.door_interact_row)
+        elif action == "no_knock_mp":
+            self._close_door_interact()
+            caster = self._find_knock_caster()
+            name = caster.name if caster else "Caster"
+            self.show_message(
+                f"{name} doesn't have enough MP to cast Knock!", 2000)
         else:
             # "leave" or unknown
             self._close_door_interact()
@@ -717,6 +740,85 @@ class DungeonState(InventoryMixin, BaseState):
             if m.is_alive() and m.char_class == "Thief":
                 return m
         return None
+
+    def _find_knock_caster(self):
+        """Return the first alive party member who can cast Knock, or None.
+
+        Reads allowable_classes and min_level from the Knock spell config
+        so nothing is hardcoded here.
+        """
+        from src.party import SPELLS_DATA
+        knock = SPELLS_DATA.get("knock")
+        if knock is None:
+            return None
+        allowed = [c.lower() for c in knock.get("allowable_classes", [])]
+        min_lvl = knock.get("min_level", 1)
+        for m in self.game.party.members:
+            if (m.is_alive()
+                    and m.char_class.lower() in allowed
+                    and m.level >= min_lvl):
+                return m
+        return None
+
+    def _attempt_knock_spell(self, col, row):
+        """Caster attempts to magically unlock a door via Knock spell.
+
+        INT saving throw: d20 + INT mod >= save_dc.
+        Consumes MP on every attempt (success or failure).
+        """
+        from src.party import SPELLS_DATA
+        caster = self._find_knock_caster()
+        if caster is None:
+            self.show_message("No one in your party can cast Knock!", 2000)
+            return
+
+        knock = SPELLS_DATA.get("knock", {})
+        mp_cost = knock.get("mp_cost", 7)
+        ev = knock.get("effect_value", {})
+        save_dc = ev.get("save_dc_base", 12)
+        save_stat = ev.get("save_stat", "intelligence")
+
+        if caster.mp < mp_cost:
+            self.show_message(
+                f"{caster.name} doesn't have enough MP! "
+                f"({caster.mp}/{mp_cost} MP)", 2000)
+            return
+
+        # Consume MP whether success or failure
+        caster.mp -= mp_cost
+
+        # Roll: d20 + INT modifier vs save DC
+        stat_val = getattr(caster, save_stat, 10)
+        modifier = caster.get_modifier(stat_val)
+        roll = random.randint(1, 20)
+        total = roll + modifier
+
+        if total >= save_dc:
+            # Success — play unlock animation, convert to open door
+            self.door_unlock_anim = {
+                "col": col,
+                "row": row,
+                "timer": 1200,
+                "duration": 1200,
+            }
+            self.game.sfx.play("lock_pick_success")
+            self.show_message(
+                f"{caster.name} casts Knock — the lock clicks open! "
+                f"(roll {roll}+{modifier}={total} vs DC {save_dc}, "
+                f"{caster.mp} MP left)", 2000)
+            self.game.game_log.append(
+                f"{caster.name} cast Knock and unlocked a door "
+                f"(d20={roll}+{modifier}={total} vs DC {save_dc}).")
+        else:
+            # Failure
+            self.game.sfx.play("lock_pick_fail")
+            self.show_message(
+                f"{caster.name}'s Knock fizzles... "
+                f"(roll {roll}+{modifier}={total} vs DC {save_dc}, "
+                f"{caster.mp} MP left)", 2000)
+            self.game.game_log.append(
+                f"{caster.name} failed to cast Knock "
+                f"(d20={roll}+{modifier}={total} vs DC {save_dc}).")
 
     def _attempt_lock_pick(self, col, row):
         """Thief attempts to pick a locked door. DEX saving throw: d20 + DEX mod >= 12.

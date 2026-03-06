@@ -474,6 +474,7 @@ These spells are available to Wizards, Alchemists, and Druids. Spells are organi
 | **Shield** | 1 | 4 | +1 AC to target for 3 turns | 5 |
 | **Long Shanks** | 1 | 4 | +4 movement range to target for 3 turns | 99 |
 | **Sleep** | 1 | 5 | Puts target to sleep (2 turns, targets up to 15 HP, save DC 8 + INT mod) | 99 |
+| **Knock** | 2 | 7 | Unlocks a locked door (d20 + INT mod vs DC 12) | 1 |
 | **Magic Arrow** | 3 | 8 | 3d8 + INT mod damage (piercing bolt, select target) | 99 |
 | **Misty Step** | 3 | 8 | Teleport to a chosen location on the battlefield | 99 |
 | **Charm Person** | 5 | 14 | Humanoid target fights for you (3 turns, save DC 12 + INT mod) | 99 |
@@ -497,6 +498,8 @@ These spells are available to Clerics, Paladins, Rangers, and Druids.
 | **Major Heal** | 5 | 15 | Heals 4d8 + WIS mod HP | 4 | Battle only |
 | **Push** | 5 | 14 | Repels monsters in a 5-tile radius | Self | Overworld, Dungeon, Town |
 | **Mass Heal** | 7 | 25 | Heals 3d10 + WIS mod HP to all nearby allies | Self | Battle only |
+
+> **Note:** **Knock** is a contextual spell — it does not appear in the normal spell menu. Instead, it automatically appears as an option when you encounter a locked door in a dungeon, provided you have an eligible caster (Wizard, Alchemist, or Druid at level 2+) with enough MP. It works like a Thief's lockpick but uses Intelligence instead of Dexterity, and costs MP instead of a lockpick.
 
 > **Tip:** At Level 1, you'll have access to cheap utility spells like Minor Heal (3 MP), Shield (4 MP), and Magic Dart (3 MP). Save your MP for when it counts — your pool is small early on.
 
