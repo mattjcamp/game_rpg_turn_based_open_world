@@ -98,6 +98,7 @@ class DungeonState(InventoryMixin, BaseState):
 
     def enter(self):
         """Called when this state becomes active."""
+        self._apply_pending_combat_rewards()
         # Returning from combat — keep party position, just show message
         if self._entered and self.dungeon_data:
             if self.pending_combat_message:
@@ -1013,6 +1014,9 @@ class DungeonState(InventoryMixin, BaseState):
             if self.use_item_anim["timer"] <= 0:
                 self.use_item_anim = None
 
+        # Tick level-up animations
+        self._update_level_up_queue(dt_ms)
+
         # Tick door unlock animation
         if self.door_unlock_anim:
             self.door_unlock_anim["timer"] -= dt_ms
@@ -1090,5 +1094,7 @@ class DungeonState(InventoryMixin, BaseState):
             infravision=infravision_active,
             galadriels_light=galadriels_active,
         )
+        if self.level_up_queue:
+            renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)

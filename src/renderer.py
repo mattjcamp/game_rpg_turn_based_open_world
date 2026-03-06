@@ -9017,6 +9017,123 @@ class Renderer:
             self.screen.blit(ts, (tx, ty))
 
     # ═══════════════════════════════════════════════════════════════
+    # LEVEL-UP ANIMATION OVERLAY
+    # ═══════════════════════════════════════════════════════════════
+
+    def draw_level_up_animation(self, entry):
+        """Draw a celebratory level-up banner on the exploration screen.
+
+        *entry* is a dict with keys:
+            name     – character name
+            level    – new level reached
+            msg      – full message like "Kira reached Level 4! HP+15 MP+3"
+            timer    – remaining ms
+            duration – total ms
+        """
+        import math as _math
+
+        if not entry or entry["timer"] <= 0:
+            return
+
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+
+        t = entry["timer"]
+        dur = entry["duration"]
+        progress = 1.0 - (t / dur)  # 0→1
+
+        # Fade in during first 15%, hold, fade out during last 15%
+        if progress < 0.15:
+            alpha = progress / 0.15
+        elif progress > 0.85:
+            alpha = (1.0 - progress) / 0.15
+        else:
+            alpha = 1.0
+        alpha = max(0.0, min(1.0, alpha))
+
+        # ── Banner background ──
+        banner_w = min(sw - 40, 380)
+        banner_h = 72
+        bx = (sw - banner_w) // 2
+        # Slide in from top
+        target_y = sh // 3 - banner_h // 2
+        if progress < 0.1:
+            by = int(-banner_h + (target_y + banner_h) * (progress / 0.1))
+        else:
+            by = target_y
+
+        bg = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
+        bg_alpha = int(210 * alpha)
+        bg.fill((10, 5, 30, bg_alpha))
+        self.screen.blit(bg, (bx, by))
+
+        # ── Golden border with pulse ──
+        pulse = 0.7 + 0.3 * _math.sin(progress * _math.pi * 8)
+        border_c = (
+            int(255 * pulse * alpha),
+            int(200 * pulse * alpha),
+            int(50 * pulse * alpha),
+            int(255 * alpha)
+        )
+        border_s = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
+        pygame.draw.rect(border_s, border_c,
+                         (0, 0, banner_w, banner_h), 3)
+        self.screen.blit(border_s, (bx, by))
+
+        # ── "LEVEL UP!" title ──
+        title_text = "LEVEL UP!"
+        title_pulse = 0.8 + 0.2 * _math.sin(progress * _math.pi * 6)
+        title_r = int(255 * title_pulse)
+        title_g = int(220 * title_pulse)
+        title_b = 50
+        title_surf = self.font.render(title_text, True,
+                                       (title_r, title_g, title_b))
+        title_surf.set_alpha(int(255 * alpha))
+        tx = bx + (banner_w - title_surf.get_width()) // 2
+        ty = by + 8
+        self.screen.blit(title_surf, (tx, ty))
+
+        # ── Character info line ──
+        msg = entry.get("msg", "")
+        info_surf = self.font_small.render(msg, True, (220, 220, 255))
+        info_surf.set_alpha(int(255 * alpha))
+        ix = bx + (banner_w - info_surf.get_width()) // 2
+        iy = by + 36
+        self.screen.blit(info_surf, (ix, iy))
+
+        # ── Sparkle particles rising from banner ──
+        import time as _time
+        now = _time.time()
+        num_sparkles = 12
+        for i in range(num_sparkles):
+            phase = now * 2.5 + i * (2 * _math.pi / num_sparkles)
+            sx = bx + int((i / num_sparkles) * banner_w)
+            sy = by + banner_h - int(
+                (now * 30 + i * 17) % (banner_h + 20))
+            spark_alpha = int(180 * alpha * (
+                0.5 + 0.5 * _math.sin(phase)))
+            if spark_alpha > 10:
+                spark_s = pygame.Surface((4, 4), pygame.SRCALPHA)
+                sc = (255, 230, 100, spark_alpha)
+                pygame.draw.circle(spark_s, sc, (2, 2), 2)
+                self.screen.blit(spark_s, (sx, sy))
+
+        # ── Star bursts at corners ──
+        for corner_x, corner_y in ((bx + 6, by + 6),
+                                    (bx + banner_w - 7, by + 6),
+                                    (bx + 6, by + banner_h - 7),
+                                    (bx + banner_w - 7, by + banner_h - 7)):
+            star_a = int(200 * alpha * (
+                0.5 + 0.5 * _math.sin(now * 4 + corner_x * 0.1)))
+            if star_a > 20:
+                star_s = pygame.Surface((8, 8), pygame.SRCALPHA)
+                pygame.draw.circle(star_s, (255, 255, 200, star_a),
+                                   (4, 4), 3)
+                pygame.draw.circle(star_s, (255, 255, 255, min(255, star_a + 40)),
+                                   (4, 4), 1)
+                self.screen.blit(star_s, (corner_x - 4, corner_y - 4))
+
+    # ═══════════════════════════════════════════════════════════════
     # ITEM EXAMINATION OVERLAY
     # ═══════════════════════════════════════════════════════════════
 

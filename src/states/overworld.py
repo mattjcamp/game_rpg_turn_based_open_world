@@ -65,6 +65,7 @@ class OverworldState(InventoryMixin, BaseState):
         self.repel_effect = None
 
     def enter(self):
+        self._apply_pending_combat_rewards()
         if self.pending_combat_message:
             self.show_message(self.pending_combat_message, 2500)
             self.pending_combat_message = None
@@ -827,6 +828,9 @@ class OverworldState(InventoryMixin, BaseState):
             if self.use_item_anim["timer"] <= 0:
                 self.use_item_anim = None
 
+        # Tick level-up animations
+        self._update_level_up_queue(dt_ms)
+
         # Push spell animation — lives as long as the repel effect is active
         if self.push_spell_anim:
             anim = self.push_spell_anim
@@ -900,6 +904,8 @@ class OverworldState(InventoryMixin, BaseState):
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
         )
+        if self.level_up_queue:
+            renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:
             renderer.draw_overworld_help_overlay()
         if self.showing_log:

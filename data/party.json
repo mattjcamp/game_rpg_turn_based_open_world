@@ -85,13 +85,33 @@
       },
       "inventory": [],
       "sprite": "src/assets/steele_tiles/vga_child_f1.png"
+    },
+    {
+      "name": "Selina",
+      "class": "Cleric",
+      "race": "Human",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 11,
+      "dexterity": 9,
+      "intelligence": 12,
+      "wisdom": 18,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "example_graphics/Ultima3_AMI_sprite_cleric.png"
     }
   ],
   "active_party": [
     0,
-    1,
     2,
-    3
+    3,
+    4
   ],
   "party_effects": {
     "effect_1": null,

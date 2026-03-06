@@ -73,6 +73,11 @@ class InventoryMixin:
         self.brew_result_msg = None   # message shown after a brew attempt
         self.brew_result_timer = 0
 
+        # Level-up animation queue
+        # Each entry: {"name": str, "level": int, "hp": int, "mp": int,
+        #              "timer": int, "duration": int}
+        self.level_up_queue = []
+
     # ── Messages ───────────────────────────────────────────────
 
     def show_message(self, text, duration_ms=2000):
@@ -81,6 +86,56 @@ class InventoryMixin:
         self.message_timer = duration_ms
         if text:
             self.game.game_log.append(text)
+
+    # ── Post-combat reward application ────────────────────────
+
+    def _apply_pending_combat_rewards(self):
+        """Apply XP and gold earned in combat, check for level-ups.
+
+        Called from each state's ``enter()`` method after returning from
+        combat.  Rewards are stored on ``game.pending_combat_rewards``
+        by the combat state's ``_trigger_victory()``.
+
+        Any level-ups are logged and queued for animation.
+        """
+        rewards = getattr(self.game, "pending_combat_rewards", None)
+        if not rewards:
+            return
+        self.game.pending_combat_rewards = None
+
+        total_xp = rewards.get("xp", 0)
+        total_gold = rewards.get("gold", 0)
+
+        # Award gold
+        self.game.party.gold += total_gold
+
+        # Award XP and detect level-ups
+        for m in self.game.party.members:
+            if not m.is_alive():
+                continue
+            old_level = m.level
+            m.exp += total_xp
+            level_msgs = m.check_level_up()
+            for msg in level_msgs:
+                self.game.game_log.append(msg)
+                self.game.sfx.play("level_up")
+                # Queue animation for this level-up
+                self.level_up_queue.append({
+                    "name": m.name,
+                    "level": m.level,
+                    "msg": msg,
+                    "timer": 3000,
+                    "duration": 3000,
+                })
+
+    def _update_level_up_queue(self, dt_ms):
+        """Tick down the current level-up animation.  Call from update()."""
+        if not self.level_up_queue:
+            return
+        entry = self.level_up_queue[0]
+        entry["timer"] -= dt_ms
+        if entry["timer"] <= 0:
+            self.level_up_queue.pop(0)
 
     # ── Hook methods (overridden by subclasses) ────────────────
 

@@ -240,6 +240,7 @@ class Game:
         # ── Keys of Shadow module: set up 8 key dungeons ──
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
         self.keys_inserted = 0  # how many keys placed in the machine
+        self.pending_combat_rewards = None  # set by combat victory, consumed by source state
         self.machine_col = None  # overworld position of the machine
         self.machine_row = None
         if self.module_manifest:

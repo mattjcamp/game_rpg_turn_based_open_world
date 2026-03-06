@@ -4915,7 +4915,13 @@ class CombatState(BaseState):
             self._end_fighter_turn()
 
     def _trigger_victory(self):
-        """Handle the common victory sequence: XP, gold, level-ups."""
+        """Handle the common victory sequence.
+
+        XP and gold are stored as pending rewards on the game object so
+        they can be applied *after* combat ends, back in the source
+        state (overworld / dungeon / town).  This lets the exploration
+        screen show a level-up animation and log message.
+        """
         self.phase = PHASE_VICTORY
         self.phase_timer = 2500
 
@@ -4923,22 +4929,16 @@ class CombatState(BaseState):
         total_xp = sum(m.xp_reward for m in self.monsters)
         total_gold = sum(m.gold_reward for m in self.monsters)
 
-        for m in self.fighters:
-            if m.is_alive():
-                m.exp += total_xp
-        self.game.party.gold += total_gold
+        # Store pending rewards — the source state will apply them
+        self.game.pending_combat_rewards = {
+            "xp": total_xp,
+            "gold": total_gold,
+        }
+
         self.game.sfx.play("victory")
         self.combat_log.append(
             f"All enemies defeated! +{total_xp} XP each, +{total_gold} gold!"
         )
-        # Check for level-ups
-        for m in self.fighters:
-            if m.is_alive():
-                level_msgs = m.check_level_up()
-                for msg in level_msgs:
-                    self.combat_log.append(msg)
-                    self.game.sfx.play("level_up")
-                    self.phase_timer += 1500  # extra time per level-up
 
     def _end_combat(self, won):
         if won and self.monster_refs:

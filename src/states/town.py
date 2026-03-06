@@ -130,6 +130,7 @@ class TownState(InventoryMixin, BaseState):
 
     def enter(self):
         """Called when this state becomes active."""
+        self._apply_pending_combat_rewards()
         if self.town_data:
             town_name = self.town_data.name
             self.show_message(f"Welcome to {town_name}!", 2500)
@@ -831,6 +832,9 @@ class TownState(InventoryMixin, BaseState):
             if self.use_item_anim["timer"] <= 0:
                 self.use_item_anim = None
 
+        # Tick level-up animations
+        self._update_level_up_queue(dt_ms)
+
     def draw(self, renderer):
         """Draw the town in Ultima III style."""
         if self.showing_shop:
@@ -915,5 +919,7 @@ class TownState(InventoryMixin, BaseState):
         if self.quest_choice_active:
             renderer.draw_quest_choice_box(
                 self.quest_choices, self.quest_choice_cursor)
+        if self.level_up_queue:
+            renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
