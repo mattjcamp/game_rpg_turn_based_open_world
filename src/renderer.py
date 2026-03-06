@@ -629,14 +629,14 @@ class Renderer:
 
         tile_name = tile_map.get_tile_name(party.col, party.row)
         # Top line: town info
-        self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
+        self._u3_text(f"GOLD:{party.gold:d}", 8, bar_y + 6, (255, 255, 0))
         self._u3_text(town_data.name.upper(), 240, bar_y + 6, (255, 170, 85))
         light_name = party.get_equipped_name("light")
         if light_name:
             charges = party.get_equipped_charges("light")
             lbl = f"LIGHT:{light_name.upper()}"
             if charges is not None:
-                lbl += f":{charges:02d}"
+                lbl += f":{charges:d}"
             self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85))
         self._u3_text(f"POS:({party.col},{party.row})", 770, bar_y + 6, (136, 136, 136))
         # Bottom line: controls
@@ -1839,7 +1839,7 @@ class Renderer:
         x += icon_sz + 8
         self._u3_text(clock.full_str, x, row1_y + 2,
                       (180, 200, 255), font=f)
-        self._u3_text(f"GOLD:{party.gold:05d}", 380, row1_y + 2,
+        self._u3_text(f"GOLD:{party.gold:d}", 380, row1_y + 2,
                       (255, 255, 0), font=f)
         self._u3_text(f"TERRAIN:{tile_name}", 560, row1_y + 2,
                       (200, 200, 255), font=f)
@@ -1853,7 +1853,7 @@ class Renderer:
             charges = party.get_equipped_charges("light")
             lbl = f"LIGHT:{light_name.upper()}"
             if charges is not None:
-                lbl += f":{charges:02d}"
+                lbl += f":{charges:d}"
             self._u3_text(lbl, row2_x, row2_y, (255, 170, 85),
                           font=self.font_small)
             row2_x += len(lbl) * 8 + 16
@@ -2115,7 +2115,7 @@ class Renderer:
         tx = x + 8
         ty = y + 6
 
-        self._u3_text(f"GOLD: {party.gold:05d}", tx, ty, (255, 255, 0))
+        self._u3_text(f"GOLD: {party.gold:d}", tx, ty, (255, 255, 0))
 
         ty += 18
         tile_name = tile_map.get_tile_name(party.col, party.row)
@@ -2410,7 +2410,7 @@ class Renderer:
         tile_name = dungeon_data.tile_map.get_tile_name(party.col, party.row)
         chests = len(dungeon_data.opened_chests)
         # Top line: game info
-        self._u3_text(f"GOLD:{party.gold:05d}", 8, bar_y + 6, (255, 255, 0))
+        self._u3_text(f"GOLD:{party.gold:d}", 8, bar_y + 6, (255, 255, 0))
         dg_name = dungeon_data.name.upper()
         if level_label:
             dg_name += f"  [{level_label}]"
@@ -2420,18 +2420,18 @@ class Renderer:
         light_charges = party.get_equipped_charges("light")
         if torch_steps >= 0:
             torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
-            lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:02d}"
+            lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:d}"
             self._u3_text(lbl, 520, bar_y + 6, torch_color)
         elif infravision:
             self._u3_text("INFRAVISION", 520, bar_y + 6, (200, 40, 40))
         elif galadriels_light:
             gl_steps = party.galadriels_light_steps
             gl_color = (120, 160, 255) if gl_steps > 50 else (200, 100, 100)
-            self._u3_text(f"STARLIGHT:{gl_steps:03d}", 520, bar_y + 6, gl_color)
+            self._u3_text(f"STARLIGHT:{gl_steps:d}", 520, bar_y + 6, gl_color)
         elif light_name:
             lbl = f"LIGHT:{light_name.upper()}"
             if light_charges is not None:
-                lbl += f":{light_charges:02d}"
+                lbl += f":{light_charges:d}"
             self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85))
         else:
             self._u3_text("NO LIGHT", 520, bar_y + 6, (136, 136, 136))
@@ -3399,17 +3399,17 @@ class Renderer:
 
             ty += 20
             self._u3_text(
-                f"HP:{member.hp:04d}/{member.max_hp:04d}  AC:{member.get_ac():02d}",
+                f"HP:{member.hp:d}/{member.max_hp:d}  AC:{member.get_ac():d}",
                 tx, ty)
 
             ty += 16
             self._u3_text(
-                f"S:{member.strength:02d} D:{member.dexterity:02d} I:{member.intelligence:02d} W:{member.wisdom:02d}",
+                f"S:{member.strength:d} D:{member.dexterity:d} I:{member.intelligence:d} W:{member.wisdom:d}",
                 tx, ty, (136, 136, 136))
 
             ty += 16
             self._u3_text(
-                f"LVL:{member.level:02d}  EXP:{member.exp:04d}/{member.xp_for_next_level:04d}",
+                f"LVL:{member.level:d}  EXP:{member.exp:d}/{member.xp_for_next_level:d}",
                 tx, ty, (136, 136, 136))
 
             ty += 16
@@ -3422,7 +3422,7 @@ class Renderer:
         tx = x + 8
         ty = info_y + 6
 
-        self._u3_text(f"GOLD: {party.gold:05d}", tx, ty, (255, 255, 0))
+        self._u3_text(f"GOLD: {party.gold:d}", tx, ty, (255, 255, 0))
 
         ty += 18
         self._u3_text(f"DUNGEON: {dungeon_data.name}", tx, ty, (200, 60, 60))
@@ -3436,7 +3436,7 @@ class Renderer:
 
         ty += 18
         chests = len(dungeon_data.opened_chests)
-        self._u3_text(f"CHESTS: {chests:02d}", tx, ty, (255, 170, 85))
+        self._u3_text(f"CHESTS: {chests:d}", tx, ty, (255, 170, 85))
 
     # ========================================================
     # COMBAT ARENA  –  Ultima III retro style
@@ -6484,7 +6484,7 @@ class Renderer:
         shield = (shield_buffs or {}).get(fighter)
         if shield:
             ac += shield["ac_bonus"]
-        self._u3_text(f"HP:{fighter.hp:04d}/{fighter.max_hp:04d}  AC:{ac:02d}",
+        self._u3_text(f"HP:{fighter.hp:d}/{fighter.max_hp:d}  AC:{ac:d}",
                       tx, ty, self._U3_WHITE, f)
         if defending:
             self._u3_text("DEF", tx + 220, ty, self._U3_ORANGE, f)
@@ -6493,11 +6493,11 @@ class Renderer:
             self._u3_text("SHLD", label_x, ty, (100, 180, 255), f)
 
         ty += 18
-        self._u3_text(f"S:{fighter.strength:02d} D:{fighter.dexterity:02d} I:{fighter.intelligence:02d} W:{fighter.wisdom:02d}",
+        self._u3_text(f"S:{fighter.strength:d} D:{fighter.dexterity:d} I:{fighter.intelligence:d} W:{fighter.wisdom:d}",
                       tx, ty, (200, 200, 200), f)
 
         ty += 18
-        self._u3_text(f"LVL:{fighter.level:02d}  EXP:{fighter.exp:04d}/{fighter.xp_for_next_level:04d}",
+        self._u3_text(f"LVL:{fighter.level:d}  EXP:{fighter.exp:d}/{fighter.xp_for_next_level:d}",
                       tx, ty, (200, 200, 200), f)
 
         ty += 18
@@ -6544,7 +6544,7 @@ class Renderer:
 
         # ── ATK/DMG line ──
         stat_y = bar_y + bar_h + 3
-        atk_text = f"ATK:+{monster.attack_bonus:02d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
+        atk_text = f"ATK:+{monster.attack_bonus:d}  DMG:{monster.damage_dice}D{monster.damage_sides}+{monster.damage_bonus}"
         self._u3_text(atk_text, info_x, stat_y, (200, 200, 200), self.font_small)
 
     def _u3_monster_panel_multi(self, monsters, x, y, w, h,
@@ -7576,7 +7576,7 @@ class Renderer:
             self._u3_draw_stat_bar(bar_x, ty + 1, bar_w, bar_h,
                                    member.hp, member.max_hp, hp_color)
             self._u3_text(
-                f"{member.hp:04d}/{member.max_hp:04d}",
+                f"{member.hp:d}/{member.max_hp:d}",
                 bar_x + bar_w + 6, ty, self._U3_WHITE, fm)
 
             # MP bar + text
@@ -7587,7 +7587,7 @@ class Renderer:
                 self._u3_draw_stat_bar(bar_x, ty + 1, bar_w, bar_h,
                                        member.current_mp, member.max_mp, mp_color)
                 self._u3_text(
-                    f"{member.current_mp:04d}/{member.max_mp:04d}",
+                    f"{member.current_mp:d}/{member.max_mp:d}",
                     bar_x + bar_w + 6, ty, self._U3_WHITE, fm)
             else:
                 self._u3_text("----/----", bar_x + bar_w + 6, ty, (120, 120, 120), fm)
@@ -7595,14 +7595,14 @@ class Renderer:
             # Stats
             ty += 20
             self._u3_text(
-                f"STR:{member.strength:02d}  DEX:{member.dexterity:02d}  "
-                f"INT:{member.intelligence:02d}  WIS:{member.wisdom:02d}",
+                f"STR:{member.strength:d}  DEX:{member.dexterity:d}  "
+                f"INT:{member.intelligence:d}  WIS:{member.wisdom:d}",
                 tx, ty, self._U3_LTBLUE, fm)
 
             # Level / EXP
             ty += 20
             self._u3_text(
-                f"LVL:{member.level:02d}  EXP:{member.exp:04d}/{member.xp_for_next_level:04d}  AC:{member.get_ac():02d}",
+                f"LVL:{member.level:d}  EXP:{member.exp:d}/{member.xp_for_next_level:d}  AC:{member.get_ac():d}",
                 tx, ty, self._U3_WHITE, fm)
 
             # Weapon info
@@ -7612,7 +7612,7 @@ class Renderer:
             ammo_str = f"  x{member.get_ammo()}" if member.is_throwable_weapon() else ""
             self._u3_text("WPN:", tx, ty, self._U3_LTBLUE, fm)
             self._u3_text(
-                f"{member.weapon}  (PWR:{wp['power']:02d} {rng}){ammo_str}",
+                f"{member.weapon}  (PWR:{wp['power']:d} {rng}){ammo_str}",
                 tx + 50, ty, (230, 230, 240), fm)
 
             # Armor info
@@ -7643,7 +7643,7 @@ class Renderer:
             ty += 20
             dmg = member.get_damage()
             self._u3_text("EST DMG:", tx, ty, self._U3_LTBLUE, fm)
-            self._u3_text(f"{dmg:02d}", tx + 88, ty, self._U3_WHITE, fm)
+            self._u3_text(f"{dmg:d}", tx + 88, ty, self._U3_WHITE, fm)
 
             # Status
             ty += 20
@@ -7656,7 +7656,7 @@ class Renderer:
         info_h = SCREEN_HEIGHT - info_y - 28
         if info_h > 10:
             self._u3_panel(4, info_y, SCREEN_WIDTH - 8, info_h)
-            self._u3_text(f"GOLD: {party.gold:05d}", 14, info_y + 6,
+            self._u3_text(f"GOLD: {party.gold:d}", 14, info_y + 6,
                           (255, 255, 0))
             alive = len(party.alive_members())
             self._u3_text(f"ALIVE: {alive}/4", 200, info_y + 6,
@@ -7734,8 +7734,8 @@ class Renderer:
         self._u3_text(f"  {gender_str}", tx + 58 + fm.size(member.race.upper())[0], ty,
                       (180, 180, 200), fm)
         ty += 20
-        self._u3_text(f"LEVEL: {member.level:02d}", tx, ty, self._U3_WHITE, fm)
-        self._u3_text(f"EXP: {member.exp:04d}/{member.xp_for_next_level:04d}",
+        self._u3_text(f"LEVEL: {member.level:d}", tx, ty, self._U3_WHITE, fm)
+        self._u3_text(f"EXP: {member.exp:d}/{member.xp_for_next_level:d}",
                       tx + 120, ty, (220, 220, 230), fm)
 
         # ── HP bar ──
@@ -7749,7 +7749,7 @@ class Renderer:
                                member.hp, member.max_hp, hp_color)
         ty += bar_h + 2
         self._u3_text(
-            f"{member.hp:04d} / {member.max_hp:04d}",
+            f"{member.hp:d} / {member.max_hp:d}",
             tx, ty, self._U3_WHITE, fm)
 
         # ── MP bar ──
@@ -7761,7 +7761,7 @@ class Renderer:
                                    member.current_mp, member.max_mp, (100, 100, 255))
             ty += bar_h + 2
             self._u3_text(
-                f"{member.current_mp:04d} / {member.max_mp:04d}",
+                f"{member.current_mp:d} / {member.max_mp:d}",
                 tx, ty, self._U3_WHITE, fm)
         else:
             self._u3_draw_stat_bar(tx, ty, bar_w, bar_h, 0, 1, (60, 60, 60))
@@ -7781,7 +7781,7 @@ class Renderer:
         for label, val, mod in attrs:
             mod_str = format_modifier(mod)
             self._u3_text(f"{label}:", tx, ty, self._U3_LTBLUE, fm)
-            self._u3_text(f"{val:02d}", tx + 42, ty, self._U3_WHITE, fm)
+            self._u3_text(f"{val:d}", tx + 42, ty, self._U3_WHITE, fm)
             mod_color = self._U3_GREEN if mod > 0 else self._U3_RED if mod < 0 else (180, 180, 180)
             self._u3_text(f"({mod_str})", tx + 68, ty, mod_color, fm)
             ty += 18
@@ -7944,7 +7944,7 @@ class Renderer:
                         hint = f"EVD:{arm['evasion']}%"
                     elif slot_key in ("right_hand", "left_hand"):
                         wp = WEAPONS.get(item_name, {"power": 0})
-                        hint = f"PWR:{wp['power']:02d}"
+                        hint = f"PWR:{wp['power']:d}"
                 if hint:
                     self._u3_text(hint, rx + right_w - 90, ry, (180, 180, 180), fm)
 
@@ -8015,7 +8015,7 @@ class Renderer:
         potion_ac = getattr(member, "potion_buffs", {}).get("ac", 0)
 
         self._u3_text("AC", rx, ry, lbl_c, fm)
-        self._u3_text(f"{ac:02d}", rx + 38, ry, val_c, fm)
+        self._u3_text(f"{ac:d}", rx + 38, ry, val_c, fm)
         ry += 16
         # Breakdown line
         parts = [f"BASE 10"]
@@ -8348,7 +8348,7 @@ class Renderer:
                 self._u3_text(f"TYPE: {wtype} WEAPON", rx, ry,
                               self._U3_LTBLUE, fm)
                 ry += 18
-                self._u3_text(f"POWER: {wp['power']:02d}", rx, ry,
+                self._u3_text(f"POWER: {wp['power']:d}", rx, ry,
                               (220, 220, 230), fm)
                 ry += 18
                 self._u3_text("SLOT: RIGHT HAND", rx, ry, (180, 180, 180), fm)
@@ -8470,7 +8470,7 @@ class Renderer:
         # ── Gold display ──
         gold_y = panel_y + panel_h - 30
         self._draw_item_icon(rx + 12, gold_y + 8, "chest", 28)
-        self._u3_text(f"GOLD: {party.gold:05d}", rx + 30, gold_y + 2,
+        self._u3_text(f"GOLD: {party.gold:d}", rx + 30, gold_y + 2,
                       (255, 255, 0), fm)
 
         # ── Floating shop message ──
@@ -8894,7 +8894,7 @@ class Renderer:
                 wtype = "RANGED" if wp.get("ranged", False) else "MELEE"
                 self._u3_text(f"TYPE: {wtype} WEAPON", rx, ry, self._U3_LTBLUE, fm)
                 ry += 18
-                self._u3_text(f"POWER: {wp['power']:02d}", rx, ry, (220, 220, 230), fm)
+                self._u3_text(f"POWER: {wp['power']:d}", rx, ry, (220, 220, 230), fm)
                 ry += 18
                 self._u3_text("SLOT: RIGHT HAND", rx, ry, (180, 180, 180), fm)
             else:
@@ -9049,7 +9049,7 @@ class Renderer:
         # ── Gold display with chest icon ──
         gold_y = panel_y + panel_h - 30
         self._draw_item_icon(rx + 12, gold_y + 8, "chest", 28)
-        self._u3_text(f"GOLD: {party.gold:05d}", rx + 30, gold_y + 2, (255, 255, 0), fm)
+        self._u3_text(f"GOLD: {party.gold:d}", rx + 30, gold_y + 2, (255, 255, 0), fm)
 
         # ── Action menu popup ──
         if action_menu and action_options:
@@ -10336,7 +10336,7 @@ class Renderer:
             self._u3_text("POWER:", name_x, ty, self._U3_LTBLUE, fm)
             pwr = wp["power"]
             pwr_color = self._U3_GREEN if pwr >= 7 else self._U3_ORANGE if pwr >= 4 else (220, 220, 230)
-            self._u3_text(f"{pwr:02d}", name_x + 65, ty, pwr_color, fm)
+            self._u3_text(f"{pwr:d}", name_x + 65, ty, pwr_color, fm)
             if wp.get("throwable", False):
                 ty += 20
                 self._u3_text("NOTE:", name_x, ty, self._U3_LTBLUE, fm)
