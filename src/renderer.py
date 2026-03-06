@@ -46,6 +46,41 @@ class Renderer:
 
         self._tile_sprites = {}  # (row, col) -> 32x32 pygame surface
 
+        # ── Always initialise tile maps & sprite caches ──
+        # (These must exist even when the sprite sheet is missing.)
+        self._chest_tile = None
+        self._town_gate_tile = None
+        self._monster_tiles = {}
+        self._npc_sprites = {}
+        self._villager_sprites = []
+        self._unique_tile_sprites = {}
+        self._assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "src", "assets")
+
+        from src.settings import (
+            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
+            TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
+            TILE_DFLOOR, TILE_DWALL, TILE_CHEST,
+        )
+        self._overworld_tile_map = {
+            TILE_WATER:    (0, 0),
+            TILE_GRASS:    (0, 1),
+            TILE_FOREST:   (0, 3),
+            TILE_MOUNTAIN: (0, 4),
+            TILE_DUNGEON:  (0, 5),
+            TILE_TOWN:     (0, 6),
+            TILE_PATH:     (0, 2),
+            TILE_CHEST:    (0, 9),
+        }
+        self._town_tile_map = {
+            TILE_FLOOR:    (0, 1),
+            TILE_WALL:     (0, 8),
+            TILE_CHEST:    (0, 9),
+            TILE_EXIT:     (0, 6),
+        }
+        self._dungeon_tile_map = {}  # populated below if sheet exists
+
         if not os.path.exists(sheet_path):
             return
 
@@ -63,10 +98,8 @@ class Renderer:
                 self._tile_sprites[(r, c)] = scaled
 
         # ── Load treasure chest tile from reference doc asset ──
-        chest_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "src", "assets", "chest_tile.png")
-        self._chest_tile = None
+        assets_dir = self._assets_dir
+        chest_path = os.path.join(assets_dir, "chest_tile.png")
         if os.path.exists(chest_path):
             raw = pygame.image.load(chest_path).convert_alpha()
             self._chest_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
@@ -75,16 +108,12 @@ class Renderer:
         gate_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             "src", "assets", "town_gate.png")
-        self._town_gate_tile = None
         if os.path.exists(gate_path):
             raw = pygame.image.load(gate_path).convert_alpha()
             self._town_gate_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
 
         # ── Load monster tile sprites from assets ──
-        self._monster_tiles = {}  # tile filename -> scaled pygame surface
         from src.monster import MONSTERS
-        assets_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "src", "assets")
         for name, data in MONSTERS.items():
             tile_file = data.get("tile")
             if tile_file and tile_file not in self._monster_tiles:
@@ -95,14 +124,11 @@ class Renderer:
                         raw, (dst_ts, dst_ts))
 
         # ── Load NPC type sprites from VGA / U4 tiles ──
-        self._npc_sprites = {}  # npc_type -> pygame surface (32x32)
         npc_sprite_map = {
             "shopkeep":  "steele_tiles/vga_tinker_f1.png",
             "innkeeper": "steele_tiles/vga_bard_f1.png",
             "elder":     "steele_tiles/vga_lord_f1.png",
         }
-        # Multiple villager sprites — picked by name hash at draw time
-        self._villager_sprites = []
         villager_files = [
             "steele_tiles/vga_citizen_f1.png",
             "steele_tiles/vga_shepherd_f1.png",
@@ -123,40 +149,6 @@ class Renderer:
                 raw = pygame.image.load(vpath).convert_alpha()
                 self._villager_sprites.append(
                     pygame.transform.scale(raw, (dst_ts, dst_ts)))
-
-        # ── Unique tile sprite cache (loaded on demand) ──
-        self._unique_tile_sprites = {}  # filename -> scaled surface
-        self._assets_dir = assets_dir
-
-        # Map game tile IDs to sheet positions (row, col)
-        # Based on the style guide tile-to-game mapping
-        from src.settings import (
-            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
-            TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
-            TILE_DFLOOR, TILE_DWALL, TILE_CHEST,
-        )
-        self._overworld_tile_map = {
-            TILE_WATER:    (0, 0),
-            TILE_GRASS:    (0, 1),
-            TILE_FOREST:   (0, 3),
-            TILE_MOUNTAIN: (0, 4),
-            TILE_DUNGEON:  (0, 5),
-            TILE_TOWN:     (0, 6),
-            # PATH uses brush/scrubland tile (R0 C2)
-            TILE_PATH:     (0, 2),
-            # Treasure chest (same sprite as town chest)
-            TILE_CHEST:    (0, 9),
-            # No exact match for sand or bridge — will fall back to procedural
-        }
-        # Town interior tile mapping
-        self._town_tile_map = {
-            TILE_FLOOR:    (0, 1),   # Grass for outdoor floor areas
-            TILE_WALL:     (0, 8),   # Red brick wall
-            TILE_CHEST:    (0, 9),   # Treasure chest
-            TILE_EXIT:     (0, 6),   # Town tile as exit marker
-            # TILE_COUNTER and TILE_DOOR have no exact match — procedural fallback
-        }
 
     def _get_tile_sprite(self, tile_id):
         """Return the sprite surface for an overworld tile, or None."""
