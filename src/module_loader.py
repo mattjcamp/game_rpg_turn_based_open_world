@@ -53,8 +53,8 @@ def scan_modules():
 
 
 def get_default_module_path():
-    """Return the absolute path to the default module (realm_of_shadow)."""
-    return os.path.abspath(os.path.join(_MODULES_DIR, "realm_of_shadow"))
+    """Return the absolute path to the default module (keys_of_shadow)."""
+    return os.path.abspath(os.path.join(_MODULES_DIR, "keys_of_shadow"))
 
 
 def load_module_data(module_path):

@@ -15,7 +15,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_EXIT, TILE_DUNGEON,
     TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
-    TILE_TOWN,
+    TILE_TOWN, TILE_MACHINE,
 )
 from src.dungeon_generator import generate_quest_dungeon
 
@@ -370,6 +370,64 @@ class TownState(InventoryMixin, BaseState):
         )
         if tile_id == TILE_EXIT:
             self._exit_town()
+        elif tile_id == TILE_MACHINE:
+            self._interact_machine()
+
+    # ── Machine interaction (Keys of Shadow) ──────────────────
+
+    def _interact_machine(self):
+        """Handle stepping on the gnome machine tile."""
+        kd = getattr(self.game, "key_dungeons", {})
+        if not kd:
+            self.show_message("A strange machine hums ominously.", 2000)
+            return
+
+        party = self.game.party
+        key_names = [d["key_name"] for d in kd.values()]
+        held_keys = [k for k in key_names if party.inv_count(k) > 0]
+
+        total = len(kd)
+        inserted = self.game.keys_inserted
+
+        if held_keys:
+            for key in held_keys:
+                party.inv_remove(key)
+                self.game.keys_inserted += 1
+            inserted = self.game.keys_inserted
+            names = ", ".join(held_keys)
+            self.show_message(
+                f"Inserted {names}! ({inserted}/{total} keys placed)", 3500)
+            if inserted >= total:
+                self._trigger_victory()
+        elif inserted >= total:
+            self.show_message(
+                "The machine is deactivated. Sunlight bathes the land!", 3000)
+        elif inserted > 0:
+            remaining = total - inserted
+            self.show_message(
+                f"The machine hums... {inserted}/{total} keys inserted. "
+                f"{remaining} more needed.", 3000)
+        else:
+            self.show_message(
+                "A massive gnomish machine blocks the sun! "
+                "It has 8 empty keyhole slots.", 3500)
+
+    def _trigger_victory(self):
+        """Called when all 8 keys are inserted — the sun returns!"""
+        self.game.darkness_active = False
+        for m in self.game.party.active_members():
+            if m.is_alive():
+                m.exp += 500
+                msgs = m.check_level_up()
+                for msg in msgs:
+                    self.game.log(msg)
+        self.game.party.gold += 1000
+        self.game.log("*** THE MACHINE POWERS DOWN! ***")
+        self.game.log("Sunlight floods the land once more!")
+        self.game.log("The people of Duskhollow are saved!")
+        self.game.log("VICTORY! +500 XP, +1000 Gold")
+        self.show_message(
+            "THE MACHINE POWERS DOWN! Sunlight returns! VICTORY!", 6000)
 
     # ── Pickpocket targeting ──────────────────────────────────
 
@@ -761,6 +819,7 @@ class TownState(InventoryMixin, BaseState):
             self.town_data,
             message=msg,
             quest_complete=quest_complete,
+            darkness_active=getattr(self.game, "darkness_active", False),
         )
         # Pickpocket targeting overlay
         if self.pickpocket_targeting and self.pickpocket_targets:

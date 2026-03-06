@@ -17,7 +17,7 @@ from src.states.overworld import OverworldState
 from src.states.town import TownState
 from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
-from src.town_generator import generate_town
+from src.town_generator import generate_town, generate_duskhollow
 from src.music import MusicManager, SoundEffects
 from src.save_load import save_game, load_game, get_save_info, NUM_SAVE_SLOTS
 from src.module_loader import load_module_data
@@ -90,7 +90,7 @@ class Game:
         self.module_list = []  # populated when screen opens
         from src.module_loader import get_default_module_path
         self.active_module_path = get_default_module_path()
-        self.active_module_name = "Realm of Shadow"
+        self.active_module_name = "Keys of Shadow"
         self.active_module_version = "1.0.0"
         self.module_manifest = None  # populated on new game start
 
@@ -183,6 +183,13 @@ class Game:
             self.party.row = start.get("row", 16)
             self.party.gold = cfg.get("gold", 100)
 
+            # Module overworld may override the start position
+            if overworld_cfg:
+                mod_start = overworld_cfg.get("start_position")
+                if mod_start:
+                    self.party.col = mod_start.get("col", self.party.col)
+                    self.party.row = mod_start.get("row", self.party.row)
+
             # Reset shared inventory to defaults
             self.party.shared_inventory = []
             for entry in cfg.get("inventory", []):
@@ -206,6 +213,13 @@ class Game:
         else:
             # No active party formed — use the default from party.json
             self.party = create_default_party()
+
+            # Module overworld may override the start position
+            if overworld_cfg:
+                mod_start = overworld_cfg.get("start_position")
+                if mod_start:
+                    self.party.col = mod_start.get("col", self.party.col)
+                    self.party.row = mod_start.get("row", self.party.row)
 
         # ── Set starting time from module config ──
         if self.module_manifest:
@@ -234,6 +248,8 @@ class Game:
             if kd_list:
                 self._init_key_dungeons(kd_list)
                 self.darkness_active = True
+                # Replace default Thornwall with Duskhollow for this module
+                self.town_data = generate_duskhollow()
 
         self.showing_title = False
         self.change_state("overworld")

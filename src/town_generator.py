@@ -12,6 +12,7 @@ import random
 from src.tile_map import TileMap
 from src.settings import (
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
+    TILE_MACHINE,
 )
 
 
@@ -200,3 +201,174 @@ def generate_town(name="Thornwall"):
     entry_row = exit_row - 1
 
     return TownData(tmap, npcs, name, entry_col, entry_row)
+
+
+def generate_duskhollow():
+    """
+    Generate the town of Duskhollow for the Keys of Shadow module.
+
+    A larger town (28×25 interior) with shrines, houses, a shop, an inn,
+    and the Gnome Machine at its centre.  The town is perpetually dark
+    (handled by the rendering layer via ``darkness_active``).
+    """
+    INTERIOR_W = 28
+    INTERIOR_H = 25
+
+    # Padding so the camera (30×21 viewport) never sees out-of-bounds.
+    PAD_X = 16
+    PAD_Y = 11
+
+    W = INTERIOR_W + 2 + PAD_X * 2
+    H = INTERIOR_H + 2 + PAD_Y * 2
+
+    BORDER_X = PAD_X
+    BORDER_Y = PAD_Y
+    BORDER_W = INTERIOR_W + 2
+    BORDER_H = INTERIOR_H + 2
+
+    tmap = TileMap(W, H, default_tile=TILE_WALL)
+
+    # --- Floor inside the brick border ---
+    for row in range(BORDER_Y + 1, BORDER_Y + BORDER_H - 1):
+        for col in range(BORDER_X + 1, BORDER_X + BORDER_W - 1):
+            tmap.set_tile(col, row, TILE_FLOOR)
+
+    # --- Exit gate (bottom centre) ---
+    exit_col = BORDER_X + BORDER_W // 2
+    exit_row = BORDER_Y + BORDER_H - 1
+    tmap.set_tile(exit_col, exit_row, TILE_EXIT)
+
+    # Interior origin — (0,0) of the interior coordinate space.
+    ox = BORDER_X + 1
+    oy = BORDER_Y + 1
+
+    # ── Gnome Machine — dead centre ──
+    machine_col = ox + INTERIOR_W // 2
+    machine_row = oy + INTERIOR_H // 2
+    tmap.set_tile(machine_col, machine_row, TILE_MACHINE)
+
+    # ================================================================
+    # BUILDINGS
+    # ================================================================
+
+    # ── Shop (upper-left, 7×5, door south) ──
+    _place_building(tmap, ox + 1, oy + 1, 7, 5, door_side="south")
+    # Counter inside
+    for c in range(ox + 3, ox + 6):
+        tmap.set_tile(c, oy + 2, TILE_COUNTER)
+
+    # ── Inn (upper-right, 7×5, door south) ──
+    _place_building(tmap, ox + 20, oy + 1, 7, 5, door_side="south")
+    # Bar counter
+    tmap.set_tile(ox + 23, oy + 2, TILE_COUNTER)
+    tmap.set_tile(ox + 24, oy + 2, TILE_COUNTER)
+    tmap.set_tile(ox + 25, oy + 2, TILE_COUNTER)
+
+    # ── Shrine of Light (mid-left, 5×5, door east) ──
+    _place_building(tmap, ox + 1, oy + 8, 5, 5, door_side="east")
+
+    # ── Shrine of Stars (mid-right, 5×5, door west) ──
+    _place_building(tmap, ox + 22, oy + 8, 5, 5, door_side="west")
+
+    # ── Elder's House (lower-left, 6×5, door east) ──
+    _place_building(tmap, ox + 1, oy + 15, 6, 5, door_side="east")
+
+    # ── Guard House (lower-right, 6×5, door west) ──
+    _place_building(tmap, ox + 21, oy + 15, 6, 5, door_side="west")
+
+    # ── Small cottage A (lower-mid-left, 4×4, door south) ──
+    _place_building(tmap, ox + 9, oy + 18, 4, 4, door_side="south")
+
+    # ── Small cottage B (lower-mid-right, 4×4, door south) ──
+    _place_building(tmap, ox + 16, oy + 18, 4, 4, door_side="south")
+
+    # ================================================================
+    # NPCs
+    # ================================================================
+    npcs = []
+
+    # ── Shopkeeper ──
+    npcs.append(NPC(ox + 4, oy + 3, "Mara", [
+        "Welcome to Mara's Provisions!",
+        "Stock up before heading into the dark.",
+        "Torches are half-price for adventurers.",
+        "Be careful out there — the monsters grow fiercer to the north.",
+    ], npc_type="shopkeep"))
+
+    # ── Innkeeper ──
+    npcs.append(NPC(ox + 24, oy + 3, "Aldric", [
+        "Welcome to the Dim Lantern Inn.",
+        "Rest here to recover your strength.",
+        "The darkness has been hard on business...",
+        "I've heard each dungeon holds a key to that cursed machine.",
+    ], npc_type="innkeeper",
+       quest_dialogue=[
+           "Adventurer! The gnome Fizzwick built a terrible machine in our town square.",
+           "It blocks the very sun! We need someone brave to find the 8 Keys of Shadow "
+           "hidden in the surrounding dungeons and shut it down. Will you help us?",
+       ],
+       quest_choices=["We'll find the keys!", "Not right now."],
+    ))
+
+    # ── Shrine Keeper of Light ──
+    npcs.append(NPC(ox + 3, oy + 10, "Sister Luma", [
+        "This is the Shrine of Light. May its glow guide you.",
+        "The first key lies in a small warren just outside town.",
+        "Bring torches — the darkness is absolute without them.",
+        "Each key you recover weakens the machine's grip.",
+        "Return here if your spirits falter. Light endures.",
+    ], npc_type="elder"))
+
+    # ── Shrine Keeper of Stars ──
+    npcs.append(NPC(ox + 24, oy + 10, "Brother Astrin", [
+        "Welcome to the Shrine of Stars, traveler.",
+        "The dungeons grow deeper and more dangerous as you venture further.",
+        "The easiest lies south-west. The hardest is far to the south-east.",
+        "Study the stars... even in darkness, they remember the sun.",
+        "Prepare well. The eighth dungeon has eight floors of peril.",
+    ], npc_type="elder"))
+
+    # ── Elder Gwynn ──
+    npcs.append(NPC(ox + 4, oy + 17, "Elder Gwynn", [
+        "Ah, you've come at last. I am Gwynn, elder of Duskhollow.",
+        "The gnome Fizzwick was once a friend to this town.",
+        "But his obsession with shadow-energy consumed him.",
+        "He built the machine to harness the sun's power...",
+        "Instead it devoured the light entirely.",
+        "Fizzwick vanished, but the machine remains. Only the 8 keys can stop it.",
+    ], npc_type="elder"))
+
+    # ── Captain Hale ──
+    npcs.append(NPC(ox + 24, oy + 17, "Captain Hale", [
+        "I'm Captain Hale of the Duskhollow Guard.",
+        "My soldiers can hold the town, but those dungeons are beyond us.",
+        "The nearer dungeons have weaker creatures — rats, goblins.",
+        "But the distant ones? Dragons. Liches. Worse.",
+        "Match your strength to the dungeon's depth, or you'll never return.",
+    ], npc_type="villager"))
+
+    # ── Villagers ──
+    npcs.append(NPC(ox + 10, oy + 7, "Tilda", [
+        "I haven't seen the sun in so long...",
+        "My children are frightened of the dark.",
+        "Please, find those keys and end this nightmare.",
+    ], npc_type="villager"))
+
+    npcs.append(NPC(ox + 18, oy + 7, "Ren", [
+        "The darkness brings foul creatures closer to town.",
+        "I've boarded up my windows, for what good it does.",
+        "Some say the keys glow when you're near them.",
+    ], npc_type="villager"))
+
+    npcs.append(NPC(ox + 14, oy + 16, "Old Finch", [
+        "I remember when the sun shone on Duskhollow.",
+        "The flowers in the square were beautiful then.",
+        "Now there's only that cursed machine.",
+        "Fizzwick... what have you done?",
+    ], npc_type="villager"))
+
+    # Entry point: just inside the exit gate
+    entry_col = exit_col
+    entry_row = exit_row - 1
+
+    return TownData(tmap, npcs, "Duskhollow", entry_col, entry_row)

@@ -503,7 +503,7 @@ class Renderer:
     _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 672
 
     def draw_town_u3(self, party, town_data, message="",
-                      quest_complete=False):
+                      quest_complete=False, darkness_active=False):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
@@ -590,6 +590,24 @@ class Renderer:
             cx = psc * ts + ts // 2
             cy = psr * ts + ts // 2
             self._u3_draw_overworld_party(cx, cy, party)
+
+        # ── 3b. darkness overlay (Keys of Shadow / nighttime) ──
+        clock = party.clock
+        has_infravision = party.has_effect("Infravision")
+        has_galadriels = (party.has_effect("Galadriel's Light")
+                          and party.galadriels_light_steps > 0)
+        if not clock.is_day or darkness_active:
+            has_light = (party.get_equipped_name("light") is not None
+                         or has_infravision or has_galadriels)
+            self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
+                                          has_light=has_light,
+                                          force_night=darkness_active)
+            if has_infravision and party.get_equipped_name("light") is None:
+                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
+            elif (has_galadriels
+                  and party.get_equipped_name("light") is None
+                  and not has_infravision):
+                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -1310,7 +1328,8 @@ class Renderer:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
-                                          has_light=has_light)
+                                          has_light=has_light,
+                                          force_night=darkness_active)
             # Apply infravision red tint when it's the active light source
             if has_infravision and party.get_equipped_name("light") is None:
                 self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
@@ -8112,7 +8131,7 @@ class Renderer:
         self.screen.blit(snow, (0, 0))
 
     def _draw_overworld_darkness(self, clock, party_sc, party_sr, ts, cols, rows,
-                                 has_light=False):
+                                 has_light=False, force_night=False):
         """Overlay darkness on the overworld map based on the time of day.
 
         During dusk/dawn the map is lightly dimmed with a warm/cool tint
@@ -8156,6 +8175,13 @@ class Renderer:
             fade_tiles = 1.5
             max_alpha = 255                        # completely dark
             tint = (0, 0, 0)                       # pure black
+        elif force_night:
+            # Forced darkness (e.g. Keys of Shadow) — treat as night
+            light_bonus = 3.0 if has_light else 0.0
+            light_radius = 1.0 + light_bonus
+            fade_tiles = 1.5
+            max_alpha = 255
+            tint = (0, 0, 0)
         else:
             return  # daytime — nothing to draw
 
