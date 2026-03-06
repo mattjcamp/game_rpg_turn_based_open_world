@@ -909,7 +909,6 @@ class OverworldState(InventoryMixin, BaseState):
             unique_pos=self.unique_tile_pos,
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
-            darkness_active=getattr(self.game, "darkness_active", False),
         )
         if self.showing_help:
             renderer.draw_overworld_help_overlay()

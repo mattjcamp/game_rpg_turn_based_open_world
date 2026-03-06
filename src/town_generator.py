@@ -300,12 +300,27 @@ def generate_duskhollow():
         "Welcome to the Dim Lantern Inn.",
         "Rest here to recover your strength.",
         "The darkness has been hard on business...",
-        "I've heard each dungeon holds a key to that cursed machine.",
-    ], npc_type="innkeeper",
+        "Talk to the gnome by the machine if you want to help.",
+    ], npc_type="innkeeper"))
+
+    # ── Fizzwick the Gnome — quest-giver, stands next to the machine ──
+    npcs.append(NPC(machine_col + 1, machine_row, "Fizzwick", [
+        "Oh! Oh dear! You've come to help, haven't you?",
+        "I built this machine to harness the sun's energy...",
+        "But something went terribly wrong! It's devouring the light!",
+        "I've tried everything — only the 8 Keys of Shadow can shut it down.",
+        "The keys are scattered across 8 dungeons in these lands.",
+        "Each dungeon is deeper and more dangerous than the last.",
+        "Please, bring me the keys! I'll insert them into the machine myself.",
+        "Hurry... Duskhollow cannot survive in darkness forever.",
+    ], npc_type="gnome",
        quest_dialogue=[
-           "Adventurer! The gnome Fizzwick built a terrible machine in our town square.",
-           "It blocks the very sun! We need someone brave to find the 8 Keys of Shadow "
-           "hidden in the surrounding dungeons and shut it down. Will you help us?",
+           "You there! Adventurers! I am Fizzwick, and I've made a terrible mistake.",
+           "My machine was meant to bring endless daylight to Duskhollow...",
+           "Instead it's consumed the sun entirely! The town is trapped in darkness!",
+           "Only the 8 Keys of Shadow can reverse it. They're hidden in dungeons "
+           "across the land — each one guarded by fiercer monsters than the last.",
+           "Will you help me recover them and save Duskhollow?",
        ],
        quest_choices=["We'll find the keys!", "Not right now."],
     ))

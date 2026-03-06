@@ -782,6 +782,14 @@ class Renderer:
 
     def _u3_draw_npc_sprite(self, npc, cx, cy):
         """Draw an NPC on the town map using per-type VGA sprites."""
+        import math as _math
+        import time as _time
+
+        # ── Animated gnome (Fizzwick) ──
+        if npc.npc_type == "gnome":
+            self._draw_gnome_sprite(npc, cx, cy)
+            return
+
         sprite = self._npc_sprites.get(npc.npc_type)
         # Villagers rotate among several sprites based on name hash
         if sprite is None and self._villager_sprites:
@@ -809,6 +817,86 @@ class Renderer:
         # Name tag above
         name_surf = self.font_small.render(npc.name.upper(), True, (255, 255, 255))
         name_rect = name_surf.get_rect(center=(cx, cy - 20))
+        bg = name_rect.inflate(4, 2)
+        pygame.draw.rect(self.screen, (0, 0, 0), bg)
+        self.screen.blit(name_surf, name_rect)
+
+    def _draw_gnome_sprite(self, npc, cx, cy):
+        """Draw an animated gnome NPC — short, pointy hat, bobbing, with glow."""
+        import math as _math
+        import time as _time
+
+        t = _time.time()
+
+        # Bobbing offset (gentle float up and down)
+        bob = int(2 * _math.sin(t * 2.5))
+
+        # Subtle pulsing glow around the gnome
+        glow_r = int(14 + 3 * _math.sin(t * 1.8))
+        glow_a = int(35 + 20 * _math.sin(t * 2.0))
+        glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+        pygame.draw.circle(
+            glow_surf, (180, 120, 255, glow_a),
+            (glow_r, glow_r), glow_r)
+        self.screen.blit(glow_surf, (cx - glow_r, cy + bob - glow_r))
+
+        # --- Body (shorter than regular NPCs) ---
+        body_color = (120, 80, 40)     # brown tunic
+        skin = (220, 180, 140)
+        hat_color = (160, 60, 200)     # purple pointy hat
+
+        # Head (round, slightly larger for gnome proportions)
+        head_y = cy + bob - 7
+        pygame.draw.circle(self.screen, skin, (cx, head_y), 5)
+        # Eyes
+        pygame.draw.circle(self.screen, (40, 40, 40), (cx - 2, head_y - 1), 1)
+        pygame.draw.circle(self.screen, (40, 40, 40), (cx + 2, head_y - 1), 1)
+
+        # Pointy hat
+        hat_tip_y = head_y - 14
+        hat_base_y = head_y - 4
+        hat_pts = [
+            (cx, hat_tip_y),           # tip
+            (cx - 6, hat_base_y),      # left brim
+            (cx + 6, hat_base_y),      # right brim
+        ]
+        pygame.draw.polygon(self.screen, hat_color, hat_pts)
+        pygame.draw.polygon(self.screen, (200, 100, 255), hat_pts, 1)
+        # Hat star/sparkle at tip (animated)
+        sparkle_a = int(200 + 55 * _math.sin(t * 4))
+        sparkle_col = (255, 255, min(255, sparkle_a))
+        pygame.draw.circle(self.screen, sparkle_col, (cx, hat_tip_y), 2)
+
+        # Torso (short, squat)
+        torso_top = cy + bob - 2
+        torso_bot = cy + bob + 5
+        pygame.draw.line(self.screen, body_color, (cx, torso_top), (cx, torso_bot), 3)
+
+        # Arms (slightly waving)
+        arm_wave = int(2 * _math.sin(t * 3.0))
+        pygame.draw.line(self.screen, body_color,
+                         (cx - 6, torso_top + 1 - arm_wave),
+                         (cx, torso_top + 2), 2)
+        pygame.draw.line(self.screen, body_color,
+                         (cx + 6, torso_top + 1 + arm_wave),
+                         (cx, torso_top + 2), 2)
+
+        # Legs (short, stubby)
+        pygame.draw.line(self.screen, body_color,
+                         (cx, torso_bot), (cx - 3, cy + bob + 11), 2)
+        pygame.draw.line(self.screen, body_color,
+                         (cx, torso_bot), (cx + 3, cy + bob + 11), 2)
+
+        # Beard (white, small)
+        beard_y = head_y + 3
+        pygame.draw.line(self.screen, (220, 220, 220),
+                         (cx - 2, beard_y), (cx, beard_y + 4), 1)
+        pygame.draw.line(self.screen, (220, 220, 220),
+                         (cx + 2, beard_y), (cx, beard_y + 4), 1)
+
+        # Name tag above (yellow for quest-giver)
+        name_surf = self.font_small.render(npc.name.upper(), True, (255, 255, 100))
+        name_rect = name_surf.get_rect(center=(cx, cy + bob - 24))
         bg = name_rect.inflate(4, 2)
         pygame.draw.rect(self.screen, (0, 0, 0), bg)
         self.screen.blit(name_surf, name_rect)

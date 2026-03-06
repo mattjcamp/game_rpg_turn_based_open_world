@@ -505,6 +505,72 @@ class TownState(InventoryMixin, BaseState):
                 self.message_timer = 0
                 return
 
+        # Gnome (Fizzwick) — Keys of Shadow quest-giver
+        if npc.npc_type == "gnome":
+            kd = getattr(self.game, "key_dungeons", {})
+            inserted = getattr(self.game, "keys_inserted", 0)
+            total = len(kd) if kd else 8
+
+            if kd:
+                # Check for held keys and auto-insert them
+                party = self.game.party
+                key_names = [d["key_name"] for d in kd.values()]
+                held_keys = [k for k in key_names if party.inv_count(k) > 0]
+
+                if held_keys:
+                    for key in held_keys:
+                        party.inv_remove(key)
+                        self.game.keys_inserted += 1
+                    inserted = self.game.keys_inserted
+                    n = len(held_keys)
+                    names = ", ".join(held_keys)
+                    self.npc_dialogue_active = True
+                    self.npc_speaking = npc
+                    if inserted >= total:
+                        self.message = (
+                            f"{npc.name}: The {names}! That's the last one! "
+                            f"Stand back — I'm shutting it down!")
+                        self.message_timer = 0
+                        self._trigger_victory()
+                    else:
+                        self.message = (
+                            f"{npc.name}: Wonderful! You found the {names}! "
+                            f"That's {inserted}/{total} keys. Keep going!")
+                        self.message_timer = 0
+                    return
+
+                # No keys held — give progress dialogue
+                if inserted >= total:
+                    self.npc_dialogue_active = True
+                    self.npc_speaking = npc
+                    self.message = (
+                        f"{npc.name}: The sun is restored! "
+                        f"I can never thank you enough. Duskhollow is saved!")
+                    self.message_timer = 0
+                    return
+                elif inserted > 0:
+                    self.npc_dialogue_active = True
+                    self.npc_speaking = npc
+                    remaining = total - inserted
+                    self.message = (
+                        f"{npc.name}: {inserted} keys inserted so far... "
+                        f"{remaining} more to go! Try the next dungeon!")
+                    self.message_timer = 0
+                    return
+
+            # No keys inserted yet — offer the quest or cycle dialogue
+            if npc.quest_dialogue and not getattr(self.game, "_gnome_quest_accepted", False):
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self.quest_dialogue_lines = list(npc.quest_dialogue)
+                self.quest_dialogue_index = 0
+                self.message = f"{npc.name}: {self.quest_dialogue_lines[0]}"
+                self.message_timer = 0
+                return
+
+            # Fall through to normal cycling dialogue
+            pass
+
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         line = npc.get_dialogue()
@@ -546,18 +612,36 @@ class TownState(InventoryMixin, BaseState):
 
     def _handle_quest_choice(self):
         """Handle the player's Y/N choice on the quest offer."""
+        npc = self.npc_speaking
         if self.quest_choice_cursor == 0:
             # Accepted
-            self._accept_quest()
+            if npc and npc.npc_type == "gnome":
+                self._accept_gnome_quest()
+            else:
+                self._accept_quest()
         else:
             # Declined
-            npc = self.npc_speaking
             self.message = f"{npc.name}: No worries. Come back if you change your mind."
             self.quest_choice_active = False
             self.quest_choices = []
             self.quest_dialogue_lines = []
             self.quest_dialogue_index = 0
             # Keep dialogue active to show the decline message
+
+    def _accept_gnome_quest(self):
+        """Accept Fizzwick's Keys of Shadow quest."""
+        npc = self.npc_speaking
+        self.game._gnome_quest_accepted = True
+        inserted = getattr(self.game, "keys_inserted", 0)
+        total = len(getattr(self.game, "key_dungeons", {}))
+        self.message = (
+            f"{npc.name}: Thank you! The 8 dungeons are scattered across "
+            f"the land. Start with the closest one — it's the easiest. "
+            f"Bring the keys back to me!")
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
 
     def _accept_quest(self):
         """Accept the innkeeper's quest: place a dungeon on the overworld."""
