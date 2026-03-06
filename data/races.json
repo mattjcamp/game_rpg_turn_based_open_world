@@ -2,13 +2,14 @@
   "_comment": "Race definitions for Realm of Shadow. Each race has stat modifiers and innate effects.",
 
   "Human": {
-    "description": "Versatile and adaptable, humans excel in no single area but have no weaknesses.",
+    "description": "Versatile and adaptable, humans excel in no single area but have no weaknesses. They learn quickly and level up faster than other races.",
     "stat_modifiers": {
       "strength": 0,
       "dexterity": 0,
       "intelligence": 0,
       "wisdom": 0
     },
+    "exp_per_level": 350,
     "effects": []
   },
 

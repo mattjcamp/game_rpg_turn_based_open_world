@@ -263,14 +263,17 @@ class PartyMember:
     def check_level_up(self):
         """Check if enough XP has been earned to level up.
 
-        Level N requires N * exp_per_level total XP (from class template):
-          e.g. with exp_per_level=500: Level 2 at 500, Level 3 at 1000, ...
+        Level N requires N * exp_per_level total XP.  The base value comes
+        from the class template (default 500), but a race can override it
+        via an ``exp_per_level`` field in races.json (e.g. Humans use 350).
 
         Returns a list of message strings for each level gained.
         """
         messages = []
         template = self._load_class_template(self.char_class)
-        xp_per = template["exp_per_level"]
+        # Race override takes priority over class default
+        race_info = self.get_race_info()
+        xp_per = race_info.get("exp_per_level", template["exp_per_level"])
         while self.exp >= self.level * xp_per:
             self.level += 1
             hp_gain = template["hp_per_level"]
