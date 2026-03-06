@@ -380,11 +380,11 @@ When a character attacks (melee or ranged), the game rolls:
 - **Natural 20** (the die shows 20): Always hits and is a **Critical Hit** — damage dice are doubled.
 - **Otherwise:** The attack hits if the total meets or exceeds the target's AC.
 
-The **Attack Bonus** for melee attacks is typically the character's **STR modifier**. For ranged attacks, the weapon's stats determine the bonus.
+The **Attack Bonus** for melee attacks uses the character's **STR modifier**. For ranged attacks (bows, crossbows, slings, thrown items), the **DEX modifier** is used instead.
 
 ### Damage
 
-When an attack hits, damage is rolled based on the weapon's power rating:
+When an attack hits, damage is rolled based on the weapon's power rating. Melee weapons add the **STR modifier** to damage, while ranged weapons add the **DEX modifier**.
 
 | Weapon Power | Damage Dice |
 |-------------|-------------|
@@ -393,18 +393,19 @@ When an attack hits, damage is rolled based on the weapon's power rating:
 | 6–8         | 1d8         |
 | 9+          | 1d10        |
 
-**Damage = Weapon dice + STR modifier**
+**Melee Damage = Weapon dice + STR modifier**
+**Ranged Damage = Weapon dice + DEX modifier**
 
-On a **Critical Hit**, the dice are rolled twice (but the STR modifier is only added once).
+On a **Critical Hit**, the dice are rolled twice (but the stat modifier is only added once).
 
 ### Movement
 
-During their turn, a character can **move** using WASD keys. Each class has a base movement range (typically 2 tiles). The **Long Shanks** spell adds +6 movement for 5 turns.
+During their turn, a character can **move** using WASD keys. Each class has a base movement range (typically 2 tiles). The **Long Shanks** spell adds +4 movement for 3 turns.
 
 Characters can also:
 
-- **Bump-to-attack**: Walk into an adjacent enemy to trigger a melee attack.
-- **Fire ranged weapons**: Use arrow keys to fire in a cardinal direction (up, down, left, right).
+- **Bump-to-attack**: Walk into an adjacent enemy to trigger a melee attack. If you have a bow equipped but also carry a melee weapon (or Fists), the melee weapon is used automatically.
+- **Fire ranged weapons**: Use arrow keys to fire in a cardinal direction (up, down, left, right). Ranged weapons cannot be fired when standing next to an enemy — your character will switch to their melee weapon instead.
 - **Cast spells**: Choose from available spells.
 - **Use items**: Consume potions, throw items, or use herbs.
 - **Equip gear**: Open the equipment screen (costs your turn).
@@ -464,41 +465,43 @@ Spells consume **Magic Points (MP)** and are divided into two schools: **Priest*
 
 ### Sorcerer Spells
 
-These spells are available to Wizards, Alchemists, and Druids.
+These spells are available to Wizards, Alchemists, and Druids. Spells are organized by tier — higher-tier spells are more powerful but require higher levels and more MP to cast.
 
-| Spell | MP | Effect | Range |
-|-------|-----|--------|-------|
-| **Magic Dart** | 5 | 2d8 + INT mod damage (single target projectile) | 99 |
-| **Magic Arrow** | 5 | 4d8 + INT mod damage (piercing bolt) | 99 |
-| **Fireball** | 8 | 3d8 + INT mod damage in a 3-tile radius (hits allies too!) | 99 |
-| **Lightning Bolt** | 7 | 4d6 + INT mod damage to all creatures in a straight line | 99 |
-| **Shield** | 5 | +2 AC to target for 3 turns | 5 |
-| **Long Shanks** | 5 | +6 movement range to target for 5 turns | 99 |
-| **Charm Person** | 5 | Humanoid target fights for you (5 turns, save DC 10 + INT mod) | 99 |
-| **Sleep** | 5 | Puts target to sleep (5 turns, targets up to 20 HP, save DC 10 + INT mod) | 99 |
-| **Invisibility** | 5 | Caster becomes invisible to enemies for 5 turns | Self |
-| **Misty Step** | 5 | Teleport to a chosen location on the battlefield | 99 |
-| **Animate Dead** | 5 | Summon a skeleton ally (12 HP, AC 11, +3 attack, 1d6 dmg) for 5 turns | 99 |
+| Spell | Lvl | MP | Effect | Range |
+|-------|-----|-----|--------|-------|
+| **Magic Dart** | 1 | 3 | 1d6 + INT mod damage (single target projectile) | 99 |
+| **Shield** | 1 | 4 | +1 AC to target for 3 turns | 5 |
+| **Long Shanks** | 1 | 4 | +4 movement range to target for 3 turns | 99 |
+| **Sleep** | 1 | 5 | Puts target to sleep (2 turns, targets up to 15 HP, save DC 8 + INT mod) | 99 |
+| **Magic Arrow** | 3 | 8 | 3d8 + INT mod damage (piercing bolt, select target) | 99 |
+| **Misty Step** | 3 | 8 | Teleport to a chosen location on the battlefield | 99 |
+| **Charm Person** | 5 | 14 | Humanoid target fights for you (3 turns, save DC 12 + INT mod) | 99 |
+| **Lightning Bolt** | 5 | 15 | 6d6 + INT mod damage to all creatures in a straight line | 99 |
+| **Invisibility** | 5 | 16 | Caster becomes invisible to enemies for 3 turns | Self |
+| **Fireball** | 7 | 25 | 5d8 + INT mod damage in a 3-tile radius (hits allies too!) | 99 |
+| **Animate Dead** | 7 | 28 | Summon a skeleton ally (30 HP, AC 14, +6 attack, 2d6+3 dmg) for 5 turns | 99 |
 
 ### Priest Spells
 
 These spells are available to Clerics, Paladins, Rangers, and Druids.
 
-| Spell | MP | Effect | Range | Usable |
-|-------|-----|--------|-------|--------|
-| **Minor Heal** | 5 | Heals 1d8 + WIS mod HP | 6 | Battle, Overworld, Town, Dungeon |
-| **Major Heal** | 10 | Heals 3d8 + WIS mod HP | 4 | Battle only |
-| **Mass Heal** | 14 | Heals 2d8 + WIS mod HP to all nearby allies | Self | Battle only |
-| **Cure Poison** | 6 | Removes poison from target | 99 | Battle only |
-| **Turn Undead** | 5 | Strips 75% HP from all undead on the battlefield | 99 | Battle only |
-| **Bless** | 8 | +2 attack bonus to all allies for 5 turns | Self | Battle only |
-| **Curse** | 7 | −2 AC and −2 attack penalty on target for 5 turns | 99 | Battle only |
-| **Light** | 4 | Illuminates dungeon corridors for 100 turns | Self | Dungeon only |
-| **Push** | 5 | Repels monsters in a 5-tile radius | Self | Overworld, Dungeon, Town |
+| Spell | Lvl | MP | Effect | Range | Usable |
+|-------|-----|-----|--------|-------|--------|
+| **Minor Heal** | 1 | 3 | Heals 1d6 + WIS mod HP | 6 | Battle, Overworld, Town, Dungeon |
+| **Light** | 1 | 3 | Illuminates dungeon corridors for 100 turns | Self | Dungeon only |
+| **Cure Poison** | 1 | 5 | Removes poison from target | 99 | Battle only |
+| **Turn Undead** | 3 | 8 | Strips 50% HP from all undead on the battlefield | 99 | Battle only |
+| **Bless** | 3 | 10 | +2 attack bonus to all allies for 4 turns | Self | Battle only |
+| **Curse** | 3 | 10 | −2 AC and −2 attack penalty on target for 4 turns | 99 | Battle only |
+| **Major Heal** | 5 | 15 | Heals 4d8 + WIS mod HP | 4 | Battle only |
+| **Push** | 5 | 14 | Repels monsters in a 5-tile radius | Self | Overworld, Dungeon, Town |
+| **Mass Heal** | 7 | 25 | Heals 3d10 + WIS mod HP to all nearby allies | Self | Battle only |
 
-> **Tip:** Minor Heal is one of the only spells usable outside of combat. Keep your healers' MP stocked for between-fight patching up.
+> **Tip:** At Level 1, you'll have access to cheap utility spells like Minor Heal (3 MP), Shield (4 MP), and Magic Dart (3 MP). Save your MP for when it counts — your pool is small early on.
 
-> **Warning:** Fireball hits *everything* in its radius, including your own party members. Position carefully before casting!
+> **Tip:** Minor Heal and Light are usable outside of combat. Keep your healers' MP stocked for between-fight patching up.
+
+> **Warning:** Fireball is the game's most devastating spell, but it requires Level 7 and costs 25 MP. It hits *everything* in its radius, including your own party members. Position carefully before casting!
 
 ---
 

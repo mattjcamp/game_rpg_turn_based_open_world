@@ -564,10 +564,15 @@ class PartyMember:
         ac += getattr(self, "potion_buffs", {}).get("ac", 0)
         return ac
 
-    def get_attack_bonus(self):
-        """Melee attack bonus: STR modifier + potion buffs."""
-        bonus = self.str_mod
-        bonus += getattr(self, "potion_buffs", {}).get("strength", 0)
+    def get_attack_bonus(self, ranged=False):
+        """Attack bonus: DEX modifier for ranged, STR modifier for melee.
+        Includes potion buff bonus."""
+        if ranged:
+            bonus = self.dex_mod
+            bonus += getattr(self, "potion_buffs", {}).get("dexterity", 0)
+        else:
+            bonus = self.str_mod
+            bonus += getattr(self, "potion_buffs", {}).get("strength", 0)
         return bonus
 
     def get_weapon_power(self, weapon_name=None):
@@ -584,17 +589,22 @@ class PartyMember:
 
     def get_damage_dice(self, weapon_name=None):
         """Return (count, sides, bonus) for weapon damage.
-        Uses weapon power to determine dice size, STR as bonus.
+        Uses weapon power to determine dice size.
+        Ranged weapons use DEX modifier, melee weapons use STR modifier.
         Optionally specify a weapon_name to get dice for a specific weapon."""
-        wp = self.get_weapon_power(weapon_name)
+        wname = weapon_name or self.weapon
+        wdata = WEAPONS.get(wname, {"power": 0})
+        wp = wdata["power"] if isinstance(wdata, dict) else 0
+        is_ranged = wdata.get("ranged", False) if isinstance(wdata, dict) else False
+        mod = self.dex_mod if is_ranged else self.str_mod
         if wp <= 2:
-            return (1, 4, self.str_mod)
+            return (1, 4, mod)
         elif wp <= 5:
-            return (1, 6, self.str_mod)
+            return (1, 6, mod)
         elif wp <= 8:
-            return (1, 8, self.str_mod)
+            return (1, 8, mod)
         else:
-            return (1, 10, self.str_mod)
+            return (1, 10, mod)
 
     def get_ranged_weapon(self):
         """Return the name of the first ranged weapon found in either hand, or None.
@@ -608,6 +618,21 @@ class PartyMember:
                 if wdata.get("ranged", False):
                     return wp_name
         return None
+
+    def get_melee_weapon(self):
+        """Return the best melee weapon from either hand, or 'Fists'.
+
+        If the character has a bow in one hand and a sword in the other,
+        this returns the sword. Falls back to Fists if no melee weapon
+        is found.
+        """
+        for slot in ("right_hand", "left_hand"):
+            wp_name = self.equipped.get(slot)
+            if wp_name and wp_name != "Fists":
+                wdata = WEAPONS.get(wp_name, {})
+                if not wdata.get("ranged", False):
+                    return wp_name
+        return "Fists"
 
     def is_ranged(self, party=None):
         """True if a ranged weapon is equipped in either hand and has ammo.

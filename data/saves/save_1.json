@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "timestamp": 1772757944.7129831,
-  "state": "town",
+  "timestamp": 1772759369.896586,
+  "state": "overworld",
   "party": {
-    "col": 18,
-    "row": 17,
-    "gold": 64,
+    "col": 12,
+    "row": 14,
+    "gold": 98,
     "roster": [
       {
         "name": "Roland",
@@ -19,7 +19,7 @@
         "intelligence": 10,
         "wisdom": 9,
         "level": 1,
-        "exp": 110,
+        "exp": 210,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -37,41 +37,15 @@
         "race": "Elf",
         "gender": "Male",
         "max_hp": 20,
-        "hp": 20,
+        "hp": 9,
         "strength": 10,
         "dexterity": 15,
         "intelligence": 10,
         "wisdom": 15,
         "level": 1,
-        "exp": 110,
+        "exp": 210,
         "equipped": {
-          "right_hand": "Fists",
-          "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [
-          "Short Bow"
-        ],
-        "current_mp": 5,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "Elrond",
-        "class": "Wizard",
-        "race": "Elf",
-        "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 10,
-        "dexterity": 10,
-        "intelligence": 18,
-        "wisdom": 12,
-        "level": 1,
-        "exp": 110,
-        "equipped": {
-          "right_hand": "Fists",
+          "right_hand": "Short Bow",
           "left_hand": null,
           "body": "Cloth",
           "head": null
@@ -82,18 +56,42 @@
         "ammo": {}
       },
       {
+        "name": "Elrond",
+        "class": "Wizard",
+        "race": "Elf",
+        "gender": "Male",
+        "max_hp": 20,
+        "hp": 2,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 18,
+        "wisdom": 12,
+        "level": 1,
+        "exp": 210,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 0,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
         "name": "Merry",
         "class": "Thief",
         "race": "Halfling",
         "gender": "Male",
         "max_hp": 20,
-        "hp": 20,
+        "hp": 13,
         "strength": 10,
         "dexterity": 16,
         "intelligence": 13,
         "wisdom": 11,
         "level": 1,
-        "exp": 110,
+        "exp": 210,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -125,7 +123,7 @@
         "intelligence": 10,
         "wisdom": 9,
         "level": 1,
-        "exp": 110,
+        "exp": 210,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -143,41 +141,15 @@
         "race": "Elf",
         "gender": "Male",
         "max_hp": 20,
-        "hp": 20,
+        "hp": 9,
         "strength": 10,
         "dexterity": 15,
         "intelligence": 10,
         "wisdom": 15,
         "level": 1,
-        "exp": 110,
+        "exp": 210,
         "equipped": {
-          "right_hand": "Fists",
-          "left_hand": null,
-          "body": "Cloth",
-          "head": null
-        },
-        "inventory": [
-          "Short Bow"
-        ],
-        "current_mp": 5,
-        "bonus_mp": 0,
-        "ammo": {}
-      },
-      {
-        "name": "Elrond",
-        "class": "Wizard",
-        "race": "Elf",
-        "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
-        "strength": 10,
-        "dexterity": 10,
-        "intelligence": 18,
-        "wisdom": 12,
-        "level": 1,
-        "exp": 110,
-        "equipped": {
-          "right_hand": "Fists",
+          "right_hand": "Short Bow",
           "left_hand": null,
           "body": "Cloth",
           "head": null
@@ -188,18 +160,42 @@
         "ammo": {}
       },
       {
+        "name": "Elrond",
+        "class": "Wizard",
+        "race": "Elf",
+        "gender": "Male",
+        "max_hp": 20,
+        "hp": 2,
+        "strength": 10,
+        "dexterity": 10,
+        "intelligence": 18,
+        "wisdom": 12,
+        "level": 1,
+        "exp": 210,
+        "equipped": {
+          "right_hand": "Fists",
+          "left_hand": null,
+          "body": "Cloth",
+          "head": null
+        },
+        "inventory": [],
+        "current_mp": 0,
+        "bonus_mp": 0,
+        "ammo": {}
+      },
+      {
         "name": "Merry",
         "class": "Thief",
         "race": "Halfling",
         "gender": "Male",
         "max_hp": 20,
-        "hp": 20,
+        "hp": 13,
         "strength": 10,
         "dexterity": 16,
         "intelligence": 13,
         "wisdom": 11,
         "level": 1,
-        "exp": 110,
+        "exp": 210,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -216,9 +212,6 @@
       "Torch",
       "Arrows",
       "Torch",
-      "Rock",
-      "Rock",
-      "Rock",
       "Healing Herb",
       {
         "name": "Camping Supplies",
@@ -242,7 +235,7 @@
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 120
+      "total_minutes": 240
     },
     "last_pickpocket_day": -1,
     "last_tinker_day": -1,

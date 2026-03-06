@@ -1748,6 +1748,14 @@ class CombatState(BaseState):
                 self.combat_log.append(f"{f.name} is out of {rw}s to throw!")
             return
 
+        # Cannot fire ranged when adjacent to a monster
+        if self._is_adjacent():
+            melee_wp = f.get_melee_weapon()
+            self.combat_log.append(
+                f"Too close to fire! {f.name} uses {melee_wp} instead.")
+            self._player_attack_animated(dcol, drow)
+            return
+
         rw = f.get_ranged_weapon()
 
         # Consume ammo for throwable weapons (daggers, etc.)
@@ -1951,9 +1959,9 @@ class CombatState(BaseState):
             self._end_fighter_turn()
             return
 
-        # Roll attack
+        # Roll attack (ranged uses DEX)
         self.defending[f] = False
-        atk_bonus = f.get_attack_bonus()
+        atk_bonus = f.get_attack_bonus(ranged=True)
         bless = self.bless_buffs.get(f)
         if bless:
             atk_bonus += bless["attack_bonus"]
@@ -2054,10 +2062,14 @@ class CombatState(BaseState):
         effect = MeleeEffect(mc, mr, (dcol, drow), color=slash_color)
         self.melee_effects.append(effect)
 
+        # Use melee weapon (not bow) for adjacent attacks
+        melee_wp = f.get_melee_weapon()
+
         # Defer the attack resolution
-        self._pending_melee = {"fighter": f, "target": target_monster}
+        self._pending_melee = {"fighter": f, "target": target_monster,
+                               "melee_weapon": melee_wp}
         self.phase = PHASE_MELEE_ANIM
-        self.combat_log.append(f"{f.name} attacks {target_monster.name} with {f.weapon}!")
+        self.combat_log.append(f"{f.name} attacks {target_monster.name} with {melee_wp}!")
 
     def _player_attack(self):
         """Melee attack — now always animated."""
@@ -2108,11 +2120,12 @@ class CombatState(BaseState):
             self.game.sfx.play("miss")
 
         if hit:
-            dice_count, dice_sides, dmg_bonus = f.get_damage_dice()
+            melee_wp = info.get("melee_weapon", f.weapon)
+            dice_count, dice_sides, dmg_bonus = f.get_damage_dice(melee_wp)
             damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
             target.hp = max(0, target.hp - damage)
             self.combat_log.append(
-                f"{f.name} deals {damage} damage to {target.name} with {f.weapon}!"
+                f"{f.name} deals {damage} damage to {target.name} with {melee_wp}!"
             )
             # Spawn a hit flash on the monster
             mc, mr = self.monster_positions.get(target, (0, 0))

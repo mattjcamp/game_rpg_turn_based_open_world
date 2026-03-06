@@ -1,19 +1,20 @@
 {
-  "_comment": "Spell definitions for Realm of Shadow. Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels. usable_in lists the game screens where the spell can be cast: 'battle', 'overworld', 'town', 'dungeon'.",
+  "_comment": "Spell definitions for Realm of Shadow. Spells are tiered by level: Tier 1 (Lv1, 3-5 MP), Tier 2 (Lv3, 8-10 MP), Tier 3 (Lv5, 14-20 MP), Tier 4 (Lv7, 25-30 MP). Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels. usable_in lists the game screens where the spell can be cast: 'battle', 'overworld', 'town', 'dungeon'.",
 
   "spells": [
+
     {
       "id": "fireball",
       "name": "Magic Dart",
-      "description": "Hurls an energy charged dark in a straight line, exploding on impact.",
-      "allowable_classes": ["Wizard"],
+      "description": "Hurls an energy-charged dart in a straight line, stinging on impact.",
+      "allowable_classes": ["Wizard", "Alchemist"],
       "casting_type": "sorcerer",
       "min_level": 1,
-      "mp_cost": 5,
+      "mp_cost": 3,
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
-        "dice": "2d8",
+        "dice": "1d6",
         "stat_bonus": "intelligence",
         "min_damage": 1
       },
@@ -23,18 +24,64 @@
       "sfx": "fireball",
       "hit_sfx": "explosion"
     },
+
+    {
+      "id": "magic_arrow",
+      "name": "Magic Arrow",
+      "description": "Conjures a piercing bolt of arcane energy that streaks toward a chosen foe.",
+      "allowable_classes": ["Wizard", "Alchemist"],
+      "casting_type": "sorcerer",
+      "min_level": 3,
+      "mp_cost": 8,
+      "duration": "instant",
+      "effect_type": "damage",
+      "effect_value": {
+        "dice": "3d8",
+        "stat_bonus": "intelligence",
+        "min_damage": 1
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "usable_in": ["battle"],
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
+    },
+
+    {
+      "id": "lightning_bolt",
+      "name": "Lightning Bolt",
+      "description": "Unleashes a searing bolt of lightning that streaks in a straight line, electrocuting everything in its path.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 5,
+      "mp_cost": 15,
+      "duration": "instant",
+      "effect_type": "lightning_bolt",
+      "effect_value": {
+        "dice_count": 6,
+        "dice_sides": 6,
+        "stat_bonus": "intelligence",
+        "min_damage": 1
+      },
+      "range": 99,
+      "targeting": "directional_projectile",
+      "usable_in": ["battle"],
+      "sfx": "fireball",
+      "hit_sfx": "explosion"
+    },
+
     {
       "id": "fireball_aoe",
       "name": "Fireball",
       "description": "Hurls a massive ball of flame that detonates in a 3-tile radius, scorching everything — friend or foe — caught in the blast.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 8,
+      "min_level": 7,
+      "mp_cost": 25,
       "duration": "instant",
       "effect_type": "aoe_fireball",
       "effect_value": {
-        "dice_count": 3,
+        "dice_count": 5,
         "dice_sides": 8,
         "stat_bonus": "intelligence",
         "min_damage": 1,
@@ -46,121 +93,19 @@
       "sfx": "fireball",
       "hit_sfx": "explosion"
     },
-    {
-      "id": "magic_arrow",
-      "name": "Magic Arrow",
-      "description": "Conjures a piercing bolt of arcane energy that streaks toward a chosen foe.",
-      "allowable_classes": ["Wizard"],
-      "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": "instant",
-      "effect_type": "damage",
-      "effect_value": {
-        "dice": "4d8",
-        "stat_bonus": "intelligence",
-        "min_damage": 1
-      },
-      "range": 99,
-      "targeting": "select_enemy",
-      "usable_in": ["battle"],
-      "sfx": "fireball",
-      "hit_sfx": "explosion"
-    },
-    {
-      "id": "heal",
-      "name": "Minor Heal",
-      "description": "Sends a wave of healing energy toward an ally.",
-      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": "instant",
-      "effect_type": "heal",
-      "effect_value": {
-        "dice": "1d8",
-        "stat_bonus": "wisdom",
-        "min_heal": 1
-      },
-      "range": 6,
-      "targeting": "select_ally",
-      "usable_in": ["battle", "overworld", "town", "dungeon"],
-      "sfx": "heal",
-      "hit_sfx": null
-    },
-    {
-      "id": "major_heal",
-      "name": "Major Heal",
-      "description": "Channels a powerful wave of restorative energy toward an ally, mending grievous wounds.",
-      "allowable_classes": ["Cleric", "Paladin"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 10,
-      "duration": "instant",
-      "effect_type": "major_heal",
-      "effect_value": {
-        "dice_count": 3,
-        "dice_sides": 8,
-        "stat_bonus": "wisdom",
-        "min_heal": 1
-      },
-      "range": 4,
-      "targeting": "select_ally",
-      "usable_in": ["battle"],
-      "sfx": "heal",
-      "hit_sfx": null
-    },
-    {
-      "id": "mass_heal",
-      "name": "Mass Heal",
-      "description": "A burst of divine light radiates from the caster, restoring health to all nearby allies.",
-      "allowable_classes": ["Cleric"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 14,
-      "duration": "instant",
-      "effect_type": "mass_heal",
-      "effect_value": {
-        "dice_count": 2,
-        "dice_sides": 8,
-        "stat_bonus": "wisdom",
-        "min_heal": 1
-      },
-      "range": 0,
-      "targeting": "self",
-      "usable_in": ["battle"],
-      "sfx": "heal",
-      "hit_sfx": null
-    },
-    {
-      "id": "cure_poison",
-      "name": "Cure Poison",
-      "description": "Draws the venom from an ally's body with a cleansing prayer, removing the poisoned condition.",
-      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 6,
-      "duration": "instant",
-      "effect_type": "cure_poison",
-      "effect_value": {},
-      "range": 99,
-      "targeting": "select_ally",
-      "usable_in": ["battle"],
-      "sfx": "heal",
-      "hit_sfx": null
-    },
+
     {
       "id": "shield",
       "name": "Shield",
-      "description": "Conjures a magical barrier around an ally, boosting their armor.",
-      "allowable_classes": ["Wizard"],
+      "description": "Conjures a faint magical barrier around an ally, slightly boosting their armor.",
+      "allowable_classes": ["Wizard", "Alchemist"],
       "casting_type": "sorcerer",
       "min_level": 1,
-      "mp_cost": 5,
+      "mp_cost": 4,
       "duration": 3,
       "effect_type": "ac_buff",
       "effect_value": {
-        "ac_bonus": 2
+        "ac_bonus": 1
       },
       "range": 5,
       "targeting": "select_ally",
@@ -168,57 +113,21 @@
       "sfx": "shield",
       "hit_sfx": null
     },
+
     {
-      "id": "long_shanks",
-      "name": "Long Shanks",
-      "description": "Enchants an ally's legs with unnatural speed, greatly extending their movement range for 5 turns.",
+      "id": "sleep",
+      "name": "Sleep",
+      "description": "Lulls a weak-minded creature into a light magical slumber.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
       "min_level": 1,
       "mp_cost": 5,
-      "duration": 5,
-      "effect_type": "range_buff",
+      "duration": 2,
+      "effect_type": "sleep",
       "effect_value": {
-        "range_bonus": 6
-      },
-      "range": 99,
-      "targeting": "select_ally",
-      "usable_in": ["battle"],
-      "sfx": "shield",
-      "hit_sfx": null
-    },
-    {
-      "id": "turn_undead",
-      "name": "Turn Undead",
-      "description": "Channels holy energy that sears undead creatures, stripping 75% of their life force.",
-      "allowable_classes": ["Cleric"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": "instant",
-      "effect_type": "undead_damage",
-      "effect_value": {
-        "hp_percent": 0.75
-      },
-      "range": 99,
-      "targeting": "auto_monster",
-      "usable_in": ["battle"],
-      "sfx": "turn_undead",
-      "hit_sfx": null
-    },
-    {
-      "id": "charm_person",
-      "name": "Charm Person",
-      "description": "Weaves an enchantment that bends the will of a humanoid creature, turning it against its allies for 5 turns.",
-      "allowable_classes": ["Wizard"],
-      "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": 5,
-      "effect_type": "charm",
-      "effect_value": {
+        "max_target_hp": 15,
         "save_dc_stat": "intelligence",
-        "save_dc_base": 10
+        "save_dc_base": 8
       },
       "range": 99,
       "targeting": "select_enemy",
@@ -226,55 +135,35 @@
       "sfx": "shield",
       "hit_sfx": null
     },
+
     {
-      "id": "animate_dead",
-      "name": "Animate Dead",
-      "description": "Raises a skeleton from the earth to fight for the caster.",
-      "allowable_classes": ["Wizard"],
+      "id": "long_shanks",
+      "name": "Long Shanks",
+      "description": "Enchants an ally's legs with unnatural speed, extending their movement range for 3 turns.",
+      "allowable_classes": ["Wizard", "Alchemist"],
       "casting_type": "sorcerer",
       "min_level": 1,
-      "mp_cost": 5,
-      "duration": 5,
-      "effect_type": "summon_skeleton",
+      "mp_cost": 4,
+      "duration": 3,
+      "effect_type": "range_buff",
       "effect_value": {
-        "skeleton_hp": 12,
-        "skeleton_ac": 11,
-        "skeleton_attack": 3,
-        "skeleton_dmg_dice": 1,
-        "skeleton_dmg_sides": 6,
-        "skeleton_dmg_bonus": 0
+        "range_bonus": 4
       },
       "range": 99,
-      "targeting": "select_tile",
+      "targeting": "select_ally",
       "usable_in": ["battle"],
       "sfx": "shield",
       "hit_sfx": null
     },
-    {
-      "id": "invisibility",
-      "name": "Invisibility",
-      "description": "The caster bends light around themselves, becoming invisible to enemies.",
-      "allowable_classes": ["Wizard"],
-      "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": 5,
-      "effect_type": "invisibility",
-      "effect_value": {},
-      "range": 0,
-      "targeting": "self",
-      "usable_in": ["battle"],
-      "sfx": "shield",
-      "hit_sfx": null
-    },
+
     {
       "id": "misty_step",
       "name": "Misty Step",
       "description": "The caster vanishes in a swirl of silvery mist and reappears at a chosen location on the battlefield.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 5,
+      "min_level": 3,
+      "mp_cost": 8,
       "duration": "instant",
       "effect_type": "teleport",
       "effect_value": {},
@@ -284,20 +173,20 @@
       "sfx": "shield",
       "hit_sfx": null
     },
+
     {
-      "id": "sleep",
-      "name": "Sleep",
-      "description": "Lulls a weak-minded creature into a deep magical slumber.",
+      "id": "charm_person",
+      "name": "Charm Person",
+      "description": "Weaves an enchantment that bends the will of a humanoid creature, turning it against its allies for 3 turns.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": 5,
-      "effect_type": "sleep",
+      "min_level": 5,
+      "mp_cost": 14,
+      "duration": 3,
+      "effect_type": "charm",
       "effect_value": {
-        "max_target_hp": 20,
         "save_dc_stat": "intelligence",
-        "save_dc_base": 10
+        "save_dc_base": 12
       },
       "range": 99,
       "targeting": "select_enemy",
@@ -305,67 +194,90 @@
       "sfx": "shield",
       "hit_sfx": null
     },
+
     {
-      "id": "lightning_bolt",
-      "name": "Lightning Bolt",
-      "description": "Unleashes a searing bolt of lightning that streaks in a straight line, electrocuting everything in its path.",
+      "id": "invisibility",
+      "name": "Invisibility",
+      "description": "The caster bends light around themselves, becoming invisible to enemies for 3 turns.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 7,
-      "duration": "instant",
-      "effect_type": "lightning_bolt",
-      "effect_value": {
-        "dice_count": 4,
-        "dice_sides": 6,
-        "stat_bonus": "intelligence",
-        "min_damage": 1
-      },
-      "range": 99,
-      "targeting": "directional_projectile",
-      "usable_in": ["battle"],
-      "sfx": "fireball",
-      "hit_sfx": "explosion"
-    },
-    {
-      "id": "bless",
-      "name": "Bless",
-      "description": "Invokes a divine blessing that empowers all allies, granting them greater accuracy in battle.",
-      "allowable_classes": ["Cleric", "Paladin"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 8,
-      "duration": 5,
-      "effect_type": "bless",
-      "effect_value": {
-        "attack_bonus": 2
-      },
+      "min_level": 5,
+      "mp_cost": 16,
+      "duration": 3,
+      "effect_type": "invisibility",
+      "effect_value": {},
       "range": 0,
       "targeting": "self",
       "usable_in": ["battle"],
       "sfx": "shield",
       "hit_sfx": null
     },
+
     {
-      "id": "curse",
-      "name": "Curse",
-      "description": "Calls down a dark malediction on an enemy, weakening its defenses and dulling its attacks.",
-      "allowable_classes": ["Cleric"],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 7,
+      "id": "animate_dead",
+      "name": "Animate Dead",
+      "description": "Raises a powerful skeleton warrior from the earth to fight for the caster.",
+      "allowable_classes": ["Wizard"],
+      "casting_type": "sorcerer",
+      "min_level": 7,
+      "mp_cost": 28,
       "duration": 5,
-      "effect_type": "curse",
+      "effect_type": "summon_skeleton",
       "effect_value": {
-        "ac_penalty": 2,
-        "attack_penalty": 2
+        "skeleton_hp": 30,
+        "skeleton_ac": 14,
+        "skeleton_attack": 6,
+        "skeleton_dmg_dice": 2,
+        "skeleton_dmg_sides": 6,
+        "skeleton_dmg_bonus": 3
       },
       "range": 99,
-      "targeting": "select_enemy",
+      "targeting": "select_tile",
       "usable_in": ["battle"],
       "sfx": "shield",
       "hit_sfx": null
     },
+
+    {
+      "id": "heal",
+      "name": "Minor Heal",
+      "description": "Sends a gentle wave of healing energy toward an ally.",
+      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 3,
+      "duration": "instant",
+      "effect_type": "heal",
+      "effect_value": {
+        "dice": "1d6",
+        "stat_bonus": "wisdom",
+        "min_heal": 1
+      },
+      "range": 6,
+      "targeting": "select_ally",
+      "usable_in": ["battle", "overworld", "town", "dungeon"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+
+    {
+      "id": "cure_poison",
+      "name": "Cure Poison",
+      "description": "Draws the venom from an ally's body with a cleansing prayer, removing the poisoned condition.",
+      "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": "instant",
+      "effect_type": "cure_poison",
+      "effect_value": {},
+      "range": 99,
+      "targeting": "select_ally",
+      "usable_in": ["battle"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+
     {
       "id": "light",
       "name": "Light",
@@ -373,7 +285,7 @@
       "allowable_classes": ["Cleric", "Paladin", "Druid"],
       "casting_type": "priest",
       "min_level": 1,
-      "mp_cost": 4,
+      "mp_cost": 3,
       "duration": 100,
       "effect_type": "magic_light",
       "effect_value": {
@@ -385,14 +297,99 @@
       "sfx": "heal",
       "hit_sfx": null
     },
+
+    {
+      "id": "turn_undead",
+      "name": "Turn Undead",
+      "description": "Channels holy energy that sears undead creatures, stripping 50% of their life force.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 3,
+      "mp_cost": 8,
+      "duration": "instant",
+      "effect_type": "undead_damage",
+      "effect_value": {
+        "hp_percent": 0.50
+      },
+      "range": 99,
+      "targeting": "auto_monster",
+      "usable_in": ["battle"],
+      "sfx": "turn_undead",
+      "hit_sfx": null
+    },
+
+    {
+      "id": "bless",
+      "name": "Bless",
+      "description": "Invokes a divine blessing that empowers all allies, granting them greater accuracy in battle.",
+      "allowable_classes": ["Cleric", "Paladin"],
+      "casting_type": "priest",
+      "min_level": 3,
+      "mp_cost": 10,
+      "duration": 4,
+      "effect_type": "bless",
+      "effect_value": {
+        "attack_bonus": 2
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+
+    {
+      "id": "curse",
+      "name": "Curse",
+      "description": "Calls down a dark malediction on an enemy, weakening its defenses and dulling its attacks.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 3,
+      "mp_cost": 10,
+      "duration": 4,
+      "effect_type": "curse",
+      "effect_value": {
+        "ac_penalty": 2,
+        "attack_penalty": 2
+      },
+      "range": 99,
+      "targeting": "select_enemy",
+      "usable_in": ["battle"],
+      "sfx": "shield",
+      "hit_sfx": null
+    },
+
+    {
+      "id": "major_heal",
+      "name": "Major Heal",
+      "description": "Channels a powerful wave of restorative energy toward an ally, mending grievous wounds.",
+      "allowable_classes": ["Cleric", "Paladin"],
+      "casting_type": "priest",
+      "min_level": 5,
+      "mp_cost": 15,
+      "duration": "instant",
+      "effect_type": "major_heal",
+      "effect_value": {
+        "dice_count": 4,
+        "dice_sides": 8,
+        "stat_bonus": "wisdom",
+        "min_heal": 1
+      },
+      "range": 4,
+      "targeting": "select_ally",
+      "usable_in": ["battle"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+
     {
       "id": "push",
       "name": "Push",
-      "description": "Emits a wave of divine force that drives nearby monsters away from the party.",
+      "description": "Emits a powerful wave of divine force that drives nearby monsters away from the party.",
       "allowable_classes": ["Cleric"],
       "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 5,
+      "min_level": 5,
+      "mp_cost": 14,
       "duration": 1000,
       "effect_type": "repel_monsters",
       "effect_value": {
@@ -403,6 +400,29 @@
       "targeting": "self",
       "usable_in": ["overworld", "dungeon", "town"],
       "sfx": "magic_burst",
+      "hit_sfx": null
+    },
+
+    {
+      "id": "mass_heal",
+      "name": "Mass Heal",
+      "description": "A burst of divine light radiates from the caster, restoring health to all nearby allies.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 7,
+      "mp_cost": 25,
+      "duration": "instant",
+      "effect_type": "mass_heal",
+      "effect_value": {
+        "dice_count": 3,
+        "dice_sides": 10,
+        "stat_bonus": "wisdom",
+        "min_heal": 1
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["battle"],
+      "sfx": "heal",
       "hit_sfx": null
     }
   ]
