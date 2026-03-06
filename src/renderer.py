@@ -503,7 +503,8 @@ class Renderer:
     _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 672
 
     def draw_town_u3(self, party, town_data, message="",
-                      quest_complete=False, darkness_active=False):
+                      quest_complete=False, darkness_active=False,
+                      keys_inserted=0):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
@@ -521,6 +522,11 @@ class Renderer:
         off_c = max(0, min(off_c, tile_map.width - cols))
         off_r = max(0, min(off_r, tile_map.height - rows))
 
+        # ── Build keyslot lookup: (col,row) → slot_index ──
+        self._keyslot_index = {}
+        for idx, pos in enumerate(getattr(town_data, "keyslot_positions", [])):
+            self._keyslot_index[pos] = idx
+
         # ── 1. draw map tiles ──
         for sr in range(rows):
             for sc in range(cols):
@@ -529,7 +535,8 @@ class Renderer:
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts
                 py = sr * ts
-                self._u3_draw_town_tile(tid, px, py, ts, wc, wr)
+                self._u3_draw_town_tile(tid, px, py, ts, wc, wr,
+                                        keys_inserted=keys_inserted)
 
         # ── 2. NPC sprites ──
         for npc in town_data.npcs:
@@ -599,9 +606,23 @@ class Renderer:
         if not clock.is_day or darkness_active:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
+            # Build extra light sources from filled keyslots
+            keyslot_lights = []
+            if keys_inserted > 0 and self._keyslot_index:
+                for (kc, kr), si in self._keyslot_index.items():
+                    if si < keys_inserted:
+                        # Convert world coords to screen-tile coords
+                        ksc = kc - off_c
+                        ksr = kr - off_r
+                        # Each filled keyslot emits light that grows
+                        # slightly with more keys inserted
+                        ks_radius = 1.5 + 0.3 * keys_inserted
+                        keyslot_lights.append(
+                            (ksc, ksr, ks_radius, 1.5))
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
                                           has_light=has_light,
-                                          force_night=darkness_active)
+                                          force_night=darkness_active,
+                                          extra_lights=keyslot_lights)
             if has_infravision and party.get_equipped_name("light") is None:
                 self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
             elif (has_galadriels
@@ -722,11 +743,13 @@ class Renderer:
             f"[ARROWS] SELECT  [ENTER] ATTEMPT  [ESC] CANCEL",
             8, prompt_y, (220, 180, 50))
 
-    def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr):
+    def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr,
+                            keys_inserted=0):
         """Draw a single town tile using sprite sheet art when available."""
         from src.settings import (
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_MACHINE, TILE_KEYSLOT,
         )
 
         # Use extracted town gate tile for exit
@@ -770,9 +793,317 @@ class Renderer:
             pygame.draw.rect(self.screen, (60, 40, 15), door_rect, 1)
             pygame.draw.circle(self.screen, YELLOW, (cx + 3, cy), 2)
 
+        elif tile_id == TILE_MACHINE:
+            self._draw_machine_tile(px, py, ts, wc, wr)
+
+        elif tile_id == TILE_KEYSLOT:
+            self._draw_keyslot_tile(px, py, ts, wc, wr, keys_inserted)
+
         else:
             # Fallback: black
             pygame.draw.rect(self.screen, BLACK, rect)
+
+    def _draw_machine_tile(self, px, py, ts, wc, wr):
+        """Draw one tile of the gnomish machine (part of a 3×3 structure).
+
+        Uses a deterministic seed from the world coordinates so each of
+        the 9 tiles gets a unique mechanical part: gears, boilers,
+        gauges, pipes, vents, or the central energy core.
+        """
+        import math as _math
+        import time as _time
+
+        t = _time.time()
+        rect = pygame.Rect(px, py, ts, ts)
+        cx = px + ts // 2
+        cy = py + ts // 2
+
+        # Palette
+        METAL = (55, 55, 65)
+        METAL_LIGHT = (80, 80, 95)
+        METAL_DARK = (35, 35, 42)
+        RIVET = (120, 120, 130)
+        COPPER = (180, 100, 40)
+        COPPER_DARK = (130, 70, 25)
+        ENERGY = (160, 80, 200)
+        ENERGY_BRIGHT = (220, 140, 255)
+
+        # Base metal plate
+        pygame.draw.rect(self.screen, METAL, rect)
+        pygame.draw.rect(self.screen, METAL_DARK, rect, 1)
+
+        # Determine which part to draw via a stable seed from world pos
+        seed = (wc + wr * 3) % 9
+
+        if seed == 0:
+            # ── Energy core: pulsing orb with arcs ──
+            core_rect = pygame.Rect(px + 2, py + 2, ts - 4, ts - 4)
+            pygame.draw.rect(self.screen, (25, 15, 35), core_rect)
+            pygame.draw.rect(self.screen, COPPER, core_rect, 2)
+            # Pulsing orb
+            orb_r = int(7 + 2 * _math.sin(t * 2.5))
+            orb_a = int(160 + 60 * _math.sin(t * 3.0))
+            orb_s = pygame.Surface((orb_r * 2 + 8, orb_r * 2 + 8),
+                                   pygame.SRCALPHA)
+            pygame.draw.circle(orb_s,
+                               (ENERGY[0], ENERGY[1], ENERGY[2], orb_a // 3),
+                               (orb_r + 4, orb_r + 4), orb_r + 4)
+            pygame.draw.circle(orb_s,
+                               (ENERGY_BRIGHT[0], ENERGY_BRIGHT[1],
+                                ENERGY_BRIGHT[2], orb_a),
+                               (orb_r + 4, orb_r + 4), orb_r)
+            pygame.draw.circle(orb_s,
+                               (255, 220, 255, min(255, orb_a + 40)),
+                               (orb_r + 4, orb_r + 4), max(1, orb_r // 2))
+            self.screen.blit(orb_s, (cx - orb_r - 4, cy - orb_r - 4))
+            # Energy arcs
+            for i in range(4):
+                angle = t * 2.0 + i * _math.pi / 2
+                arc_len = 6 + int(3 * _math.sin(t * 4 + i))
+                x1 = cx + int(5 * _math.cos(angle))
+                y1 = cy + int(5 * _math.sin(angle))
+                x2 = cx + int(arc_len * _math.cos(angle))
+                y2 = cy + int(arc_len * _math.sin(angle))
+                arc_c = min(255, int(220 + 35 * _math.sin(t * 5 + i)))
+                pygame.draw.line(self.screen, (arc_c, 100, 255),
+                                 (x1, y1), (x2, y2), 1)
+            # Corner bolts
+            for bx, by in ((px + 4, py + 4), (px + ts - 5, py + 4),
+                           (px + 4, py + ts - 5), (px + ts - 5, py + ts - 5)):
+                pygame.draw.circle(self.screen, RIVET, (bx, by), 2)
+                pygame.draw.circle(self.screen, METAL_DARK, (bx, by), 1)
+
+        elif seed in (1, 5):
+            # ── Rotating gear ──
+            direction = 1.0 if seed == 1 else -1.0
+            gear_r = 9
+            pygame.draw.circle(self.screen, COPPER, (cx, cy), gear_r, 2)
+            teeth = 8
+            for i in range(teeth):
+                angle = direction * t * 1.2 + i * (2 * _math.pi / teeth)
+                tx = cx + int((gear_r + 2) * _math.cos(angle))
+                ty = cy + int((gear_r + 2) * _math.sin(angle))
+                pygame.draw.circle(self.screen, COPPER_DARK, (tx, ty), 2)
+            pygame.draw.circle(self.screen, METAL_LIGHT, (cx, cy), 4)
+            pygame.draw.circle(self.screen, METAL_DARK, (cx, cy), 2)
+            # Spokes
+            for i in range(4):
+                angle = direction * t * 1.2 + i * _math.pi / 2
+                sx = cx + int(gear_r * _math.cos(angle))
+                sy = cy + int(gear_r * _math.sin(angle))
+                pygame.draw.line(self.screen, COPPER_DARK, (cx, cy), (sx, sy), 1)
+
+        elif seed in (2, 6):
+            # ── Boiler with pressure gauge ──
+            boiler = pygame.Rect(px + 4, py + 4, ts - 8, ts - 8)
+            pygame.draw.rect(self.screen, METAL_LIGHT, boiler)
+            pygame.draw.rect(self.screen, METAL_DARK, boiler, 1)
+            # Horizontal bands
+            for band_y in (py + 8, py + ts // 2, py + ts - 9):
+                pygame.draw.line(self.screen, COPPER_DARK,
+                                 (px + 4, band_y), (px + ts - 5, band_y), 1)
+            # Gauge
+            g_cx = cx + (4 if seed == 2 else -4)
+            g_cy = cy - 2
+            pygame.draw.circle(self.screen, (20, 20, 20), (g_cx, g_cy), 5)
+            pygame.draw.circle(self.screen, RIVET, (g_cx, g_cy), 5, 1)
+            # Animated needle
+            angle = t * 1.5 + seed * 0.7
+            nx = g_cx + int(3 * _math.cos(angle))
+            ny = g_cy + int(3 * _math.sin(angle))
+            pygame.draw.line(self.screen, (255, 60, 60),
+                             (g_cx, g_cy), (nx, ny), 1)
+            # Rivets
+            for rx, ry in ((px + 3, py + 3), (px + ts - 4, py + 3),
+                           (px + 3, py + ts - 4), (px + ts - 4, py + ts - 4)):
+                pygame.draw.circle(self.screen, RIVET, (rx, ry), 1)
+
+        elif seed in (3, 7):
+            # ── Exhaust vents with steam ──
+            for vx in range(px + 4, px + ts - 3, 6):
+                vent = pygame.Rect(vx, py + 3, 4, ts - 6)
+                pygame.draw.rect(self.screen, METAL_DARK, vent)
+                pygame.draw.rect(self.screen, METAL_LIGHT, vent, 1)
+            # Animated steam puffs
+            steam_a = int(70 + 40 * _math.sin(t * 3 + seed))
+            steam_s = pygame.Surface((14, 10), pygame.SRCALPHA)
+            pygame.draw.ellipse(steam_s, (200, 200, 220, steam_a),
+                                (0, 0, 14, 10))
+            sx = cx - 7 + int(3 * _math.sin(t * 2 + seed))
+            sy = py - 3 + int(2 * _math.cos(t * 1.5))
+            self.screen.blit(steam_s, (sx, sy))
+            # Pipe across one edge
+            pygame.draw.line(self.screen, COPPER,
+                             (px, py + ts - 3), (px + ts, py + ts - 3), 2)
+
+        elif seed == 4:
+            # ── Key slots panel (4 glowing slots) ──
+            base = pygame.Rect(px + 2, py + 2, ts - 4, ts - 4)
+            pygame.draw.rect(self.screen, METAL_DARK, base)
+            pygame.draw.rect(self.screen, RIVET, base, 1)
+            for i in range(4):
+                kx = px + 4 + i * 7
+                slot = pygame.Rect(kx, cy - 3, 5, 7)
+                pulse = int(60 + 50 * _math.sin(t * 2 + i * 0.8))
+                pygame.draw.rect(self.screen, (pulse, 25, pulse + 30), slot)
+                pygame.draw.rect(self.screen, RIVET, slot, 1)
+            # Label "KEYS" in tiny text
+            label = self.font_small.render("KEYS", True, ENERGY)
+            lrect = label.get_rect(center=(cx, py + 6))
+            self.screen.blit(label, lrect)
+            # Pipe across top
+            pygame.draw.line(self.screen, COPPER,
+                             (px, py + 2), (px + ts, py + 2), 2)
+
+        else:
+            # ── Conduit / pipe junction ──
+            # Horizontal pipe
+            pygame.draw.line(self.screen, COPPER,
+                             (px, cy), (px + ts, cy), 3)
+            pygame.draw.line(self.screen, COPPER_DARK,
+                             (px, cy - 2), (px + ts, cy - 2), 1)
+            # Vertical pipe
+            pygame.draw.line(self.screen, COPPER,
+                             (cx, py), (cx, py + ts), 3)
+            pygame.draw.line(self.screen, COPPER_DARK,
+                             (cx - 2, py), (cx - 2, py + ts), 1)
+            # Junction plate
+            junct = pygame.Rect(cx - 5, cy - 5, 10, 10)
+            pygame.draw.rect(self.screen, METAL_LIGHT, junct)
+            pygame.draw.rect(self.screen, COPPER, junct, 1)
+            # Animated flow indicator
+            flow_x = px + int((t * 20 + seed * 10) % ts)
+            pygame.draw.circle(self.screen, ENERGY, (flow_x, cy), 2)
+            flow_y = py + int((t * 15 + seed * 7) % ts)
+            pygame.draw.circle(self.screen, ENERGY, (cx, flow_y), 2)
+
+    def _draw_keyslot_tile(self, px, py, ts, wc, wr, keys_inserted):
+        """Draw a single keyslot pedestal around the gnome machine.
+
+        Empty slots show a dark stone pedestal with an empty keyhole.
+        Filled slots glow and pulse with golden-white light, and emit
+        a small radial light bloom to push back the darkness.
+        """
+        import math as _math
+        import time as _time
+
+        t = _time.time()
+        rect = pygame.Rect(px, py, ts, ts)
+        cx = px + ts // 2
+        cy = py + ts // 2
+
+        # Determine this slot's index (0-7)
+        slot_idx = getattr(self, "_keyslot_index", {}).get((wc, wr), -1)
+        filled = slot_idx >= 0 and slot_idx < keys_inserted
+
+        # Palette
+        STONE = (50, 45, 55)
+        STONE_LIGHT = (70, 65, 75)
+        STONE_DARK = (30, 28, 35)
+
+        # Key colours — each slot gets a unique hue
+        KEY_HUES = [
+            (255, 200, 60),   # 0: gold
+            (60, 200, 255),   # 1: ice blue
+            (255, 80, 80),    # 2: crimson
+            (80, 255, 120),   # 3: emerald
+            (200, 120, 255),  # 4: violet
+            (255, 160, 40),   # 5: amber
+            (40, 255, 220),   # 6: teal
+            (255, 255, 180),  # 7: pale sun
+        ]
+        hue = KEY_HUES[slot_idx % 8] if slot_idx >= 0 else (100, 100, 100)
+
+        # ── Base: stone pedestal ──
+        pygame.draw.rect(self.screen, STONE, rect)
+        pygame.draw.rect(self.screen, STONE_DARK, rect, 1)
+        # Inner raised platform
+        plat = pygame.Rect(px + 3, py + 3, ts - 6, ts - 6)
+        pygame.draw.rect(self.screen, STONE_LIGHT, plat)
+        pygame.draw.rect(self.screen, STONE_DARK, plat, 1)
+
+        if filled:
+            # ── Filled slot: glowing key with pulse and light bloom ──
+
+            # Outer glow bloom (alpha-blended circle)
+            pulse = 0.5 + 0.5 * _math.sin(t * 2.5 + slot_idx * 0.9)
+            bloom_r = int(ts * 0.7 + 4 * pulse)
+            bloom_alpha = int(60 + 50 * pulse)
+            bloom_s = pygame.Surface((bloom_r * 2, bloom_r * 2),
+                                     pygame.SRCALPHA)
+            br, bg, bb = hue
+            pygame.draw.circle(bloom_s,
+                               (br, bg, bb, bloom_alpha // 3),
+                               (bloom_r, bloom_r), bloom_r)
+            pygame.draw.circle(bloom_s,
+                               (br, bg, bb, bloom_alpha),
+                               (bloom_r, bloom_r), bloom_r // 2)
+            self.screen.blit(bloom_s,
+                             (cx - bloom_r, cy - bloom_r))
+
+            # Key shape: vertical bar + crossbar (T-shape)
+            key_bright = tuple(min(255, int(c * (0.8 + 0.2 * pulse)))
+                               for c in hue)
+            # Vertical shaft
+            pygame.draw.line(self.screen, key_bright,
+                             (cx, cy - 6), (cx, cy + 5), 3)
+            # Key head (circle at top)
+            pygame.draw.circle(self.screen, key_bright, (cx, cy - 6), 3)
+            pygame.draw.circle(self.screen,
+                               (255, 255, 255), (cx, cy - 6), 1)
+            # Key teeth (small nubs at bottom)
+            pygame.draw.line(self.screen, key_bright,
+                             (cx, cy + 4), (cx + 3, cy + 4), 2)
+            pygame.draw.line(self.screen, key_bright,
+                             (cx, cy + 2), (cx + 2, cy + 2), 1)
+
+            # Central sparkle
+            sparkle_a = int(180 + 75 * _math.sin(t * 4.0 + slot_idx))
+            sparkle_s = pygame.Surface((8, 8), pygame.SRCALPHA)
+            pygame.draw.circle(sparkle_s,
+                               (255, 255, 240, sparkle_a), (4, 4), 3)
+            pygame.draw.circle(sparkle_s,
+                               (255, 255, 255, min(255, sparkle_a + 40)),
+                               (4, 4), 1)
+            self.screen.blit(sparkle_s, (cx - 4, cy - 8))
+
+            # Corner rune marks (tiny glowing dots)
+            for corner_x, corner_y in ((px + 4, py + 4),
+                                        (px + ts - 5, py + 4),
+                                        (px + 4, py + ts - 5),
+                                        (px + ts - 5, py + ts - 5)):
+                dot_a = int(120 + 80 * _math.sin(
+                    t * 3.0 + corner_x * 0.1 + corner_y * 0.1))
+                dot_s = pygame.Surface((4, 4), pygame.SRCALPHA)
+                pygame.draw.circle(dot_s,
+                                   (br, bg, bb, dot_a), (2, 2), 2)
+                self.screen.blit(dot_s, (corner_x - 2, corner_y - 2))
+        else:
+            # ── Empty slot: dark keyhole waiting for a key ──
+
+            # Keyhole shape: circle + triangle
+            pygame.draw.circle(self.screen, STONE_DARK, (cx, cy - 2), 4)
+            pygame.draw.circle(self.screen, (20, 15, 25), (cx, cy - 2), 3)
+            # Keyhole slit
+            pygame.draw.polygon(self.screen, (20, 15, 25), [
+                (cx - 2, cy + 1),
+                (cx + 2, cy + 1),
+                (cx + 1, cy + 6),
+                (cx - 1, cy + 6),
+            ])
+
+            # Faint pulse to indicate it's interactive
+            faint = int(20 + 15 * _math.sin(t * 1.5 + slot_idx * 0.7))
+            faint_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+            pygame.draw.circle(faint_s,
+                               (hue[0], hue[1], hue[2], faint),
+                               (ts // 2, ts // 2), ts // 3)
+            self.screen.blit(faint_s, (px, py))
+
+            # Corner rivets
+            for rx, ry in ((px + 4, py + 4), (px + ts - 5, py + 4),
+                           (px + 4, py + ts - 5), (px + ts - 5, py + ts - 5)):
+                pygame.draw.circle(self.screen, (80, 75, 85), (rx, ry), 1)
 
     def _u3_draw_npc_sprite(self, npc, cx, cy):
         """Draw an NPC on the town map using per-type VGA sprites."""
@@ -1548,6 +1879,7 @@ class Renderer:
         from src.settings import (
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
             TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
+            TILE_MACHINE, TILE_KEYSLOT,
         )
 
         # Try sprite sheet first
@@ -1580,6 +1912,15 @@ class Renderer:
                 plank = pygame.Rect(px + 2, py + 6 + i * 10, ts - 4, 5)
                 pygame.draw.rect(self.screen, BROWN, plank)
                 pygame.draw.rect(self.screen, (80, 60, 30), plank, 1)
+
+        elif tile_id == TILE_MACHINE:
+            self._draw_machine_tile(px, py, ts, wc, wr)
+            return
+
+        elif tile_id == TILE_KEYSLOT:
+            # On overworld, draw keyslots with 0 keys (no state available)
+            self._draw_keyslot_tile(px, py, ts, wc, wr, 0)
+            return
 
         else:
             pygame.draw.rect(self.screen, BLACK, rect)
@@ -8289,7 +8630,8 @@ class Renderer:
         self.screen.blit(snow, (0, 0))
 
     def _draw_overworld_darkness(self, clock, party_sc, party_sr, ts, cols, rows,
-                                 has_light=False, force_night=False):
+                                 has_light=False, force_night=False,
+                                 extra_lights=None):
         """Overlay darkness on the overworld map based on the time of day.
 
         During dusk/dawn the map is lightly dimmed with a warm/cool tint
@@ -8315,7 +8657,16 @@ class Renderer:
         # fade_tiles   = gradient band width in tiles.
         # max_alpha    = darkness level for tiles beyond the lit area.
         # tint         = (R, G, B) colour tint blended into the darkness.
-        if clock.is_dusk:
+        if force_night:
+            # Forced darkness (e.g. Keys of Shadow) — always full night
+            # regardless of the clock phase.  This keeps the town dark
+            # through dusk/dawn/day until the quest is complete.
+            light_bonus = 3.0 if has_light else 0.0
+            light_radius = 1.0 + light_bonus
+            fade_tiles = 1.5
+            max_alpha = 255
+            tint = (0, 0, 0)
+        elif clock.is_dusk:
             light_radius = 10.0
             fade_tiles = 4.0
             max_alpha = 100
@@ -8333,13 +8684,6 @@ class Renderer:
             fade_tiles = 1.5
             max_alpha = 255                        # completely dark
             tint = (0, 0, 0)                       # pure black
-        elif force_night:
-            # Forced darkness (e.g. Keys of Shadow) — treat as night
-            light_bonus = 3.0 if has_light else 0.0
-            light_radius = 1.0 + light_bonus
-            fade_tiles = 1.5
-            max_alpha = 255
-            tint = (0, 0, 0)
         else:
             return  # daytime — nothing to draw
 
@@ -8347,19 +8691,34 @@ class Renderer:
 
         fade_end = light_radius + fade_tiles
 
+        # Build list of all light sources: (screen_col, screen_row, radius, fade)
+        all_lights = [(party_sc, party_sr, light_radius, fade_tiles)]
+        if extra_lights:
+            for el in extra_lights:
+                all_lights.append(el)
+
         for sr in range(rows):
             for sc in range(cols):
-                dx = sc - party_sc
-                dy = sr - party_sr
-                dist = math.sqrt(dx * dx + dy * dy)
+                # Find the closest effective distance across all light sources
+                best_t = 999.0  # normalised distance (0 = fully lit, >=1 = full dark)
+                for lsc, lsr, lr, lf in all_lights:
+                    dx = sc - lsc
+                    dy = sr - lsr
+                    dist = math.sqrt(dx * dx + dy * dy)
+                    if dist <= lr:
+                        best_t = 0.0
+                        break
+                    elif lf > 0:
+                        t_val = (dist - lr) / lf
+                        if t_val < best_t:
+                            best_t = t_val
 
-                if dist <= light_radius:
+                if best_t <= 0.0:
                     continue  # fully lit
-                elif dist >= fade_end:
+                elif best_t >= 1.0:
                     alpha = max_alpha
                 else:
-                    t = (dist - light_radius) / fade_tiles
-                    alpha = int(max_alpha * t)
+                    alpha = int(max_alpha * best_t)
 
                 alpha = max(0, min(255, alpha))
                 r = tint[0]

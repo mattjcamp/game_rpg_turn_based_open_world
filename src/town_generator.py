@@ -12,7 +12,7 @@ import random
 from src.tile_map import TileMap
 from src.settings import (
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
-    TILE_MACHINE,
+    TILE_MACHINE, TILE_KEYSLOT,
 )
 
 
@@ -41,12 +41,15 @@ class NPC:
 class TownData:
     """Holds everything about a town: map, NPCs, name, entry point."""
 
-    def __init__(self, tile_map, npcs, name, entry_col, entry_row):
+    def __init__(self, tile_map, npcs, name, entry_col, entry_row,
+                 keyslot_positions=None):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
         self.entry_col = entry_col
         self.entry_row = entry_row
+        # Ordered list of (col, row) for the 8 key slots (index = slot number)
+        self.keyslot_positions = keyslot_positions or []
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""
@@ -242,10 +245,31 @@ def generate_duskhollow():
     ox = BORDER_X + 1
     oy = BORDER_Y + 1
 
-    # ── Gnome Machine — dead centre ──
+    # ── Gnome Machine — dead centre, 3×3 footprint ──
     machine_col = ox + INTERIOR_W // 2
     machine_row = oy + INTERIOR_H // 2
-    tmap.set_tile(machine_col, machine_row, TILE_MACHINE)
+    for dr in range(-1, 2):
+        for dc in range(-1, 2):
+            tmap.set_tile(machine_col + dc, machine_row + dr, TILE_MACHINE)
+
+    # ── 8 Key Slots surrounding the machine ──
+    # Placed in a ring just outside the 3×3 machine body.
+    # Order: N, NE, E, SE, S, SW, W, NW (matches key indices 0-7)
+    keyslot_offsets = [
+        ( 0, -2),   # N  — top centre
+        ( 2, -2),   # NE — top-right
+        ( 2,  0),   # E  — right centre
+        ( 2,  2),   # SE — bottom-right
+        ( 0,  2),   # S  — bottom centre
+        (-2,  2),   # SW — bottom-left
+        (-2,  0),   # W  — left centre
+        (-2, -2),   # NW — top-left
+    ]
+    keyslot_positions = []  # ordered list of (col, row) for slots 0-7
+    for dc, dr in keyslot_offsets:
+        sc, sr = machine_col + dc, machine_row + dr
+        tmap.set_tile(sc, sr, TILE_KEYSLOT)
+        keyslot_positions.append((sc, sr))
 
     # ================================================================
     # BUILDINGS
@@ -304,7 +328,7 @@ def generate_duskhollow():
     ], npc_type="innkeeper"))
 
     # ── Fizzwick the Gnome — quest-giver, stands next to the machine ──
-    npcs.append(NPC(machine_col + 1, machine_row, "Fizzwick", [
+    npcs.append(NPC(machine_col + 3, machine_row, "Fizzwick", [
         "Oh! Oh dear! You've come to help, haven't you?",
         "I built this machine to harness the sun's energy...",
         "But something went terribly wrong! It's devouring the light!",
@@ -386,4 +410,5 @@ def generate_duskhollow():
     entry_col = exit_col
     entry_row = exit_row - 1
 
-    return TownData(tmap, npcs, "Duskhollow", entry_col, entry_row)
+    return TownData(tmap, npcs, "Duskhollow", entry_col, entry_row,
+                    keyslot_positions=keyslot_positions)

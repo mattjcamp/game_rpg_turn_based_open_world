@@ -789,15 +789,6 @@ class TownState(InventoryMixin, BaseState):
                     self.shop_sell_cursor = max(
                         0, len(self.game.party.shared_inventory) - 1)
 
-    def _handle_equip_action(self, member):
-        """Open the action menu for the selected item/slot."""
-        options = self._get_action_options(member)
-        if not options:
-            self.message = "Empty slot — equip items from inventory"
-            self.message_timer = 2000
-            return
-        self.char_action_menu = True
-        self.char_action_cursor = 0
     def _exit_town(self):
         """Leave the town and return to the overworld."""
         # Restore party position on the overworld
@@ -904,6 +895,7 @@ class TownState(InventoryMixin, BaseState):
             message=msg,
             quest_complete=quest_complete,
             darkness_active=getattr(self.game, "darkness_active", False),
+            keys_inserted=getattr(self.game, "keys_inserted", 0),
         )
         # Pickpocket targeting overlay
         if self.pickpocket_targeting and self.pickpocket_targets:

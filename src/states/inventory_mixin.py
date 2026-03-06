@@ -117,6 +117,16 @@ class InventoryMixin:
                 return member.inventory[inv_idx]
         return None
 
+    def _handle_equip_action(self, member):
+        """Open the action menu for the selected item/slot."""
+        options = self._get_action_options(member)
+        if not options:
+            self.message = "Empty slot — equip items from inventory"
+            self.message_timer = 2000
+            return
+        self.char_action_menu = True
+        self.char_action_cursor = 0
+
     def _get_action_options(self, member):
         """Build the list of action option keys for the current cursor position."""
         from src.party import PartyMember, ITEM_INFO
