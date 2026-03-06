@@ -70,6 +70,8 @@ def load_items(data_dir=None):
             }
             if "charges" in data:
                 info["charges"] = data["charges"]
+            if data.get("item_type"):
+                info["item_type"] = data["item_type"]
             item_info[name] = info
 
         # Shop prices (what SHOP_INVENTORY needs)
@@ -97,6 +99,8 @@ def load_items(data_dir=None):
             }
             if "charges" in data:
                 info["charges"] = data["charges"]
+            if data.get("item_type"):
+                info["item_type"] = data["item_type"]
             item_info[name] = info
 
         if "buy" in data:
@@ -126,6 +130,10 @@ def load_items(data_dir=None):
                 info["effect"] = data["effect"]
             if "power" in data:
                 info["power"] = data["power"]
+            if data.get("item_type"):
+                info["item_type"] = data["item_type"]
+            if data.get("quest_item"):
+                info["quest_item"] = True
             item_info[name] = info
 
         if "buy" in data:

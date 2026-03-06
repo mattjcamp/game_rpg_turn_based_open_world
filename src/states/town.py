@@ -732,21 +732,24 @@ class TownState(InventoryMixin, BaseState):
 
     def _handle_shop_input(self, event):
         """Handle input while the shop screen is open."""
-        from src.party import SHOP_INVENTORY, get_sell_price
+        from src.party import (SHOP_INVENTORY, get_sell_price,
+                                group_items_by_category,
+                                group_inventory_by_category)
 
         buy_items = list(SHOP_INVENTORY.keys())
         sell_items = self.game.party.shared_inventory
+        num_buy = len(buy_items)
+        num_sell = len(sell_items)
 
         if event.key == pygame.K_ESCAPE:
             self.showing_shop = False
             return
 
         if event.key == pygame.K_TAB:
-            # Toggle buy / sell
             if self.shop_mode == "buy":
                 self.shop_mode = "sell"
                 self.shop_sell_cursor = min(
-                    self.shop_sell_cursor, max(0, len(sell_items) - 1))
+                    self.shop_sell_cursor, max(0, num_sell - 1))
             else:
                 self.shop_mode = "buy"
             return
@@ -755,11 +758,22 @@ class TownState(InventoryMixin, BaseState):
             if not buy_items:
                 return
             if event.key == pygame.K_UP:
-                self.shop_cursor = (self.shop_cursor - 1) % len(buy_items)
+                self.shop_cursor = (self.shop_cursor - 1) % num_buy
             elif event.key == pygame.K_DOWN:
-                self.shop_cursor = (self.shop_cursor + 1) % len(buy_items)
+                self.shop_cursor = (self.shop_cursor + 1) % num_buy
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                item_name = buy_items[self.shop_cursor]
+                # Resolve item name from grouped list
+                grouped = group_items_by_category(buy_items)
+                item_name = None
+                ic = -1
+                for iname, cat in grouped:
+                    if iname is not None:
+                        ic += 1
+                        if ic == self.shop_cursor:
+                            item_name = iname
+                            break
+                if item_name is None:
+                    return
                 cost = SHOP_INVENTORY[item_name]["buy"]
                 if self.game.party.gold >= cost:
                     self.game.party.gold -= cost
@@ -774,18 +788,34 @@ class TownState(InventoryMixin, BaseState):
             if not sell_items:
                 return
             if event.key == pygame.K_UP:
-                self.shop_sell_cursor = (self.shop_sell_cursor - 1) % len(sell_items)
+                self.shop_sell_cursor = (self.shop_sell_cursor - 1) % num_sell
             elif event.key == pygame.K_DOWN:
-                self.shop_sell_cursor = (self.shop_sell_cursor + 1) % len(sell_items)
+                self.shop_sell_cursor = (self.shop_sell_cursor + 1) % num_sell
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                entry = sell_items[self.shop_sell_cursor]
-                item_name = self.game.party.item_name(entry)
+                # Resolve entry from grouped list
+                grouped = group_inventory_by_category(
+                    sell_items, self.game.party.item_name)
+                real_entry = None
+                real_idx = None
+                ic = -1
+                for entry in grouped:
+                    is_hdr = (isinstance(entry, str)
+                              and entry.startswith("__header__:"))
+                    if not is_hdr:
+                        ic += 1
+                        if ic == self.shop_sell_cursor:
+                            real_entry = entry
+                            # Find index in original list
+                            real_idx = sell_items.index(entry)
+                            break
+                if real_entry is None:
+                    return
+                item_name = self.game.party.item_name(real_entry)
                 price = get_sell_price(item_name)
                 self.game.party.gold += price
-                self.game.party.shared_inventory.pop(self.shop_sell_cursor)
+                self.game.party.shared_inventory.pop(real_idx)
                 self.shop_message = f"Sold {item_name} for {price}g!"
                 self.shop_message_timer = 1500
-                # Clamp cursor
                 if self.shop_sell_cursor >= len(self.game.party.shared_inventory):
                     self.shop_sell_cursor = max(
                         0, len(self.game.party.shared_inventory) - 1)

@@ -168,6 +168,140 @@ def get_sell_price(item_name):
     return 5
 
 
+# ── Item categorization for grouped display ──
+
+# Categories in display order.  Pinned essentials first.
+_ITEM_CATEGORIES = [
+    ("SUPPLIES",        {"camping_supplies", "torch"}),
+    ("AMMUNITION",      {"ammo"}),
+    ("POTIONS",         {"herb", "antidote", "potion"}),
+    ("MELEE WEAPONS",   "__melee__"),
+    ("RANGED WEAPONS",  "__ranged__"),
+    ("ARMOR",           "__armor__"),
+    ("REAGENTS",        {"reagent"}),
+    ("SCROLLS & MAGIC", {"scroll", "holy_water", "throwable"}),
+    ("TOOLS",           {"rope", "lockpick", "bomb", "tool"}),
+    ("QUEST ITEMS",     {"quest_item"}),
+]
+
+
+def _item_category(item_name):
+    """Return (category_label, sort_order) for *item_name*."""
+    info = ITEM_INFO.get(item_name, {})
+    itype = info.get("item_type", "")
+
+    # Check weapons first (melee vs ranged)
+    wp = WEAPONS.get(item_name)
+    if wp:
+        is_ranged = wp.get("ranged", False)
+        target = "__ranged__" if is_ranged else "__melee__"
+        for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
+            if match == target:
+                return label, idx
+        return "OTHER", len(_ITEM_CATEGORIES)
+
+    # Check armors
+    if item_name in ARMORS:
+        for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
+            if match == "__armor__":
+                return label, idx
+        return "ARMOR", len(_ITEM_CATEGORIES)
+
+    # Match by item_type set
+    for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
+        if isinstance(match, set) and itype in match:
+            return label, idx
+
+    # Quest items also flagged directly
+    if info.get("quest_item"):
+        for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
+            if isinstance(match, set) and "quest_item" in match:
+                return label, idx
+
+    return "OTHER", len(_ITEM_CATEGORIES)
+
+
+def group_items_by_category(item_names):
+    """Sort a list of item names into category groups.
+
+    Returns a list of (item_name_or_None, category_label_or_None) tuples.
+    A tuple with item_name=None is a header row.
+    A tuple with category_label=None is a normal item row.
+
+    Items within each category are sorted alphabetically.
+    """
+    buckets = {}
+    for name in item_names:
+        cat_label, sort_order = _item_category(name)
+        if cat_label not in buckets:
+            buckets[cat_label] = (sort_order, [])
+        buckets[cat_label][1].append(name)
+
+    sorted_cats = sorted(buckets.items(), key=lambda kv: kv[1][0])
+
+    result = []
+    for cat_label, (_, names) in sorted_cats:
+        result.append((None, cat_label))   # header row
+        for name in sorted(names):
+            result.append((name, None))    # item row
+    return result
+
+
+def group_inventory_by_category(inventory, name_fn):
+    """Sort an inventory list into category groups.
+
+    *name_fn* extracts the item name from each entry.
+    Returns a new list with ``"__header__:LABEL"`` strings inserted
+    before each group.
+    """
+    buckets = {}
+    for entry in inventory:
+        iname = name_fn(entry)
+        cat_label, sort_order = _item_category(iname)
+        if cat_label not in buckets:
+            buckets[cat_label] = (sort_order, [])
+        buckets[cat_label][1].append(entry)
+
+    sorted_cats = sorted(buckets.items(), key=lambda kv: kv[1][0])
+
+    result = []
+    for cat_label, (_, entries) in sorted_cats:
+        result.append(f"__header__:{cat_label}")
+        for e in sorted(entries, key=lambda x: name_fn(x)):
+            result.append(e)
+    return result
+
+
+def grouped_index_to_original(inventory, name_fn, grouped_item_index):
+    """Convert a grouped-order item index to the original inventory index.
+
+    Given that the inventory was grouped with ``group_inventory_by_category``,
+    return the index in the *original* ``inventory`` list that corresponds to
+    the ``grouped_item_index``-th non-header entry in the grouped list.
+    Returns -1 if out of range.
+    """
+    # Build grouped list preserving original indices
+    # Bucket entries with their original indices
+    buckets = {}
+    for oi, entry in enumerate(inventory):
+        iname = name_fn(entry)
+        cat_label, sort_order = _item_category(iname)
+        if cat_label not in buckets:
+            buckets[cat_label] = (sort_order, [])
+        buckets[cat_label][1].append((oi, entry))
+
+    sorted_cats = sorted(buckets.items(), key=lambda kv: kv[1][0])
+
+    flat = []
+    for cat_label, (_, items) in sorted_cats:
+        for oi, entry in sorted(items, key=lambda x: name_fn(x[1])):
+            flat.append(oi)
+
+    if 0 <= grouped_item_index < len(flat):
+        return flat[grouped_item_index]
+    return -1
+
+
 VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 
 class PartyMember:

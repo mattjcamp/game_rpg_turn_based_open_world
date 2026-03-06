@@ -8170,7 +8170,9 @@ class Renderer:
         *message*: transient feedback text (e.g. "Bought Sword!")
         *quest_complete*: if True, show Shadow Crystal display case
         """
-        from src.party import SHOP_INVENTORY, WEAPONS, ARMORS, ITEM_INFO, get_sell_price
+        from src.party import (SHOP_INVENTORY, WEAPONS, ARMORS, ITEM_INFO,
+                                get_sell_price, group_items_by_category,
+                                group_inventory_by_category)
 
         fm = self.font_med
         f = self.font
@@ -8178,6 +8180,11 @@ class Renderer:
 
         buy_items = list(SHOP_INVENTORY.keys())
         sell_items = party.shared_inventory
+
+        # Pre-compute grouped buy list: [(item_name_or_None, cat_label_or_None), ...]
+        grouped_buy = group_items_by_category(buy_items)
+        # Pre-compute grouped sell list with headers
+        grouped_sell = group_inventory_by_category(sell_items, party.item_name)
 
         # ── Title bar with BUY / SELL tabs ──
         self._u3_panel(0, 0, SCREEN_WIDTH, 30)
@@ -8223,23 +8230,41 @@ class Renderer:
                           self._U3_GRAY, fm)
             ty += 24
 
-            items = buy_items
+            # grouped_buy: [(item_name_or_None, cat_label_or_None), ...]
+            rows = grouped_buy
             max_visible = (panel_h - 60) // row_h
-            scroll_top = 0
-            if len(items) > max_visible:
-                scroll_top = max(0, min(cursor_index - max_visible // 2,
-                                        len(items) - max_visible))
+            # Find the visual row that corresponds to cursor_index-th item
+            item_counter = -1
+            cursor_visual = 0
+            for ri, (iname, cat) in enumerate(rows):
+                if iname is not None:
+                    item_counter += 1
+                    if item_counter == cursor_index:
+                        cursor_visual = ri
+                        break
 
-            for vi, item_idx in enumerate(
-                    range(scroll_top, min(scroll_top + max_visible, len(items)))):
-                item_name = items[item_idx]
-                selected = (item_idx == cursor_index)
+            scroll_top = 0
+            if len(rows) > max_visible:
+                scroll_top = max(0, min(cursor_visual - max_visible // 2,
+                                        len(rows) - max_visible))
+
+            item_counter = -1
+            for ri in range(scroll_top, min(scroll_top + max_visible, len(rows))):
+                iname, cat = rows[ri]
+                if iname is None:
+                    # Category header
+                    self._u3_text(f"-- {cat} --", tx + 4, ty,
+                                  self._U3_ORANGE, self.font_small)
+                    ty += row_h
+                    continue
+
+                item_counter_temp = sum(1 for r in rows[:ri + 1] if r[0] is not None) - 1
+                selected = (item_counter_temp == cursor_index)
                 prefix = "> " if selected else "  "
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
-                cost = SHOP_INVENTORY[item_name]["buy"]
+                cost = SHOP_INVENTORY[iname]["buy"]
 
-                self._u3_text(f"{prefix}{item_name}", tx, ty, name_color, fm)
-                # Price on the right
+                self._u3_text(f"{prefix}{iname}", tx, ty, name_color, fm)
                 price_col = (255, 255, 0) if selected else (200, 200, 100)
                 self._u3_text(f"{cost}g", tx + left_w - 80, ty, price_col, fm)
 
@@ -8254,7 +8279,7 @@ class Renderer:
             if scroll_top > 0:
                 self._u3_text("^ MORE ^", tx + left_w // 2 - 50,
                               panel_y + 32, self._U3_GRAY, self.font_small)
-            if scroll_top + max_visible < len(items):
+            if scroll_top + max_visible < len(rows):
                 self._u3_text("v MORE v", tx + left_w // 2 - 50,
                               panel_y + panel_h - 18, self._U3_GRAY,
                               self.font_small)
@@ -8269,20 +8294,40 @@ class Renderer:
                 self._u3_text("  (NOTHING TO SELL)", tx, ty,
                               (120, 120, 120), fm)
             else:
-                items = sell_items
+                rows = grouped_sell  # mixed list: header strings + inventory entries
                 max_visible = (panel_h - 60) // row_h
-                scroll_top = 0
-                if len(items) > max_visible:
-                    scroll_top = max(0, min(cursor_index - max_visible // 2,
-                                            len(items) - max_visible))
+                # Find visual row for cursor_index-th item
+                item_counter = -1
+                cursor_visual = 0
+                for ri, entry in enumerate(rows):
+                    is_header = isinstance(entry, str) and entry.startswith("__header__:")
+                    if not is_header:
+                        item_counter += 1
+                        if item_counter == cursor_index:
+                            cursor_visual = ri
+                            break
 
-                for vi, item_idx in enumerate(
-                        range(scroll_top,
-                              min(scroll_top + max_visible, len(items)))):
-                    entry = items[item_idx]
+                scroll_top = 0
+                if len(rows) > max_visible:
+                    scroll_top = max(0, min(cursor_visual - max_visible // 2,
+                                            len(rows) - max_visible))
+
+                for ri in range(scroll_top, min(scroll_top + max_visible, len(rows))):
+                    entry = rows[ri]
+                    is_header = isinstance(entry, str) and entry.startswith("__header__:")
+                    if is_header:
+                        cat_label = entry.split(":", 1)[1]
+                        self._u3_text(f"-- {cat_label} --", tx + 4, ty,
+                                      self._U3_ORANGE, self.font_small)
+                        ty += row_h
+                        continue
+
                     item_name = party.item_name(entry)
                     item_ch = party.item_charges(entry)
-                    selected = (item_idx == cursor_index)
+                    # Compute this entry's item index
+                    idx_temp = sum(1 for r in rows[:ri + 1]
+                                   if not (isinstance(r, str) and r.startswith("__header__:"))) - 1
+                    selected = (idx_temp == cursor_index)
                     prefix = "> " if selected else "  "
                     name_color = self._U3_WHITE if selected else (220, 220, 230)
                     price = get_sell_price(item_name)
@@ -8309,7 +8354,7 @@ class Renderer:
                     self._u3_text("^ MORE ^", tx + left_w // 2 - 50,
                                   panel_y + 32, self._U3_GRAY,
                                   self.font_small)
-                if scroll_top + max_visible < len(items):
+                if scroll_top + max_visible < len(rows):
                     self._u3_text("v MORE v", tx + left_w // 2 - 50,
                                   panel_y + panel_h - 18, self._U3_GRAY,
                                   self.font_small)
@@ -8320,12 +8365,25 @@ class Renderer:
         rx = right_x + 10
         ry = panel_y + 10
 
-        # Determine selected item
+        # Determine selected item from grouped lists
         sel_item = None
-        if mode == "buy" and buy_items and 0 <= cursor_index < len(buy_items):
-            sel_item = buy_items[cursor_index]
-        elif mode == "sell" and sell_items and 0 <= cursor_index < len(sell_items):
-            sel_item = party.item_name(sell_items[cursor_index])
+        if mode == "buy" and grouped_buy:
+            item_count = -1
+            for iname, cat in grouped_buy:
+                if iname is not None:
+                    item_count += 1
+                    if item_count == cursor_index:
+                        sel_item = iname
+                        break
+        elif mode == "sell" and grouped_sell:
+            item_count = -1
+            for entry in grouped_sell:
+                is_hdr = isinstance(entry, str) and entry.startswith("__header__:")
+                if not is_hdr:
+                    item_count += 1
+                    if item_count == cursor_index:
+                        sel_item = party.item_name(entry)
+                        break
 
         if sel_item:
             self._u3_text("DETAILS", rx, ry, self._U3_ORANGE, fm)
@@ -8518,7 +8576,8 @@ class Renderer:
         - Normal: browse items with cursor, Enter to open action menu.
         - action_menu: choose from context-sensitive options.
         """
-        from src.party import WEAPONS, ARMORS, ITEM_INFO, EFFECTS_DATA
+        from src.party import (WEAPONS, ARMORS, ITEM_INFO, EFFECTS_DATA,
+                                group_inventory_by_category)
 
         fm = self.font_med
         f = self.font
@@ -8687,24 +8746,55 @@ class Renderer:
         if not inv:
             self._u3_text("  (EMPTY)", tx, ty, (120, 120, 120), fm)
         else:
-            # Compute visible window (scroll if list is long)
+            # Build grouped display list (header strings + original entries)
+            grouped_stash = group_inventory_by_category(inv, party.item_name)
+
+            # Map: for each row in grouped_stash, what flat inventory index?
+            # Headers get -1, items get their index counting only non-headers.
+            row_inv_indices = []
+            item_counter = 0
+            for entry in grouped_stash:
+                is_hdr = isinstance(entry, str) and entry.startswith("__header__:")
+                if is_hdr:
+                    row_inv_indices.append(-1)
+                else:
+                    row_inv_indices.append(item_counter)
+                    item_counter += 1
+
+            header_count = next_header  # effects + CAST + BREW (+ PICKPOCKET/TINKER)
+            inv_cursor = cursor_index - header_count  # cursor relative to inventory
+
+            # Find the visual row that corresponds to inv_cursor
+            cursor_visual = 0
+            for ri, flat_idx in enumerate(row_inv_indices):
+                if flat_idx == inv_cursor:
+                    cursor_visual = ri
+                    break
+
             stash_area_top = ty
             stash_area_h = panel_y + panel_h - ty - 10
             max_visible = stash_area_h // row_h
 
             scroll_top = 0
-            header_count = next_header  # effects + CAST + BREW (+ PICKPOCKET/TINKER if shown)
-            inv_cursor = cursor_index - header_count  # cursor relative to inventory
-            if len(inv) > max_visible:
-                scroll_top = max(0, min(inv_cursor - max_visible // 2,
-                                        len(inv) - max_visible))
+            if len(grouped_stash) > max_visible:
+                scroll_top = max(0, min(cursor_visual - max_visible // 2,
+                                        len(grouped_stash) - max_visible))
 
-            for vi, item_idx in enumerate(range(scroll_top, min(scroll_top + max_visible, len(inv)))):
-                entry = inv[item_idx]
+            for ri in range(scroll_top, min(scroll_top + max_visible, len(grouped_stash))):
+                entry = grouped_stash[ri]
+                is_hdr = isinstance(entry, str) and entry.startswith("__header__:")
+
+                if is_hdr:
+                    cat_label = entry.split(":", 1)[1]
+                    self._u3_text(f"-- {cat_label} --", tx + 4, ty,
+                                  self._U3_ORANGE, self.font_small)
+                    ty += row_h
+                    continue
+
+                flat_idx = row_inv_indices[ri]
                 item_name = party.item_name(entry)
                 item_ch = party.item_charges(entry)
-                global_idx = item_idx + header_count
-                selected = (global_idx == cursor_index)
+                selected = (flat_idx == inv_cursor)
                 prefix = "> " if selected else "  "
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
 
@@ -8718,7 +8808,6 @@ class Renderer:
                 if item_name in ARMORS:
                     hint = "ARMOR"
                 elif item_name in WEAPONS:
-                    wp = WEAPONS[item_name]
                     hint = "WEAPON"
                 else:
                     hint = "ITEM"
@@ -8738,7 +8827,7 @@ class Renderer:
             if scroll_top > 0:
                 self._u3_text("^ MORE ^", tx + left_w // 2 - 50, stash_area_top - 2,
                                self._U3_GRAY, self.font_small)
-            if scroll_top + max_visible < len(inv):
+            if scroll_top + max_visible < len(grouped_stash):
                 self._u3_text("v MORE v", tx + left_w // 2 - 50,
                                panel_y + panel_h - 18, self._U3_GRAY, self.font_small)
 
@@ -8845,10 +8934,14 @@ class Renderer:
             pass  # handled separately below with effect detail display
         elif is_cast_row or is_brew_row or is_pick_row or is_tink_row:
             pass  # no item detail for the CAST/BREW/PICK/TINK rows
-        elif cursor_index >= header_count and cursor_index - header_count < len(inv):
-            entry = inv[cursor_index - header_count]
-            sel_item = party.item_name(entry)
-            sel_charges = party.item_charges(entry)
+        elif cursor_index >= header_count:
+            from src.party import grouped_index_to_original
+            grouped_idx = cursor_index - header_count
+            orig_idx = grouped_index_to_original(inv, party.item_name, grouped_idx)
+            if 0 <= orig_idx < len(inv):
+                entry = inv[orig_idx]
+                sel_item = party.item_name(entry)
+                sel_charges = party.item_charges(entry)
 
         # Show details of the selected item
         if sel_item:

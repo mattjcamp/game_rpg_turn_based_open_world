@@ -825,6 +825,7 @@ class InventoryMixin:
 
     def _handle_party_inv_action(self, chosen):
         """Execute the chosen action on the selected party inventory entry."""
+        from src.party import grouped_index_to_original
         party = self.game.party
         NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _, PICK_INDEX, TINK_INDEX = self._stash_layout()
         idx = self.party_inv_cursor
@@ -836,9 +837,10 @@ class InventoryMixin:
             # CAST row — handled by browsing Enter, not by action menu
             self.party_inv_action_menu = False
         elif idx >= STASH_START:
-            inv_idx = idx - STASH_START
+            grouped_idx = idx - STASH_START
             inv = party.shared_inventory
-            if inv_idx < len(inv):
+            inv_idx = grouped_index_to_original(inv, party.item_name, grouped_idx)
+            if inv_idx >= 0 and inv_idx < len(inv):
                 item_name = party.item_name(inv[inv_idx])
                 if chosen == "USE":
                     self._use_party_item(item_name, inv_idx)
@@ -871,6 +873,7 @@ class InventoryMixin:
 
     def _get_party_inv_action_options(self):
         """Build action options for the selected party inventory entry."""
+        from src.party import grouped_index_to_original
         party = self.game.party
         NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _, PICK_INDEX, TINK_INDEX = self._stash_layout()
         idx = self.party_inv_cursor
@@ -882,9 +885,10 @@ class InventoryMixin:
             # No action menu for the CAST row — Enter opens spell list directly
             return []
         elif idx >= STASH_START:
-            inv_idx = idx - STASH_START
+            grouped_idx = idx - STASH_START
             inv = party.shared_inventory
-            if inv_idx >= len(inv):
+            inv_idx = grouped_index_to_original(inv, party.item_name, grouped_idx)
+            if inv_idx < 0 or inv_idx >= len(inv):
                 return []
             options = []
             item_name = party.item_name(inv[inv_idx])
