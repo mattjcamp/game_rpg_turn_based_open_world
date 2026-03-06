@@ -1,0 +1,176 @@
+{
+  "_comment": "Keys of Shadow overworld — a large island with Duskhollow town at center and 8 dungeons radiating outward in increasing difficulty.",
+
+  "size": {
+    "width": 64,
+    "height": 48
+  },
+
+  "seed": 7777,
+
+  "noise": {
+    "elevation_scale": 0.09,
+    "elevation_octaves": 6,
+    "moisture_scale": 0.10,
+    "moisture_octaves": 4,
+    "moisture_offset": { "x": 200, "y": 200 }
+  },
+
+  "island_mask": {
+    "x_squash": 0.85,
+    "y_squash": 1.05,
+    "edge_falloff": 0.90,
+    "blend_land": 0.30,
+    "blend_ocean": 0.70,
+    "ocean_penalty": 0.12
+  },
+
+  "terrain_thresholds": {
+    "water_max": 0.08,
+    "sand_max": 0.14,
+    "mountain_min": 0.45,
+    "forest_elevation_min": 0.26,
+    "forest_moisture_min": 0.40,
+    "forest_alt_moisture_min": 0.50,
+    "forest_alt_elevation_min": 0.16
+  },
+
+  "rivers": {
+    "enabled": true,
+    "start_offset_range": [-6, 6],
+    "meander_options": [-1, -1, 0, 0, 0, 1, 1],
+    "widen_chance": 0.35,
+    "bridge": true
+  },
+
+  "start_position": { "col": 32, "row": 26 },
+
+  "landmarks": [
+    {
+      "id": "duskhollow",
+      "type": "town",
+      "col": 32,
+      "row": 24,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3,
+      "_comment": "Central town shrouded in darkness"
+    },
+    {
+      "id": "gnome_machine",
+      "type": "machine",
+      "col": 34,
+      "row": 24,
+      "tile": "TILE_MACHINE",
+      "clear_radius": 1,
+      "_comment": "The gnome machine blocking the sun — insert 8 keys here"
+    },
+
+    {
+      "id": "dungeon_1",
+      "type": "dungeon",
+      "col": 28,
+      "row": 22,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Ratling Warren — just outside town, very easy"
+    },
+    {
+      "id": "dungeon_2",
+      "type": "dungeon",
+      "col": 22,
+      "row": 20,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Goblin Tunnels — short trek west"
+    },
+    {
+      "id": "dungeon_3",
+      "type": "dungeon",
+      "col": 40,
+      "row": 18,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Tomb of Whispers — northeast"
+    },
+    {
+      "id": "dungeon_4",
+      "type": "dungeon",
+      "col": 16,
+      "row": 28,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Orcish Stronghold — southwest"
+    },
+    {
+      "id": "dungeon_5",
+      "type": "dungeon",
+      "col": 48,
+      "row": 26,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Mage's Sanctum — far east"
+    },
+    {
+      "id": "dungeon_6",
+      "type": "dungeon",
+      "col": 20,
+      "row": 12,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Troll Caverns — far northwest"
+    },
+    {
+      "id": "dungeon_7",
+      "type": "dungeon",
+      "col": 50,
+      "row": 14,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "Shadow Fortress — far northeast"
+    },
+    {
+      "id": "dungeon_8",
+      "type": "dungeon",
+      "col": 44,
+      "row": 38,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2,
+      "_comment": "The Abyss — far south, most dangerous"
+    }
+  ],
+
+  "paths": [
+    { "from": [32, 26], "to": [32, 24], "_comment": "Start to town" },
+    { "from": [32, 24], "to": [28, 22], "_comment": "Town to Dungeon 1" },
+    { "from": [28, 22], "to": [22, 20], "_comment": "Dungeon 1 to Dungeon 2" },
+    { "from": [32, 24], "to": [40, 18], "_comment": "Town to Dungeon 3" },
+    { "from": [32, 24], "to": [16, 28], "_comment": "Town to Dungeon 4" },
+    { "from": [32, 24], "to": [48, 26], "_comment": "Town to Dungeon 5" },
+    { "from": [22, 20], "to": [20, 12], "_comment": "Dungeon 2 to Dungeon 6" },
+    { "from": [40, 18], "to": [50, 14], "_comment": "Dungeon 3 to Dungeon 7" },
+    { "from": [48, 26], "to": [44, 38], "_comment": "Dungeon 5 to Dungeon 8" }
+  ],
+
+  "unique_tile_placements": {
+    "fixed": {
+      "signpost": { "col": 30, "row": 24 }
+    },
+    "scatter": [
+      "ancient_shrine", "war_memorial", "whispering_stones",
+      "old_campfire", "fairy_ring", "hermit_camp",
+      "enchanted_spring", "oracle_pool", "forgotten_grave",
+      "dragon_bones", "wandering_ghost",
+      "merchant_wagon", "bandit_cache", "shadow_mark",
+      "ancient_battlefield", "moongate", "cursed_well",
+      "poison_swamp"
+    ]
+  },
+
+  "encounter_zones": [
+    {
+      "id": "default",
+      "encounter_area": "overworld",
+      "encounter_rate": 0.10
+    }
+  ]
+}

@@ -427,6 +427,70 @@
       "party_can_equip": false,
       "character_can_equip": false
     },
+    "Iron Key": {
+      "description": "A heavy iron key etched with gnomish runes. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Bronze Key": {
+      "description": "A tarnished bronze key with intricate gnomish gearwork. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Silver Key": {
+      "description": "A gleaming silver key inscribed with arcane formulae. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Gold Key": {
+      "description": "A solid gold key shaped like a miniature war hammer. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Crystal Key": {
+      "description": "A translucent key carved from a single crystal, humming with magical energy. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Ruby Key": {
+      "description": "A blood-red key that pulses with warmth. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Obsidian Key": {
+      "description": "A key of polished volcanic glass, cold to the touch. One of the 8 Keys of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
+    "Diamond Key": {
+      "description": "A flawless diamond key that refracts light into rainbows. The final Key of Shadow.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false
+    },
     "Camping Supplies": {
       "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
       "icon": "tool",

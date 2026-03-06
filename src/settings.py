@@ -50,6 +50,7 @@ TILE_DDOOR    = 26
 TILE_ARTIFACT = 27
 TILE_PORTAL   = 28
 TILE_LOCKED_DOOR = 29
+TILE_MACHINE = 30
 
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
@@ -80,6 +81,7 @@ TILE_DEFS = {
     TILE_ARTIFACT: {"color": (200, 180, 50), "walkable": True,  "name": "Artifact"},
     TILE_PORTAL:   {"color": (100, 200, 255), "walkable": True, "name": "Portal"},
     TILE_LOCKED_DOOR: {"color": (100, 60, 30), "walkable": False, "name": "Locked Door"},
+    TILE_MACHINE: {"color": (160, 80, 200), "walkable": True, "name": "Machine"},
 }
 
 # ----- Colors (UI) -----

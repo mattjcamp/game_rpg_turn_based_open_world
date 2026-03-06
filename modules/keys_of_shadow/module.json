@@ -1,0 +1,114 @@
+{
+  "_comment": "Module definition for Keys of Shadow — a full adventure about restoring sunlight to a darkened town.",
+
+  "metadata": {
+    "id": "keys_of_shadow",
+    "name": "Keys of Shadow",
+    "author": "Matt",
+    "description": "A gnome's infernal machine blocks the sun, plunging the town of Duskhollow into perpetual darkness. The guild of tinkerers has failed to stop it. Now a band of adventurers must recover the 8 Keys of the Gnomes from increasingly dangerous dungeons and shut down the machine to restore sunlight.",
+    "version": "1.0.0"
+  },
+
+  "settings": {
+    "tile_size": 32,
+    "map_width": 64,
+    "map_height": 48,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0,
+      "_comment": "High noon — yet the sky is dark"
+    }
+  },
+
+  "data": {
+    "party": "party.json",
+    "items": "items.json",
+    "races": "races.json",
+    "classes_dir": "classes",
+    "spells": "spells.json",
+    "effects": "effects.json",
+    "monsters": "monsters.json",
+    "encounters": "encounters.json",
+    "unique_tiles": "unique_tiles.json"
+  },
+
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [],
+    "dungeons": []
+  },
+
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 8,
+      "deliver_to": "duskhollow_machine"
+    },
+    "starting_quests": ["restore_sunlight"],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Ratling Warren",
+        "key_name": "Iron Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1"
+      },
+      {
+        "id": "dungeon_key_2",
+        "name": "Goblin Tunnels",
+        "key_name": "Bronze Key",
+        "dungeon_number": 2,
+        "landmark_id": "dungeon_2"
+      },
+      {
+        "id": "dungeon_key_3",
+        "name": "Tomb of Whispers",
+        "key_name": "Silver Key",
+        "dungeon_number": 3,
+        "landmark_id": "dungeon_3"
+      },
+      {
+        "id": "dungeon_key_4",
+        "name": "Orcish Stronghold",
+        "key_name": "Gold Key",
+        "dungeon_number": 4,
+        "landmark_id": "dungeon_4"
+      },
+      {
+        "id": "dungeon_key_5",
+        "name": "Mage's Sanctum",
+        "key_name": "Crystal Key",
+        "dungeon_number": 5,
+        "landmark_id": "dungeon_5"
+      },
+      {
+        "id": "dungeon_key_6",
+        "name": "Troll Caverns",
+        "key_name": "Ruby Key",
+        "dungeon_number": 6,
+        "landmark_id": "dungeon_6"
+      },
+      {
+        "id": "dungeon_key_7",
+        "name": "Shadow Fortress",
+        "key_name": "Obsidian Key",
+        "dungeon_number": 7,
+        "landmark_id": "dungeon_7"
+      },
+      {
+        "id": "dungeon_key_8",
+        "name": "The Abyss",
+        "key_name": "Diamond Key",
+        "dungeon_number": 8,
+        "landmark_id": "dungeon_8"
+      }
+    ]
+  }
+}

@@ -59,6 +59,9 @@ class Game:
         self.quest = None
         self.house_quest = None
 
+        # --- Darkness effect (Keys of Shadow module) ---
+        self.darkness_active = False
+
         # --- Game log ---
         # Accumulates all messages from every state for the log overlay
         self.game_log = []
@@ -219,9 +222,66 @@ class Game:
 
         self.quest = None
         self.house_quest = None
+
+        # ── Keys of Shadow module: set up 8 key dungeons ──
+        self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
+        self.keys_inserted = 0  # how many keys placed in the machine
+        self.machine_col = None  # overworld position of the machine
+        self.machine_row = None
+        if self.module_manifest:
+            prog = self.module_manifest.get("progression", {})
+            kd_list = prog.get("key_dungeons", [])
+            if kd_list:
+                self._init_key_dungeons(kd_list)
+                self.darkness_active = True
+
         self.showing_title = False
         self.change_state("overworld")
         self.camera.update(self.party.col, self.party.row)
+
+    def _init_key_dungeons(self, kd_list):
+        """Set up key dungeon quest entries from the module manifest.
+
+        Each key dungeon is stored in self.key_dungeons keyed by its
+        overworld (col, row) position.  The dungeon levels are generated
+        lazily on first entry.
+        """
+        from src.dungeon_generator import generate_keys_dungeon
+
+        overworld_cfg = self.module_manifest.get("_overworld_cfg", {})
+        landmarks = {lm["id"]: lm for lm in overworld_cfg.get("landmarks", [])}
+
+        # Find the machine landmark
+        for lm in overworld_cfg.get("landmarks", []):
+            if lm.get("type") == "machine":
+                self.machine_col = lm["col"]
+                self.machine_row = lm["row"]
+                break
+
+        for kd in kd_list:
+            lm_id = kd.get("landmark_id", "")
+            lm = landmarks.get(lm_id)
+            if not lm:
+                continue
+            col, row = lm["col"], lm["row"]
+            dnum = kd["dungeon_number"]
+            name = kd.get("name", f"Key Dungeon {dnum}")
+            key_name = kd.get("key_name", f"Key {dnum}")
+
+            # Generate the multi-floor dungeon
+            levels = generate_keys_dungeon(dnum, name=name)
+
+            self.key_dungeons[(col, row)] = {
+                "dungeon_number": dnum,
+                "name": name,
+                "key_name": key_name,
+                "levels": levels,
+                "current_level": 0,
+                "status": "active",  # active → artifact_found → completed
+                "dungeon_col": col,
+                "dungeon_row": row,
+                "artifact_name": key_name,
+            }
 
     def _title_save_game(self):
         """Open the save screen from the title."""

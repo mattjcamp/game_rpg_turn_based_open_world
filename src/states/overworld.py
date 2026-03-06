@@ -15,7 +15,7 @@ from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
-    TILE_WATER,
+    TILE_WATER, TILE_MACHINE,
 )
 from src.dungeon_generator import generate_dungeon, generate_house_dungeon
 from src.monster import create_random_monster, create_encounter, create_monster
@@ -75,6 +75,66 @@ class OverworldState(InventoryMixin, BaseState):
             self._spawn_orcs()
             # ── TEST: place a spell-casting Dark Mage near the start ──
             self._spawn_test_spellcaster()
+
+    def _interact_machine(self):
+        """Handle stepping on the gnome machine tile (Keys of Shadow)."""
+        kd = self.game.key_dungeons
+        if not kd:
+            self.show_message("A strange machine hums ominously.", 2000)
+            return
+
+        # Count keys the party currently holds
+        party = self.game.party
+        key_names = [d["key_name"] for d in kd.values()]
+        held_keys = [k for k in key_names if party.inv_count(k) > 0]
+
+        total = len(kd)
+        inserted = self.game.keys_inserted
+
+        if held_keys:
+            # Insert all held keys
+            for key in held_keys:
+                party.inv_remove(key)
+                self.game.keys_inserted += 1
+            inserted = self.game.keys_inserted
+            n = len(held_keys)
+            names = ", ".join(held_keys)
+            self.show_message(
+                f"Inserted {names}! ({inserted}/{total} keys placed)", 3500)
+
+            # Check victory
+            if inserted >= total:
+                self._trigger_victory()
+        elif inserted >= total:
+            self.show_message(
+                "The machine is deactivated. Sunlight bathes the land!", 3000)
+        elif inserted > 0:
+            remaining = total - inserted
+            self.show_message(
+                f"The machine hums... {inserted}/{total} keys inserted. "
+                f"{remaining} more needed.", 3000)
+        else:
+            self.show_message(
+                "A massive gnomish machine blocks the sun! "
+                "It has 8 empty keyhole slots.", 3500)
+
+    def _trigger_victory(self):
+        """Called when all 8 keys are inserted — the sun returns!"""
+        self.game.darkness_active = False
+        # Award XP and gold to all alive party members
+        for m in self.game.party.active_members():
+            if m.is_alive():
+                m.exp += 500
+                msgs = m.check_level_up()
+                for msg in msgs:
+                    self.game.log(msg)
+        self.game.party.gold += 1000
+        self.game.log("*** THE MACHINE POWERS DOWN! ***")
+        self.game.log("Sunlight floods the land once more!")
+        self.game.log("The people of Duskhollow are saved!")
+        self.game.log("VICTORY! +500 XP, +1000 Gold")
+        self.show_message(
+            "THE MACHINE POWERS DOWN! Sunlight returns! VICTORY!", 6000)
 
     def _spawn_test_spellcaster(self):
         """Place a spell-casting Dark Mage 4 tiles east of the party start.
@@ -554,13 +614,20 @@ class OverworldState(InventoryMixin, BaseState):
             dungeon_state = self.game.states["dungeon"]
             pcol, prow = self.game.party.col, self.game.party.row
 
-            # Check if this is the Shadow Crystal quest dungeon
-            quest = self.game.quest
-            if (quest and quest["status"] in ("active", "artifact_found")
-                    and pcol == quest["dungeon_col"]
-                    and prow == quest["dungeon_row"]):
+            # Check if this is a Keys of Shadow key dungeon
+            kd = self.game.key_dungeons.get((pcol, prow))
+            if kd and kd["status"] in ("active", "artifact_found"):
                 dungeon_state.enter_quest_dungeon(
-                    quest["levels"], pcol, prow
+                    kd["levels"], pcol, prow
+                )
+
+            # Check if this is the Shadow Crystal quest dungeon
+            elif (self.game.quest
+                    and self.game.quest["status"] in ("active", "artifact_found")
+                    and pcol == self.game.quest["dungeon_col"]
+                    and prow == self.game.quest["dungeon_row"]):
+                dungeon_state.enter_quest_dungeon(
+                    self.game.quest["levels"], pcol, prow
                 )
 
             # Check if this is the house quest dungeon
@@ -577,6 +644,10 @@ class OverworldState(InventoryMixin, BaseState):
                     dungeon_data, pcol, prow
                 )
             self.game.change_state("dungeon")
+            return
+
+        elif tile_id == TILE_MACHINE:
+            self._interact_machine()
             return
 
         elif tile_id == TILE_CHEST:
@@ -838,6 +909,7 @@ class OverworldState(InventoryMixin, BaseState):
             unique_pos=self.unique_tile_pos,
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
+            darkness_active=getattr(self.game, "darkness_active", False),
         )
         if self.showing_help:
             renderer.draw_overworld_help_overlay()

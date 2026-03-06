@@ -1212,7 +1212,8 @@ class Renderer:
 
     def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None,
                           unique_text="", unique_flash=0.0, unique_pos=None,
-                          push_anim=None, repel_effect=None):
+                          push_anim=None, repel_effect=None,
+                          darkness_active=False):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -1305,7 +1306,7 @@ class Renderer:
         has_infravision = party.has_effect("Infravision")
         has_galadriels = (party.has_effect("Galadriel's Light")
                           and party.galadriels_light_steps > 0)
-        if not clock.is_day:
+        if not clock.is_day or darkness_active:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,

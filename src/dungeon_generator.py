@@ -207,7 +207,9 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      seed=None,
                      place_stairs_down=False, place_artifact=False,
                      place_doors=False,
-                     encounter_area="dungeon"):
+                     encounter_area="dungeon",
+                     encounter_min_level=None,
+                     encounter_max_level=None):
     """
     Generate a procedural dungeon.
 
@@ -308,7 +310,9 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             my += random.randint(-1, 1)
             # Make sure we're on a floor tile (not a chest/trap/stairs)
             if tmap.get_tile(mx, my) == TILE_DFLOOR:
-                enc = create_encounter(encounter_area)
+                enc = create_encounter(encounter_area,
+                                       min_level=encounter_min_level,
+                                       max_level=encounter_max_level)
                 # Create the map-visible monster using the party tile
                 monster = create_monster(enc["monster_party_tile"])
                 monster.col = mx
@@ -402,3 +406,53 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
         place_doors=True,
     )
     return [level_0, level_1]
+
+
+def generate_keys_dungeon(dungeon_number, name=None):
+    """Generate a progressive dungeon for the Keys of Shadow module.
+
+    Dungeon N has N floors. Floor K (0-indexed) has encounters at level K+1.
+    The artifact (key) is on the deepest floor.
+
+    Parameters
+    ----------
+    dungeon_number : int
+        Which dungeon (1-8). Determines number of floors and max difficulty.
+    name : str or None
+        Display name. Defaults to "Dungeon of Key N".
+
+    Returns
+    -------
+    list of DungeonData
+        One entry per floor, [floor_0, floor_1, ..., floor_(N-1)].
+    """
+    if name is None:
+        name = f"Dungeon of Key {dungeon_number}"
+
+    num_floors = dungeon_number
+    levels = []
+
+    for floor in range(num_floors):
+        is_last = (floor == num_floors - 1)
+        enc_level = floor + 1  # floor 0 → level 1, floor 1 → level 2, etc.
+
+        # Dungeons get slightly bigger with depth
+        w = min(40, 28 + floor * 2)
+        h = min(30, 22 + floor * 2)
+        min_r = min(8, 4 + floor)
+        max_r = min(12, 6 + floor)
+
+        level_data = generate_dungeon(
+            name=f"{name} - Floor {floor + 1}",
+            width=w, height=h,
+            min_rooms=min_r, max_rooms=max_r,
+            place_stairs_down=not is_last,
+            place_artifact=is_last,
+            place_doors=True,
+            encounter_area="dungeon",
+            encounter_min_level=enc_level,
+            encounter_max_level=enc_level,
+        )
+        levels.append(level_data)
+
+    return levels

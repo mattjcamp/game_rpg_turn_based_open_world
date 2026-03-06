@@ -71,6 +71,11 @@ class DungeonState(InventoryMixin, BaseState):
     def _get_active_quest(self):
         """Return the quest dict that owns this dungeon, or None."""
         oc, orow = self.overworld_col, self.overworld_row
+        # Check key dungeons first (Keys of Shadow module)
+        kd = self.game.key_dungeons.get((oc, orow))
+        if kd and kd.get("status") in ("active", "artifact_found"):
+            return kd
+        # Check standard quests
         for q in (self.game.quest, getattr(self.game, "house_quest", None)):
             if (q and q.get("status") in ("active", "artifact_found")
                     and q.get("dungeon_col") == oc
@@ -829,10 +834,10 @@ class DungeonState(InventoryMixin, BaseState):
                 self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
 
         elif tile_id == TILE_STAIRS_DOWN:
-            if self.quest_levels and self.current_level == 0:
-                # Descend to level 2
-                self.current_level = 1
-                self.dungeon_data = self.quest_levels[1]
+            if self.quest_levels and self.current_level < len(self.quest_levels) - 1:
+                # Descend to next level
+                self.current_level += 1
+                self.dungeon_data = self.quest_levels[self.current_level]
                 self.game.party.col = self.dungeon_data.entry_col
                 self.game.party.row = self.dungeon_data.entry_row
                 self.game.camera.map_width = self.dungeon_data.tile_map.width
@@ -842,10 +847,13 @@ class DungeonState(InventoryMixin, BaseState):
                 self._visible_tiles = set()
                 if self.torch_active:
                     self._visible_tiles = self._compute_visible_tiles()
-                self.show_message("You descend deeper...", 2000)
+                depth = self.current_level + 1
+                total = len(self.quest_levels)
+                self.show_message(
+                    f"You descend deeper... (Floor {depth}/{total})", 2000)
                 active_q = self._get_active_quest()
                 if active_q:
-                    active_q["current_level"] = 1
+                    active_q["current_level"] = self.current_level
             else:
                 self.show_message("Stairs leading down...", 1500)
 
@@ -935,10 +943,12 @@ class DungeonState(InventoryMixin, BaseState):
         tmap.set_tile(col, row, TILE_PORTAL)
 
     def _ascend_level(self):
-        """Ascend from level 1 back to level 0 in a quest dungeon."""
-        self.current_level = 0
-        self.dungeon_data = self.quest_levels[0]
-        # Find the stairs-down tile on level 0 to place the party there
+        """Ascend one level up in a multi-level quest dungeon."""
+        if self.current_level <= 0:
+            return  # Already at top
+        self.current_level -= 1
+        self.dungeon_data = self.quest_levels[self.current_level]
+        # Find the stairs-down tile on the level above to place the party
         tmap = self.dungeon_data.tile_map
         placed = False
         for r in range(tmap.height):
@@ -962,8 +972,9 @@ class DungeonState(InventoryMixin, BaseState):
             self._visible_tiles = self._compute_visible_tiles()
         active_q = self._get_active_quest()
         if active_q:
-            active_q["current_level"] = 0
-        self.show_message("You ascend to the upper level.", 2000)
+            active_q["current_level"] = self.current_level
+        depth = self.current_level + 1
+        self.show_message(f"You ascend to floor {depth}.", 2000)
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""
