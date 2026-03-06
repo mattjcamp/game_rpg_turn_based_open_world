@@ -70,6 +70,10 @@ class Game:
         self.music = MusicManager()
         self.sfx = SoundEffects()
 
+        # --- Game-in-progress flag ---
+        # True once the player has started or loaded a game.
+        self._game_started = False
+
         # --- Title screen ---
         self.showing_title = True
         self.title_cursor = 0
@@ -139,8 +143,12 @@ class Game:
 
     @property
     def title_options(self):
-        """Build title menu options, adding RETURN TO GAME when a game is active."""
-        if self.current_state is not None:
+        """Build title menu options, adding RETURN TO GAME when applicable.
+
+        Shows RETURN TO GAME if a game is actively in progress, OR if
+        there is at least one save file the player can resume from.
+        """
+        if self._game_started or self._find_most_recent_save() is not None:
             return ([{"label": "RETURN TO GAME",
                        "action": self._title_return_to_game}]
                     + self._title_options_base)
@@ -252,6 +260,7 @@ class Game:
                 # Replace default Thornwall with Duskhollow for this module
                 self.town_data = generate_duskhollow()
 
+        self._game_started = True
         self.showing_title = False
         self.change_state("overworld")
         self.camera.update(self.party.col, self.party.row)
@@ -783,8 +792,35 @@ class Game:
         self.settings_cursor = 0
         self._title_settings_mode = True
 
+    def _find_most_recent_save(self):
+        """Return the slot number of the most recent save, or None."""
+        best_slot = None
+        best_ts = -1
+        for slot in range(1, NUM_SAVE_SLOTS + 1):
+            info = get_save_info(slot)
+            if info and info.get("timestamp", 0) > best_ts:
+                best_ts = info["timestamp"]
+                best_slot = slot
+        return best_slot
+
     def _title_return_to_game(self):
-        """Return to the active game from the title screen."""
+        """Return to the active game, or load the most recent save."""
+        if self._game_started:
+            # Game already running — just dismiss the title screen
+            self.showing_title = False
+            return
+
+        # No game running — try to load the most recent save
+        slot = self._find_most_recent_save()
+        if slot is not None:
+            ok = load_game(slot, self)
+            if ok:
+                self._game_started = True
+                self.showing_title = False
+                return
+
+        # Shouldn't reach here (button hidden when no saves exist),
+        # but fall back to just dismissing the title screen.
         self.showing_title = False
 
     def _title_quit(self):
@@ -865,6 +901,7 @@ class Game:
         """Load game from the given slot and show feedback."""
         ok = load_game(slot, self)
         if ok:
+            self._game_started = True
             self.save_load_message = f"Loaded Slot {slot}!"
             self.save_load_msg_timer = 2.0
             # Close settings after a successful load

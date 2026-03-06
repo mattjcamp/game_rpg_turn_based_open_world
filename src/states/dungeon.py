@@ -56,6 +56,9 @@ class DungeonState(InventoryMixin, BaseState):
         # ── Door unlock animation ──
         self.door_unlock_anim = None  # {"col", "row", "timer", "duration"}
 
+        # ── Artifact pickup animation ──
+        self.artifact_pickup_anim = None  # {"col", "row", "timer", "duration", "name"}
+
     def enter_dungeon(self, dungeon_data, overworld_col, overworld_row):
         """
         Set up the dungeon state with dungeon-specific data.
@@ -658,7 +661,7 @@ class DungeonState(InventoryMixin, BaseState):
             from src.party import SPELLS_DATA
             knock_spell = SPELLS_DATA.get("knock", {})
             mp_cost = knock_spell.get("mp_cost", 7)
-            if knock_caster.mp >= mp_cost:
+            if knock_caster.current_mp >= mp_cost:
                 options.append(
                     (f"Cast Knock ({knock_caster.name}, {mp_cost} MP)", "knock"))
             else:
@@ -779,14 +782,14 @@ class DungeonState(InventoryMixin, BaseState):
         save_dc = ev.get("save_dc_base", 12)
         save_stat = ev.get("save_stat", "intelligence")
 
-        if caster.mp < mp_cost:
+        if caster.current_mp < mp_cost:
             self.show_message(
                 f"{caster.name} doesn't have enough MP! "
-                f"({caster.mp}/{mp_cost} MP)", 2000)
+                f"({caster.current_mp}/{mp_cost} MP)", 2000)
             return
 
         # Consume MP whether success or failure
-        caster.mp -= mp_cost
+        caster.current_mp -= mp_cost
 
         # Roll: d20 + INT modifier vs save DC
         stat_val = getattr(caster, save_stat, 10)
@@ -806,7 +809,7 @@ class DungeonState(InventoryMixin, BaseState):
             self.show_message(
                 f"{caster.name} casts Knock — the lock clicks open! "
                 f"(roll {roll}+{modifier}={total} vs DC {save_dc}, "
-                f"{caster.mp} MP left)", 2000)
+                f"{caster.current_mp} MP left)", 2000)
             self.game.game_log.append(
                 f"{caster.name} cast Knock and unlocked a door "
                 f"(d20={roll}+{modifier}={total} vs DC {save_dc}).")
@@ -816,7 +819,7 @@ class DungeonState(InventoryMixin, BaseState):
             self.show_message(
                 f"{caster.name}'s Knock fizzles... "
                 f"(roll {roll}+{modifier}={total} vs DC {save_dc}, "
-                f"{caster.mp} MP left)", 2000)
+                f"{caster.current_mp} MP left)", 2000)
             self.game.game_log.append(
                 f"{caster.name} failed to cast Knock "
                 f"(d20={roll}+{modifier}={total} vs DC {save_dc}).")
@@ -971,6 +974,15 @@ class DungeonState(InventoryMixin, BaseState):
                 active_q["status"] = "artifact_found"
             # Spawn a portal doorway on an adjacent floor tile
             self._place_portal(col, row)
+            # Play pickup animation
+            self.artifact_pickup_anim = {
+                "col": col,
+                "row": row,
+                "timer": 2000,
+                "duration": 2000,
+                "name": artifact,
+            }
+            self.game.sfx.play("critical")
             self.show_message(f"Found the {artifact}! A portal appears!", 3000)
 
         elif tile_id == TILE_PORTAL:
@@ -1139,6 +1151,12 @@ class DungeonState(InventoryMixin, BaseState):
                 self.dungeon_data.tile_map.set_tile(col, row, TILE_DDOOR)
                 self.door_unlock_anim = None
 
+        # Tick artifact pickup animation
+        if self.artifact_pickup_anim:
+            self.artifact_pickup_anim["timer"] -= dt_ms
+            if self.artifact_pickup_anim["timer"] <= 0:
+                self.artifact_pickup_anim = None
+
     def draw(self, renderer):
         """Draw the dungeon in Ultima III style."""
         if self.showing_party_inv:
@@ -1204,7 +1222,9 @@ class DungeonState(InventoryMixin, BaseState):
             door_unlock_anim=self.door_unlock_anim,
             door_interact=self._get_door_interact_state(),
             infravision=infravision_active,
+            artifact_pickup_anim=self.artifact_pickup_anim,
             galadriels_light=galadriels_active,
+            dungeon_level=self.current_level,
         )
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])

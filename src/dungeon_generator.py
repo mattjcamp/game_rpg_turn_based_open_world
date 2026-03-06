@@ -338,10 +338,6 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         ac, ar = last_room.center
         tmap.set_tile(ac, ar, TILE_ARTIFACT)
 
-    # --- Optional: place doors at corridor/room junctions ---
-    if place_doors:
-        _place_doors(tmap, rooms)
-
     # --- Place locked doors on rooms with single-tile entrances ---
     _place_locked_doors(tmap, rooms)
 
@@ -370,7 +366,7 @@ def generate_house_dungeon(name="Elara's House"):
         min_rooms=4, max_rooms=5,
         room_min_size=3, room_max_size=5,
         place_stairs_down=True,
-        place_doors=True,
+        place_doors=False,
         encounter_area="house_basement",
     )
     level_1 = generate_dungeon(
@@ -379,7 +375,7 @@ def generate_house_dungeon(name="Elara's House"):
         min_rooms=3, max_rooms=4,
         room_min_size=3, room_max_size=5,
         place_artifact=True,
-        place_doors=True,
+        place_doors=False,
         encounter_area="house_basement",
     )
     return [level_0, level_1]
@@ -398,12 +394,12 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
     level_0 = generate_dungeon(
         name=f"{name} - Level 1",
         place_stairs_down=True,
-        place_doors=True,
+        place_doors=False,
     )
     level_1 = generate_dungeon(
         name=f"{name} - Level 2",
         place_artifact=True,
-        place_doors=True,
+        place_doors=False,
     )
     return [level_0, level_1]
 
@@ -448,7 +444,7 @@ def generate_keys_dungeon(dungeon_number, name=None):
             min_rooms=min_r, max_rooms=max_r,
             place_stairs_down=not is_last,
             place_artifact=is_last,
-            place_doors=True,
+            place_doors=False,
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,

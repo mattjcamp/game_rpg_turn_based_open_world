@@ -2134,11 +2134,70 @@ class Renderer:
     _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 960
     _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 672
 
+    # ── dungeon level palettes ──────────────────────────────
+    # Each palette defines the visual theme for a dungeon depth.
+    # Keys: wall_base, wall_bricks (list of 3), wall_mortar, floor_base,
+    #        floor_detail, accent, env_type
+    _DUNGEON_PALETTES = [
+        {   # Level 1 — Standard stone dungeon (gray-blue)
+            "wall_base":   (30, 28, 40),
+            "wall_bricks": [(75, 70, 90), (60, 58, 78), (85, 80, 100)],
+            "wall_mortar": (40, 38, 55),
+            "floor_base":  (0, 0, 0),
+            "floor_detail": (30, 28, 35),
+            "accent":      (80, 80, 100),
+            "env_type":    "stone",
+        },
+        {   # Level 2 — Mossy cavern (green-tinted)
+            "wall_base":   (22, 35, 25),
+            "wall_bricks": [(50, 75, 55), (40, 62, 45), (58, 82, 60)],
+            "wall_mortar": (28, 42, 30),
+            "floor_base":  (5, 8, 3),
+            "floor_detail": (20, 35, 18),
+            "accent":      (60, 100, 65),
+            "env_type":    "moss",
+        },
+        {   # Level 3 — Volcanic depths (red-orange)
+            "wall_base":   (40, 22, 18),
+            "wall_bricks": [(90, 55, 40), (75, 45, 32), (100, 60, 42)],
+            "wall_mortar": (50, 28, 20),
+            "floor_base":  (10, 3, 2),
+            "floor_detail": (40, 15, 10),
+            "accent":      (200, 100, 40),
+            "env_type":    "lava",
+        },
+        {   # Level 4 — Frozen crypt (ice-blue)
+            "wall_base":   (28, 35, 48),
+            "wall_bricks": [(70, 85, 110), (55, 70, 95), (80, 95, 120)],
+            "wall_mortar": (38, 45, 62),
+            "floor_base":  (4, 6, 12),
+            "floor_detail": (22, 30, 45),
+            "accent":      (140, 180, 220),
+            "env_type":    "ice",
+        },
+        {   # Level 5+ — Shadow void (deep purple/black)
+            "wall_base":   (35, 18, 40),
+            "wall_bricks": [(72, 40, 80), (58, 32, 68), (82, 48, 92)],
+            "wall_mortar": (42, 22, 48),
+            "floor_base":  (6, 2, 8),
+            "floor_detail": (28, 12, 32),
+            "accent":      (160, 80, 200),
+            "env_type":    "void",
+        },
+    ]
+
+    def _get_dungeon_palette(self, level):
+        """Return the palette dict for the given dungeon depth (0-based)."""
+        idx = min(level, len(self._DUNGEON_PALETTES) - 1)
+        return self._DUNGEON_PALETTES[idx]
+
     def draw_dungeon_u3(self, party, dungeon_data, message="",
                          visible_tiles=None, torch_steps=-1,
                          level_label=None, detected_traps=None,
                          door_unlock_anim=None, door_interact=None,
-                         infravision=False, galadriels_light=False):
+                         infravision=False, galadriels_light=False,
+                         artifact_pickup_anim=None,
+                         dungeon_level=0):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -2158,6 +2217,7 @@ class Renderer:
         off_r = max(0, min(off_r, tile_map.height - rows))
 
         # ── 1. draw map tiles ──
+        palette = self._get_dungeon_palette(dungeon_level)
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
@@ -2165,7 +2225,7 @@ class Renderer:
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts
                 py = sr * ts
-                self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr)
+                self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr, palette)
 
         # ── 1b. red glow on detected traps ──
         if detected_traps:
@@ -2188,6 +2248,45 @@ class Renderer:
                                      (cx_t - 6, cy_t - 6), (cx_t + 6, cy_t + 6), 2)
                     pygame.draw.line(self.screen, line_col,
                                      (cx_t + 6, cy_t - 6), (cx_t - 6, cy_t + 6), 2)
+
+        # ── 1c. animated glow on artifact tiles ──
+        import math as _math
+        _art_t = pygame.time.get_ticks()
+        _art_pulse = 0.5 + 0.5 * _math.sin(_art_t * 0.004)
+        _art_ring = (0.5 + 0.5 * _math.sin(_art_t * 0.002)) * 6 + 8
+        for sr2 in range(rows):
+            for sc2 in range(cols):
+                wc2 = sc2 + off_c
+                wr2 = sr2 + off_r
+                if tile_map.get_tile(wc2, wr2) == TILE_ARTIFACT:
+                    # Skip if not visible
+                    if visible_tiles and (wc2, wr2) not in visible_tiles:
+                        continue
+                    acx = sc2 * ts + ts // 2
+                    acy = sr2 * ts + ts // 2
+                    # Outer pulsing ring
+                    ring_r = int(_art_ring)
+                    ring_alpha = int(80 * _art_pulse)
+                    ring_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                    pygame.draw.circle(ring_surf, (200, 100, 255, ring_alpha),
+                                       (ts // 2, ts // 2), ring_r, 2)
+                    self.screen.blit(ring_surf, (sc2 * ts, sr2 * ts))
+                    # Inner golden glow
+                    glow_alpha = int(60 + 50 * _art_pulse)
+                    glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                    pygame.draw.circle(glow_surf,
+                                       (255, 220, 100, glow_alpha),
+                                       (ts // 2, ts // 2), 6)
+                    self.screen.blit(glow_surf, (sc2 * ts, sr2 * ts))
+                    # Rotating sparkles
+                    for i in range(4):
+                        angle = _art_t * 0.003 + i * 1.5708
+                        sp_r = 8 + 3 * _math.sin(_art_t * 0.006 + i)
+                        sx = acx + int(_math.cos(angle) * sp_r)
+                        sy = acy + int(_math.sin(angle) * sp_r)
+                        brightness = int(180 + 75 * _art_pulse)
+                        pygame.draw.circle(self.screen,
+                                           (brightness, brightness, 200), (sx, sy), 1)
 
         # ── 2. monster sprites (only within visible tiles) ──
         for monster in dungeon_data.monsters:
@@ -2228,6 +2327,11 @@ class Renderer:
         if door_unlock_anim:
             self._u3_draw_door_unlock_anim(door_unlock_anim, off_c, off_r,
                                             cols, rows, ts)
+
+        # ── 4c. artifact pickup animation ──
+        if artifact_pickup_anim:
+            self._u3_draw_artifact_pickup(artifact_pickup_anim, off_c, off_r,
+                                           cols, rows, ts)
 
         # ── 5. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -2433,6 +2537,95 @@ class Renderer:
                                 int(40 * glow_f)))
                 self.screen.blit(glow_surf, (px - 4, py - 4))
 
+    def _u3_draw_artifact_pickup(self, anim, off_c, off_r, cols, rows, ts):
+        """Draw artifact pickup celebration: expanding rings, rising sparks,
+        and a floating artifact name that rises and fades."""
+        import math
+
+        col, row = anim["col"], anim["row"]
+        sc = col - off_c
+        sr = row - off_r
+        if not (0 <= sc < cols and 0 <= sr < rows):
+            return
+
+        progress = 1.0 - (anim["timer"] / anim["duration"])
+        cx = sc * ts + ts // 2
+        cy = sr * ts + ts // 2
+
+        # Phase 1 (0.0–0.4): bright flash + expanding golden rings
+        if progress < 0.4:
+            p = progress / 0.4
+            # Central flash — white circle that expands and fades
+            flash_r = int(4 + 20 * p)
+            flash_a = int(255 * (1.0 - p))
+            flash_surf = pygame.Surface((ts * 3, ts * 3), pygame.SRCALPHA)
+            pygame.draw.circle(flash_surf, (255, 255, 220, flash_a),
+                               (ts * 3 // 2, ts * 3 // 2), flash_r)
+            self.screen.blit(flash_surf,
+                             (cx - ts * 3 // 2, cy - ts * 3 // 2))
+            # Two expanding golden rings
+            for i in range(2):
+                ring_p = max(0.0, p - i * 0.15)
+                ring_r = int(6 + 30 * ring_p)
+                ring_a = int(200 * (1.0 - ring_p))
+                if ring_a > 0:
+                    ring_surf = pygame.Surface((ts * 3, ts * 3), pygame.SRCALPHA)
+                    pygame.draw.circle(ring_surf, (255, 200, 50, ring_a),
+                                       (ts * 3 // 2, ts * 3 // 2), ring_r, 2)
+                    self.screen.blit(ring_surf,
+                                     (cx - ts * 3 // 2, cy - ts * 3 // 2))
+
+        # Phase 2 (0.2–0.8): sparkles rise upward
+        if 0.2 < progress < 0.8:
+            sp = (progress - 0.2) / 0.6
+            num_sparks = 12
+            for i in range(num_sparks):
+                angle = i * (2 * math.pi / num_sparks) + sp * 2
+                dist = 6 + 18 * sp
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy - int(8 + 30 * sp) + int(math.sin(angle * 2) * 4)
+                alpha = int(255 * (1.0 - sp))
+                spark_col = (255, 220, 80) if i % 2 == 0 else (200, 120, 255)
+                spark_surf = pygame.Surface((6, 6), pygame.SRCALPHA)
+                # Cross sparkle
+                pygame.draw.line(spark_surf, (*spark_col, alpha),
+                                 (3, 0), (3, 5), 1)
+                pygame.draw.line(spark_surf, (*spark_col, alpha),
+                                 (0, 3), (5, 3), 1)
+                self.screen.blit(spark_surf, (sx - 3, sy - 3))
+
+        # Phase 3 (0.3–1.0): floating artifact name rises and fades
+        if progress > 0.3:
+            tp = (progress - 0.3) / 0.7
+            text_alpha = int(255 * (1.0 - tp * tp))
+            text_y = cy - 20 - int(40 * tp)
+            name = anim.get("name", "ARTIFACT")
+            text_surf = self.font_small.render(name.upper(), True,
+                                                (255, 220, 100))
+            # Create alpha surface
+            alpha_surf = pygame.Surface(text_surf.get_size(), pygame.SRCALPHA)
+            alpha_surf.blit(text_surf, (0, 0))
+            alpha_surf.set_alpha(text_alpha)
+            tx = cx - text_surf.get_width() // 2
+            self.screen.blit(alpha_surf, (tx, text_y))
+
+        # Phase 2b (0.4–0.7): brief purple diamond shape expanding
+        if 0.4 < progress < 0.7:
+            dp = (progress - 0.4) / 0.3
+            d_size = int(4 + 16 * dp)
+            d_alpha = int(180 * (1.0 - dp))
+            diamond = [
+                (cx, cy - d_size),
+                (cx + d_size, cy),
+                (cx, cy + d_size),
+                (cx - d_size, cy),
+            ]
+            d_surf = pygame.Surface((ts * 3, ts * 3), pygame.SRCALPHA)
+            offset_pts = [(x - cx + ts * 3 // 2, y - cy + ts * 3 // 2)
+                          for x, y in diamond]
+            pygame.draw.polygon(d_surf, (200, 100, 255, d_alpha), offset_pts, 2)
+            self.screen.blit(d_surf, (cx - ts * 3 // 2, cy - ts * 3 // 2))
+
     def _u3_draw_door_interact(self, interact, off_c, off_r, ts):
         """Draw the locked-door interaction prompt panel near the door.
 
@@ -2499,7 +2692,7 @@ class Renderer:
         glow_surf.fill((255, 180, 60, alpha))
         self.screen.blit(glow_surf, (door_px, door_py))
 
-    def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr):
+    def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr, palette=None):
         """Draw a single dungeon tile in Ultima III style."""
         BLACK  = (0, 0, 0)
         WHITE  = (255, 255, 255)
@@ -2512,41 +2705,114 @@ class Renderer:
         ORANGE = (255, 170, 85)
         YELLOW = (255, 255, 0)
 
+        # Default palette (level 1 stone) if none provided
+        if palette is None:
+            palette = self._DUNGEON_PALETTES[0]
+
         rect = pygame.Rect(px, py, ts, ts)
         cx = px + ts // 2
         cy = py + ts // 2
         seed = wc * 31 + wr * 17
 
         if tile_id == TILE_DWALL:
-            # Ornate gray-blue stone blocks (matches example_dungeon)
-            pygame.draw.rect(self.screen, (30, 28, 40), rect)
-            # Brick pattern with slight color variation
+            # Stone blocks — colors from level palette
+            pygame.draw.rect(self.screen, palette["wall_base"], rect)
+            bricks = palette["wall_bricks"]
+            mortar = palette["wall_mortar"]
             for iy in range(0, ts, 8):
                 offset = 5 if (iy // 8) % 2 else 0
                 for ix in range(offset, ts, 11):
                     s = (wc * 7 + wr * 13 + ix + iy) % 5
-                    # Vary brick colors for stone texture
                     if s < 2:
-                        bc = (75, 70, 90)
+                        bc = bricks[0]
                     elif s < 4:
-                        bc = (60, 58, 78)
+                        bc = bricks[1]
                     else:
-                        bc = (85, 80, 100)
+                        bc = bricks[2]
                     brick = pygame.Rect(px + ix, py + iy, 9, 6)
                     pygame.draw.rect(self.screen, bc, brick)
-                    pygame.draw.rect(self.screen, (40, 38, 55), brick, 1)
+                    pygame.draw.rect(self.screen, mortar, brick, 1)
+
+            # Environmental details on walls
+            env = palette["env_type"]
+            if env == "moss":
+                # Moss patches on some wall tiles
+                if seed % 3 == 0:
+                    mx = (seed * 7) % (ts - 8) + 2
+                    my = ts - 4
+                    for i in range(3):
+                        gx = px + mx + i * 3 - 3
+                        gy = py + my - (seed + i) % 3
+                        pygame.draw.rect(self.screen, (40, 90, 35),
+                                         pygame.Rect(gx, gy, 2, 2))
+            elif env == "lava":
+                # Glowing cracks in walls
+                if seed % 4 == 0:
+                    lx = px + (seed * 3) % (ts - 6) + 3
+                    pygame.draw.line(self.screen, (200, 80, 20),
+                                     (lx, py + ts - 2), (lx + 3, py + ts - 8), 1)
+            elif env == "ice":
+                # Frost crystals on walls
+                if seed % 3 == 0:
+                    fx = px + (seed * 5) % (ts - 8) + 4
+                    fy = py + (seed * 3) % (ts - 8) + 4
+                    pygame.draw.line(self.screen, (160, 200, 240),
+                                     (fx, fy), (fx + 4, fy - 3), 1)
+                    pygame.draw.line(self.screen, (160, 200, 240),
+                                     (fx, fy), (fx - 2, fy - 4), 1)
+            elif env == "void":
+                # Faint purple energy wisps
+                if seed % 5 == 0:
+                    import math as _m
+                    t = pygame.time.get_ticks() * 0.003 + seed
+                    vx = px + ts // 2 + int(_m.sin(t) * 4)
+                    vy = py + ts // 2 + int(_m.cos(t * 0.7) * 3)
+                    pygame.draw.circle(self.screen, (120, 50, 160),
+                                       (vx, vy), 2)
 
         elif tile_id == TILE_DFLOOR:
-            # Black floor with subtle stone-crack dots
-            pygame.draw.rect(self.screen, BLACK, rect)
-            # Sparse gray dots for stone floor texture
+            # Floor — colors from level palette
+            pygame.draw.rect(self.screen, palette["floor_base"], rect)
+            detail_col = palette["floor_detail"]
             for i in range(2):
                 s = seed + i * 41
                 if s % 4 < 2:
                     dx = (s * 7) % (ts - 6) + 3
                     dy = (s * 13) % (ts - 6) + 3
-                    pygame.draw.rect(self.screen, (30, 28, 35),
+                    pygame.draw.rect(self.screen, detail_col,
                                      pygame.Rect(px + dx, py + dy, 2, 1))
+
+            # Environmental floor details
+            env = palette["env_type"]
+            if env == "moss":
+                # Small moss spots on floor
+                if seed % 5 == 0:
+                    mx = (seed * 11) % (ts - 4) + 2
+                    my = (seed * 7) % (ts - 4) + 2
+                    pygame.draw.rect(self.screen, (25, 55, 22),
+                                     pygame.Rect(px + mx, py + my, 3, 2))
+            elif env == "lava":
+                # Lava glow seeping through floor cracks
+                if seed % 6 < 2:
+                    lx = (seed * 9) % (ts - 8) + 4
+                    ly = (seed * 5) % (ts - 6) + 3
+                    glow_c = (140 + (seed % 40), 40 + (seed % 20), 10)
+                    pygame.draw.line(self.screen, glow_c,
+                                     (px + lx, py + ly),
+                                     (px + lx + 5, py + ly + 2), 1)
+            elif env == "ice":
+                # Ice sheen on floor
+                if seed % 4 == 0:
+                    shine = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                    shine.fill((100, 150, 220, 12))
+                    self.screen.blit(shine, (px, py))
+            elif env == "void":
+                # Dark energy tendrils on floor
+                if seed % 7 < 2:
+                    vx = (seed * 3) % (ts - 6) + 3
+                    vy = (seed * 11) % (ts - 6) + 3
+                    pygame.draw.circle(self.screen, (60, 20, 70),
+                                       (px + vx, py + vy), 2)
 
         elif tile_id == TILE_WALL:
             # Town-interior walls reused in dungeon — same stone style
