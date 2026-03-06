@@ -168,6 +168,61 @@
     {
       "item": "Brimite Ore",
       "charges": 1
+    },
+    {
+      "item": "Dagger"
+    },
+    {
+      "item": "Dagger"
+    },
+    {
+      "item": "Mace"
+    },
+    {
+      "item": "Axe"
+    },
+    {
+      "item": "Sword"
+    },
+    {
+      "item": "Spear"
+    },
+    {
+      "item": "Leather"
+    },
+    {
+      "item": "Leather"
+    },
+    {
+      "item": "Chain"
+    },
+    {
+      "item": "Short Bow"
+    },
+    {
+      "item": "Long Bow"
+    },
+    {
+      "item": "Crossbow"
+    },
+    {
+      "item": "Sling"
+    },
+    {
+      "item": "Arrows",
+      "charges": 20
+    },
+    {
+      "item": "Arrows",
+      "charges": 20
+    },
+    {
+      "item": "Bolts",
+      "charges": 15
+    },
+    {
+      "item": "Bolts",
+      "charges": 15
     }
   ]
 }

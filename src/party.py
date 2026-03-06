@@ -793,6 +793,25 @@ class PartyMember:
         elif slot not in valid_slots:
             return False
 
+        # ── Weapon type exclusion ──
+        # A character may have one melee and one ranged weapon, but never
+        # two melee or two ranged weapons across both hands.
+        # "Fists" is the bare-hand default, not a real weapon for this check.
+        new_wp = WEAPONS.get(item_name)
+        if new_wp and slot in ("right_hand", "left_hand"):
+            new_is_ranged = new_wp.get("ranged", False)
+            other_slot = "left_hand" if slot == "right_hand" else "right_hand"
+            other_item = self.equipped.get(other_slot)
+            other_default = self._SLOT_DEFAULTS.get(other_slot)
+            if other_item and other_item != other_default:
+                other_wp = WEAPONS.get(other_item)
+                if other_wp:
+                    other_is_ranged = other_wp.get("ranged", False)
+                    if new_is_ranged == other_is_ranged:
+                        # Same type in the other hand — unequip it first
+                        self.inventory.append(other_item)
+                        self.equipped[other_slot] = other_default
+
         # Move the currently equipped item back to inventory (if not a default)
         old_item = self.equipped.get(slot)
         if old_item and old_item != self._SLOT_DEFAULTS.get(slot):

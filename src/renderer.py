@@ -7730,6 +7730,9 @@ class Renderer:
         ty += 22
         self._u3_text("RACE:", tx, ty, self._U3_LTBLUE, fm)
         self._u3_text(f"{member.race}", tx + 58, ty, self._U3_WHITE, fm)
+        gender_str = getattr(member, 'gender', 'Unknown')
+        self._u3_text(f"  {gender_str}", tx + 58 + fm.size(member.race.upper())[0], ty,
+                      (180, 180, 200), fm)
         ty += 20
         self._u3_text(f"LEVEL: {member.level:02d}", tx, ty, self._U3_WHITE, fm)
         self._u3_text(f"EXP: {member.exp:04d}/{member.xp_for_next_level:04d}",
@@ -7976,31 +7979,127 @@ class Renderer:
             list_row += 1
 
         # If inventory is empty, show placeholder
-        if len(inv) == 0 and list_row == 3:
+        if len(inv) == 0 and list_row == num_equip_slots:
             ry += 10
             self._u3_text("ITEMS", rx, ry, self._U3_ORANGE, fm)
             ry += 22
             self._u3_text("  (EMPTY)", rx, ry, (120, 120, 120), fm)
 
-        # ── Combat summary (compact) ──
+        # ── Combat stats (detailed breakdown) ──
         ry += 16
         pygame.draw.line(self.screen, (60, 60, 80),
                          (rx, ry), (rx + right_w - 24, ry), 1)
         ry += 8
-        ac = member.get_ac()
-        est_dmg = member.get_damage()
-        self._u3_text(f"AC:{ac:02d}  ATK:D20{format_modifier(member.get_attack_bonus())}  DMG:{est_dmg:02d}",
-                      rx, ry, self._U3_LTBLUE, fm)
-
-        # ── Magic summary (compact) ──
+        self._u3_text("COMBAT STATS", rx, ry, self._U3_ORANGE, fm)
         ry += 20
+        rpb = right_w - 24  # right panel usable width
+        fs = self.font_small
+        dim = (120, 120, 140)   # dim color for breakdown text
+        val_c = self._U3_WHITE  # value color
+        lbl_c = self._U3_LTBLUE  # label color
+        buf_c = (180, 255, 140)  # buff bonus color
+
+        # — Armor Class —
+        ac = member.get_ac()
+        armor_name = member.armor or "Cloth"
+        armor_data = ARMORS.get(armor_name, {"evasion": 50})
+        armor_bonus = (armor_data["evasion"] - 50) // 5
+        dex_mod = member.dex_mod
+        potion_ac = getattr(member, "potion_buffs", {}).get("ac", 0)
+
+        self._u3_text("AC", rx, ry, lbl_c, fm)
+        self._u3_text(f"{ac:02d}", rx + 38, ry, val_c, fm)
+        ry += 16
+        # Breakdown line
+        parts = [f"BASE 10"]
+        if armor_bonus:
+            parts.append(f"{armor_name.upper()} {armor_bonus:+d}")
+        if dex_mod:
+            parts.append(f"DEX {dex_mod:+d}")
+        if potion_ac:
+            parts.append(f"POTION {potion_ac:+d}")
+        breakdown = "  ".join(parts)
+        self._u3_text(breakdown, rx + 4, ry, dim, fs)
+        ry += 18
+
+        # — Gather weapons from both hands —
+        eq = getattr(member, 'equipped', {})
+        rh_name = eq.get("right_hand") or "Fists"
+        lh_name = eq.get("left_hand")
+        # Build list of (weapon_name, hand_label) for each occupied hand
+        weapon_entries = []
+        rh_data = WEAPONS.get(rh_name, {})
+        if rh_data or rh_name == "Fists":
+            weapon_entries.append((rh_name, "R"))
+        if lh_name and WEAPONS.get(lh_name):
+            weapon_entries.append((lh_name, "L"))
+        has_two = len(weapon_entries) > 1
+        potions = getattr(member, "potion_buffs", {})
+
+        for wp_name, hand_tag in weapon_entries:
+            wdata = WEAPONS.get(wp_name, {"power": 0})
+            wp_power = wdata["power"] if isinstance(wdata, dict) else 0
+            wp_ranged = wdata.get("ranged", False) if isinstance(wdata, dict) else False
+
+            # — Header for this weapon —
+            if has_two:
+                hand_label = "RIGHT HAND" if hand_tag == "R" else "LEFT HAND"
+                self._u3_text(hand_label, rx, ry, self._U3_ORANGE, fs)
+                ry += 14
+
+            # — Attack —
+            stat_label = "DEX" if wp_ranged else "STR"
+            stat_mod = member.dex_mod if wp_ranged else member.str_mod
+            potion_key = "dexterity" if wp_ranged else "strength"
+            potion_atk = potions.get(potion_key, 0)
+            atk_total = stat_mod + potion_atk
+
+            self._u3_text("ATK", rx, ry, lbl_c, fm)
+            self._u3_text(f"D20{format_modifier(atk_total)}", rx + 38, ry, val_c, fm)
+            ry += 16
+            parts = []
+            if wp_ranged:
+                parts.append("RANGED")
+            parts.append(f"{stat_label} {stat_mod:+d}")
+            if potion_atk:
+                parts.append(f"POTION {potion_atk:+d}")
+            self._u3_text("  ".join(parts), rx + 4, ry, dim, fs)
+            ry += 16
+
+            # — Damage —
+            dice_count, dice_sides, dmg_bonus = member.get_damage_dice(wp_name)
+            potion_dmg = potions.get(potion_key, 0)
+            total_bonus = dmg_bonus + potion_dmg
+            dmg_min = max(1, dice_count + total_bonus)
+            dmg_max = max(1, dice_count * dice_sides + total_bonus)
+            dice_str = f"{dice_count}D{dice_sides}"
+            if total_bonus > 0:
+                dice_str += f"+{total_bonus}"
+            elif total_bonus < 0:
+                dice_str += f"{total_bonus}"
+
+            self._u3_text("DAMAGE", rx, ry, lbl_c, fm)
+            self._u3_text(dice_str, rx + 68, ry, val_c, fm)
+            ry += 16
+            self._u3_text(f"RANGE {dmg_min} - {dmg_max}", rx + 4, ry, dim, fs)
+            ry += 14
+            parts = [f"{wp_name.upper()} {dice_count}D{dice_sides}"]
+            parts.append(f"{stat_label} {dmg_bonus:+d}")
+            if potion_dmg:
+                parts.append(f"POTION {potion_dmg:+d}")
+            self._u3_text("  ".join(parts), rx + 4, ry, dim, fs)
+            ry += 16
+
+        # — Magic type —
         magic_types = []
         if member.can_cast_priest():
             magic_types.append("PRIEST")
         if member.can_cast_sorcerer():
             magic_types.append("SORCERER")
         magic_str = " + ".join(magic_types) if magic_types else "NONE"
-        self._u3_text(f"MAGIC: {magic_str}", rx, ry, (180, 180, 255) if magic_types else (150, 150, 150), fm)
+        self._u3_text("MAGIC", rx, ry, lbl_c, fm)
+        self._u3_text(magic_str, rx + 60, ry,
+                      (180, 180, 255) if magic_types else (150, 150, 150), fm)
 
         # ── Action menu popup ──
         if action_menu and action_options:

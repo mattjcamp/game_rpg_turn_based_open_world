@@ -219,6 +219,33 @@
       "charges": 1
     },
     {
+      "item": "Dagger"
+    },
+    {
+      "item": "Dagger"
+    },
+    {
+      "item": "Mace"
+    },
+    {
+      "item": "Axe"
+    },
+    {
+      "item": "Sword"
+    },
+    {
+      "item": "Spear"
+    },
+    {
+      "item": "Leather"
+    },
+    {
+      "item": "Leather"
+    },
+    {
+      "item": "Chain"
+    },
+    {
       "item": "Short Bow"
     },
     {
@@ -228,20 +255,23 @@
       "item": "Crossbow"
     },
     {
-      "item": "Arrows",
-      "charges": 10
+      "item": "Sling"
     },
     {
       "item": "Arrows",
-      "charges": 10
+      "charges": 20
+    },
+    {
+      "item": "Arrows",
+      "charges": 20
     },
     {
       "item": "Bolts",
-      "charges": 10
+      "charges": 15
     },
     {
       "item": "Bolts",
-      "charges": 10
+      "charges": 15
     }
   ]
 }
