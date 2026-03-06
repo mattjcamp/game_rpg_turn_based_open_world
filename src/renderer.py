@@ -40,9 +40,8 @@ class Renderer:
     def _load_tile_sheet(self):
         """Load U3TilesE.gif and extract individual 16x16 tiles, scaled to 32x32."""
         import os
-        sheet_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "research", "example_graphics", "U3TilesE.gif")
+        assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+        sheet_path = os.path.join(assets_dir, "U3TilesE.gif")
 
         self._tile_sprites = {}  # (row, col) -> 32x32 pygame surface
 
@@ -54,8 +53,7 @@ class Renderer:
         self._npc_sprites = {}
         self._villager_sprites = []
         self._unique_tile_sprites = {}
-        self._assets_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "src", "assets")
+        self._assets_dir = assets_dir
 
         from src.settings import (
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
@@ -105,9 +103,7 @@ class Renderer:
             self._chest_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
 
         # ── Load town gate tile ──
-        gate_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "src", "assets", "town_gate.png")
+        gate_path = os.path.join(assets_dir, "town_gate.png")
         if os.path.exists(gate_path):
             raw = pygame.image.load(gate_path).convert_alpha()
             self._town_gate_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
@@ -160,14 +156,13 @@ class Renderer:
     def _load_class_sprites(self):
         """Load character class sprites.
 
-        Primary source: larger Amiga-style sprites in example_graphics/.
+        Primary source: larger Amiga-style sprites in src/assets/.
         Fallback: U4 16×16 tile sprites in src/assets/u4_tiles/ for any
         class that doesn't have an Amiga sprite.  The U4 tiles are scaled
         to 32×32 so they're comparable in size to the Amiga sprites.
         """
         import os
-        sprite_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "research", "example_graphics")
+        sprite_dir = os.path.join(os.path.dirname(__file__), "assets")
 
         # Primary sprites (Amiga-style, ~28-34 px)
         sprite_files = {
@@ -180,9 +175,7 @@ class Renderer:
 
         # U4 tile fallbacks for classes without Amiga sprites.
         # Maps class name -> filename in src/assets/u4_tiles/
-        u4_tile_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "src", "assets", "u4_tiles")
+        u4_tile_dir = os.path.join(os.path.dirname(__file__), "assets", "u4_tiles")
         u4_class_tiles = {
             "alchemist":   "healer_alt_f1.png", # alchemist tile
             "illusionist": "mage.png",           # blue-robed mage
