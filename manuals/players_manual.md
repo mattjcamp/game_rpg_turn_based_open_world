@@ -104,7 +104,7 @@ Each class determines your character's hit points per level, magic points per le
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 15       | 0        | 2     | None       |
+| 15       | 0        | 4     | None       |
 
 **Allowed Weapons:** All weapons
 **Allowed Armor:** All armor (Cloth, Leather, Chain, Plate)
@@ -115,7 +115,7 @@ Each class determines your character's hit points per level, magic points per le
 - **Shield Wall** — Reduces incoming physical damage when wielding a shield.
 - **Cleave** — Melee attacks can strike adjacent enemies in a sweeping arc.
 
-Fighters are the backbone of any party. With the highest HP per level and access to every weapon and armor type, they belong on the front line where the fighting is thickest. They have no magic but more than compensate with raw staying power and damage output.
+Fighters are the backbone of any party. With the highest HP per level, a generous 4-tile combat range, and access to every weapon and armor type, they belong on the front line where the fighting is thickest. They have no magic but more than compensate with raw staying power and damage output.
 
 ---
 
@@ -170,7 +170,7 @@ Clerics are the primary healers of the party. Minor Heal, Major Heal, and Mass H
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 5        | 0        | 5     | None       |
+| 5        | 0        | 10    | None       |
 
 **Allowed Weapons:** Fists, Dagger, Club, Sling, Short Bow
 **Allowed Armor:** Cloth, Leather
@@ -182,7 +182,7 @@ Clerics are the primary healers of the party. Minor Heal, Major Heal, and Mass H
 - **Detect Traps** — Can detect and disarm hidden traps in dungeons.
 - **Backstab** — Deals double damage when attacking from behind an enemy.
 
-The Thief has the longest combat range of any class (5 tiles), making them excellent skirmishers. With a Short Bow they can pelt enemies from across the arena. Their real value outside combat is Pick Locks and Detect Traps, which open up areas and loot that other classes can't reach. Pair with Halfling for the Pickpocket bonus.
+The Thief has the longest combat range of any class (10 tiles), making them unmatched skirmishers who can strike from nearly anywhere on the battlefield. With a Short Bow they can pelt enemies from across the arena while staying safely out of harm's way. Their real value outside combat is Pick Locks and Detect Traps, which open up areas and loot that other classes can't reach. Pair with Halfling for the Pickpocket bonus.
 
 ---
 
@@ -216,7 +216,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 15       | 0        | 2     | Priest     |
+| 15       | 0        | 3     | Priest     |
 
 **Allowed Weapons:** Fists, Dagger, Club, Sling, Short Bow, Long Bow, Sword
 **Allowed Armor:** Cloth, Leather, Chain
@@ -230,7 +230,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 - **Forage** — Can find herbs and reagents while exploring.
 - **Dual Wield** — Can equip a weapon in each hand for extra attacks.
 
-Rangers match Fighters for HP per level and add bow proficiency plus limited healing magic. With Long Bow access they can deal serious ranged damage, and Forage keeps the party supplied with herbs and reagents. A strong choice for parties that want a self-sufficient frontliner.
+Rangers match Fighters for HP per level and add bow proficiency plus limited healing magic. With a 3-tile combat range and Long Bow access they can deal serious ranged damage, and Forage keeps the party supplied with herbs and reagents. A strong choice for parties that want a self-sufficient frontliner.
 
 ---
 
