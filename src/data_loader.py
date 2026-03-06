@@ -147,9 +147,13 @@ def load_races(data_dir=None):
     for name, data in raw.items():
         if name.startswith("_"):
             continue  # skip _comment
-        races[name] = {
+        info = {
             "description": data.get("description", ""),
             "stat_modifiers": data.get("stat_modifiers", {}),
             "effects": list(data.get("effects", [])),
         }
+        # Preserve optional XP-per-level override (e.g. Humans level faster)
+        if "exp_per_level" in data:
+            info["exp_per_level"] = data["exp_per_level"]
+        races[name] = info
     return races

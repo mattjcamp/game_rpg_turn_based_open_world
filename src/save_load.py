@@ -42,10 +42,10 @@ def _serialize_member(member):
         "gender": member.gender,
         "max_hp": member.max_hp,
         "hp": member.hp,
-        "strength": member.strength,
-        "dexterity": member.dexterity,
-        "intelligence": member.intelligence,
-        "wisdom": member.wisdom,
+        "strength": member.base_strength,
+        "dexterity": member.base_dexterity,
+        "intelligence": member.base_intelligence,
+        "wisdom": member.base_wisdom,
         "level": member.level,
         "exp": member.exp,
         "equipped": dict(member.equipped),
@@ -188,9 +188,13 @@ def _deserialize_party(data):
         party.equipped[slot] = entry  # None or {"name": ..., "charges": ...}
 
     # Party-level passive effects
+    from src.party import EFFECTS_DATA
+    valid_names = {e["name"] for e in EFFECTS_DATA} | {"Torch"}
     saved_eff = data.get("effects", {})
     for slot in party.EFFECT_SLOTS:
-        party.effects[slot] = saved_eff.get(slot)
+        eff = saved_eff.get(slot)
+        # Clear any effects that no longer exist in the data files
+        party.effects[slot] = eff if eff in valid_names else None
 
     # Game clock
     from src.game_time import GameClock

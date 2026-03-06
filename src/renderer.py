@@ -3409,7 +3409,7 @@ class Renderer:
 
             ty += 16
             self._u3_text(
-                f"LVL:{member.level:02d}  EXP:{member.exp:04d}",
+                f"LVL:{member.level:02d}  EXP:{member.exp:04d}/{member.xp_for_next_level:04d}",
                 tx, ty, (136, 136, 136))
 
             ty += 16
@@ -6497,7 +6497,7 @@ class Renderer:
                       tx, ty, (200, 200, 200), f)
 
         ty += 18
-        self._u3_text(f"LVL:{fighter.level:02d}  EXP:{fighter.exp:04d}",
+        self._u3_text(f"LVL:{fighter.level:02d}  EXP:{fighter.exp:04d}/{fighter.xp_for_next_level:04d}",
                       tx, ty, (200, 200, 200), f)
 
         ty += 18
@@ -7602,7 +7602,7 @@ class Renderer:
             # Level / EXP
             ty += 20
             self._u3_text(
-                f"LVL:{member.level:02d}  EXP:{member.exp:04d}  AC:{member.get_ac():02d}",
+                f"LVL:{member.level:02d}  EXP:{member.exp:04d}/{member.xp_for_next_level:04d}  AC:{member.get_ac():02d}",
                 tx, ty, self._U3_WHITE, fm)
 
             # Weapon info
@@ -7732,7 +7732,8 @@ class Renderer:
         self._u3_text(f"{member.race}", tx + 58, ty, self._U3_WHITE, fm)
         ty += 20
         self._u3_text(f"LEVEL: {member.level:02d}", tx, ty, self._U3_WHITE, fm)
-        self._u3_text(f"EXP: {member.exp:04d}", tx + 120, ty, (220, 220, 230), fm)
+        self._u3_text(f"EXP: {member.exp:04d}/{member.xp_for_next_level:04d}",
+                      tx + 120, ty, (220, 220, 230), fm)
 
         # ── HP bar ──
         ty += 28
@@ -7789,20 +7790,59 @@ class Renderer:
         self._u3_text("STATUS:", tx, ty, self._U3_LTBLUE, fm)
         self._u3_text(status, tx + 78, ty, sc, fm)
 
-        # ── Abilities ──
+        # ── Racial Traits / Effects ──
         ty += 26
-        abilities = member.abilities
-        if abilities:
-            self._u3_text("ABILITIES", tx, ty, self._U3_ORANGE, fm)
+        # Collect racial effects from races.json and match against
+        # effects.json for descriptions; also show innate racial traits
+        # that aren't in the party-effect system.
+        from src.party import EFFECTS_DATA
+        racial_fx = member.racial_effects  # list of effect id strings
+        panel_bottom = panel_y + panel_h - 8
+        desc_max_w = left_w - 28  # max pixel width for description text
+        if racial_fx:
+            self._u3_text("TRAITS", tx, ty, self._U3_ORANGE, fm)
             ty += 20
-            for ab in abilities:
-                ab_name = ab.get("name", "")
-                ab_desc = ab.get("description", "")
-                self._u3_text(ab_name, tx, ty, (220, 200, 140), fm)
+            # Build lookup from effects.json for descriptions
+            eff_lookup = {e["id"]: e for e in EFFECTS_DATA}
+            # Fallback descriptions for racial traits not in effects.json
+            _trait_desc = {
+                "infravision": "Dwarven eyes pierce the darkness.",
+                "pickpocket": "Nimble fingers can pilfer from NPCs.",
+                "tinker": "Knack for tinkering with mechanisms.",
+                "galadriel_light": "Elven starlight illuminates the dark.",
+                "detect_traps": "Keen senses reveal hidden traps.",
+            }
+            fs = self.font_small
+            for fx_id in racial_fx:
+                if ty + 15 > panel_bottom:
+                    break
+                eff = eff_lookup.get(fx_id)
+                if eff:
+                    fx_name = eff["name"]
+                    fx_desc = eff.get("description", "")
+                else:
+                    fx_name = fx_id.replace("_", " ").title()
+                    fx_desc = _trait_desc.get(fx_id, "")
+                self._u3_text(fx_name, tx, ty, (220, 200, 140), fm)
                 ty += 15
-                self._u3_text(ab_desc, tx + 8, ty, (140, 140, 160),
-                              self.font_small)
-                ty += 16
+                if fx_desc:
+                    # Word-wrap description to fit within the panel
+                    words = fx_desc.upper().split()
+                    line = ""
+                    for word in words:
+                        test = (line + " " + word).strip()
+                        tw, _ = fs.size(test)
+                        if tw > desc_max_w and line:
+                            if ty + 14 > panel_bottom:
+                                break
+                            self._u3_text(line, tx + 8, ty, (140, 140, 160), fs)
+                            ty += 14
+                            line = word
+                        else:
+                            line = test
+                    if line and ty + 14 <= panel_bottom:
+                        self._u3_text(line, tx + 8, ty, (140, 140, 160), fs)
+                        ty += 16
 
         # ── Available Spells ──
         ty += 6

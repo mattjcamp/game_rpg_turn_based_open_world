@@ -1,34 +1,26 @@
 {
   "_comment": "Paladin (Fighter + Cleric). Heavy fighter with priest healing. Can use all weapons and up to plate armor.",
-
   "allowed_weapons": "all",
-  "allowed_armor": ["cloth", "leather", "chain", "plate"],
-
+  "allowed_armor": [
+    "cloth",
+    "leather",
+    "chain",
+    "plate"
+  ],
   "hp_per_level": 10,
   "mp_per_level": 5,
-
   "range": 2,
-
   "exp_per_level": 500,
-
-  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
-
+  "allowed_races": [
+    "human",
+    "dwarf",
+    "halfling",
+    "elf",
+    "gnome"
+  ],
   "spell_type": "priest",
-
-  "mp_source": { "ability": "wisdom", "percentage": 50 },
-
-  "abilities": [
-    {
-      "name": "Lay on Hands",
-      "description": "Can heal allies with a touch outside of combat"
-    },
-    {
-      "name": "Holy Aura",
-      "description": "Nearby undead take damage each turn"
-    },
-    {
-      "name": "Shield Wall",
-      "description": "Reduces incoming physical damage when wielding a shield"
-    }
-  ]
+  "mp_source": {
+    "ability": "wisdom",
+    "percentage": 50
+  }
 }

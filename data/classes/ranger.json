@@ -1,34 +1,33 @@
 {
   "_comment": "A woodsman who can use light weapons and armor and knows healing magic.",
-
-  "allowed_weapons": ["fists", "dagger", "club", "sling", "short_bow", "long_bow", "sword"],
-  "allowed_armor": ["cloth", "leather", "chain"],
-
+  "allowed_weapons": [
+    "fists",
+    "dagger",
+    "club",
+    "sling",
+    "short_bow",
+    "long_bow",
+    "sword"
+  ],
+  "allowed_armor": [
+    "cloth",
+    "leather",
+    "chain"
+  ],
   "hp_per_level": 15,
   "mp_per_level": 0,
-
   "range": 3,
-
   "exp_per_level": 500,
-
-  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
-
+  "allowed_races": [
+    "human",
+    "dwarf",
+    "halfling",
+    "elf",
+    "gnome"
+  ],
   "spell_type": "priest",
-
-  "mp_source": { "ability": "wisdom", "percentage": 50 },
-
-  "abilities": [
-    {
-      "name": "Track",
-      "description": "Can detect nearby enemies in the overworld"
-    },
-    {
-      "name": "Forage",
-      "description": "Can find herbs and reagents while exploring"
-    },
-    {
-      "name": "Dual Wield",
-      "description": "Can equip a weapon in each hand"
-    }
-  ]
+  "mp_source": {
+    "ability": "wisdom",
+    "percentage": 50
+  }
 }

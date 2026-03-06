@@ -57,10 +57,10 @@ def _roster_member_to_json(member):
         "race": member.race,
         "gender": member.gender,
         "hp": member.max_hp,
-        "strength": member.strength,
-        "dexterity": member.dexterity,
-        "intelligence": member.intelligence,
-        "wisdom": member.wisdom,
+        "strength": member.base_strength,
+        "dexterity": member.base_dexterity,
+        "intelligence": member.base_intelligence,
+        "wisdom": member.base_wisdom,
         "level": member.level,
         "equipped": {
             "right_hand": member.equipped.get("right_hand"),
@@ -142,13 +142,14 @@ def reload_module_data(module_data_dir=None):
     """
     global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY
     global RACE_INFO, EFFECTS_DATA, SPELLS_DATA, POTIONS_DATA
-    global _module_data_dir
+    global VALID_RACES, _module_data_dir
 
     _module_data_dir = module_data_dir
 
     # Reload items, races
     WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items(module_data_dir)
     RACE_INFO = load_races(module_data_dir)
+    VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 
     # Reload effects and spells
     EFFECTS_DATA = _load_effects_config().get("effects", [])
@@ -167,7 +168,7 @@ def get_sell_price(item_name):
     return 5
 
 
-VALID_RACES = ("Human", "Dwarf", "Halfling", "Elf", "Gnome")
+VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 
 class PartyMember:
     """A single character in the party."""
@@ -185,10 +186,11 @@ class PartyMember:
 
         self.max_hp = hp
         self.hp = hp
-        self.strength = strength
-        self.dexterity = dexterity
-        self.intelligence = intelligence
-        self.wisdom = wisdom
+        # Base stats — racial modifiers are applied via properties
+        self.base_strength = strength
+        self.base_dexterity = dexterity
+        self.base_intelligence = intelligence
+        self.base_wisdom = wisdom
         self.level = level
         self.exp = 0
 
@@ -218,6 +220,28 @@ class PartyMember:
         # Potion buffs — consumed at end of next combat
         # Keys: "strength", "ac"; values: int bonus
         self.potion_buffs = {}
+
+    # ── Stats (base + racial modifiers) ─────────────────────────
+
+    @property
+    def strength(self):
+        mods = self.race_info.get("stat_modifiers", {})
+        return self.base_strength + mods.get("strength", 0)
+
+    @property
+    def dexterity(self):
+        mods = self.race_info.get("stat_modifiers", {})
+        return self.base_dexterity + mods.get("dexterity", 0)
+
+    @property
+    def intelligence(self):
+        mods = self.race_info.get("stat_modifiers", {})
+        return self.base_intelligence + mods.get("intelligence", 0)
+
+    @property
+    def wisdom(self):
+        mods = self.race_info.get("stat_modifiers", {})
+        return self.base_wisdom + mods.get("wisdom", 0)
 
     # ── Derived stats ──────────────────────────────────────────
 
@@ -321,6 +345,14 @@ class PartyMember:
                 msg += f" MP+{mp_gain}"
             messages.append(msg)
         return messages
+
+    @property
+    def xp_for_next_level(self):
+        """Total XP required to reach the next level."""
+        template = self._load_class_template(self.char_class)
+        race_info = self.race_info
+        xp_per = race_info.get("exp_per_level", template["exp_per_level"])
+        return self.level * xp_per
 
     # ── Equipment proficiency ─────────────────────────────────────
     #

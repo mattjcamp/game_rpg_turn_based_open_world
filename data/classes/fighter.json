@@ -1,30 +1,18 @@
 {
   "_comment": "Fighter class template. Fighters can use all weapons and all armor.",
-
   "allowed_weapons": "all",
   "allowed_armor": "all",
-
   "hp_per_level": 15,
   "mp_per_level": 0,
-
   "range": 4,
-
   "exp_per_level": 500,
-
-  "allowed_races": ["human", "dwarf", "halfling", "elf", "gnome"],
-
+  "allowed_races": [
+    "human",
+    "dwarf",
+    "halfling",
+    "elf",
+    "gnome"
+  ],
   "spell_type": "none",
-
-  "mp_source": null,
-
-  "abilities": [
-    {
-      "name": "Shield Wall",
-      "description": "Reduces incoming physical damage when wielding a shield"
-    },
-    {
-      "name": "Cleave",
-      "description": "Attacks can hit adjacent enemies"
-    }
-  ]
+  "mp_source": null
 }
