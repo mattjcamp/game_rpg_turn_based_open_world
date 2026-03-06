@@ -635,13 +635,7 @@ class Renderer:
                       8, bar_y + 28, (68, 68, 255))
 
         # ── 6. floating message ──
-        if message:
-            surf = self.font.render(message.upper(), True, (255, 220, 140))
-            rect = surf.get_rect(center=(SCREEN_WIDTH // 2, 16))
-            bg = rect.inflate(20, 8)
-            pygame.draw.rect(self.screen, (0, 0, 0), bg)
-            pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
-            self.screen.blit(surf, rect)
+        self._draw_floating_message(message)
 
     def draw_pickpocket_targeting(self, party, town_data, targets, cursor_idx):
         """Draw pickpocket targeting overlay on top of the town map.
@@ -1011,27 +1005,58 @@ class Renderer:
         self.screen.blit(chests_surface, (SCREEN_WIDTH - 140, hud_y + 30))
 
     def draw_dialogue_box(self, message):
-        """Draw an NPC dialogue box at the top of the screen."""
+        """Draw an NPC dialogue box at the top of the screen with word wrap."""
         if not message:
             return
-        box_width = SCREEN_WIDTH - 60
-        box_height = 60
         box_x = 30
         box_y = 10
+        box_width = SCREEN_WIDTH - 60
+        text_pad = 12
+        max_text_w = box_width - text_pad * 2
+
+        # Word-wrap the message into lines that fit the box
+        words = message.split()
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip() if current else word
+            tw, _ = self.font.size(test)
+            if tw <= max_text_w:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            lines = [message]
+
+        line_h = self.font.get_linesize()
+        spacing = 2
+        text_block_h = len(lines) * line_h + max(0, len(lines) - 1) * spacing
+        hint_h = 20  # space for the hint line
+        box_height = text_pad + text_block_h + 6 + hint_h + text_pad
+
+        # Store the dialogue box bottom for the quest choice box to use
+        self._dialogue_box_bottom = box_y + box_height
 
         # Dark box with border
         box_rect = pygame.Rect(box_x, box_y, box_width, box_height)
         pygame.draw.rect(self.screen, (15, 15, 30), box_rect)
         pygame.draw.rect(self.screen, (120, 100, 60), box_rect, 2)
 
-        # Text
-        text_surface = self.font.render(message, True, COLOR_WHITE)
-        self.screen.blit(text_surface, (box_x + 12, box_y + 10))
+        # Draw wrapped text lines
+        cur_y = box_y + text_pad
+        for ln in lines:
+            text_surface = self.font.render(ln, True, COLOR_WHITE)
+            self.screen.blit(text_surface, (box_x + text_pad, cur_y))
+            cur_y += line_h + spacing
 
         # Hint to dismiss
         hint = "[SPACE / ENTER] continue   [ESC] close"
         hint_surface = self.font_small.render(hint, True, (120, 120, 140))
-        self.screen.blit(hint_surface, (box_x + 12, box_y + 36))
+        self.screen.blit(hint_surface, (box_x + text_pad, cur_y + 4))
 
     def draw_quest_complete_effect(self, effect):
         """Draw the quest completion celebration animation overlay.
@@ -1243,11 +1268,12 @@ class Renderer:
                                      brightness // 3))
 
     def draw_quest_choice_box(self, choices, cursor):
-        """Draw a Y/N quest choice prompt at the bottom of the dialogue area."""
+        """Draw a Y/N quest choice prompt below the dialogue box."""
         box_width = SCREEN_WIDTH - 60
         box_height = 50
         box_x = 30
-        box_y = 80  # below the dialogue box
+        # Position just below the dialogue box (dynamic height)
+        box_y = getattr(self, "_dialogue_box_bottom", 80) + 6
 
         box_rect = pygame.Rect(box_x, box_y, box_width, box_height)
         pygame.draw.rect(self.screen, (15, 15, 30), box_rect)
@@ -1512,13 +1538,7 @@ class Renderer:
                     self.screen.blit(dot_surf, (sx - 3, sy - 3))
 
         # ── 6. floating message ──
-        if message:
-            surf = self.font.render(message.upper(), True, (255, 220, 140))
-            rect = surf.get_rect(center=(SCREEN_WIDTH // 2, 16))
-            bg = rect.inflate(20, 8)
-            pygame.draw.rect(self.screen, (0, 0, 0), bg)
-            pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
-            self.screen.blit(surf, rect)
+        self._draw_floating_message(message)
 
     # ── overworld tile rendering ─────────────────────────────
 
@@ -1784,13 +1804,7 @@ class Renderer:
                       8, bar_y + 28, (68, 68, 255))
 
         # ── 7. floating message ──
-        if message:
-            surf = self.font.render(message.upper(), True, (255, 220, 140))
-            rect = surf.get_rect(center=(SCREEN_WIDTH // 2, 16))
-            bg = rect.inflate(20, 8)
-            pygame.draw.rect(self.screen, (0, 0, 0), bg)
-            pygame.draw.rect(self.screen, (120, 120, 255), bg, 2)
-            self.screen.blit(surf, rect)
+        self._draw_floating_message(message)
 
         # ── 8. door interaction prompt ──
         if door_interact:
@@ -2560,6 +2574,62 @@ class Renderer:
         c = color or self._U3_WHITE
         surf = f.render(text.upper(), True, c)
         self.screen.blit(surf, (x, y))
+
+    def _draw_floating_message(self, message, y=16, max_width=None):
+        """Draw a word-wrapped floating message box centred on screen.
+
+        Long messages are split across multiple lines so they stay inside
+        the game viewport.
+        """
+        if not message:
+            return
+        if max_width is None:
+            max_width = SCREEN_WIDTH - 40  # 20px padding each side
+        text = message.upper()
+        color = (255, 220, 140)
+        border_color = (120, 120, 255)
+        font = self.font
+
+        # Word-wrap into lines that fit within max_width
+        words = text.split()
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip() if current else word
+            tw, _ = font.size(test)
+            if tw <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            return
+
+        # Render each line surface
+        line_surfs = [font.render(ln, True, color) for ln in lines]
+        line_h = line_surfs[0].get_height()
+        spacing = 2
+        total_h = len(line_surfs) * line_h + (len(line_surfs) - 1) * spacing
+        box_w = max(s.get_width() for s in line_surfs) + 20
+        box_h = total_h + 10
+
+        box_x = (SCREEN_WIDTH - box_w) // 2
+        box_y = y - box_h // 2
+
+        # Background and border
+        bg_rect = pygame.Rect(box_x, box_y, box_w, box_h)
+        pygame.draw.rect(self.screen, (0, 0, 0), bg_rect)
+        pygame.draw.rect(self.screen, border_color, bg_rect, 2)
+
+        # Blit lines centred
+        cur_y = box_y + 5
+        for surf in line_surfs:
+            sx = (SCREEN_WIDTH - surf.get_width()) // 2
+            self.screen.blit(surf, (sx, cur_y))
+            cur_y += line_h + spacing
 
     # ── helper: scrollable list for action panels ──
 
