@@ -1,11 +1,11 @@
 {
-  "version": 1,
-  "timestamp": 1772796901.2292538,
+  "version": 2,
+  "timestamp": 1772798840.803319,
   "state": "overworld",
   "party": {
-    "col": 27,
-    "row": 24,
-    "gold": 42,
+    "col": 29,
+    "row": 17,
+    "gold": 84,
     "roster": [
       {
         "name": "Roland",
@@ -19,7 +19,7 @@
         "intelligence": 10,
         "wisdom": 9,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -29,7 +29,8 @@
         "inventory": [],
         "current_mp": 0,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/u4_tiles/guard_f1.png"
       },
       {
         "name": "Tanis",
@@ -53,7 +54,8 @@
         "inventory": [],
         "current_mp": null,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/u4_tiles/villager_male.png"
       },
       {
         "name": "Elrond",
@@ -67,7 +69,7 @@
         "intelligence": 18,
         "wisdom": 12,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -75,9 +77,10 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 15,
+        "current_mp": 12,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/steele_tiles/vga_evil_mage_f1.png"
       },
       {
         "name": "Merry",
@@ -91,7 +94,7 @@
         "intelligence": 13,
         "wisdom": 11,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -101,7 +104,8 @@
         "inventory": [],
         "current_mp": 0,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/steele_tiles/vga_child_f1.png"
       },
       {
         "name": "Selina",
@@ -115,7 +119,7 @@
         "intelligence": 12,
         "wisdom": 18,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -123,9 +127,10 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 18,
+        "current_mp": 15,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "example_graphics/Ultima3_AMI_sprite_cleric.png"
       }
     ],
     "active_party": [
@@ -147,7 +152,7 @@
         "intelligence": 10,
         "wisdom": 9,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -157,7 +162,8 @@
         "inventory": [],
         "current_mp": 0,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/u4_tiles/guard_f1.png"
       },
       {
         "name": "Elrond",
@@ -171,7 +177,7 @@
         "intelligence": 18,
         "wisdom": 12,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -179,9 +185,10 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 15,
+        "current_mp": 12,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/steele_tiles/vga_evil_mage_f1.png"
       },
       {
         "name": "Merry",
@@ -195,7 +202,7 @@
         "intelligence": 13,
         "wisdom": 11,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -205,7 +212,8 @@
         "inventory": [],
         "current_mp": 0,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "src/assets/steele_tiles/vga_child_f1.png"
       },
       {
         "name": "Selina",
@@ -219,7 +227,7 @@
         "intelligence": 12,
         "wisdom": 18,
         "level": 1,
-        "exp": 25,
+        "exp": 100,
         "equipped": {
           "right_hand": "Fists",
           "left_hand": null,
@@ -227,16 +235,16 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 18,
+        "current_mp": 15,
         "bonus_mp": 0,
-        "ammo": {}
+        "ammo": {},
+        "sprite": "example_graphics/Ultima3_AMI_sprite_cleric.png"
       }
     ],
     "shared_inventory": [
+      "Torch",
       "Arrows",
       "Torch",
-      "Rock",
-      "Rock",
       "Healing Herb",
       {
         "name": "Camping Supplies",
@@ -244,7 +252,7 @@
       },
       {
         "name": "Lockpick",
-        "charges": 3
+        "charges": 5
       },
       {
         "name": "Moonpetal",
@@ -266,29 +274,218 @@
         "name": "Brimite Ore",
         "charges": 1
       },
-      "Short Bow"
+      {
+        "name": "Torch",
+        "charges": 150
+      }
     ],
     "equipped": {
       "navigation": null,
       "camping": null,
       "special": null,
-      "light": {
-        "name": "Torch",
-        "charges": 99
-      }
+      "light": null
     },
     "effects": {
-      "effect_1": "Torch",
+      "effect_1": null,
       "effect_2": null,
       "effect_3": null,
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 201850
+      "total_minutes": 201760
     },
     "last_pickpocket_day": -1,
     "last_tinker_day": -1,
     "galadriels_light_steps": 0,
     "last_galadriels_light_day": -1
-  }
+  },
+  "cleared_dungeons": [],
+  "module_path": "/Users/matthewcampbell/Projects/ultima3_clone/modules/keys_of_shadow",
+  "module_name": "Keys of Shadow",
+  "module_version": "1.0.0",
+  "key_dungeons": [
+    {
+      "col": 28,
+      "row": 22,
+      "dungeon_number": 1,
+      "name": "Ratling Warren",
+      "key_name": "Iron Key",
+      "status": "active",
+      "artifact_name": "Iron Key",
+      "current_level": 0
+    },
+    {
+      "col": 22,
+      "row": 20,
+      "dungeon_number": 2,
+      "name": "Goblin Tunnels",
+      "key_name": "Bronze Key",
+      "status": "active",
+      "artifact_name": "Bronze Key",
+      "current_level": 0
+    },
+    {
+      "col": 40,
+      "row": 18,
+      "dungeon_number": 3,
+      "name": "Tomb of Whispers",
+      "key_name": "Silver Key",
+      "status": "active",
+      "artifact_name": "Silver Key",
+      "current_level": 0
+    },
+    {
+      "col": 16,
+      "row": 28,
+      "dungeon_number": 4,
+      "name": "Orcish Stronghold",
+      "key_name": "Gold Key",
+      "status": "active",
+      "artifact_name": "Gold Key",
+      "current_level": 0
+    },
+    {
+      "col": 48,
+      "row": 26,
+      "dungeon_number": 5,
+      "name": "Mage's Sanctum",
+      "key_name": "Crystal Key",
+      "status": "active",
+      "artifact_name": "Crystal Key",
+      "current_level": 0
+    },
+    {
+      "col": 20,
+      "row": 12,
+      "dungeon_number": 6,
+      "name": "Troll Caverns",
+      "key_name": "Ruby Key",
+      "status": "active",
+      "artifact_name": "Ruby Key",
+      "current_level": 0
+    },
+    {
+      "col": 50,
+      "row": 14,
+      "dungeon_number": 7,
+      "name": "Shadow Fortress",
+      "key_name": "Obsidian Key",
+      "status": "active",
+      "artifact_name": "Obsidian Key",
+      "current_level": 0
+    },
+    {
+      "col": 44,
+      "row": 38,
+      "dungeon_number": 8,
+      "name": "The Abyss",
+      "key_name": "Diamond Key",
+      "status": "active",
+      "artifact_name": "Diamond Key",
+      "current_level": 0
+    }
+  ],
+  "keys_inserted": 0,
+  "machine_col": 34,
+  "machine_row": 24,
+  "darkness_active": true,
+  "quest": null,
+  "house_quest": null,
+  "game_log": [
+    "-- Merchant's Wagon --",
+    "An overturned wagon lies at the roadside, one wheel shattered. Crates of goods are scattered in the mud.",
+    "Among the scattered goods you find supplies that are still usable. A trail of blood leads into the forest.",
+    "Merchant's Wagon",
+    "--- Party vs 2 enemies! ---",
+    "  (Orc, Orc)",
+    "4 party members engage!",
+    "-- Roland's turn --",
+    "-- Elrond's turn --",
+    "-- Merry's turn --",
+    "-- Selina's turn --",
+    "Orc moves closer...",
+    "Orc moves closer...",
+    "-- Roland's turn --",
+    "-- Elrond's turn --",
+    "-- Merry's turn --",
+    "Merry throws Rock! (2 left)",
+    "Merry rolls 1 (+3) = 4 vs AC 13 \u2014 Miss!",
+    "-- Selina's turn --",
+    "Orc moves closer...",
+    "Orc moves closer...",
+    "-- Roland's turn --",
+    "Roland attacks Orc with Fists!",
+    "Roland rolls 1 (+5) = 6 vs AC 13 \u2014 Miss!",
+    "-- Elrond's turn --",
+    "-- Merry's turn --",
+    "Merry throws Rock! (1 left)",
+    "Merry rolls 5 (+3) = 8 vs AC 13 \u2014 Miss!",
+    "-- Selina's turn --",
+    "Orc moves closer...",
+    "Orc \u2192 Roland: rolls 19 (+5) = 24 vs AC 10 \u2014 Hit!",
+    "Orc deals 7 damage to Roland!",
+    "-- Roland's turn --",
+    "Roland attacks Orc with Fists!",
+    "Roland rolls 5 (+5) = 10 vs AC 13 \u2014 Miss!",
+    "-- Elrond's turn --",
+    "-- Merry's turn --",
+    "Merry throws Rock! (0 left)",
+    "Merry rolls 6 (+3) = 9 vs AC 13 \u2014 Miss!",
+    "-- Selina's turn --",
+    "Orc fires javelin!",
+    "Orc's javelin misses the target!",
+    "-- Roland's turn --",
+    "Roland attacks Orc with Fists!",
+    "Roland rolls 15 (+5) = 20 vs AC 13 \u2014 Hit!",
+    "Roland deals 9 damage to Orc with Fists!",
+    "-- Elrond's turn --",
+    "-- Merry's turn --",
+    "Merry attacks Orc with Fists!",
+    "Merry rolls 5 (+0) = 5 vs AC 13 \u2014 Miss!",
+    "-- Selina's turn --",
+    "Orc fires javelin!",
+    "Orc's javelin misses the target!",
+    "-- Roland's turn --",
+    "Roland attacks Orc with Fists!",
+    "Roland rolls 3 (+5) = 8 vs AC 13 \u2014 Miss!",
+    "-- Elrond's turn --",
+    "-- Merry's turn --",
+    "Merry attacks Orc with Fists!",
+    "Merry rolls 3 (+0) = 3 vs AC 13 \u2014 Miss!",
+    "-- Selina's turn --",
+    "Selina casts Minor Heal on Roland! (+7 HP, -3 MP)",
+    "Orc fires javelin!",
+    "Orc's javelin misses the target!",
+    "-- Roland's turn --",
+    "Roland attacks Orc with Fists!",
+    "Roland rolls 6 (+5) = 11 vs AC 13 \u2014 Miss!",
+    "-- Elrond's turn --",
+    "Elrond casts FIREBALL! (-3 MP)",
+    "FIREBALL hits Orc for 13 damage!",
+    "-- Merry's turn --",
+    "Merry attacks Orc with Fists!",
+    "Merry rolls 11 (+0) = 11 vs AC 13 \u2014 Miss!",
+    "-- Selina's turn --",
+    "Selina attacks Orc with Fists!",
+    "Selina rolls 13 (+0) = 13 vs AC 13 \u2014 Hit!",
+    "Selina deals 3 damage to Orc with Fists!",
+    "Orc fires javelin!",
+    "Orc's javelin misses the target!",
+    "-- Roland's turn --",
+    "Roland attacks Orc with Fists!",
+    "Roland rolls 8 (+5) = 13 vs AC 13 \u2014 Hit!",
+    "Roland deals 8 damage to Orc with Fists!",
+    "-- Elrond's turn --",
+    "Elrond casts FIREBALL! (-3 MP)",
+    "FIREBALL hits Orc for 14 damage!",
+    "Orc is defeated!",
+    "-- Merry's turn --",
+    "Merry attacks Orc with Fists!",
+    "Merry rolls 13 (+0) = 13 vs AC 13 \u2014 Hit!",
+    "Merry deals 2 damage to Orc with Fists!",
+    "Orc is defeated!",
+    "All enemies defeated! +100 XP each, +33 gold!",
+    "Victory! A treasure chest appears!",
+    "Treasure! 26 gold and Torch!"
+  ]
 }

@@ -53,6 +53,7 @@ def _serialize_member(member):
         "current_mp": member._current_mp,
         "bonus_mp": member._bonus_mp,
         "ammo": dict(member.ammo),
+        "sprite": member.sprite,
     }
 
 
@@ -130,6 +131,9 @@ def _deserialize_member(data):
     member.hp = data.get("hp", member.max_hp)
     member.max_hp = data.get("max_hp", member.max_hp)
     member.exp = data.get("exp", 0)
+
+    # Custom sprite tile
+    member.sprite = data.get("sprite")
 
     # Equipment slots
     equip = data.get("equipped", {})
