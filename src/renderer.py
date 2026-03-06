@@ -7921,37 +7921,44 @@ class Renderer:
             prefix = "> " if selected else "  "
 
             if is_eq:
-                # Equipped slot row
+                # Equipped slot row: label on first line, item indented below
+                eq_row_h = 34  # total height for a two-line equipped row
                 display_name = item_name if item_name else "-- NONE --"
                 name_color = self._U3_WHITE if selected else self._U3_LTBLUE
 
-                # Slot label
-                self._u3_text(f"{prefix}{slot_label}:", rx, ry, name_color, fm)
-                # Item name (offset enough to clear longest label "RIGHT HAND:")
-                item_x = rx + 120
-                if item_name:
-                    self._u3_text(f"{display_name}", item_x, ry, self._U3_WHITE if selected else (220, 220, 230), fm)
-                    # Stat hint
-                    hint = ""
-                    if slot_key == "body":
-                        arm = ARMORS.get(item_name, {"evasion": 50})
-                        hint = f"EVD:{arm['evasion']}%"
-                    elif slot_key == "head":
-                        hint = ""  # head slot — no stat preview yet
-                    elif slot_key in ("right_hand", "left_hand"):
-                        wp = WEAPONS.get(item_name, {"power": 0})
-                        hint = f"PWR:{wp['power']:02d}"
-                    if hint:
-                        self._u3_text(hint, rx + right_w - 90, ry, (180, 180, 180), fm)
-                else:
-                    self._u3_text("-- NONE --", item_x, ry, (120, 120, 120), fm)
-
-                # Highlight bar behind selected row
+                # Highlight bar behind both lines of selected row
                 if selected:
-                    sel_rect = pygame.Rect(rx - 4, ry - 1, right_w - 16, row_h)
+                    sel_rect = pygame.Rect(rx - 4, ry - 1, right_w - 16, eq_row_h)
                     sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
                     sel_surf.fill((255, 255, 255, 25))
                     self.screen.blit(sel_surf, sel_rect)
+
+                # Slot label line
+                self._u3_text(f"{prefix}{slot_label}:", rx, ry, name_color, fm)
+
+                # Stat hint on label line (right-aligned)
+                hint = ""
+                if item_name:
+                    if slot_key == "body":
+                        arm = ARMORS.get(item_name, {"evasion": 50})
+                        hint = f"EVD:{arm['evasion']}%"
+                    elif slot_key in ("right_hand", "left_hand"):
+                        wp = WEAPONS.get(item_name, {"power": 0})
+                        hint = f"PWR:{wp['power']:02d}"
+                if hint:
+                    self._u3_text(hint, rx + right_w - 90, ry, (180, 180, 180), fm)
+
+                # Item name on second line, indented
+                ry += 16
+                item_indent = rx + 20
+                if item_name:
+                    self._u3_text(display_name, item_indent, ry,
+                                  self._U3_WHITE if selected else (220, 220, 230), fm)
+                else:
+                    self._u3_text("-- NONE --", item_indent, ry, (120, 120, 120), fm)
+
+                # Advance past the item line to next row
+                ry += 20
 
             else:
                 # Inventory item row
@@ -7975,7 +7982,7 @@ class Renderer:
                     sel_surf.fill((255, 255, 255, 25))
                     self.screen.blit(sel_surf, sel_rect)
 
-            ry += row_h
+                ry += row_h
             list_row += 1
 
         # If inventory is empty, show placeholder
