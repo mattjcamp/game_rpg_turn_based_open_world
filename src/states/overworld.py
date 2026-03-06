@@ -73,6 +73,32 @@ class OverworldState(InventoryMixin, BaseState):
             self.message_timer = 3000
             # Spawn initial orcs
             self._spawn_orcs()
+            # ── TEST: place a spell-casting Dark Mage near the start ──
+            self._spawn_test_spellcaster()
+
+    def _spawn_test_spellcaster(self):
+        """Place a spell-casting Dark Mage 4 tiles east of the party start.
+
+        This is for testing the monster spell system — walk into it to
+        trigger a Dark Coven encounter with sleep/curse spells.
+        """
+        party = self.game.party
+        tile_map = self.game.tile_map
+        # Try a few offsets near the player
+        for dc, dr in [(4, 0), (3, 0), (5, 0), (4, 1), (3, -1), (0, 4)]:
+            c, r = party.col + dc, party.row + dr
+            if 0 <= c < tile_map.width and 0 <= r < tile_map.height:
+                if tile_map.is_walkable(c, r):
+                    mage = create_monster("Dark Mage")
+                    mage.encounter_template = {
+                        "name": "Dark Coven",
+                        "monster_names": ["Dark Mage", "Orc Shaman", "Goblin"],
+                        "monster_party_tile": "Dark Mage",
+                    }
+                    mage.col = c
+                    mage.row = r
+                    self.overworld_monsters.append(mage)
+                    return
 
     # ── Equipment management ─────────────────────────────────────
 

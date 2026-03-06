@@ -1,3 +1,3 @@
 
 - World building system
-- Add more complex features to monsters (range, spells, effects)
+- Try and optimize gameplay (up to level 10 at least)

@@ -3184,6 +3184,26 @@ class Renderer:
             pygame.draw.rect(self.screen, self._U3_WHITE,
                              pygame.Rect(cx - 4, cy - 10, 3, 3))
 
+        # HP bar below the monster sprite
+        hp_ratio = max(0.0, min(1.0, monster.hp / monster.max_hp)) if monster.max_hp > 0 else 0.0
+        bar_w = max(sprite.get_width() if sprite else 20, 20)
+        bar_h = 3
+        bar_x = cx - bar_w // 2
+        bar_y = cy + 22
+
+        pygame.draw.rect(self.screen, (40, 40, 40),
+                         pygame.Rect(bar_x, bar_y, bar_w, bar_h))
+        fill_w = max(0, int(bar_w * hp_ratio))
+        if fill_w > 0:
+            if hp_ratio > 0.66:
+                bar_color = (40, 220, 40)
+            elif hp_ratio > 0.33:
+                bar_color = (220, 220, 40)
+            else:
+                bar_color = (220, 40, 40)
+            pygame.draw.rect(self.screen, bar_color,
+                             pygame.Rect(bar_x, bar_y, fill_w, bar_h))
+
     # ==============================================================
     #  SPRITE DRAWING  (simple retro pixel-art figures)
     # ==============================================================
@@ -3244,6 +3264,26 @@ class Renderer:
                              (cx - 4, cy + 8), (cx - 6, cy + 14), 2)
             pygame.draw.line(self.screen, mc,
                              (cx + 4, cy + 8), (cx + 6, cy + 14), 2)
+
+        # HP bar below the monster sprite
+        hp_ratio = max(0.0, min(1.0, monster.hp / monster.max_hp)) if monster.max_hp > 0 else 0.0
+        bar_w = max(sprite.get_width() if sprite else 20, 20)
+        bar_h = 3
+        bar_x = cx - bar_w // 2
+        bar_y = cy + 22
+
+        pygame.draw.rect(self.screen, (40, 40, 40),
+                         pygame.Rect(bar_x, bar_y, bar_w, bar_h))
+        fill_w = max(0, int(bar_w * hp_ratio))
+        if fill_w > 0:
+            if hp_ratio > 0.66:
+                bar_color = (40, 220, 40)
+            elif hp_ratio > 0.33:
+                bar_color = (220, 220, 40)
+            else:
+                bar_color = (220, 40, 40)
+            pygame.draw.rect(self.screen, bar_color,
+                             pygame.Rect(bar_x, bar_y, fill_w, bar_h))
 
     # ── Per-class colour for party member sprites ──
     _CLASS_COLORS = {
@@ -3322,11 +3362,39 @@ class Renderer:
             arrow_pts = [(cx, arrow_y + 5), (cx - 4, arrow_y - 1), (cx + 4, arrow_y - 1)]
             pygame.draw.polygon(self.screen, self._U3_ORANGE, arrow_pts)
 
-        # Name label below
-        name_surf = self.font_small.render(member.name[0].upper(), True, color)
+        # HP bar below the sprite
+        hp_ratio = max(0.0, min(1.0, member.hp / member.max_hp)) if member.max_hp > 0 else 0.0
+        bar_w = max(sprite.get_width() if sprite else 20, 20)
+        bar_h = 3
+        bar_x = cx - bar_w // 2
+        bar_y = cy + 22
+
+        # Background (dark)
+        bg_rect = pygame.Rect(bar_x, bar_y, bar_w, bar_h)
         if alpha < 255:
-            name_surf.set_alpha(alpha)
-        self.screen.blit(name_surf, (cx - 3, cy + 14))
+            bg_surf = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
+            bg_surf.fill((40, 40, 40, alpha))
+            self.screen.blit(bg_surf, (bar_x, bar_y))
+        else:
+            pygame.draw.rect(self.screen, (40, 40, 40), bg_rect)
+
+        # Filled portion — color based on HP ratio
+        fill_w = max(0, int(bar_w * hp_ratio))
+        if fill_w > 0:
+            if hp_ratio > 0.66:
+                bar_color = (40, 220, 40)       # green — top third
+            elif hp_ratio > 0.33:
+                bar_color = (220, 220, 40)      # yellow — middle third
+            else:
+                bar_color = (220, 40, 40)        # red — bottom third
+
+            fill_rect = pygame.Rect(bar_x, bar_y, fill_w, bar_h)
+            if alpha < 255:
+                fill_surf = pygame.Surface((fill_w, bar_h), pygame.SRCALPHA)
+                fill_surf.fill((*bar_color, alpha))
+                self.screen.blit(fill_surf, (bar_x, bar_y))
+            else:
+                pygame.draw.rect(self.screen, bar_color, fill_rect)
 
     # ==============================================================
     #  COMBAT EFFECTS (slash, hit flash)
@@ -9113,82 +9181,166 @@ class Renderer:
     def draw_log_overlay(self, log_entries, scroll_offset=0):
         """Draw a full-screen scrollable game log overlay.
 
+        Long lines are word-wrapped so nothing bleeds past the panel
+        edges, and a clipping rect prevents vertical overflow.
+
         log_entries : list[str]  – all accumulated log messages
         scroll_offset : int      – how many lines scrolled up from the bottom
         """
-        # Dim background
+        # Lazily create the larger log font once
+        if not hasattr(self, "_log_font"):
+            self._log_font = pygame.font.SysFont("monospace", 18, bold=True)
+        if not hasattr(self, "_log_title_font"):
+            self._log_title_font = pygame.font.SysFont("monospace", 24, bold=True)
+
+        log_font = self._log_font
+        title_font = self._log_title_font
+
+        # Dim background (darker for better contrast)
         dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 180))
+        dim.fill((0, 0, 0, 210))
         self.screen.blit(dim, (0, 0))
 
         # Log panel
-        margin = 40
+        margin = 30
         px = margin
         py = margin
         pw = SCREEN_WIDTH - margin * 2
         ph = SCREEN_HEIGHT - margin * 2
 
-        pygame.draw.rect(self.screen, (12, 12, 24), (px, py, pw, ph))
-        pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
+        text_pad = 16            # horizontal padding inside the panel
+        max_text_w = pw - text_pad * 2   # max pixel width for a line of text
 
-        # Title
-        self._u3_text("GAME LOG", px + pw // 2 - 40, py + 8,
-                       self._U3_ORANGE, self.font)
+        # Solid dark background for readability
+        pygame.draw.rect(self.screen, (8, 8, 18), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, self._U3_ORANGE, (px, py, pw, ph), 2)
+
+        # Title — large and bright
+        title_surf = title_font.render("GAME LOG", True, self._U3_ORANGE)
+        self.screen.blit(title_surf,
+                         (px + pw // 2 - title_surf.get_width() // 2, py + 8))
 
         # Hints
-        self._u3_text("[UP/DOWN] SCROLL    [L/ESC] CLOSE",
-                      px + pw // 2 - 130, py + ph - 20,
-                      self._U3_BLUE, self.font_small)
+        hint_surf = self.font.render("[UP/DOWN] SCROLL    [L/ESC] CLOSE",
+                                     True, (120, 160, 255))
+        self.screen.blit(hint_surf,
+                         (px + pw // 2 - hint_surf.get_width() // 2,
+                          py + ph - 24))
 
         # Content area
-        content_y = py + 32
-        content_h = ph - 56  # room for title + hint
-        line_h = 16
+        content_y = py + 42
+        content_h = ph - 72  # room for title + hint
+        line_h = 22
+
+        # ── Helper: word-wrap a single log entry into display lines ──
+        def _wrap_line(text, font, max_w):
+            """Return a list of strings that each fit within *max_w* px."""
+            words = text.split(" ")
+            lines = []
+            current = ""
+            for word in words:
+                test = (current + " " + word).strip()
+                tw, _ = font.size(test.upper())
+                if tw <= max_w:
+                    current = test
+                else:
+                    if current:
+                        lines.append(current)
+                    # If a single word is wider than max_w, truncate it
+                    tw2, _ = font.size(word.upper())
+                    if tw2 > max_w:
+                        while word:
+                            for end in range(len(word), 0, -1):
+                                cw, _ = font.size(word[:end].upper())
+                                if cw <= max_w:
+                                    lines.append(word[:end])
+                                    word = word[end:]
+                                    break
+                            else:
+                                # Safety: at least one char per line
+                                lines.append(word[0])
+                                word = word[1:]
+                        current = ""
+                    else:
+                        current = word
+            if current:
+                lines.append(current)
+            return lines if lines else [""]
+
+        # ── Pre-wrap all log entries into (display_line, original_entry) ──
+        wrapped = []  # list of (display_text, original_entry_text)
+        for entry in log_entries:
+            sub_lines = _wrap_line(entry, log_font, max_text_w)
+            for sl in sub_lines:
+                wrapped.append((sl, entry))
+
         max_visible = content_h // line_h
 
-        if not log_entries:
-            self._u3_text("No log entries yet.",
-                          px + 16, content_y + 8, self._U3_GRAY, self.font)
+        if not wrapped:
+            no_log = log_font.render("NO LOG ENTRIES YET.", True,
+                                     self._U3_GRAY)
+            self.screen.blit(no_log, (px + text_pad, content_y + 8))
             return
 
-        total = len(log_entries)
+        total = len(wrapped)
 
         # scroll_offset 0 = bottom (most recent visible)
-        # Clamp scroll
         max_scroll = max(0, total - max_visible)
         scroll_offset = max(0, min(scroll_offset, max_scroll))
 
-        # Which entries to show
         end_idx = total - scroll_offset
         start_idx = max(0, end_idx - max_visible)
-        visible = log_entries[start_idx:end_idx]
+        visible = wrapped[start_idx:end_idx]
 
-        for i, line in enumerate(visible):
+        # Set a clipping rect so nothing draws outside the content area
+        clip_rect = pygame.Rect(px + 2, content_y, pw - 4, content_h)
+        old_clip = self.screen.get_clip()
+        self.screen.set_clip(clip_rect)
+
+        for i, (display_text, original) in enumerate(visible):
             ly = content_y + i * line_h
-            # Color code based on content
-            if "CRITICAL" in line or "defeated" in line.lower():
-                color = (255, 200, 80)
-            elif "Hit!" in line or "damage" in line:
-                color = self._U3_WHITE
-            elif "Miss" in line or "Failed" in line:
-                color = (160, 160, 170)
-            elif line.startswith("--"):
-                color = self._U3_ORANGE
-            elif "gold" in line.lower() or "treasure" in line.lower():
-                color = (255, 255, 0)
+            # Color code based on original entry content
+            lo = original.lower()
+            if "critical" in lo or "defeated" in lo:
+                color = (255, 220, 60)
+            elif "hit!" in lo or "damage" in lo:
+                color = (255, 255, 255)
+            elif "miss" in lo or "failed" in lo or "resisted" in lo:
+                color = (140, 140, 160)
+            elif original.startswith("--"):
+                color = (255, 180, 50)
+            elif "gold" in lo or "treasure" in lo:
+                color = (255, 255, 60)
+            elif "heals" in lo or "wakes up" in lo:
+                color = (80, 255, 120)
+            elif "poison" in lo:
+                color = (120, 220, 60)
+            elif "sleep" in lo or "zzz" in lo:
+                color = (160, 140, 255)
+            elif "curse" in lo or "hex" in lo:
+                color = (255, 100, 100)
+            elif "fallen" in lo:
+                color = (255, 80, 80)
             else:
-                color = (180, 180, 200)
-            self._u3_text(line, px + 16, ly, color, self.font_small)
+                color = (210, 210, 230)
 
-        # Scroll indicator
+            surf = log_font.render(display_text.upper(), True, color)
+            self.screen.blit(surf, (px + text_pad, ly))
+
+        # Restore original clip
+        self.screen.set_clip(old_clip)
+
+        # Scroll indicators — brighter, drawn outside the clip
         if scroll_offset > 0:
-            self._u3_text("v MORE v", px + pw // 2 - 30,
-                          content_y + content_h - 14,
-                          self._U3_LTBLUE, self.font_small)
-        if end_idx < total or start_idx > 0:
-            if scroll_offset < max_scroll:
-                self._u3_text("^ MORE ^", px + pw // 2 - 30,
-                              content_y, self._U3_LTBLUE, self.font_small)
+            more_down = log_font.render("v MORE v", True, (100, 180, 255))
+            self.screen.blit(more_down,
+                             (px + pw // 2 - more_down.get_width() // 2,
+                              content_y + content_h - 18))
+        if scroll_offset < max_scroll:
+            more_up = log_font.render("^ MORE ^", True, (100, 180, 255))
+            self.screen.blit(more_up,
+                             (px + pw // 2 - more_up.get_width() // 2,
+                              content_y))
 
     # ── Character Creation Screen ─────────────────────────────────
 
