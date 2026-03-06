@@ -3817,6 +3817,15 @@ class Renderer:
                 if sleep_buffs and mon in sleep_buffs:
                     self._u3_draw_sleep_indicator(mx, my, ts, mc, mr,
                                                   sleep_buffs[mon])
+                # Draw poison indicator on poisoned monsters
+                mon_poisoned = (getattr(mon, "poisoned", False)
+                                or getattr(mon, "poisoned_mp", False)
+                                or getattr(mon, "poisoned_debilitate", False))
+                if mon_poisoned:
+                    turns = max(getattr(mon, "poison_turns", 0),
+                                getattr(mon, "poison_mp_turns", 0),
+                                getattr(mon, "poison_debilitate_turns", 0))
+                    self._u3_draw_poison_indicator(mx, my, ts, mc, mr, turns)
         elif monster and monster.is_alive():
             # Legacy single-monster fallback
             if is_outdoor:
@@ -7952,8 +7961,18 @@ class Renderer:
                 ry += 16
                 item_indent = rx + 20
                 if item_name:
-                    self._u3_text(display_name, item_indent, ry,
-                                  self._U3_WHITE if selected else (220, 220, 230), fm)
+                    # Check for weapon poison on this slot
+                    wp_poison = None
+                    if slot_key in ("right_hand", "left_hand"):
+                        wp_poison = getattr(member, "weapon_poison", {}).get(slot_key)
+                    if wp_poison:
+                        hits = wp_poison.get("hits_remaining", 0)
+                        poison_label = f"{display_name} (P:{hits})"
+                        self._u3_text(poison_label, item_indent, ry,
+                                      (80, 220, 80) if selected else (60, 180, 60), fm)
+                    else:
+                        self._u3_text(display_name, item_indent, ry,
+                                      self._U3_WHITE if selected else (220, 220, 230), fm)
                 else:
                     self._u3_text("-- NONE --", item_indent, ry, (120, 120, 120), fm)
 
@@ -8565,7 +8584,11 @@ class Renderer:
                                  brew_list_cursor=0,
                                  brew_result_msg=None,
                                  pickpocket_available=False,
-                                 tinker_available=False):
+                                 tinker_available=False,
+                                 applying_poison_step=None,
+                                 applying_poison_cursor=0,
+                                 applying_poison_item=None,
+                                 applying_poison_member=None):
         """
         Full-screen shared party inventory with party equipment slots.
 
@@ -9390,10 +9413,89 @@ class Renderer:
                     self.screen.blit(hl_s, hl)
                 oy += 22
 
+        # ── Poison application overlay ──
+        if applying_poison_step == "member":
+            from src.party import WEAPONS
+            alive = [m for m in party.members if m.is_alive()]
+            popup_w = 320
+            popup_h = 28 + len(alive) * 22 + 8
+            popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+            popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+            pygame.draw.rect(self.screen, (20, 30, 20),
+                             (popup_x, popup_y, popup_w, popup_h))
+            pygame.draw.rect(self.screen, (80, 200, 80),
+                             (popup_x, popup_y, popup_w, popup_h), 2)
+
+            title = f"APPLY {applying_poison_item or 'POISON'}"
+            self._u3_text(title, popup_x + 10, popup_y + 6,
+                          (80, 220, 80), fm)
+            oy = popup_y + 28
+            for mi, m in enumerate(alive):
+                sel = (mi == applying_poison_cursor)
+                prefix = "> " if sel else "  "
+                cls_ok = m.char_class in ("Thief", "Ranger", "Alchemist")
+                label = f"{prefix}{m.name} ({m.char_class})"
+                if cls_ok:
+                    col = self._U3_WHITE if sel else self._U3_LTBLUE
+                else:
+                    col = (140, 100, 100) if sel else (100, 70, 70)
+                self._u3_text(label, popup_x + 10, oy, col, fm)
+                if sel:
+                    hl = pygame.Rect(popup_x + 4, oy - 1,
+                                     popup_w - 8, 20)
+                    hl_s = pygame.Surface((hl.w, hl.h),
+                                          pygame.SRCALPHA)
+                    hl_s.fill((255, 255, 255, 25))
+                    self.screen.blit(hl_s, hl)
+                oy += 22
+
+        elif applying_poison_step == "slot":
+            from src.party import WEAPONS
+            member = applying_poison_member
+            slots = []
+            for slot in ("right_hand", "left_hand"):
+                wp_name = member.equipped.get(slot) if member else None
+                if wp_name and wp_name != "Fists":
+                    slot_label = "RIGHT HAND" if slot == "right_hand" else "LEFT HAND"
+                    slots.append((slot_label, wp_name))
+            popup_w = 320
+            popup_h = 28 + max(len(slots), 1) * 22 + 8
+            popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+            popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+            pygame.draw.rect(self.screen, (20, 30, 20),
+                             (popup_x, popup_y, popup_w, popup_h))
+            pygame.draw.rect(self.screen, (80, 200, 80),
+                             (popup_x, popup_y, popup_w, popup_h), 2)
+
+            title = f"WHICH WEAPON?"
+            self._u3_text(title, popup_x + 10, popup_y + 6,
+                          (80, 220, 80), fm)
+            oy = popup_y + 28
+            for si, (slot_label, wp_name) in enumerate(slots):
+                sel = (si == applying_poison_cursor)
+                prefix = "> " if sel else "  "
+                label = f"{prefix}{slot_label}: {wp_name}"
+                col = self._U3_WHITE if sel else self._U3_LTBLUE
+                self._u3_text(label, popup_x + 10, oy, col, fm)
+                if sel:
+                    hl = pygame.Rect(popup_x + 4, oy - 1,
+                                     popup_w - 8, 20)
+                    hl_s = pygame.Surface((hl.w, hl.h),
+                                          pygame.SRCALPHA)
+                    hl_s.fill((255, 255, 255, 25))
+                    self.screen.blit(hl_s, hl)
+                oy += 22
+
         # ── Bottom status bar ──
         bar_y = SCREEN_HEIGHT - 24
         self._u3_panel(0, bar_y, SCREEN_WIDTH, 24)
-        if choosing_heal_target:
+        if applying_poison_step:
+            self._u3_text(
+                "[UP/DN] SELECT  [ENTER] CONFIRM  [ESC] CANCEL",
+                8, bar_y + 5, self._U3_BLUE)
+        elif choosing_heal_target:
             self._u3_text(
                 "[UP/DN] SELECT  [ENTER] HEAL  [ESC] CANCEL",
                 8, bar_y + 5, self._U3_BLUE)

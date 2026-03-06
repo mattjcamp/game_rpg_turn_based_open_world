@@ -74,6 +74,57 @@
       "result_item": "Elixir of Warding",
       "result_count": 1,
       "category": "enhancement"
+    },
+    "Poison Vial": {
+      "name": "Poison Vial",
+      "description": "A vial of toxic liquid that inflicts poison damage.",
+      "reagents": {
+        "Serpent Root": 2,
+        "Spring Water": 1
+      },
+      "dc": 12,
+      "result_item": "Poison Vial",
+      "result_count": 1,
+      "category": "offensive"
+    },
+    "Paralytic Poison": {
+      "name": "Paralytic Poison",
+      "description": "A nerve toxin that drains magical energy from the target.",
+      "reagents": {
+        "Serpent Root": 1,
+        "Glowcap Mushroom": 1,
+        "Spring Water": 1
+      },
+      "dc": 14,
+      "result_item": "Paralytic Poison",
+      "result_count": 1,
+      "category": "offensive"
+    },
+    "Weakening Poison": {
+      "name": "Weakening Poison",
+      "description": "A venom that saps physical prowess and fighting ability.",
+      "reagents": {
+        "Serpent Root": 1,
+        "Brimite Ore": 1,
+        "Spring Water": 1
+      },
+      "dc": 14,
+      "result_item": "Weakening Poison",
+      "result_count": 1,
+      "category": "offensive"
+    },
+    "Lingering Venom": {
+      "name": "Lingering Venom",
+      "description": "A potent toxin that persists far longer than ordinary poisons.",
+      "reagents": {
+        "Serpent Root": 2,
+        "Moonpetal": 1,
+        "Spring Water": 1
+      },
+      "dc": 16,
+      "result_item": "Lingering Venom",
+      "result_count": 1,
+      "category": "offensive"
     }
   },
 

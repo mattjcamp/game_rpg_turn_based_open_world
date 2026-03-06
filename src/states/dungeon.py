@@ -1178,7 +1178,11 @@ class DungeonState(InventoryMixin, BaseState):
                 brew_list_items=self.brew_list_items,
                 brew_list_cursor=self.brew_list_cursor,
                 brew_result_msg=self.brew_result_msg,
-                tinker_available=self._can_tinker())
+                tinker_available=self._can_tinker(),
+                applying_poison_step=self.applying_poison_step,
+                applying_poison_cursor=self.applying_poison_cursor,
+                applying_poison_item=self.applying_poison_item,
+                applying_poison_member=getattr(self, '_applying_poison_member', None))
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:

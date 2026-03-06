@@ -18,9 +18,9 @@
       "wisdom": 8,
       "level": 1,
       "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
+        "right_hand": "Sword",
+        "left_hand": "Long Bow",
+        "body": "Leather",
         "head": null
       },
       "inventory": [],
@@ -78,9 +78,9 @@
       "wisdom": 10,
       "level": 1,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Short Bow",
         "left_hand": null,
-        "body": "Cloth",
+        "body": "Leather",
         "head": null
       },
       "inventory": [],
@@ -98,20 +98,40 @@
       "wisdom": 18,
       "level": 1,
       "equipped": {
+        "right_hand": "Mace",
+        "left_hand": null,
+        "body": "Chain",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "example_graphics/Ultima3_AMI_sprite_cleric.png"
+    },
+    {
+      "name": "Al",
+      "class": "Alchemist",
+      "race": "Human",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 15,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
         "right_hand": "Fists",
         "left_hand": null,
         "body": "Cloth",
         "head": null
       },
       "inventory": [],
-      "sprite": "example_graphics/Ultima3_AMI_sprite_cleric.png"
+      "sprite": "src/assets/u4_tiles/ranger.png"
     }
   ],
   "active_party": [
     0,
-    2,
     3,
-    4
+    4,
+    5
   ],
   "party_effects": {
     "effect_1": null,

@@ -134,6 +134,19 @@ def load_items(data_dir=None):
                 info["item_type"] = data["item_type"]
             if data.get("quest_item"):
                 info["quest_item"] = True
+            # Poison potion fields
+            if data.get("poison_type"):
+                info["poison_type"] = data["poison_type"]
+            if "poison_damage" in data:
+                info["poison_damage"] = data["poison_damage"]
+            if "poison_mp_drain" in data:
+                info["poison_mp_drain"] = data["poison_mp_drain"]
+            if "poison_debilitate" in data:
+                info["poison_debilitate"] = data["poison_debilitate"]
+            if "poison_duration" in data:
+                info["poison_duration"] = data["poison_duration"]
+            if "save_dc" in data:
+                info["save_dc"] = data["save_dc"]
             item_info[name] = info
 
         if "buy" in data:

@@ -174,7 +174,7 @@ def get_sell_price(item_name):
 _ITEM_CATEGORIES = [
     ("SUPPLIES",        {"camping_supplies", "torch"}),
     ("AMMUNITION",      {"ammo"}),
-    ("POTIONS",         {"herb", "antidote", "potion"}),
+    ("POTIONS",         {"herb", "antidote", "potion", "poison_potion"}),
     ("MELEE WEAPONS",   "__melee__"),
     ("RANGED WEAPONS",  "__ranged__"),
     ("ARMOR",           "__armor__"),
@@ -354,6 +354,12 @@ class PartyMember:
         # Potion buffs — consumed at end of next combat
         # Keys: "strength", "ac"; values: int bonus
         self.potion_buffs = {}
+
+        # Weapon poison — applied to weapon, lasts N successful hits
+        # Keys: "right_hand", "left_hand"; values: None or dict
+        # Dict: {"poison_name", "poison_type", "damage", "mp_drain",
+        #        "debilitate", "duration", "save_dc", "hits_remaining"}
+        self.weapon_poison = {"right_hand": None, "left_hand": None}
 
     # ── Stats (base + racial modifiers) ─────────────────────────
 
@@ -945,11 +951,17 @@ class PartyMember:
                         # Same type in the other hand — unequip it first
                         self.inventory.append(other_item)
                         self.equipped[other_slot] = other_default
+                        # Clear weapon poison from swapped-out weapon
+                        if hasattr(self, 'weapon_poison'):
+                            self.weapon_poison[other_slot] = None
 
         # Move the currently equipped item back to inventory (if not a default)
         old_item = self.equipped.get(slot)
         if old_item and old_item != self._SLOT_DEFAULTS.get(slot):
             self.inventory.append(old_item)
+            # Clear weapon poison from the slot being replaced
+            if hasattr(self, 'weapon_poison') and slot in self.weapon_poison:
+                self.weapon_poison[slot] = None
 
         # Remove from inventory and equip
         self.inventory.remove(item_name)
@@ -972,6 +984,9 @@ class PartyMember:
 
         self.inventory.append(current)
         self.equipped[slot] = default
+        # Clear weapon poison from unequipped slot
+        if hasattr(self, 'weapon_poison') and slot in self.weapon_poison:
+            self.weapon_poison[slot] = None
 
         # Sync legacy fields
         self._sync_legacy_fields()

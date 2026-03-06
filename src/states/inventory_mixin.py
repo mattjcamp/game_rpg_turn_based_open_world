@@ -42,6 +42,12 @@ class InventoryMixin:
         self.party_inv_action_menu = False
         self.party_inv_action_cursor = 0
 
+        # Poison application workflow
+        self.applying_poison_item = None   # item name being applied
+        self.applying_poison_inv_idx = None  # original inventory index
+        self.applying_poison_step = None   # "member" or "slot"
+        self.applying_poison_cursor = 0    # cursor for member or slot selection
+
         # Effect chooser
         self.choosing_effect = False
         self.effect_list = []
@@ -336,8 +342,19 @@ class InventoryMixin:
                 f"{member.name} uses {item_name}. (+{restore} MP)")
             self.show_message(f"{member.name}: +{restore} MP", 3000)
         elif effect == "cure_poison":
-            if getattr(member, "poisoned", False):
+            any_poison = (getattr(member, "poisoned", False)
+                          or getattr(member, "poisoned_mp", False)
+                          or getattr(member, "poisoned_debilitate", False))
+            if any_poison:
                 member.poisoned = False
+                member.poisoned_mp = False
+                member.poisoned_debilitate = False
+                member.poison_damage = 0
+                member.poison_turns = 0
+                member.poison_mp_drain = 0
+                member.poison_mp_turns = 0
+                member.poison_debilitate_amount = 0
+                member.poison_debilitate_turns = 0
                 self.game.game_log.append(
                     f"{member.name}'s poison was cured!")
                 self.show_message(f"{member.name}: Poison cured!", 3000)
@@ -727,6 +744,11 @@ class InventoryMixin:
                 self.examining_item = None
             return
 
+        # Poison application workflow is active
+        if self.applying_poison_step is not None:
+            self._handle_apply_poison_input(event)
+            return
+
         # Action menu is open
         if self.party_inv_action_menu:
             options = self._get_party_inv_action_options()
@@ -860,6 +882,13 @@ class InventoryMixin:
                         self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen == "EXAMINE":
                     self.examining_item = item_name
+                elif chosen == "APPLY TO WEAPON":
+                    # Start poison application workflow
+                    self.applying_poison_item = item_name
+                    self.applying_poison_inv_idx = inv_idx
+                    self.applying_poison_step = "member"
+                    self.applying_poison_cursor = 0
+                    self.party_inv_action_menu = False
                 elif chosen.startswith("GIVE TO "):
                     give_name = chosen[8:].strip()
                     for mi, member in enumerate(party.members):
@@ -903,10 +932,96 @@ class InventoryMixin:
                 )
                 if not already and has_free:
                     options.append("EQUIP")
+            # Poison potions can be applied to weapons
+            if info.get("item_type") == "poison_potion":
+                options.append("APPLY TO WEAPON")
             for mi, member in enumerate(self.game.party.members):
                 options.append(f"GIVE TO {member.name.upper()}")
             options.append("EXAMINE")
             return options
+
+    def _handle_apply_poison_input(self, event):
+        """Handle input for the poison application workflow (member → slot)."""
+        from src.party import ITEM_INFO, WEAPONS
+        party = self.game.party
+
+        if event.key == pygame.K_ESCAPE:
+            self.applying_poison_step = None
+            self.applying_poison_item = None
+            self.applying_poison_inv_idx = None
+            return
+
+        if self.applying_poison_step == "member":
+            # Choosing which party member to apply poison to (1-4)
+            alive = [m for m in party.members if m.is_alive()]
+            if event.key == pygame.K_UP:
+                self.applying_poison_cursor = (
+                    self.applying_poison_cursor - 1) % len(alive)
+            elif event.key == pygame.K_DOWN:
+                self.applying_poison_cursor = (
+                    self.applying_poison_cursor + 1) % len(alive)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                member = alive[self.applying_poison_cursor]
+                # Class check: only Thief, Ranger, Alchemist
+                if member.char_class not in ("Thief", "Ranger", "Alchemist"):
+                    self.show_message(
+                        f"{member.name} ({member.char_class}) can't apply poison!",
+                        2500)
+                    return
+                self._applying_poison_member = member
+                self.applying_poison_step = "slot"
+                self.applying_poison_cursor = 0
+
+        elif self.applying_poison_step == "slot":
+            # Choosing which weapon slot (RIGHT HAND / LEFT HAND)
+            member = self._applying_poison_member
+            slots = []
+            for slot in ("right_hand", "left_hand"):
+                wp_name = member.equipped.get(slot)
+                if wp_name and wp_name != "Fists":
+                    wdata = WEAPONS.get(wp_name, {})
+                    # Only real weapons (not None, not Fists)
+                    slots.append((slot, wp_name))
+            if not slots:
+                self.show_message(
+                    f"{member.name} has no weapon to poison!", 2500)
+                self.applying_poison_step = None
+                self.applying_poison_item = None
+                return
+            if event.key == pygame.K_UP:
+                self.applying_poison_cursor = (
+                    self.applying_poison_cursor - 1) % len(slots)
+            elif event.key == pygame.K_DOWN:
+                self.applying_poison_cursor = (
+                    self.applying_poison_cursor + 1) % len(slots)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                slot, wp_name = slots[self.applying_poison_cursor]
+                # Apply poison to weapon
+                info = ITEM_INFO.get(self.applying_poison_item, {})
+                member.weapon_poison[slot] = {
+                    "poison_name": self.applying_poison_item,
+                    "poison_type": info.get("poison_type", "damage"),
+                    "damage": info.get("poison_damage", 0),
+                    "mp_drain": info.get("poison_mp_drain", 0),
+                    "debilitate": info.get("poison_debilitate", 0),
+                    "duration": info.get("poison_duration", 4),
+                    "save_dc": info.get("save_dc", 11),
+                    "hits_remaining": 5,
+                }
+                # Consume from party stash
+                party.shared_inventory.pop(self.applying_poison_inv_idx)
+                self.show_message(
+                    f"Applied {self.applying_poison_item} to "
+                    f"{member.name}'s {wp_name}! (5 hits)", 3000)
+                # Reset workflow
+                self.applying_poison_step = None
+                self.applying_poison_item = None
+                self.applying_poison_inv_idx = None
+                # Adjust cursor if needed
+                NUM_EFFECTS, CAST_INDEX, BREW_INDEX, STASH_START, _, PICK_INDEX, TINK_INDEX = self._stash_layout()
+                new_total = STASH_START + len(party.shared_inventory)
+                if self.party_inv_cursor >= new_total:
+                    self.party_inv_cursor = max(0, new_total - 1)
 
     def _use_party_item(self, item_name, inv_idx):
         """Use a consumable item from the party stash."""
@@ -986,8 +1101,19 @@ class InventoryMixin:
         elif effect == "cure_poison":
             cured = False
             for m in party.members:
-                if getattr(m, "poisoned", False):
+                any_poison = (getattr(m, "poisoned", False)
+                              or getattr(m, "poisoned_mp", False)
+                              or getattr(m, "poisoned_debilitate", False))
+                if any_poison:
                     m.poisoned = False
+                    m.poisoned_mp = False
+                    m.poisoned_debilitate = False
+                    m.poison_damage = 0
+                    m.poison_turns = 0
+                    m.poison_mp_drain = 0
+                    m.poison_mp_turns = 0
+                    m.poison_debilitate_amount = 0
+                    m.poison_debilitate_turns = 0
                     self.game.game_log.append(
                         f"{m.name}'s poison was cured!")
                     cured = True
@@ -1238,8 +1364,19 @@ class InventoryMixin:
         elif effect_type == "cure_poison":
             cured = False
             for m in party.members:
-                if getattr(m, "poisoned", False):
+                any_poison = (getattr(m, "poisoned", False)
+                              or getattr(m, "poisoned_mp", False)
+                              or getattr(m, "poisoned_debilitate", False))
+                if any_poison:
                     m.poisoned = False
+                    m.poisoned_mp = False
+                    m.poisoned_debilitate = False
+                    m.poison_damage = 0
+                    m.poison_turns = 0
+                    m.poison_mp_drain = 0
+                    m.poison_mp_turns = 0
+                    m.poison_debilitate_amount = 0
+                    m.poison_debilitate_turns = 0
                     self.show_message(
                         f"{member.name} casts {spell_name}! "
                         f"{m.name}'s poison was cured!", 3000)

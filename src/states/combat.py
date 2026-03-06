@@ -1118,15 +1118,20 @@ class CombatState(BaseState):
         """Build the list of throwable items the fighter can throw.
 
         Scans personal inventory and party shared stash for items with
-        the 'throwable' attribute. Returns [(item_name, count), ...].
+        the 'throwable' attribute, including poison potions.
+        Returns [(item_name, count), ...].
         """
-        from src.party import WEAPONS
+        from src.party import WEAPONS, ITEM_INFO
         seen = {}
         # Check personal inventory
         for item in fighter.inventory:
             wp = WEAPONS.get(item)
             if wp and wp.get("throwable", False):
                 seen[item] = seen.get(item, 0) + 1
+            else:
+                info = ITEM_INFO.get(item, {})
+                if info.get("throwable", False):
+                    seen[item] = seen.get(item, 0) + 1
         # Check party shared stash
         party = self.game.party
         for entry in party.shared_inventory:
@@ -1134,6 +1139,10 @@ class CombatState(BaseState):
             wp = WEAPONS.get(name)
             if wp and wp.get("throwable", False):
                 seen[name] = seen.get(name, 0) + 1
+            else:
+                info = ITEM_INFO.get(name, {})
+                if info.get("throwable", False):
+                    seen[name] = seen.get(name, 0) + 1
         return [(name, count) for name, count in seen.items()]
 
     def _build_usable_item_list(self, fighter):
@@ -1866,7 +1875,7 @@ class CombatState(BaseState):
 
     def _throw_item(self, dcol, drow):
         """Throw a selected item from inventory in the given direction."""
-        from src.party import WEAPONS
+        from src.party import WEAPONS, ITEM_INFO
         f = self.active_fighter
         item_name = self.selected_throw
         if not f or not item_name:
@@ -1919,12 +1928,26 @@ class CombatState(BaseState):
         # Store the weapon stats for damage resolution — use the thrown
         # item's power, not the equipped weapon's
         wp = WEAPONS.get(item_name, {"power": 0})
-        self._pending_ranged = {
+        item_info = ITEM_INFO.get(item_name, {})
+        is_poison = item_info.get("item_type") == "poison_potion"
+        pending = {
             "fighter": f,
             "hit_monster": hit_monster,  # Monster object or None
             "thrown_item": item_name,
             "thrown_power": wp.get("power", 0),
+            "thrown_is_poison": is_poison,
         }
+        if is_poison:
+            pending["thrown_poison_type"] = item_info.get("poison_type", "damage")
+            pending["thrown_save_dc"] = item_info.get("save_dc", 11)
+            pending["thrown_poison_damage"] = item_info.get("poison_damage", 0)
+            pending["thrown_poison_mp_drain"] = item_info.get("poison_mp_drain", 0)
+            pending["thrown_poison_debilitate"] = item_info.get("poison_debilitate", 0)
+            pending["thrown_poison_duration"] = item_info.get("poison_duration", 4)
+            # Poison potions use green projectile
+            proj_color = (80, 200, 80)
+            proj.color = proj_color
+        self._pending_ranged = pending
 
         self.phase = PHASE_PROJECTILE
         # Count remaining
@@ -2017,6 +2040,7 @@ class CombatState(BaseState):
             self.game.sfx.play("miss")
 
         if hit:
+            thrown_is_poison = info.get("thrown_is_poison", False)
             if thrown_item:
                 thrown_power = info.get("thrown_power", 0)
                 damage = roll_damage(1, 6, thrown_power, critical=crit)
@@ -2034,7 +2058,137 @@ class CombatState(BaseState):
             mc, mr = self.monster_positions.get(target, (0, 0))
             self.hit_effects.append(HitEffect(mc, mr, damage))
 
+            # ── Thrown poison potion effect ──
+            if thrown_is_poison and target.is_alive():
+                self._apply_thrown_poison(f, target, info)
+
+            # ── Weapon poison on ranged hit (non-thrown) ──
+            elif not thrown_item and target.is_alive():
+                rw_name = info.get("ranged_weapon") or f.weapon
+                ranged_slot = "right_hand"
+                for s in ("right_hand", "left_hand"):
+                    if f.equipped.get(s) == rw_name:
+                        ranged_slot = s
+                        break
+                self._try_weapon_poison(f, target, ranged_slot)
+
         self._check_monster_death(target)
+
+    # ── Weapon poison application on hit ───────────────────────────
+
+    def _try_weapon_poison(self, attacker, target, slot):
+        """Check if attacker's weapon in *slot* is poisoned; if so, try to
+        apply the poison effect to *target* (a monster).
+
+        Decrements hits_remaining and clears the poison when it runs out.
+        Target rolls a STR save to resist.
+        """
+        wp = getattr(attacker, "weapon_poison", {}).get(slot)
+        if not wp:
+            return
+
+        # Decrement remaining hits
+        wp["hits_remaining"] -= 1
+        if wp["hits_remaining"] <= 0:
+            self.combat_log.append(
+                f"The poison on {attacker.name}'s weapon wears off!")
+            attacker.weapon_poison[slot] = None
+
+        # Monster STR save to resist
+        save_roll = roll_d20()
+        str_mod = get_modifier(getattr(target, "strength", 10))
+        save_total = save_roll + str_mod
+        save_dc = wp["save_dc"]
+
+        if save_total >= save_dc:
+            self.combat_log.append(
+                f"{target.name} resists the poison! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc})")
+            return
+
+        # Apply poison by type
+        ptype = wp["poison_type"]
+        duration = wp["duration"]
+
+        if ptype in ("damage", "dot"):
+            dmg = wp["damage"]
+            target.poisoned = True
+            target.poison_damage = dmg
+            target.poison_turns = duration
+            self.combat_log.append(
+                f"{target.name} is poisoned! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
+                f"— {dmg} dmg/turn for {duration} turns")
+
+        elif ptype == "mp_drain":
+            drain = wp["mp_drain"]
+            target.poisoned_mp = True
+            target.poison_mp_drain = drain
+            target.poison_mp_turns = duration
+            self.combat_log.append(
+                f"{target.name} is afflicted with paralytic poison! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
+                f"— {drain} MP drain/turn for {duration} turns")
+
+        elif ptype == "debilitate":
+            amount = wp["debilitate"]
+            target.poisoned_debilitate = True
+            target.poison_debilitate_amount = amount
+            target.poison_debilitate_turns = duration
+            self.combat_log.append(
+                f"{target.name} is weakened by poison! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
+                f"— {amount} attack penalty for {duration} turns")
+
+    def _apply_thrown_poison(self, thrower, target, pending_info):
+        """Apply a thrown poison potion's effect to a monster target.
+
+        *pending_info* is the ``_pending_ranged`` dict which carries the
+        poison metadata stored by ``_throw_item``.
+        """
+        save_dc = pending_info.get("thrown_save_dc", 11)
+        ptype = pending_info.get("thrown_poison_type", "damage")
+        duration = pending_info.get("thrown_poison_duration", 4)
+        pname = pending_info.get("thrown_item", "poison")
+
+        # Monster STR save
+        save_roll = roll_d20()
+        str_mod = get_modifier(getattr(target, "strength", 10))
+        save_total = save_roll + str_mod
+
+        if save_total >= save_dc:
+            self.combat_log.append(
+                f"{target.name} resists {pname}! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc})")
+            return
+
+        if ptype in ("damage", "dot"):
+            dmg = pending_info.get("thrown_poison_damage", 2)
+            target.poisoned = True
+            target.poison_damage = dmg
+            target.poison_turns = duration
+            self.combat_log.append(
+                f"{target.name} is poisoned by {pname}! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
+                f"— {dmg} dmg/turn for {duration} turns")
+        elif ptype == "mp_drain":
+            drain = pending_info.get("thrown_poison_mp_drain", 3)
+            target.poisoned_mp = True
+            target.poison_mp_drain = drain
+            target.poison_mp_turns = duration
+            self.combat_log.append(
+                f"{target.name} is afflicted by {pname}! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
+                f"— {drain} MP drain/turn for {duration} turns")
+        elif ptype == "debilitate":
+            amount = pending_info.get("thrown_poison_debilitate", 2)
+            target.poisoned_debilitate = True
+            target.poison_debilitate_amount = amount
+            target.poison_debilitate_turns = duration
+            self.combat_log.append(
+                f"{target.name} is weakened by {pname}! "
+                f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
+                f"— {amount} attack penalty for {duration} turns")
 
     # ── Melee attack ─────────────────────────────────────────────
 
@@ -2188,6 +2342,16 @@ class CombatState(BaseState):
                     _PrecisionStrikeEffect(mc, mr))
             else:
                 self.hit_effects.append(HitEffect(mc, mr, damage))
+
+            # ── Weapon poison on melee hit ──
+            if target.is_alive():
+                # Determine which slot holds the melee weapon
+                melee_slot = "right_hand"
+                for s in ("right_hand", "left_hand"):
+                    if f.equipped.get(s) == melee_wp:
+                        melee_slot = s
+                        break
+                self._try_weapon_poison(f, target, melee_slot)
 
         self._check_monster_death(target)
 
@@ -2838,8 +3002,11 @@ class CombatState(BaseState):
             self.phase = PHASE_PLAYER
             return
 
-        # Check if target is actually poisoned
-        if not getattr(target, "poisoned", False):
+        # Check if target is actually poisoned (any type)
+        any_poison = (getattr(target, "poisoned", False)
+                      or getattr(target, "poisoned_mp", False)
+                      or getattr(target, "poisoned_debilitate", False))
+        if not any_poison:
             self.combat_log.append(f"{target.name} is not poisoned!")
             self.selected_spell = None
             self.phase = PHASE_SPELL_SELECT
@@ -2848,8 +3015,16 @@ class CombatState(BaseState):
         # Deduct MP
         f.current_mp -= mp_cost
 
-        # Cure the poison
+        # Cure all poison types
         target.poisoned = False
+        target.poisoned_mp = False
+        target.poisoned_debilitate = False
+        target.poison_damage = 0
+        target.poison_turns = 0
+        target.poison_mp_drain = 0
+        target.poison_mp_turns = 0
+        target.poison_debilitate_amount = 0
+        target.poison_debilitate_turns = 0
 
         # Spawn cleansing effect
         tc, tr = self.fighter_positions.get(target, (3, 5))
@@ -3786,8 +3961,18 @@ class CombatState(BaseState):
             self._end_fighter_turn()
 
         elif effect == "cure_poison":
+            # Clear all poison types
+            f.poisoned = False
+            f.poisoned_mp = False
+            f.poisoned_debilitate = False
+            f.poison_damage = 0
+            f.poison_turns = 0
+            f.poison_mp_drain = 0
+            f.poison_mp_turns = 0
+            f.poison_debilitate_amount = 0
+            f.poison_debilitate_turns = 0
             self.combat_log.append(
-                f"{f.name} uses {item_name}!"
+                f"{f.name} uses {item_name}! Poison cleansed!"
             )
             self._end_fighter_turn()
 
@@ -3934,6 +4119,40 @@ class CombatState(BaseState):
         mon = self.monsters[self.active_monster_idx]
         mc, mr = self.monster_positions.get(mon, (0, 0))
 
+        # ── Monster poison ticks ──
+        if getattr(mon, "poisoned", False):
+            dmg = getattr(mon, "poison_damage", 2)
+            mon.hp = max(0, mon.hp - dmg)
+            mon.poison_turns = getattr(mon, "poison_turns", 0) - 1
+            self.combat_log.append(
+                f"{mon.name} takes {dmg} poison damage! "
+                f"({mon.hp}/{mon.max_hp} HP)")
+            if mon.poison_turns <= 0:
+                mon.poisoned = False
+                self.combat_log.append(
+                    f"The poison wears off {mon.name}.")
+            if not mon.is_alive():
+                self.combat_log.append(f"{mon.name} succumbs to poison!")
+                self.active_monster_idx += 1
+                self._check_monster_death(mon)
+                return
+        if getattr(mon, "poisoned_mp", False):
+            drain = getattr(mon, "poison_mp_drain", 3)
+            mon.poison_mp_turns = getattr(mon, "poison_mp_turns", 0) - 1
+            self.combat_log.append(
+                f"{mon.name} is weakened by paralytic poison!")
+            if mon.poison_mp_turns <= 0:
+                mon.poisoned_mp = False
+                self.combat_log.append(
+                    f"The paralytic poison wears off {mon.name}.")
+        if getattr(mon, "poisoned_debilitate", False):
+            mon.poison_debilitate_turns = getattr(
+                mon, "poison_debilitate_turns", 0) - 1
+            if mon.poison_debilitate_turns <= 0:
+                mon.poisoned_debilitate = False
+                self.combat_log.append(
+                    f"The weakening poison wears off {mon.name}.")
+
         # ── Charmed monster: attacks other (non-charmed) monsters ──
         if getattr(mon, "charmed", False):
             self._charmed_monster_turn(mon)
@@ -4056,6 +4275,9 @@ class CombatState(BaseState):
         curse = self.curse_buffs.get(monster)
         if curse:
             monster_atk -= curse["attack_penalty"]
+        # Debilitate poison penalty
+        if getattr(monster, "poisoned_debilitate", False):
+            monster_atk -= getattr(monster, "poison_debilitate_amount", 2)
 
         hit, roll, total, crit = roll_attack(
             monster_atk, player_ac
@@ -5050,11 +5272,19 @@ class CombatState(BaseState):
         for m in self.game.party.members:
             if hasattr(m, "potion_buffs"):
                 m.potion_buffs = {}
-            # Clear poison status after combat
+            # Clear all poison types after combat
             if getattr(m, "poisoned", False):
                 m.poisoned = False
                 m.poison_damage = 0
                 m.poison_turns = 0
+            if getattr(m, "poisoned_mp", False):
+                m.poisoned_mp = False
+                m.poison_mp_drain = 0
+                m.poison_mp_turns = 0
+            if getattr(m, "poisoned_debilitate", False):
+                m.poisoned_debilitate = False
+                m.poison_debilitate_amount = 0
+                m.poison_debilitate_turns = 0
 
         self.game.change_state(self.source_state)
 

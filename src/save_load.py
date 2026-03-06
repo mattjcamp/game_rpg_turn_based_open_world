@@ -54,6 +54,8 @@ def _serialize_member(member):
         "bonus_mp": member._bonus_mp,
         "ammo": dict(member.ammo),
         "sprite": member.sprite,
+        "weapon_poison": dict(getattr(member, "weapon_poison",
+                                       {"right_hand": None, "left_hand": None})),
     }
 
 
@@ -154,6 +156,10 @@ def _deserialize_member(data):
 
     # Ammo tracking
     member.ammo = dict(data.get("ammo", {}))
+
+    # Weapon poison
+    member.weapon_poison = data.get("weapon_poison",
+                                     {"right_hand": None, "left_hand": None})
 
     return member
 
