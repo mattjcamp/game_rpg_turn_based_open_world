@@ -8819,6 +8819,7 @@ class Renderer:
                 item_ch = party.item_charges(entry)
                 selected = (flat_idx == inv_cursor)
                 prefix = "> " if selected else "  "
+
                 name_color = self._U3_WHITE if selected else (220, 220, 230)
 
                 display = item_name
@@ -8966,6 +8967,13 @@ class Renderer:
                 sel_item = party.item_name(entry)
                 sel_charges = party.item_charges(entry)
 
+        # Clip all right-panel drawing to the panel bounds
+        _rp_clip = pygame.Rect(right_x, panel_y, right_w, panel_h)
+        _prev_clip = self.screen.get_clip()
+        self.screen.set_clip(_rp_clip)
+        # Maximum pixel width for text inside the right panel
+        _rp_max_w = right_w - 20
+
         # Show details of the selected item
         if sel_item:
             if is_active_effect:
@@ -8986,11 +8994,19 @@ class Renderer:
                                (icon_cx, icon_cy), icon_size // 2 + 6)
             pygame.draw.circle(self.screen, (60, 60, 90),
                                (icon_cx, icon_cy), icon_size // 2 + 6, 2)
-            self._draw_item_icon(icon_cx, icon_cy, icon_type, icon_size)
+            _icon_tint = self._potion_tint(icon_info)
+            self._draw_item_icon(icon_cx, icon_cy, icon_type, icon_size,
+                                 tint=_icon_tint)
 
-            # Item name to the right of the icon
+            # Item name to the right of the icon (pixel-width aware)
             name_x = rx + icon_size + 18
-            self._u3_text(sel_item, name_x, ry + 4, self._U3_WHITE, f)
+            _name_max_w = right_x + right_w - name_x - 8
+            _name_disp = sel_item
+            while f.size(_name_disp.upper())[0] > _name_max_w and len(_name_disp) > 4:
+                _name_disp = _name_disp[:-1]
+            if _name_disp != sel_item:
+                _name_disp = _name_disp.rstrip() + ".."
+            self._u3_text(_name_disp, name_x, ry + 4, self._U3_WHITE, f)
             # Charges under the name if applicable
             if sel_charges is not None:
                 self._u3_text(f"x{sel_charges}", name_x, ry + 24,
@@ -9000,7 +9016,7 @@ class Renderer:
             # Item stats
             if sel_item in ARMORS:
                 arm = ARMORS[sel_item]
-                self._u3_text(f"TYPE: ARMOR", rx, ry, self._U3_LTBLUE, fm)
+                self._u3_text("TYPE: ARMOR", rx, ry, self._U3_LTBLUE, fm)
                 ry += 18
                 self._u3_text(f"EVASION: {arm['evasion']}%", rx, ry, (220, 220, 230), fm)
                 ry += 18
@@ -9033,7 +9049,7 @@ class Renderer:
                 line = ""
                 for word in words:
                     test = f"{line} {word}".strip()
-                    if len(test) > 28:
+                    if fm.size(test.upper())[0] > _rp_max_w:
                         self._u3_text(line, rx, ry, (180, 180, 200), fm)
                         ry += 16
                         line = word
@@ -9141,7 +9157,7 @@ class Renderer:
                 line = ""
                 for word in words:
                     test = f"{line} {word}".strip()
-                    if len(test) > 28:
+                    if fm.size(test.upper())[0] > _rp_max_w:
                         self._u3_text(line, rx, ry, (180, 180, 200), fm)
                         ry += 16
                         line = word
@@ -9161,6 +9177,9 @@ class Renderer:
         else:
             self._u3_text("NO ITEMS", rx, ry, (120, 120, 120), fm)
 
+
+        # Restore clipping after right-panel detail drawing
+        self.screen.set_clip(_prev_clip)
 
         # ── Gold display with chest icon ──
         gold_y = panel_y + panel_h - 30
@@ -10153,8 +10172,31 @@ class Renderer:
         scaled = pygame.transform.scale(raw, (size, size))
         self.screen.blit(scaled, (cx - size // 2, cy - size // 2))
 
-    def _draw_item_icon(self, cx, cy, icon_type, size=64):
-        """Draw a pixel-art icon for an item type, centered at (cx, cy)."""
+    @staticmethod
+    def _potion_tint(info):
+        """Return an RGB tint tuple for a consumable item, or None."""
+        itype = info.get("item_type", "")
+        effect = info.get("effect", "")
+        if itype == "poison_potion":
+            return (60, 180, 60)            # green
+        elif itype == "herb":
+            return (200, 60, 60)            # red  (healing herbs)
+        elif itype == "antidote":
+            return (220, 180, 50)           # amber / yellow
+        elif itype == "potion":
+            if effect in ("heal_hp",):
+                return (200, 60, 60)        # red  (healing potion)
+            elif effect in ("heal_mp",):
+                return (80, 120, 220)       # blue (mana potion)
+            elif effect.startswith("buff_"):
+                return (160, 80, 200)       # purple (elixirs / buffs)
+            else:
+                return (80, 120, 220)       # blue default
+        return None
+
+    def _draw_item_icon(self, cx, cy, icon_type, size=64, tint=None):
+        """Draw a pixel-art icon for an item type, centered at (cx, cy).
+        Optional *tint* overrides the primary colour for potion/herb icons."""
         s = size
         hs = s // 2
         x0 = cx - hs
@@ -10293,27 +10335,32 @@ class Renderer:
             pygame.draw.line(self.screen, WHITE, (cx - 4, cy - 14), (cx - 4, cy + 2), 1)
 
         elif icon_type == "potion":
+            # Use tint colour if provided, otherwise default blue
+            p_fill = tint if tint else BLUE
+            p_edge = tuple(min(c + 60, 255) for c in p_fill)
             # Bottle body
-            pygame.draw.ellipse(self.screen, BLUE, (cx - 10, cy - 4, 20, 24))
-            pygame.draw.ellipse(self.screen, LIGHT_BLUE, (cx - 10, cy - 4, 20, 24), 2)
+            pygame.draw.ellipse(self.screen, p_fill, (cx - 10, cy - 4, 20, 24))
+            pygame.draw.ellipse(self.screen, p_edge, (cx - 10, cy - 4, 20, 24), 2)
             # Neck
-            pygame.draw.rect(self.screen, BLUE, (cx - 4, cy - 14, 8, 12))
-            pygame.draw.rect(self.screen, LIGHT_BLUE, (cx - 4, cy - 14, 8, 12), 1)
+            pygame.draw.rect(self.screen, p_fill, (cx - 4, cy - 14, 8, 12))
+            pygame.draw.rect(self.screen, p_edge, (cx - 4, cy - 14, 8, 12), 1)
             # Cork
             pygame.draw.rect(self.screen, BROWN, (cx - 5, cy - 18, 10, 6), border_radius=2)
             # Highlight
             pygame.draw.ellipse(self.screen, WHITE, (cx - 4, cy + 2, 6, 8), 1)
 
         elif icon_type == "herb":
+            h_fill = tint if tint else GREEN
+            h_light = tuple(min(c + 40, 255) for c in h_fill)
             # Stem
-            pygame.draw.line(self.screen, GREEN, (cx, cy + 16), (cx, cy - 4), 2)
+            pygame.draw.line(self.screen, h_fill, (cx, cy + 16), (cx, cy - 4), 2)
             # Leaves
-            pygame.draw.ellipse(self.screen, GREEN, (cx - 14, cy - 10, 14, 8))
-            pygame.draw.ellipse(self.screen, GREEN, (cx, cy - 14, 14, 8))
-            pygame.draw.ellipse(self.screen, GREEN, (cx - 8, cy - 20, 12, 8))
+            pygame.draw.ellipse(self.screen, h_fill, (cx - 14, cy - 10, 14, 8))
+            pygame.draw.ellipse(self.screen, h_fill, (cx, cy - 14, 14, 8))
+            pygame.draw.ellipse(self.screen, h_fill, (cx - 8, cy - 20, 12, 8))
             # Highlight
-            pygame.draw.ellipse(self.screen, (100, 220, 100), (cx - 12, cy - 9, 8, 4))
-            pygame.draw.ellipse(self.screen, (100, 220, 100), (cx + 2, cy - 13, 8, 4))
+            pygame.draw.ellipse(self.screen, h_light, (cx - 12, cy - 9, 8, 4))
+            pygame.draw.ellipse(self.screen, h_light, (cx + 2, cy - 13, 8, 4))
 
         elif icon_type == "scroll":
             # Main body
@@ -10491,6 +10538,11 @@ class Renderer:
         pygame.draw.rect(self.screen, (16, 16, 32), (px, py, pw, ph))
         pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
 
+        # Clip to popup bounds
+        _exam_prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(px, py, pw, ph))
+        _exam_max_w = pw - 36  # 18px padding each side
+
         # ── Icon area (left side) ──
         icon_cx = px + 56
         icon_cy = py + 70
@@ -10500,12 +10552,19 @@ class Renderer:
 
         info = ITEM_INFO.get(item_name, {})
         icon_type = info.get("icon", "gem")
-        self._draw_item_icon(icon_cx, icon_cy, icon_type, 60)
+        _shop_tint = self._potion_tint(info)
+        self._draw_item_icon(icon_cx, icon_cy, icon_type, 60, tint=_shop_tint)
 
         # ── Item name ──
         name_x = px + 110
         name_y = py + 14
-        self._u3_text(item_name.upper(), name_x, name_y, self._U3_ORANGE, f)
+        _exam_name = item_name
+        _exam_name_max = px + pw - name_x - 10
+        while f.size(_exam_name.upper())[0] > _exam_name_max and len(_exam_name) > 4:
+            _exam_name = _exam_name[:-1]
+        if _exam_name != item_name:
+            _exam_name = _exam_name.rstrip() + ".."
+        self._u3_text(_exam_name, name_x, name_y, self._U3_ORANGE, f)
 
         # ── Type and stats ──
         ty = name_y + 26
@@ -10548,14 +10607,13 @@ class Renderer:
         pygame.draw.line(self.screen, (60, 60, 100),
                         (px + 14, desc_y - 6), (px + pw - 14, desc_y - 6), 1)
 
-        # Word wrap the description
+        # Word wrap the description using pixel width
         words = desc.split()
         lines = []
         current_line = ""
-        max_chars = 38  # chars per line at font_med
         for word in words:
             test = current_line + (" " if current_line else "") + word
-            if len(test) <= max_chars:
+            if fm.size(test.upper())[0] <= _exam_max_w:
                 current_line = test
             else:
                 if current_line:
@@ -10598,6 +10656,9 @@ class Renderer:
         # ── Dismiss hint ──
         self._u3_text("[ESC] CLOSE", px + pw - 100, py + ph - 20,
                       self._U3_BLUE, self.font_small)
+
+        # Restore clipping
+        self.screen.set_clip(_exam_prev_clip)
 
     def draw_overworld_help_overlay(self):
         """Draw a full-screen overlay showing all overworld controls."""

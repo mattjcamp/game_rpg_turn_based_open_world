@@ -129,9 +129,9 @@
   ],
   "active_party": [
     0,
+    1,
     3,
-    4,
-    5
+    4
   ],
   "party_effects": {
     "effect_1": null,
@@ -243,6 +243,60 @@
     {
       "item": "Bolts",
       "charges": 15
+    },
+    {
+      "item": "Healing Herb"
+    },
+    {
+      "item": "Healing Herb"
+    },
+    {
+      "item": "Antidote"
+    },
+    {
+      "item": "Antidote"
+    },
+    {
+      "item": "Mana Potion"
+    },
+    {
+      "item": "Mana Potion"
+    },
+    {
+      "item": "Healing Potion"
+    },
+    {
+      "item": "Healing Potion"
+    },
+    {
+      "item": "Elixir of Strength"
+    },
+    {
+      "item": "Elixir of Warding"
+    },
+    {
+      "item": "Poison Vial"
+    },
+    {
+      "item": "Poison Vial"
+    },
+    {
+      "item": "Paralytic Poison"
+    },
+    {
+      "item": "Paralytic Poison"
+    },
+    {
+      "item": "Weakening Poison"
+    },
+    {
+      "item": "Weakening Poison"
+    },
+    {
+      "item": "Lingering Venom"
+    },
+    {
+      "item": "Lingering Venom"
     }
   ]
 }
