@@ -186,6 +186,33 @@ class HitEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
+class _PrecisionStrikeEffect:
+    """A brief purple-white flash for the Thief's precision strike.
+
+    Rendered as expanding rings with sparkles — visually distinct from
+    the normal HitEffect so the player can tell a precision crit happened.
+    """
+
+    DURATION = 0.5  # seconds
+
+    def __init__(self, col, row):
+        self.col = col
+        self.row = row
+        self.timer = self.DURATION
+        self.alive = True
+        self.damage = 0  # not used for rendering damage numbers
+
+    def update(self, dt):
+        self.timer -= dt
+        if self.timer <= 0:
+            self.timer = 0
+            self.alive = False
+
+    @property
+    def progress(self):
+        return 1.0 - (self.timer / self.DURATION)
+
+
 class FireballEffect:
     """An animated fireball traveling across the arena."""
 
@@ -2122,6 +2149,31 @@ class CombatState(BaseState):
         if hit:
             melee_wp = info.get("melee_weapon", f.weapon)
             dice_count, dice_sides, dmg_bonus = f.get_damage_dice(melee_wp)
+
+            # ── Thief Precision Strike ──
+            # Level 3+ Thieves wielding a Dagger get a chance at a
+            # precision critical: roll a DEX saving throw (d20 + DEX mod
+            # vs DC 12).  On success the hit becomes a critical, doubling
+            # the damage dice just like a natural-20 crit.
+            thief_crit = False
+            if (not crit
+                    and getattr(f, "char_class", "").lower() == "thief"
+                    and f.level >= 3
+                    and melee_wp.lower() == "dagger"):
+                save_roll = roll_d20()
+                dex_mod = get_modifier(f.dexterity)
+                save_total = save_roll + dex_mod
+                save_dc = 12
+                if save_total >= save_dc:
+                    thief_crit = True
+                    crit = True
+                    self.combat_log.append(
+                        f"{f.name} finds an opening! "
+                        f"(DEX save {save_roll}+{dex_mod}={save_total} vs DC {save_dc}) "
+                        f"— PRECISION STRIKE!"
+                    )
+                    self.game.sfx.play("critical")
+
             damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
             target.hp = max(0, target.hp - damage)
             self.combat_log.append(
@@ -2129,7 +2181,13 @@ class CombatState(BaseState):
             )
             # Spawn a hit flash on the monster
             mc, mr = self.monster_positions.get(target, (0, 0))
-            self.hit_effects.append(HitEffect(mc, mr, damage))
+            if thief_crit:
+                # Extra-bright purple flash for precision strike
+                self.hit_effects.append(HitEffect(mc, mr, damage))
+                self.hit_effects.append(
+                    _PrecisionStrikeEffect(mc, mr))
+            else:
+                self.hit_effects.append(HitEffect(mc, mr, damage))
 
         self._check_monster_death(target)
 

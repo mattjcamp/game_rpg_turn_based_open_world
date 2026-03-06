@@ -3475,9 +3475,13 @@ class Renderer:
 
         # ── 2d. hit flash effects ──
         if hit_effects:
+            from src.states.combat import _PrecisionStrikeEffect
             for fx in hit_effects:
                 if fx.alive:
-                    self._u3_draw_hit_effect(mx, my, ts, fx)
+                    if isinstance(fx, _PrecisionStrikeEffect):
+                        self._u3_draw_precision_strike(mx, my, ts, fx)
+                    else:
+                        self._u3_draw_hit_effect(mx, my, ts, fx)
 
         # ── 2e. fireball projectiles ──
         if fireballs:
@@ -4121,6 +4125,67 @@ class Renderer:
             for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 self.screen.blit(outline, (rx + ox, float_y + oy))
             self.screen.blit(surf, (rx, float_y))
+
+    def _u3_draw_precision_strike(self, ax, ay, ts, fx):
+        """Draw the Thief precision strike effect — purple expanding rings
+        with bright sparkle bursts, distinct from normal hit flashes."""
+        cx = ax + fx.col * ts + ts // 2
+        cy = ay + fx.row * ts + ts // 2
+        p = fx.progress  # 0 → 1
+
+        # Phase 1 (0–0.3): bright purple-white flash
+        # Phase 2 (0.3–0.7): expanding double rings with sparkles
+        # Phase 3 (0.7–1.0): "PRECISION STRIKE!" text floats up, fades
+
+        if p < 0.3:
+            sub_p = p / 0.3
+            radius = int(4 + sub_p * 10)
+            alpha_f = 1.0 - sub_p * 0.3
+            c = (int(200 * alpha_f), int(140 * alpha_f), int(255 * alpha_f))
+            pygame.draw.circle(self.screen, c, (cx, cy), radius)
+            # White core
+            pygame.draw.circle(self.screen, (255, 255, 255),
+                               (cx, cy), int(3 + sub_p * 4))
+        elif p < 0.7:
+            sub_p = (p - 0.3) / 0.4
+            alpha_f = 1.0 - sub_p
+            # Outer expanding ring
+            r1 = int(12 + sub_p * 16)
+            c1 = (int(180 * alpha_f), int(80 * alpha_f), int(255 * alpha_f))
+            pygame.draw.circle(self.screen, c1, (cx, cy), r1, 2)
+            # Inner ring
+            r2 = int(6 + sub_p * 10)
+            c2 = (int(255 * alpha_f), int(200 * alpha_f), int(255 * alpha_f))
+            pygame.draw.circle(self.screen, c2, (cx, cy), r2, 1)
+            # Sparkle crosses at cardinal points
+            for angle_i in range(4):
+                import math as _m
+                a = angle_i * 1.5708 + sub_p * 2.0
+                sx = cx + int(_m.cos(a) * r1)
+                sy = cy + int(_m.sin(a) * r1)
+                spark_sz = int(3 * alpha_f)
+                if spark_sz > 0:
+                    pygame.draw.line(self.screen, (255, 220, 255),
+                                     (sx - spark_sz, sy), (sx + spark_sz, sy), 1)
+                    pygame.draw.line(self.screen, (255, 220, 255),
+                                     (sx, sy - spark_sz), (sx, sy + spark_sz), 1)
+
+        # Floating "PRECISION STRIKE!" label
+        if p > 0.2:
+            label_p = min(1.0, (p - 0.2) / 0.8)
+            float_y = cy - 20 - int(label_p * 16)
+            alpha_f = 1.0 - max(0.0, (label_p - 0.6) / 0.4)
+            r_val = int(220 * alpha_f)
+            g_val = int(180 * alpha_f)
+            b_val = int(255 * alpha_f)
+            if r_val > 0:
+                text = "PRECISION STRIKE!"
+                surf = self.font_small.render(text, True, (r_val, g_val, b_val))
+                outline = self.font_small.render(text, True, (0, 0, 0))
+                rx = cx - surf.get_width() // 2
+                for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    self.screen.blit(outline, (rx + ox, float_y + oy))
+                self.screen.blit(surf, (rx, float_y))
 
     def _u3_draw_fireball(self, ax, ay, ts, fb):
         """Draw a fireball projectile — orange/red glowing ball with trail."""
