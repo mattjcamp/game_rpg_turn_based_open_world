@@ -240,6 +240,7 @@ class TownState(InventoryMixin, BaseState):
         self.quest_complete_effect = None
         # Machine shutdown animation (Keys of Shadow victory)
         self.machine_shutdown_effect = None
+        self._pending_victory = False  # deferred until dialogue dismissed
 
         # Temple service menu
         self.showing_temple_service = False
@@ -703,7 +704,9 @@ class TownState(InventoryMixin, BaseState):
                         self._set_dialogue(
                             f"{npc.name}: The {names}! That's the last one! "
                             f"Stand back — I'm shutting it down!")
-                        self._trigger_victory()
+                        # Defer the machine animation until the player
+                        # dismisses this dialogue (see _advance_dialogue).
+                        self._pending_victory = True
                     else:
                         self._set_dialogue(
                             f"{npc.name}: Wonderful! You found the {names}! "
@@ -774,6 +777,12 @@ class TownState(InventoryMixin, BaseState):
         self.quest_choices = []
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
+
+        # If the gnome's final dialogue was just dismissed, fire the
+        # machine shutdown animation now.
+        if self._pending_victory:
+            self._pending_victory = False
+            self._trigger_victory()
 
     # ── Quest ─────────────────────────────────────────────────────
 

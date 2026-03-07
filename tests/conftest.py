@@ -143,7 +143,7 @@ class _MockEvent:
 
 class _MockChannel:
     def __init__(self, *a): pass
-    def play(self, *a): pass
+    def play(self, *a, **kw): pass
     def stop(self): pass
     def fadeout(self, ms): pass
     def get_busy(self): return False
