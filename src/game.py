@@ -76,6 +76,8 @@ class Game:
         self._config = load_config()
         if not self._config.get("music_enabled", True):
             self.music.toggle_mute()   # start muted if saved that way
+        self.smite_enabled = self._config.get("smite_enabled", False)
+        self.start_with_equipment = self._config.get("start_with_equipment", True)
 
         # --- Game-in-progress flag ---
         # True once the player has started or loaded a game.
@@ -125,6 +127,12 @@ class Game:
             {"label": "MUSIC",
              "value": self._config.get("music_enabled", True),
              "type": "toggle", "action": self._toggle_music},
+            {"label": "SMITE (DEBUG)",
+             "value": self._config.get("smite_enabled", False),
+             "type": "toggle", "action": self._toggle_smite},
+            {"label": "START WITH EQUIPMENT",
+             "value": self._config.get("start_with_equipment", True),
+             "type": "toggle", "action": self._toggle_start_equipment},
         ]
 
         # --- Game Over screen ---
@@ -226,9 +234,25 @@ class Game:
             for m in self.party.members:
                 m.hp = m.max_hp
                 m.inventory = []
+
+            # Strip equipment if starting without gear
+            if not self.start_with_equipment:
+                for m in self.party.roster:
+                    m.equipped = {
+                        "right_hand": "Club",
+                        "left_hand": None,
+                        "body": "Cloth",
+                        "head": None,
+                    }
+                    m._sync_legacy_fields()
+                    m.personal_inventory = []
+                self.party.shared_inventory = []
+                for _ in range(15):
+                    self.party.shared_inventory.append("Stones")
         else:
             # No active party formed — use the default from party.json
-            self.party = create_default_party()
+            self.party = create_default_party(
+                start_with_equipment=self.start_with_equipment)
 
             # Module overworld may override the start position
             if overworld_cfg:
@@ -920,6 +944,20 @@ class Game:
         muted = self.music.toggle_mute()
         self.settings_options[0]["value"] = not muted
         self._config["music_enabled"] = not muted
+        save_config(self._config)
+
+    def _toggle_smite(self):
+        """Toggle the Smite debug action in combat menus."""
+        self.smite_enabled = not self.smite_enabled
+        self.settings_options[1]["value"] = self.smite_enabled
+        self._config["smite_enabled"] = self.smite_enabled
+        save_config(self._config)
+
+    def _toggle_start_equipment(self):
+        """Toggle whether new games start with full equipment or minimal gear."""
+        self.start_with_equipment = not self.start_with_equipment
+        self.settings_options[2]["value"] = self.start_with_equipment
+        self._config["start_with_equipment"] = self.start_with_equipment
         save_config(self._config)
 
     def _open_save_screen(self):

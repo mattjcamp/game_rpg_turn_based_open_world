@@ -4652,11 +4652,11 @@ class Renderer:
 
         # ── 2d. hit flash effects ──
         if hit_effects:
-            from src.states.combat import _PrecisionStrikeEffect
+            from src.states.combat import _BackstabEffect
             for fx in hit_effects:
                 if fx.alive:
-                    if isinstance(fx, _PrecisionStrikeEffect):
-                        self._u3_draw_precision_strike(mx, my, ts, fx)
+                    if isinstance(fx, _BackstabEffect):
+                        self._u3_draw_backstab(mx, my, ts, fx)
                     else:
                         self._u3_draw_hit_effect(mx, my, ts, fx)
 
@@ -5322,8 +5322,8 @@ class Renderer:
                 self.screen.blit(outline, (rx + ox, float_y + oy))
             self.screen.blit(surf, (rx, float_y))
 
-    def _u3_draw_precision_strike(self, ax, ay, ts, fx):
-        """Draw the Thief precision strike effect — purple expanding rings
+    def _u3_draw_backstab(self, ax, ay, ts, fx):
+        """Draw the Thief backstab effect — purple expanding rings
         with bright sparkle bursts, distinct from normal hit flashes."""
         cx = ax + fx.col * ts + ts // 2
         cy = ay + fx.row * ts + ts // 2

@@ -207,11 +207,11 @@ class HitEffect:
         return 1.0 - (self.timer / self.DURATION)
 
 
-class _PrecisionStrikeEffect:
-    """A brief purple-white flash for the Thief's precision strike.
+class _BackstabEffect:
+    """A brief purple-white flash for the Thief's backstab.
 
     Rendered as expanding rings with sparkles — visually distinct from
-    the normal HitEffect so the player can tell a precision crit happened.
+    the normal HitEffect so the player can tell a backstab crit happened.
     """
 
     DURATION = 0.5  # seconds
@@ -1117,8 +1117,9 @@ class CombatState(BaseState):
             self.menu_actions.append((ACTION_USE_ITEM, "Use Item"))
         # Equip is always available
         self.menu_actions.append((ACTION_EQUIP, "Equip"))
-        # DEBUG: temporary smite-all power for testing
-        self.menu_actions.append((ACTION_SMITE, "\u26a1 Smite All"))
+        # DEBUG: smite-all power for testing (toggle in Settings)
+        if getattr(self.game, 'smite_enabled', False):
+            self.menu_actions.append((ACTION_SMITE, "\u26a1 Smite All"))
         self.selected_action = 0
 
     def _build_spell_list(self, fighter):
@@ -2440,9 +2441,9 @@ class CombatState(BaseState):
             melee_wp = info.get("melee_weapon", f.weapon)
             dice_count, dice_sides, dmg_bonus = f.get_damage_dice(melee_wp)
 
-            # ── Thief Precision Strike ──
+            # ── Thief Backstab ──
             # Level 3+ Thieves wielding a Dagger get a chance at a
-            # precision critical: roll a DEX saving throw (d20 + DEX mod
+            # backstab critical: roll a DEX saving throw (d20 + DEX mod
             # vs DC 12).  On success the hit becomes a critical, doubling
             # the damage dice just like a natural-20 crit.
             thief_crit = False
@@ -2460,7 +2461,7 @@ class CombatState(BaseState):
                     self.combat_log.append(
                         f"{f.name} finds an opening! "
                         f"(DEX save {save_roll}+{dex_mod}={save_total} vs DC {save_dc}) "
-                        f"— PRECISION STRIKE!"
+                        f"— BACKSTAB!"
                     )
                     self.game.sfx.play("critical")
 
@@ -2475,7 +2476,7 @@ class CombatState(BaseState):
                 # Extra-bright purple flash for precision strike
                 self.hit_effects.append(HitEffect(mc, mr, damage))
                 self.hit_effects.append(
-                    _PrecisionStrikeEffect(mc, mr))
+                    _BackstabEffect(mc, mr))
             else:
                 self.hit_effects.append(HitEffect(mc, mr, damage))
 

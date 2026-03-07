@@ -1461,12 +1461,16 @@ def _build_member_from_cfg(char_cfg):
     return member
 
 
-def create_default_party(start_col=None, start_row=None):
+def create_default_party(start_col=None, start_row=None,
+                         start_with_equipment=True):
     """Create a party from data/party.json configuration.
 
     Characters are loaded into a roster; the active_party indices
     select which characters form the adventuring party.
     If start_col/start_row are provided they override the JSON values.
+
+    When *start_with_equipment* is False, every member starts with only
+    Cloth armor and a Club, and the shared inventory receives 15 Stones.
     """
     cfg = _load_party_config()
     if start_col is None:
@@ -1519,5 +1523,20 @@ def create_default_party(start_col=None, start_row=None):
             party.inv_add(item_name, charges=charges)
         else:
             party.shared_inventory.append(item_name)
+
+    # ── Strip equipment if starting without gear ──
+    if not start_with_equipment:
+        for member in party.roster:
+            member.equipped = {
+                "right_hand": "Club",
+                "left_hand": None,
+                "body": "Cloth",
+                "head": None,
+            }
+            member._sync_legacy_fields()
+            member.personal_inventory = []
+        party.shared_inventory = []
+        for _ in range(15):
+            party.shared_inventory.append("Stones")
 
     return party

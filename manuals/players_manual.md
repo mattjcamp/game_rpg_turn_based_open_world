@@ -181,10 +181,9 @@ Clerics are the primary healers of the party. Minor Heal, Major Heal, and Mass H
 
 - **Pick Locks** — Can open locked doors and chests without a key.
 - **Detect Traps** — Can detect and disarm hidden traps in dungeons.
-- **Backstab** — Deals double damage when attacking from behind an enemy.
-- **Precision Strike** *(Level 3+)* — When attacking with a Dagger in melee, the Thief rolls a DEX saving throw (d20 + DEX modifier vs DC 12). On success, the hit becomes a critical, doubling the damage dice. This stacks with natural 20 criticals — if the initial roll is already a natural 20, the precision strike check is skipped. A distinctive purple flash and "PRECISION STRIKE!" callout alert you when it triggers.
+- **Backstab** *(Level 3+)* — When attacking with a Dagger in melee, the Thief rolls a DEX saving throw (d20 + DEX modifier vs DC 12). On success, the hit becomes a critical, doubling the damage dice. This stacks with natural 20 criticals — if the initial roll is already a natural 20, the backstab check is skipped. A distinctive purple flash and "BACKSTAB!" callout alert you when it triggers.
 
-The Thief has the longest combat range of any class (10 tiles), making them unmatched skirmishers who can strike from nearly anywhere on the battlefield. With a Short Bow they can pelt enemies from across the arena while staying safely out of harm's way. At Level 3, Thieves gain Precision Strike, turning the humble Dagger into a devastating weapon — a high-DEX Thief can crit on nearly half their dagger attacks. Their real value outside combat is Pick Locks and Detect Traps, which open up areas and loot that other classes can't reach. Pair with Halfling for the Pickpocket bonus.
+The Thief has the longest combat range of any class (10 tiles), making them unmatched skirmishers who can strike from nearly anywhere on the battlefield. With a Short Bow they can pelt enemies from across the arena while staying safely out of harm's way. At Level 3, Thieves gain Backstab, turning the humble Dagger into a devastating weapon — a high-DEX Thief can crit on nearly half their dagger attacks. Their real value outside combat is Pick Locks and Detect Traps, which open up areas and loot that other classes can't reach. Pair with Halfling for the Pickpocket bonus.
 
 ---
 
