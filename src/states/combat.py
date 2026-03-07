@@ -71,6 +71,7 @@ PHASE_CURE_POISON = "cure_poison"        # cure poison cleansing animation
 PHASE_BLESS = "bless"                    # bless party-wide buff animation
 PHASE_CURSE = "curse"                    # curse debuff animation on enemy
 PHASE_MONSTER_SPELL = "monster_spell"    # monster casting a spell-like ability
+PHASE_SMITE       = "smite"             # DEBUG: flash + kill-all animation
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -89,6 +90,7 @@ ACTION_RANGED = 5      # menu ranged attack
 ACTION_EQUIP  = 6      # open equip screen (costs turn)
 ACTION_THROW  = 7      # throw a throwable item from inventory
 ACTION_USE_ITEM = 8    # use a consumable item (herb, potion, etc.)
+ACTION_SMITE    = 9    # DEBUG: instant-kill all monsters (temporary)
 
 # Menu is built dynamically per character — see _build_menu_actions()
 
@@ -1082,6 +1084,8 @@ class CombatState(BaseState):
             self.menu_actions.append((ACTION_USE_ITEM, "Use Item"))
         # Equip is always available
         self.menu_actions.append((ACTION_EQUIP, "Equip"))
+        # DEBUG: temporary smite-all power for testing
+        self.menu_actions.append((ACTION_SMITE, "\u26a1 Smite All"))
         self.selected_action = 0
 
     def _build_spell_list(self, fighter):
@@ -1194,7 +1198,7 @@ class CombatState(BaseState):
             return
 
         # During animation phases, no input
-        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT, PHASE_CURE_POISON, PHASE_BLESS, PHASE_CURSE, PHASE_MONSTER_SPELL):
+        if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT, PHASE_CURE_POISON, PHASE_BLESS, PHASE_CURSE, PHASE_MONSTER_SPELL, PHASE_SMITE):
             return
 
         # Equip screen handles its own input
@@ -1341,6 +1345,20 @@ class CombatState(BaseState):
             self.use_item_cursor = 0
             self.selected_use_item = None
             self.phase = PHASE_USE_ITEM
+            return
+
+        if action_id == ACTION_SMITE:
+            # DEBUG: instant-kill all monsters with a flash
+            self.phase = PHASE_SMITE
+            self.phase_timer = 800  # flash duration in ms
+            self.smite_flash = 1.0  # flash intensity (1.0 → 0.0)
+            self.combat_log.append(">> SMITE ALL — divine wrath obliterates all foes! <<")
+            # Kill every monster
+            for m in self.monsters:
+                if m.is_alive():
+                    m.hp = 0
+                    self._on_monster_killed(m)
+            self.game.sfx.play("victory")
             return
 
         # Directional actions (ranged)
@@ -5137,6 +5155,10 @@ class CombatState(BaseState):
                 self._resolve_melee()
             return
 
+        # Decay smite flash intensity
+        if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):
+            self.smite_flash = max(0.0, self.phase_timer / 800.0)
+
         if self.phase_timer > 0:
             self.phase_timer -= dt_ms
             if self.phase_timer <= 0:
@@ -5154,6 +5176,9 @@ class CombatState(BaseState):
             # Advance to next monster
             self.active_monster_idx += 1
             self._monster_turn()
+        elif self.phase == PHASE_SMITE:
+            # Flash done — transition to normal victory
+            self._trigger_victory()
         elif self.phase == PHASE_VICTORY:
             self._end_combat(won=True)
         elif self.phase == PHASE_DEFEAT:
@@ -5397,6 +5422,15 @@ class CombatState(BaseState):
             monster_positions=self.monster_positions,
             encounter_name=self.encounter_name,
         )
+        # DEBUG: smite flash overlay
+        if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):
+            alpha = int(255 * self.smite_flash)
+            if alpha > 0:
+                flash_surf = pygame.Surface(
+                    (renderer.screen.get_width(), renderer.screen.get_height()),
+                    pygame.SRCALPHA)
+                flash_surf.fill((255, 255, 255, alpha))
+                renderer.screen.blit(flash_surf, (0, 0))
         if self.showing_help:
             renderer.draw_combat_help_overlay()
         if self.showing_log:
