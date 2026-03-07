@@ -644,7 +644,11 @@ class Renderer:
             if not hasattr(self, "_tn_readout_font"):
                 self._tn_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
             rf = self._tn_readout_font
-            text_color = (255, 255, 255)
+            # NPC dialogue gets soft blue; other messages stay white
+            if ": " in message and message[0].isupper():
+                text_color = (180, 220, 255)
+            else:
+                text_color = (255, 255, 255)
             text_x = 10
             text_y = bar_y + 28
             max_w = SCREEN_WIDTH - text_x - 16
@@ -11460,8 +11464,17 @@ class Renderer:
         # ── Color for a log entry ──
         _COMBAT_SUMMARY_COLOR = (255, 230, 80)   # warm gold for all combat summaries
 
+        _NPC_DIALOGUE_COLOR = (180, 220, 255)    # soft blue for NPC dialogue
+
         def _log_color(original):
             lo = original.lower()
+            # ── NPC dialogue lines (Name: dialogue) ──
+            if ": " in original and not lo.startswith("--") and not lo.startswith("the party"):
+                colon_idx = original.index(": ")
+                name_part = original[:colon_idx].strip()
+                if (name_part and name_part[0].isupper()
+                        and len(name_part) <= 30):
+                    return _NPC_DIALOGUE_COLOR
             # ── Combat / battle summary lines (world log) ──
             if ("the party defeated" in lo or "treasure chest" in lo
                     or "fled from battle" in lo

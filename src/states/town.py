@@ -511,6 +511,13 @@ class TownState(InventoryMixin, BaseState):
             self.pickpocket_targeting = False
             self.pickpocket_targets = []
 
+    def _set_dialogue(self, text):
+        """Set the NPC dialogue message and log it to the game log."""
+        self.message = text
+        self.message_timer = 0
+        if text:
+            self.game.game_log.append(text)
+
     def _start_dialogue(self, npc):
         """Begin talking to an NPC, or open the shop for shopkeepers."""
         if npc.npc_type == "shopkeep":
@@ -540,8 +547,7 @@ class TownState(InventoryMixin, BaseState):
                 self.npc_speaking = npc
                 self.quest_dialogue_lines = list(npc.quest_dialogue)
                 self.quest_dialogue_index = 0
-                self.message = f"{npc.name}: {self.quest_dialogue_lines[0]}"
-                self.message_timer = 0
+                self._set_dialogue(f"{npc.name}: {self.quest_dialogue_lines[0]}")
                 return
             # Player has the artifact — complete the quest
             if quest and quest["status"] == "artifact_found":
@@ -551,15 +557,13 @@ class TownState(InventoryMixin, BaseState):
             if quest and quest["status"] == "active":
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                self.message = f"{npc.name}: Have you found the Shadow Crystal yet? It's out there somewhere..."
-                self.message_timer = 0
+                self._set_dialogue(f"{npc.name}: Have you found the Shadow Crystal yet? It's out there somewhere...")
                 return
             # Quest completed — display item dialogue
             if quest and quest["status"] == "completed":
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                self.message = f"{npc.name}: The Shadow Crystal sits safely behind my counter. You've earned a hero's welcome here!"
-                self.message_timer = 0
+                self._set_dialogue(f"{npc.name}: The Shadow Crystal sits safely behind my counter. You've earned a hero's welcome here!")
                 return
 
         # Gnome (Fizzwick) — Keys of Shadow quest-giver
@@ -584,35 +588,31 @@ class TownState(InventoryMixin, BaseState):
                     self.npc_dialogue_active = True
                     self.npc_speaking = npc
                     if inserted >= total:
-                        self.message = (
+                        self._set_dialogue(
                             f"{npc.name}: The {names}! That's the last one! "
                             f"Stand back — I'm shutting it down!")
-                        self.message_timer = 0
                         self._trigger_victory()
                     else:
-                        self.message = (
+                        self._set_dialogue(
                             f"{npc.name}: Wonderful! You found the {names}! "
                             f"That's {inserted}/{total} keys. Keep going!")
-                        self.message_timer = 0
                     return
 
                 # No keys held — give progress dialogue
                 if inserted >= total:
                     self.npc_dialogue_active = True
                     self.npc_speaking = npc
-                    self.message = (
+                    self._set_dialogue(
                         f"{npc.name}: The sun is restored! "
                         f"I can never thank you enough. Duskhollow is saved!")
-                    self.message_timer = 0
                     return
                 elif inserted > 0:
                     self.npc_dialogue_active = True
                     self.npc_speaking = npc
                     remaining = total - inserted
-                    self.message = (
+                    self._set_dialogue(
                         f"{npc.name}: {inserted} keys inserted so far... "
                         f"{remaining} more to go! Try the next dungeon!")
-                    self.message_timer = 0
                     return
 
             # No keys inserted yet — offer the quest or cycle dialogue
@@ -621,8 +621,7 @@ class TownState(InventoryMixin, BaseState):
                 self.npc_speaking = npc
                 self.quest_dialogue_lines = list(npc.quest_dialogue)
                 self.quest_dialogue_index = 0
-                self.message = f"{npc.name}: {self.quest_dialogue_lines[0]}"
-                self.message_timer = 0
+                self._set_dialogue(f"{npc.name}: {self.quest_dialogue_lines[0]}")
                 return
 
             # Fall through to normal cycling dialogue
@@ -631,8 +630,7 @@ class TownState(InventoryMixin, BaseState):
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         line = npc.get_dialogue()
-        self.message = f"{npc.name}: {line}"
-        self.message_timer = 0  # dialogue stays until dismissed
+        self._set_dialogue(f"{npc.name}: {line}")
 
     def _advance_dialogue(self):
         """Advance or dismiss the current dialogue."""
@@ -642,7 +640,7 @@ class TownState(InventoryMixin, BaseState):
             if self.quest_dialogue_index < len(self.quest_dialogue_lines):
                 # Show next quest dialogue line
                 npc = self.npc_speaking
-                self.message = f"{npc.name}: {self.quest_dialogue_lines[self.quest_dialogue_index]}"
+                self._set_dialogue(f"{npc.name}: {self.quest_dialogue_lines[self.quest_dialogue_index]}")
                 return
             else:
                 # All dialogue lines shown — present the Y/N choices
@@ -678,7 +676,7 @@ class TownState(InventoryMixin, BaseState):
                 self._accept_quest()
         else:
             # Declined
-            self.message = f"{npc.name}: No worries. Come back if you change your mind."
+            self._set_dialogue(f"{npc.name}: No worries. Come back if you change your mind.")
             self.quest_choice_active = False
             self.quest_choices = []
             self.quest_dialogue_lines = []
@@ -691,7 +689,7 @@ class TownState(InventoryMixin, BaseState):
         self.game._gnome_quest_accepted = True
         inserted = getattr(self.game, "keys_inserted", 0)
         total = len(getattr(self.game, "key_dungeons", {}))
-        self.message = (
+        self._set_dialogue(
             f"{npc.name}: Thank you! The 8 dungeons are scattered across "
             f"the land. Start with the closest one — it's the easiest. "
             f"Bring the keys back to me!")
@@ -725,7 +723,7 @@ class TownState(InventoryMixin, BaseState):
         }
 
         # Show confirmation
-        self.message = f"{npc.name}: Thank you! I've marked a suspicious location on your map. Be careful down there!"
+        self._set_dialogue(f"{npc.name}: Thank you! I've marked a suspicious location on your map. Be careful down there!")
         self.quest_choice_active = False
         self.quest_choices = []
         self.quest_dialogue_lines = []
@@ -781,8 +779,7 @@ class TownState(InventoryMixin, BaseState):
         # Dialogue will show after the animation finishes
         self.npc_dialogue_active = True
         self.npc_speaking = npc
-        self.message = f"{npc.name}: You found the Shadow Crystal! Here's {reward} gold for your bravery!"
-        self.message_timer = 0
+        self._set_dialogue(f"{npc.name}: You found the Shadow Crystal! Here's {reward} gold for your bravery!")
 
     # ── Shop ──────────────────────────────────────────────────────
 
@@ -1089,7 +1086,7 @@ class TownState(InventoryMixin, BaseState):
             renderer.draw_party_screen_u3(self.game.party)
             return
         # Use the new sprite-tile-based town renderer
-        msg = self.message if not self.npc_dialogue_active else ""
+        msg = self.message
         quest = self.game.quest
         quest_complete = (quest is not None
                           and quest.get("status") == "completed")
