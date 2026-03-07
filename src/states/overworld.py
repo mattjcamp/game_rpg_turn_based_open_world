@@ -70,6 +70,11 @@ class OverworldState(InventoryMixin, BaseState):
         self.dungeon_action_info = {}         # {name, description, visited, quest_name}
         self.dungeon_action_entry_args = None # pre-computed entry params
 
+        # Town/location entry action screen
+        self.town_action_active = False
+        self.town_action_cursor = 0           # 0=Enter, 1=Leave
+        self.town_action_info = {}            # {name, description}
+
     def enter(self):
         self._apply_pending_combat_rewards()
         if self.pending_combat_message:
@@ -259,6 +264,11 @@ class OverworldState(InventoryMixin, BaseState):
                         self.log_scroll += 3
                     elif event.key == pygame.K_DOWN:
                         self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
+                # ── Town action screen input ──
+                if self.town_action_active:
+                    self._handle_town_action_input(event)
                     return
 
                 # ── Dungeon action screen input ──
@@ -602,14 +612,7 @@ class OverworldState(InventoryMixin, BaseState):
         )
 
         if tile_id == TILE_TOWN:
-            # Enter the town!
-            town_state = self.game.states["town"]
-            town_state.enter_town(
-                self.game.town_data,
-                self.game.party.col,
-                self.game.party.row
-            )
-            self.game.change_state("town")
+            self._show_town_action()
             return
 
         elif tile_id == TILE_DUNGEON:
@@ -699,6 +702,54 @@ class OverworldState(InventoryMixin, BaseState):
         if not hq or hq["status"] not in ("active", "artifact_found"):
             return False
         return col == hq["dungeon_col"] and row == hq["dungeon_row"]
+
+    # ── Dungeon action screen ─────────────────────────────────
+
+    # ── Town/location action screen ──────────────────────────────
+
+    _TOWN_DESCRIPTIONS = {
+        "Thornwall": "A sturdy frontier town nestled against the hills. Merchants, healers, and townsfolk go about their daily lives within its wooden walls.",
+        "Duskhollow": "A shadowed settlement cloaked in perpetual twilight. Strange lights flicker in the windows and whispered rumors fill the streets.",
+    }
+
+    def _show_town_action(self):
+        """Show the town entry action screen."""
+        town_data = self.game.town_data
+        name = town_data.name if town_data else "Town"
+        desc = self._TOWN_DESCRIPTIONS.get(name,
+            "A small settlement rises from the landscape. Smoke drifts from chimneys and voices carry on the wind.")
+
+        self.town_action_info = {
+            "name": name,
+            "description": desc,
+        }
+        self.town_action_cursor = 0
+        self.town_action_active = True
+
+    def _handle_town_action_input(self, event):
+        """Handle input for the town entry action screen."""
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.town_action_cursor = (self.town_action_cursor - 1) % 2
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.town_action_cursor = (self.town_action_cursor + 1) % 2
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self.town_action_cursor == 0:
+                self._enter_town_confirmed()
+            else:
+                self.town_action_active = False
+        elif event.key == pygame.K_ESCAPE:
+            self.town_action_active = False
+
+    def _enter_town_confirmed(self):
+        """Execute the actual town entry after the player confirms."""
+        self.town_action_active = False
+        town_state = self.game.states["town"]
+        town_state.enter_town(
+            self.game.town_data,
+            self.game.party.col,
+            self.game.party.row
+        )
+        self.game.change_state("town")
 
     # ── Dungeon action screen ─────────────────────────────────
 
@@ -1015,6 +1066,9 @@ class OverworldState(InventoryMixin, BaseState):
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
         )
+        if self.town_action_active:
+            renderer.draw_town_action_screen(
+                self.town_action_info, self.town_action_cursor)
         if self.dungeon_action_active:
             renderer.draw_dungeon_action_screen(
                 self.dungeon_action_info, self.dungeon_action_cursor)

@@ -485,10 +485,10 @@ class Renderer:
     # ========================================================
 
     _U3_TN_COLS = 30       # tiles visible horizontally (full width)
-    _U3_TN_ROWS = 21       # tiles visible vertically
+    _U3_TN_ROWS = 20       # tiles visible vertically
     _U3_TN_TS   = 32       # tile size
     _U3_TN_MAP_W = _U3_TN_COLS * _U3_TN_TS   # 960
-    _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 672
+    _U3_TN_MAP_H = _U3_TN_ROWS * _U3_TN_TS   # 640
 
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False, darkness_active=False,
@@ -631,26 +631,54 @@ class Renderer:
         prev_clip = self.screen.get_clip()
         self.screen.set_clip(pygame.Rect(0, bar_y, SCREEN_WIDTH, bar_h))
 
-        tile_name = tile_map.get_tile_name(party.col, party.row)
-        # Top line: town info
-        self._u3_text(f"GOLD:{party.gold:d}", 8, bar_y + 6, (255, 255, 0))
-        self._u3_text(town_data.name.upper(), 240, bar_y + 6, (255, 170, 85))
-        light_name = party.get_equipped_name("light")
-        if light_name:
-            charges = party.get_equipped_charges("light")
-            lbl = f"LIGHT:{light_name.upper()}"
-            if charges is not None:
-                lbl += f":{charges:d}"
-            self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85))
-        self._u3_text(f"POS:({party.col},{party.row})", 770, bar_y + 6, (136, 136, 136))
-        # Bottom line: controls
-        self._u3_text("[ARROWS/WASD] MOVE  [P] PARTY  [BUMP NPC] TALK  [ESC] LEAVE",
-                      8, bar_y + 28, (68, 68, 255))
+        # ── Row 1: town name + [H] HELP ──
+        f = self.font  # 18px font for row 1
+        row1_y = bar_y + 4
+        self._u3_text(town_data.name.upper(), 8, row1_y + 2,
+                      (255, 170, 85), font=f)
+        self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y + 2,
+                      (120, 120, 200), font=self.font_small)
+
+        # ── Row 2+: message text (bigger, mixed-case, multi-line) ──
+        if message:
+            if not hasattr(self, "_tn_readout_font"):
+                self._tn_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
+            rf = self._tn_readout_font
+            text_color = (255, 255, 255)
+            text_x = 10
+            text_y = bar_y + 28
+            max_w = SCREEN_WIDTH - text_x - 16
+            line_h = rf.get_linesize()
+            max_lines = max(1, (bar_y + bar_h - text_y - 4) // line_h)
+
+            # Word-wrap into lines that fit the bar width
+            words = message.split(" ")
+            lines = []
+            current = ""
+            for word in words:
+                test = (current + " " + word).strip() if current else word
+                if rf.size(test)[0] <= max_w:
+                    current = test
+                else:
+                    if current:
+                        lines.append(current)
+                    current = word
+            if current:
+                lines.append(current)
+
+            # Truncate to max visible lines
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                last = lines[-1]
+                while last and rf.size(last + "..")[0] > max_w:
+                    last = last[:-1]
+                lines[-1] = last.rstrip() + ".."
+
+            for i, line in enumerate(lines):
+                line_surf = rf.render(line, True, text_color)
+                self.screen.blit(line_surf, (text_x, text_y + i * line_h))
 
         self.screen.set_clip(prev_clip)
-
-        # ── 6. floating message ──
-        self._draw_floating_message(message)
 
     def draw_pickpocket_targeting(self, party, town_data, targets, cursor_idx):
         """Draw pickpocket targeting overlay on top of the town map.
@@ -2935,6 +2963,83 @@ class Renderer:
         self.screen.blit(glow_surf, (door_px, door_py))
 
     # ── Dungeon entry action screen ──────────────────────────────
+
+    def draw_town_action_screen(self, info, cursor):
+        """Draw the town/location entry confirmation panel over the overworld."""
+        name = info.get("name", "Town")
+        desc = info.get("description", "")
+
+        panel_w = 440
+        pad = 16
+        content_w = panel_w - pad * 2
+        line_h = 24
+        title_font = pygame.font.SysFont("monospace", 22, bold=True)
+        body_font = self.font          # 18px
+        hint_font = self.font_small    # 14px
+
+        # ── Word-wrap the description ──
+        desc_lines = []
+        for word in desc.split():
+            if desc_lines and body_font.size(desc_lines[-1] + " " + word)[0] <= content_w:
+                desc_lines[-1] += " " + word
+            else:
+                desc_lines.append(word)
+
+        # ── Calculate panel height ──
+        h = pad
+        h += 28           # title
+        h += 12           # gap
+        h += len(desc_lines) * line_h  # description
+        h += 16           # gap
+        h += line_h * 2   # two options
+        h += 12           # gap
+        h += 18           # hint
+        h += pad
+
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
+
+        # ── Dim overlay ──
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.screen.blit(dim, (0, 0))
+
+        # ── Panel ──
+        self._u3_panel(panel_x, panel_y, panel_w, h)
+
+        y = panel_y + pad
+
+        # ── Title ──
+        title_surf = title_font.render(name, True, (200, 180, 255))
+        self.screen.blit(title_surf, (panel_x + pad, y))
+        y += 28 + 12
+
+        # ── Description ──
+        for line in desc_lines:
+            line_surf = body_font.render(line, True, (220, 220, 240))
+            self.screen.blit(line_surf, (panel_x + pad, y))
+            y += line_h
+        y += 16
+
+        # ── Options ──
+        options = [f"Enter {name}", "Leave"]
+        for i, label in enumerate(options):
+            is_sel = (i == cursor)
+            if is_sel:
+                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
+                pygame.draw.rect(self.screen, (40, 40, 80), hl)
+                arrow_surf = body_font.render(">", True, (255, 220, 100))
+                self.screen.blit(arrow_surf, (panel_x + pad, y))
+
+            color = (255, 255, 255) if is_sel else (180, 180, 200)
+            opt_surf = body_font.render(label, True, color)
+            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
+            y += line_h
+        y += 12
+
+        # ── Hint ──
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, (80, 80, 140))
+        self.screen.blit(hint_surf, (panel_x + pad, y))
 
     def draw_dungeon_action_screen(self, info, cursor):
         """Draw the dungeon entry confirmation panel over the overworld."""
