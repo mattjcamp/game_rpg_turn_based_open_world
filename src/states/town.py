@@ -185,11 +185,23 @@ class TownState(InventoryMixin, BaseState):
             self.game.camera.update(self.game.party.col, self.game.party.row)
 
     def exit(self):
-        """Called when leaving this state."""
+        """Called when leaving this state — reset all transient UI state."""
         self.npc_dialogue_active = False
         self.npc_speaking = None
+        self.message = ""
+        self.message_timer = 0
         self.pickpocket_targeting = False
         self.pickpocket_targets = []
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
+        self.showing_shop = False
+        self.showing_temple_service = False
+        self.showing_log = False
+        self.showing_party = False
+        self.showing_party_inv = False
+        self.showing_char_detail = None
 
     def handle_input(self, events, keys_pressed):
         """Handle movement and NPC interaction."""

@@ -11524,31 +11524,43 @@ class Renderer:
             return
 
         # ── Calculate how many rows fit, accounting for group gaps ──
-        # We need to figure out visible rows from the bottom up.
+        # Walk BACKWARD from the end so the newest entries are always visible.
         total = len(wrapped)
 
-        # Estimate max_visible (rough upper bound for scroll math)
-        max_visible = text_h // line_h
+        # First, figure out how many rows fit when viewing the very bottom
+        # (scroll_offset == 0). Walk backward from the last row.
+        def _count_fitting(end):
+            """Return (start_idx, num_rows) that fit in text_h ending at end."""
+            acc = 0
+            start = end
+            for i in range(end - 1, -1, -1):
+                _text, _orig, _is_start = wrapped[i]
+                cost = line_h
+                # group gap applies when this row is a group start and
+                # there is a following row visible (i.e. i < end - 1 won't
+                # be the very last row drawn)
+                if _is_start and i < end - 1:
+                    cost += group_gap
+                if acc + cost > text_h:
+                    break
+                acc += cost
+                start = i
+            return start, end - start
 
-        max_scroll = max(0, total - max_visible)
+        # Compute max_visible using the densest-possible estimate (no gaps)
+        # then refine with the backward walk for accurate rendering.
+        max_visible_est = text_h // line_h
+        max_scroll = max(0, total - max_visible_est)
         scroll_offset = max(0, min(scroll_offset, max_scroll))
 
         end_idx = total - scroll_offset
-        start_idx = max(0, end_idx - max_visible)
+        start_idx, _count = _count_fitting(end_idx)
 
-        # Now refine: walk forward from start_idx, accumulating height
-        # to determine exactly which rows fit
+        # Build the visible list (forward order for rendering)
         visible = []
-        accum_h = 0
         for idx in range(start_idx, end_idx):
             row_text, row_orig, row_is_start = wrapped[idx]
-            row_cost = line_h
-            if row_is_start and visible:  # group gap before new entry
-                row_cost += group_gap
-            if accum_h + row_cost > text_h:
-                break
             visible.append((row_text, row_orig, row_is_start))
-            accum_h += row_cost
 
         # Set a clipping rect so nothing draws outside the content area
         clip_rect = pygame.Rect(px + 2, content_y, pw - 4, content_h)
@@ -11573,7 +11585,7 @@ class Renderer:
             self.screen.blit(more_down,
                              (px + pw // 2 - more_down.get_width() // 2,
                               text_bottom + 2))
-        if scroll_offset < max_scroll:
+        if start_idx > 0:
             more_up = log_font.render("^ MORE ^", True, (100, 180, 255))
             self.screen.blit(more_up,
                              (px + pw // 2 - more_up.get_width() // 2,
