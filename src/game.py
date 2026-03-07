@@ -35,6 +35,7 @@ class Game:
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption(GAME_TITLE)
+        pygame.display.set_icon(self._generate_window_icon())
         self.clock = pygame.time.Clock()
         self.running = True
 
@@ -273,6 +274,40 @@ class Game:
         self.showing_title = False
         self.change_state("overworld")
         self.camera.update(self.party.col, self.party.row)
+
+    @staticmethod
+    def _generate_window_icon():
+        """Create a 32×32 procedural window icon — dark-fantasy crystal."""
+        import math
+        sz = 32
+        icon = pygame.Surface((sz, sz), pygame.SRCALPHA)
+        icon.fill((0, 0, 0, 0))
+        cx, cy = sz // 2, sz // 2
+
+        # Dark background circle
+        pygame.draw.circle(icon, (15, 10, 30, 255), (cx, cy), 15)
+        pygame.draw.circle(icon, (30, 20, 50, 255), (cx, cy), 13)
+
+        # Glowing purple crystal (diamond shape)
+        pts = [(cx, cy - 10), (cx + 7, cy), (cx, cy + 10), (cx - 7, cy)]
+        pygame.draw.polygon(icon, (120, 50, 200), pts)
+        # Crystal highlight
+        inner = [(cx, cy - 6), (cx + 4, cy), (cx, cy + 6), (cx - 4, cy)]
+        pygame.draw.polygon(icon, (170, 100, 255), inner)
+        # Bright core
+        pygame.draw.circle(icon, (220, 180, 255), (cx, cy), 2)
+
+        # Glow aura
+        for r in range(8, 15):
+            a = max(0, 60 - (r - 8) * 8)
+            glow = pygame.Surface((sz, sz), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (140, 80, 220, a), (cx, cy), r)
+            icon.blit(glow, (0, 0))
+
+        # Thin gold border ring
+        pygame.draw.circle(icon, (200, 170, 60), (cx, cy), 15, 1)
+
+        return icon
 
     def _init_key_dungeons(self, kd_list):
         """Set up key dungeon quest entries from the module manifest.

@@ -3109,6 +3109,64 @@ class CombatState(BaseState):
         self.game.sfx.play("heal")
         self.selected_spell = None
 
+    def _cast_restore(self):
+        """Cast Restore — fully heals HP and MP for all allies and cures poison."""
+        f = self.active_fighter
+        if not f:
+            return
+
+        spell_id = self.selected_spell or "restore"
+        spell = SPELLS_DATA.get(spell_id, {})
+        spell_name = spell.get("name", "Restore")
+        mp_cost = spell.get("mp_cost", 35)
+
+        if not f.can_cast_priest():
+            self.combat_log.append(f"{f.name} cannot cast divine spells!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"Not enough MP! ({f.current_mp}/{mp_cost})")
+            self.selected_spell = None
+            self.phase = PHASE_PLAYER
+            return
+
+        f.current_mp -= mp_cost
+
+        self.combat_log.append(
+            f"{f.name} casts {spell_name}! (-{mp_cost} MP)")
+
+        for member in self.fighters:
+            if not member.is_alive():
+                continue
+            # Restore HP to full
+            old_hp = member.hp
+            member.hp = member.max_hp
+            hp_restored = member.hp - old_hp
+
+            # Restore MP to full for allies — caster pays the cost
+            if member is not f:
+                member.current_mp = member.max_mp
+
+            # Cure poison
+            if getattr(member, "poisoned", False):
+                member.poisoned = False
+                self.combat_log.append(
+                    f"  {member.name} is cured of poison!")
+
+            if hp_restored > 0:
+                mc, mr = self.fighter_positions.get(member, (3, 5))
+                self.heal_effects.append(HealEffect(mc, mr, hp_restored))
+
+            self.combat_log.append(
+                f"  {member.name} is fully restored!")
+
+        self.phase = PHASE_HEAL
+        self.game.sfx.play("heal")
+        self.selected_spell = None
+
     def _cast_cure_poison(self, target):
         """Cast Cure Poison on a selected ally, removing the poisoned condition."""
         f = self.active_fighter
@@ -3581,6 +3639,8 @@ class CombatState(BaseState):
             self._cast_invisibility()
         elif effect_type == "mass_heal":
             self._cast_mass_heal()
+        elif effect_type == "restore":
+            self._cast_restore()
         elif effect_type == "bless":
             self._cast_bless()
         else:

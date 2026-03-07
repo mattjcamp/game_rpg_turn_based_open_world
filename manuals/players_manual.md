@@ -469,22 +469,22 @@ Spells consume **Magic Points (MP)** and are divided into two schools: **Priest*
 
 ### Sorcerer Spells
 
-These spells are available to Wizards, Alchemists, and Druids. Spells are organized by tier — higher-tier spells are more powerful but require higher levels and more MP to cast.
+These spells are available to Wizards, Alchemists, and Druids. New spells unlock at every level — higher-level spells are more powerful but require more MP to cast.
 
 | Spell | Lvl | MP | Effect | Range |
 |-------|-----|-----|--------|-------|
 | **Magic Dart** | 1 | 3 | 1d6 + INT mod damage (single target projectile) | 99 |
 | **Shield** | 1 | 4 | +1 AC to target for 3 turns | 5 |
-| **Long Shanks** | 1 | 4 | +4 movement range to target for 3 turns | 99 |
 | **Sleep** | 1 | 5 | Puts target to sleep (2 turns, targets up to 15 HP, save DC 8 + INT mod) | 99 |
-| **Knock** | 2 | 7 | Unlocks a locked door (d20 + INT mod vs DC 12) | 1 |
+| **Long Shanks** | 2 | 6 | +4 movement range to target for 3 turns | 99 |
+| **Knock** | 2 | 6 | Unlocks a locked door (d20 + INT mod vs DC 12) | 1 |
 | **Magic Arrow** | 3 | 8 | 3d8 + INT mod damage (piercing bolt, select target) | 99 |
-| **Misty Step** | 3 | 8 | Teleport to a chosen location on the battlefield | 99 |
+| **Misty Step** | 4 | 8 | Teleport to a chosen location on the battlefield | 99 |
+| **Invisibility** | 4 | 16 | Caster becomes invisible to enemies for 3 turns | Self |
 | **Charm Person** | 5 | 14 | Humanoid target fights for you (3 turns, save DC 12 + INT mod) | 99 |
 | **Lightning Bolt** | 5 | 15 | 6d6 + INT mod damage to all creatures in a straight line | 99 |
-| **Invisibility** | 5 | 16 | Caster becomes invisible to enemies for 3 turns | Self |
+| **Animate Dead** | 6 | 20 | Summon a skeleton ally (30 HP, AC 14, +6 attack, 2d6+3 dmg) for 5 turns | 99 |
 | **Fireball** | 7 | 25 | 5d8 + INT mod damage in a 3-tile radius (hits allies too!) | 99 |
-| **Animate Dead** | 7 | 28 | Summon a skeleton ally (30 HP, AC 14, +6 attack, 2d6+3 dmg) for 5 turns | 99 |
 
 ### Priest Spells
 
@@ -494,13 +494,14 @@ These spells are available to Clerics, Paladins, Rangers, and Druids.
 |-------|-----|-----|--------|-------|--------|
 | **Minor Heal** | 1 | 3 | Heals 1d6 + WIS mod HP | 6 | Battle, Overworld, Town, Dungeon |
 | **Light** | 1 | 3 | Illuminates dungeon corridors for 100 turns | Self | Dungeon only |
-| **Cure Poison** | 1 | 5 | Removes poison from target | 99 | Battle only |
-| **Turn Undead** | 3 | 8 | Strips 50% HP from all undead on the battlefield | 99 | Battle only |
+| **Cure Poison** | 2 | 5 | Removes poison from target | 99 | Battle only |
+| **Turn Undead** | 2 | 8 | Strips 50% HP from all undead on the battlefield | 99 | Battle only |
 | **Bless** | 3 | 10 | +2 attack bonus to all allies for 4 turns | Self | Battle only |
 | **Curse** | 3 | 10 | −2 AC and −2 attack penalty on target for 4 turns | 99 | Battle only |
-| **Major Heal** | 5 | 15 | Heals 4d8 + WIS mod HP | 4 | Battle only |
+| **Major Heal** | 4 | 15 | Heals 4d8 + WIS mod HP | 4 | Battle only |
 | **Push** | 5 | 14 | Repels monsters in a 5-tile radius | Self | Overworld, Dungeon, Town |
-| **Mass Heal** | 7 | 25 | Heals 3d10 + WIS mod HP to all nearby allies | Self | Battle only |
+| **Mass Heal** | 6 | 25 | Heals 3d10 + WIS mod HP to all nearby allies | Self | Battle only |
+| **Restore** | 7 | 35 | Fully restores HP and MP for all allies and cures all poisons (caster's MP is not restored) | Self | Battle only |
 
 > **Note:** **Knock** is a contextual spell — it does not appear in the normal spell menu. Instead, it automatically appears as an option when you encounter a locked door in a dungeon, provided you have an eligible caster (Wizard, Alchemist, or Druid at level 2+) with enough MP. It works like a Thief's lockpick but uses Intelligence instead of Dexterity, and costs MP instead of a lockpick.
 
@@ -509,6 +510,8 @@ These spells are available to Clerics, Paladins, Rangers, and Druids.
 > **Tip:** Minor Heal and Light are usable outside of combat. Keep your healers' MP stocked for between-fight patching up.
 
 > **Warning:** Fireball is the game's most devastating spell, but it requires Level 7 and costs 25 MP. It hits *everything* in its radius, including your own party members. Position carefully before casting!
+
+> **Warning:** Restore is the Cleric's ultimate spell — it fully heals the entire party's HP and MP and cures all poisons, but at 35 MP it costs half the Cleric's total pool at Level 7, and the caster's own MP is *not* restored. Use it when the party is on the brink.
 
 ---
 

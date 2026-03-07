@@ -306,6 +306,8 @@ class InventoryMixin:
                 getattr(member, "current_mp", 0) + mp_restore)
             actual_hp = member.hp - old_hp
             actual_mp = member.current_mp - old_mp
+            # Advance the clock by 10 hours (camping takes time)
+            self.game.party.clock.advance(600)
             self.game.game_log.append(
                 f"{member.name} rests using {item_name}. "
                 f"(+{actual_hp} HP, +{actual_mp} MP)")
@@ -1048,6 +1050,8 @@ class InventoryMixin:
                     m.max_mp, getattr(m, "current_mp", 0) + mp_restore)
                 total_hp += m.hp - old_hp
                 total_mp += m.current_mp - old_mp
+            # Advance the clock by 10 hours (camping takes time)
+            party.clock.advance(600)
             self.game.game_log.append(
                 f"The party rests using {item_name}...")
             self.game.game_log.append(

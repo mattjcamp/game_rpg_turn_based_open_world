@@ -109,6 +109,7 @@ class _MockDraw:
 class _MockDisplay:
     def set_mode(self, *a, **kw): return _MockSurface((800, 600))
     def set_caption(self, *a): pass
+    def set_icon(self, *a): pass
     def flip(self): pass
     def update(self, *a): pass
     def get_surface(self): return _MockSurface((800, 600))

@@ -1,5 +1,5 @@
 {
-  "_comment": "Spell definitions for Realm of Shadow. Spells are tiered by level: Tier 1 (Lv1, 3-5 MP), Tier 2 (Lv3, 8-10 MP), Tier 3 (Lv5, 14-20 MP), Tier 4 (Lv7, 25-30 MP). Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels. usable_in lists the game screens where the spell can be cast: 'battle', 'overworld', 'town', 'dungeon'.",
+  "_comment": "Spell definitions for Realm of Shadow. New spells unlock at every level from 1-7. Each spell can be cast by characters whose class matches the allowable_classes list and whose level meets min_level. Duration is 'instant' or a turn count. effect_value describes the spell's power formula. range is the max number of squares the effect travels. usable_in lists the game screens where the spell can be cast: 'battle', 'overworld', 'town', 'dungeon'.",
 
   "spells": [
 
@@ -142,8 +142,8 @@
       "description": "Enchants an ally's legs with unnatural speed, extending their movement range for 3 turns.",
       "allowable_classes": ["Wizard", "Alchemist"],
       "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 4,
+      "min_level": 2,
+      "mp_cost": 6,
       "duration": 3,
       "effect_type": "range_buff",
       "effect_value": {
@@ -162,7 +162,7 @@
       "description": "The caster vanishes in a swirl of silvery mist and reappears at a chosen location on the battlefield.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 3,
+      "min_level": 4,
       "mp_cost": 8,
       "duration": "instant",
       "effect_type": "teleport",
@@ -201,7 +201,7 @@
       "description": "The caster bends light around themselves, becoming invisible to enemies for 3 turns.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 5,
+      "min_level": 4,
       "mp_cost": 16,
       "duration": 3,
       "effect_type": "invisibility",
@@ -219,8 +219,8 @@
       "description": "Raises a powerful skeleton warrior from the earth to fight for the caster.",
       "allowable_classes": ["Wizard"],
       "casting_type": "sorcerer",
-      "min_level": 7,
-      "mp_cost": 28,
+      "min_level": 6,
+      "mp_cost": 20,
       "duration": 5,
       "effect_type": "summon_skeleton",
       "effect_value": {
@@ -266,7 +266,7 @@
       "description": "Draws the venom from an ally's body with a cleansing prayer, removing the poisoned condition.",
       "allowable_classes": ["Cleric", "Paladin", "Druid", "Ranger"],
       "casting_type": "priest",
-      "min_level": 1,
+      "min_level": 2,
       "mp_cost": 5,
       "duration": "instant",
       "effect_type": "cure_poison",
@@ -304,7 +304,7 @@
       "description": "Channels holy energy that sears undead creatures, stripping 50% of their life force.",
       "allowable_classes": ["Cleric"],
       "casting_type": "priest",
-      "min_level": 3,
+      "min_level": 2,
       "mp_cost": 8,
       "duration": "instant",
       "effect_type": "undead_damage",
@@ -365,7 +365,7 @@
       "description": "Channels a powerful wave of restorative energy toward an ally, mending grievous wounds.",
       "allowable_classes": ["Cleric", "Paladin"],
       "casting_type": "priest",
-      "min_level": 5,
+      "min_level": 4,
       "mp_cost": 15,
       "duration": "instant",
       "effect_type": "major_heal",
@@ -409,7 +409,7 @@
       "description": "A burst of divine light radiates from the caster, restoring health to all nearby allies.",
       "allowable_classes": ["Cleric"],
       "casting_type": "priest",
-      "min_level": 7,
+      "min_level": 6,
       "mp_cost": 25,
       "duration": "instant",
       "effect_type": "mass_heal",
@@ -427,13 +427,35 @@
     },
 
     {
+      "id": "restore",
+      "name": "Restore",
+      "description": "A radiant pillar of divine power engulfs the party, fully restoring health and mana to all allies and purging all poisons from their bodies.",
+      "allowable_classes": ["Cleric"],
+      "casting_type": "priest",
+      "min_level": 7,
+      "mp_cost": 35,
+      "duration": "instant",
+      "effect_type": "restore",
+      "effect_value": {
+        "heal_percent": 1.0,
+        "mp_percent": 1.0,
+        "cure_poison": true
+      },
+      "range": 0,
+      "targeting": "self",
+      "usable_in": ["battle"],
+      "sfx": "heal",
+      "hit_sfx": null
+    },
+
+    {
       "id": "knock",
       "name": "Knock",
       "description": "Sends a pulse of arcane force into a lock's mechanism, rattling tumblers and wards alike.",
       "allowable_classes": ["Wizard", "Alchemist", "Druid"],
       "casting_type": "sorcerer",
       "min_level": 2,
-      "mp_cost": 7,
+      "mp_cost": 6,
       "duration": "instant",
       "effect_type": "knock",
       "effect_value": {
