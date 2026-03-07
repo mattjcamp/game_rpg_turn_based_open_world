@@ -719,6 +719,13 @@ class OverworldState(InventoryMixin, BaseState):
         desc = self._TOWN_DESCRIPTIONS.get(name,
             "A small settlement rises from the landscape. Smoke drifts from chimneys and voices carry on the wind.")
 
+        # After the quest is complete, Duskhollow is no longer dark
+        if (name == "Duskhollow"
+                and not getattr(self.game, "darkness_active", False)):
+            desc = ("Once shrouded in eternal darkness, Duskhollow now basks "
+                    "in warm sunlight. The townsfolk celebrate their freedom "
+                    "as life returns to normal.")
+
         self.town_action_info = {
             "name": name,
             "description": desc,

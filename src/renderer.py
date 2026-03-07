@@ -492,12 +492,18 @@ class Renderer:
 
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False, darkness_active=False,
-                      keys_inserted=0):
+                      keys_inserted=0, shake_offset=(0, 0)):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
         """
         self.screen.fill((0, 0, 0))
+
+        # Apply screen shake offset (used during machine shutdown animation)
+        if shake_offset != (0, 0):
+            self._shake_offset = shake_offset
+        else:
+            self._shake_offset = (0, 0)
 
         ts = self._U3_TN_TS
         cols = self._U3_TN_COLS
@@ -516,13 +522,14 @@ class Renderer:
             self._keyslot_index[pos] = idx
 
         # ── 1. draw map tiles ──
+        sx, sy = self._shake_offset
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
                 wr = sr + off_r
                 tid = tile_map.get_tile(wc, wr)
-                px = sc * ts
-                py = sr * ts
+                px = sc * ts + sx
+                py = sr * ts + sy
                 self._u3_draw_town_tile(tid, px, py, ts, wc, wr,
                                         keys_inserted=keys_inserted)
 
@@ -531,11 +538,11 @@ class Renderer:
             nsc = npc.col - off_c
             nsr = npc.row - off_r
             if 0 <= nsc < cols and 0 <= nsr < rows:
-                cx = nsc * ts + ts // 2
-                cy = nsr * ts + ts // 2
+                cx = nsc * ts + ts // 2 + sx
+                cy = nsr * ts + ts // 2 + sy
                 self._u3_draw_npc_sprite(npc, cx, cy)
 
-        # ── 2b. Shadow Crystal on innkeeper's counter (quest trophy) ──
+        # ── 2b. Shadow Crystal on innkeeper's counter (quest trophy, no shake) ──
         if quest_complete:
             import math
             import time as _time
@@ -582,8 +589,8 @@ class Renderer:
         psc = party.col - off_c
         psr = party.row - off_r
         if 0 <= psc < cols and 0 <= psr < rows:
-            cx = psc * ts + ts // 2
-            cy = psr * ts + ts // 2
+            cx = psc * ts + ts // 2 + sx
+            cy = psr * ts + ts // 2 + sy
             self._u3_draw_overworld_party(cx, cy, party)
 
         # ── 3b. darkness overlay (Keys of Shadow / nighttime) ──
@@ -1540,6 +1547,269 @@ class Renderer:
         hint = "[SPACE / ENTER] continue   [ESC] close"
         hint_surface = self.font_small.render(hint, True, (120, 120, 140))
         self.screen.blit(hint_surface, (box_x + text_pad, cur_y + 4))
+
+    def draw_machine_shutdown_effect(self, effect):
+        """Draw the gnome machine shutdown animation overlay.
+
+        Four phases:
+        1. Machine overload — red/orange pulsing, energy arcs, screen shake
+        2. Machine dies — shockwave ring expands, colour cools to blue
+        3. Light returns — golden light expands, darkness fades away
+        4. Victory banner — QUEST COMPLETE with rewards
+        """
+        import math
+
+        t = effect.timer
+        cx = SCREEN_WIDTH // 2
+        cy = SCREEN_HEIGHT // 2
+
+        # ── Phase 1 (0.0 - 1.5s): Machine Overload ──
+        if t < 1.5:
+            phase = t / 1.5  # 0..1
+
+            # Red/orange pulsing overlay — intensifies over time
+            pulse = 0.5 + 0.5 * math.sin(t * 12)
+            overlay_alpha = int((40 + 80 * pulse) * phase)
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                     pygame.SRCALPHA)
+            r = int(200 + 55 * pulse)
+            g = int(60 + 40 * pulse)
+            overlay.fill((r, g, 0, overlay_alpha))
+            self.screen.blit(overlay, (0, 0))
+
+            # Bright glow at machine center
+            glow_r = int(30 + 60 * phase + 20 * pulse)
+            glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+            ga = int(120 + 100 * pulse * phase)
+            pygame.draw.circle(glow, (255, 160, 40, ga),
+                               (glow_r, glow_r), glow_r)
+            # Inner bright core
+            core_r = glow_r // 2
+            pygame.draw.circle(glow, (255, 240, 200, min(255, ga + 60)),
+                               (glow_r, glow_r), core_r)
+            self.screen.blit(glow, (cx - glow_r, cy - glow_r))
+
+            # Energy arcs radiating from center
+            for arc in effect.arcs:
+                # Flicker each arc on/off
+                flicker = math.sin(t * arc["speed"] + arc["phase_offset"])
+                if flicker < 0.1:
+                    continue
+                a = arc["angle"] + t * 0.5  # slow rotation
+                length = arc["length"] * phase * flicker
+                ex = cx + int(math.cos(a) * length)
+                ey = cy + int(math.sin(a) * length)
+                # Lightning jag — single segment with midpoint offset
+                mid_x = (cx + ex) // 2 + int(8 * math.sin(t * 15 + arc["phase_offset"]))
+                mid_y = (cy + ey) // 2 + int(8 * math.cos(t * 15 + arc["phase_offset"]))
+                brightness = int(200 + 55 * flicker)
+                color = (brightness, int(brightness * 0.5), 0)
+                w = arc["width"]
+                pygame.draw.line(self.screen, color, (cx, cy), (mid_x, mid_y), w)
+                pygame.draw.line(self.screen, color, (mid_x, mid_y), (ex, ey), w)
+
+        # ── Phase 2 (1.5 - 3.0s): Machine Dies — Shockwave ──
+        elif t < 3.0:
+            phase = (t - 1.5) / 1.5  # 0..1
+
+            # Bright flash at the start of the shockwave
+            if phase < 0.1:
+                flash_a = int(255 * (1.0 - phase / 0.1))
+                flash = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                       pygame.SRCALPHA)
+                flash.fill((255, 255, 255, flash_a))
+                self.screen.blit(flash, (0, 0))
+
+            # Expanding shockwave ring
+            max_radius = int(math.sqrt(cx * cx + cy * cy))  # corner distance
+            ring_radius = int(phase * max_radius)
+            ring_width = max(2, int(6 * (1.0 - phase)))
+            # Colour shifts from warm white → cool blue
+            rb = int(200 * (1.0 - phase) + 80 * phase)
+            gb = int(200 * (1.0 - phase) + 140 * phase)
+            bb = int(220 * (1.0 - phase) + 255 * phase)
+            ring_alpha = int(200 * (1.0 - phase * 0.7))
+            ring_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                       pygame.SRCALPHA)
+            pygame.draw.circle(ring_surf, (rb, gb, bb, ring_alpha),
+                               (cx, cy), ring_radius, ring_width)
+            self.screen.blit(ring_surf, (0, 0))
+
+            # Sparks along the shockwave front
+            elapsed = t - 1.5
+            for spark in effect.sparks:
+                if elapsed > spark["lifetime"]:
+                    continue
+                sp = elapsed / spark["lifetime"]
+                sx = cx + int(spark["vx"] * elapsed)
+                sy = cy + int(spark["vy"] * elapsed)
+                fade = 1.0 - sp
+                if (0 <= sx < SCREEN_WIDTH and 0 <= sy < SCREEN_HEIGHT
+                        and fade > 0):
+                    sc = spark["color"]
+                    fc = (int(sc[0] * fade), int(sc[1] * fade),
+                          int(sc[2] * fade))
+                    s = spark["size"]
+                    pygame.draw.rect(self.screen, fc, (sx, sy, s, s))
+
+            # Fading residual energy arcs (dimming)
+            arc_fade = max(0.0, 1.0 - phase * 2)
+            if arc_fade > 0:
+                for arc in effect.arcs:
+                    a = arc["angle"] + t * 0.3
+                    length = arc["length"] * 0.5 * arc_fade
+                    ex = cx + int(math.cos(a) * length)
+                    ey = cy + int(math.sin(a) * length)
+                    c = int(100 * arc_fade)
+                    pygame.draw.line(self.screen, (c, c, int(c * 1.5)),
+                                     (cx, cy), (ex, ey), 1)
+
+        # ── Phase 3 (3.0 - 4.5s): Light Returns ──
+        elif t < 4.5:
+            phase = (t - 3.0) / 1.5  # 0..1
+
+            # Expanding golden light circle from center
+            max_radius = int(math.sqrt(cx * cx + cy * cy)) + 50
+            light_radius = int(phase * max_radius)
+
+            # Golden glow overlay
+            light_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                        pygame.SRCALPHA)
+            # Warm golden tint that intensifies
+            ga = int(60 * phase)
+            light_surf.fill((255, 220, 100, ga))
+            self.screen.blit(light_surf, (0, 0))
+
+            # Bright expanding circle
+            glow_alpha = int(140 * (1.0 - phase * 0.5))
+            glow_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                       pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (255, 240, 180, glow_alpha),
+                               (cx, cy), light_radius)
+            # Inner brighter core
+            inner_r = max(1, light_radius // 2)
+            pygame.draw.circle(glow_surf, (255, 255, 230, min(255, glow_alpha + 40)),
+                               (cx, cy), inner_r)
+            self.screen.blit(glow_surf, (0, 0))
+
+            # Light rays
+            for ray in effect.rays:
+                ray_len = light_radius * 1.2
+                a = ray["angle"]
+                half_w = ray["width"]
+                ra = int(glow_alpha * ray["alpha_mult"])
+                if ra < 10:
+                    continue
+                # Triangle ray from center outward
+                tip_x = cx + int(math.cos(a) * ray_len)
+                tip_y = cy + int(math.sin(a) * ray_len)
+                perp_a = a + math.pi / 2
+                hw = int(half_w * ray_len)
+                base_l = (cx + int(math.cos(perp_a) * hw),
+                          cy + int(math.sin(perp_a) * hw))
+                base_r = (cx - int(math.cos(perp_a) * hw),
+                          cy - int(math.sin(perp_a) * hw))
+                ray_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                          pygame.SRCALPHA)
+                pygame.draw.polygon(ray_surf,
+                                    (255, 240, 180, ra // 2),
+                                    [base_l, (tip_x, tip_y), base_r])
+                self.screen.blit(ray_surf, (0, 0))
+
+            # "Sunlight returns!" text rising
+            text = "SUNLIGHT RETURNS!"
+            text_alpha = min(255, int(phase * 500))
+            if text_alpha > 50:
+                tc = min(255, text_alpha)
+                tw = len(text) * 10
+                self._u3_text(text, cx - tw // 2,
+                              cy - 60 - int(phase * 30),
+                              (tc, tc, int(tc * 0.5)), self.font)
+
+        # ── Phase 4 (4.5 - 6.0s): Victory Banner ──
+        else:
+            phase = (t - 4.5) / 1.5  # 0..1
+
+            # Warm ambient glow (sustained from Phase 3)
+            warm = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                                  pygame.SRCALPHA)
+            warm.fill((255, 220, 100, 30))
+            self.screen.blit(warm, (0, 0))
+
+            # Banner fade in
+            banner_alpha = min(1.0, phase * 2)
+
+            # Banner background
+            banner_w = 520
+            banner_h = 130
+            bx = (SCREEN_WIDTH - banner_w) // 2
+            by = (SCREEN_HEIGHT - banner_h) // 2 - 40
+
+            banner_surf = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
+            ba = int(210 * banner_alpha)
+            banner_surf.fill((10, 5, 30, ba))
+            self.screen.blit(banner_surf, (bx, by))
+
+            # Ornate double border
+            bc = int(220 * banner_alpha)
+            border_color = (bc, int(bc * 0.85), int(bc * 0.2))
+            pygame.draw.rect(self.screen, border_color,
+                             (bx, by, banner_w, banner_h), 2)
+            pygame.draw.rect(self.screen, border_color,
+                             (bx + 4, by + 4, banner_w - 8, banner_h - 8), 1)
+
+            # "QUEST COMPLETE!" text
+            title = "QUEST COMPLETE!"
+            pulse = 0.1 * math.sin(t * 3)
+            tr = min(255, int(255 * banner_alpha * (1 + pulse)))
+            tg = min(255, int(220 * banner_alpha * (1 + pulse)))
+            tb = min(255, int(60 * banner_alpha * (1 + pulse)))
+            tw = len(title) * 10
+            self._u3_text(title, cx - tw // 2, by + 14,
+                          (tr, tg, tb), self.font)
+
+            # Quest subtitle
+            qname = "Keys of Shadow"
+            qw = len(qname) * 8
+            qc = int(180 * banner_alpha)
+            self._u3_text(qname, cx - qw // 2, by + 44,
+                          (qc, qc, int(qc * 1.2)), self.font_med)
+
+            # Reward summary
+            reward_text = "+1000 Gold   +500 XP"
+            rw = len(reward_text) * 7
+            rc = int(200 * banner_alpha)
+            self._u3_text(reward_text, cx - rw // 2, by + 70,
+                          (rc, rc, int(rc * 0.4)), self.font_med)
+
+            # Flavour text
+            flavour = "The people of Duskhollow are saved!"
+            fw = len(flavour) * 6
+            fc = int(160 * banner_alpha)
+            self._u3_text(flavour, cx - fw // 2, by + 98,
+                          (fc, int(fc * 0.9), fc), self.font_small)
+
+            # Celebration sparkles
+            for sparkle in effect.sparkles:
+                sp_x = sparkle["x"]
+                sp_y = sparkle["y"]
+                sp_phase = sparkle["phase"] + t * sparkle["speed"]
+                brightness = int(
+                    (0.5 + 0.5 * math.sin(sp_phase)) * 255 * banner_alpha)
+                if brightness > 30:
+                    sc = (brightness, int(brightness * 0.85),
+                          int(brightness * 0.3))
+                    if 0 <= sp_x < SCREEN_WIDTH and 0 <= sp_y < SCREEN_HEIGHT:
+                        self.screen.set_at((sp_x, sp_y), sc)
+                        if brightness > 150:
+                            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                                nx, ny = sp_x + dx, sp_y + dy
+                                if (0 <= nx < SCREEN_WIDTH
+                                        and 0 <= ny < SCREEN_HEIGHT):
+                                    self.screen.set_at(
+                                        (nx, ny),
+                                        (brightness // 2, brightness // 2,
+                                         brightness // 3))
 
     def draw_quest_complete_effect(self, effect):
         """Draw the quest completion celebration animation overlay.

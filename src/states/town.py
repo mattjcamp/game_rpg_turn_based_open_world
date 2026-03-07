@@ -113,6 +113,101 @@ class TempleHealEffect:
             self.alive = False
 
 
+class MachineShutdownEffect:
+    """Multi-phase animation when the gnome machine is shut down.
+
+    Phase 1 (0.0 – 1.5s): Machine overload — screen shakes, red/orange pulsing,
+                            energy arcs radiate from center.
+    Phase 2 (1.5 – 3.0s): Machine dies — shockwave ring expands, colour cools
+                            from red to blue, arcs fade.
+    Phase 3 (3.0 – 4.5s): Light returns — golden light expands from center,
+                            darkness alpha fades to zero.
+    Phase 4 (4.5 – 6.0s): Victory banner — "QUEST COMPLETE" with reward text
+                            and sparkles.
+    """
+    DURATION = 6.0
+
+    def __init__(self):
+        self.timer = 0.0
+        self.alive = True
+
+        # Pre-generate energy arc data (Phase 1-2)
+        self.arcs = []
+        for _ in range(12):
+            angle = random.uniform(0, 2 * math.pi)
+            length = random.uniform(80, 220)
+            self.arcs.append({
+                "angle": angle,
+                "length": length,
+                "width": random.randint(1, 3),
+                "phase_offset": random.uniform(0, 2 * math.pi),
+                "speed": random.uniform(3, 8),
+            })
+
+        # Pre-generate shockwave sparks (Phase 2)
+        self.sparks = []
+        for _ in range(30):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(100, 300)
+            self.sparks.append({
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed,
+                "color": random.choice([
+                    (100, 160, 255), (140, 200, 255), (200, 220, 255),
+                    (80, 120, 220), (255, 255, 255),
+                ]),
+                "size": random.randint(2, 4),
+                "lifetime": random.uniform(0.8, 1.4),
+            })
+
+        # Pre-generate light rays (Phase 3)
+        self.rays = []
+        for _ in range(16):
+            angle = random.uniform(0, 2 * math.pi)
+            self.rays.append({
+                "angle": angle,
+                "width": random.uniform(0.04, 0.12),
+                "alpha_mult": random.uniform(0.6, 1.0),
+            })
+
+        # Pre-generate banner sparkles (Phase 4)
+        self.sparkles = []
+        for _ in range(20):
+            self.sparkles.append({
+                "x": random.randint(50, 750),
+                "y": random.randint(50, 650),
+                "phase": random.uniform(0, 2 * math.pi),
+                "speed": random.uniform(2, 5),
+            })
+
+        # Pre-generate screen shake offsets (Phase 1)
+        self.shake_offsets = []
+        for _ in range(60):
+            self.shake_offsets.append((
+                random.randint(-6, 6),
+                random.randint(-6, 6),
+            ))
+
+    def update(self, dt):
+        self.timer += dt
+        if self.timer >= self.DURATION:
+            self.alive = False
+
+    @property
+    def progress(self):
+        return min(1.0, self.timer / self.DURATION)
+
+    @property
+    def shake_offset(self):
+        """Return current screen shake (x, y) offset — only active in Phase 1."""
+        if self.timer > 1.5:
+            return (0, 0)
+        intensity = 1.0 - self.timer / 1.5  # fade out shake
+        idx = int(self.timer * 40) % len(self.shake_offsets)
+        sx, sy = self.shake_offsets[idx]
+        return (int(sx * intensity), int(sy * intensity))
+
+
 class TownState(InventoryMixin, BaseState):
     """Handles exploration inside a town."""
 
@@ -143,6 +238,8 @@ class TownState(InventoryMixin, BaseState):
 
         # Quest completion celebration effect
         self.quest_complete_effect = None
+        # Machine shutdown animation (Keys of Shadow victory)
+        self.machine_shutdown_effect = None
 
         # Temple service menu
         self.showing_temple_service = False
@@ -205,8 +302,8 @@ class TownState(InventoryMixin, BaseState):
 
     def handle_input(self, events, keys_pressed):
         """Handle movement and NPC interaction."""
-        # Block all input during quest celebration
-        if self.quest_complete_effect:
+        # Block all input during quest celebration or machine shutdown
+        if self.quest_complete_effect or self.machine_shutdown_effect:
             return
 
         for event in events:
@@ -474,7 +571,7 @@ class TownState(InventoryMixin, BaseState):
 
     def _trigger_victory(self):
         """Called when all 8 keys are inserted — the sun returns!"""
-        self.game.darkness_active = False
+        # Award rewards immediately (behind the animation)
         for m in self.game.party.alive_members():
             if m.is_alive():
                 m.exp += 500
@@ -486,8 +583,11 @@ class TownState(InventoryMixin, BaseState):
         self.game.game_log.append("Sunlight floods the land once more!")
         self.game.game_log.append("The people of Duskhollow are saved!")
         self.game.game_log.append("VICTORY! +500 XP, +1000 Gold")
-        self.show_message(
-            "THE MACHINE POWERS DOWN! Sunlight returns! VICTORY!", 6000)
+
+        # Launch the machine shutdown animation — darkness_active is
+        # cleared when the animation finishes (in update()).
+        self.machine_shutdown_effect = MachineShutdownEffect()
+        self.game.sfx.play("quest_complete")
 
     # ── Pickpocket targeting ──────────────────────────────────
 
@@ -990,6 +1090,14 @@ class TownState(InventoryMixin, BaseState):
                 self.quest_complete_effect = None
             return
 
+        # Machine shutdown animation — when it finishes, lift the darkness
+        if self.machine_shutdown_effect:
+            self.machine_shutdown_effect.update(dt)
+            if not self.machine_shutdown_effect.alive:
+                self.game.darkness_active = False
+                self.machine_shutdown_effect = None
+            return
+
         if self.message_timer > 0:
             self.message_timer -= dt_ms
             if self.message_timer <= 0:
@@ -1102,6 +1210,11 @@ class TownState(InventoryMixin, BaseState):
         quest = self.game.quest
         quest_complete = (quest is not None
                           and quest.get("status") == "completed")
+        # Screen shake offset during machine shutdown Phase 1
+        shake_x, shake_y = (0, 0)
+        if self.machine_shutdown_effect:
+            shake_x, shake_y = self.machine_shutdown_effect.shake_offset
+
         renderer.draw_town_u3(
             self.game.party,
             self.town_data,
@@ -1109,12 +1222,18 @@ class TownState(InventoryMixin, BaseState):
             quest_complete=quest_complete,
             darkness_active=getattr(self.game, "darkness_active", False),
             keys_inserted=getattr(self.game, "keys_inserted", 0),
+            shake_offset=(shake_x, shake_y),
         )
         # Pickpocket targeting overlay
         if self.pickpocket_targeting and self.pickpocket_targets:
             renderer.draw_pickpocket_targeting(
                 self.game.party, self.town_data,
                 self.pickpocket_targets, self.pickpocket_cursor)
+
+        # Machine shutdown animation overlay
+        if self.machine_shutdown_effect:
+            renderer.draw_machine_shutdown_effect(self.machine_shutdown_effect)
+            return  # blocks dialogue rendering during animation
 
         # Quest completion celebration overlay
         if self.quest_complete_effect:
