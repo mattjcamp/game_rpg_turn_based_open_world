@@ -618,7 +618,8 @@ class OverworldState(InventoryMixin, BaseState):
             return
 
         elif tile_id == TILE_DUNGEON_CLEARED:
-            self.show_message("This dungeon has been cleared.", 1500)
+            pcol, prow = self.game.party.col, self.game.party.row
+            self._show_dungeon_action(pcol, prow)
             return
 
         elif tile_id == TILE_MACHINE:
@@ -704,39 +705,59 @@ class OverworldState(InventoryMixin, BaseState):
     def _show_dungeon_action(self, pcol, prow):
         """Show the dungeon entry action screen instead of entering immediately."""
         visited = (pcol, prow) in self.game.visited_dungeons
+        cleared = False
 
         # Determine dungeon type and build info
         kd = self.game.key_dungeons.get((pcol, prow))
         quest = getattr(self.game, "quest", None)
         hq = getattr(self.game, "house_quest", None)
 
-        if kd and kd["status"] in ("active", "artifact_found"):
+        if kd:
             name = kd.get("name", "Key Dungeon")
             desc = "A dark cave entrance leads deep underground. The air smells of ancient stone and danger."
-            quest_name = f"Retrieve the {kd.get('key_name', 'Key')}"
+            if kd["status"] == "completed":
+                cleared = True
+                quest_name = f"{kd.get('key_name', 'Key')} (completed)"
+            else:
+                quest_name = f"Retrieve the {kd.get('key_name', 'Key')}"
             entry_type = "key_dungeon"
-        elif (quest and quest["status"] in ("active", "artifact_found")
+        elif (quest
                 and pcol == quest.get("dungeon_col")
                 and prow == quest.get("dungeon_row")):
             name = quest.get("name", "The Shadow Crystal")
             desc = "A foreboding passage descends into darkness. Somewhere below lies the Shadow Crystal."
-            quest_name = quest.get("name", "The Shadow Crystal")
+            if quest["status"] == "completed":
+                cleared = True
+                quest_name = f"{quest.get('name', 'The Shadow Crystal')} (completed)"
+            else:
+                quest_name = quest.get("name", "The Shadow Crystal")
             entry_type = "quest"
-        elif self._is_house_quest_dungeon(pcol, prow):
+        elif (hq
+                and pcol == hq.get("dungeon_col")
+                and prow == hq.get("dungeon_row")):
             name = "Elara's House"
             desc = "The old house sits quietly. The family heirloom is said to be hidden inside."
-            quest_name = "Retrieve the Family Heirloom"
+            if hq.get("status") == "completed":
+                cleared = True
+                quest_name = "Family Heirloom (completed)"
+            else:
+                quest_name = "Retrieve the Family Heirloom"
             entry_type = "house_quest"
         else:
             name = "The Depths"
             desc = "A yawning cave entrance beckons. Who knows what lurks in the darkness below."
             quest_name = None
             entry_type = "random"
+            # A cleared random dungeon (TILE_DUNGEON_CLEARED with no quest)
+            tile_id = self.game.tile_map.get_tile(pcol, prow)
+            if tile_id == TILE_DUNGEON_CLEARED:
+                cleared = True
 
         self.dungeon_action_info = {
             "name": name,
             "description": desc,
             "visited": visited,
+            "cleared": cleared,
             "quest_name": quest_name,
         }
         self.dungeon_action_entry_args = {
@@ -775,7 +796,13 @@ class OverworldState(InventoryMixin, BaseState):
         # Mark as visited
         self.game.visited_dungeons.add((pcol, prow))
 
-        if entry_type == "key_dungeon":
+        cleared = self.dungeon_action_info.get("cleared", False)
+
+        if cleared:
+            # Completed quest or cleared dungeon — generate a fresh random dungeon
+            dungeon_data = generate_dungeon("The Depths")
+            dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
+        elif entry_type == "key_dungeon":
             kd = self.game.key_dungeons.get((pcol, prow))
             if kd:
                 dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)

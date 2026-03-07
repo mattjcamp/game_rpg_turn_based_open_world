@@ -2247,10 +2247,10 @@ class Renderer:
 
     # Dungeon viewport: same split-screen as overworld
     _U3_DG_COLS = 30
-    _U3_DG_ROWS = 21
+    _U3_DG_ROWS = 20
     _U3_DG_TS   = 32
     _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 960
-    _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 672
+    _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 640
 
     # ── dungeon level palettes ──────────────────────────────
     # Each palette defines the visual theme for a dungeon depth.
@@ -2528,38 +2528,92 @@ class Renderer:
         prev_clip = self.screen.get_clip()
         self.screen.set_clip(pygame.Rect(0, bar_y, SCREEN_WIDTH, bar_h))
 
-        tile_name = dungeon_data.tile_map.get_tile_name(party.col, party.row)
-        chests = len(dungeon_data.opened_chests)
-        # Top line: game info
-        self._u3_text(f"GOLD:{party.gold:d}", 8, bar_y + 6, (255, 255, 0))
+        f = self.font  # 18px for row 1 (original style)
+        if not hasattr(self, "_dg_readout_font"):
+            self._dg_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
+        rf = self._dg_readout_font
+
+        row1_y = bar_y + 4
+        row_h = f.get_linesize() + 4   # height of one info row (~22px)
+
+        # ── Row 1: dungeon name + level  |  [H] HELP ──
         dg_name = dungeon_data.name.upper()
         if level_label:
             dg_name += f"  [{level_label}]"
-        self._u3_text(dg_name, 240, bar_y + 6, (200, 60, 60))
+        self._u3_text(dg_name, 8, row1_y, (200, 60, 60), font=f)
+        self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y,
+                      (120, 120, 200), font=self.font_small)
+
+        # ── Row 2: active effects (light, detect traps, etc.) ──
+        row2_y = row1_y + row_h
+        effect_tags = []
+
         # Light status
         light_name = party.get_equipped_name("light")
         light_charges = party.get_equipped_charges("light")
         if torch_steps >= 0:
             torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
             lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:d}"
-            self._u3_text(lbl, 520, bar_y + 6, torch_color)
+            effect_tags.append((lbl, torch_color))
         elif infravision:
-            self._u3_text("INFRAVISION", 520, bar_y + 6, (200, 40, 40))
+            effect_tags.append(("INFRAVISION", (200, 40, 40)))
         elif galadriels_light:
             gl_steps = party.galadriels_light_steps
             gl_color = (120, 160, 255) if gl_steps > 50 else (200, 100, 100)
-            self._u3_text(f"STARLIGHT:{gl_steps:d}", 520, bar_y + 6, gl_color)
+            effect_tags.append((f"STARLIGHT:{gl_steps:d}", gl_color))
         elif light_name:
             lbl = f"LIGHT:{light_name.upper()}"
             if light_charges is not None:
                 lbl += f":{light_charges:d}"
-            self._u3_text(lbl, 520, bar_y + 6, (255, 170, 85))
+            effect_tags.append((lbl, (255, 170, 85)))
         else:
-            self._u3_text("NO LIGHT", 520, bar_y + 6, (136, 136, 136))
-        self._u3_text(f"POS:({party.col},{party.row})", 750, bar_y + 6, (136, 136, 136))
-        # Bottom line: controls
-        self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] STAIRS",
-                      8, bar_y + 28, (68, 68, 255))
+            effect_tags.append(("NO LIGHT", (136, 136, 136)))
+
+        # Detect Traps
+        if party.has_effect("Detect Traps"):
+            effect_tags.append(("DETECT TRAPS", (180, 255, 120)))
+
+        ex = 8
+        tag_gap = 20
+        for tag_text, tag_color in effect_tags:
+            self._u3_text(tag_text, ex, row2_y, tag_color, font=self.font_small)
+            ex += self.font_small.size(tag_text.upper())[0] + tag_gap
+
+        # ── Row 3+: message text (bigger, mixed-case, multi-line) ──
+        if message:
+            text_x = 10
+            text_y = row2_y + row_h
+            max_w = SCREEN_WIDTH - text_x - 16
+            line_h = rf.get_linesize()
+            max_lines = max(1, (bar_y + bar_h - text_y - 4) // line_h)
+            text_color = (240, 230, 160)
+
+            # Word-wrap
+            words = message.split(" ")
+            lines = []
+            current = ""
+            for word in words:
+                test = (current + " " + word).strip() if current else word
+                if rf.size(test)[0] <= max_w:
+                    current = test
+                else:
+                    if current:
+                        lines.append(current)
+                    current = word
+            if current:
+                lines.append(current)
+
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                last = lines[-1]
+                while rf.size(last + "..")[0] > max_w and len(last) > 1:
+                    last = last[:-1]
+                lines[-1] = last + ".."
+
+            for ln in lines:
+                surf = rf.render(ln, True, text_color)
+                self.screen.blit(surf, (text_x, text_y))
+                text_y += line_h
 
         self.screen.set_clip(prev_clip)
 
@@ -2887,6 +2941,7 @@ class Renderer:
         name = info.get("name", "Unknown")
         desc = info.get("description", "")
         visited = info.get("visited", False)
+        cleared = info.get("cleared", False)
         quest_name = info.get("quest_name")
 
         panel_w = 440
@@ -2946,7 +3001,10 @@ class Renderer:
         y += 14
 
         # ── Status line ──
-        if visited:
+        if cleared:
+            status_text = "This dungeon has been cleared."
+            status_color = (180, 180, 140)
+        elif visited:
             status_text = "You have been here before."
             status_color = (120, 200, 120)
         else:
