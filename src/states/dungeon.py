@@ -1204,6 +1204,9 @@ class DungeonState(InventoryMixin, BaseState):
             renderer.draw_party_screen_u3(self.game.party)
             return
         visible = self._compute_visible_tiles()
+        # Persist every tile the party has ever seen for fog of war
+        self.dungeon_data.explored_tiles.update(visible)
+
         level_label = None
         if self.quest_levels:
             level_label = f"LEVEL {self.current_level + 1}"
@@ -1221,6 +1224,7 @@ class DungeonState(InventoryMixin, BaseState):
             self.dungeon_data,
             message=self.message,
             visible_tiles=visible,
+            explored_tiles=self.dungeon_data.explored_tiles,
             torch_steps=self.torch_steps if has_torch_light else -1,
             level_label=level_label,
             detected_traps=self.dungeon_data.detected_traps,

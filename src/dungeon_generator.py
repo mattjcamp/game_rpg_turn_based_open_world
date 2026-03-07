@@ -71,6 +71,8 @@ class DungeonData:
         self.detected_traps = set()
         # Monsters placed in the dungeon
         self.monsters = monsters or []
+        # Fog of war: tiles the party has ever seen
+        self.explored_tiles = set()
 
 
 def _carve_room(tmap, room):

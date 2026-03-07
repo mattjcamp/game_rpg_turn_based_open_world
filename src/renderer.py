@@ -2615,7 +2615,8 @@ class Renderer:
         return self._DUNGEON_PALETTES[idx]
 
     def draw_dungeon_u3(self, party, dungeon_data, message="",
-                         visible_tiles=None, torch_steps=-1,
+                         visible_tiles=None, explored_tiles=None,
+                         torch_steps=-1,
                          level_label=None, detected_traps=None,
                          door_unlock_anim=None, door_interact=None,
                          infravision=False, galadriels_light=False,
@@ -2808,7 +2809,9 @@ class Renderer:
 
         # ── 4. fog of war ──
         self._u3_dungeon_fog(psc, psr, cols, rows, ts,
-                              visible_tiles=visible_tiles, off_c=off_c, off_r=off_r)
+                              visible_tiles=visible_tiles,
+                              explored_tiles=explored_tiles,
+                              off_c=off_c, off_r=off_r)
 
         # ── 4b. door unlock animation ──
         if door_unlock_anim:
@@ -3893,19 +3896,26 @@ class Renderer:
     # ── dungeon fog of war ─────────────────────────────────
 
     def _u3_dungeon_fog(self, party_sc, party_sr, cols, rows, ts,
-                         visible_tiles=None, off_c=0, off_r=0):
+                         visible_tiles=None, explored_tiles=None,
+                         off_c=0, off_r=0):
         """Draw fog of war over the U3 dungeon map area.
 
         If *visible_tiles* is provided (a set of (col, row) world coords),
         tiles in the set are fully visible, tiles one step beyond get a soft
-        fade, and everything else is blacked out.  Falls back to a simple
-        radius-1 Euclidean fog when no set is supplied.
+        fade, and everything else is blacked out.
+
+        If *explored_tiles* is also provided, tiles the party has previously
+        seen but are no longer in the visible set are shown as dim gray
+        outlines instead of full black — a classic fog of war effect.
+
+        Falls back to a simple radius-1 Euclidean fog when no set is supplied.
         """
         import math
 
         fog = pygame.Surface((self._U3_DG_MAP_W, self._U3_DG_MAP_H), pygame.SRCALPHA)
 
         if visible_tiles is not None:
+            _explored = explored_tiles or set()
             for sr in range(rows):
                 for sc in range(cols):
                     wc = sc + off_c
@@ -3922,9 +3932,15 @@ class Renderer:
                                 break
                         if edge:
                             break
-                    alpha = 160 if edge else 255
                     rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
-                    fog.fill((0, 0, 0, alpha), rect)
+                    if edge:
+                        fog.fill((0, 0, 0, 160), rect)
+                    elif (wc, wr) in _explored:
+                        # Previously seen — desaturated gray-blue tint so
+                        # the underlying tile shapes show as dim outlines.
+                        fog.fill((15, 15, 30, 175), rect)
+                    else:
+                        fog.fill((0, 0, 0, 255), rect)
         else:
             # Fallback: simple radius-1 fog
             fade_start = 1
