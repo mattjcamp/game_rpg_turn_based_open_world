@@ -134,17 +134,17 @@ class OverworldState(InventoryMixin, BaseState):
         """Called when all 8 keys are inserted — the sun returns!"""
         self.game.darkness_active = False
         # Award XP and gold to all alive party members
-        for m in self.game.party.active_members():
+        for m in self.game.party.alive_members():
             if m.is_alive():
                 m.exp += 500
                 msgs = m.check_level_up()
                 for msg in msgs:
-                    self.game.log(msg)
+                    self.game.game_log.append(msg)
         self.game.party.gold += 1000
-        self.game.log("*** THE MACHINE POWERS DOWN! ***")
-        self.game.log("Sunlight floods the land once more!")
-        self.game.log("The people of Duskhollow are saved!")
-        self.game.log("VICTORY! +500 XP, +1000 Gold")
+        self.game.game_log.append("*** THE MACHINE POWERS DOWN! ***")
+        self.game.game_log.append("Sunlight floods the land once more!")
+        self.game.game_log.append("The people of Duskhollow are saved!")
+        self.game.game_log.append("VICTORY! +500 XP, +1000 Gold")
         self.show_message(
             "THE MACHINE POWERS DOWN! Sunlight returns! VICTORY!", 6000)
 
