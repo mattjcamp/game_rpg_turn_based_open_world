@@ -21,6 +21,35 @@ _SAVE_DIR = os.path.join(
 NUM_SAVE_SLOTS = 3
 
 
+_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "config.json")
+
+# Default player settings
+_DEFAULT_CONFIG = {
+    "music_enabled": True,
+}
+
+
+def load_config():
+    """Load player settings from config.json, returning defaults on failure."""
+    try:
+        with open(_CONFIG_PATH, "r") as f:
+            data = json.load(f)
+        # Merge with defaults so new keys are always present
+        merged = dict(_DEFAULT_CONFIG)
+        merged.update(data)
+        return merged
+    except (FileNotFoundError, json.JSONDecodeError):
+        return dict(_DEFAULT_CONFIG)
+
+
+def save_config(config):
+    """Persist player settings to config.json."""
+    os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
+    with open(_CONFIG_PATH, "w") as f:
+        json.dump(config, f, indent=2)
+
+
 def _ensure_save_dir():
     """Create the saves directory if it doesn't exist."""
     os.makedirs(_SAVE_DIR, exist_ok=True)

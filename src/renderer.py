@@ -627,6 +627,10 @@ class Renderer:
         bar_h = SCREEN_HEIGHT - bar_y
         self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
+        # Clip to the info bar so nothing bleeds outside
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(0, bar_y, SCREEN_WIDTH, bar_h))
+
         tile_name = tile_map.get_tile_name(party.col, party.row)
         # Top line: town info
         self._u3_text(f"GOLD:{party.gold:d}", 8, bar_y + 6, (255, 255, 0))
@@ -642,6 +646,8 @@ class Renderer:
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE  [P] PARTY  [BUMP NPC] TALK  [ESC] LEAVE",
                       8, bar_y + 28, (68, 68, 255))
+
+        self.screen.set_clip(prev_clip)
 
         # ── 6. floating message ──
         self._draw_floating_message(message)
@@ -1782,10 +1788,10 @@ class Renderer:
 
     # Map viewport for the U3 split-screen layout
     _U3_OW_COLS = 30       # tiles visible horizontally (full width)
-    _U3_OW_ROWS = 21       # tiles visible vertically
+    _U3_OW_ROWS = 20       # tiles visible vertically
     _U3_OW_TS   = 32       # tile size (same as global TILE_SIZE)
     _U3_OW_MAP_W = _U3_OW_COLS * _U3_OW_TS   # 960
-    _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 672
+    _U3_OW_MAP_H = _U3_OW_ROWS * _U3_OW_TS   # 640
 
     def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None,
                           unique_text="", unique_flash=0.0, unique_pos=None,
@@ -1911,14 +1917,21 @@ class Renderer:
         bar_h = SCREEN_HEIGHT - bar_y
         self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
+        # Clip to the info bar so nothing bleeds outside
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(0, bar_y, SCREEN_WIDTH, bar_h))
+
         tile_name = tile_map.get_tile_name(party.col, party.row)
-        f = self.font  # larger 16px font for readability
+        # Lazily create a larger readout font (mixed-case, bright)
+        if not hasattr(self, "_ow_readout_font"):
+            self._ow_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
+        rf = self._ow_readout_font
+        f = self.font  # original 18px font for row 1
         clock = party.clock
         icon_sz = 20
         row1_y = bar_y + 4
-        row2_y = bar_y + 30
 
-        # ── Row 1: [moon][sun/moon] date+time  gold  terrain ──
+        # ── Row 1: [moon][sun/moon] date+time  terrain (original style) ──
         x = 6
         self._draw_moon_phase(x, row1_y, icon_sz, clock.lunar_phase_index)
         x += icon_sz + 4
@@ -1926,36 +1939,53 @@ class Renderer:
         x += icon_sz + 8
         self._u3_text(clock.full_str, x, row1_y + 2,
                       (180, 200, 255), font=f)
-        self._u3_text(f"GOLD:{party.gold:d}", 380, row1_y + 2,
-                      (255, 255, 0), font=f)
-        self._u3_text(f"TERRAIN:{tile_name}", 560, row1_y + 2,
+        self._u3_text(f"TERRAIN:{tile_name}", 380, row1_y + 2,
                       (200, 200, 255), font=f)
-        self._u3_text(f"POS:({party.col},{party.row})", 840, row1_y + 2,
-                      (220, 220, 220), font=f)
+        self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y + 2,
+                      (120, 120, 200), font=self.font_small)
 
-        # ── Row 2: light info + unique tile text ──
-        light_name = party.get_equipped_name("light")
-        row2_x = 8
-        if light_name:
-            charges = party.get_equipped_charges("light")
-            lbl = f"LIGHT:{light_name.upper()}"
-            if charges is not None:
-                lbl += f":{charges:d}"
-            self._u3_text(lbl, row2_x, row2_y, (255, 170, 85),
-                          font=self.font_small)
-            row2_x += len(lbl) * 8 + 16
-
+        # ── Row 2+: unique tile text (bigger, mixed-case, multi-line) ──
         if unique_text:
             pulse = (math.sin(unique_flash) + 1.0) * 0.5
-            r = int(200 + 55 * pulse)
-            g = int(170 + 60 * pulse)
-            b = int(80 * (1.0 - pulse * 0.4))
-            display_text = unique_text
-            max_chars = (SCREEN_WIDTH - row2_x - 8) // 7
-            if len(display_text) > max_chars:
-                display_text = display_text[:max_chars - 3] + "..."
-            self._u3_text(display_text, row2_x, row2_y,
-                          (r, g, b), font=self.font_small)
+            r = int(220 + 35 * pulse)
+            g = int(200 + 55 * pulse)
+            b = int(100 * (1.0 - pulse * 0.3))
+            text_color = (r, g, b)
+            text_x = 10
+            text_y = bar_y + 28
+            max_w = SCREEN_WIDTH - text_x - 16
+            line_h = rf.get_linesize()
+            max_lines = max(1, (bar_y + bar_h - text_y - 4) // line_h)
+
+            # Word-wrap into lines that fit the bar width
+            words = unique_text.split(" ")
+            lines = []
+            current = ""
+            for word in words:
+                test = (current + " " + word).strip() if current else word
+                if rf.size(test)[0] <= max_w:
+                    current = test
+                else:
+                    if current:
+                        lines.append(current)
+                    current = word
+            if current:
+                lines.append(current)
+
+            # Truncate to max visible lines
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                # Add ".." to last visible line
+                last = lines[-1]
+                while last and rf.size(last + "..")[0] > max_w:
+                    last = last[:-1]
+                lines[-1] = last.rstrip() + ".."
+
+            for i, line in enumerate(lines):
+                line_surf = rf.render(line, True, text_color)
+                self.screen.blit(line_surf, (text_x, text_y + i * line_h))
+
+        self.screen.set_clip(prev_clip)
 
         # ── 5c. sparkle effect on the map tile ──
         if unique_pos and unique_flash > 0:
@@ -2494,6 +2524,10 @@ class Renderer:
         bar_h = SCREEN_HEIGHT - bar_y
         self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
+        # Clip to the info bar so nothing bleeds outside
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(0, bar_y, SCREEN_WIDTH, bar_h))
+
         tile_name = dungeon_data.tile_map.get_tile_name(party.col, party.row)
         chests = len(dungeon_data.opened_chests)
         # Top line: game info
@@ -2526,6 +2560,8 @@ class Renderer:
         # Bottom line: controls
         self._u3_text("[ARROWS/WASD] MOVE    [P] PARTY    [ESC] STAIRS",
                       8, bar_y + 28, (68, 68, 255))
+
+        self.screen.set_clip(prev_clip)
 
         # ── 7. floating message ──
         self._draw_floating_message(message)
@@ -7469,6 +7505,10 @@ class Renderer:
 
         self._u3_panel(panel_x, panel_y, panel_w, panel_h)
 
+        # Clip to panel bounds so text never bleeds outside
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(panel_x, panel_y, panel_w, panel_h))
+
         for i, setting in enumerate(settings):
             y = panel_y + 20 + i * 40
             selected = (i == cursor)
@@ -7497,8 +7537,10 @@ class Renderer:
 
         # Controls hint
         hint_y = panel_y + panel_h - 30
-        self._u3_text("[UP/DOWN] SELECT   [ENTER] CHOOSE   [M/ESC] CLOSE",
+        self._u3_text("[UP/DN] SELECT  [ENTER] CHOOSE  [M/ESC] CLOSE",
                       panel_x + 16, hint_y, (68, 68, 255), self.font_small)
+
+        self.screen.set_clip(prev_clip)
 
     def draw_save_load_screen(self, mode, slot_infos, cursor, message=None):
         """Draw the save/load slot picker screen.
@@ -7532,6 +7574,10 @@ class Renderer:
         panel_y = 60
 
         self._u3_panel(panel_x, panel_y, panel_w, panel_h)
+
+        # Clip to panel bounds so text never bleeds outside
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(panel_x, panel_y, panel_w, panel_h))
 
         for i, info in enumerate(slot_infos):
             y = panel_y + 20 + i * (slot_h + 8)
@@ -7582,8 +7628,16 @@ class Renderer:
                 self._u3_text(dt_str, panel_x + panel_w - 200, y + 6,
                               (150, 150, 200), self.font_small)
 
-                # Party names
-                self._u3_text(names, panel_x + 30, y + 28,
+                # Party names — truncate if too wide
+                max_name_w = panel_w - 60
+                names_upper = names.upper()
+                if self.font_med.size(names_upper)[0] > max_name_w:
+                    while (len(names_upper) > 3
+                           and self.font_med.size(names_upper + "..")[0]
+                           > max_name_w):
+                        names_upper = names_upper[:-1]
+                    names_upper = names_upper.rstrip() + ".."
+                self._u3_text(names_upper, panel_x + 30, y + 28,
                               (180, 200, 255), self.font_med)
 
                 # Gold and level
@@ -7602,8 +7656,10 @@ class Renderer:
         hint_y = panel_y + panel_h - 30
         action_word = "SAVE" if mode == "save" else "LOAD"
         self._u3_text(
-            f"[UP/DOWN] SELECT   [ENTER] {action_word}   [ESC] BACK",
+            f"[UP/DN] SELECT  [ENTER] {action_word}  [ESC] BACK",
             panel_x + 16, hint_y, (68, 68, 255), self.font_small)
+
+        self.screen.set_clip(prev_clip)
 
     def draw_party_screen_u3(self, party):
         """
@@ -10749,212 +10805,290 @@ class Renderer:
 
     def draw_overworld_help_overlay(self):
         """Draw a full-screen overlay showing all overworld controls."""
+        # Lazily create help-screen fonts
+        if not hasattr(self, "_help_title_font"):
+            self._help_title_font = pygame.font.SysFont("monospace", 26, bold=True)
+        if not hasattr(self, "_help_font"):
+            self._help_font = pygame.font.SysFont("monospace", 18, bold=True)
+        if not hasattr(self, "_help_section_font"):
+            self._help_section_font = pygame.font.SysFont("monospace", 20, bold=True)
+
         dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 200))
+        dim.fill((0, 0, 0, 210))
         self.screen.blit(dim, (0, 0))
 
-        margin = 60
+        margin = 40
         px, py = margin, margin
         pw = SCREEN_WIDTH - margin * 2
         ph = SCREEN_HEIGHT - margin * 2
 
-        pygame.draw.rect(self.screen, (12, 12, 24), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, (8, 8, 20), (px, py, pw, ph))
         pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
 
-        self._u3_text("OVERWORLD CONTROLS", px + pw // 2 - 80, py + 10,
-                       self._U3_ORANGE, self.font)
+        # Clip so nothing bleeds past the panel
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(px, py, pw, ph))
 
-        f = self.font_small
-        lh = 18
-        col1_x = px + 20
-        col2_x = px + pw // 2 + 10
-        y = py + 40
+        tf = self._help_title_font
+        sf = self._help_section_font
+        f = self._help_font
+        lh = 24
+        key_w = 120
+
+        title_surf = tf.render("OVERWORLD CONTROLS", True, (255, 200, 100))
+        self.screen.blit(title_surf,
+                         (px + pw // 2 - title_surf.get_width() // 2, py + 12))
+
+        col1_x = px + 24
+        col2_x = px + pw // 2 + 14
+        y = py + 50
 
         # ── Left column ──
-        self._u3_text("MOVEMENT", col1_x, y, self._U3_LTBLUE, f)
-        y += lh + 4
+        sect = sf.render("MOVEMENT", True, (200, 210, 255))
+        self.screen.blit(sect, (col1_x, y))
+        y += lh + 6
         lines_left = [
             ("[W/A/S/D]", "Move on the map"),
             ("[ARROWS]", "Move on the map"),
         ]
         for key, desc in lines_left:
-            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
-            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (255, 255, 255))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col1_x, y))
+            self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
 
-        y += 8
-        self._u3_text("MENUS & SCREENS", col1_x, y, self._U3_LTBLUE, f)
-        y += lh + 4
+        y += 10
+        sect = sf.render("MENUS & SCREENS", True, (200, 210, 255))
+        self.screen.blit(sect, (col1_x, y))
+        y += lh + 6
         lines_menus = [
             ("[P]", "Open party / inventory"),
             ("[L]", "Open game log"),
             ("[H]", "Toggle this help screen"),
+            ("[M]", "Open settings"),
             ("[ESC]", "Quit game"),
         ]
         for key, desc in lines_menus:
-            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
-            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (255, 255, 255))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col1_x, y))
+            self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
 
         # ── Right column ──
-        ry = py + 40
-        self._u3_text("INTERACTIONS", col2_x, ry, self._U3_LTBLUE, f)
-        ry += lh + 4
+        ry = py + 50
+        sect = sf.render("INTERACTIONS", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
         lines_interact = [
             ("Walk into", "Enter towns and dungeons"),
             ("Enemies", "Touch to start combat"),
         ]
         for key, desc in lines_interact:
-            self._u3_text(key, col2_x, ry, (200, 180, 120), f)
-            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (240, 220, 150))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
-        ry += 8
-        self._u3_text("PARTY SCREEN", col2_x, ry, self._U3_LTBLUE, f)
-        ry += lh + 4
+        ry += 10
+        sect = sf.render("PARTY SCREEN", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
         lines_party = [
             ("[UP/DOWN]", "Select party member"),
             ("[ENTER]", "View character details"),
             ("[ESC]", "Close screen"),
         ]
         for key, desc in lines_party:
-            self._u3_text(key, col2_x, ry, self._U3_WHITE, f)
-            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (255, 255, 255))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
-        ry += 8
-        self._u3_text("INFO BAR", col2_x, ry, self._U3_LTBLUE, f)
-        ry += lh + 4
+        ry += 10
+        sect = sf.render("INFO BAR", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
         lines_info = [
-            ("GOLD", "Your current gold amount"),
-            ("TERRAIN", "Tile type you're standing on"),
-            ("POS", "Your map coordinates"),
+            ("Terrain", "Tile type you're standing on"),
+            ("Time", "Current date and time of day"),
         ]
         for key, desc in lines_info:
-            self._u3_text(key, col2_x, ry, (200, 180, 120), f)
-            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (240, 220, 150))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
+        # ── Tip ──
+        tip_y = max(y, ry) + 14
+        tip_text = ("TIP: Talk to the people you meet in town to learn"
+                    " what is happening in the world of Realm of Shadow.")
+        # Word-wrap the tip to fit within the panel
+        tip_max_w = pw - 48
+        tip_words = tip_text.split(" ")
+        tip_lines = []
+        cur = ""
+        for w in tip_words:
+            test = (cur + " " + w).strip() if cur else w
+            if f.size(test)[0] <= tip_max_w:
+                cur = test
+            else:
+                if cur:
+                    tip_lines.append(cur)
+                cur = w
+        if cur:
+            tip_lines.append(cur)
+        for i, tl in enumerate(tip_lines):
+            ts2 = f.render(tl, True, (180, 200, 140))
+            self.screen.blit(ts2, (px + 24, tip_y + i * lh))
+
         # Footer
-        self._u3_text("[H / ESC] CLOSE",
-                      px + pw // 2 - 50, py + ph - 22,
-                      self._U3_BLUE, self.font_small)
+        footer = f.render("[H / ESC] CLOSE", True, (150, 160, 255))
+        self.screen.blit(footer,
+                         (px + pw // 2 - footer.get_width() // 2,
+                          py + ph - 30))
+
+        self.screen.set_clip(prev_clip)
 
     def draw_combat_help_overlay(self):
         """Draw a full-screen overlay showing all combat controls."""
-        # Dim background
+        # Reuse help fonts (created lazily by overworld help)
+        if not hasattr(self, "_help_title_font"):
+            self._help_title_font = pygame.font.SysFont("monospace", 26, bold=True)
+        if not hasattr(self, "_help_font"):
+            self._help_font = pygame.font.SysFont("monospace", 18, bold=True)
+        if not hasattr(self, "_help_section_font"):
+            self._help_section_font = pygame.font.SysFont("monospace", 20, bold=True)
+
         dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 200))
+        dim.fill((0, 0, 0, 210))
         self.screen.blit(dim, (0, 0))
 
-        margin = 60
+        margin = 40
         px, py = margin, margin
         pw = SCREEN_WIDTH - margin * 2
         ph = SCREEN_HEIGHT - margin * 2
 
-        pygame.draw.rect(self.screen, (12, 12, 24), (px, py, pw, ph))
+        pygame.draw.rect(self.screen, (8, 8, 20), (px, py, pw, ph))
         pygame.draw.rect(self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
 
-        # Title
-        self._u3_text("COMBAT CONTROLS", px + pw // 2 - 70, py + 10,
-                       self._U3_ORANGE, self.font)
+        # Clip so nothing bleeds past the panel
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(px, py, pw, ph))
 
-        f = self.font_small
-        lh = 18  # line height
-        col1_x = px + 20
-        col2_x = px + pw // 2 + 10
-        y = py + 40
+        tf = self._help_title_font
+        sf = self._help_section_font
+        f = self._help_font
+        lh = 24
+        key_w = 120
+
+        title_surf = tf.render("COMBAT CONTROLS", True, (255, 200, 100))
+        self.screen.blit(title_surf,
+                         (px + pw // 2 - title_surf.get_width() // 2, py + 12))
+
+        col1_x = px + 24
+        col2_x = px + pw // 2 + 14
+        y = py + 50
 
         # ── Left column ──
-        self._u3_text("MOVEMENT & ACTIONS", col1_x, y, self._U3_LTBLUE, f)
-        y += lh + 4
+        sect = sf.render("MOVEMENT & ACTIONS", True, (200, 210, 255))
+        self.screen.blit(sect, (col1_x, y))
+        y += lh + 6
         lines_left = [
             ("[W/A/S/D]", "Move / Melee attack"),
-            ("[ARROWS]", "Navigate menus / Choose direction"),
+            ("[ARROWS]", "Navigate menus / Direction"),
             ("[ENTER]", "Confirm selection"),
-            ("[SPACE]", "Skip turn / Speed up animations"),
+            ("[SPACE]", "Skip turn / Speed up"),
             ("[ESC]", "Cancel current action"),
         ]
         for key, desc in lines_left:
-            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
-            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (255, 255, 255))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col1_x, y))
+            self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
 
-        y += 8
-        self._u3_text("MENU COMMANDS", col1_x, y, self._U3_LTBLUE, f)
-        y += lh + 4
-        lines_menu = [
-            ("[ENTER]", "Select highlighted action"),
-            ("[UP/DOWN]", "Scroll action menu"),
-        ]
-        for key, desc in lines_menu:
-            self._u3_text(key, col1_x, y, self._U3_WHITE, f)
-            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
-            y += lh
-
-        y += 8
-        self._u3_text("ACTIONS", col1_x, y, self._U3_LTBLUE, f)
-        y += lh + 4
+        y += 10
+        sect = sf.render("ACTIONS", True, (200, 210, 255))
+        self.screen.blit(sect, (col1_x, y))
+        y += lh + 6
         lines_actions = [
             ("Attack", "Move into an adjacent enemy"),
             ("Ranged", "Fire weapon in a direction"),
-            ("Spell", "Cast a spell from your list"),
+            ("Spell", "Cast from your spell list"),
             ("Throw", "Throw an item at enemies"),
             ("Use Item", "Use a consumable item"),
-            ("Defend", "Reduce damage taken this round"),
+            ("Defend", "Reduce damage this round"),
             ("Flee", "Attempt to escape combat"),
         ]
         for action, desc in lines_actions:
-            self._u3_text(action, col1_x, y, (200, 180, 120), f)
-            self._u3_text(desc, col1_x + 100, y, self._U3_GRAY, f)
+            ks = f.render(action.upper(), True, (240, 220, 150))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col1_x, y))
+            self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
 
         # ── Right column ──
-        ry = py + 40
-        self._u3_text("SPELLS", col2_x, ry, self._U3_LTBLUE, f)
-        ry += lh + 4
+        ry = py + 50
+        sect = sf.render("SPELLS", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
         lines_spells = [
-            ("Fireball", "Ranged fire damage (directional)"),
-            ("Heal", "Restore HP to a party member"),
-            ("Shield", "Boost AC of a party member"),
-            ("Turn Undead", "Damage all undead enemies"),
+            ("Fireball", "Ranged fire damage"),
+            ("Heal", "Restore HP to an ally"),
+            ("Shield", "Boost AC of an ally"),
+            ("Turn Undead", "Damage all undead"),
         ]
         for spell, desc in lines_spells:
-            self._u3_text(spell, col2_x, ry, (200, 180, 120), f)
-            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ks = f.render(spell.upper(), True, (240, 220, 150))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
-        ry += 8
-        self._u3_text("TARGETING", col2_x, ry, self._U3_LTBLUE, f)
-        ry += lh + 4
+        ry += 10
+        sect = sf.render("TARGETING", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
         lines_target = [
-            ("[ARROWS]", "Choose direction for ranged/spells"),
-            ("[ARROWS]", "Move cursor for shield target"),
+            ("[ARROWS]", "Choose direction / target"),
             ("[ENTER]", "Confirm target"),
-            ("[ESC]", "Cancel and return to menu"),
+            ("[ESC]", "Cancel and return"),
         ]
         for key, desc in lines_target:
-            self._u3_text(key, col2_x, ry, self._U3_WHITE, f)
-            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (255, 255, 255))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
-        ry += 8
-        self._u3_text("OTHER", col2_x, ry, self._U3_LTBLUE, f)
-        ry += lh + 4
+        ry += 10
+        sect = sf.render("OTHER", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
         lines_other = [
             ("[L]", "Open game log"),
             ("[H]", "Toggle this help screen"),
             ("[E]", "Open equipment screen"),
         ]
         for key, desc in lines_other:
-            self._u3_text(key, col2_x, ry, self._U3_WHITE, f)
-            self._u3_text(desc, col2_x + 100, ry, self._U3_GRAY, f)
+            ks = f.render(key.upper(), True, (255, 255, 255))
+            ds = f.render(desc.upper(), True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
-        # Footer hint
-        self._u3_text("[H / ESC] CLOSE",
-                      px + pw // 2 - 50, py + ph - 22,
-                      self._U3_BLUE, self.font_small)
+        # Footer
+        footer = f.render("[H / ESC] CLOSE", True, (150, 160, 255))
+        self.screen.blit(footer,
+                         (px + pw // 2 - footer.get_width() // 2,
+                          py + ph - 30))
+
+        self.screen.set_clip(prev_clip)
 
     def draw_log_overlay(self, log_entries, scroll_offset=0):
         """Draw a full-screen scrollable game log overlay.
@@ -10967,9 +11101,9 @@ class Renderer:
         """
         # Lazily create the larger log font once
         if not hasattr(self, "_log_font"):
-            self._log_font = pygame.font.SysFont("monospace", 18, bold=True)
+            self._log_font = pygame.font.SysFont("monospace", 22, bold=True)
         if not hasattr(self, "_log_title_font"):
-            self._log_title_font = pygame.font.SysFont("monospace", 24, bold=True)
+            self._log_title_font = pygame.font.SysFont("monospace", 28, bold=True)
 
         log_font = self._log_font
         title_font = self._log_title_font
@@ -11006,9 +11140,9 @@ class Renderer:
                           py + ph - 24))
 
         # Content area
-        content_y = py + 42
-        content_h = ph - 72  # room for title + hint
-        line_h = 22
+        content_y = py + 48
+        content_h = ph - 80  # room for title + hint
+        line_h = 26
 
         # ── Helper: word-wrap a single log entry into display lines ──
         def _wrap_line(text, font, max_w):
@@ -11080,27 +11214,27 @@ class Renderer:
             # Color code based on original entry content
             lo = original.lower()
             if "critical" in lo or "defeated" in lo:
-                color = (255, 220, 60)
+                color = (255, 230, 80)
             elif "hit!" in lo or "damage" in lo:
                 color = (255, 255, 255)
             elif "miss" in lo or "failed" in lo or "resisted" in lo:
-                color = (140, 140, 160)
+                color = (180, 180, 200)
             elif original.startswith("--"):
-                color = (255, 180, 50)
+                color = (255, 200, 80)
             elif "gold" in lo or "treasure" in lo:
-                color = (255, 255, 60)
+                color = (255, 255, 100)
             elif "heals" in lo or "wakes up" in lo:
-                color = (80, 255, 120)
+                color = (100, 255, 140)
             elif "poison" in lo:
-                color = (120, 220, 60)
+                color = (150, 240, 80)
             elif "sleep" in lo or "zzz" in lo:
-                color = (160, 140, 255)
+                color = (190, 170, 255)
             elif "curse" in lo or "hex" in lo:
-                color = (255, 100, 100)
+                color = (255, 130, 130)
             elif "fallen" in lo:
-                color = (255, 80, 80)
+                color = (255, 110, 110)
             else:
-                color = (210, 210, 230)
+                color = (235, 235, 250)
 
             surf = log_font.render(display_text.upper(), True, color)
             self.screen.blit(surf, (px + text_pad, ly))

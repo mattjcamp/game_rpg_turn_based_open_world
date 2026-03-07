@@ -19,7 +19,8 @@ from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.town_generator import generate_town, generate_duskhollow
 from src.music import MusicManager, SoundEffects
-from src.save_load import save_game, load_game, get_save_info, NUM_SAVE_SLOTS
+from src.save_load import (save_game, load_game, get_save_info,
+                           NUM_SAVE_SLOTS, load_config, save_config)
 from src.module_loader import load_module_data
 
 
@@ -70,6 +71,11 @@ class Game:
         self.music = MusicManager()
         self.sfx = SoundEffects()
 
+        # --- Load persistent player config ---
+        self._config = load_config()
+        if not self._config.get("music_enabled", True):
+            self.music.toggle_mute()   # start muted if saved that way
+
         # --- Game-in-progress flag ---
         # True once the player has started or loaded a game.
         self._game_started = False
@@ -115,8 +121,9 @@ class Game:
         self.save_load_message = None    # feedback message ("Saved!", "Loaded!", etc.)
         self.save_load_msg_timer = 0.0   # seconds remaining for message display
         self.settings_options = [
-            {"label": "MUSIC", "value": True, "type": "toggle",
-             "action": self._toggle_music},
+            {"label": "MUSIC",
+             "value": self._config.get("music_enabled", True),
+             "type": "toggle", "action": self._toggle_music},
         ]
 
         # --- Game Over screen ---
@@ -872,9 +879,11 @@ class Game:
     # ── Music / settings helpers ────────────────────────────────
 
     def _toggle_music(self):
-        """Toggle music on/off and sync settings display."""
+        """Toggle music on/off, sync settings display, and persist."""
         muted = self.music.toggle_mute()
         self.settings_options[0]["value"] = not muted
+        self._config["music_enabled"] = not muted
+        save_config(self._config)
 
     def _open_save_screen(self):
         """Switch settings view to the save-slot picker."""
