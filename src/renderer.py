@@ -2880,6 +2880,111 @@ class Renderer:
         glow_surf.fill((255, 180, 60, alpha))
         self.screen.blit(glow_surf, (door_px, door_py))
 
+    # ── Dungeon entry action screen ──────────────────────────────
+
+    def draw_dungeon_action_screen(self, info, cursor):
+        """Draw the dungeon entry confirmation panel over the overworld."""
+        name = info.get("name", "Unknown")
+        desc = info.get("description", "")
+        visited = info.get("visited", False)
+        quest_name = info.get("quest_name")
+
+        panel_w = 440
+        pad = 16
+        content_w = panel_w - pad * 2
+        line_h = 24
+        title_font = pygame.font.SysFont("monospace", 22, bold=True)
+        body_font = self.font          # 18px
+        hint_font = self.font_small    # 14px
+
+        # ── Word-wrap the description ──
+        desc_lines = []
+        for word in desc.split():
+            if desc_lines and body_font.size(desc_lines[-1] + " " + word)[0] <= content_w:
+                desc_lines[-1] += " " + word
+            else:
+                desc_lines.append(word)
+
+        # ── Calculate panel height ──
+        h = pad  # top padding
+        h += 28  # title
+        h += 12  # gap
+        h += len(desc_lines) * line_h  # description
+        h += 14  # gap
+        h += line_h  # status line
+        if quest_name:
+            h += line_h  # quest line
+        h += 16  # gap
+        h += line_h * 2  # two options
+        h += 12  # gap
+        h += 18  # hint
+        h += pad  # bottom padding
+
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
+
+        # ── Dim overlay behind panel ──
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.screen.blit(dim, (0, 0))
+
+        # ── Panel ──
+        self._u3_panel(panel_x, panel_y, panel_w, h)
+
+        y = panel_y + pad
+
+        # ── Title (dungeon name in gold) ──
+        title_surf = title_font.render(name, True, (255, 200, 80))
+        self.screen.blit(title_surf, (panel_x + pad, y))
+        y += 28 + 12
+
+        # ── Description (white, word-wrapped) ──
+        for line in desc_lines:
+            line_surf = body_font.render(line, True, (220, 220, 240))
+            self.screen.blit(line_surf, (panel_x + pad, y))
+            y += line_h
+        y += 14
+
+        # ── Status line ──
+        if visited:
+            status_text = "You have been here before."
+            status_color = (120, 200, 120)
+        else:
+            status_text = "This place is unexplored."
+            status_color = (120, 140, 200)
+        status_surf = body_font.render(status_text, True, status_color)
+        self.screen.blit(status_surf, (panel_x + pad, y))
+        y += line_h
+
+        # ── Quest line (if applicable) ──
+        if quest_name:
+            quest_surf = body_font.render(f"Quest: {quest_name}", True, (255, 220, 100))
+            self.screen.blit(quest_surf, (panel_x + pad, y))
+            y += line_h
+        y += 16
+
+        # ── Options ──
+        options = ["Enter the Dungeon", "Leave"]
+        for i, label in enumerate(options):
+            is_sel = (i == cursor)
+            if is_sel:
+                # Highlight bar
+                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
+                pygame.draw.rect(self.screen, (40, 40, 80), hl)
+                # Arrow
+                arrow_surf = body_font.render(">", True, (255, 220, 100))
+                self.screen.blit(arrow_surf, (panel_x + pad, y))
+
+            color = (255, 255, 255) if is_sel else (180, 180, 200)
+            opt_surf = body_font.render(label, True, color)
+            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
+            y += line_h
+        y += 12
+
+        # ── Hint ──
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, (80, 80, 140))
+        self.screen.blit(hint_surf, (panel_x + pad, y))
+
     def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr, palette=None):
         """Draw a single dungeon tile in Ultima III style."""
         BLACK  = (0, 0, 0)

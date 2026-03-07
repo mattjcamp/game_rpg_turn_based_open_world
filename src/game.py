@@ -252,6 +252,8 @@ class Game:
         self.quest = None
         self.house_quest = None
 
+        self.visited_dungeons = set()  # {(col, row)} — tracks which dungeon tiles the party has entered
+
         # ── Keys of Shadow module: set up 8 key dungeons ──
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
         self.keys_inserted = 0  # how many keys placed in the machine

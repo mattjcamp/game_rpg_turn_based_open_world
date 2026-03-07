@@ -303,6 +303,8 @@ def save_game(slot, game):
             "house_quest": _serialize_quest(getattr(game, "house_quest", None)),
             # ── Game log ──
             "game_log": list(getattr(game, "game_log", [])),
+            # ── Visited dungeons ──
+            "visited_dungeons": [list(pos) for pos in getattr(game, "visited_dungeons", set())],
         }
 
         path = _save_path(slot)
@@ -392,6 +394,9 @@ def load_game(slot, game):
 
         # ── Restore game log ────────────────────────────────────
         game.game_log = list(save_data.get("game_log", []))
+
+        # ── Restore visited dungeons ──────────────────────────
+        game.visited_dungeons = {tuple(pos) for pos in save_data.get("visited_dungeons", [])}
 
         # ── Reset transient state ───────────────────────────────
         game.pending_combat_rewards = None

@@ -64,6 +64,12 @@ class OverworldState(InventoryMixin, BaseState):
         # dict with keys: steps_remaining, radius
         self.repel_effect = None
 
+        # Dungeon entry action screen
+        self.dungeon_action_active = False
+        self.dungeon_action_cursor = 0        # 0=Enter, 1=Leave
+        self.dungeon_action_info = {}         # {name, description, visited, quest_name}
+        self.dungeon_action_entry_args = None # pre-computed entry params
+
     def enter(self):
         self._apply_pending_combat_rewards()
         if self.pending_combat_message:
@@ -253,6 +259,11 @@ class OverworldState(InventoryMixin, BaseState):
                         self.log_scroll += 3
                     elif event.key == pygame.K_DOWN:
                         self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
+                # ── Dungeon action screen input ──
+                if self.dungeon_action_active:
+                    self._handle_dungeon_action_input(event)
                     return
 
                 # ── Party inventory screen input ──
@@ -602,39 +613,8 @@ class OverworldState(InventoryMixin, BaseState):
             return
 
         elif tile_id == TILE_DUNGEON:
-            dungeon_state = self.game.states["dungeon"]
             pcol, prow = self.game.party.col, self.game.party.row
-
-            # Check if this is a Keys of Shadow key dungeon
-            kd = self.game.key_dungeons.get((pcol, prow))
-            if kd and kd["status"] in ("active", "artifact_found"):
-                dungeon_state.enter_quest_dungeon(
-                    kd["levels"], pcol, prow
-                )
-
-            # Check if this is the Shadow Crystal quest dungeon
-            elif (self.game.quest
-                    and self.game.quest["status"] in ("active", "artifact_found")
-                    and pcol == self.game.quest["dungeon_col"]
-                    and prow == self.game.quest["dungeon_row"]):
-                dungeon_state.enter_quest_dungeon(
-                    self.game.quest["levels"], pcol, prow
-                )
-
-            # Check if this is the house quest dungeon
-            elif self._is_house_quest_dungeon(pcol, prow):
-                hq = self.game.house_quest
-                dungeon_state.enter_quest_dungeon(
-                    hq["levels"], pcol, prow
-                )
-
-            else:
-                # Generate a fresh dungeon each time!
-                dungeon_data = generate_dungeon("The Depths")
-                dungeon_state.enter_dungeon(
-                    dungeon_data, pcol, prow
-                )
-            self.game.change_state("dungeon")
+            self._show_dungeon_action(pcol, prow)
             return
 
         elif tile_id == TILE_DUNGEON_CLEARED:
@@ -718,6 +698,101 @@ class OverworldState(InventoryMixin, BaseState):
         if not hq or hq["status"] not in ("active", "artifact_found"):
             return False
         return col == hq["dungeon_col"] and row == hq["dungeon_row"]
+
+    # ── Dungeon action screen ─────────────────────────────────
+
+    def _show_dungeon_action(self, pcol, prow):
+        """Show the dungeon entry action screen instead of entering immediately."""
+        visited = (pcol, prow) in self.game.visited_dungeons
+
+        # Determine dungeon type and build info
+        kd = self.game.key_dungeons.get((pcol, prow))
+        quest = getattr(self.game, "quest", None)
+        hq = getattr(self.game, "house_quest", None)
+
+        if kd and kd["status"] in ("active", "artifact_found"):
+            name = kd.get("name", "Key Dungeon")
+            desc = "A dark cave entrance leads deep underground. The air smells of ancient stone and danger."
+            quest_name = f"Retrieve the {kd.get('key_name', 'Key')}"
+            entry_type = "key_dungeon"
+        elif (quest and quest["status"] in ("active", "artifact_found")
+                and pcol == quest.get("dungeon_col")
+                and prow == quest.get("dungeon_row")):
+            name = quest.get("name", "The Shadow Crystal")
+            desc = "A foreboding passage descends into darkness. Somewhere below lies the Shadow Crystal."
+            quest_name = quest.get("name", "The Shadow Crystal")
+            entry_type = "quest"
+        elif self._is_house_quest_dungeon(pcol, prow):
+            name = "Elara's House"
+            desc = "The old house sits quietly. The family heirloom is said to be hidden inside."
+            quest_name = "Retrieve the Family Heirloom"
+            entry_type = "house_quest"
+        else:
+            name = "The Depths"
+            desc = "A yawning cave entrance beckons. Who knows what lurks in the darkness below."
+            quest_name = None
+            entry_type = "random"
+
+        self.dungeon_action_info = {
+            "name": name,
+            "description": desc,
+            "visited": visited,
+            "quest_name": quest_name,
+        }
+        self.dungeon_action_entry_args = {
+            "type": entry_type,
+            "col": pcol,
+            "row": prow,
+        }
+        self.dungeon_action_cursor = 0
+        self.dungeon_action_active = True
+
+    def _handle_dungeon_action_input(self, event):
+        """Handle input for the dungeon entry action screen."""
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.dungeon_action_cursor = (self.dungeon_action_cursor - 1) % 2
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.dungeon_action_cursor = (self.dungeon_action_cursor + 1) % 2
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self.dungeon_action_cursor == 0:
+                self._enter_dungeon_confirmed()
+            else:
+                self.dungeon_action_active = False
+        elif event.key == pygame.K_ESCAPE:
+            self.dungeon_action_active = False
+
+    def _enter_dungeon_confirmed(self):
+        """Execute the actual dungeon entry after the player confirms."""
+        args = self.dungeon_action_entry_args
+        if not args:
+            self.dungeon_action_active = False
+            return
+
+        pcol, prow = args["col"], args["row"]
+        entry_type = args["type"]
+        dungeon_state = self.game.states["dungeon"]
+
+        # Mark as visited
+        self.game.visited_dungeons.add((pcol, prow))
+
+        if entry_type == "key_dungeon":
+            kd = self.game.key_dungeons.get((pcol, prow))
+            if kd:
+                dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)
+        elif entry_type == "quest":
+            quest = self.game.quest
+            if quest:
+                dungeon_state.enter_quest_dungeon(quest["levels"], pcol, prow)
+        elif entry_type == "house_quest":
+            hq = self.game.house_quest
+            if hq:
+                dungeon_state.enter_quest_dungeon(hq["levels"], pcol, prow)
+        else:
+            dungeon_data = generate_dungeon("The Depths")
+            dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
+
+        self.dungeon_action_active = False
+        self.game.change_state("dungeon")
 
     def _activate_house_quest(self):
         """Activate the house quest when the party speaks to Elara."""
@@ -913,6 +988,9 @@ class OverworldState(InventoryMixin, BaseState):
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
         )
+        if self.dungeon_action_active:
+            renderer.draw_dungeon_action_screen(
+                self.dungeon_action_info, self.dungeon_action_cursor)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:
