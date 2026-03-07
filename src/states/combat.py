@@ -72,6 +72,7 @@ PHASE_BLESS = "bless"                    # bless party-wide buff animation
 PHASE_CURSE = "curse"                    # curse debuff animation on enemy
 PHASE_MONSTER_SPELL = "monster_spell"    # monster casting a spell-like ability
 PHASE_SMITE       = "smite"             # DEBUG: flash + kill-all animation
+PHASE_LOOT        = "loot"              # post-victory: free movement to pick up loot
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
@@ -91,8 +92,26 @@ ACTION_EQUIP  = 6      # open equip screen (costs turn)
 ACTION_THROW  = 7      # throw a throwable item from inventory
 ACTION_USE_ITEM = 8    # use a consumable item (herb, potion, etc.)
 ACTION_SMITE    = 9    # DEBUG: instant-kill all monsters (temporary)
+ACTION_LEAVE_ENCOUNTER = 10  # loot phase: leave the encounter
 
 # Menu is built dynamically per character — see _build_menu_actions()
+
+# ── Loot table (weighted) — rolled per dead monster position ────────
+_CHEST_LOOT = [
+    (None,           10),   # gold only (no item)
+    ("Torch",         6),
+    ("Healing Herb",  5),
+    ("Antidote",      3),
+    ("Dagger",        3),
+    ("Club",          3),
+    ("Mace",          2),
+    ("Leather",       2),
+    ("Sling",         2),
+    ("Axe",           1),
+    ("Sword",         1),
+    ("Chain",         1),
+    ("Short Bow",     1),
+]
 
 # ── Projectile speed (pixels per second) ─────────────────────────
 PROJECTILE_SPEED = 480
@@ -946,6 +965,14 @@ class CombatState(BaseState):
         self.log_scroll = 0
         self.showing_help = False
 
+        # Loot phase state
+        self.ground_items = {}          # (col, row) -> {"item": str|None, "gold": int}
+        self.looter_fighter = None      # party member with free movement in PHASE_LOOT
+        self.loot_message = ""          # "Picked up Torch", etc.
+        self.loot_msg_timer = 0         # ms remaining for pickup message
+        self._victory_gold = 0          # total gold from monsters (for loot generation)
+        self._fled = False              # True if party fled (skip loot phase)
+
         # Gather alive party members
         self.fighters = [m for m in self.game.party.members if m.is_alive()]
         self.active_idx = 0
@@ -1054,6 +1081,12 @@ class CombatState(BaseState):
 
     def _rebuild_menu(self):
         """Build the dynamic action menu for the current fighter."""
+        # In loot phase, only show "Leave Encounter"
+        if self.phase == PHASE_LOOT:
+            self.menu_actions = [(ACTION_LEAVE_ENCOUNTER, "Leave Encounter")]
+            self.selected_action = 0
+            return
+
         f = self.active_fighter
         self.menu_actions = []  # list of (action_id, label)
         if not f:
@@ -1237,7 +1270,7 @@ class CombatState(BaseState):
             return
 
         # Speed up non-player phases with Space/Enter
-        if self.phase not in (PHASE_PLAYER, PHASE_PLAYER_DIR):
+        if self.phase not in (PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_LOOT):
             for event in events:
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_SPACE, pygame.K_RETURN):
@@ -1284,6 +1317,29 @@ class CombatState(BaseState):
                     self._try_arena_move(-1, 0)
                 elif event.key == pygame.K_d:
                     self._try_arena_move(1, 0)
+
+            # ── PHASE_LOOT: free movement + leave encounter ──
+            elif self.phase == PHASE_LOOT:
+                # WASD movement for the looter
+                if event.key == pygame.K_w:
+                    self._try_loot_move(0, -1)
+                elif event.key == pygame.K_s:
+                    self._try_loot_move(0, 1)
+                elif event.key == pygame.K_a:
+                    self._try_loot_move(-1, 0)
+                elif event.key == pygame.K_d:
+                    self._try_loot_move(1, 0)
+                elif event.key == pygame.K_UP:
+                    if self.menu_actions:
+                        self.selected_action = (self.selected_action - 1) % len(self.menu_actions)
+                elif event.key == pygame.K_DOWN:
+                    if self.menu_actions:
+                        self.selected_action = (self.selected_action + 1) % len(self.menu_actions)
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    if self.menu_actions:
+                        action_id, _ = self.menu_actions[self.selected_action]
+                        if action_id == ACTION_LEAVE_ENCOUNTER:
+                            self._end_combat(won=True)
 
             # ── PHASE_PLAYER_DIR: directional input ──
             elif self.phase == PHASE_PLAYER_DIR:
@@ -1735,6 +1791,63 @@ class CombatState(BaseState):
             self.moves_remaining -= 1
             if self.moves_remaining <= 0:
                 self._end_fighter_turn()
+
+    # ── Loot phase movement ─────────────────────────────────────
+
+    def _try_loot_move(self, dcol, drow):
+        """Move the looter freely in the arena and pick up items."""
+        f = self.looter_fighter
+        if not f:
+            return
+
+        col, row = self.fighter_positions[f]
+        new_col = col + dcol
+        new_row = row + drow
+
+        # Can't walk through walls
+        if self._is_arena_wall(new_col, new_row):
+            return
+
+        # Can't walk through other party members
+        if self._is_occupied_by_ally(new_col, new_row, exclude=f):
+            return
+
+        # Move (no movement limit — free roaming)
+        self.fighter_positions[f] = (new_col, new_row)
+
+        # Check for ground loot at the new position
+        if (new_col, new_row) in self.ground_items:
+            self._pickup_ground_loot(new_col, new_row)
+
+    def _pickup_ground_loot(self, col, row):
+        """Pick up items/gold at a ground position."""
+        if (col, row) not in self.ground_items:
+            return
+
+        loot = self.ground_items.pop((col, row))
+        item_name = loot.get("item")
+        gold_amount = loot.get("gold", 0)
+
+        msg_parts = []
+
+        if gold_amount > 0:
+            self.game.party.gold += gold_amount
+            msg_parts.append(f"{gold_amount} gold")
+
+        if item_name:
+            self.game.party.inv_add(item_name)
+            msg_parts.append(item_name)
+
+        if msg_parts:
+            pickup_msg = f"{self.looter_fighter.name} picked up: " + ", ".join(msg_parts)
+            self.loot_message = pickup_msg
+            self.loot_msg_timer = 1500
+            self.combat_log.append(pickup_msg)
+            self.game.game_log.append(pickup_msg)
+            try:
+                self.game.sfx.play("item")
+            except Exception:
+                pass  # sound may not exist
 
     def _execute_player_action(self):
         action = self.selected_action
@@ -4069,6 +4182,7 @@ class CombatState(BaseState):
             )
             self.phase = PHASE_VICTORY
             self.phase_timer = 1500
+            self._fled = True
             self.game.sfx.play("flee")
             self.combat_log.append("Your party flees the battle!")
             self.game.game_log.append("Fled from battle.")
@@ -5159,6 +5273,13 @@ class CombatState(BaseState):
         if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):
             self.smite_flash = max(0.0, self.phase_timer / 800.0)
 
+        # Loot pickup message timer
+        if self.loot_msg_timer > 0:
+            self.loot_msg_timer -= dt_ms
+            if self.loot_msg_timer <= 0:
+                self.loot_msg_timer = 0
+                self.loot_message = ""
+
         if self.phase_timer > 0:
             self.phase_timer -= dt_ms
             if self.phase_timer <= 0:
@@ -5180,7 +5301,10 @@ class CombatState(BaseState):
             # Flash done — transition to normal victory
             self._trigger_victory()
         elif self.phase == PHASE_VICTORY:
-            self._end_combat(won=True)
+            if self._fled:
+                self._end_combat(won=True)
+            else:
+                self._enter_loot_phase()
         elif self.phase == PHASE_DEFEAT:
             self._end_combat(won=False)
 
@@ -5227,40 +5351,105 @@ class CombatState(BaseState):
         else:
             self._end_fighter_turn()
 
+    # ── Loot generation helpers ──────────────────────────────────
+
+    @staticmethod
+    def _roll_loot_item():
+        """Roll a random item from the loot table. Returns item_name or None."""
+        total_weight = sum(w for _, w in _CHEST_LOOT)
+        roll = random.randint(1, total_weight)
+        cumulative = 0
+        for item, weight in _CHEST_LOOT:
+            cumulative += weight
+            if roll <= cumulative:
+                return item
+        return None
+
+    def _generate_ground_loot(self, total_gold):
+        """Drop loot items on the arena at dead monster positions."""
+        self.ground_items = {}
+
+        # Collect positions of dead monsters
+        loot_positions = []
+        for monster in self.monsters:
+            if not monster.is_alive():
+                pos = self.monster_positions.get(monster)
+                if pos:
+                    loot_positions.append(pos)
+
+        if not loot_positions:
+            loot_positions = [(ARENA_COLS // 2, ARENA_ROWS // 2)]
+
+        # Drop gold at first monster's position
+        first_pos = loot_positions[0]
+        first_item = self._roll_loot_item()
+        self.ground_items[first_pos] = {
+            "item": first_item,
+            "gold": total_gold,
+        }
+
+        # Drop one item roll per additional dead monster position
+        for pos in loot_positions[1:]:
+            item = self._roll_loot_item()
+            if item:
+                if pos in self.ground_items:
+                    # Same position — merge
+                    self.ground_items[pos]["item"] = item
+                else:
+                    self.ground_items[pos] = {"item": item, "gold": 0}
+
+    def _enter_loot_phase(self):
+        """Transition from victory fanfare to the loot pickup phase."""
+        self.phase = PHASE_LOOT
+        self.phase_timer = 0  # no auto-advance
+
+        # Generate ground loot at dead monster positions
+        self._generate_ground_loot(self._victory_gold)
+
+        # Pick a random alive fighter as the looter
+        alive = [f for f in self.fighters if f.is_alive()]
+        if alive:
+            self.looter_fighter = random.choice(alive)
+            # Point active_idx at the looter so the property returns them
+            if self.looter_fighter in self.fighters:
+                self.active_idx = self.fighters.index(self.looter_fighter)
+            self.combat_log.append(
+                f"{self.looter_fighter.name} surveys the battlefield for loot.")
+        else:
+            # Everyone dead — shouldn't happen after victory, but be safe
+            self._end_combat(won=True)
+            return
+
+        self._rebuild_menu()
+
     def _trigger_victory(self):
         """Handle the common victory sequence.
 
-        XP and gold are stored as pending rewards on the game object so
-        they can be applied *after* combat ends, back in the source
-        state (overworld / dungeon / town).  This lets the exploration
-        screen show a level-up animation and log message.
+        XP is stored as a pending reward; gold drops on the battlefield
+        for the player to pick up during the loot phase.
         """
         self.phase = PHASE_VICTORY
-        self.phase_timer = 2500
+        self.phase_timer = 2000
 
         # Sum rewards from all monsters
         total_xp = sum(m.xp_reward for m in self.monsters)
         total_gold = sum(m.gold_reward for m in self.monsters)
 
-        # Store pending rewards — the source state will apply them
+        # Store pending XP — gold is picked up during loot phase
         self.game.pending_combat_rewards = {
             "xp": total_xp,
-            "gold": total_gold,
+            "gold": 0,
         }
+        self._victory_gold = total_gold
 
         self.game.sfx.play("victory")
         self.combat_log.append(
-            f"All enemies defeated! +{total_xp} XP each, +{total_gold} gold!"
+            f"All enemies defeated! +{total_xp} XP each!"
         )
 
     def _end_combat(self, won):
-        chest_placed = False
+        # Remove dead monsters from the source state's tracking
         if won and self.monster_refs:
-            from src.settings import TILE_CHEST
-            # Place chest at first monster's map position
-            first = self.monster_refs[0]
-            mc, mr = self.monster_map_positions.get(first, (0, 0))
-
             if self.source_state == "dungeon":
                 dungeon_state = self.game.states.get("dungeon")
                 if dungeon_state and dungeon_state.dungeon_data:
@@ -5269,13 +5458,6 @@ class CombatState(BaseState):
                         if mref in ddata.monsters:
                             ddata.monsters.remove(mref)
 
-                    # Place a treasure chest where the first monster stood
-                    ddata.tile_map.set_tile(mc, mr, TILE_CHEST)
-                    chest_placed = True
-                    dungeon_state.pending_combat_message = (
-                        "A treasure chest appeared nearby."
-                    )
-
             elif self.source_state == "overworld":
                 overworld_state = self.game.states.get("overworld")
                 if overworld_state:
@@ -5283,30 +5465,13 @@ class CombatState(BaseState):
                         if mref in overworld_state.overworld_monsters:
                             overworld_state.overworld_monsters.remove(mref)
 
-                    # Remember the original tile before placing the chest
-                    original_tile = self.game.tile_map.get_tile(mc, mr)
-                    overworld_state.chest_under_tiles[(mc, mr)] = original_tile
-
-                    # Place a treasure chest where the orc stood
-                    self.game.tile_map.set_tile(mc, mr, TILE_CHEST)
-                    chest_placed = True
-                    overworld_state.pending_combat_message = (
-                        "A treasure chest appeared nearby."
-                    )
-
         # ── Narrative summary for the world game log ──
         if won:
-            # Build a description of what was defeated
             if len(self.monsters) == 1:
                 foe_desc = self.monsters[0].name
             else:
                 foe_desc = self.encounter_name
-            summary = f"The party defeated {foe_desc}"
-            if chest_placed:
-                summary += " and discovered a treasure chest."
-            else:
-                summary += "."
-            self.game.game_log.append(summary)
+            self.game.game_log.append(f"The party defeated {foe_desc}.")
 
         if not won:
             # Check if this is a total party wipe
@@ -5421,6 +5586,8 @@ class CombatState(BaseState):
             monsters=self.monsters,
             monster_positions=self.monster_positions,
             encounter_name=self.encounter_name,
+            ground_items=self.ground_items if self.phase == PHASE_LOOT else None,
+            loot_message=self.loot_message,
         )
         # DEBUG: smite flash overlay
         if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):

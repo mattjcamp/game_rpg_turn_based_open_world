@@ -4167,7 +4167,8 @@ class Renderer:
                           use_item_list=None, use_item_cursor=0,
                           selected_use_item=None,
                           monsters=None, monster_positions=None,
-                          encounter_name=None):
+                          encounter_name=None,
+                          ground_items=None, loot_message=""):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -4194,6 +4195,48 @@ class Renderer:
                         self._u3_draw_wall_tile(px, py, ts)
                     else:
                         self._u3_draw_floor_tile(px, py, ts, c, r)
+
+        # ── 1b. ground loot items (drawn on floor, under entities) ──
+        if ground_items:
+            gi_font = self.font_small  # small font for labels
+            for (gc, gr), loot in ground_items.items():
+                gx = mx + gc * ts
+                gy = my + gr * ts
+                cx = gx + ts // 2
+                cy = gy + ts // 2
+
+                gold_amt = loot.get("gold", 0)
+                item_name = loot.get("item")
+
+                if gold_amt > 0:
+                    # Draw gold pile: yellow circle + "G"
+                    pygame.draw.circle(self.screen, (220, 180, 40),
+                                       (cx - 4, cy), 8)
+                    pygame.draw.circle(self.screen, (255, 220, 60),
+                                       (cx - 4, cy), 6)
+                    g_surf = gi_font.render("G", True, (80, 60, 0))
+                    self.screen.blit(g_surf,
+                                     (cx - 4 - g_surf.get_width() // 2,
+                                      cy - g_surf.get_height() // 2))
+                    # Gold amount label above
+                    amt_surf = gi_font.render(str(gold_amt), True, (255, 220, 60))
+                    self.screen.blit(amt_surf,
+                                     (cx - amt_surf.get_width() // 2,
+                                      gy + 1))
+
+                if item_name:
+                    # Draw item: small colored square + name
+                    ix = cx + (8 if gold_amt > 0 else 0)
+                    iy = cy + (4 if gold_amt > 0 else 0)
+                    pygame.draw.rect(self.screen, (100, 180, 255),
+                                     (ix - 6, iy - 6, 12, 12))
+                    pygame.draw.rect(self.screen, (60, 120, 200),
+                                     (ix - 6, iy - 6, 12, 12), 1)
+                    # Item name below tile
+                    nm_surf = gi_font.render(item_name[:10], True, (180, 220, 255))
+                    self.screen.blit(nm_surf,
+                                     (cx - nm_surf.get_width() // 2,
+                                      gy + ts - 2))
 
         # ── 2. monster sprites ──
         if monsters and monster_positions:
@@ -4478,8 +4521,9 @@ class Renderer:
             PHASE_PLAYER as _PP, PHASE_PLAYER_DIR as _PPD,
             PHASE_SPELL_SELECT as _PSS, PHASE_THROW_SELECT as _PTS,
             PHASE_USE_ITEM as _PUI, PHASE_SHIELD_TARGET as _PST,
+            PHASE_LOOT as _PL,
         )
-        _player_phases = (_PP, _PPD, _PSS, _PTS, _PUI, _PST)
+        _player_phases = (_PP, _PPD, _PSS, _PTS, _PUI, _PST, _PL)
         is_player_phase = phase in _player_phases
 
         # Animate expand/collapse (smooth ease-out interpolation)
@@ -4594,6 +4638,17 @@ class Renderer:
             pygame.draw.rect(self.screen, self._U3_BLACK, bg)
             pygame.draw.rect(self.screen, self._U3_BLUE, bg, 2)
             self.screen.blit(surf, rect)
+
+        # ── 8. loot pickup message (bottom of arena) ──
+        if loot_message:
+            lm_surf = self.font.render(loot_message, True, (255, 220, 80))
+            lm_rect = lm_surf.get_rect(
+                center=(mx + self._MAP_W // 2,
+                        my + self._MAP_H - 25))
+            lm_bg = lm_rect.inflate(20, 10)
+            pygame.draw.rect(self.screen, self._U3_BLACK, lm_bg)
+            pygame.draw.rect(self.screen, (180, 160, 40), lm_bg, 2)
+            self.screen.blit(lm_surf, lm_rect)
 
     # ==============================================================
     #  TILE DRAWING  (retro Ultima III look)
@@ -7065,7 +7120,7 @@ class Renderer:
             ACTION_RANGED, ACTION_CAST, ACTION_THROW, ACTION_USE_ITEM,
             PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_SPELL_SELECT,
             PHASE_THROW_SELECT, PHASE_USE_ITEM,
-            PHASE_VICTORY, PHASE_DEFEAT,
+            PHASE_VICTORY, PHASE_DEFEAT, PHASE_LOOT,
             PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL,
             PHASE_SHIELD, PHASE_SHIELD_TARGET, PHASE_TURN_UNDEAD,
         )
@@ -7207,6 +7262,19 @@ class Renderer:
             self._u3_text("<   >", cx - 24, cy, self._U3_WHITE, f)
             self._u3_text("v", cx - 4, cy + 20, self._U3_WHITE, f)
 
+
+        elif phase == PHASE_LOOT:
+            # Loot pickup phase — show looter name + menu
+            name = active_fighter.name if active_fighter else "???"
+            self._u3_text(f"-- {name.upper()} --", tx, ty, (255, 220, 80), f)
+            self._u3_text("COLLECT LOOT (WASD)", tx, ty + 22, (200, 200, 160), f)
+
+            if menu_actions:
+                self._u3_scrollable_list(
+                    tx, ty + 50, h - 56, f,
+                    items=[(label.upper(), i == selected_action)
+                           for i, (_aid, label) in enumerate(menu_actions)],
+                    cursor=selected_action)
 
         elif phase == PHASE_VICTORY:
             self._u3_text("** VICTORY! **", tx, ty, self._U3_GREEN, f)
