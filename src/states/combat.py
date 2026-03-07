@@ -981,18 +981,12 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"--- Party vs {self.monsters[0].name}! ---"
             )
-            self.game.game_log.append(
-                f"Encountered {self.monsters[0].name}!"
-            )
         else:
             names = ", ".join(m.name for m in self.monsters)
             self.combat_log.append(
                 f"--- Party vs {len(self.monsters)} enemies! ---"
             )
             self.combat_log.append(f"  ({names})")
-            self.game.game_log.append(
-                f"Encountered {len(self.monsters)} enemies ({names})!"
-            )
         self.combat_log.append(
             f"{len(self.fighters)} party members engage!"
         )
@@ -5233,11 +5227,9 @@ class CombatState(BaseState):
         self.combat_log.append(
             f"All enemies defeated! +{total_xp} XP each, +{total_gold} gold!"
         )
-        self.game.game_log.append(
-            f"Victory! +{total_xp} XP each, +{total_gold} gold."
-        )
 
     def _end_combat(self, won):
+        chest_placed = False
         if won and self.monster_refs:
             from src.settings import TILE_CHEST
             # Place chest at first monster's map position
@@ -5254,8 +5246,9 @@ class CombatState(BaseState):
 
                     # Place a treasure chest where the first monster stood
                     ddata.tile_map.set_tile(mc, mr, TILE_CHEST)
+                    chest_placed = True
                     dungeon_state.pending_combat_message = (
-                        "Victory! A treasure chest appears!"
+                        "A treasure chest appeared nearby."
                     )
 
             elif self.source_state == "overworld":
@@ -5271,9 +5264,24 @@ class CombatState(BaseState):
 
                     # Place a treasure chest where the orc stood
                     self.game.tile_map.set_tile(mc, mr, TILE_CHEST)
+                    chest_placed = True
                     overworld_state.pending_combat_message = (
-                        "Victory! A treasure chest appears!"
+                        "A treasure chest appeared nearby."
                     )
+
+        # ── Narrative summary for the world game log ──
+        if won:
+            # Build a description of what was defeated
+            if len(self.monsters) == 1:
+                foe_desc = self.monsters[0].name
+            else:
+                foe_desc = self.encounter_name
+            summary = f"The party defeated {foe_desc}"
+            if chest_placed:
+                summary += " and discovered a treasure chest."
+            else:
+                summary += "."
+            self.game.game_log.append(summary)
 
         if not won:
             # Check if this is a total party wipe
@@ -5392,4 +5400,4 @@ class CombatState(BaseState):
         if self.showing_help:
             renderer.draw_combat_help_overlay()
         if self.showing_log:
-            renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
+            renderer.draw_log_overlay(self.combat_log, self.log_scroll)

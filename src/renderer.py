@@ -11190,16 +11190,26 @@ class Renderer:
             return lines if lines else [""]
 
         # ── Color for a log entry ──
+        _COMBAT_SUMMARY_COLOR = (255, 230, 80)   # warm gold for all combat summaries
+
         def _log_color(original):
             lo = original.lower()
-            if "critical" in lo or "defeated" in lo:
+            # ── Combat / battle summary lines (world log) ──
+            if ("the party defeated" in lo or "treasure chest" in lo
+                    or "fled from battle" in lo
+                    or "defeated in battle" in lo):
+                return _COMBAT_SUMMARY_COLOR
+            # ── Combat detail lines (battle log) ──
+            if "critical" in lo:
+                return (255, 230, 80)
+            elif lo.startswith("--"):
+                return (255, 200, 80)
+            elif "is defeated" in lo:
                 return (255, 230, 80)
             elif "hit!" in lo or "damage" in lo:
                 return (255, 255, 255)
             elif "miss" in lo or "failed" in lo or "resisted" in lo:
                 return (180, 180, 200)
-            elif original.startswith("--"):
-                return (255, 200, 80)
             elif "gold" in lo or "treasure" in lo:
                 return (255, 255, 100)
             elif "heals" in lo or "wakes up" in lo:

@@ -1049,9 +1049,10 @@ class DungeonState(InventoryMixin, BaseState):
         if chosen_item:
             self.game.party.inv_add(chosen_item)
             self.show_message(
-                f"Treasure! {gold} gold and {chosen_item}!", 2500)
+                f"The party opened a treasure chest and found {gold} gold and {chosen_item}.", 2500)
         else:
-            self.show_message(f"Treasure! Found {gold} gold!", 2000)
+            self.show_message(
+                f"The party opened a treasure chest and found {gold} gold.", 2000)
 
     def _place_portal(self, col, row):
         """Place a TILE_PORTAL on an adjacent walkable floor tile."""
