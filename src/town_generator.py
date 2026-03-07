@@ -12,7 +12,7 @@ import random
 from src.tile_map import TileMap
 from src.settings import (
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
-    TILE_MACHINE, TILE_KEYSLOT,
+    TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR,
 )
 
 
@@ -20,16 +20,18 @@ class NPC:
     """A non-player character inside a town."""
 
     def __init__(self, col, row, name, dialogue, npc_type="villager",
-                 quest_dialogue=None, quest_choices=None):
+                 quest_dialogue=None, quest_choices=None, god_name=None):
         self.col = col
         self.row = row
         self.name = name
         self.dialogue = dialogue  # list of strings, cycles through on each talk
-        self.npc_type = npc_type  # villager, shopkeep, innkeeper, elder
+        self.npc_type = npc_type  # villager, shopkeep, innkeeper, elder, priest
         self._talk_index = 0
         # Quest support — only used for quest-giving NPCs
         self.quest_dialogue = quest_dialogue  # list of strings for quest offer
         self.quest_choices = quest_choices    # e.g. ["Yes, I'll do it!", "Not right now."]
+        # Priest support
+        self.god_name = god_name or "The Divine"
 
     def get_dialogue(self):
         """Return the next line of dialogue and advance the index."""
@@ -150,8 +152,21 @@ def generate_town(name="Thornwall"):
     tmap.set_tile(ox + 13, oy + 2, TILE_COUNTER)
     tmap.set_tile(ox + 14, oy + 2, TILE_COUNTER)
 
+    # Temple of Solarius (lower-left, 6 wide × 5 tall, door faces east)
+    _place_building(tmap, ox + 1, oy + 12, 6, 5, door_side="east")
+    # Altar inside the temple
+    tmap.set_tile(ox + 3, oy + 14, TILE_ALTAR)
+
     # --- NPCs ---
     npcs = []
+
+    # Priest inside the temple
+    npcs.append(NPC(ox + 4, oy + 14, "Brother Cedric", [
+        "Welcome to the Temple of Solarius, child.",
+        "The light of Solarius heals all wounds.",
+        "We offer healing and resurrection for those in need.",
+        "May the sun's radiance guide your path.",
+    ], npc_type="priest", god_name="Solarius"))
 
     # Shopkeeper inside the shop (behind the counter)
     npcs.append(NPC(ox + 4, oy + 3, "Gruff", [
@@ -300,11 +315,16 @@ def generate_duskhollow():
     # ── Guard House (lower-right, 6×5, door west) ──
     _place_building(tmap, ox + 21, oy + 15, 6, 5, door_side="west")
 
+    # ── Temple of Lunara (lower-centre, 6×5, door north) ──
+    _place_building(tmap, ox + 11, oy + 18, 6, 5, door_side="north")
+    # Altar inside the temple
+    tmap.set_tile(ox + 13, oy + 20, TILE_ALTAR)
+
     # ── Small cottage A (lower-mid-left, 4×4, door south) ──
-    _place_building(tmap, ox + 9, oy + 18, 4, 4, door_side="south")
+    _place_building(tmap, ox + 8, oy + 18, 4, 4, door_side="south")
 
     # ── Small cottage B (lower-mid-right, 4×4, door south) ──
-    _place_building(tmap, ox + 16, oy + 18, 4, 4, door_side="south")
+    _place_building(tmap, ox + 18, oy + 18, 4, 4, door_side="south")
 
     # ================================================================
     # NPCs
@@ -366,6 +386,14 @@ def generate_duskhollow():
         "Study the stars... even in darkness, they remember the sun.",
         "Prepare well. The eighth dungeon has eight floors of peril.",
     ], npc_type="elder"))
+
+    # ── Temple Priestess ──
+    npcs.append(NPC(ox + 14, oy + 20, "Sister Vesper", [
+        "Welcome to the Temple of Lunara, traveler.",
+        "Even in this endless night, the moon watches over us.",
+        "We offer healing and resurrection to those in need.",
+        "May Lunara's silver light guide you through the dark.",
+    ], npc_type="priest", god_name="Lunara"))
 
     # ── Elder Gwynn ──
     npcs.append(NPC(ox + 4, oy + 17, "Elder Gwynn", [

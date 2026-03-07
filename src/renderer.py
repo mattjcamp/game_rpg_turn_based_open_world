@@ -737,7 +737,7 @@ class Renderer:
         from src.settings import (
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_MACHINE, TILE_KEYSLOT,
+            TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR,
         )
 
         # Use extracted town gate tile for exit
@@ -821,6 +821,9 @@ class Renderer:
 
         elif tile_id == TILE_KEYSLOT:
             self._draw_keyslot_tile(px, py, ts, wc, wr, keys_inserted)
+
+        elif tile_id == TILE_ALTAR:
+            self._draw_altar_tile(px, py, ts)
 
         else:
             # Unknown tile — use TILE_DEFS color if available
@@ -1131,6 +1134,90 @@ class Renderer:
             for rx, ry in ((px + 4, py + 4), (px + ts - 5, py + 4),
                            (px + 4, py + ts - 5), (px + ts - 5, py + ts - 5)):
                 pygame.draw.circle(self.screen, (80, 75, 85), (rx, ry), 1)
+
+    def _draw_altar_tile(self, px, py, ts):
+        """Animated temple altar with candles, holy symbol, and pulsing aura."""
+        import math as _math
+        import time as _time
+
+        t = _time.time()
+        cx = px + ts // 2
+        cy = px + ts // 2  # Note: intentionally uses px for symmetry calc
+        cy = py + ts // 2
+
+        # ── Stone altar base ──
+        STONE_BASE = (140, 120, 95)
+        STONE_LIGHT = (170, 150, 120)
+        STONE_DARK = (90, 75, 60)
+        GOLD = (200, 170, 50)
+        GOLD_BRIGHT = (255, 220, 80)
+
+        # Base rectangle
+        base = pygame.Rect(px + 1, py + 1, ts - 2, ts - 2)
+        pygame.draw.rect(self.screen, STONE_BASE, base)
+        # Carved border (double outline)
+        pygame.draw.rect(self.screen, STONE_DARK, base, 1)
+        inner = pygame.Rect(px + 3, py + 3, ts - 6, ts - 6)
+        pygame.draw.rect(self.screen, STONE_LIGHT, inner, 1)
+
+        # ── Pulsing aura glow ──
+        pulse = 0.5 + 0.5 * _math.sin(t * 2.0)
+        aura_alpha = int(30 + 40 * pulse)
+        aura_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        aura_r = int(ts * 0.35 + 2 * pulse)
+        # White-gold shifting glow
+        gr = int(255 * (0.8 + 0.2 * pulse))
+        gg = int(220 * (0.7 + 0.3 * pulse))
+        gb = int(100 * (0.3 + 0.3 * (1 - pulse)))
+        pygame.draw.circle(aura_s, (gr, gg, gb, aura_alpha),
+                           (ts // 2, ts // 2), aura_r)
+        self.screen.blit(aura_s, (px, py))
+
+        # ── Rotating light rays ──
+        ray_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        ray_alpha = int(18 + 14 * pulse)
+        rot = t * 0.5  # slow rotation
+        for i in range(8):
+            angle = rot + i * _math.pi / 4
+            ex = ts // 2 + int(ts * 0.4 * _math.cos(angle))
+            ey = ts // 2 + int(ts * 0.4 * _math.sin(angle))
+            pygame.draw.line(ray_s, (255, 230, 120, ray_alpha),
+                             (ts // 2, ts // 2), (ex, ey), 1)
+        self.screen.blit(ray_s, (px, py))
+
+        # ── Center holy symbol (cross / star) ──
+        cross_pulse = 0.7 + 0.3 * _math.sin(t * 1.8 + 0.5)
+        cc = tuple(min(255, int(c * cross_pulse)) for c in GOLD_BRIGHT)
+        # Vertical bar
+        pygame.draw.line(self.screen, cc, (cx, cy - 5), (cx, cy + 5), 2)
+        # Horizontal bar
+        pygame.draw.line(self.screen, cc, (cx - 4, cy - 1), (cx + 4, cy - 1), 2)
+        # Star points (small)
+        for i in range(4):
+            a = t * 0.8 + i * _math.pi / 2
+            sx = cx + int(3 * _math.cos(a))
+            sy = cy + int(3 * _math.sin(a))
+            pygame.draw.circle(self.screen, GOLD, (sx, sy), 1)
+
+        # ── 4 candle flames on corners ──
+        candle_positions = [
+            (px + 5, py + 5), (px + ts - 6, py + 5),
+            (px + 5, py + ts - 6), (px + ts - 6, py + ts - 6),
+        ]
+        for idx, (fx, fy) in enumerate(candle_positions):
+            # Candle base (small rectangle)
+            pygame.draw.rect(self.screen, (180, 160, 120),
+                             pygame.Rect(fx - 1, fy, 3, 4))
+            # Flame flicker
+            flicker = _math.sin(t * 5 + idx * 1.7)
+            flame_h = int(3 + 2 * abs(flicker))
+            flame_x = fx + int(flicker * 0.5)
+            # Flame outer (orange)
+            pygame.draw.ellipse(self.screen, (220, 140, 30),
+                                pygame.Rect(flame_x - 1, fy - flame_h, 3, flame_h))
+            # Flame inner (yellow-white)
+            pygame.draw.line(self.screen, (255, 240, 180),
+                             (fx, fy - 1), (fx, fy - flame_h + 1), 1)
 
     def _u3_draw_npc_sprite(self, npc, cx, cy):
         """Draw an NPC on the town map using per-type VGA sprites."""
@@ -11771,3 +11858,215 @@ class Renderer:
                                         (255, 220, 100))
             mx = sw // 2 - msg_surf.get_width() // 2
             self.screen.blit(msg_surf, (mx, sh - 30))
+
+    # ════════════════════════════════════════════════════════════════
+    #  TEMPLE SERVICE MENU
+    # ════════════════════════════════════════════════════════════════
+
+    def draw_temple_service_menu(self, party, cursor, npc_name, god_name,
+                                  message=""):
+        """Full-screen temple service UI — healing & resurrection."""
+        import math as _math
+        import time as _time
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+        fm = self.font_med
+        f = self.font
+        fs = self.font_small
+        t = _time.time()
+
+        self.screen.fill(self._U3_BLACK)
+
+        # ── Title bar ──
+        self._u3_panel(0, 0, sw, 34)
+        title = f"TEMPLE OF {god_name.upper()}"
+        self._u3_text(title, 10, 9, (255, 220, 120), fm)
+        # Priest name on right
+        self._u3_text(npc_name.upper(), sw - 10 - fm.size(npc_name.upper())[0],
+                      9, self._U3_LTBLUE, fm)
+
+        # ── Main panel (services) ──
+        panel_y = 40
+        panel_h = 260
+        self._u3_panel(4, panel_y, sw - 8, panel_h)
+
+        # Decorative cross symbol (animated)
+        sym_x = sw // 2
+        sym_y = panel_y + 35
+        pulse = 0.5 + 0.5 * _math.sin(t * 2.0)
+        glow_a = int(40 + 30 * pulse)
+        glow_s = pygame.Surface((40, 40), pygame.SRCALPHA)
+        pygame.draw.circle(glow_s, (255, 220, 100, glow_a), (20, 20), 18)
+        self.screen.blit(glow_s, (sym_x - 20, sym_y - 20))
+        gc = (255, 230, 120)
+        pygame.draw.line(self.screen, gc, (sym_x, sym_y - 10),
+                         (sym_x, sym_y + 10), 2)
+        pygame.draw.line(self.screen, gc, (sym_x - 7, sym_y - 3),
+                         (sym_x + 7, sym_y - 3), 2)
+
+        # ── Service options ──
+        services = [
+            ("HEALING",      "RESTORE ALL HP & MP FOR LIVING MEMBERS",  100),
+            ("RESURRECTION", "REVIVE A FALLEN PARTY MEMBER TO FULL",   1000),
+        ]
+
+        sy = panel_y + 70
+        for idx, (name, desc, cost) in enumerate(services):
+            selected = (idx == cursor)
+            row_rect = pygame.Rect(20, sy, sw - 40, 50)
+
+            if selected:
+                # Highlight background
+                hl_s = pygame.Surface((row_rect.w, row_rect.h), pygame.SRCALPHA)
+                hl_s.fill((90, 90, 255, 40))
+                self.screen.blit(hl_s, row_rect.topleft)
+                pygame.draw.rect(self.screen, self._U3_LTBLUE, row_rect, 1)
+                # Cursor arrow
+                self._u3_text(">", 10, sy + 8, self._U3_ORANGE, fm)
+
+            name_col = self._U3_WHITE if selected else self._U3_GRAY
+            self._u3_text(name, 30, sy + 4, name_col, fm)
+            self._u3_text(desc, 30, sy + 24, (140, 140, 160), fs)
+            # Cost on right
+            cost_str = f"{cost} GOLD"
+            cost_w = fm.size(cost_str)[0]
+            cost_col = self._U3_ORANGE if selected else (180, 150, 80)
+            self._u3_text(cost_str, sw - 30 - cost_w, sy + 4, cost_col, fm)
+
+            sy += 60
+
+        # Separator
+        pygame.draw.line(self.screen, (60, 60, 100),
+                         (20, sy + 10), (sw - 20, sy + 10), 1)
+
+        # Flavor text
+        flavor = f"\"MAY {god_name.upper()} GRANT YOU STRENGTH.\""
+        self._u3_text(flavor, 30, sy + 20, (120, 110, 140), fs)
+
+        # ── Party status panel ──
+        status_y = panel_y + panel_h + 8
+        status_h = sh - status_y - 38
+        self._u3_panel(4, status_y, sw - 8, status_h)
+        self._u3_text("PARTY STATUS", 14, status_y + 6, self._U3_ORANGE, fm)
+
+        # Gold display
+        gold_str = f"GOLD: {party.gold}"
+        gold_w = fm.size(gold_str)[0]
+        self._u3_text(gold_str, sw - 14 - gold_w, status_y + 6,
+                      (255, 220, 80), fm)
+
+        # Member rows
+        my = status_y + 30
+        row_h = 22
+        for i, m in enumerate(party.members):
+            alive = m.is_alive()
+            nc = self._U3_WHITE if alive else self._U3_RED
+            self._u3_text(m.name.upper(), 20, my, nc, fm)
+
+            if alive:
+                # HP bar
+                hp_label = f"HP {m.hp}/{m.max_hp}"
+                self._u3_text(hp_label, 200, my, self._U3_GREEN, fs)
+                # MP bar
+                mp_label = f"MP {m.current_mp}/{m.max_mp}"
+                self._u3_text(mp_label, 340, my, self._U3_LTBLUE, fs)
+                # Status
+                if m.hp < m.max_hp or m.current_mp < m.max_mp:
+                    self._u3_text("WOUNDED", 480, my, (220, 180, 60), fs)
+                else:
+                    self._u3_text("HEALTHY", 480, my, (100, 200, 100), fs)
+            else:
+                self._u3_text("FALLEN", 200, my, self._U3_RED, fs)
+
+            my += row_h
+
+        # ── Message area ──
+        if message:
+            msg_col = self._U3_ORANGE
+            msg_surf = fm.render(message.upper(), True, msg_col)
+            mx = sw // 2 - msg_surf.get_width() // 2
+            # Pulsing message
+            msg_alpha = int(200 + 55 * _math.sin(t * 4))
+            msg_a_surf = pygame.Surface(msg_surf.get_size(), pygame.SRCALPHA)
+            msg_a_surf.fill((255, 255, 255, msg_alpha))
+            msg_surf_copy = msg_surf.copy()
+            msg_surf_copy.blit(msg_a_surf, (0, 0),
+                               special_flags=pygame.BLEND_RGBA_MULT)
+            self.screen.blit(msg_surf_copy, (mx, sh - 56))
+
+        # ── Controls hint ──
+        self._u3_text("[UP/DOWN] SELECT  [ENTER] CONFIRM  [ESC] LEAVE",
+                      10, sh - 22, (68, 68, 200), fs)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TEMPLE HEAL EFFECT (celestial animation overlay)
+    # ════════════════════════════════════════════════════════════════
+
+    def draw_temple_heal_effect(self, effect):
+        """Celestial animation overlay: radial glow, light rays, particles."""
+        import math as _math
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+        t = effect.timer
+        progress = t / effect.DURATION  # 0..1
+
+        overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
+
+        cx = sw // 2
+        cy = sh // 2
+
+        # ── Central expanding radial glow ──
+        glow_r = int(40 + 200 * progress)
+        # Fade: ramp up then down
+        if progress < 0.3:
+            glow_alpha = int(120 * (progress / 0.3))
+        elif progress < 0.7:
+            glow_alpha = 120
+        else:
+            glow_alpha = int(120 * (1 - (progress - 0.7) / 0.3))
+
+        # White-gold shifting
+        gr = 255
+        gg = int(230 + 25 * _math.sin(t * 3))
+        gb = int(150 - 80 * progress)
+        pygame.draw.circle(overlay, (gr, gg, gb, glow_alpha // 2),
+                           (cx, cy), glow_r)
+        pygame.draw.circle(overlay, (gr, gg, gb, glow_alpha),
+                           (cx, cy), glow_r // 2)
+
+        # ── 8 light rays in star pattern, slowly rotating ──
+        rot_speed = 0.4
+        for i in range(8):
+            angle = t * rot_speed + i * _math.pi / 4
+            ray_len = int(60 + 180 * progress)
+            ray_alpha = glow_alpha // 2
+            ex = cx + int(ray_len * _math.cos(angle))
+            ey = cy + int(ray_len * _math.sin(angle))
+            pygame.draw.line(overlay, (255, 240, 160, ray_alpha),
+                             (cx, cy), (ex, ey), 2)
+
+        # ── Ascending particles ──
+        for p in effect.particles:
+            vx = p["vx"]
+            vy = p["vy"]
+            r, g, b = p["color"]
+            lifetime = p["lifetime"]
+            if t > lifetime:
+                continue
+            # Position from centre
+            p_x = cx + int(vx * t + 8 * _math.sin(t * 3 + vx * 0.1))
+            p_y = cy + int(vy * t)
+            # Fade out as lifetime expires
+            p_alpha = max(0, int(220 * (1 - t / lifetime)))
+            if p_alpha <= 0:
+                continue
+            pygame.draw.circle(overlay, (r, g, b, p_alpha), (p_x, p_y), 2)
+            # Tiny sparkle trail
+            trail_a = p_alpha // 2
+            if trail_a > 0:
+                pygame.draw.circle(overlay, (r, g, b, trail_a),
+                                   (p_x, p_y + 4), 1)
+
+        self.screen.blit(overlay, (0, 0))

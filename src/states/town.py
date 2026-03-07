@@ -79,6 +79,40 @@ class QuestCompleteEffect:
         return min(1.0, self.timer / self.DURATION)
 
 
+class TempleHealEffect:
+    """Celestial animation when a temple service is performed.
+
+    Golden/white particles rise and radiate outward from the screen centre
+    while a holy glow expands and fades over ~2.5 seconds.
+    """
+    DURATION = 2.5
+
+    def __init__(self):
+        self.timer = 0.0
+        self.alive = True
+        # Pre-generate ascending particle data
+        self.particles = []
+        for _ in range(30):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(40, 120)
+            self.particles.append({
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed - 50,  # upward bias
+                "color": random.choice([
+                    (255, 255, 255),    # white
+                    (255, 220, 100),    # gold
+                    (200, 255, 200),    # pale green
+                    (100, 200, 255),    # pale blue
+                ]),
+                "lifetime": random.uniform(1.0, 2.4),
+            })
+
+    def update(self, dt):
+        self.timer += dt
+        if self.timer >= self.DURATION:
+            self.alive = False
+
+
 class TownState(InventoryMixin, BaseState):
     """Handles exploration inside a town."""
 
@@ -109,6 +143,14 @@ class TownState(InventoryMixin, BaseState):
 
         # Quest completion celebration effect
         self.quest_complete_effect = None
+
+        # Temple service menu
+        self.showing_temple_service = False
+        self.temple_service_cursor = 0   # 0=HEALING, 1=RESURRECTION
+        self.temple_npc = None
+        self.temple_heal_effect = None
+        self.temple_message = ""
+        self.temple_message_timer = 0
 
         # Pickpocket targeting mode
         self.pickpocket_targeting = False
@@ -165,6 +207,11 @@ class TownState(InventoryMixin, BaseState):
                         self.log_scroll += 3
                     elif event.key == pygame.K_DOWN:
                         self.log_scroll = max(0, self.log_scroll - 3)
+                    return
+
+                # ── Temple service menu input ──
+                if self.showing_temple_service:
+                    self._handle_temple_service_input(event)
                     return
 
                 # ── Shop screen input ──
@@ -303,7 +350,7 @@ class TownState(InventoryMixin, BaseState):
         # If showing party screen, character detail, inventory, dialogue, or shop, block movement
         if self.showing_party or self.showing_char_detail is not None or self.showing_party_inv:
             return
-        if self.showing_shop:
+        if self.showing_shop or self.showing_temple_service:
             return
         if self.npc_dialogue_active:
             return
@@ -473,6 +520,15 @@ class TownState(InventoryMixin, BaseState):
             self.shop_sell_cursor = 0
             self.shop_message = ""
             self.shop_message_timer = 0
+            return
+
+        # Priest — open the temple service menu
+        if npc.npc_type == "priest":
+            self.showing_temple_service = True
+            self.temple_npc = npc
+            self.temple_service_cursor = 0
+            self.temple_message = ""
+            self.temple_message_timer = 0
             return
 
         # Innkeeper quest logic
@@ -820,6 +876,93 @@ class TownState(InventoryMixin, BaseState):
                     self.shop_sell_cursor = max(
                         0, len(self.game.party.shared_inventory) - 1)
 
+    # ── Temple service menu ─────────────────────────────────
+
+    def _handle_temple_service_input(self, event):
+        """Handle input while the temple service menu is open."""
+        if event.key == pygame.K_ESCAPE:
+            self.showing_temple_service = False
+            self.temple_npc = None
+            return
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.temple_service_cursor = (self.temple_service_cursor - 1) % 2
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.temple_service_cursor = (self.temple_service_cursor + 1) % 2
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._process_temple_service()
+
+    def _process_temple_service(self):
+        """Perform the selected temple service (healing or resurrection)."""
+        party = self.game.party
+        npc = self.temple_npc
+
+        if self.temple_service_cursor == 0:
+            # ── HEALING — 100 gold ──
+            if party.gold < 100:
+                self.temple_message = "Not enough gold for healing."
+                self.temple_message_timer = 2500
+                return
+            # Check if anyone actually needs healing
+            needs_heal = any(
+                (m.hp < m.max_hp or m.current_mp < m.max_mp)
+                for m in party.members if m.is_alive()
+            )
+            if not needs_heal:
+                self.temple_message = "Your party is already in perfect health."
+                self.temple_message_timer = 2500
+                return
+            # Apply full heal to all alive members
+            party.gold -= 100
+            for m in party.members:
+                if m.is_alive():
+                    m.hp = m.max_hp
+                    m.current_mp = m.max_mp
+            self.temple_message = (
+                f"The blessing of {npc.god_name} restores your party!"
+            )
+            self.temple_message_timer = 3000
+            self.temple_heal_effect = TempleHealEffect()
+            self.game.game_log.append(
+                f"Temple of {npc.god_name}: All HP and MP restored for 100 gold."
+            )
+            try:
+                self.game.sfx.play("heal")
+            except Exception:
+                pass
+
+        elif self.temple_service_cursor == 1:
+            # ── RESURRECTION — 1000 gold ──
+            if party.gold < 1000:
+                self.temple_message = "Not enough gold for resurrection."
+                self.temple_message_timer = 2500
+                return
+            # Find first dead (non-ash) party member
+            target = None
+            for m in party.members:
+                if m.hp <= 0 and not getattr(m, "is_ash", False):
+                    target = m
+                    break
+            if target is None:
+                self.temple_message = "No fallen allies to resurrect."
+                self.temple_message_timer = 2500
+                return
+            # Resurrect to full
+            party.gold -= 1000
+            target.hp = target.max_hp
+            target.current_mp = target.max_mp
+            self.temple_message = (
+                f"{target.name} is returned to life by {npc.god_name}!"
+            )
+            self.temple_message_timer = 3000
+            self.temple_heal_effect = TempleHealEffect()
+            self.game.game_log.append(
+                f"Temple of {npc.god_name}: {target.name} resurrected for 1000 gold."
+            )
+            try:
+                self.game.sfx.play("heal")
+            except Exception:
+                pass
+
     def _exit_town(self):
         """Leave the town and return to the overworld."""
         # Restore party position on the overworld
@@ -851,6 +994,17 @@ class TownState(InventoryMixin, BaseState):
                 self.shop_message = ""
                 self.shop_message_timer = 0
 
+        # Temple timers
+        if self.temple_heal_effect:
+            self.temple_heal_effect.update(dt)
+            if not self.temple_heal_effect.alive:
+                self.temple_heal_effect = None
+        if self.temple_message_timer > 0:
+            self.temple_message_timer -= dt_ms
+            if self.temple_message_timer <= 0:
+                self.temple_message = ""
+                self.temple_message_timer = 0
+
         if self.move_cooldown > 0:
             self.move_cooldown -= dt_ms
             if self.move_cooldown < 0:
@@ -867,6 +1021,18 @@ class TownState(InventoryMixin, BaseState):
 
     def draw(self, renderer):
         """Draw the town in Ultima III style."""
+        if self.showing_temple_service:
+            npc = self.temple_npc
+            renderer.draw_temple_service_menu(
+                self.game.party,
+                self.temple_service_cursor,
+                npc.name if npc else "",
+                npc.god_name if npc else "The Divine",
+                self.temple_message,
+            )
+            if self.temple_heal_effect:
+                renderer.draw_temple_heal_effect(self.temple_heal_effect)
+            return
         if self.showing_shop:
             cursor = (self.shop_cursor if self.shop_mode == "buy"
                       else self.shop_sell_cursor)
@@ -945,6 +1111,10 @@ class TownState(InventoryMixin, BaseState):
         if self.quest_complete_effect:
             renderer.draw_quest_complete_effect(self.quest_complete_effect)
             return  # blocks dialogue rendering during animation
+
+        # Temple celestial animation overlay (when walking in town after service)
+        if self.temple_heal_effect:
+            renderer.draw_temple_heal_effect(self.temple_heal_effect)
 
         # Dialogue box renders on top if active
         if self.message and self.npc_dialogue_active:

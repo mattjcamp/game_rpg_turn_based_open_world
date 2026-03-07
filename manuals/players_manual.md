@@ -18,7 +18,8 @@
 10. [Items & Consumables](#items--consumables)
 11. [Experience & Leveling](#experience--leveling)
 12. [Monsters & Bestiary](#monsters--bestiary)
-13. [Controls & Interface](#controls--interface)
+13. [Temples](#temples)
+14. [Controls & Interface](#controls--interface)
 
 ---
 
@@ -820,6 +821,28 @@ Every encounter in the game has a difficulty level from 1 to 8. Easy areas (like
 | 8 | Troll hordes, shadow armies, massed orcs | Shadow Army, Undead Apocalypse, Troll Kings |
 
 As a rule of thumb, your party should be around the encounter's level to have a fair fight. Encounters 2+ levels above your party are very dangerous, and encounters 2+ levels below are easy pickings.
+
+---
+
+## Temples
+
+Each town has a temple dedicated to its patron deity, staffed by a priest who offers divine services in exchange for gold.
+
+### Thornwall — Temple of Solarius
+
+Brother Cedric tends the Temple of Solarius, god of light and the sun. The temple is located in the southwest area of Thornwall. Approach Brother Cedric and press Enter to access services.
+
+### Duskhollow — Temple of Lunara
+
+Sister Vesper keeps vigil at the Temple of Lunara, goddess of the moon and stars. The temple is found in the southern quarter of Duskhollow.
+
+### Temple Services
+
+**Healing (100 gold)** — Fully restores HP and MP for all living party members. If everyone is already at full health, the priest will let you know.
+
+**Resurrection (1,000 gold)** — Revives the first fallen party member to full HP and MP. Members reduced to ash cannot be resurrected. If no one in the party has fallen, the service is unavailable.
+
+A celestial blessing animation plays when a service is performed. Use the arrow keys to select a service, Enter to confirm, and Escape to leave.
 
 ---
 
