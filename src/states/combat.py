@@ -72,6 +72,7 @@ PHASE_BLESS = "bless"                    # bless party-wide buff animation
 PHASE_CURSE = "curse"                    # curse debuff animation on enemy
 PHASE_MONSTER_SPELL = "monster_spell"    # monster casting a spell-like ability
 PHASE_SMITE       = "smite"             # DEBUG: flash + kill-all animation
+PHASE_SHADOW_STEP = "shadow_step"       # Thief L7+: post-attack movement
 PHASE_LOOT        = "loot"              # post-victory: free movement to pick up loot
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
@@ -1271,7 +1272,7 @@ class CombatState(BaseState):
             return
 
         # Speed up non-player phases with Space/Enter
-        if self.phase not in (PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_LOOT):
+        if self.phase not in (PHASE_PLAYER, PHASE_PLAYER_DIR, PHASE_LOOT, PHASE_SHADOW_STEP):
             for event in events:
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_SPACE, pygame.K_RETURN):
@@ -1341,6 +1342,20 @@ class CombatState(BaseState):
                         action_id, _ = self.menu_actions[self.selected_action]
                         if action_id == ACTION_LEAVE_ENCOUNTER:
                             self._end_combat(won=True)
+
+            # ── PHASE_SHADOW_STEP: post-attack movement for L7+ Thieves ──
+            elif self.phase == PHASE_SHADOW_STEP:
+                if event.key == pygame.K_w:
+                    self._try_arena_move(0, -1)
+                elif event.key == pygame.K_s:
+                    self._try_arena_move(0, 1)
+                elif event.key == pygame.K_a:
+                    self._try_arena_move(-1, 0)
+                elif event.key == pygame.K_d:
+                    self._try_arena_move(1, 0)
+                elif event.key == pygame.K_SPACE:
+                    # End turn early
+                    self._end_fighter_turn()
 
             # ── PHASE_PLAYER_DIR: directional input ──
             elif self.phase == PHASE_PLAYER_DIR:
@@ -1782,6 +1797,9 @@ class CombatState(BaseState):
         # Bump attack: moving into a monster's tile (uses all remaining moves)
         bump_monster = self._get_monster_at(new_col, new_row)
         if bump_monster:
+            if self.phase == PHASE_SHADOW_STEP:
+                # During Shadow Step, no second attack — treat as blocked
+                return
             self._player_attack_animated(dcol, drow, target_monster=bump_monster)
             return
 
@@ -5400,6 +5418,14 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"{fighter.name} is jolted awake by the attack!")
 
+    def _can_shadow_step(self, fighter):
+        """Level 7+ Thieves get post-attack movement (Shadow Step)."""
+        return (fighter is not None
+                and fighter.is_alive()
+                and getattr(fighter, "char_class", "").lower() == "thief"
+                and fighter.level >= 7
+                and self.moves_remaining > 0)
+
     def _check_monster_death(self, target):
         """After damaging a monster, check if it died and if combat is over."""
         if target and target.is_alive():
@@ -5409,6 +5435,13 @@ class CombatState(BaseState):
             self._on_monster_killed(target)
         if self._all_monsters_dead():
             self._trigger_victory()
+        elif self._can_shadow_step(self.active_fighter):
+            # Thief Shadow Step: allow post-attack movement
+            self.phase = PHASE_SHADOW_STEP
+            self.combat_log.append(
+                f"{self.active_fighter.name} Shadow Steps! "
+                f"({self.moves_remaining} moves remaining)"
+            )
         else:
             self._end_fighter_turn()
 
