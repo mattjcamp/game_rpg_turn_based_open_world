@@ -492,13 +492,13 @@ These spells are available to Clerics, Paladins, Rangers, and Druids.
 
 | Spell | Lvl | MP | Effect | Range | Usable |
 |-------|-----|-----|--------|-------|--------|
-| **Minor Heal** | 1 | 3 | Heals 1d6 + WIS mod HP | 6 | Battle, Overworld, Town, Dungeon |
+| **Minor Heal** | 1 | 3 | Heals 1d6 + WIS mod HP (can target self) | 6 | Battle, Overworld, Town, Dungeon |
 | **Light** | 1 | 3 | Illuminates dungeon corridors for 100 turns | Self | Dungeon only |
 | **Cure Poison** | 2 | 5 | Removes poison from target | 99 | Battle only |
 | **Turn Undead** | 2 | 8 | Strips 50% HP from all undead on the battlefield | 99 | Battle only |
 | **Bless** | 3 | 10 | +2 attack bonus to all allies for 4 turns | Self | Battle only |
 | **Curse** | 3 | 10 | −2 AC and −2 attack penalty on target for 4 turns | 99 | Battle only |
-| **Major Heal** | 4 | 15 | Heals 4d8 + WIS mod HP | 4 | Battle only |
+| **Major Heal** | 4 | 15 | Heals 4d8 + WIS mod HP (can target self) | 10 | Battle only |
 | **Push** | 5 | 14 | Repels monsters in a 5-tile radius | Self | Overworld, Dungeon, Town |
 | **Mass Heal** | 6 | 25 | Heals 3d10 + WIS mod HP to all nearby allies | Self | Battle only |
 | **Restore** | 7 | 35 | Fully restores HP and MP for all allies and cures all poisons (caster's MP is not restored) | Self | Battle only |

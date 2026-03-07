@@ -1439,7 +1439,7 @@ class CombatState(BaseState):
             # Check targeting mode for the selected spell
             spell_data = SPELLS_DATA.get(spell_id, {})
             targeting = spell_data.get("targeting", "directional_projectile")
-            if targeting in ("select_ally", "select_enemy", "select_tile"):
+            if targeting in ("select_ally", "select_ally_or_self", "select_enemy", "select_tile"):
                 # Enter free-cursor target selection mode
                 f = self.active_fighter
                 if f:
@@ -1538,10 +1538,13 @@ class CombatState(BaseState):
                 else:
                     self.combat_log.append("No enemy at that position!")
             else:
-                # Ally targeting (Shield, etc.)
+                # Ally targeting (Shield, etc.) — or ally+self targeting
+                allow_self = targeting == "select_ally_or_self"
                 target = None
                 for member in self.fighters:
-                    if member is f or not member.is_alive():
+                    if not member.is_alive():
+                        continue
+                    if member is f and not allow_self:
                         continue
                     mc, mr = self.fighter_positions.get(member, (-1, -1))
                     if mc == self.shield_target_col and mr == self.shield_target_row:
