@@ -1844,10 +1844,7 @@ class CombatState(BaseState):
             self.loot_msg_timer = 1500
             self.combat_log.append(pickup_msg)
             self.game.game_log.append(pickup_msg)
-            try:
-                self.game.sfx.play("item")
-            except Exception:
-                pass  # sound may not exist
+            self.game.sfx.play("chirp")
 
     def _execute_player_action(self):
         action = self.selected_action
@@ -5365,8 +5362,33 @@ class CombatState(BaseState):
                 return item
         return None
 
+    def _find_free_loot_tile(self, near_col, near_row):
+        """Find an unoccupied floor tile near (near_col, near_row).
+
+        Tries the given position first, then spirals outward checking
+        adjacent tiles.  Returns (col, row) or None.
+        """
+        if ((near_col, near_row) not in self.ground_items
+                and not self._is_arena_wall(near_col, near_row)):
+            return (near_col, near_row)
+
+        # Spiral outward (Chebyshev rings 1..5)
+        for ring in range(1, 6):
+            candidates = []
+            for dc in range(-ring, ring + 1):
+                for dr in range(-ring, ring + 1):
+                    if max(abs(dc), abs(dr)) != ring:
+                        continue
+                    c, r = near_col + dc, near_row + dr
+                    if (not self._is_arena_wall(c, r)
+                            and (c, r) not in self.ground_items):
+                        candidates.append((c, r))
+            if candidates:
+                return random.choice(candidates)
+        return None
+
     def _generate_ground_loot(self, total_gold):
-        """Drop loot items on the arena at dead monster positions."""
+        """Drop loot on the arena — each drop gets its own tile."""
         self.ground_items = {}
 
         # Collect positions of dead monsters
@@ -5380,23 +5402,18 @@ class CombatState(BaseState):
         if not loot_positions:
             loot_positions = [(ARENA_COLS // 2, ARENA_ROWS // 2)]
 
-        # Drop gold at first monster's position
-        first_pos = loot_positions[0]
-        first_item = self._roll_loot_item()
-        self.ground_items[first_pos] = {
-            "item": first_item,
-            "gold": total_gold,
-        }
+        # Gold pile on its own tile (near first dead monster)
+        gold_pos = self._find_free_loot_tile(*loot_positions[0])
+        if gold_pos and total_gold > 0:
+            self.ground_items[gold_pos] = {"item": None, "gold": total_gold}
 
-        # Drop one item roll per additional dead monster position
-        for pos in loot_positions[1:]:
+        # Roll one item per dead monster, each on a separate tile
+        for pos in loot_positions:
             item = self._roll_loot_item()
             if item:
-                if pos in self.ground_items:
-                    # Same position — merge
-                    self.ground_items[pos]["item"] = item
-                else:
-                    self.ground_items[pos] = {"item": item, "gold": 0}
+                tile = self._find_free_loot_tile(*pos)
+                if tile:
+                    self.ground_items[tile] = {"item": item, "gold": 0}
 
     def _enter_loot_phase(self):
         """Transition from victory fanfare to the loot pickup phase."""

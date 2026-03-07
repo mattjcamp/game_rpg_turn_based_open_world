@@ -1046,6 +1046,15 @@ def _gen_sfx_quest_complete():
     return np.concatenate([arp, _mix_tracks(chord, shimmer)])
 
 
+def _gen_sfx_chirp():
+    """Item pickup chirp: quick ascending two-note bleep."""
+    n1 = _square_wave(_n('E5'), 0.05, duty=0.25) * 0.18
+    n1 = _envelope(n1, attack=0.002, release=0.03)
+    n2 = _square_wave(_n('A5'), 0.07, duty=0.25) * 0.18
+    n2 = _envelope(n2, attack=0.002, release=0.04)
+    return np.concatenate([n1, n2])
+
+
 class SoundEffects:
     """Manages chiptune combat sound effects."""
 
@@ -1072,6 +1081,7 @@ class SoundEffects:
         "shield":            _gen_sfx_shield,
         "turn_undead":       _gen_sfx_turn_undead,
         "quest_complete":    _gen_sfx_quest_complete,
+        "chirp":             _gen_sfx_chirp,
     }
 
     def __init__(self):

@@ -4196,46 +4196,38 @@ class Renderer:
                     else:
                         self._u3_draw_floor_tile(px, py, ts, c, r)
 
-        # ── 1b. ground loot items (drawn on floor, under entities) ──
+        # ── 1b. ground loot items (one drop per tile) ──
         if ground_items:
-            gi_font = self.font_small  # small font for labels
+            from src.party import ITEM_INFO
+            gi_font = self.font_small
+            icon_sz = ts - 4  # fits within one arena tile
             for (gc, gr), loot in ground_items.items():
                 gx = mx + gc * ts
                 gy = my + gr * ts
-                cx = gx + ts // 2
-                cy = gy + ts // 2
+                icx = gx + ts // 2
+                icy = gy + ts // 2
 
                 gold_amt = loot.get("gold", 0)
                 item_name = loot.get("item")
 
                 if gold_amt > 0:
-                    # Draw gold pile: yellow circle + "G"
-                    pygame.draw.circle(self.screen, (220, 180, 40),
-                                       (cx - 4, cy), 8)
-                    pygame.draw.circle(self.screen, (255, 220, 60),
-                                       (cx - 4, cy), 6)
-                    g_surf = gi_font.render("G", True, (80, 60, 0))
-                    self.screen.blit(g_surf,
-                                     (cx - 4 - g_surf.get_width() // 2,
-                                      cy - g_surf.get_height() // 2))
-                    # Gold amount label above
-                    amt_surf = gi_font.render(str(gold_amt), True, (255, 220, 60))
+                    # Gold pile — treasure chest icon + amount label
+                    self._draw_item_icon(icx, icy, "chest", icon_sz)
+                    amt_surf = gi_font.render(f"{gold_amt}G", True,
+                                              (255, 220, 60))
                     self.screen.blit(amt_surf,
-                                     (cx - amt_surf.get_width() // 2,
-                                      gy + 1))
-
-                if item_name:
-                    # Draw item: small colored square + name
-                    ix = cx + (8 if gold_amt > 0 else 0)
-                    iy = cy + (4 if gold_amt > 0 else 0)
-                    pygame.draw.rect(self.screen, (100, 180, 255),
-                                     (ix - 6, iy - 6, 12, 12))
-                    pygame.draw.rect(self.screen, (60, 120, 200),
-                                     (ix - 6, iy - 6, 12, 12), 1)
-                    # Item name below tile
-                    nm_surf = gi_font.render(item_name[:10], True, (180, 220, 255))
+                                     (icx - amt_surf.get_width() // 2,
+                                      gy))
+                elif item_name:
+                    # Item — use its proper icon from ITEM_INFO
+                    info = ITEM_INFO.get(item_name, {})
+                    icon_type = info.get("icon", "potion")
+                    self._draw_item_icon(icx, icy, icon_type, icon_sz)
+                    # Item name label below tile
+                    nm_surf = gi_font.render(item_name[:12], True,
+                                             (200, 220, 255))
                     self.screen.blit(nm_surf,
-                                     (cx - nm_surf.get_width() // 2,
+                                     (icx - nm_surf.get_width() // 2,
                                       gy + ts - 2))
 
         # ── 2. monster sprites ──
