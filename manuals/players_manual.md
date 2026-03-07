@@ -19,7 +19,8 @@
 11. [Experience & Leveling](#experience--leveling)
 12. [Monsters & Bestiary](#monsters--bestiary)
 13. [Temples](#temples)
-14. [Controls & Interface](#controls--interface)
+14. [Settings](#settings)
+15. [Controls & Interface](#controls--interface)
 
 ---
 
@@ -111,11 +112,6 @@ Each class determines your character's hit points per level, magic points per le
 **Allowed Armor:** All armor (Cloth, Leather, Chain, Plate)
 **Allowed Races:** All
 
-**Class Abilities:**
-
-- **Shield Wall** — Reduces incoming physical damage when wielding a shield.
-- **Cleave** — Melee attacks can strike adjacent enemies in a sweeping arc.
-
 Fighters are the backbone of any party. With the highest HP per level, a generous 4-tile combat range, and access to every weapon and armor type, they belong on the front line where the fighting is thickest. They have no magic but more than compensate with raw staying power and damage output.
 
 ---
@@ -136,8 +132,7 @@ Fighters are the backbone of any party. With the highest HP per level, a generou
 
 **Class Abilities:**
 
-- **Arcane Focus** — Spell damage is increased by the Intelligence bonus.
-- **Identify** — Can identify unknown magical items.
+- **Arcane Focus** — Spell damage is increased by the Intelligence modifier. This applies automatically to all Sorcerer spells.
 
 Wizards command the most diverse and powerful spell list in the game. From Fireball to Lightning Bolt, Charm Person to Animate Dead, they reshape the battlefield. Their weakness is severe — the lowest HP per level, no armor, and only daggers for weapons. Keep them behind your front line and let them rain destruction from safety.
 
@@ -159,9 +154,9 @@ Wizards command the most diverse and powerful spell list in the game. From Fireb
 
 **Class Abilities:**
 
-- **Turn Undead** — Channels holy energy that strips 75% of HP from all undead enemies on the battlefield. Devastating against skeletons and zombies.
+- **Turn Undead** *(Level 2+)* — Channels holy energy that strips 50% of HP from all undead enemies on the battlefield. Devastating against skeletons and zombies.
 
-Clerics are the primary healers of the party. Minor Heal, Major Heal, and Mass Heal keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead. Every party should have one.
+Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead. Every party should have one.
 
 ---
 
@@ -201,13 +196,7 @@ The Thief has the longest combat range of any class (10 tiles), making them unma
 
 **MP Source:** 50% of Wisdom
 
-**Class Abilities:**
-
-- **Lay on Hands** — Can heal allies with a touch outside of combat.
-- **Holy Aura** — Nearby undead take damage each turn.
-- **Shield Wall** — Reduces incoming physical damage when wielding a shield.
-
-Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Their Holy Aura makes them particularly effective in undead-heavy dungeons.
+Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). They are a strong choice for parties that want a tanky frontliner with some healing versatility.
 
 ---
 
@@ -225,13 +214,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 **MP Source:** 50% of Wisdom
 
-**Class Abilities:**
-
-- **Track** — Can detect nearby enemies on the overworld.
-- **Forage** — Can find herbs and reagents while exploring.
-- **Dual Wield** — Can equip a weapon in each hand for extra attacks.
-
-Rangers match Fighters for HP per level and add bow proficiency plus limited healing magic. With a 3-tile combat range and Long Bow access they can deal serious ranged damage, and Forage keeps the party supplied with herbs and reagents. A strong choice for parties that want a self-sufficient frontliner.
+Rangers match Fighters for HP per level and add bow proficiency plus limited healing magic. With a 3-tile combat range and Long Bow access they can deal serious ranged damage. A strong choice for parties that want a self-sufficient frontliner who can both fight and heal.
 
 ---
 
@@ -250,12 +233,7 @@ Rangers match Fighters for HP per level and add bow proficiency plus limited hea
 **MP Source:** 50% of whichever is higher (INT or WIS)
 **MP Regeneration:** 2× normal rate
 
-**Class Abilities:**
-
-- **Nature's Blessing** — Slowly regenerates HP while outdoors.
-- **Herbalism** — Can identify and use wild herbs for healing.
-
-The Druid is the game's only hybrid caster, able to cast both Priest spells (healing, Cure Poison, Bless) and Sorcerer spells (Fireball, Shield, Lightning Bolt). Their MP regenerates twice as fast as other classes. The trade-off is low HP and cloth-only armor — like Wizards, they need protection.
+The Druid is the game's only hybrid caster, able to cast both Priest spells (Minor Heal, Cure Poison, Light) and Sorcerer spells (Magic Dart, Shield, Knock). Their MP regenerates twice as fast as other classes. The trade-off is low HP and cloth-only armor — like Wizards, they need protection.
 
 ---
 
@@ -345,7 +323,7 @@ The armor bonus comes from the **evasion rating** of your equipped armor:
 Your AC can be further modified by:
 
 - **Defending** (skipping your turn to brace): +2 AC until your next turn
-- **Shield spell**: +2 AC for 3 turns
+- **Shield spell**: +1 AC for 3 turns
 - **Elixir of Warding**: +2 AC for the duration of combat
 - **Curse debuff**: −2 AC (applied by enemy spellcasters)
 
@@ -355,7 +333,7 @@ A Ranger wearing Chain armor (evasion 58) with DEX 14 (+2 modifier):
 
 AC = 10 + 2 + (58 − 50) ÷ 5 = 10 + 2 + 1.6 = **13.6 ≈ 14**
 
-If they are also under a Shield spell: AC = 14 + 2 = **16**
+If they are also under a Shield spell: AC = 14 + 1 = **15**
 
 ---
 
@@ -440,10 +418,10 @@ Sleeping monsters skip their turn. Invisible party members are ignored by monste
 | **Sleep** | Sleep spell, Dark Slumber | 3–5 turns | Target skips all turns; broken by taking damage |
 | **Poison** | Poison Spit, traps | 4 turns | Takes damage at the start of each turn |
 | **Curse** | Curse spell, Hex | 3–5 turns | −2 AC and −2 attack penalty |
-| **Charm** | Charm Person | 5 turns | Humanoid monster fights for the party |
-| **Invisible** | Invisibility spell | 5 turns | Monsters cannot target you |
-| **Blessed** | Bless spell | 5 turns | +2 attack bonus for all allies |
-| **Shielded** | Shield spell | 3 turns | +2 AC bonus |
+| **Charm** | Charm Person | 3 turns | Humanoid monster fights for the party |
+| **Invisible** | Invisibility spell | 3 turns | Monsters cannot target you |
+| **Blessed** | Bless spell | 4 turns | +2 attack bonus for all allies |
+| **Shielded** | Shield spell | 3 turns | +1 AC bonus |
 
 ### Death & Revival
 
@@ -621,11 +599,11 @@ Elixirs provide a bonus that lasts for the next combat encounter.
 |------|--------|-----|
 | Torch | Illuminates dark areas (150 charges) | 5g |
 | Lockpick | Opens locked doors and chests (5 uses) | 8g |
-| Camping Supplies | Rest safely to restore HP/MP (3 uses) | 25g |
+| Camping Supplies | Rest safely to restore HP/MP; advances time by 10 hours (3 uses) | 25g |
 
 ### Reagents (Crafting Materials)
 
-Alchemists use these to brew potions. Rangers can find them with Forage.
+Alchemists use these to brew potions.
 
 | Reagent | Buy |
 |---------|-----|
@@ -845,6 +823,18 @@ Sister Vesper keeps vigil at the Temple of Lunara, goddess of the moon and stars
 **Resurrection (1,000 gold)** — Revives the first fallen party member to full HP and MP. Members reduced to ash cannot be resurrected. If no one in the party has fallen, the service is unavailable.
 
 A celestial blessing animation plays when a service is performed. Use the arrow keys to select a service, Enter to confirm, and Escape to leave.
+
+---
+
+## Settings
+
+The Settings screen is accessible from the title menu. All settings are saved to disk and persist between sessions.
+
+- **Music** — Toggle background music on/off.
+- **Smite (Debug)** — When enabled, adds a "Smite All" option to the combat menu that instantly kills all monsters. Off by default.
+- **Start With Equipment** — When enabled (default), new games begin with each character's full starting gear. When disabled, all characters start with only Cloth armor and a Club, with 15 Stones in the shared inventory.
+
+> **Note:** The "Start With Equipment" setting only affects new games. Loading a saved game always restores whatever gear was saved.
 
 ---
 
