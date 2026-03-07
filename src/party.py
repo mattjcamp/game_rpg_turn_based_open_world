@@ -428,8 +428,8 @@ class PartyMember:
         """Check if enough XP has been earned to level up.
 
         Level N requires N * exp_per_level total XP.  The base value comes
-        from the class template (default 500), but a race can override it
-        via an ``exp_per_level`` field in races.json (e.g. Humans use 350).
+        from the class template (default 1000), but a race can override it
+        via an ``exp_per_level`` field in races.json (e.g. Humans use 750).
 
         HP gains are modified by STR modifier (minimum +1 total).
         MP gains are modified by the class's casting stat modifier:
@@ -550,7 +550,7 @@ class PartyMember:
         template["hp_per_level"] = data.get("hp_per_level", 6)
         template["mp_per_level"] = data.get("mp_per_level", 0)
         template["range"] = data.get("range", 1)
-        template["exp_per_level"] = data.get("exp_per_level", 500)
+        template["exp_per_level"] = data.get("exp_per_level", 1000)
         template["spell_type"] = data.get("spell_type", "none")
 
         # mp_source: None for non-casters, or dict with percentage.

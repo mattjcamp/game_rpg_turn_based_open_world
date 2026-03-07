@@ -10,7 +10,7 @@
   "hp_per_level": 4,
   "mp_per_level": 8,
   "range": 3,
-  "exp_per_level": 500,
+  "exp_per_level": 1000,
   "allowed_races": [
     "human",
     "dwarf",

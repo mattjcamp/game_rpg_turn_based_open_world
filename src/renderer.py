@@ -4484,24 +4484,13 @@ class Renderer:
                 item_name = loot.get("item")
 
                 if gold_amt > 0:
-                    # Gold pile — treasure chest icon + amount label
+                    # Gold pile — treasure chest icon only
                     self._draw_item_icon(icx, icy, "chest", icon_sz)
-                    amt_surf = gi_font.render(f"{gold_amt}G", True,
-                                              (255, 220, 60))
-                    self.screen.blit(amt_surf,
-                                     (icx - amt_surf.get_width() // 2,
-                                      gy))
                 elif item_name:
                     # Item — use its proper icon from ITEM_INFO
                     info = ITEM_INFO.get(item_name, {})
                     icon_type = info.get("icon", "potion")
                     self._draw_item_icon(icx, icy, icon_type, icon_sz)
-                    # Item name label below tile
-                    nm_surf = gi_font.render(item_name[:12], True,
-                                             (200, 220, 255))
-                    self.screen.blit(nm_surf,
-                                     (icx - nm_surf.get_width() // 2,
-                                      gy + ts - 2))
 
         # ── 2. monster sprites ──
         if monsters and monster_positions:

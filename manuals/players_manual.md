@@ -43,7 +43,7 @@ Each race provides permanent stat bonuses and a unique innate ability. Choose a 
 |-----|-----|-----|-----|
 | +0  | +0  | +0  | +0  |
 
-**Innate Ability — Fast Learner:** Humans require only **350 XP per level** instead of the standard 500, allowing them to level up roughly 30% faster than other races. This compensates for their lack of stat bonuses and makes them an excellent choice for any class.
+**Innate Ability — Fast Learner:** Humans require only **750 XP per level** instead of the standard 1000, allowing them to level up 25% faster than other races. This compensates for their lack of stat bonuses and makes them an excellent choice for any class.
 
 ---
 
@@ -645,18 +645,18 @@ The XP required for each level follows a simple formula:
 
 **Level N requires N × XP-per-level cumulative XP**
 
-The standard XP-per-level is **500** for most races. **Humans** level faster, requiring only **350 XP per level**.
+The standard XP-per-level is **1000** for most races. **Humans** level faster, requiring only **750 XP per level**.
 
-| Level | Standard (500/lvl) | Human (350/lvl) |
-|-------|-------------------|-----------------|
+| Level | Standard (1000/lvl) | Human (750/lvl) |
+|-------|---------------------|-----------------|
 | 1 | 0 | 0 |
-| 2 | 500 | 350 |
-| 3 | 1,000 | 700 |
-| 4 | 1,500 | 1,050 |
-| 5 | 2,000 | 1,400 |
-| 6 | 2,500 | 1,750 |
-| 7 | 3,000 | 2,100 |
-| 8 | 3,500 | 2,450 |
+| 2 | 1,000 | 750 |
+| 3 | 2,000 | 1,500 |
+| 4 | 3,000 | 2,250 |
+| 5 | 4,000 | 3,000 |
+| 6 | 5,000 | 3,750 |
+| 7 | 6,000 | 4,500 |
+| 8 | 7,000 | 5,250 |
 
 ### What You Gain Per Level
 
