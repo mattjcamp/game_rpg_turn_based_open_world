@@ -594,11 +594,14 @@ class Renderer:
             self._u3_draw_overworld_party(cx, cy, party)
 
         # ── 3b. darkness overlay (Keys of Shadow / nighttime) ──
+        # After all keys are inserted and darkness_active is cleared,
+        # the town is permanently lit — skip even normal night darkness.
         clock = party.clock
+        darkness_lifted = (keys_inserted >= 8 and not darkness_active)
         has_infravision = party.has_effect("Infravision")
         has_galadriels = (party.has_effect("Galadriel's Light")
                           and party.galadriels_light_steps > 0)
-        if not clock.is_day or darkness_active:
+        if (not clock.is_day or darkness_active) and not darkness_lifted:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
             # Build extra light sources from filled keyslots
