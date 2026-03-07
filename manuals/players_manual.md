@@ -389,8 +389,10 @@ When an attack hits, damage is rolled based on the weapon's power rating. Melee 
 
 | Weapon Power | Damage Dice |
 |-------------|-------------|
-| 0–2         | 1d4         |
-| 3–5         | 1d6         |
+| 0           | 1 (flat)    |
+| 1           | 1d4-1       |
+| 2–3         | 1d4         |
+| 4–5         | 1d6         |
 | 6–8         | 1d8         |
 | 9+          | 1d10        |
 
@@ -517,9 +519,9 @@ Weapons determine your attack damage in combat. Each has a **power rating** that
 
 | Weapon | Power | Damage | Buy | Classes |
 |--------|-------|--------|-----|---------|
-| Fists | 0 | 1d4 | — | All |
-| Dagger | 1 | 1d4 | 20g | All except some |
-| Club | 1 | 1d4 | 20g | Fighter, Cleric, Thief, Ranger, Druid |
+| Fists | 0 | 1 | — | All |
+| Dagger | 1 | 1d4-1 | 20g | All except some |
+| Club | 1 | 1d4-1 | 20g | Fighter, Cleric, Thief, Ranger, Druid |
 | Mace | 2 | 1d4 | 40g | Fighter, Cleric, Paladin, Druid |
 | Axe | 4 | 1d6 | 80g | Fighter, Paladin |
 | Sword | 5 | 1d6 | 120g | Fighter, Paladin, Ranger |
@@ -557,8 +559,8 @@ Ranged weapons consume ammo from your inventory. When you run out, you can't fir
 
 Some items can be thrown as a ranged attack and are consumed on use:
 
-- **Dagger** — Can be thrown (power 1) or used in melee
-- **Rock** — Free throwable projectile (power 1)
+- **Dagger** — Can be thrown (1d4-1 damage) or used in melee
+- **Rock** — Free throwable projectile (1 flat damage)
 - **Fire Oil** — Thrown in combat for 20 burst damage (buy: 35g)
 
 ---

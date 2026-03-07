@@ -2043,7 +2043,13 @@ class CombatState(BaseState):
             thrown_is_poison = info.get("thrown_is_poison", False)
             if thrown_item:
                 thrown_power = info.get("thrown_power", 0)
-                damage = roll_damage(1, 6, thrown_power, critical=crit)
+                # Use same damage tiers as melee weapons
+                if thrown_power <= 0:
+                    damage = 1            # flat 1 (rocks)
+                elif thrown_power == 1:
+                    damage = roll_damage(1, 4, -1, critical=crit)  # 1d4-1 ≈ 1d3
+                else:
+                    damage = roll_damage(1, 6, 0, critical=crit)
                 dmg_label = thrown_item
             else:
                 rw_name = info.get("ranged_weapon") or f.weapon

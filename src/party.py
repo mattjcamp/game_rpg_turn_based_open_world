@@ -763,13 +763,26 @@ class PartyMember:
         """Return (count, sides, bonus) for weapon damage.
         Uses weapon power to determine dice size.
         Ranged weapons use DEX modifier, melee weapons use STR modifier.
-        Optionally specify a weapon_name to get dice for a specific weapon."""
+        Optionally specify a weapon_name to get dice for a specific weapon.
+
+        Power tiers:
+          0  → flat 1 damage (fists, thrown rocks)
+          1  → 1d4-1  (daggers, clubs — effective range 0-3, min 1)
+          2-3 → 1d4
+          4-5 → 1d6
+          6-8 → 1d8
+          9+  → 1d10
+        """
         wname = weapon_name or self.weapon
         wdata = WEAPONS.get(wname, {"power": 0})
         wp = wdata["power"] if isinstance(wdata, dict) else 0
         is_ranged = wdata.get("ranged", False) if isinstance(wdata, dict) else False
         mod = self.dex_mod if is_ranged else self.str_mod
-        if wp <= 2:
+        if wp <= 0:
+            return (0, 0, 1)          # flat 1 damage (fists, rocks)
+        elif wp == 1:
+            return (1, 4, mod - 1)    # 1d4-1 ≈ 1d3 (daggers, clubs)
+        elif wp <= 3:
             return (1, 4, mod)
         elif wp <= 5:
             return (1, 6, mod)
