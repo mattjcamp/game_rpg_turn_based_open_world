@@ -20,15 +20,15 @@ from src.monster import Monster
 
 
 class _DualLog(list):
-    """A list that also appends each entry to a second target list."""
+    """A combat-only log list (no longer mirrors to the game log)."""
 
     def __init__(self, mirror_target):
         super().__init__()
+        # Keep ref so combat can post summaries explicitly if needed
         self._mirror = mirror_target
 
     def append(self, item):
         super().append(item)
-        self._mirror.append(item)
 from src.combat_engine import (
     roll_initiative, roll_attack, roll_damage, roll_d20, roll_dice,
     format_modifier, get_modifier,
@@ -981,12 +981,18 @@ class CombatState(BaseState):
             self.combat_log.append(
                 f"--- Party vs {self.monsters[0].name}! ---"
             )
+            self.game.game_log.append(
+                f"Encountered {self.monsters[0].name}!"
+            )
         else:
             names = ", ".join(m.name for m in self.monsters)
             self.combat_log.append(
                 f"--- Party vs {len(self.monsters)} enemies! ---"
             )
             self.combat_log.append(f"  ({names})")
+            self.game.game_log.append(
+                f"Encountered {len(self.monsters)} enemies ({names})!"
+            )
         self.combat_log.append(
             f"{len(self.fighters)} party members engage!"
         )
@@ -1045,10 +1051,9 @@ class CombatState(BaseState):
         if rb:
             bonus = rb["range_bonus"]
         self.moves_remaining = base_range + bonus
-        ranged_hint = " [RANGED]" if f.is_ranged(self.game.party) else ""
         speed_hint = f" [+{bonus} MOVE]" if bonus else ""
         self.combat_log.append(
-            f"-- {f.name}'s turn --{ranged_hint}{speed_hint}")
+            f"-- {f.name}'s turn --{speed_hint}")
         self._rebuild_menu()
 
     def _rebuild_menu(self):
@@ -4054,6 +4059,7 @@ class CombatState(BaseState):
             self.phase_timer = 1500
             self.game.sfx.play("flee")
             self.combat_log.append("Your party flees the battle!")
+            self.game.game_log.append("Fled from battle.")
         else:
             self.combat_log.append(
                 f"{f.name} rolls {roll} "
@@ -4340,6 +4346,7 @@ class CombatState(BaseState):
             self.phase_timer = 2500
             self.game.sfx.play("defeat")
             self.combat_log.append("The party has been defeated!")
+            self.game.game_log.append("The party was defeated in battle.")
         else:
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 800
@@ -4485,6 +4492,7 @@ class CombatState(BaseState):
             self.phase_timer = 2500
             self.game.sfx.play("defeat")
             self.combat_log.append("The party has been defeated!")
+            self.game.game_log.append("The party was defeated in battle.")
         else:
             self.active_monster_idx += 1
             self.phase = PHASE_MONSTER_ACT
@@ -5224,6 +5232,9 @@ class CombatState(BaseState):
         self.game.sfx.play("victory")
         self.combat_log.append(
             f"All enemies defeated! +{total_xp} XP each, +{total_gold} gold!"
+        )
+        self.game.game_log.append(
+            f"Victory! +{total_xp} XP each, +{total_gold} gold."
         )
 
     def _end_combat(self, won):

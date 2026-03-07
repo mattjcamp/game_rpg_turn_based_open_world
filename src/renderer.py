@@ -3579,15 +3579,15 @@ class Renderer:
     _U3_BRICK2 = (68, 34, 68)
 
     # ── Layout constants ──
-    _ARENA_TILE = 32
+    _ARENA_TILE = 30
     _ARENA_COLS = 18
     _ARENA_ROWS = 21
     _MAP_X  = 4                                     # left edge of map panel
     _MAP_Y  = 4
-    _MAP_W  = _ARENA_COLS * _ARENA_TILE              # 576
-    _MAP_H  = _ARENA_ROWS * _ARENA_TILE              # 672
-    _RPANEL_X = _MAP_X + _MAP_W + 8                  # 588
-    _RPANEL_W = SCREEN_WIDTH - _RPANEL_X - 4          # 368
+    _MAP_W  = _ARENA_COLS * _ARENA_TILE              # 540
+    _MAP_H  = _ARENA_ROWS * _ARENA_TILE              # 630
+    _RPANEL_X = _MAP_X + _MAP_W + 8                  # 552
+    _RPANEL_W = SCREEN_WIDTH - _RPANEL_X - 4          # 404
 
     # ── helper: draw a blue-bordered retro panel ──
     def _u3_panel(self, x, y, w, h):
@@ -4279,31 +4279,38 @@ class Renderer:
         bar_h = SCREEN_HEIGHT - bar_y
         self._u3_panel(0, bar_y, SCREEN_WIDTH, bar_h)
 
+        # Clip to the log bar so nothing bleeds outside
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(0, bar_y, SCREEN_WIDTH, bar_h))
+
         log_y_start = bar_y + 4
-        line_h = 16
+        line_h = 20
         max_lines = (bar_h - 8) // line_h
         if max_lines > 0 and combat_log:
             visible = combat_log[-max_lines:]
             for i, line in enumerate(visible):
                 if "CRITICAL" in line:
-                    color = (255, 200, 80)
+                    color = (255, 230, 80)
                 elif "Hit!" in line:
                     color = self._U3_WHITE
                 elif "Miss" in line or "Failed" in line:
-                    color = (200, 200, 210)
+                    color = (200, 200, 220)
                 elif "damage" in line and "deals" in line:
-                    color = (255, 100, 100)
+                    color = (255, 120, 120)
                 elif "defeated" in line or "XP" in line or "Escaped" in line:
-                    color = (80, 255, 80)
+                    color = (100, 255, 100)
                 elif "fallen" in line:
-                    color = (255, 100, 100)
+                    color = (255, 120, 120)
                 elif "---" in line:
-                    color = (255, 200, 80)
+                    color = (255, 210, 90)
                 elif "moves closer" in line:
-                    color = (255, 200, 80)
+                    color = (255, 210, 90)
                 else:
-                    color = (210, 210, 255)
-                self._u3_text(line, 8, log_y_start + i * line_h, color, self.font)
+                    color = (230, 230, 255)
+                txt_surf = self.font.render(line, True, color)
+                self.screen.blit(txt_surf, (8, log_y_start + i * line_h))
+
+        self.screen.set_clip(prev_clip)
 
         # ── 7. floating combat message ──
         if combat_message:
@@ -11099,11 +11106,11 @@ class Renderer:
         log_entries : list[str]  – all accumulated log messages
         scroll_offset : int      – how many lines scrolled up from the bottom
         """
-        # Lazily create the larger log font once
+        # Lazily create the log fonts
         if not hasattr(self, "_log_font"):
-            self._log_font = pygame.font.SysFont("monospace", 22, bold=True)
+            self._log_font = pygame.font.SysFont("monospace", 16, bold=True)
         if not hasattr(self, "_log_title_font"):
-            self._log_title_font = pygame.font.SysFont("monospace", 28, bold=True)
+            self._log_title_font = pygame.font.SysFont("monospace", 22, bold=True)
 
         log_font = self._log_font
         title_font = self._log_title_font
@@ -11139,10 +11146,15 @@ class Renderer:
                          (px + pw // 2 - hint_surf.get_width() // 2,
                           py + ph - 24))
 
-        # Content area
-        content_y = py + 48
-        content_h = ph - 80  # room for title + hint
-        line_h = 26
+        # Content area — reserve space for scroll indicators at top/bottom
+        indicator_h = 20  # height reserved for "^ MORE ^" / "v MORE v"
+        content_y = py + 40
+        content_h = ph - 70  # room for title + hint
+        text_top = content_y + indicator_h
+        text_bottom = content_y + content_h - indicator_h
+        text_h = text_bottom - text_top
+        line_h = 19
+        group_gap = 8  # extra pixels between different log entry groups
 
         # ── Helper: word-wrap a single log entry into display lines ──
         def _wrap_line(text, font, max_w):
@@ -11151,25 +11163,23 @@ class Renderer:
             lines = []
             current = ""
             for word in words:
-                test = (current + " " + word).strip()
-                tw, _ = font.size(test.upper())
+                test = (current + " " + word).strip() if current else word
+                tw, _ = font.size(test)
                 if tw <= max_w:
                     current = test
                 else:
                     if current:
                         lines.append(current)
-                    # If a single word is wider than max_w, truncate it
-                    tw2, _ = font.size(word.upper())
+                    tw2, _ = font.size(word)
                     if tw2 > max_w:
                         while word:
                             for end in range(len(word), 0, -1):
-                                cw, _ = font.size(word[:end].upper())
+                                cw, _ = font.size(word[:end])
                                 if cw <= max_w:
                                     lines.append(word[:end])
                                     word = word[end:]
                                     break
                             else:
-                                # Safety: at least one char per line
                                 lines.append(word[0])
                                 word = word[1:]
                         current = ""
@@ -11179,80 +11189,104 @@ class Renderer:
                 lines.append(current)
             return lines if lines else [""]
 
-        # ── Pre-wrap all log entries into (display_line, original_entry) ──
-        wrapped = []  # list of (display_text, original_entry_text)
+        # ── Color for a log entry ──
+        def _log_color(original):
+            lo = original.lower()
+            if "critical" in lo or "defeated" in lo:
+                return (255, 230, 80)
+            elif "hit!" in lo or "damage" in lo:
+                return (255, 255, 255)
+            elif "miss" in lo or "failed" in lo or "resisted" in lo:
+                return (180, 180, 200)
+            elif original.startswith("--"):
+                return (255, 200, 80)
+            elif "gold" in lo or "treasure" in lo:
+                return (255, 255, 100)
+            elif "heals" in lo or "wakes up" in lo:
+                return (100, 255, 140)
+            elif "poison" in lo:
+                return (150, 240, 80)
+            elif "sleep" in lo or "zzz" in lo:
+                return (190, 170, 255)
+            elif "curse" in lo or "hex" in lo:
+                return (255, 130, 130)
+            elif "fallen" in lo:
+                return (255, 110, 110)
+            return (235, 235, 250)
+
+        # ── Pre-wrap all entries into display rows ──
+        # Each row: (display_text, original_entry, is_group_start)
+        # is_group_start = True when the original entry differs from previous
+        wrapped = []
+        prev_entry = None
         for entry in log_entries:
             sub_lines = _wrap_line(entry, log_font, max_text_w)
-            for sl in sub_lines:
-                wrapped.append((sl, entry))
-
-        max_visible = content_h // line_h
+            for j, sl in enumerate(sub_lines):
+                is_start = (j == 0 and entry != prev_entry)
+                wrapped.append((sl, entry, is_start))
+            prev_entry = entry
 
         if not wrapped:
-            no_log = log_font.render("NO LOG ENTRIES YET.", True,
+            no_log = log_font.render("No log entries yet.", True,
                                      self._U3_GRAY)
-            self.screen.blit(no_log, (px + text_pad, content_y + 8))
+            self.screen.blit(no_log, (px + text_pad, text_top + 8))
             return
 
+        # ── Calculate how many rows fit, accounting for group gaps ──
+        # We need to figure out visible rows from the bottom up.
         total = len(wrapped)
 
-        # scroll_offset 0 = bottom (most recent visible)
+        # Estimate max_visible (rough upper bound for scroll math)
+        max_visible = text_h // line_h
+
         max_scroll = max(0, total - max_visible)
         scroll_offset = max(0, min(scroll_offset, max_scroll))
 
         end_idx = total - scroll_offset
         start_idx = max(0, end_idx - max_visible)
-        visible = wrapped[start_idx:end_idx]
+
+        # Now refine: walk forward from start_idx, accumulating height
+        # to determine exactly which rows fit
+        visible = []
+        accum_h = 0
+        for idx in range(start_idx, end_idx):
+            row_text, row_orig, row_is_start = wrapped[idx]
+            row_cost = line_h
+            if row_is_start and visible:  # group gap before new entry
+                row_cost += group_gap
+            if accum_h + row_cost > text_h:
+                break
+            visible.append((row_text, row_orig, row_is_start))
+            accum_h += row_cost
 
         # Set a clipping rect so nothing draws outside the content area
         clip_rect = pygame.Rect(px + 2, content_y, pw - 4, content_h)
         old_clip = self.screen.get_clip()
         self.screen.set_clip(clip_rect)
 
-        for i, (display_text, original) in enumerate(visible):
-            ly = content_y + i * line_h
-            # Color code based on original entry content
-            lo = original.lower()
-            if "critical" in lo or "defeated" in lo:
-                color = (255, 230, 80)
-            elif "hit!" in lo or "damage" in lo:
-                color = (255, 255, 255)
-            elif "miss" in lo or "failed" in lo or "resisted" in lo:
-                color = (180, 180, 200)
-            elif original.startswith("--"):
-                color = (255, 200, 80)
-            elif "gold" in lo or "treasure" in lo:
-                color = (255, 255, 100)
-            elif "heals" in lo or "wakes up" in lo:
-                color = (100, 255, 140)
-            elif "poison" in lo:
-                color = (150, 240, 80)
-            elif "sleep" in lo or "zzz" in lo:
-                color = (190, 170, 255)
-            elif "curse" in lo or "hex" in lo:
-                color = (255, 130, 130)
-            elif "fallen" in lo:
-                color = (255, 110, 110)
-            else:
-                color = (235, 235, 250)
-
-            surf = log_font.render(display_text.upper(), True, color)
+        ly = text_top
+        for row_text, row_orig, row_is_start in visible:
+            if row_is_start and ly > text_top:
+                ly += group_gap
+            color = _log_color(row_orig)
+            surf = log_font.render(row_text, True, color)
             self.screen.blit(surf, (px + text_pad, ly))
+            ly += line_h
 
         # Restore original clip
         self.screen.set_clip(old_clip)
 
-        # Scroll indicators — brighter, drawn outside the clip
+        # Scroll indicators — drawn in the reserved indicator zones
         if scroll_offset > 0:
             more_down = log_font.render("v MORE v", True, (100, 180, 255))
             self.screen.blit(more_down,
                              (px + pw // 2 - more_down.get_width() // 2,
-                              content_y + content_h - 18))
+                              text_bottom + 2))
         if scroll_offset < max_scroll:
             more_up = log_font.render("^ MORE ^", True, (100, 180, 255))
             self.screen.blit(more_up,
                              (px + pw // 2 - more_up.get_width() // 2,
-                              content_y))
+                              content_y + 2))
 
     # ── Character Creation Screen ─────────────────────────────────
 
