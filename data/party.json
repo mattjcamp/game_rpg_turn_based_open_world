@@ -27,26 +27,6 @@
       "sprite": "src/assets/u4_tiles/guard_f1.png"
     },
     {
-      "name": "Tanis",
-      "class": "Ranger",
-      "race": "Elf",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 11,
-      "dexterity": 14,
-      "intelligence": 8,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/u4_tiles/villager_male.png"
-    },
-    {
       "name": "Elrond",
       "class": "Wizard",
       "race": "Elf",
@@ -107,10 +87,30 @@
       "sprite": "example_graphics/Ultima3_AMI_sprite_cleric.png"
     },
     {
-      "name": "Al",
-      "class": "Alchemist",
+      "name": "Paladin",
+      "class": "Paladin",
       "race": "Human",
       "gender": "Male",
+      "hp": 20,
+      "strength": 16,
+      "dexterity": 10,
+      "intelligence": 8,
+      "wisdom": 16,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/u4_tiles/paladin.png"
+    },
+    {
+      "name": "Druid",
+      "class": "Druid",
+      "race": "Elf",
+      "gender": "Female",
       "hp": 20,
       "strength": 10,
       "dexterity": 10,
@@ -124,14 +124,34 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/u4_tiles/ranger.png"
+      "sprite": "src/assets/u4_tiles/ranger_alt.png"
+    },
+    {
+      "name": "Ranger",
+      "class": "Ranger",
+      "race": "Human",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 15,
+      "intelligence": 10,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/u4_tiles/villager_male.png"
     }
   ],
   "active_party": [
-    0,
     2,
-    3,
-    4
+    4,
+    5,
+    6
   ],
   "party_effects": {
     "effect_1": null,
