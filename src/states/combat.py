@@ -17,6 +17,22 @@ import pygame
 from src.states.base_state import BaseState
 from src.party import SPELLS_DATA
 from src.monster import Monster
+from src.combat_engine import (
+    roll_initiative, roll_attack, roll_damage, roll_d20, roll_dice,
+    format_modifier, get_modifier,
+)
+from src.states.combat_effects import (
+    PROJECTILE_SPEED, FIREBALL_SPEED,
+    Projectile, MeleeEffect, HitEffect, _BackstabEffect,
+    FireballEffect, FireballExplosion,
+    HealEffect, ShieldEffect, TurnUndeadEffect,
+    CharmEffect, SleepEffect, TeleportEffect, InvisibilityEffect,
+    AnimateDeadEffect, AoeFireballEffect, AoeExplosionEffect,
+    BlessEffect, CurseEffect, CurePoisonEffect,
+    LightningBoltEffect, MonsterSpellEffect,
+)
+
+# SPELLS_DATA is imported from src.party (shared across combat and exploration)
 
 
 class _DualLog(list):
@@ -29,19 +45,12 @@ class _DualLog(list):
 
     def append(self, item):
         super().append(item)
-from src.combat_engine import (
-    roll_initiative, roll_attack, roll_damage, roll_d20, roll_dice,
-    format_modifier, get_modifier,
-)
-
-# SPELLS_DATA is imported from src.party (shared across combat and exploration)
 
 
 # ── Arena constants ──────────────────────────────────────────────
 ARENA_COLS = 18
 ARENA_ROWS = 21
 
-# ── Combat phases ────────────────────────────────────────────────
 PHASE_INIT        = "init"
 PHASE_PLAYER      = "player"         # menu selection (up/down + enter)
 PHASE_PLAYER_DIR  = "player_dir"     # choosing direction for action
@@ -113,565 +122,6 @@ _CHEST_LOOT = [
     ("Chain",         1),
     ("Short Bow",     1),
 ]
-
-# ── Projectile speed (pixels per second) ─────────────────────────
-PROJECTILE_SPEED = 480
-
-
-class Projectile:
-    """A projectile traveling across the arena."""
-
-    def __init__(self, start_col, start_row, end_col, end_row,
-                 color=(255, 255, 255), symbol="*"):
-        self.start_col = start_col
-        self.start_row = start_row
-        self.end_col = end_col
-        self.end_row = end_row
-        self.color = color
-        self.symbol = symbol
-        self.progress = 0.0  # 0 = start, 1 = arrived
-        self.alive = True
-
-    def update(self, dt):
-        """Advance the projectile. dt in seconds."""
-        # Calculate total travel distance in tiles
-        dx = self.end_col - self.start_col
-        dy = self.end_row - self.start_row
-        dist = math.sqrt(dx * dx + dy * dy)
-        if dist < 0.01:
-            self.progress = 1.0
-            self.alive = False
-            return
-
-        # Speed in tiles per second (PROJECTILE_SPEED px / 32 px per tile)
-        tiles_per_sec = PROJECTILE_SPEED / 32.0
-        self.progress += (tiles_per_sec / dist) * dt
-
-        if self.progress >= 1.0:
-            self.progress = 1.0
-            self.alive = False
-
-    @property
-    def current_col(self):
-        return self.start_col + (self.end_col - self.start_col) * self.progress
-
-    @property
-    def current_row(self):
-        return self.start_row + (self.end_row - self.start_row) * self.progress
-
-
-class MeleeEffect:
-    """A short-lived slash animation at a target tile."""
-
-    DURATION = 0.35  # seconds
-
-    def __init__(self, col, row, direction, color=(255, 255, 255)):
-        self.col = col
-        self.row = row
-        self.direction = direction  # (dcol, drow)
-        self.color = color
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        """0 = start, 1 = done."""
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class HitEffect:
-    """A flash/shake on a target when they take damage."""
-
-    DURATION = 0.3  # seconds
-
-    def __init__(self, col, row, damage=0):
-        self.col = col
-        self.row = row
-        self.damage = damage
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class _BackstabEffect:
-    """A brief purple-white flash for the Thief's backstab.
-
-    Rendered as expanding rings with sparkles — visually distinct from
-    the normal HitEffect so the player can tell a backstab crit happened.
-    """
-
-    DURATION = 0.5  # seconds
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-        self.damage = 0  # not used for rendering damage numbers
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class FireballEffect:
-    """An animated fireball traveling across the arena."""
-
-    def __init__(self, start_col, start_row, end_col, end_row):
-        self.start_col = start_col
-        self.start_row = start_row
-        self.end_col = end_col
-        self.end_row = end_row
-        self.progress = 0.0  # 0 = start, 1 = arrived
-        self.alive = True
-        self.radius = 6  # base visual radius in pixels
-
-    def update(self, dt):
-        """Advance the fireball. dt in seconds."""
-        dx = self.end_col - self.start_col
-        dy = self.end_row - self.start_row
-        dist = math.sqrt(dx * dx + dy * dy)
-        if dist < 0.01:
-            self.progress = 1.0
-            self.alive = False
-            return
-
-        tiles_per_sec = FIREBALL_SPEED / 32.0
-        self.progress += (tiles_per_sec / dist) * dt
-
-        if self.progress >= 1.0:
-            self.progress = 1.0
-            self.alive = False
-
-    @property
-    def current_col(self):
-        return self.start_col + (self.end_col - self.start_col) * self.progress
-
-    @property
-    def current_row(self):
-        return self.start_row + (self.end_row - self.start_row) * self.progress
-
-
-class FireballExplosion:
-    """A brief explosion effect when the fireball hits."""
-
-    DURATION = 0.5
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class HealEffect:
-    """A glowing heal animation over a party member."""
-
-    DURATION = 0.8  # seconds
-
-    def __init__(self, col, row, amount=0):
-        self.col = col
-        self.row = row
-        self.amount = amount
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class ShieldEffect:
-    """A blue shield glow animation over a party member."""
-
-    DURATION = 0.8  # seconds
-
-    def __init__(self, col, row, ac_bonus=0):
-        self.col = col
-        self.row = row
-        self.ac_bonus = ac_bonus
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class TurnUndeadEffect:
-    """A holy blast radiating out from the caster toward the monster."""
-
-    DURATION = 1.2  # seconds — longer for dramatic effect
-
-    def __init__(self, caster_col, caster_row, monster_col, monster_row, damage=0):
-        self.caster_col = caster_col
-        self.caster_row = caster_row
-        self.monster_col = monster_col
-        self.monster_row = monster_row
-        self.damage = damage
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class CharmEffect:
-    """A swirling pink/purple enchantment spiral around the target monster."""
-
-    DURATION = 1.4  # seconds
-
-    def __init__(self, col, row, success=True):
-        self.col = col
-        self.row = row
-        self.success = success  # True = charmed, False = resisted
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class SleepEffect:
-    """A soft blue/purple mist descending over the target monster."""
-
-    DURATION = 1.2  # seconds
-
-    def __init__(self, col, row, success=True):
-        self.col = col
-        self.row = row
-        self.success = success  # True = asleep, False = resisted
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class TeleportEffect:
-    """A silvery mist effect for Misty Step — plays at both origin and destination."""
-
-    DURATION = 1.0  # seconds
-
-    def __init__(self, from_col, from_row, to_col, to_row):
-        self.from_col = from_col
-        self.from_row = from_row
-        self.to_col = to_col
-        self.to_row = to_row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class InvisibilityEffect:
-    """A shimmer/fade animation when a character turns invisible."""
-
-    DURATION = 1.0  # seconds
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class AnimateDeadEffect:
-    """A dark green/black rising-from-the-ground animation for summoning a skeleton."""
-
-    DURATION = 1.4  # seconds
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class AoeFireballEffect:
-    """An AoE fireball projectile traveling to a target tile."""
-
-    def __init__(self, start_col, start_row, end_col, end_row):
-        self.start_col = start_col
-        self.start_row = start_row
-        self.end_col = end_col
-        self.end_row = end_row
-        self.progress = 0.0  # 0 = start, 1 = arrived
-        self.alive = True
-        self.radius = 8  # base visual radius in pixels (bigger than normal fireball)
-
-    def update(self, dt):
-        dx = self.end_col - self.start_col
-        dy = self.end_row - self.start_row
-        dist = math.sqrt(dx * dx + dy * dy)
-        if dist < 0.01:
-            self.progress = 1.0
-            self.alive = False
-            return
-        tiles_per_sec = FIREBALL_SPEED / 32.0
-        self.progress += (tiles_per_sec / dist) * dt
-        if self.progress >= 1.0:
-            self.progress = 1.0
-            self.alive = False
-
-    @property
-    def current_col(self):
-        return self.start_col + (self.end_col - self.start_col) * self.progress
-
-    @property
-    def current_row(self):
-        return self.start_row + (self.end_row - self.start_row) * self.progress
-
-
-class AoeExplosionEffect:
-    """A massive expanding explosion covering a multi-tile radius."""
-
-    DURATION = 1.2  # seconds — longer than normal explosion for drama
-
-    def __init__(self, col, row, radius=3):
-        self.col = col
-        self.row = row
-        self.radius = radius
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class BlessEffect:
-    """A golden radiance expanding from the caster to all allies."""
-
-    DURATION = 1.0  # seconds
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class CurseEffect:
-    """A dark purple miasma settling on a cursed enemy."""
-
-    DURATION = 1.0  # seconds
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class CurePoisonEffect:
-    """A green-to-white cleansing glow over a cured ally."""
-
-    DURATION = 1.0  # seconds
-
-    def __init__(self, col, row):
-        self.col = col
-        self.row = row
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class LightningBoltEffect:
-    """A crackling bolt of lightning along a straight line of tiles.
-
-    Unlike projectiles, the bolt appears all at once along its path and
-    crackles for its duration before dissipating.
-    """
-
-    DURATION = 1.0  # seconds
-
-    def __init__(self, tiles):
-        """*tiles* is a list of (col, row) tuples the bolt passes through."""
-        self.tiles = tiles  # ordered list of (col, row)
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        """0 = just appeared, 1 = done."""
-        return 1.0 - (self.timer / self.DURATION)
-
-
-class MonsterSpellEffect:
-    """A brief visual effect when a monster casts a spell-like ability.
-
-    Colour coded by spell type:
-        sleep  → purple/blue
-        curse  → dark red
-        heal   → green
-        poison → sickly green
-    """
-
-    DURATION = 1.0  # seconds
-
-    # Default colour per spell type
-    COLORS = {
-        "sleep":     (120,  80, 200),
-        "curse":     (200,  60,  60),
-        "heal_self": ( 60, 200,  80),
-        "heal_ally": ( 60, 200,  80),
-        "poison":    (100, 180,  40),
-    }
-
-    def __init__(self, col, row, spell_type="sleep", label="", success=True):
-        self.col = col
-        self.row = row
-        self.spell_type = spell_type
-        self.color = self.COLORS.get(spell_type, (200, 200, 200))
-        self.label = label
-        self.success = success
-        self.timer = self.DURATION
-        self.alive = True
-
-    def update(self, dt):
-        self.timer -= dt
-        if self.timer <= 0:
-            self.timer = 0
-            self.alive = False
-
-    @property
-    def progress(self):
-        return 1.0 - (self.timer / self.DURATION)
-
 
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
@@ -807,6 +257,9 @@ class CombatState(BaseState):
 
         # Callback info for returning to source state
         self.source_state = "dungeon"
+
+        # Effect phase table (built lazily on first update() call)
+        self._effect_phase_table = None
 
     # ── Arena helpers ────────────────────────────────────────────
 
@@ -3332,18 +2785,38 @@ class CombatState(BaseState):
             f"All allies gain +{attack_bonus} attack for {duration} turns!")
         self.selected_spell = None
 
+    def _tick_buff_dict(self, buff_dict, on_expire, skip=None):
+        """Decrement buff durations and call *on_expire* for each that runs out.
+
+        Works with both dict-of-dicts (keyed by ``turns_left``) and
+        dict-of-ints (bare integer values).
+
+        *on_expire(entity)* is called for each expired entry.
+        *skip* is an optional set/list of entities to skip decrementing.
+        """
+        expired = []
+        for entity, val in buff_dict.items():
+            if skip and entity in skip:
+                continue
+            if isinstance(val, dict):
+                val["turns_left"] -= 1
+                if val["turns_left"] <= 0:
+                    expired.append(entity)
+            else:
+                val -= 1
+                buff_dict[entity] = val
+                if val <= 0:
+                    expired.append(entity)
+        for entity in expired:
+            del buff_dict[entity]
+            on_expire(entity)
+
     def _tick_bless_buffs(self):
         """Decrement bless buff durations at end of each round."""
-        expired = []
-        for member, buff in self.bless_buffs.items():
-            buff["turns_left"] -= 1
-            if buff["turns_left"] <= 0:
-                expired.append(member)
-        for member in expired:
-            del self.bless_buffs[member]
+        def _expire(member):
             if member.is_alive():
-                self.combat_log.append(
-                    f"{member.name}'s blessing fades.")
+                self.combat_log.append(f"{member.name}'s blessing fades.")
+        self._tick_buff_dict(self.bless_buffs, _expire)
 
     # ── Curse casting ──────────────────────────────────────────────
 
@@ -3404,16 +2877,10 @@ class CombatState(BaseState):
 
     def _tick_curse_buffs(self):
         """Decrement curse debuff durations at end of each round."""
-        expired = []
-        for monster, buff in self.curse_buffs.items():
-            buff["turns_left"] -= 1
-            if buff["turns_left"] <= 0:
-                expired.append(monster)
-        for monster in expired:
-            del self.curse_buffs[monster]
+        def _expire(monster):
             if monster.is_alive():
-                self.combat_log.append(
-                    f"{monster.name}'s curse lifts.")
+                self.combat_log.append(f"{monster.name}'s curse lifts.")
+        self._tick_buff_dict(self.curse_buffs, _expire)
 
     # ── Shield casting ─────────────────────────────────────────────
 
@@ -3590,84 +3057,38 @@ class CombatState(BaseState):
         self._check_monster_death(target)
 
     def _tick_shield_buffs(self):
-        """Decrement shield buff durations at the end of each full round.
-        Called when all fighters have taken their turns."""
-        expired = []
-        for member, buff in self.shield_buffs.items():
-            buff["turns_left"] -= 1
-            if buff["turns_left"] <= 0:
-                expired.append(member)
-                self.combat_log.append(
-                    f"{member.name}'s shield fades away."
-                )
-        for member in expired:
-            del self.shield_buffs[member]
+        """Decrement shield buff durations at the end of each full round."""
+        def _expire(member):
+            self.combat_log.append(f"{member.name}'s shield fades away.")
+        self._tick_buff_dict(self.shield_buffs, _expire)
 
     def _tick_range_buffs(self):
         """Decrement range buff durations at the end of each full round."""
-        expired = []
-        for member, buff in self.range_buffs.items():
-            buff["turns_left"] -= 1
-            if buff["turns_left"] <= 0:
-                expired.append(member)
-                self.combat_log.append(
-                    f"{member.name}'s Long Shanks wears off."
-                )
-        for member in expired:
-            del self.range_buffs[member]
+        def _expire(member):
+            self.combat_log.append(f"{member.name}'s Long Shanks wears off.")
+        self._tick_buff_dict(self.range_buffs, _expire)
 
     def _tick_charm_buffs(self):
-        """Decrement charm durations at the end of each full round.
-
-        When a charm expires the monster reverts to hostile.
-        """
-        expired = []
-        for monster, turns_left in self.charm_buffs.items():
-            turns_left -= 1
-            self.charm_buffs[monster] = turns_left
-            if turns_left <= 0:
-                expired.append(monster)
-        for monster in expired:
-            del self.charm_buffs[monster]
+        """Decrement charm durations. When expired the monster reverts to hostile."""
+        def _expire(monster):
             if monster.is_alive():
                 monster.charmed = False
-                self.combat_log.append(
-                    f"The charm on {monster.name} wears off!")
+                self.combat_log.append(f"The charm on {monster.name} wears off!")
+        self._tick_buff_dict(self.charm_buffs, _expire)
 
     def _tick_sleep_buffs(self):
-        """Decrement sleep durations at the end of each full round.
-
-        Only decrements monster sleep entries here.  Fighter sleep is
-        decremented in ``_announce_turn`` so it doesn't double-tick.
-        """
-        expired = []
-        for entity, turns_left in self.sleep_buffs.items():
-            # Skip fighters — their sleep is ticked in _announce_turn
-            if entity in self.fighters:
-                continue
-            turns_left -= 1
-            self.sleep_buffs[entity] = turns_left
-            if turns_left <= 0:
-                expired.append(entity)
-        for entity in expired:
-            del self.sleep_buffs[entity]
+        """Decrement sleep durations (monsters only — fighter sleep ticked in _announce_turn)."""
+        def _expire(entity):
             if entity.is_alive():
-                self.combat_log.append(
-                    f"{entity.name} wakes up!")
+                self.combat_log.append(f"{entity.name} wakes up!")
+        self._tick_buff_dict(self.sleep_buffs, _expire, skip=self.fighters)
 
     def _tick_invisibility_buffs(self):
         """Decrement invisibility durations at the end of each full round."""
-        expired = []
-        for member, turns_left in self.invisibility_buffs.items():
-            turns_left -= 1
-            self.invisibility_buffs[member] = turns_left
-            if turns_left <= 0:
-                expired.append(member)
-        for member in expired:
-            del self.invisibility_buffs[member]
+        def _expire(member):
             if member.is_alive():
-                self.combat_log.append(
-                    f"{member.name}'s invisibility fades away.")
+                self.combat_log.append(f"{member.name}'s invisibility fades away.")
+        self._tick_buff_dict(self.invisibility_buffs, _expire)
 
     def _break_invisibility(self, member):
         """Break invisibility when the member attacks or casts offensively."""
@@ -3817,23 +3238,13 @@ class CombatState(BaseState):
             self.game.sfx.play(sfx)
 
     def _tick_summon_buffs(self):
-        """Decrement summon durations at the end of each full round.
-
-        When a summon expires the skeleton crumbles to dust (killed).
-        """
-        expired = []
-        for monster, turns_left in self.summon_buffs.items():
-            turns_left -= 1
-            self.summon_buffs[monster] = turns_left
-            if turns_left <= 0:
-                expired.append(monster)
-        for monster in expired:
-            del self.summon_buffs[monster]
+        """Decrement summon durations. When expired the skeleton crumbles to dust."""
+        def _expire(monster):
             if monster.is_alive():
                 monster.hp = 0
                 monster.charmed = False
-                self.combat_log.append(
-                    f"{monster.name} crumbles to dust!")
+                self.combat_log.append(f"{monster.name} crumbles to dust!")
+        self._tick_buff_dict(self.summon_buffs, _expire)
 
     # ── Auto-monster spell dispatch ──────────────────────────────
 
@@ -5131,8 +4542,67 @@ class CombatState(BaseState):
 
     # ── Phase machine ────────────────────────────────────────────
 
+    def _build_effect_phase_table(self):
+        """Build the phase→(attr, callback) lookup the first time update() runs.
+
+        We can't build this at class level because the callback methods
+        don't exist yet at class definition time.
+        """
+        def _victory_or_end():
+            if self._all_monsters_dead():
+                self._trigger_victory()
+            else:
+                self._end_fighter_turn()
+
+        def _victory_defeat_or_end():
+            if self._all_monsters_dead():
+                self._trigger_victory()
+            elif not any(m.is_alive() for m in self.fighters):
+                self.phase = PHASE_DEFEAT
+                self.phase_timer = 2500
+            else:
+                self._end_fighter_turn()
+
+        def _charm_done():
+            self.charm_target = None
+            _victory_or_end()
+
+        def _monster_spell_done():
+            self.phase = PHASE_MONSTER
+            self.phase_timer = 400
+
+        self._effect_phase_table = [
+            # (phase,                attr_name,                callback)
+            (PHASE_HEAL,            "heal_effects",           self._end_fighter_turn),
+            (PHASE_CURE_POISON,     "cure_poison_effects",    self._end_fighter_turn),
+            (PHASE_BLESS,           "bless_effects",          self._end_fighter_turn),
+            (PHASE_CURSE,           "curse_effects",          self._end_fighter_turn),
+            (PHASE_SHIELD,          "shield_effects",         self._end_fighter_turn),
+            (PHASE_TURN_UNDEAD,     "turn_undead_effects",    _victory_or_end),
+            (PHASE_CHARM,           "charm_effects",          _charm_done),
+            (PHASE_SLEEP,           "sleep_effects",          _victory_or_end),
+            (PHASE_TELEPORT,        "teleport_effects",       self._end_fighter_turn),
+            (PHASE_INVISIBILITY,    "invisibility_effects",   self._end_fighter_turn),
+            (PHASE_ANIMATE_DEAD,    "animate_dead_effects",   self._end_fighter_turn),
+            (PHASE_AOE_FIREBALL,    "aoe_fireball_effects",   self._resolve_aoe_fireball),
+            (PHASE_AOE_EXPLOSION,   "aoe_explosions",         _victory_defeat_or_end),
+            (PHASE_LIGHTNING_BOLT,  "lightning_bolt_effects",  _victory_defeat_or_end),
+            (PHASE_MONSTER_SPELL,   "monster_spell_effects",  _monster_spell_done),
+        ]
+
+    @staticmethod
+    def _tick_effect_list(fx_list, dt):
+        """Update all effects in *fx_list* and prune dead ones in-place."""
+        for fx in fx_list:
+            if fx.alive:
+                fx.update(dt)
+
     def update(self, dt):
         dt_ms = dt * 1000
+
+        # Lazy-init the effect phase table (once)
+        if self._effect_phase_table is None:
+            self._build_effect_phase_table()
 
         # Tick the temporary combat message
         if self.combat_msg_timer > 0:
@@ -5141,231 +4611,36 @@ class CombatState(BaseState):
                 self.combat_message = ""
                 self.combat_msg_timer = 0
 
-        # Update all visual effects (always, regardless of phase)
-        for fx in self.hit_effects:
-            if fx.alive:
-                fx.update(dt)
+        # Always-update effects (visual only, no phase gating)
+        self._tick_effect_list(self.hit_effects, dt)
         self.hit_effects = [fx for fx in self.hit_effects if fx.alive]
-
-        # Update fireball explosions (always, visual only)
-        for fx in self.fireball_explosions:
-            if fx.alive:
-                fx.update(dt)
+        self._tick_effect_list(self.fireball_explosions, dt)
         self.fireball_explosions = [fx for fx in self.fireball_explosions if fx.alive]
 
-        # Update heal effects
-        for fx in self.heal_effects:
-            if fx.alive:
-                fx.update(dt)
-        # Check if heal phase is done
-        if self.phase == PHASE_HEAL:
-            if all(not fx.alive for fx in self.heal_effects):
-                self.heal_effects = []
-                self._end_fighter_turn()
-            return
-        self.heal_effects = [fx for fx in self.heal_effects if fx.alive]
+        # Phase-gated effect animations — tick effects, and when all done
+        # in the matching phase, call the completion callback and return.
+        for phase, attr, callback in self._effect_phase_table:
+            fx_list = getattr(self, attr)
+            self._tick_effect_list(fx_list, dt)
+            if self.phase == phase:
+                if all(not fx.alive for fx in fx_list):
+                    setattr(self, attr, [])
+                    callback()
+                return
+            # Not in this phase — just prune dead effects
+            setattr(self, attr, [fx for fx in fx_list if fx.alive])
 
-        # Update cure poison effects
-        for fx in self.cure_poison_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_CURE_POISON:
-            if all(not fx.alive for fx in self.cure_poison_effects):
-                self.cure_poison_effects = []
-                self._end_fighter_turn()
-            return
-        self.cure_poison_effects = [fx for fx in self.cure_poison_effects if fx.alive]
-
-        # Update bless effects
-        for fx in self.bless_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_BLESS:
-            if all(not fx.alive for fx in self.bless_effects):
-                self.bless_effects = []
-                self._end_fighter_turn()
-            return
-        self.bless_effects = [fx for fx in self.bless_effects if fx.alive]
-
-        # Update curse effects
-        for fx in self.curse_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_CURSE:
-            if all(not fx.alive for fx in self.curse_effects):
-                self.curse_effects = []
-                self._end_fighter_turn()
-            return
-        self.curse_effects = [fx for fx in self.curse_effects if fx.alive]
-
-        # Update shield effects
-        for fx in self.shield_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_SHIELD:
-            if all(not fx.alive for fx in self.shield_effects):
-                self.shield_effects = []
-                self._end_fighter_turn()
-            return
-        self.shield_effects = [fx for fx in self.shield_effects if fx.alive]
-
-        # Update turn undead effects
-        for fx in self.turn_undead_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_TURN_UNDEAD:
-            if all(not fx.alive for fx in self.turn_undead_effects):
-                self.turn_undead_effects = []
-                # Check if all monsters died from the holy blast
-                if self._all_monsters_dead():
-                    self._trigger_victory()
-                else:
-                    self._end_fighter_turn()
-            return
-        self.turn_undead_effects = [fx for fx in self.turn_undead_effects if fx.alive]
-
-        # Update charm effects
-        for fx in self.charm_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_CHARM:
-            if all(not fx.alive for fx in self.charm_effects):
-                self.charm_effects = []
-                self.charm_target = None
-                # Check if all non-charmed monsters are dead
-                if self._all_monsters_dead():
-                    self._trigger_victory()
-                else:
-                    self._end_fighter_turn()
-            return
-        self.charm_effects = [fx for fx in self.charm_effects if fx.alive]
-
-        # Update sleep effects
-        for fx in self.sleep_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_SLEEP:
-            if all(not fx.alive for fx in self.sleep_effects):
-                self.sleep_effects = []
-                # Check if all non-charmed monsters are dead
-                if self._all_monsters_dead():
-                    self._trigger_victory()
-                else:
-                    self._end_fighter_turn()
-            return
-        self.sleep_effects = [fx for fx in self.sleep_effects if fx.alive]
-
-        # Update teleport effects
-        for fx in self.teleport_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_TELEPORT:
-            if all(not fx.alive for fx in self.teleport_effects):
-                self.teleport_effects = []
-                self._end_fighter_turn()
-            return
-        self.teleport_effects = [fx for fx in self.teleport_effects if fx.alive]
-
-        # Update invisibility effects
-        for fx in self.invisibility_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_INVISIBILITY:
-            if all(not fx.alive for fx in self.invisibility_effects):
-                self.invisibility_effects = []
-                self._end_fighter_turn()
-            return
-        self.invisibility_effects = [fx for fx in self.invisibility_effects if fx.alive]
-
-        # Update animate dead effects
-        for fx in self.animate_dead_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_ANIMATE_DEAD:
-            if all(not fx.alive for fx in self.animate_dead_effects):
-                self.animate_dead_effects = []
-                self._end_fighter_turn()
-            return
-        self.animate_dead_effects = [fx for fx in self.animate_dead_effects if fx.alive]
-
-        # Update AoE fireball projectile
-        for fx in self.aoe_fireball_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_AOE_FIREBALL:
-            if all(not fx.alive for fx in self.aoe_fireball_effects):
-                self.aoe_fireball_effects = []
-                self._resolve_aoe_fireball()
-            return
-        self.aoe_fireball_effects = [fx for fx in self.aoe_fireball_effects if fx.alive]
-
-        # Update AoE explosions
-        for fx in self.aoe_explosions:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_AOE_EXPLOSION:
-            if all(not fx.alive for fx in self.aoe_explosions):
-                self.aoe_explosions = []
-                # Check victory/defeat after the explosion animation
-                if self._all_monsters_dead():
-                    self._trigger_victory()
-                elif not any(m.is_alive() for m in self.fighters):
-                    self.phase = PHASE_DEFEAT
-                    self.phase_timer = 2500
-                else:
-                    self._end_fighter_turn()
-            return
-        self.aoe_explosions = [fx for fx in self.aoe_explosions if fx.alive]
-
-        # Update lightning bolt effects
-        for fx in self.lightning_bolt_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_LIGHTNING_BOLT:
-            if all(not fx.alive for fx in self.lightning_bolt_effects):
-                self.lightning_bolt_effects = []
-                # Check victory/defeat after the bolt animation
-                if self._all_monsters_dead():
-                    self._trigger_victory()
-                elif not any(m.is_alive() for m in self.fighters):
-                    self.phase = PHASE_DEFEAT
-                    self.phase_timer = 2500
-                else:
-                    self._end_fighter_turn()
-            return
-        self.lightning_bolt_effects = [fx for fx in self.lightning_bolt_effects if fx.alive]
-
-        # Update monster spell effects
-        for fx in self.monster_spell_effects:
-            if fx.alive:
-                fx.update(dt)
-        if self.phase == PHASE_MONSTER_SPELL:
-            if all(not fx.alive for fx in self.monster_spell_effects):
-                self.monster_spell_effects = []
-                # After monster spell animation, continue to next monster
-                self.phase = PHASE_MONSTER
-                self.phase_timer = 400
-            return
-        self.monster_spell_effects = [fx for fx in self.monster_spell_effects if fx.alive]
-
-        # Update fireballs
+        # Update fireballs (phase-only — only tick when in PHASE_FIREBALL)
         if self.phase == PHASE_FIREBALL:
-            for fb in self.fireballs:
-                if fb.alive:
-                    fb.update(dt)
-
+            self._tick_effect_list(self.fireballs, dt)
             if all(not fb.alive for fb in self.fireballs):
                 self.fireballs = []
                 self._resolve_fireball()
             return
 
-        # Update projectiles
+        # Update projectiles (phase-only)
         if self.phase == PHASE_PROJECTILE:
-            for proj in self.projectiles:
-                if proj.alive:
-                    proj.update(dt)
-
-            # Check if all projectiles have arrived
+            self._tick_effect_list(self.projectiles, dt)
             if all(not p.alive for p in self.projectiles):
                 self.projectiles = []
                 if self._pending_monster_ranged:
@@ -5374,13 +4649,9 @@ class CombatState(BaseState):
                     self._resolve_ranged()
             return
 
-        # Update melee effects
+        # Update melee effects (phase-only)
         if self.phase == PHASE_MELEE_ANIM:
-            for fx in self.melee_effects:
-                if fx.alive:
-                    fx.update(dt)
-
-            # Check if all melee effects are done
+            self._tick_effect_list(self.melee_effects, dt)
             if all(not fx.alive for fx in self.melee_effects):
                 self.melee_effects = []
                 self._resolve_melee()

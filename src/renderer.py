@@ -4652,7 +4652,7 @@ class Renderer:
 
         # ── 2d. hit flash effects ──
         if hit_effects:
-            from src.states.combat import _BackstabEffect
+            from src.states.combat_effects import _BackstabEffect
             for fx in hit_effects:
                 if fx.alive:
                     if isinstance(fx, _BackstabEffect):

@@ -1,5 +1,5 @@
 {
-  "music_enabled": true,
-  "smite_enabled": false,
+  "music_enabled": false,
+  "smite_enabled": true,
   "start_with_equipment": false
 }
