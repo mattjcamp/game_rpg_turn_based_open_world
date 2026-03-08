@@ -1,168 +1,259 @@
-# Realm of Shadow - An Ultima III Inspired RPG
+# Realm of Shadow
 
-A hobby RPG project built with Python and Pygame, inspired by the classic Ultima III: Exodus.
+An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. Lead a party of four adventurers through a procedurally generated world of overworld exploration, town visits, dungeon delving, and tactical grid combat.
 
-- [Detailed Ultima 3 Information](https://strategywiki.org/wiki/Ultima_III:_Exodus)
-- [Visual Style Guide](STYLE_GUIDE.md) — color palette, layout rules, sprite specs, and tile patterns derived from the `example_*` reference images
+This is a hobby project. The programming was done with the help of AI (primarily Anthropic's Claude), and the codebase is designed to be approachable for anyone who wants to tinker, extend, or learn from it. See the section on [working with AI](#working-with-ai) below for tips on how to make changes yourself — even if you're not a programmer.
 
-## Vision
+## Documentation & Reference
 
-An Ultima III-inspired (not exact) top-down, turn-based RPG with a party of 4 adventurers. The core gameplay loop follows the classic overworld-town-dungeon structure with traditional character progression and loot. The key twist is that the **world content is randomly generated** — each new game produces a fresh overworld map with procedurally generated towns and dungeons, giving every playthrough a unique world to explore.
+Before diving into the code, these documents give useful context on the game's design and mechanics:
 
-### What stays faithful to Ultima III
-- Party of 4 adventurers with races, classes, and stats
-- Turn-based combat
-- Top-down tile-based view
-- Overworld map with towns and dungeons to discover
-- Character progression (leveling, equipment, spells)
-- Loot as both random drops and standard items
+- **[Player's Manual](manuals/players_manual.md)** — races, classes, combat, spells, items, and controls from the player's perspective. There is also a [.docx version](manuals/players_manual.docx) and illustrations in `manuals/images/`.
+- **[Visual Style Guide](STYLE_GUIDE.md)** — color palette, layout rules, sprite specs, and tile patterns. Derived from the Ultima III reference screenshots in `research/`.
+- **[Combat Mechanics](data/COMBAT_MECHANICS.md)** — the single source of truth for how attacks, damage, defense, and spells work under the hood.
+- **[Ultima III Character Reference](research/ULTIMA3_CHARACTERS.md)** — original game's race/class/attribute system, used as a design template.
+- **[Ultima III StrategyWiki](https://strategywiki.org/wiki/Ultima_III:_Exodus)** — external reference for the original game.
 
-### What's new
-- Procedurally generated overworld (coastlines, biomes, terrain)
-- Randomly generated towns (layouts, NPC placement, shops)
-- Randomly generated dungeons (rooms, corridors, encounters)
-- Themed or hybrid generation planned for later iterations
+The `research/` folder also contains reference screenshots (`example_combat.webp`, `example_overview_map.png`, etc.) and sprite reference material in `research/example_graphics/` that were used to guide the visual style.
 
-## Tech Stack
+---
 
-- **Python 3** — chosen for rapid iteration and readability; this project will change a lot
-- **Pygame** — lightweight, good fit for tile-based rendering, simple input/audio
+## Getting Started
 
-## Running the Game
+### What You Need
 
-```bash
-pip install pygame
-python3 main.py
-```
+- **Python 3.9 or newer.** Check with `python3 --version` in a terminal. If you don't have it:
+  - **Mac:** `brew install python3` (if you have Homebrew) or download from [python.org](https://www.python.org/downloads/macos/)
+  - **Windows:** Download from [python.org](https://www.python.org/downloads/windows/) — check "Add Python to PATH" during install
+  - **Linux:** `sudo apt install python3 python3-pip` (Ubuntu/Debian) or your distro's equivalent
+
+- **Git** (to clone the repo). Most Macs and Linux systems have it already. Windows users can get it from [git-scm.com](https://git-scm.com/).
+
+### Setup
+
+1. **Clone the repository:**
+   ```
+   git clone <repo-url>
+   cd ultima3_clone
+   ```
+
+2. **Install dependencies:**
+   ```
+   pip3 install -r requirements.txt
+   ```
+   This installs Pygame (graphics/audio) and NumPy (used for procedural music generation).
+
+3. **Run the game:**
+   ```
+   python3 main.py
+   ```
+
+That's it. A window should open with the title screen.
 
 ### Controls
+
+**Overworld:**
+
 - Arrow keys or WASD — Move the party
-- Walk into NPCs — Talk to them
-- Space / Enter — Advance NPC dialogue
-- ESC — Leave town (when inside) / Leave dungeon (on stairs) / Quit (on overworld)
+- E — Examine the local area (zoomed-in view of the current tile)
+- L — Load game
+- P — Pause / open settings
+- H — Help
+- Walk into a town tile to enter it; walk into a dungeon tile to enter it
+- ESC — Quit
+
+**Towns:**
+
+- Arrow keys or WASD — Move
+- Walk into NPCs to talk; Space/Enter to advance dialogue
+- ESC — Leave town
+
+**Dungeons:**
+
+- Arrow keys or WASD — Move
+- Walk into monsters to fight; walk into chests to loot
+- ESC on stairs — Leave dungeon
+
+**Combat (tactical grid):**
+
+- WASD — Move on the arena grid (each move takes a turn)
+- Walk into a monster to melee attack
+- Arrow keys — Navigate action menu
+- Enter — Confirm action
+- ESC — Flee attempt
+
+**Examine mode:**
+
+- Arrow keys or WASD — Walk around the zoomed-in area
+- Q — Drop an item from inventory
+- ESC — Return to overworld
+
+---
 
 ## Project Structure
 
 ```
 ultima3_clone/
-├── main.py              ← Entry point
-├── requirements.txt     ← Dependencies
-├── assets/              ← Future sprites and sounds
-├── data/                ← Future map data, item tables
-└── src/
-    ├── settings.py      ← Constants, tile definitions, colors
-    ├── tile_map.py      ← Map grid and test map
-    ├── party.py         ← Party and character management
-    ├── camera.py        ← Viewport that follows the party
-    ├── renderer.py      ← Tile rendering, party marker, HUD, NPC drawing
-    ├── game.py          ← Game loop and state machine
-    ├── town_generator.py    ← Town map + NPC generation
-    ├── dungeon_generator.py ← Procedural dungeon generation
-    ├── monster.py           ← Monster class and factory functions
-    ├── combat_engine.py     ← D&D dice rolls, attack resolution, damage
-    └── states/
-        ├── base_state.py    ← Base state interface
-        ├── overworld.py     ← Overworld exploration state
-        ├── town.py          ← Town interior exploration state
-        ├── dungeon.py       ← Dungeon exploration state
-        └── combat.py        ← Turn-based combat state
+├── main.py                  ← Entry point — run this to play
+├── requirements.txt         ← Python dependencies (pygame, numpy)
+├── STYLE_GUIDE.md           ← Visual design rules
+│
+├── data/                    ← Game data (all JSON, easy to edit)
+│   ├── items.json           ← Weapons, armor, consumables, shop inventories
+│   ├── monsters.json        ← Monster stats, drops, and behavior
+│   ├── spells.json          ← Spell definitions and effects
+│   ├── effects.json         ← Buff/debuff effect definitions
+│   ├── encounters.json      ← Encounter tables by terrain
+│   ├── races.json           ← Playable race stats and bonuses
+│   ├── party.json           ← Default starting party configuration
+│   ├── potions.json         ← Potion effects
+│   ├── config.json          ← Player settings (music, etc.)
+│   ├── character_tiles.json ← Character sprite assignments
+│   ├── unique_tiles.json    ← Special overworld tile definitions
+│   ├── u4_tiles.json        ← Tile mapping for Ultima IV–style sprites
+│   ├── COMBAT_MECHANICS.md  ← Combat math reference
+│   ├── classes/             ← One JSON file per character class
+│   │   ├── fighter.json
+│   │   ├── cleric.json
+│   │   ├── wizard.json
+│   │   ├── thief.json
+│   │   ├── paladin.json
+│   │   ├── ranger.json
+│   │   ├── druid.json
+│   │   └── alchemist.json
+│   └── saves/               ← Save game slots
+│
+├── src/                     ← Game source code
+│   ├── game.py              ← Main game loop, state machine, menus
+│   ├── settings.py          ← Constants, tile definitions, colors
+│   ├── tile_map.py          ← Overworld map grid and generation
+│   ├── camera.py            ← Viewport that follows the party
+│   ├── renderer.py          ← All drawing: tiles, sprites, HUD, UI panels
+│   ├── party.py             ← Party, characters, inventory, equipment
+│   ├── monster.py           ← Monster definitions and factory functions
+│   ├── combat_engine.py     ← D&D-style dice rolls, attack resolution
+│   ├── combat_effect_renderer.py ← Visual effects for combat (sparks, etc.)
+│   ├── music.py             ← Procedural chiptune music (numpy waveforms)
+│   ├── save_load.py         ← Save/load game state to JSON
+│   ├── data_loader.py       ← Reads JSON data files with module fallback
+│   ├── module_loader.py     ← Discovers and loads game modules
+│   ├── game_time.py         ← In-game clock and day/night cycle
+│   ├── town_generator.py    ← Procedural town layouts and NPCs
+│   ├── dungeon_generator.py ← Procedural dungeon rooms and corridors
+│   ├── assets/              ← Sprite sheets, tile images (~375 files)
+│   └── states/              ← Game state implementations
+│       ├── base_state.py    ← Base state interface (enter/exit/update/draw)
+│       ├── overworld.py     ← Overworld exploration
+│       ├── town.py          ← Town interior exploration
+│       ├── dungeon.py       ← Dungeon crawling
+│       ├── combat.py        ← Tactical grid combat
+│       ├── combat_effects.py ← Combat buff/debuff system
+│       ├── examine.py       ← Zoomed-in tile examination
+│       └── inventory_mixin.py ← Shared inventory UI behavior
+│
+├── modules/                 ← Game content modules
+│   └── keys_of_shadow/      ← Default adventure module
+│       ├── module.json      ← Module manifest and progression config
+│       └── overworld.json   ← Custom overworld map data
+│
+├── manuals/                 ← Player-facing documentation
+│   ├── players_manual.md
+│   ├── players_manual.docx
+│   └── images/              ← Manual illustrations
+│
+├── research/                ← Design reference material
+│   ├── ULTIMA3_CHARACTERS.md
+│   ├── example_combat.webp
+│   ├── example_overview_map.png
+│   ├── example_dungeon.jpg
+│   └── example_graphics/    ← Sprite reference images
+│
+├── tests/                   ← Test suite (166 tests)
+│   ├── conftest.py          ← Headless pygame mock and shared fixtures
+│   ├── test_combat.py
+│   ├── test_examine.py
+│   ├── test_party.py
+│   ├── test_refactored.py
+│   └── test_states.py
+│
+└── archive/                 ← Deprecated data files
 ```
 
-## Development Log
+### Architecture at a Glance
 
-### Session 1 — Initial Prototype
-- Discussed game vision and design decisions
-- Chose Python + Pygame as the tech stack
-- Built the foundational engine:
-  - Game loop with state machine architecture
-  - Tile-based map system with 9 tile types (grass, water, forest, mountain, town, dungeon, path, sand, bridge)
-  - Camera/viewport that follows the party
-  - Renderer with colored rectangles and simple tile icons (trees, mountains, houses, cave entrances)
-  - Party system with 4 starter characters (Fighter, Cleric, Mage, Thief)
-  - Arrow key / WASD movement with collision detection
-  - HUD showing position, terrain, and party stats
-  - A 40x30 hardcoded test island with ocean border, beaches, mountains, forest, a river with bridge, a town, and a dungeon entrance
+The game runs on a **state machine**. `game.py` owns the main loop and switches between states registered in `self.states`: overworld, town, dungeon, combat, and examine. Each state is a class that implements `enter()`, `exit()`, `handle_input()`, `update()`, and `draw()`. Transitions happen via `game.change_state("state_name")`.
 
-### Session 2 — Town Interiors
-- Added 5 new town-interior tile types: floor, wall, counter, door, exit
-- Built a town generator that creates a 20x20 walled town with:
-  - Weapon shop (Gruff's Armaments) with counter
-  - Armor shop (Helga's Armor Emporium) with counter
-  - Inn (The Sleeping Griffin) with bar counter
-  - Elder's house (Elder Morath with quest dialogue)
-  - Central grass courtyard
-  - 3 wandering villagers with unique dialogue
-  - Exit gate at the bottom
-- NPC system with dialogue cycling (bump to talk, Space/Enter to advance)
-- Color-coded NPC sprites by type (gold=shopkeep, blue=innkeeper, purple=elder, green=villager)
-- Name tags floating above each NPC
-- TownState handles separate camera, movement, NPC interaction, and exit back to overworld
-- Dialogue box UI with dismiss/continue hints
-- Town-specific HUD showing town name, position, controls hint
-- Renderer expanded with brick walls, counters, doors, exit arrow, and NPC drawing
-- Seamless overworld ↔ town transitions (walk onto town tile to enter, walk onto exit or press ESC to leave)
+**Rendering** is centralized in `renderer.py` — it's the largest file and handles all drawing for every state. Each state calls a specific renderer method in its `draw()` (e.g., `renderer.draw_overworld()`, `renderer.draw_combat_arena()`).
 
-### Session 3 — Procedural Dungeons
-- Added 5 dungeon tile types: stone floor, stone wall, stairs up, chest, trap
-- Built a procedural dungeon generator using rooms-and-corridors algorithm:
-  - Carves 6–10 random rooms out of solid stone
-  - Connects rooms with L-shaped corridors
-  - Places entrance stairs in the first room
-  - Scatters treasure chests (60% chance per room) in later rooms
-  - Hides traps (35% chance) in rooms and corridors
-  - Every dungeon is unique — generated fresh each time you enter
-- DungeonState with full exploration:
-  - Walk onto chests to loot gold (10–50 per chest, added to party total)
-  - Step on traps for damage to a random party member (3–8 HP)
-  - Chests and traps disappear after triggering (replaced with floor)
-  - Can only exit by standing on the stairs and pressing ESC
-- Dark dungeon visuals: stone block walls, cracked floors, stair steps with up-arrow, golden chests with locks, subtle red trap markers
-- Dungeon-specific HUD with dark red theme, gold counter, and chests-found tracker
-- Knight avatar with sword/shield updated to work across all three map types
+**Game data is JSON-driven.** Items, monsters, spells, classes, encounters, and effects are all defined in `data/*.json`. You can tweak stats, add new monsters, or rebalance weapons just by editing JSON — no code changes needed.
 
-### Session 4 — D&D Turn-Based Combat
-- Built a complete D&D 5e-inspired combat engine:
-  - Dice rolling: d20 attack rolls, variable damage dice per weapon
-  - Ability modifiers: (stat − 10) / 2 for STR, DEX, INT
-  - Attack resolution: d20 + attack bonus vs AC, natural 1 always misses, natural 20 always crits
-  - Critical hits double the damage dice (not the bonus)
-  - Initiative: d20 + DEX modifier determines who acts first
-- Monster system with 3 monster types:
-  - Giant Rat (HP 8, AC 12) — weak but fast
-  - Skeleton (HP 16, AC 13) — undead warrior
-  - Orc (HP 22, AC 13) — tough and hard-hitting
-  - Each has unique color, damage dice, and XP/gold rewards
-- Full CombatState with phase-based turn system:
-  - Initiative phase → Player turn → Monster turn → repeat
-  - Player actions: Attack (d20 + STR mod vs AC), Defend (+2 AC until next turn), Flee (DEX check vs DC 10)
-  - Failed flee attempt gives the monster a free attack
-  - Victory awards XP and gold, removes monster from dungeon
-  - Defeat revives the fighter with 1 HP
-- Combat screen with dedicated UI:
-  - Large monster sprite at top with HP bar and AC display
-  - Color-coded scrolling combat log (hits in green, misses in gray, crits in yellow, damage in red)
-  - Player info panel with HP bar, AC, weapon, and stat breakdowns
-  - Action menu with arrow-key selection and phase-appropriate labels
-- Monsters placed in procedurally generated dungeons:
-  - 50% chance per room (excluding entrance) to spawn a random monster
-  - Monsters visible on the dungeon map as colored sprites with red eyes
-  - Walk into a monster to initiate combat (bump-to-fight)
-- Party members now have real weapons: Roland (Long Sword 1d8), Mira (Mace 1d6), Theron (Staff 1d6), Sable (Dagger 1d4+DEX)
+**Modules** are self-contained content packs in `modules/`. The default module, Keys of Shadow, provides its own overworld map and progression system. The module loader falls back to `data/` for anything a module doesn't override.
 
-### Session 5 — Tactical Combat Arena + Ultima III Reskin
-- Converted combat from a portrait-style stat screen to a **top-down tactical arena**:
-  - 15×10 tile grid with brick walls and open floor
-  - Player and monster positioned on the arena as moveable sprites
-  - **WASD movement** during player's turn (each move consumes the turn)
-  - **Bump-to-attack**: walk into the monster's tile to melee attack
-  - Attack menu option requires **adjacency** (Chebyshev distance ≤ 1) — grayed out when too far
-  - Monster AI: chases the player 1 tile per turn, attacks when adjacent
-- Reskinned combat screen to match **Ultima III visual style** (see `STYLE_GUIDE.md`):
-  - Pure black background with bright blue `(68,68,255)` panel borders
-  - Left-side map / right-side stat panels layout (matching the classic split-screen)
-  - Dark purple brick-pattern wall tiles, black floor with scattered green dot/cross decorations
-  - Simple white stick-figure player sprite, colored block-figure monster sprites
-  - All text uppercase in monospace font with retro color coding (orange names, white stats, blue labels)
-  - Zero-padded stat numbers (`HP:0030/0030 AC:12`)
-  - Combat log with color-coded lines in blue-bordered scrolling panel
-  - Bottom status bar with control hints
+**Music** is procedurally generated at runtime using numpy waveforms — square waves, triangle waves, and noise — so there are no audio files to manage.
+
+---
+
+## Running the Tests
+
+The test suite runs entirely headless (no display needed) using a mock pygame layer defined in `tests/conftest.py`.
+
+```
+pip3 install pytest
+python3 -m pytest tests/ -v
+```
+
+All 166 tests should pass. Run this before and after making changes to catch regressions.
+
+---
+
+## Working with AI
+
+Most of the code in this project was written with the help of AI, primarily using **Claude** (Anthropic's AI assistant). This is a practical and effective way to build and modify a game like this, even if you're not deeply experienced with Python or Pygame.
+
+### How to make changes using Claude
+
+1. **Start a conversation** in the Claude app (claude.ai) or Claude Code (command-line tool).
+
+2. **Give Claude context.** Share the relevant file(s) you want to change. For example, if you want to add a new monster, you might paste in `data/monsters.json` and a snippet from `src/monster.py` and ask Claude to add one. If you want to change how combat works, share `src/states/combat.py` and `data/COMBAT_MECHANICS.md`.
+
+3. **Describe what you want in plain language.** You don't need to specify exact code. Examples of good prompts:
+   - "Add a new monster called Shadow Wolf with 30 HP, 14 AC, that does 2d6 damage and drops 50 XP"
+   - "Make forest tiles spawn more items when examined"
+   - "Change the combat music to be slower and more ominous"
+   - "Add a new spell called Fireball that hits all enemies for 3d6 damage"
+
+4. **Ask Claude to explain what it changed** if you want to understand the code better.
+
+5. **Run the tests** after making changes: `python3 -m pytest tests/ -v`
+
+### Tips for working with AI on this codebase
+
+- **Data changes are the easiest.** Adding items, monsters, spells, or tweaking stats usually means editing a JSON file in `data/`. Claude can do this reliably and you can verify the changes by just reading the JSON.
+
+- **The state machine is the key concept.** If you tell Claude you want to add a new game screen or mode, mention that the game uses a state machine and point it to `src/states/base_state.py` as a template.
+
+- **`renderer.py` is large.** If you want visual changes, tell Claude which state's drawing you want to modify (e.g., "the overworld HUD" or "the combat arena floor tiles") so it can find the right section.
+
+- **Ask for tests.** When Claude adds new features, ask it to write tests too. The existing test suite in `tests/` provides good examples of the testing patterns used.
+
+- **Share the style guide.** If you want UI or visual changes that match the game's aesthetic, share `STYLE_GUIDE.md` with Claude so it follows the established color palette and layout conventions.
+
+---
+
+## Game Design
+
+### What stays faithful to Ultima III
+- Party of 4 adventurers with races, classes, and stats
+- Turn-based tactical combat on a grid
+- Top-down tile-based world view
+- Overworld with towns and dungeons to discover
+- Character progression through leveling and equipment
+- Procedural chiptune music
+
+### What's different
+- Procedurally generated overworld (coastlines, biomes, terrain)
+- Randomly generated town layouts and NPC placement
+- Randomly generated dungeon rooms, corridors, and encounters
+- Modular content system (adventures are self-contained modules)
+- Examine mode for zoomed-in tile exploration with persistent layouts
+- Item dropping and ground item persistence

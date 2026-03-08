@@ -1,2 +1,0 @@
-- In the overview map, the player can press "E" to examine the local area which brings them to a battle screen like area (but not an encounter). This little map is like an expanded version of the tile on the overview map but will have more detail. Sometimes minor items will randomly spawn. In the future there will be special tiles with more detail (future implementation).
-- Play test, refine UI
