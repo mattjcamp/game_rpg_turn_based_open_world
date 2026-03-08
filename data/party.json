@@ -148,10 +148,10 @@
     }
   ],
   "active_party": [
+    0,
+    1,
     2,
-    4,
-    5,
-    6
+    3
   ],
   "party_effects": {
     "effect_1": null,
