@@ -18,7 +18,7 @@
         "moongate": {
             "name": "Moongate",
             "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
-            "tile": "landmarks/moongate_active.png",
+            "tile": "game/landmarks/moongate_active.png",
             "visible": true,
             "walkable": true,
             "base_tile": "grass",
@@ -33,7 +33,7 @@
         "moongate_dormant": {
             "name": "Dormant Moongate",
             "description": "A circle of ancient stones lies in the grass. The air feels heavy here, as if the stones are waiting for something.",
-            "tile": "landmarks/moongate_dormant.png",
+            "tile": "game/landmarks/moongate_dormant.png",
             "visible": true,
             "walkable": true,
             "base_tile": "grass",
@@ -95,7 +95,7 @@
         "ruined_tower": {
             "name": "Ruined Tower",
             "description": "The crumbling base of what was once a wizard's tower. Scorch marks blacken the remaining stones. Something terrible happened here.",
-            "tile": "landmarks/ruined_tower.png",
+            "tile": "game/landmarks/ruined_tower.png",
             "visible": true,
             "walkable": true,
             "base_tile": "grass",
@@ -144,7 +144,7 @@
         "sunken_shipwreck": {
             "name": "Sunken Shipwreck",
             "description": "The broken mast of a ship juts from the shallow water near shore. Barnacles coat the rotting wood.",
-            "tile": "landmarks/sunken_shipwreck.png",
+            "tile": "game/landmarks/sunken_shipwreck.png",
             "visible": true,
             "walkable": true,
             "base_tile": "sand",
@@ -243,7 +243,7 @@
         "lava_vent": {
             "name": "Lava Vent",
             "description": "A crack in the earth vents hot sulfurous steam. The rock around it is stained yellow and orange.",
-            "tile": "landmarks/lava_vent.png",
+            "tile": "game/landmarks/lava_vent.png",
             "visible": true,
             "walkable": true,
             "base_tile": "mountain",
@@ -259,7 +259,7 @@
         "smuggler_tunnel": {
             "name": "Smuggler's Tunnel",
             "description": "Behind a curtain of vines, a narrow tunnel leads into darkness. Boot prints in the mud suggest recent use.",
-            "tile": "landmarks/smuggler_tunnel.png",
+            "tile": "game/landmarks/smuggler_tunnel.png",
             "visible": true,
             "walkable": true,
             "base_tile": "mountain",
@@ -420,7 +420,7 @@
         "seal_of_binding": {
             "name": "Seal of Binding",
             "description": "A massive stone disc embedded in the floor, carved with concentric rings of glowing glyphs. This is one of the three seals.",
-            "tile": "landmarks/moongate_active.png",
+            "tile": "game/landmarks/moongate_active.png",
             "visible": true,
             "walkable": true,
             "base_tile": "dungeon_floor",
@@ -485,7 +485,7 @@
         "poison_swamp": {
             "name": "Poison Swamp",
             "description": "Bubbles of noxious gas rise from murky green water. The stench is overpowering. Dead trees stand like skeletal sentries.",
-            "tile": "landmarks/poison_swamp.png",
+            "tile": "game/landmarks/poison_swamp.png",
             "visible": true,
             "walkable": true,
             "base_tile": "grass",
@@ -503,7 +503,7 @@
         "treasure_hoard": {
             "name": "Hidden Treasure Hoard",
             "description": "Behind a loose stone in the wall, a narrow space is packed with gold and jewels.",
-            "tile": "landmarks/treasure_hoard.png",
+            "tile": "game/landmarks/treasure_hoard.png",
             "visible": true,
             "walkable": true,
             "base_tile": "dungeon_floor",

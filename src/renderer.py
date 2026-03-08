@@ -165,7 +165,7 @@ class Renderer(CombatEffectRendererMixin):
                 self._villager_sprites.append(sprite)
 
         # ── Load skeleton fallback for monster sprite misses ──
-        skel_path = os.path.join(assets_dir, "monsters", "skeleton.png")
+        skel_path = os.path.join(assets_dir, "game", "monsters", "skeleton.png")
         if os.path.exists(skel_path):
             raw = pygame.image.load(skel_path).convert_alpha()
             self._skeleton_fallback = pygame.transform.scale(

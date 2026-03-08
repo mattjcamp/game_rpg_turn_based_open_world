@@ -30,7 +30,7 @@
         "current_mp": null,
         "bonus_mp": 0,
         "ammo": {},
-        "sprite": "src/assets/characters/fighter.png",
+        "sprite": "src/assets/game/characters/fighter.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -59,7 +59,7 @@
         "current_mp": null,
         "bonus_mp": 0,
         "ammo": {},
-        "sprite": "src/assets/characters/wizard.png",
+        "sprite": "src/assets/game/characters/wizard.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -88,7 +88,7 @@
         "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {},
-        "sprite": "src/assets/characters/thief.png",
+        "sprite": "src/assets/game/characters/thief.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -117,7 +117,7 @@
         "current_mp": null,
         "bonus_mp": 0,
         "ammo": {},
-        "sprite": "src/assets/characters/cleric.png",
+        "sprite": "src/assets/game/characters/cleric.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -146,7 +146,7 @@
         "current_mp": 40,
         "bonus_mp": 32,
         "ammo": {},
-        "sprite": "src/assets/characters/paladin.png",
+        "sprite": "src/assets/game/characters/paladin.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -175,7 +175,7 @@
         "current_mp": 53,
         "bonus_mp": 45,
         "ammo": {},
-        "sprite": "src/assets/characters/druid.png",
+        "sprite": "src/assets/game/characters/druid.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -206,7 +206,7 @@
         "current_mp": 25,
         "bonus_mp": 20,
         "ammo": {},
-        "sprite": "src/assets/characters/ranger.png",
+        "sprite": "src/assets/game/characters/ranger.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -243,7 +243,7 @@
         "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {},
-        "sprite": "src/assets/characters/thief.png",
+        "sprite": "src/assets/game/characters/thief.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -272,7 +272,7 @@
         "current_mp": 40,
         "bonus_mp": 32,
         "ammo": {},
-        "sprite": "src/assets/characters/paladin.png",
+        "sprite": "src/assets/game/characters/paladin.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -301,7 +301,7 @@
         "current_mp": 53,
         "bonus_mp": 45,
         "ammo": {},
-        "sprite": "src/assets/characters/druid.png",
+        "sprite": "src/assets/game/characters/druid.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null
@@ -332,7 +332,7 @@
         "current_mp": 25,
         "bonus_mp": 20,
         "ammo": {},
-        "sprite": "src/assets/characters/ranger.png",
+        "sprite": "src/assets/game/characters/ranger.png",
         "weapon_poison": {
           "right_hand": null,
           "left_hand": null

@@ -4,252 +4,252 @@
         {
             "name": "Fighter",
             "source": "amiga",
-            "file": "src/assets/characters/fighter.png"
+            "file": "src/assets/game/characters/fighter.png"
         },
         {
             "name": "Cleric",
             "source": "amiga",
-            "file": "src/assets/characters/cleric.png"
+            "file": "src/assets/game/characters/cleric.png"
         },
         {
             "name": "Wizard",
             "source": "amiga",
-            "file": "src/assets/characters/wizard.png"
+            "file": "src/assets/game/characters/wizard.png"
         },
         {
             "name": "Thief",
             "source": "amiga",
-            "file": "src/assets/characters/thief.png"
+            "file": "src/assets/game/characters/thief.png"
         },
         {
             "name": "Barbarian",
             "source": "amiga",
-            "file": "src/assets/characters/barbarian.png"
+            "file": "src/assets/game/characters/barbarian.png"
         },
         {
             "name": "Alchemist",
             "source": "u4",
-            "file": "src/assets/characters/alchemist.png"
+            "file": "src/assets/game/characters/alchemist.png"
         },
         {
             "name": "Illusionist",
             "source": "u4",
-            "file": "src/assets/characters/illusionist.png"
+            "file": "src/assets/game/characters/illusionist.png"
         },
         {
             "name": "Druid",
             "source": "u4",
-            "file": "src/assets/characters/druid.png"
+            "file": "src/assets/game/characters/druid.png"
         },
         {
             "name": "Paladin",
             "source": "u4",
-            "file": "src/assets/characters/paladin.png"
+            "file": "src/assets/game/characters/paladin.png"
         },
         {
             "name": "Ranger",
             "source": "u4",
-            "file": "src/assets/characters/ranger.png"
+            "file": "src/assets/game/characters/ranger.png"
         },
         {
             "name": "Lark",
             "source": "u4",
-            "file": "src/assets/characters/lark.png"
+            "file": "src/assets/game/characters/lark.png"
         },
         {
             "name": "Ranger Alt",
             "source": "u4",
-            "file": "src/assets/characters/ranger_alt.png"
+            "file": "src/assets/game/characters/ranger_alt.png"
         },
         {
             "name": "Mage",
             "source": "u4",
-            "file": "src/assets/characters/illusionist.png"
+            "file": "src/assets/game/characters/illusionist.png"
         },
         {
             "name": "Bard",
             "source": "u4",
-            "file": "src/assets/characters/lark.png"
+            "file": "src/assets/game/characters/lark.png"
         },
         {
             "name": "Monk",
             "source": "u4",
-            "file": "src/assets/npcs/u4_monk.png"
+            "file": "src/assets/game/npcs/u4_monk.png"
         },
         {
             "name": "Tinker",
             "source": "u4",
-            "file": "src/assets/npcs/u4_tinker.png"
+            "file": "src/assets/game/npcs/u4_tinker.png"
         },
         {
             "name": "Shepherd",
             "source": "u4",
-            "file": "src/assets/npcs/u4_shepherd.png"
+            "file": "src/assets/game/npcs/u4_shepherd.png"
         },
         {
             "name": "Avatar",
             "source": "u4",
-            "file": "src/assets/npcs/u4_avatar.png"
+            "file": "src/assets/game/npcs/u4_avatar.png"
         },
         {
             "name": "Knight",
             "source": "u4",
-            "file": "src/assets/npcs/u4_knight.png"
+            "file": "src/assets/game/npcs/u4_knight.png"
         },
         {
             "name": "Guard",
             "source": "u4",
-            "file": "src/assets/npcs/u4_guard.png"
+            "file": "src/assets/game/npcs/u4_guard.png"
         },
         {
             "name": "Healer",
             "source": "u4",
-            "file": "src/assets/npcs/u4_healer.png"
+            "file": "src/assets/game/npcs/u4_healer.png"
         },
         {
             "name": "Jester",
             "source": "u4",
-            "file": "src/assets/npcs/u4_jester.png"
+            "file": "src/assets/game/npcs/u4_jester.png"
         },
         {
             "name": "Villager",
             "source": "u4",
-            "file": "src/assets/npcs/u4_villager_male.png"
+            "file": "src/assets/game/npcs/u4_villager_male.png"
         },
         {
             "name": "Villager F",
             "source": "u4",
-            "file": "src/assets/npcs/u4_villager_female.png"
+            "file": "src/assets/game/npcs/u4_villager_female.png"
         },
         {
             "name": "Dark Mage",
             "source": "assets",
-            "file": "src/assets/monsters/dark_mage.png"
+            "file": "src/assets/game/monsters/dark_mage.png"
         },
         {
             "name": "Brigand",
             "source": "assets",
-            "file": "src/assets/npcs/brigand.png"
+            "file": "src/assets/game/npcs/brigand.png"
         },
         {
             "name": "Child",
             "source": "u4",
-            "file": "src/assets/npcs/u4_child.png"
+            "file": "src/assets/game/npcs/u4_child.png"
         },
         {
             "name": "Beggar",
             "source": "u4",
-            "file": "src/assets/npcs/u4_beggar.png"
+            "file": "src/assets/game/npcs/u4_beggar.png"
         },
         {
             "name": "Citizen",
             "source": "u4",
-            "file": "src/assets/npcs/u4_citizen.png"
+            "file": "src/assets/game/npcs/u4_citizen.png"
         },
         {
             "name": "Guard Alt",
             "source": "u4",
-            "file": "src/assets/npcs/u4_guard_npc.png"
+            "file": "src/assets/game/npcs/u4_guard_npc.png"
         },
         {
             "name": "Townsfolk",
             "source": "assets",
-            "file": "src/assets/npcs/townsfolk.png"
+            "file": "src/assets/game/npcs/townsfolk.png"
         },
         {
             "name": "Lark Alt",
             "source": "assets",
-            "file": "src/assets/characters/lark.png"
+            "file": "src/assets/game/characters/lark.png"
         },
         {
             "name": "VGA Avatar",
             "source": "vga",
-            "file": "src/assets/npcs/vga_avatar.png"
+            "file": "src/assets/game/npcs/vga_avatar.png"
         },
         {
             "name": "VGA Mage",
             "source": "vga",
-            "file": "src/assets/npcs/vga_mage.png"
+            "file": "src/assets/game/npcs/vga_mage.png"
         },
         {
             "name": "VGA Bard",
             "source": "vga",
-            "file": "src/assets/npcs/innkeeper.png"
+            "file": "src/assets/game/npcs/innkeeper.png"
         },
         {
             "name": "VGA Fighter",
             "source": "vga",
-            "file": "src/assets/npcs/vga_fighter.png"
+            "file": "src/assets/game/npcs/vga_fighter.png"
         },
         {
             "name": "VGA Druid",
             "source": "vga",
-            "file": "src/assets/npcs/vga_druid.png"
+            "file": "src/assets/game/npcs/vga_druid.png"
         },
         {
             "name": "VGA Tinker",
             "source": "vga",
-            "file": "src/assets/npcs/shopkeep.png"
+            "file": "src/assets/game/npcs/shopkeep.png"
         },
         {
             "name": "VGA Paladin",
             "source": "vga",
-            "file": "src/assets/npcs/vga_paladin.png"
+            "file": "src/assets/game/npcs/vga_paladin.png"
         },
         {
             "name": "VGA Ranger",
             "source": "vga",
-            "file": "src/assets/npcs/vga_ranger.png"
+            "file": "src/assets/game/npcs/vga_ranger.png"
         },
         {
             "name": "VGA Shepherd",
             "source": "vga",
-            "file": "src/assets/npcs/villager_shepherd.png"
+            "file": "src/assets/game/npcs/villager_shepherd.png"
         },
         {
             "name": "VGA Guard",
             "source": "vga",
-            "file": "src/assets/npcs/villager_guard.png"
+            "file": "src/assets/game/npcs/villager_guard.png"
         },
         {
             "name": "VGA Citizen",
             "source": "vga",
-            "file": "src/assets/npcs/villager_citizen.png"
+            "file": "src/assets/game/npcs/villager_citizen.png"
         },
         {
             "name": "VGA Singing Bard",
             "source": "vga",
-            "file": "src/assets/npcs/villager_bard.png"
+            "file": "src/assets/game/npcs/villager_bard.png"
         },
         {
             "name": "VGA Jester",
             "source": "vga",
-            "file": "src/assets/npcs/vga_jester.png"
+            "file": "src/assets/game/npcs/vga_jester.png"
         },
         {
             "name": "VGA Beggar",
             "source": "vga",
-            "file": "src/assets/npcs/villager_beggar.png"
+            "file": "src/assets/game/npcs/villager_beggar.png"
         },
         {
             "name": "VGA Child",
             "source": "vga",
-            "file": "src/assets/npcs/villager_child.png"
+            "file": "src/assets/game/npcs/villager_child.png"
         },
         {
             "name": "VGA Lord",
             "source": "vga",
-            "file": "src/assets/npcs/elder.png"
+            "file": "src/assets/game/npcs/elder.png"
         },
         {
             "name": "VGA Rogue",
             "source": "vga",
-            "file": "src/assets/npcs/vga_rogue.png"
+            "file": "src/assets/game/npcs/vga_rogue.png"
         },
         {
             "name": "VGA Evil Mage",
             "source": "vga",
-            "file": "src/assets/npcs/vga_evil_mage.png"
+            "file": "src/assets/game/npcs/vga_evil_mage.png"
         }
     ]
 }

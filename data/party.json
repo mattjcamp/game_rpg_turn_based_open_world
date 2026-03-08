@@ -24,7 +24,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/fighter.png"
+      "sprite": "src/assets/game/characters/fighter.png"
     },
     {
       "name": "Elrond",
@@ -44,7 +44,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/wizard.png"
+      "sprite": "src/assets/game/characters/wizard.png"
     },
     {
       "name": "Merry",
@@ -64,7 +64,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/thief.png"
+      "sprite": "src/assets/game/characters/thief.png"
     },
     {
       "name": "Selina",
@@ -84,7 +84,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/cleric.png"
+      "sprite": "src/assets/game/characters/cleric.png"
     },
     {
       "name": "Paladin",
@@ -104,7 +104,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/paladin.png"
+      "sprite": "src/assets/game/characters/paladin.png"
     },
     {
       "name": "Druid",
@@ -124,7 +124,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/druid.png"
+      "sprite": "src/assets/game/characters/druid.png"
     },
     {
       "name": "Ranger",
@@ -144,7 +144,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/characters/ranger.png"
+      "sprite": "src/assets/game/characters/ranger.png"
     }
   ],
   "active_party": [

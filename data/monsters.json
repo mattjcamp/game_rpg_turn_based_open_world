@@ -20,7 +20,7 @@
                 80
             ],
             "spawn_weight": 40,
-            "tile": "monsters/giant_rat.png"
+            "tile": "game/monsters/giant_rat.png"
         },
         "Skeleton": {
             "description": "An undead skeleton warrior. Medium difficulty.",
@@ -41,7 +41,7 @@
                 200
             ],
             "spawn_weight": 35,
-            "tile": "monsters/skeleton.png"
+            "tile": "game/monsters/skeleton.png"
         },
         "Skeleton Archer": {
             "description": "A skeletal bowman that fires arrows from a distance.",
@@ -62,7 +62,7 @@
                 200
             ],
             "spawn_weight": 20,
-            "tile": "monsters/skeleton.png",
+            "tile": "game/monsters/skeleton.png",
             "ranged": {
                 "range": 6,
                 "attack_bonus": 4,
@@ -97,7 +97,7 @@
                 60
             ],
             "spawn_weight": 25,
-            "tile": "monsters/orc.png",
+            "tile": "game/monsters/orc.png",
             "ranged": {
                 "range": 3,
                 "attack_bonus": 3,
@@ -132,7 +132,7 @@
                 60
             ],
             "spawn_weight": 40,
-            "tile": "monsters/goblin.png",
+            "tile": "game/monsters/goblin.png",
             "ranged": {
                 "range": 4,
                 "attack_bonus": 2,
@@ -167,7 +167,7 @@
                 80
             ],
             "spawn_weight": 30,
-            "tile": "monsters/zombie.png"
+            "tile": "game/monsters/zombie.png"
         },
         "Wolf": {
             "description": "A fierce grey wolf. Fast and cunning.",
@@ -188,7 +188,7 @@
                 160
             ],
             "spawn_weight": 35,
-            "tile": "monsters/wolf.png"
+            "tile": "game/monsters/wolf.png"
         },
         "Dark Mage": {
             "description": "A robed figure crackling with dark energy.",
@@ -209,7 +209,7 @@
                 140
             ],
             "spawn_weight": 15,
-            "tile": "monsters/dark_mage.png",
+            "tile": "game/monsters/dark_mage.png",
             "ranged": {
                 "range": 7,
                 "attack_bonus": 5,
@@ -264,7 +264,7 @@
                 60
             ],
             "spawn_weight": 10,
-            "tile": "monsters/troll.png",
+            "tile": "game/monsters/troll.png",
             "spells": [
                 {
                     "type": "heal_self",
@@ -295,7 +295,7 @@
                 60
             ],
             "spawn_weight": 10,
-            "tile": "monsters/orc.png",
+            "tile": "game/monsters/orc.png",
             "spells": [
                 {
                     "type": "heal_ally",
