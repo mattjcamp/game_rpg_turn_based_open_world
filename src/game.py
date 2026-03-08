@@ -144,6 +144,9 @@ class Game:
             {"label": "NEW GAME", "action": self._game_over_new},
         ]
 
+        # Combat rewards (must be set before change_state triggers enter())
+        self.pending_combat_rewards = None
+
         # --- State machine ---
         self.states = {
             "overworld": OverworldState(self),
@@ -376,6 +379,72 @@ class Game:
                 "dungeon_row": row,
                 "artifact_name": key_name,
             }
+
+    # ── Public accessors for game state ─────────────────────────
+    # States should use these instead of reaching into internals.
+
+    def is_dungeon_visited(self, col, row):
+        """Return True if the dungeon at (col, row) has been entered before."""
+        return (col, row) in self.visited_dungeons
+
+    def mark_dungeon_visited(self, col, row):
+        """Record that the dungeon at (col, row) has been entered."""
+        self.visited_dungeons.add((col, row))
+
+    def get_key_dungeons(self):
+        """Return the full key-dungeon dict: {(col,row): info_dict}."""
+        return self.key_dungeons
+
+    def get_key_dungeon(self, col, row):
+        """Return key-dungeon info at (col, row), or None."""
+        return self.key_dungeons.get((col, row))
+
+    def get_keys_inserted(self):
+        """Return how many Keys of Shadow have been inserted."""
+        return self.keys_inserted
+
+    def insert_key(self):
+        """Increment keys_inserted by one.  Returns the new count."""
+        self.keys_inserted += 1
+        return self.keys_inserted
+
+    def get_total_keys(self):
+        """Return the total number of key dungeons (= total keys needed)."""
+        return len(self.key_dungeons)
+
+    def set_darkness(self, active):
+        """Enable or disable the darkness overlay."""
+        self.darkness_active = active
+
+    def get_quest(self):
+        """Return the active quest dict, or None."""
+        return self.quest
+
+    def set_quest(self, quest):
+        """Set the active quest dict (or None to clear)."""
+        self.quest = quest
+
+    def get_house_quest(self):
+        """Return the house quest dict, or None."""
+        return self.house_quest
+
+    def set_house_quest(self, quest):
+        """Set the house quest dict (or None to clear)."""
+        self.house_quest = quest
+
+    def set_combat_rewards(self, rewards):
+        """Store pending combat rewards (dict with xp, gold, etc.)."""
+        self.pending_combat_rewards = rewards
+
+    def consume_combat_rewards(self):
+        """Return pending combat rewards and clear them."""
+        rewards = self.pending_combat_rewards
+        self.pending_combat_rewards = None
+        return rewards
+
+    def set_gnome_quest_accepted(self):
+        """Mark the gnome quest as accepted."""
+        self._gnome_quest_accepted = True
 
     def _title_save_game(self):
         """Open the save screen from the title."""

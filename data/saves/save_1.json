@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "timestamp": 1772968544.886355,
+  "timestamp": 1772968856.398658,
   "state": "overworld",
   "party": {
-    "col": 31,
+    "col": 30,
     "row": 26,
-    "gold": 63,
+    "gold": 71,
     "roster": [
       {
         "name": "Roland",
@@ -19,7 +19,7 @@
         "intelligence": 10,
         "wisdom": 8,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -48,7 +48,7 @@
         "intelligence": 16,
         "wisdom": 12,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -77,7 +77,7 @@
         "intelligence": 13,
         "wisdom": 10,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -106,7 +106,7 @@
         "intelligence": 12,
         "wisdom": 18,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -230,7 +230,7 @@
         "intelligence": 10,
         "wisdom": 8,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -259,7 +259,7 @@
         "intelligence": 16,
         "wisdom": 12,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -288,7 +288,7 @@
         "intelligence": 13,
         "wisdom": 10,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -317,7 +317,7 @@
         "intelligence": 12,
         "wisdom": 18,
         "level": 1,
-        "exp": 100,
+        "exp": 120,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -366,11 +366,11 @@
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 201870
+      "total_minutes": 202060
     },
     "last_pickpocket_day": -1,
     "last_tinker_day": -1,
-    "galadriels_light_steps": 472,
+    "galadriels_light_steps": 444,
     "last_galadriels_light_day": 140
   },
   "cleared_dungeons": [],
@@ -473,6 +473,15 @@
     "Merry picked up: 38 gold",
     "Merry picked up: Club",
     "The party defeated Orc Scouts.",
+    "You descend into Ratling Warren - Floor 1... No torch equipped!",
+    "Stairs up! Press ESC to leave.",
+    "Welcome to Duskhollow!",
+    "-- Merchant's Wagon --",
+    "An overturned wagon lies at the roadside, one wheel shattered. Crates of goods are scattered in the mud.",
+    "Among the scattered goods you find supplies that are still usable. A trail of blood leads into the forest.",
+    "Merchant's Wagon",
+    "Elrond picked up: 8 gold",
+    "The party defeated Goblin Scouts.",
     "You descend into Ratling Warren - Floor 1... No torch equipped!",
     "Stairs up! Press ESC to leave.",
     "Welcome to Duskhollow!"

@@ -545,13 +545,12 @@ class TownState(InventoryMixin, BaseState):
         held_keys = [k for k in key_names if party.inv_count(k) > 0]
 
         total = len(kd)
-        inserted = self.game.keys_inserted
+        inserted = self.game.get_keys_inserted()
 
         if held_keys:
             for key in held_keys:
                 party.inv_remove(key)
-                self.game.keys_inserted += 1
-            inserted = self.game.keys_inserted
+                inserted = self.game.insert_key()
             names = ", ".join(held_keys)
             self.show_message(
                 f"Inserted {names}! ({inserted}/{total} keys placed)", 3500)
@@ -653,7 +652,7 @@ class TownState(InventoryMixin, BaseState):
 
         # Innkeeper quest logic
         if npc.npc_type == "innkeeper":
-            quest = self.game.quest
+            quest = self.game.get_quest()
             # No quest yet — offer one
             if quest is None and npc.quest_dialogue:
                 self.npc_dialogue_active = True
@@ -694,8 +693,7 @@ class TownState(InventoryMixin, BaseState):
                 if held_keys:
                     for key in held_keys:
                         party.inv_remove(key)
-                        self.game.keys_inserted += 1
-                    inserted = self.game.keys_inserted
+                        inserted = self.game.insert_key()
                     n = len(held_keys)
                     names = ", ".join(held_keys)
                     self.npc_dialogue_active = True
@@ -807,9 +805,9 @@ class TownState(InventoryMixin, BaseState):
     def _accept_gnome_quest(self):
         """Accept Fizzwick's Keys of Shadow quest."""
         npc = self.npc_speaking
-        self.game._gnome_quest_accepted = True
-        inserted = getattr(self.game, "keys_inserted", 0)
-        total = len(getattr(self.game, "key_dungeons", {}))
+        self.game.set_gnome_quest_accepted()
+        inserted = self.game.get_keys_inserted()
+        total = self.game.get_total_keys()
         self._set_dialogue(
             f"{npc.name}: Thank you! The 8 dungeons are scattered across "
             f"the land. Start with the closest one — it's the easiest. "
@@ -833,7 +831,7 @@ class TownState(InventoryMixin, BaseState):
         self.game.tile_map.set_tile(dc, dr, TILE_DUNGEON)
 
         # Store quest state
-        self.game.quest = {
+        self.game.set_quest({
             "name": "The Shadow Crystal",
             "status": "active",
             "dungeon_col": dc,
@@ -841,7 +839,7 @@ class TownState(InventoryMixin, BaseState):
             "levels": levels,
             "current_level": 0,
             "artifact_name": "Shadow Crystal",
-        }
+        })
 
         # Show confirmation
         self._set_dialogue(f"{npc.name}: Thank you! I've marked a suspicious location on your map. Be careful down there!")
@@ -891,7 +889,7 @@ class TownState(InventoryMixin, BaseState):
             member.exp += 50
 
         # Mark quest completed
-        self.game.quest["status"] = "completed"
+        self.game.get_quest()["status"] = "completed"
 
         # Launch celebration animation and play fanfare
         self.quest_complete_effect = QuestCompleteEffect(reward)
@@ -1103,7 +1101,7 @@ class TownState(InventoryMixin, BaseState):
         if self.machine_shutdown_effect:
             self.machine_shutdown_effect.update(dt)
             if not self.machine_shutdown_effect.alive:
-                self.game.darkness_active = False
+                self.game.set_darkness(False)
                 self.machine_shutdown_effect = None
             return
 
@@ -1162,7 +1160,7 @@ class TownState(InventoryMixin, BaseState):
         if self.showing_shop:
             cursor = (self.shop_cursor if self.shop_mode == "buy"
                       else self.shop_sell_cursor)
-            quest = self.game.quest
+            quest = self.game.get_quest()
             quest_complete = (quest is not None
                               and quest.get("status") == "completed")
             renderer.draw_shop_u3(
@@ -1216,7 +1214,7 @@ class TownState(InventoryMixin, BaseState):
             return
         # Use the new sprite-tile-based town renderer
         msg = self.message
-        quest = self.game.quest
+        quest = self.game.get_quest()
         quest_complete = (quest is not None
                           and quest.get("status") == "completed")
         # Screen shake offset during machine shutdown Phase 1

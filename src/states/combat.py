@@ -1611,72 +1611,31 @@ class CombatState(BaseState):
             self._end_fighter_turn()
             return
 
-        # Roll attack (ranged uses DEX)
-        self.defending[f] = False
-        atk_bonus = f.get_attack_bonus(ranged=True)
-        bless = self.bless_buffs.get(f)
-        if bless:
-            atk_bonus += bless["attack_bonus"]
-        target_ac = target.ac
-        curse = self.curse_buffs.get(target)
-        if curse:
-            target_ac -= curse["ac_penalty"]
-        hit, roll, total, crit = roll_attack(atk_bonus, target_ac)
-
-        if crit:
-            self.combat_log.append(
-                f"{f.name} rolls {roll} — CRITICAL HIT!"
-            )
-            self.game.sfx.play("critical")
-        elif hit:
-            self.combat_log.append(
-                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target_ac} — Hit!"
-            )
-            self.game.sfx.play("sword_hit")
-        else:
-            self.combat_log.append(
-                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target_ac} — Miss!"
-            )
-            self.game.sfx.play("miss")
+        hit, crit = self._roll_attack_with_buffs(f, target, ranged=True)
 
         if hit:
             thrown_is_poison = info.get("thrown_is_poison", False)
-            holy_smite_ranged = False
             if thrown_item:
+                # Thrown items use fixed damage tiers (not weapon dice)
                 thrown_power = info.get("thrown_power", 0)
-                # Use same damage tiers as melee weapons
                 if thrown_power <= 0:
                     damage = 1            # flat 1 (rocks)
                 elif thrown_power == 1:
                     damage = roll_damage(1, 4, -1, critical=crit)  # 1d4-1 ≈ 1d3
                 else:
                     damage = roll_damage(1, 6, 0, critical=crit)
-                dmg_label = thrown_item
+                target.hp = max(0, target.hp - damage)
+                self.combat_log.append(
+                    f"{f.name} deals {damage} damage to {target.name} "
+                    f"with {thrown_item}!")
+                mc, mr = self.monster_positions.get(target, (0, 0))
+                self.hit_effects.append(HitEffect(mc, mr, damage))
             else:
+                # Normal ranged weapon — use shared damage with Holy Smite
                 rw_name = info.get("ranged_weapon") or f.weapon
                 dice_count, dice_sides, dmg_bonus = f.get_damage_dice(rw_name)
-                # ── Paladin Holy Smite (ranged vs undead) ──
-                if (getattr(f, "char_class", "").lower() == "paladin"
-                        and getattr(target, "undead", False)):
-                    dice_count *= 2
-                    holy_smite_ranged = True
-                damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
-                dmg_label = rw_name
-            target.hp = max(0, target.hp - damage)
-            if holy_smite_ranged:
-                self.combat_log.append(
-                    f"{f.name} HOLY SMITES {target.name} for {damage} damage with {dmg_label}!"
-                )
-                self.game.sfx.play("critical")
-            else:
-                self.combat_log.append(
-                    f"{f.name} deals {damage} damage to {target.name} with {dmg_label}!"
-                )
-            # Spawn a hit flash on the monster
-            mc, mr = self.monster_positions.get(target, (0, 0))
-            self.hit_effects.append(HitEffect(mc, mr, damage))
+                damage, _holy = self._apply_damage(
+                    f, target, dice_count, dice_sides, dmg_bonus, crit, rw_name)
 
             # ── Thrown poison potion effect ──
             if thrown_is_poison and target.is_alive():
@@ -1810,6 +1769,69 @@ class CombatState(BaseState):
                 f"(STR save {save_roll}+{str_mod}={save_total} vs DC {save_dc}) "
                 f"— {amount} attack penalty for {duration} turns")
 
+    # ── Shared attack helpers ────────────────────────────────────
+
+    def _roll_attack_with_buffs(self, f, target, ranged=False):
+        """Roll to hit, applying bless/curse buffs and logging the result.
+
+        Returns ``(hit, crit)`` booleans.
+        """
+        self.defending[f] = False
+        atk_bonus = f.get_attack_bonus(ranged=ranged)
+        bless = self.bless_buffs.get(f)
+        if bless:
+            atk_bonus += bless["attack_bonus"]
+        target_ac = target.ac
+        curse = self.curse_buffs.get(target)
+        if curse:
+            target_ac -= curse["ac_penalty"]
+        hit, roll, total, crit = roll_attack(atk_bonus, target_ac)
+
+        if crit:
+            self.combat_log.append(f"{f.name} rolls {roll} — CRITICAL HIT!")
+            self.game.sfx.play("critical")
+        elif hit:
+            self.combat_log.append(
+                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
+                f"= {total} vs AC {target_ac} — Hit!")
+            self.game.sfx.play("sword_hit")
+        else:
+            self.combat_log.append(
+                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
+                f"= {total} vs AC {target_ac} — Miss!")
+            self.game.sfx.play("miss")
+
+        return hit, crit
+
+    def _apply_damage(self, f, target, dice_count, dice_sides, dmg_bonus,
+                      crit, weapon_label):
+        """Roll damage, apply Holy Smite if applicable, deal HP, and log.
+
+        Spawns a HitEffect on the target.  Returns ``(damage, holy_smite)``.
+        """
+        holy_smite = False
+        if (getattr(f, "char_class", "").lower() == "paladin"
+                and getattr(target, "undead", False)):
+            dice_count *= 2
+            holy_smite = True
+
+        damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
+        target.hp = max(0, target.hp - damage)
+
+        if holy_smite:
+            self.combat_log.append(
+                f"{f.name} HOLY SMITES {target.name} for {damage} damage "
+                f"with {weapon_label}!")
+            self.game.sfx.play("critical")
+        else:
+            self.combat_log.append(
+                f"{f.name} deals {damage} damage to {target.name} "
+                f"with {weapon_label}!")
+
+        mc, mr = self.monster_positions.get(target, (0, 0))
+        self.hit_effects.append(HitEffect(mc, mr, damage))
+        return damage, holy_smite
+
     # ── Melee attack ─────────────────────────────────────────────
 
     def _try_melee_directional(self, dcol, drow):
@@ -1891,34 +1913,7 @@ class CombatState(BaseState):
             self._end_fighter_turn()
             return
 
-        self.defending[f] = False
-        atk_bonus = f.get_attack_bonus()
-        bless = self.bless_buffs.get(f)
-        if bless:
-            atk_bonus += bless["attack_bonus"]
-        target_ac = target.ac
-        curse = self.curse_buffs.get(target)
-        if curse:
-            target_ac -= curse["ac_penalty"]
-        hit, roll, total, crit = roll_attack(atk_bonus, target_ac)
-
-        if crit:
-            self.combat_log.append(
-                f"{f.name} rolls {roll} — CRITICAL HIT!"
-            )
-            self.game.sfx.play("critical")
-        elif hit:
-            self.combat_log.append(
-                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target_ac} — Hit!"
-            )
-            self.game.sfx.play("sword_hit")
-        else:
-            self.combat_log.append(
-                f"{f.name} rolls {roll} ({format_modifier(atk_bonus)}) "
-                f"= {total} vs AC {target_ac} — Miss!"
-            )
-            self.game.sfx.play("miss")
+        hit, crit = self._roll_attack_with_buffs(f, target, ranged=False)
 
         if hit:
             melee_wp = info.get("melee_weapon", f.weapon)
@@ -1948,38 +1943,16 @@ class CombatState(BaseState):
                     )
                     self.game.sfx.play("critical")
 
-            # ── Paladin Holy Smite ──
-            # Paladins deal double damage dice against undead.
-            holy_smite = False
-            if (getattr(f, "char_class", "").lower() == "paladin"
-                    and getattr(target, "undead", False)):
-                dice_count *= 2
-                holy_smite = True
+            damage, _holy = self._apply_damage(
+                f, target, dice_count, dice_sides, dmg_bonus, crit, melee_wp)
 
-            damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
-            target.hp = max(0, target.hp - damage)
-            if holy_smite:
-                self.combat_log.append(
-                    f"{f.name} HOLY SMITES {target.name} for {damage} damage with {melee_wp}!"
-                )
-                self.game.sfx.play("critical")
-            else:
-                self.combat_log.append(
-                    f"{f.name} deals {damage} damage to {target.name} with {melee_wp}!"
-                )
-            # Spawn a hit flash on the monster
-            mc, mr = self.monster_positions.get(target, (0, 0))
+            # Extra backstab visual
             if thief_crit:
-                # Extra-bright purple flash for precision strike
-                self.hit_effects.append(HitEffect(mc, mr, damage))
-                self.hit_effects.append(
-                    _BackstabEffect(mc, mr))
-            else:
-                self.hit_effects.append(HitEffect(mc, mr, damage))
+                mc, mr = self.monster_positions.get(target, (0, 0))
+                self.hit_effects.append(_BackstabEffect(mc, mr))
 
             # ── Weapon poison on melee hit ──
             if target.is_alive():
-                # Determine which slot holds the melee weapon
                 melee_slot = "right_hand"
                 for s in ("right_hand", "left_hand"):
                     if f.equipped.get(s) == melee_wp:
@@ -4859,10 +4832,10 @@ class CombatState(BaseState):
         total_gold = sum(m.gold_reward for m in self.monsters)
 
         # Store pending XP — gold is picked up during loot phase
-        self.game.pending_combat_rewards = {
+        self.game.set_combat_rewards({
             "xp": total_xp,
             "gold": 0,
-        }
+        })
         self._victory_gold = total_gold
 
         self.game.sfx.play("victory")

@@ -104,10 +104,9 @@ class InventoryMixin:
 
         Any level-ups are logged and queued for animation.
         """
-        rewards = getattr(self.game, "pending_combat_rewards", None)
+        rewards = self.game.consume_combat_rewards()
         if not rewards:
             return
-        self.game.pending_combat_rewards = None
 
         total_xp = rewards.get("xp", 0)
         total_gold = rewards.get("gold", 0)

@@ -90,7 +90,7 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _interact_machine(self):
         """Handle stepping on the gnome machine tile (Keys of Shadow)."""
-        kd = self.game.key_dungeons
+        kd = self.game.get_key_dungeons()
         if not kd:
             self.show_message("A strange machine hums ominously.", 2000)
             return
@@ -100,15 +100,14 @@ class OverworldState(InventoryMixin, BaseState):
         key_names = [d["key_name"] for d in kd.values()]
         held_keys = [k for k in key_names if party.inv_count(k) > 0]
 
-        total = len(kd)
-        inserted = self.game.keys_inserted
+        total = self.game.get_total_keys()
+        inserted = self.game.get_keys_inserted()
 
         if held_keys:
             # Insert all held keys
             for key in held_keys:
                 party.inv_remove(key)
-                self.game.keys_inserted += 1
-            inserted = self.game.keys_inserted
+                inserted = self.game.insert_key()
             n = len(held_keys)
             names = ", ".join(held_keys)
             self.show_message(
@@ -132,7 +131,7 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _trigger_victory(self):
         """Called when all 8 keys are inserted — the sun returns!"""
-        self.game.darkness_active = False
+        self.game.set_darkness(False)
         # Award XP and gold to all alive party members
         for m in self.game.party.alive_members():
             if m.is_alive():
@@ -762,13 +761,13 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _show_dungeon_action(self, pcol, prow):
         """Show the dungeon entry action screen instead of entering immediately."""
-        visited = (pcol, prow) in self.game.visited_dungeons
+        visited = self.game.is_dungeon_visited(pcol, prow)
         cleared = False
 
         # Determine dungeon type and build info
-        kd = self.game.key_dungeons.get((pcol, prow))
-        quest = getattr(self.game, "quest", None)
-        hq = getattr(self.game, "house_quest", None)
+        kd = self.game.get_key_dungeon(pcol, prow)
+        quest = self.game.get_quest()
+        hq = self.game.get_house_quest()
 
         if kd:
             name = kd.get("name", "Key Dungeon")
@@ -852,7 +851,7 @@ class OverworldState(InventoryMixin, BaseState):
         dungeon_state = self.game.states["dungeon"]
 
         # Mark as visited
-        self.game.visited_dungeons.add((pcol, prow))
+        self.game.mark_dungeon_visited(pcol, prow)
 
         cleared = self.dungeon_action_info.get("cleared", False)
 
@@ -861,15 +860,15 @@ class OverworldState(InventoryMixin, BaseState):
             dungeon_data = generate_dungeon("The Depths")
             dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
         elif entry_type == "key_dungeon":
-            kd = self.game.key_dungeons.get((pcol, prow))
+            kd = self.game.get_key_dungeon(pcol, prow)
             if kd:
                 dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)
         elif entry_type == "quest":
-            quest = self.game.quest
+            quest = self.game.get_quest()
             if quest:
                 dungeon_state.enter_quest_dungeon(quest["levels"], pcol, prow)
         elif entry_type == "house_quest":
-            hq = self.game.house_quest
+            hq = self.game.get_house_quest()
             if hq:
                 dungeon_state.enter_quest_dungeon(hq["levels"], pcol, prow)
         else:
@@ -881,7 +880,7 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _activate_house_quest(self):
         """Activate the house quest when the party speaks to Elara."""
-        hq = getattr(self.game, "house_quest", None)
+        hq = self.game.get_house_quest()
         if hq and hq["status"] != "not_started":
             # Quest already active or completed
             if hq["status"] == "completed":
@@ -898,7 +897,7 @@ class OverworldState(InventoryMixin, BaseState):
         house_col, house_row = 7, 10  # fixed house dungeon location
 
         # Store house quest state
-        self.game.house_quest = {
+        self.game.set_house_quest({
             "name": "Family Heirloom",
             "status": "active",
             "dungeon_col": house_col,
@@ -906,7 +905,7 @@ class OverworldState(InventoryMixin, BaseState):
             "levels": levels,
             "current_level": 0,
             "artifact_name": "Family Heirloom",
-        }
+        })
 
         self.show_message("Elara: Thank you! The house is just north of here. Be careful!", 4000)
         self.game.game_log.append("Quest accepted: Retrieve the Family Heirloom from Elara's house.")
@@ -926,7 +925,7 @@ class OverworldState(InventoryMixin, BaseState):
         for member in party.alive_members():
             member.exp += 30
 
-        self.game.house_quest["status"] = "completed"
+        self.game.get_house_quest()["status"] = "completed"
         self.game.game_log.append(
             f"Quest complete! Elara rewards the party with {reward_gold} gold."
         )
