@@ -19,22 +19,32 @@ from src.settings import (
 EXAMINE_COLS = 12
 EXAMINE_ROWS = 14
 
+# ── Terrain obstacle density ─────────────────────────────────────
+# Maps tile type → (obstacle_kind, min_count, max_count).
+# obstacle_kind is passed to the renderer to choose the right sprite.
+TERRAIN_OBSTACLES = {
+    TILE_GRASS:  ("bush",  0, 2),    # mostly open, occasional bush
+    TILE_FOREST: ("tree",  6, 10),   # dense trees
+    TILE_SAND:   ("rock",  1, 3),    # scattered rocks
+    TILE_PATH:   ("bush",  0, 1),    # mostly clear, rare bush
+}
+_DEFAULT_OBSTACLES = ("bush", 0, 1)
+
 # ── Terrain-themed loot tables ───────────────────────────────────
+# Low-value scraps only — nothing you'd be excited to find.
 # Each entry is (item_name, weight).
 EXAMINE_LOOT = {
     TILE_GRASS: [
-        ("Healing Herb", 3),
+        ("Stones", 5),
         ("Torch", 3),
-        ("Stones", 4),
     ],
     TILE_FOREST: [
-        ("Healing Herb", 2),
-        ("Antidote", 2),
-        ("Torch", 5),
+        ("Stones", 4),
+        ("Torch", 4),
     ],
     TILE_SAND: [
-        ("Stones", 6),
-        ("Torch", 4),
+        ("Stones", 7),
+        ("Torch", 3),
     ],
     TILE_PATH: [
         ("Stones", 6),
@@ -56,6 +66,7 @@ class ExamineState(BaseState):
         self.player_col = _START_COL
         self.player_row = _START_ROW
         self.examined_tile_type = TILE_GRASS
+        self.obstacles = {}               # {(col, row): obstacle_kind}
         self.ground_items = {}            # {(col, row): {"item": str, "gold": int}}
         self.pickup_message = ""
         self.pickup_msg_timer = 0         # ms remaining
@@ -80,10 +91,12 @@ class ExamineState(BaseState):
         self.pickup_message = ""
         self.pickup_msg_timer = 0
 
+        self._spawn_obstacles()
         self._spawn_examine_items()
 
     def exit(self):
         self.ground_items.clear()
+        self.obstacles.clear()
 
     # ── Input ─────────────────────────────────────────────────────
 
@@ -119,6 +132,7 @@ class ExamineState(BaseState):
             player_col=self.player_col,
             player_row=self.player_row,
             tile_type=self.examined_tile_type,
+            obstacles=self.obstacles,
             ground_items=self.ground_items,
             tile_name=self.tile_name,
             party_member_name=self.party_member_name,
@@ -132,19 +146,43 @@ class ExamineState(BaseState):
         new_col = self.player_col + dcol
         new_row = self.player_row + drow
         # Interior bounds: exclude the outer edge ring
-        if 1 <= new_col <= EXAMINE_COLS - 2 and 1 <= new_row <= EXAMINE_ROWS - 2:
-            self.player_col = new_col
-            self.player_row = new_row
-            self._attempt_pickup()
+        if not (1 <= new_col <= EXAMINE_COLS - 2
+                and 1 <= new_row <= EXAMINE_ROWS - 2):
+            return
+        if (new_col, new_row) in self.obstacles:
+            return
+        self.player_col = new_col
+        self.player_row = new_row
+        self._attempt_pickup()
+
+    # ── Obstacle generation ─────────────────────────────────────
+
+    def _spawn_obstacles(self):
+        """Scatter terrain-appropriate obstacles across the interior."""
+        self.obstacles.clear()
+        kind, lo, hi = TERRAIN_OBSTACLES.get(
+            self.examined_tile_type, _DEFAULT_OBSTACLES)
+        count = random.randint(lo, hi)
+        for _ in range(count):
+            for _attempt in range(40):
+                col = random.randint(1, EXAMINE_COLS - 2)
+                row = random.randint(1, EXAMINE_ROWS - 2)
+                if (col, row) == (_START_COL, _START_ROW):
+                    continue
+                if (col, row) in self.obstacles:
+                    continue
+                self.obstacles[(col, row)] = kind
+                break
 
     # ── Item spawning ─────────────────────────────────────────────
 
     def _spawn_examine_items(self):
-        """Spawn 0–3 terrain-themed items on random interior tiles."""
+        """Occasionally spawn 0–1 low-value items on random interior tiles."""
         self.ground_items.clear()
         loot_table = EXAMINE_LOOT.get(self.examined_tile_type, _DEFAULT_LOOT)
         weights = [w for _, w in loot_table]
-        num_items = random.randint(0, 3)
+        # Most of the time nothing spawns (60% chance of zero items).
+        num_items = random.choices([0, 0, 0, 1, 1], k=1)[0]
 
         for _ in range(num_items):
             for _attempt in range(30):
@@ -153,6 +191,8 @@ class ExamineState(BaseState):
                 if (col, row) == (_START_COL, _START_ROW):
                     continue
                 if (col, row) in self.ground_items:
+                    continue
+                if (col, row) in self.obstacles:
                     continue
                 choice = random.choices(loot_table, weights=weights, k=1)[0]
                 item_name = choice[0]

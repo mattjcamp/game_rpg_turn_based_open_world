@@ -4995,7 +4995,7 @@ class Renderer(CombatEffectRendererMixin):
     _EXAMINE_TILE = 30  # px per tile
 
     def draw_examine_area(self, player_col, player_row, tile_type,
-                          ground_items=None, tile_name="",
+                          obstacles=None, ground_items=None, tile_name="",
                           party_member_name="", pickup_message=""):
         """Draw the examine-area screen (12×14 grid with themed tiles)."""
         from src.settings import (
@@ -5019,6 +5019,13 @@ class Renderer(CombatEffectRendererMixin):
                     self._draw_examine_edge_tile(px, py, ts, tile_type, c, r)
                 else:
                     self._draw_examine_floor_tile(px, py, ts, tile_type, c, r)
+
+        # ── 1b. draw obstacles on top of floor tiles ──
+        if obstacles:
+            for (oc, orr), kind in obstacles.items():
+                opx = mx + oc * ts
+                opy = my + orr * ts
+                self._draw_examine_obstacle(opx, opy, ts, kind, oc, orr)
 
         # ── 2. draw ground items ──
         if ground_items:
@@ -5079,9 +5086,29 @@ class Renderer(CombatEffectRendererMixin):
         from src.settings import (
             TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
         )
-        if tile_type in (TILE_GRASS, TILE_FOREST):
-            # Reuse the outdoor grass tile from combat
+        if tile_type == TILE_GRASS:
             self._u3_draw_outdoor_floor_tile(px, py, ts, col, row)
+        elif tile_type == TILE_FOREST:
+            # Darker, denser grass with more undergrowth
+            sprite = self._tile_sprites.get((0, 1))  # grass tile
+            if sprite:
+                self.screen.blit(sprite, (px, py))
+            else:
+                pygame.draw.rect(self.screen, (10, 48, 10),
+                                 pygame.Rect(px, py, ts, ts))
+            # Scatter small undergrowth marks
+            seed = (col * 31 + row * 17)
+            for i in range(3):
+                s = seed + i * 11
+                dx = (s * 7) % (ts - 6) + 3
+                dy = (s * 13) % (ts - 6) + 3
+                c = (25, 80, 25) if s % 3 else (18, 60, 18)
+                pygame.draw.line(self.screen, c,
+                                 (px + dx, py + dy - 2),
+                                 (px + dx + 1, py + dy + 2), 1)
+                if (s + 5) % 4 == 0:
+                    pygame.draw.rect(self.screen, (20, 55, 15),
+                                     pygame.Rect(px + dx + 3, py + dy, 2, 2))
         elif tile_type == TILE_SAND:
             # Sandy floor
             pygame.draw.rect(self.screen, (50, 42, 18),
@@ -5139,6 +5166,34 @@ class Renderer(CombatEffectRendererMixin):
         else:
             # Default: forest edge
             self._u3_draw_outdoor_edge_tile(px, py, ts, col, row)
+
+    def _draw_examine_obstacle(self, px, py, ts, kind, col, row):
+        """Draw an obstacle sprite (tree, bush, rock) on the examine grid."""
+        cx = px + ts // 2
+        cy = py + ts // 2
+
+        if kind == "tree":
+            # Small tree: brown trunk + green canopy
+            # Trunk
+            pygame.draw.rect(self.screen, (90, 55, 25),
+                             pygame.Rect(cx - 2, cy + 2, 4, 10))
+            # Canopy — two overlapping circles for fullness
+            pygame.draw.circle(self.screen, (20, 80, 20), (cx, cy - 4), 8)
+            pygame.draw.circle(self.screen, (25, 95, 25), (cx - 3, cy - 2), 6)
+            pygame.draw.circle(self.screen, (15, 65, 15), (cx + 3, cy - 5), 5)
+        elif kind == "rock":
+            # Grey boulder
+            pygame.draw.circle(self.screen, (110, 105, 95), (cx, cy + 1), 7)
+            pygame.draw.circle(self.screen, (130, 125, 115), (cx - 1, cy - 1), 5)
+            # Highlight
+            pygame.draw.circle(self.screen, (150, 145, 135), (cx - 2, cy - 3), 2)
+        elif kind == "bush":
+            # Small green shrub
+            pygame.draw.circle(self.screen, (30, 75, 20), (cx, cy), 6)
+            pygame.draw.circle(self.screen, (40, 90, 30), (cx - 2, cy - 1), 4)
+        else:
+            # Fallback: generic dot
+            pygame.draw.circle(self.screen, (80, 80, 80), (cx, cy), 5)
 
     def _u3_draw_orc_combat_sprite(self, monster, ax, ay, ts, col, row):
         """Draw monster using its unique tile sprite for overworld combat."""

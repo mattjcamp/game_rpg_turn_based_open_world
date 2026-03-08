@@ -67,11 +67,17 @@ class TestExamineEnter:
         from src.states.examine import _START_COL, _START_ROW
         assert (_START_COL, _START_ROW) not in examine.ground_items
 
-    def test_spawns_at_most_three_items(self, examine):
+    def test_spawns_at_most_one_item(self, examine):
         # Run enter() many times to verify the max
         for _ in range(50):
             examine.enter()
-            assert len(examine.ground_items) <= 3
+            assert len(examine.ground_items) <= 1
+
+    def test_items_not_on_obstacles(self, examine):
+        for _ in range(50):
+            examine.enter()
+            for pos in examine.ground_items:
+                assert pos not in examine.obstacles
 
 
 # =====================================================================
@@ -80,27 +86,31 @@ class TestExamineEnter:
 
 class TestExamineMovement:
     def test_move_down(self, examine):
+        examine.obstacles.clear()
         start_row = examine.player_row
         examine.handle_input([make_event(pygame.K_DOWN)], [0] * 512)
         assert examine.player_row == start_row + 1
 
     def test_move_up(self, examine):
-        # Move down first so we're not at edge
+        examine.obstacles.clear()
         examine.player_row = 5
         examine.handle_input([make_event(pygame.K_UP)], [0] * 512)
         assert examine.player_row == 4
 
     def test_move_left(self, examine):
+        examine.obstacles.clear()
         examine.player_col = 5
         examine.handle_input([make_event(pygame.K_LEFT)], [0] * 512)
         assert examine.player_col == 4
 
     def test_move_right(self, examine):
+        examine.obstacles.clear()
         start_col = examine.player_col
         examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
         assert examine.player_col == start_col + 1
 
     def test_wasd_movement(self, examine):
+        examine.obstacles.clear()
         examine.player_col = 5
         examine.player_row = 5
         examine.handle_input([make_event(pygame.K_w)], [0] * 512)
@@ -111,6 +121,13 @@ class TestExamineMovement:
         assert examine.player_col == 4
         examine.handle_input([make_event(pygame.K_d)], [0] * 512)
         assert examine.player_col == 5
+
+    def test_blocked_by_obstacle(self, examine):
+        examine.obstacles.clear()
+        target = (examine.player_col + 1, examine.player_row)
+        examine.obstacles[target] = "tree"
+        examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
+        assert examine.player_col != target[0]  # didn't move
 
     def test_blocked_at_top_edge(self, examine):
         examine.player_row = 1
@@ -141,7 +158,7 @@ class TestExamineMovement:
 
 class TestExaminePickup:
     def test_walking_on_item_picks_it_up(self, examine, game):
-        # Place item one tile to the right
+        examine.obstacles.clear()
         item_col = examine.player_col + 1
         item_row = examine.player_row
         examine.ground_items[(item_col, item_row)] = {
@@ -152,25 +169,27 @@ class TestExaminePickup:
         assert game.party.inv_count("Torch") == inv_before + 1
 
     def test_pickup_sets_message(self, examine):
+        examine.obstacles.clear()
         item_col = examine.player_col + 1
         examine.ground_items[(item_col, examine.player_row)] = {
-            "item": "Healing Herb", "gold": 0}
+            "item": "Stones", "gold": 0}
         examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
-        assert "Healing Herb" in examine.pickup_message
+        assert "Stones" in examine.pickup_message
         assert examine.pickup_msg_timer > 0
 
     def test_pickup_message_fades(self, examine):
+        examine.obstacles.clear()
         item_col = examine.player_col + 1
         examine.ground_items[(item_col, examine.player_row)] = {
             "item": "Stones", "gold": 0}
         examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
         assert examine.pickup_msg_timer > 0
-        # Advance time past the timer
         examine.update(3.0)
         assert examine.pickup_msg_timer == 0
         assert examine.pickup_message == ""
 
     def test_gold_pickup(self, examine, game):
+        examine.obstacles.clear()
         item_col = examine.player_col + 1
         examine.ground_items[(item_col, examine.player_row)] = {
             "item": None, "gold": 25}
@@ -179,6 +198,7 @@ class TestExaminePickup:
         assert game.party.gold == gold_before + 25
 
     def test_no_pickup_on_empty_tile(self, examine):
+        examine.obstacles.clear()
         examine.ground_items.clear()
         examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
         assert examine.pickup_message == ""
@@ -233,3 +253,43 @@ class TestExamineLootTables:
         from src.states.examine import EXAMINE_LOOT, _DEFAULT_LOOT
         from src.settings import TILE_GRASS
         assert _DEFAULT_LOOT is EXAMINE_LOOT[TILE_GRASS]
+
+
+# =====================================================================
+# Obstacles
+# =====================================================================
+
+class TestExamineObstacles:
+    def test_obstacles_within_bounds(self, examine):
+        from src.states.examine import EXAMINE_COLS, EXAMINE_ROWS
+        for (c, r) in examine.obstacles:
+            assert 1 <= c <= EXAMINE_COLS - 2
+            assert 1 <= r <= EXAMINE_ROWS - 2
+
+    def test_obstacles_not_on_player_start(self, examine):
+        from src.states.examine import _START_COL, _START_ROW
+        assert (_START_COL, _START_ROW) not in examine.obstacles
+
+    def test_forest_has_many_obstacles(self, examine):
+        """Forest terrain should generate several tree obstacles."""
+        from src.settings import TILE_FOREST
+        examine.examined_tile_type = TILE_FOREST
+        counts = []
+        for _ in range(30):
+            examine._spawn_obstacles()
+            counts.append(len(examine.obstacles))
+        assert max(counts) >= 6  # forest min is 6
+
+    def test_grass_has_few_obstacles(self, examine):
+        """Grass terrain should be mostly open."""
+        from src.settings import TILE_GRASS
+        examine.examined_tile_type = TILE_GRASS
+        for _ in range(30):
+            examine._spawn_obstacles()
+            assert len(examine.obstacles) <= 2
+
+    def test_obstacle_kinds_match_terrain(self):
+        from src.states.examine import TERRAIN_OBSTACLES
+        from src.settings import TILE_FOREST, TILE_SAND
+        assert TERRAIN_OBSTACLES[TILE_FOREST][0] == "tree"
+        assert TERRAIN_OBSTACLES[TILE_SAND][0] == "rock"
