@@ -130,8 +130,11 @@ class TileManifest:
 
         raw = pygame.image.load(abs_path).convert_alpha()
 
-        # Make black pixels transparent for U4 / custom tiles
-        if "u4_tiles" in rel_path:
+        # Make black pixels transparent for U4-origin tiles (characters,
+        # NPCs, dungeon, monsters) and any remaining u4_tiles references.
+        _transparent_dirs = ("characters/", "npcs/", "dungeon/", "monsters/",
+                             "u4_tiles/")
+        if any(d in rel_path for d in _transparent_dirs):
             raw = self._make_black_transparent(raw)
 
         # Scale to target size

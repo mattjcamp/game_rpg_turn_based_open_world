@@ -1,255 +1,255 @@
 {
-  "_comment": "Available character tiles for character creation. Each entry maps a display name to a tile file path relative to the project root. Add or remove entries to customize available tiles.",
-  "tiles": [
-    {
-      "name": "Fighter",
-      "source": "amiga",
-      "file": "example_graphics/Ultima3_AMI_sprite_fighter.png"
-    },
-    {
-      "name": "Cleric",
-      "source": "amiga",
-      "file": "example_graphics/Ultima3_AMI_sprite_cleric.png"
-    },
-    {
-      "name": "Wizard",
-      "source": "amiga",
-      "file": "example_graphics/Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png"
-    },
-    {
-      "name": "Thief",
-      "source": "amiga",
-      "file": "example_graphics/Ultima3_AMI_sprite_thief.png"
-    },
-    {
-      "name": "Barbarian",
-      "source": "amiga",
-      "file": "example_graphics/Ultima3_AMI_sprite_barbarian.png"
-    },
-    {
-      "name": "Alchemist",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/healer_alt_f1.png"
-    },
-    {
-      "name": "Illusionist",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/mage.png"
-    },
-    {
-      "name": "Druid",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/druid.png"
-    },
-    {
-      "name": "Paladin",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/paladin.png"
-    },
-    {
-      "name": "Ranger",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/ranger.png"
-    },
-    {
-      "name": "Lark",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/bard.png"
-    },
-    {
-      "name": "Ranger Alt",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/ranger_alt.png"
-    },
-    {
-      "name": "Mage",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/mage.png"
-    },
-    {
-      "name": "Bard",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/bard.png"
-    },
-    {
-      "name": "Monk",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/monk.png"
-    },
-    {
-      "name": "Tinker",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/tinker.png"
-    },
-    {
-      "name": "Shepherd",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/shepherd.png"
-    },
-    {
-      "name": "Avatar",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/avatar_f1.png"
-    },
-    {
-      "name": "Knight",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/knight_f1.png"
-    },
-    {
-      "name": "Guard",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/guard_f1.png"
-    },
-    {
-      "name": "Healer",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/healer_f1.png"
-    },
-    {
-      "name": "Jester",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/jester_f1.png"
-    },
-    {
-      "name": "Villager",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/villager_male.png"
-    },
-    {
-      "name": "Villager F",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/villager_female.png"
-    },
-    {
-      "name": "Dark Mage",
-      "source": "assets",
-      "file": "src/assets/dark_mage_f1.png"
-    },
-    {
-      "name": "Brigand",
-      "source": "assets",
-      "file": "src/assets/pirate_brigand_f1.png"
-    },
-    {
-      "name": "Child",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/child_f1.png"
-    },
-    {
-      "name": "Beggar",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/beggar_f1.png"
-    },
-    {
-      "name": "Citizen",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/citizen_f1.png"
-    },
-    {
-      "name": "Guard Alt",
-      "source": "u4",
-      "file": "src/assets/u4_tiles/guard_npc.png"
-    },
-    {
-      "name": "Townsfolk",
-      "source": "assets",
-      "file": "src/assets/npc_townsfolk.png"
-    },
-    {
-      "name": "Lark Alt",
-      "source": "assets",
-      "file": "src/assets/lark_f1.png"
-    },
-    {
-      "name": "VGA Avatar",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_avatar_f1.png"
-    },
-    {
-      "name": "VGA Mage",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_mage_f1.png"
-    },
-    {
-      "name": "VGA Bard",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_bard_f1.png"
-    },
-    {
-      "name": "VGA Fighter",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_fighter_f1.png"
-    },
-    {
-      "name": "VGA Druid",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_druid_f1.png"
-    },
-    {
-      "name": "VGA Tinker",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_tinker_f1.png"
-    },
-    {
-      "name": "VGA Paladin",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_paladin_f1.png"
-    },
-    {
-      "name": "VGA Ranger",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_ranger_f1.png"
-    },
-    {
-      "name": "VGA Shepherd",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_shepherd_f1.png"
-    },
-    {
-      "name": "VGA Guard",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_guard_f1.png"
-    },
-    {
-      "name": "VGA Citizen",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_citizen_f1.png"
-    },
-    {
-      "name": "VGA Singing Bard",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_singing_bard_f1.png"
-    },
-    {
-      "name": "VGA Jester",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_jester_f1.png"
-    },
-    {
-      "name": "VGA Beggar",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_beggar_f1.png"
-    },
-    {
-      "name": "VGA Child",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_child_f1.png"
-    },
-    {
-      "name": "VGA Lord",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_lord_f1.png"
-    },
-    {
-      "name": "VGA Rogue",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_rogue_f1.png"
-    },
-    {
-      "name": "VGA Evil Mage",
-      "source": "vga",
-      "file": "src/assets/steele_tiles/vga_evil_mage_f1.png"
-    }
-  ]
+    "_comment": "Available character tiles for character creation. Each entry maps a display name to a tile file path relative to the project root. Add or remove entries to customize available tiles.",
+    "tiles": [
+        {
+            "name": "Fighter",
+            "source": "amiga",
+            "file": "src/assets/characters/fighter.png"
+        },
+        {
+            "name": "Cleric",
+            "source": "amiga",
+            "file": "src/assets/characters/cleric.png"
+        },
+        {
+            "name": "Wizard",
+            "source": "amiga",
+            "file": "src/assets/characters/wizard.png"
+        },
+        {
+            "name": "Thief",
+            "source": "amiga",
+            "file": "src/assets/characters/thief.png"
+        },
+        {
+            "name": "Barbarian",
+            "source": "amiga",
+            "file": "src/assets/characters/barbarian.png"
+        },
+        {
+            "name": "Alchemist",
+            "source": "u4",
+            "file": "src/assets/characters/alchemist.png"
+        },
+        {
+            "name": "Illusionist",
+            "source": "u4",
+            "file": "src/assets/characters/illusionist.png"
+        },
+        {
+            "name": "Druid",
+            "source": "u4",
+            "file": "src/assets/characters/druid.png"
+        },
+        {
+            "name": "Paladin",
+            "source": "u4",
+            "file": "src/assets/characters/paladin.png"
+        },
+        {
+            "name": "Ranger",
+            "source": "u4",
+            "file": "src/assets/characters/ranger.png"
+        },
+        {
+            "name": "Lark",
+            "source": "u4",
+            "file": "src/assets/characters/lark.png"
+        },
+        {
+            "name": "Ranger Alt",
+            "source": "u4",
+            "file": "src/assets/characters/ranger_alt.png"
+        },
+        {
+            "name": "Mage",
+            "source": "u4",
+            "file": "src/assets/characters/illusionist.png"
+        },
+        {
+            "name": "Bard",
+            "source": "u4",
+            "file": "src/assets/characters/lark.png"
+        },
+        {
+            "name": "Monk",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_monk.png"
+        },
+        {
+            "name": "Tinker",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_tinker.png"
+        },
+        {
+            "name": "Shepherd",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_shepherd.png"
+        },
+        {
+            "name": "Avatar",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_avatar.png"
+        },
+        {
+            "name": "Knight",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_knight.png"
+        },
+        {
+            "name": "Guard",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_guard.png"
+        },
+        {
+            "name": "Healer",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_healer.png"
+        },
+        {
+            "name": "Jester",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_jester.png"
+        },
+        {
+            "name": "Villager",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_villager_male.png"
+        },
+        {
+            "name": "Villager F",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_villager_female.png"
+        },
+        {
+            "name": "Dark Mage",
+            "source": "assets",
+            "file": "src/assets/monsters/dark_mage.png"
+        },
+        {
+            "name": "Brigand",
+            "source": "assets",
+            "file": "src/assets/npcs/brigand.png"
+        },
+        {
+            "name": "Child",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_child.png"
+        },
+        {
+            "name": "Beggar",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_beggar.png"
+        },
+        {
+            "name": "Citizen",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_citizen.png"
+        },
+        {
+            "name": "Guard Alt",
+            "source": "u4",
+            "file": "src/assets/npcs/u4_guard_npc.png"
+        },
+        {
+            "name": "Townsfolk",
+            "source": "assets",
+            "file": "src/assets/npcs/townsfolk.png"
+        },
+        {
+            "name": "Lark Alt",
+            "source": "assets",
+            "file": "src/assets/characters/lark.png"
+        },
+        {
+            "name": "VGA Avatar",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_avatar.png"
+        },
+        {
+            "name": "VGA Mage",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_mage.png"
+        },
+        {
+            "name": "VGA Bard",
+            "source": "vga",
+            "file": "src/assets/npcs/innkeeper.png"
+        },
+        {
+            "name": "VGA Fighter",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_fighter.png"
+        },
+        {
+            "name": "VGA Druid",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_druid.png"
+        },
+        {
+            "name": "VGA Tinker",
+            "source": "vga",
+            "file": "src/assets/npcs/shopkeep.png"
+        },
+        {
+            "name": "VGA Paladin",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_paladin.png"
+        },
+        {
+            "name": "VGA Ranger",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_ranger.png"
+        },
+        {
+            "name": "VGA Shepherd",
+            "source": "vga",
+            "file": "src/assets/npcs/villager_shepherd.png"
+        },
+        {
+            "name": "VGA Guard",
+            "source": "vga",
+            "file": "src/assets/npcs/villager_guard.png"
+        },
+        {
+            "name": "VGA Citizen",
+            "source": "vga",
+            "file": "src/assets/npcs/villager_citizen.png"
+        },
+        {
+            "name": "VGA Singing Bard",
+            "source": "vga",
+            "file": "src/assets/npcs/villager_bard.png"
+        },
+        {
+            "name": "VGA Jester",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_jester.png"
+        },
+        {
+            "name": "VGA Beggar",
+            "source": "vga",
+            "file": "src/assets/npcs/villager_beggar.png"
+        },
+        {
+            "name": "VGA Child",
+            "source": "vga",
+            "file": "src/assets/npcs/villager_child.png"
+        },
+        {
+            "name": "VGA Lord",
+            "source": "vga",
+            "file": "src/assets/npcs/elder.png"
+        },
+        {
+            "name": "VGA Rogue",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_rogue.png"
+        },
+        {
+            "name": "VGA Evil Mage",
+            "source": "vga",
+            "file": "src/assets/npcs/vga_evil_mage.png"
+        }
+    ]
 }
