@@ -2190,6 +2190,7 @@ class CombatState(BaseState):
 
         if hit:
             thrown_is_poison = info.get("thrown_is_poison", False)
+            holy_smite_ranged = False
             if thrown_item:
                 thrown_power = info.get("thrown_power", 0)
                 # Use same damage tiers as melee weapons
@@ -2203,12 +2204,23 @@ class CombatState(BaseState):
             else:
                 rw_name = info.get("ranged_weapon") or f.weapon
                 dice_count, dice_sides, dmg_bonus = f.get_damage_dice(rw_name)
+                # ── Paladin Holy Smite (ranged vs undead) ──
+                if (getattr(f, "char_class", "").lower() == "paladin"
+                        and getattr(target, "undead", False)):
+                    dice_count *= 2
+                    holy_smite_ranged = True
                 damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
                 dmg_label = rw_name
             target.hp = max(0, target.hp - damage)
-            self.combat_log.append(
-                f"{f.name} deals {damage} damage to {target.name} with {dmg_label}!"
-            )
+            if holy_smite_ranged:
+                self.combat_log.append(
+                    f"{f.name} HOLY SMITES {target.name} for {damage} damage with {dmg_label}!"
+                )
+                self.game.sfx.play("critical")
+            else:
+                self.combat_log.append(
+                    f"{f.name} deals {damage} damage to {target.name} with {dmg_label}!"
+                )
             # Spawn a hit flash on the monster
             mc, mr = self.monster_positions.get(target, (0, 0))
             self.hit_effects.append(HitEffect(mc, mr, damage))
@@ -2483,11 +2495,25 @@ class CombatState(BaseState):
                     )
                     self.game.sfx.play("critical")
 
+            # ── Paladin Holy Smite ──
+            # Paladins deal double damage dice against undead.
+            holy_smite = False
+            if (getattr(f, "char_class", "").lower() == "paladin"
+                    and getattr(target, "undead", False)):
+                dice_count *= 2
+                holy_smite = True
+
             damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
             target.hp = max(0, target.hp - damage)
-            self.combat_log.append(
-                f"{f.name} deals {damage} damage to {target.name} with {melee_wp}!"
-            )
+            if holy_smite:
+                self.combat_log.append(
+                    f"{f.name} HOLY SMITES {target.name} for {damage} damage with {melee_wp}!"
+                )
+                self.game.sfx.play("critical")
+            else:
+                self.combat_log.append(
+                    f"{f.name} deals {damage} damage to {target.name} with {melee_wp}!"
+                )
             # Spawn a hit flash on the monster
             mc, mr = self.monster_positions.get(target, (0, 0))
             if thief_crit:
@@ -3838,8 +3864,12 @@ class CombatState(BaseState):
             self.selected_spell = None
             return
 
-        # Check MP
-        if f.current_mp < mp_cost:
+        # Paladin free Turn Undead (once per rest)
+        is_paladin = getattr(f, "char_class", "").lower() == "paladin"
+        free_cast = is_paladin and getattr(f, "turn_undead_free_use", False)
+
+        # Check MP (skip for free Paladin cast)
+        if not free_cast and f.current_mp < mp_cost:
             self.combat_log.append(f"{f.name} doesn't have enough MP! (need {mp_cost})")
             self.phase = PHASE_PLAYER
             self.selected_spell = None
@@ -3861,8 +3891,11 @@ class CombatState(BaseState):
             self.selected_spell = None
             return
 
-        # Deduct MP
-        f.current_mp -= mp_cost
+        # Deduct MP (or consume free use)
+        if free_cast:
+            f.turn_undead_free_use = False
+        else:
+            f.current_mp -= mp_cost
 
         hp_pct = spell["effect_value"].get("hp_percent", 0.75)
         caster_col, caster_row = self.fighter_positions.get(f, (3, 5))
@@ -3884,9 +3917,14 @@ class CombatState(BaseState):
 
         self.phase = PHASE_TURN_UNDEAD
         self.game.sfx.play("turn_undead")
-        self.combat_log.append(
-            f"{f.name} channels TURN UNDEAD! (-{mp_cost} MP)"
-        )
+        if free_cast:
+            self.combat_log.append(
+                f"{f.name} channels TURN UNDEAD! (FREE \u2014 once per rest)"
+            )
+        else:
+            self.combat_log.append(
+                f"{f.name} channels TURN UNDEAD! (-{mp_cost} MP)"
+            )
 
         # Check all undead targets for death
         for target in undead_targets:

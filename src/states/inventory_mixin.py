@@ -306,6 +306,9 @@ class InventoryMixin:
                 getattr(member, "current_mp", 0) + mp_restore)
             actual_hp = member.hp - old_hp
             actual_mp = member.current_mp - old_mp
+            # Reset Paladin free Turn Undead on rest
+            if getattr(member, "char_class", "").lower() == "paladin":
+                member.turn_undead_free_use = True
             # Advance the clock by 10 hours (camping takes time)
             self.game.party.clock.advance(600)
             self.game.game_log.append(

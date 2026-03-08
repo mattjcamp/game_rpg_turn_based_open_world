@@ -302,7 +302,7 @@
       "id": "turn_undead",
       "name": "Turn Undead",
       "description": "Channels holy energy that sears undead creatures, stripping 50% of their life force.",
-      "allowable_classes": ["Cleric"],
+      "allowable_classes": ["Cleric", "Paladin"],
       "casting_type": "priest",
       "min_level": 2,
       "mp_cost": 8,

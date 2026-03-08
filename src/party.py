@@ -355,6 +355,9 @@ class PartyMember:
         # Keys: "strength", "ac"; values: int bonus
         self.potion_buffs = {}
 
+        # Paladin: free Turn Undead once per rest
+        self.turn_undead_free_use = True
+
         # Weapon poison — applied to weapon, lasts N successful hits
         # Keys: "right_hand", "left_hand"; values: None or dict
         # Dict: {"poison_name", "poison_type", "damage", "mp_drain",

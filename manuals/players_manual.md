@@ -197,7 +197,12 @@ The Thief has the longest combat range of any class (10 tiles), making them unma
 
 **MP Source:** 50% of Wisdom
 
-Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). They are a strong choice for parties that want a tanky frontliner with some healing versatility.
+**Class Abilities:**
+
+- **Holy Smite** — Attacks against undead deal double damage dice (melee and ranged).
+- **Turn Undead** *(Free, once per rest)* — Can cast Turn Undead once per rest without spending MP. Additional casts cost MP normally.
+
+Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — and their free Turn Undead means they can open any undead encounter with a powerful holy blast at no cost. They are a strong choice for parties that want a tanky frontliner with healing versatility and anti-undead power.
 
 ---
 
@@ -207,7 +212,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 15       | 0        | 3     | Priest     |
+| 10       | 3        | 3     | Priest     |
 
 **Allowed Weapons:** Fists, Dagger, Club, Sling, Short Bow, Long Bow, Sword
 **Allowed Armor:** Cloth, Leather, Chain
@@ -215,7 +220,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 **MP Source:** 50% of Wisdom
 
-Rangers match Fighters for HP per level and add bow proficiency plus limited healing magic. With a 3-tile combat range and Long Bow access they can deal serious ranged damage. A strong choice for parties that want a self-sufficient frontliner who can both fight and heal.
+Rangers are durable frontliners with bow proficiency and limited healing magic. With a 3-tile combat range and Long Bow access they can deal serious ranged damage, and their small MP pool lets them cast the occasional Minor Heal to keep the party going between fights. A strong choice for parties that want a self-sufficient frontliner who can both fight and heal.
 
 ---
 
@@ -257,6 +262,23 @@ The Druid is the game's only hybrid caster, able to cast both Priest spells (Min
 - **Brew Potions** — Can craft potions from gathered reagents, turning Moonpetal, Glowcap Mushrooms, and other ingredients into useful elixirs.
 
 Alchemists have modest combat ability but provide unique value through potion crafting. Their 3-tile range gives them slightly better positioning than Wizards, and access to Sorcerer spells means they can still contribute offensive magic.
+
+---
+
+### Class Comparison
+
+| Class | Base HP/Lvl | Base MP/Lvl | Range | Spell Type | Best Armor | MP Source | Key Abilities |
+|-------|-------------|-------------|-------|------------|------------|-----------|---------------|
+| Fighter | 15 | 0 | 4 | None | Plate | — | — |
+| Wizard | 4 | 15 | 2 | Sorcerer | Cloth | 100% INT | Arcane Focus |
+| Cleric | 6 | 10 | 2 | Priest | Chain | 100% WIS | Turn Undead |
+| Thief | 5 | 0 | 10 | None | Leather | — | Pick Locks, Backstab, Shadow Step |
+| Paladin | 10 | 5 | 2 | Priest | Plate | 50% WIS | Holy Smite, Turn Undead |
+| Ranger | 10 | 3 | 3 | Priest | Chain | 50% WIS | — |
+| Druid | 5 | 12 | 2 | Both | Cloth | 50% INT/WIS | 2× MP regen |
+| Alchemist | 4 | 8 | 3 | Sorcerer | Cloth | 50% INT | Brew Potions |
+
+> **Tip:** A well-rounded party might include a Fighter or Paladin on the front line, a Cleric for healing and Turn Undead, a Wizard for devastating damage spells, and a Thief for utility and ranged harassment. Experiment to find your preferred combination.
 
 ---
 

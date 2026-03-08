@@ -14,8 +14,8 @@
     "leather",
     "chain"
   ],
-  "hp_per_level": 15,
-  "mp_per_level": 0,
+  "hp_per_level": 10,
+  "mp_per_level": 3,
   "range": 3,
   "exp_per_level": 1000,
   "allowed_races": [
