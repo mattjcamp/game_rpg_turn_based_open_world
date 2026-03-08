@@ -147,6 +147,8 @@ class Game:
 
         # Combat rewards (must be set before change_state triggers enter())
         self.pending_combat_rewards = None
+        # Examine tile persistence (must exist before examine state enter())
+        self.examined_tiles = {}
 
         # --- State machine ---
         self.states = {
@@ -281,6 +283,7 @@ class Game:
 
         self.quest = None
         self.house_quest = None
+        self.examined_tiles = {}  # {(col, row): {"obstacles": {}, "ground_items": {}}}
 
         self.visited_dungeons = set()  # {(col, row)} — tracks which dungeon tiles the party has entered
 
@@ -443,6 +446,14 @@ class Game:
         rewards = self.pending_combat_rewards
         self.pending_combat_rewards = None
         return rewards
+
+    def get_examined_tile(self, col, row):
+        """Return saved examine data for (col, row), or None."""
+        return self.examined_tiles.get((col, row))
+
+    def save_examined_tile(self, col, row, data):
+        """Store examine layout data for overworld tile (col, row)."""
+        self.examined_tiles[(col, row)] = data
 
     def set_gnome_quest_accepted(self):
         """Mark the gnome quest as accepted."""

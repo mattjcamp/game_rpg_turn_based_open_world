@@ -293,3 +293,293 @@ class TestExamineObstacles:
         from src.settings import TILE_FOREST, TILE_SAND
         assert TERRAIN_OBSTACLES[TILE_FOREST][0] == "tree"
         assert TERRAIN_OBSTACLES[TILE_SAND][0] == "rock"
+
+
+# =====================================================================
+# Tile persistence
+# =====================================================================
+
+class TestExaminePersistence:
+    def test_exit_saves_layout(self, examine, game):
+        """Exiting examine should persist obstacles and ground_items."""
+        examine.obstacles.clear()
+        examine.obstacles[(3, 4)] = "tree"
+        examine.ground_items[(7, 8)] = {"item": "Torch", "gold": 0}
+        col, row = game.party.col, game.party.row
+        # Exit to overworld
+        examine.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        saved = game.get_examined_tile(col, row)
+        assert saved is not None
+        assert (3, 4) in saved["obstacles"] or "3,4" in saved["obstacles"]
+
+    def test_reenter_restores_layout(self, examine, game):
+        """Re-entering the same overworld tile restores the saved layout."""
+        examine.obstacles.clear()
+        examine.obstacles[(3, 4)] = "bush"
+        examine.ground_items.clear()
+        examine.ground_items[(7, 8)] = {"item": "Stones", "gold": 0}
+        # Exit (saves layout)
+        examine.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        # Re-enter
+        game.change_state("examine")
+        ex2 = game.states["examine"]
+        assert (3, 4) in ex2.obstacles
+        assert ex2.obstacles[(3, 4)] == "bush"
+        assert (7, 8) in ex2.ground_items
+        assert ex2.ground_items[(7, 8)]["item"] == "Stones"
+
+    def test_fresh_tile_generates_new_layout(self, game):
+        """First visit to a tile should generate a fresh random layout."""
+        col, row = game.party.col, game.party.row
+        assert game.get_examined_tile(col, row) is None
+        game.change_state("examine")
+        # State has been populated by _spawn_obstacles / _spawn_examine_items
+        examine = game.states["examine"]
+        assert examine.examined_tile_type is not None
+
+    def test_different_tiles_have_independent_layouts(self, game):
+        """Two different overworld tiles have separate saved layouts."""
+        # Visit tile at current position
+        game.change_state("examine")
+        ex = game.states["examine"]
+        ex.obstacles.clear()
+        ex.obstacles[(2, 2)] = "tree"
+        ex.ground_items.clear()
+        ex.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        old_col, old_row = game.party.col, game.party.row
+
+        # Move party and visit a different tile
+        game.party.col += 1
+        game.change_state("examine")
+        ex2 = game.states["examine"]
+        ex2.obstacles.clear()
+        ex2.obstacles[(9, 9)] = "rock"
+        ex2.ground_items.clear()
+        ex2.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+
+        # Verify both are saved independently
+        saved1 = game.get_examined_tile(old_col, old_row)
+        saved2 = game.get_examined_tile(old_col + 1, old_row)
+        assert saved1 is not None
+        assert saved2 is not None
+        # They should have different obstacle layouts
+        obs1_keys = set(saved1["obstacles"].keys())
+        obs2_keys = set(saved2["obstacles"].keys())
+        assert obs1_keys != obs2_keys
+
+    def test_picked_up_items_not_restored(self, examine, game):
+        """If the player picks up an item then leaves,
+        the item should NOT reappear on re-entry."""
+        examine.obstacles.clear()
+        examine.ground_items.clear()
+        item_col = examine.player_col + 1
+        item_row = examine.player_row
+        examine.ground_items[(item_col, item_row)] = {
+            "item": "Torch", "gold": 0}
+        # Pick up the item
+        examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
+        assert (item_col, item_row) not in examine.ground_items
+        # Exit
+        examine.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        # Re-enter
+        game.change_state("examine")
+        ex2 = game.states["examine"]
+        # Item was picked up, so it should not be restored
+        assert (item_col, item_row) not in ex2.ground_items
+
+    def test_dropped_item_persists_across_visits(self, examine, game):
+        """Dropping an item and returning should show it still on the ground."""
+        examine.obstacles.clear()
+        examine.ground_items.clear()
+        # Add an item to party inventory
+        game.party.inv_add("Torch")
+        # Drop it via the drop mechanism
+        examine._enter_drop_mode()
+        assert examine.drop_mode is True
+        # Select the item (it should be in the list)
+        examine._confirm_drop()
+        pos = (examine.player_col, examine.player_row)
+        assert pos in examine.ground_items
+        assert examine.ground_items[pos]["item"] == "Torch"
+
+        # Exit and re-enter
+        examine.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        game.change_state("examine")
+        ex2 = game.states["examine"]
+        # The dropped item should still be there (at saved position)
+        # Player starts at _START_COL, _START_ROW again,
+        # but the item was at that position — check ground_items
+        from src.states.examine import _START_COL, _START_ROW
+        assert (_START_COL, _START_ROW) in ex2.ground_items
+        assert ex2.ground_items[(_START_COL, _START_ROW)]["item"] == "Torch"
+
+    def test_obstacles_persist_across_visits(self, examine, game):
+        """Obstacle positions should be the same on re-entry."""
+        examine.obstacles.clear()
+        examine.obstacles[(4, 5)] = "tree"
+        examine.obstacles[(8, 3)] = "bush"
+        examine.ground_items.clear()
+        # Exit
+        examine.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        # Re-enter
+        game.change_state("examine")
+        ex2 = game.states["examine"]
+        assert (4, 5) in ex2.obstacles
+        assert ex2.obstacles[(4, 5)] == "tree"
+        assert (8, 3) in ex2.obstacles
+        assert ex2.obstacles[(8, 3)] == "bush"
+
+    def test_game_examined_tiles_dict_exists(self, game):
+        """Game should have an examined_tiles dict."""
+        assert hasattr(game, "examined_tiles")
+        assert isinstance(game.examined_tiles, dict)
+
+    def test_save_and_get_examined_tile(self, game):
+        """Accessor methods for examined tiles should work."""
+        assert game.get_examined_tile(10, 20) is None
+        game.save_examined_tile(10, 20, {"obstacles": {}, "ground_items": {}})
+        result = game.get_examined_tile(10, 20)
+        assert result is not None
+        assert "obstacles" in result
+
+
+# =====================================================================
+# Item dropping
+# =====================================================================
+
+class TestExamineDrop:
+    def test_q_opens_drop_mode(self, examine, game):
+        """Pressing Q with items in inventory opens drop mode."""
+        game.party.inv_add("Torch")
+        examine.handle_input([make_event(pygame.K_q)], [0] * 512)
+        assert examine.drop_mode is True
+        assert len(examine.drop_items) > 0
+
+    def test_q_with_empty_inventory_shows_message(self, examine, game):
+        """Pressing Q with no inventory shows a 'nothing to drop' message."""
+        game.party.shared_inventory.clear()
+        examine.handle_input([make_event(pygame.K_q)], [0] * 512)
+        assert examine.drop_mode is False
+        assert "Nothing" in examine.pickup_message
+
+    def test_drop_mode_cursor_navigation(self, examine, game):
+        """Up/Down arrows navigate the drop cursor."""
+        game.party.inv_add("Torch")
+        game.party.inv_add("Stones")
+        examine._enter_drop_mode()
+        assert examine.drop_cursor == 0
+        examine.handle_input([make_event(pygame.K_DOWN)], [0] * 512)
+        assert examine.drop_cursor == 1
+        examine.handle_input([make_event(pygame.K_UP)], [0] * 512)
+        assert examine.drop_cursor == 0
+
+    def test_drop_mode_cursor_clamps(self, examine, game):
+        """Cursor shouldn't go below 0 or above last item."""
+        game.party.shared_inventory.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        assert examine.drop_cursor == 0
+        examine.handle_input([make_event(pygame.K_UP)], [0] * 512)
+        assert examine.drop_cursor == 0  # can't go negative
+        examine.handle_input([make_event(pygame.K_DOWN)], [0] * 512)
+        # Only one item, so cursor stays at 0
+        assert examine.drop_cursor == 0
+
+    def test_escape_cancels_drop_mode(self, examine, game):
+        """ESC while in drop mode cancels without dropping."""
+        game.party.shared_inventory.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        assert examine.drop_mode is True
+        examine.handle_input([make_event(pygame.K_ESCAPE)], [0] * 512)
+        assert examine.drop_mode is False
+        # Item still in inventory
+        assert game.party.inv_count("Torch") == 1
+
+    def test_confirm_drop_places_item(self, examine, game):
+        """RETURN drops the selected item at player's feet."""
+        examine.obstacles.clear()
+        examine.ground_items.clear()
+        game.party.shared_inventory.clear()
+        game.party.inv_add("Stones")
+        assert game.party.inv_count("Stones") == 1
+        examine._enter_drop_mode()
+        examine.handle_input([make_event(pygame.K_RETURN)], [0] * 512)
+        pos = (examine.player_col, examine.player_row)
+        assert pos in examine.ground_items
+        assert examine.ground_items[pos]["item"] == "Stones"
+        assert game.party.inv_count("Stones") == 0
+        assert examine.drop_mode is False
+
+    def test_drop_sets_message(self, examine, game):
+        """Dropping an item shows a drop confirmation message."""
+        examine.obstacles.clear()
+        examine.ground_items.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        examine._confirm_drop()
+        assert "Dropped" in examine.drop_message
+        assert "Torch" in examine.drop_message
+        assert examine.drop_msg_timer > 0
+
+    def test_drop_message_fades(self, examine, game):
+        """Drop message should fade after timer expires."""
+        examine.obstacles.clear()
+        examine.ground_items.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        examine._confirm_drop()
+        assert examine.drop_msg_timer > 0
+        examine.update(3.0)
+        assert examine.drop_msg_timer == 0
+        assert examine.drop_message == ""
+
+    def test_cant_drop_on_occupied_tile(self, examine, game):
+        """Can't drop an item where one already exists."""
+        examine.obstacles.clear()
+        pos = (examine.player_col, examine.player_row)
+        examine.ground_items[pos] = {"item": "Stones", "gold": 0}
+        game.party.shared_inventory.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        examine._confirm_drop()
+        # Should not have been dropped — item still in inventory
+        assert game.party.inv_count("Torch") == 1
+        assert examine.ground_items[pos]["item"] == "Stones"
+        assert "already" in examine.drop_message.lower()
+
+    def test_cant_drop_on_obstacle(self, examine, game):
+        """Can't drop an item on an obstacle tile."""
+        pos = (examine.player_col, examine.player_row)
+        examine.obstacles[pos] = "tree"
+        examine.ground_items.clear()
+        game.party.shared_inventory.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        examine._confirm_drop()
+        assert game.party.inv_count("Torch") == 1
+        assert pos not in examine.ground_items
+
+    def test_drop_deduplicates_inventory(self, examine, game):
+        """Drop list should show unique item names, not duplicates."""
+        game.party.shared_inventory.clear()
+        game.party.inv_add("Stones")
+        game.party.inv_add("Stones")
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        # Should have 2 unique items (Stones, Torch), not 3
+        assert len(examine.drop_items) == 2
+        assert "Stones" in examine.drop_items
+        assert "Torch" in examine.drop_items
+
+    def test_movement_blocked_in_drop_mode(self, examine, game):
+        """Arrow keys shouldn't move the player during drop mode."""
+        examine.obstacles.clear()
+        game.party.inv_add("Torch")
+        examine._enter_drop_mode()
+        start_col = examine.player_col
+        start_row = examine.player_row
+        examine.handle_input([make_event(pygame.K_RIGHT)], [0] * 512)
+        # Player shouldn't move (RIGHT is consumed by drop mode)
+        assert examine.player_col == start_col
+        assert examine.player_row == start_row

@@ -4996,7 +4996,9 @@ class Renderer(CombatEffectRendererMixin):
 
     def draw_examine_area(self, player_col, player_row, tile_type,
                           obstacles=None, ground_items=None, tile_name="",
-                          party_member_name="", pickup_message=""):
+                          party_member_name="", pickup_message="",
+                          drop_mode=False, drop_items=None, drop_cursor=0,
+                          drop_message=""):
         """Draw the examine-area screen (12×14 grid with themed tiles)."""
         from src.settings import (
             TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
@@ -5069,7 +5071,7 @@ class Renderer(CombatEffectRendererMixin):
         y += 24
 
         # Instructions
-        for txt in ("Arrow Keys: Move", "ESC: Return"):
+        for txt in ("Arrow Keys: Move", "Q: Drop Item", "ESC: Return"):
             inst = self.font_small.render(txt, True, (120, 120, 120))
             self.screen.blit(inst, (panel_x, y))
             y += 20
@@ -5080,6 +5082,40 @@ class Renderer(CombatEffectRendererMixin):
             pm = self.font_small.render(pickup_message, True,
                                         (255, 220, 80))
             self.screen.blit(pm, (panel_x, y))
+
+        # Drop message
+        if drop_message:
+            y += 12
+            dm = self.font_small.render(drop_message, True,
+                                        (180, 220, 255))
+            self.screen.blit(dm, (panel_x, y))
+
+        # Drop mode overlay
+        if drop_mode and drop_items:
+            self._draw_drop_selector(panel_x, my + 200,
+                                     drop_items, drop_cursor)
+
+    def _draw_drop_selector(self, x, y, items, cursor):
+        """Draw the drop-item selection list."""
+        # Background panel
+        panel_w = 180
+        panel_h = 24 + len(items) * 20
+        pygame.draw.rect(self.screen, (20, 20, 40),
+                         pygame.Rect(x, y, panel_w, panel_h))
+        pygame.draw.rect(self.screen, (80, 80, 140),
+                         pygame.Rect(x, y, panel_w, panel_h), 1)
+        # Title
+        title = self.font_small.render("Drop which item?", True,
+                                       (200, 200, 255))
+        self.screen.blit(title, (x + 6, y + 4))
+        iy = y + 22
+        for idx, name in enumerate(items):
+            color = (255, 255, 100) if idx == cursor else (160, 160, 160)
+            prefix = "> " if idx == cursor else "  "
+            item_surf = self.font_small.render(f"{prefix}{name}",
+                                               True, color)
+            self.screen.blit(item_surf, (x + 6, iy))
+            iy += 20
 
     def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):
         """Draw an interior floor tile themed by overworld tile type."""

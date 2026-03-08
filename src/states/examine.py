@@ -4,6 +4,9 @@ Examine state — zoomed-in local area view of the current overworld tile.
 Pressing E on the overworld opens this state, which shows a 12×14 tile grid
 themed to match the terrain.  The player walks a single character around and
 can pick up randomly-spawned items.  Press ESC to return to the overworld.
+
+Tile layouts (obstacles and ground items) are persisted so revisiting a tile
+shows the same layout.  The player can drop inventory items with Q.
 """
 
 import random
@@ -72,6 +75,12 @@ class ExamineState(BaseState):
         self.pickup_msg_timer = 0         # ms remaining
         self.tile_name = ""
         self.party_member_name = ""
+        # Drop mode state
+        self.drop_mode = False
+        self.drop_cursor = 0
+        self.drop_items = []              # list of item names available to drop
+        self.drop_message = ""
+        self.drop_msg_timer = 0
 
     # ── Lifecycle ─────────────────────────────────────────────────
 
@@ -90,13 +99,54 @@ class ExamineState(BaseState):
         self.player_row = _START_ROW
         self.pickup_message = ""
         self.pickup_msg_timer = 0
+        self.drop_mode = False
+        self.drop_cursor = 0
+        self.drop_items = []
+        self.drop_message = ""
+        self.drop_msg_timer = 0
 
-        self._spawn_obstacles()
-        self._spawn_examine_items()
+        # Check for a saved layout for this overworld tile
+        saved = self.game.get_examined_tile(party.col, party.row)
+        if saved is not None:
+            self._restore_layout(saved)
+        else:
+            self._spawn_obstacles()
+            self._spawn_examine_items()
 
     def exit(self):
+        # Save the current layout before leaving
+        party = self.game.party
+        self._save_layout(party.col, party.row)
         self.ground_items.clear()
         self.obstacles.clear()
+
+    # ── Persistence ──────────────────────────────────────────────
+
+    def _save_layout(self, col, row):
+        """Persist current obstacles and ground items for this tile."""
+        data = {
+            "obstacles": dict(self.obstacles),
+            "ground_items": {
+                f"{c},{r}": v
+                for (c, r), v in self.ground_items.items()
+            },
+        }
+        self.game.save_examined_tile(col, row, data)
+
+    def _restore_layout(self, saved):
+        """Restore obstacles and ground items from saved data."""
+        self.obstacles.clear()
+        self.ground_items.clear()
+        for pos, kind in saved.get("obstacles", {}).items():
+            if isinstance(pos, tuple):
+                self.obstacles[pos] = kind
+            else:
+                # Saved keys may be "col,row" strings
+                c, r = pos.split(",")
+                self.obstacles[(int(c), int(r))] = kind
+        for pos_str, item_data in saved.get("ground_items", {}).items():
+            c, r = pos_str.split(",")
+            self.ground_items[(int(c), int(r))] = dict(item_data)
 
     # ── Input ─────────────────────────────────────────────────────
 
@@ -104,6 +154,9 @@ class ExamineState(BaseState):
         for event in events:
             if event.type != pygame.KEYDOWN:
                 continue
+            if self.drop_mode:
+                self._handle_drop_input(event)
+                return
             if event.key == pygame.K_ESCAPE:
                 self.game.change_state("overworld")
                 return
@@ -115,6 +168,22 @@ class ExamineState(BaseState):
                 self._try_move(-1, 0)
             elif event.key in (pygame.K_RIGHT, pygame.K_d):
                 self._try_move(1, 0)
+            elif event.key == pygame.K_q:
+                self._enter_drop_mode()
+
+    def _handle_drop_input(self, event):
+        """Handle input while in drop-item selection mode."""
+        if event.key == pygame.K_ESCAPE:
+            self.drop_mode = False
+            return
+        if event.key in (pygame.K_UP, pygame.K_w):
+            if self.drop_cursor > 0:
+                self.drop_cursor -= 1
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            if self.drop_cursor < len(self.drop_items) - 1:
+                self.drop_cursor += 1
+        elif event.key == pygame.K_RETURN:
+            self._confirm_drop()
 
     # ── Update ────────────────────────────────────────────────────
 
@@ -124,6 +193,11 @@ class ExamineState(BaseState):
             if self.pickup_msg_timer <= 0:
                 self.pickup_message = ""
                 self.pickup_msg_timer = 0
+        if self.drop_msg_timer > 0:
+            self.drop_msg_timer -= dt * 1000
+            if self.drop_msg_timer <= 0:
+                self.drop_message = ""
+                self.drop_msg_timer = 0
 
     # ── Draw ──────────────────────────────────────────────────────
 
@@ -137,6 +211,10 @@ class ExamineState(BaseState):
             tile_name=self.tile_name,
             party_member_name=self.party_member_name,
             pickup_message=self.pickup_message,
+            drop_mode=self.drop_mode,
+            drop_items=self.drop_items,
+            drop_cursor=self.drop_cursor,
+            drop_message=self.drop_message,
         )
 
     # ── Movement ──────────────────────────────────────────────────
@@ -220,3 +298,54 @@ class ExamineState(BaseState):
             self.pickup_message = f"Picked up {', '.join(parts)}!"
             self.pickup_msg_timer = 2000
             self.game.sfx.play("chirp")
+
+    # ── Drop items ───────────────────────────────────────────────
+
+    def _enter_drop_mode(self):
+        """Open the drop-item selector from current inventory."""
+        names = self.game.party.inv_names()
+        if not names:
+            self.pickup_message = "Nothing to drop."
+            self.pickup_msg_timer = 1500
+            return
+        # Deduplicate while preserving order
+        seen = set()
+        unique = []
+        for n in names:
+            if n not in seen:
+                seen.add(n)
+                unique.append(n)
+        self.drop_items = unique
+        self.drop_cursor = 0
+        self.drop_mode = True
+
+    def _confirm_drop(self):
+        """Drop the selected item at the player's feet."""
+        if not self.drop_items:
+            self.drop_mode = False
+            return
+        item_name = self.drop_items[self.drop_cursor]
+        pos = (self.player_col, self.player_row)
+
+        # Can't drop on a tile that already has an item or an obstacle
+        if pos in self.ground_items:
+            self.drop_message = "Something is already here."
+            self.drop_msg_timer = 1500
+            self.drop_mode = False
+            return
+        if pos in self.obstacles:
+            self.drop_message = "Can't drop here."
+            self.drop_msg_timer = 1500
+            self.drop_mode = False
+            return
+
+        removed = self.game.party.inv_remove(item_name)
+        if removed is None:
+            self.drop_mode = False
+            return
+
+        self.ground_items[pos] = {"item": item_name, "gold": 0}
+        self.drop_message = f"Dropped {item_name}."
+        self.drop_msg_timer = 2000
+        self.drop_mode = False
+        self.game.sfx.play("chirp")
