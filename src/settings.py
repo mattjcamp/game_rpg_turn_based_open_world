@@ -108,3 +108,6 @@ COLOR_HUD_TEXT = (220, 220, 220)
 
 # ----- Party marker -----
 PARTY_COLOR = (255, 255, 255)
+
+# ----- Graphics manifest -----
+TILE_MANIFEST_PATH = "data/tile_manifest.json"

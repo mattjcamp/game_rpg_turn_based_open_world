@@ -1,0 +1,98 @@
+{
+    "_comment": "Single source of truth for all game graphics. Maps every visual element to an individual PNG file path (relative to project root). Edit paths here to reskin the game.",
+    "_version": 1,
+
+    "overworld": {
+        "grass":            { "path": "src/assets/tile_sheet_extracted/grass_0_1.png",    "tile_id": 0 },
+        "water":            { "path": "src/assets/tile_sheet_extracted/water_0_0.png",    "tile_id": 1 },
+        "forest":           { "path": "src/assets/tile_sheet_extracted/forest_0_3.png",   "tile_id": 2 },
+        "mountain":         { "path": "src/assets/tile_sheet_extracted/mountain_0_4.png", "tile_id": 3 },
+        "town":             { "path": "src/assets/tile_sheet_extracted/town_0_6.png",     "tile_id": 4 },
+        "dungeon":          { "path": "src/assets/tile_sheet_extracted/dungeon_0_5.png",  "tile_id": 5 },
+        "path":             { "path": "src/assets/tile_sheet_extracted/path_0_2.png",     "tile_id": 6 },
+        "sand":             { "path": "src/assets/tile_sheet_extracted/sand_0_7.png",     "tile_id": 7 },
+        "bridge":           { "path": "src/assets/tile_sheet_extracted/bridge_0_10.png",  "tile_id": 8 },
+        "dungeon_cleared":  { "path": "src/assets/tile_sheet_extracted/dungeon_0_5.png",  "tile_id": 9 }
+    },
+
+    "town": {
+        "floor":    { "path": "src/assets/tile_sheet_extracted/grass_0_1.png",    "tile_id": 10 },
+        "wall":     { "path": "src/assets/tile_sheet_extracted/wall_0_8.png",     "tile_id": 11 },
+        "counter":  { "path": "src/assets/tile_sheet_extracted/counter_0_12.png", "tile_id": 12 },
+        "door":     { "path": "src/assets/tile_sheet_extracted/door_0_13.png",    "tile_id": 13 },
+        "exit":     { "path": "src/assets/tile_sheet_extracted/town_0_6.png",     "tile_id": 14 },
+        "altar":    { "path": "src/assets/tile_sheet_extracted/altar_0_14.png",   "tile_id": 35 }
+    },
+
+    "dungeon": {
+        "dfloor":       { "path": "src/assets/u4_tiles/brick_floor.png",    "tile_id": 20 },
+        "dwall":        { "path": "src/assets/u4_tiles/brick_wall.png",     "tile_id": 21 },
+        "stairs":       { "path": "src/assets/u4_tiles/brick_floor.png",    "tile_id": 22 },
+        "chest":        { "path": "src/assets/chest_tile.png",              "tile_id": 23 },
+        "trap":         { "path": "src/assets/u4_tiles/brick_floor.png",    "tile_id": 24 },
+        "stairs_down":  { "path": "src/assets/u4_tiles/brick_floor.png",    "tile_id": 25 },
+        "ddoor":        { "path": "src/assets/u4_tiles/locked_door.png",    "tile_id": 26 },
+        "artifact":     { "path": "src/assets/u4_tiles/sparkle.png",        "tile_id": 27 },
+        "portal":       { "path": "src/assets/u4_tiles/portal_open.png",    "tile_id": 28 },
+        "locked_door":  { "path": "src/assets/u4_tiles/locked_door.png",    "tile_id": 29 },
+        "machine":      { "path": "src/assets/u4_tiles/brick_floor.png",    "tile_id": 30 },
+        "keyslot":      { "path": "src/assets/u4_tiles/brick_floor.png",    "tile_id": 31 },
+        "puddle":       { "path": "src/assets/u4_tiles/shallow_water.png",  "tile_id": 32 },
+        "moss":         { "path": "src/assets/u4_tiles/swamp.png",          "tile_id": 33 },
+        "wall_torch":   { "path": "src/assets/u4_tiles/torch_post.png",    "tile_id": 34 }
+    },
+
+    "characters": {
+        "fighter":      { "path": "src/assets/Ultima3_AMI_sprite_fighter.png" },
+        "cleric":       { "path": "src/assets/Ultima3_AMI_sprite_cleric.png" },
+        "wizard":       { "path": "src/assets/Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png" },
+        "thief":        { "path": "src/assets/Ultima3_AMI_sprite_thief.png" },
+        "barbarian":    { "path": "src/assets/Ultima3_AMI_sprite_barbarian.png" },
+        "alchemist":    { "path": "src/assets/u4_tiles/healer_alt_f1.png" },
+        "illusionist":  { "path": "src/assets/u4_tiles/mage.png" },
+        "druid":        { "path": "src/assets/u4_tiles/druid.png" },
+        "paladin":      { "path": "src/assets/u4_tiles/paladin.png" },
+        "ranger":       { "path": "src/assets/u4_tiles/ranger.png" },
+        "lark":         { "path": "src/assets/u4_tiles/bard.png" }
+    },
+
+    "npcs": {
+        "shopkeep":     { "path": "src/assets/steele_tiles/vga_tinker_f1.png" },
+        "innkeeper":    { "path": "src/assets/steele_tiles/vga_bard_f1.png" },
+        "elder":        { "path": "src/assets/steele_tiles/vga_lord_f1.png" },
+        "villager_0":   { "path": "src/assets/steele_tiles/vga_citizen_f1.png" },
+        "villager_1":   { "path": "src/assets/steele_tiles/vga_shepherd_f1.png" },
+        "villager_2":   { "path": "src/assets/steele_tiles/vga_singing_bard_f1.png" },
+        "villager_3":   { "path": "src/assets/steele_tiles/vga_guard_f1.png" },
+        "villager_4":   { "path": "src/assets/steele_tiles/vga_beggar_f1.png" },
+        "villager_5":   { "path": "src/assets/steele_tiles/vga_child_f1.png" }
+    },
+
+    "monsters": {
+        "giant_rat":    { "path": "src/assets/giant_rat_f1.png" },
+        "skeleton":     { "path": "src/assets/skeleton_f1.png" },
+        "orc":          { "path": "src/assets/orc_f1.png" },
+        "goblin":       { "path": "src/assets/goblin_f1.png" },
+        "zombie":       { "path": "src/assets/zombie_f1.png" },
+        "wolf":         { "path": "src/assets/wolf_f1.png" },
+        "dark_mage":    { "path": "src/assets/dark_mage_f1.png" },
+        "troll":        { "path": "src/assets/troll_f1.png" }
+    },
+
+    "unique_tiles": {
+        "moongate":             { "path": "src/assets/moongate_active.png" },
+        "moongate_dormant":     { "path": "src/assets/moongate_portal.png" },
+        "ruined_tower":         { "path": "src/assets/castle.png" },
+        "sunken_shipwreck":     { "path": "src/assets/pirate_ship.png" },
+        "lava_vent":            { "path": "src/assets/lava_fire_field.png" },
+        "smuggler_tunnel":      { "path": "src/assets/dungeon_entrance.png" },
+        "seal_of_binding":      { "path": "src/assets/moongate_active.png" },
+        "poison_swamp":         { "path": "src/assets/poison_flames.png" },
+        "treasure_hoard":       { "path": "src/assets/treasure_chest.png" }
+    },
+
+    "objects": {
+        "chest":        { "path": "src/assets/chest_tile.png" },
+        "town_gate":    { "path": "src/assets/town_gate.png" }
+    }
+}

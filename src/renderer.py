@@ -18,6 +18,8 @@ from src.settings import (
     TILE_SIZE, TILE_DEFS, VIEWPORT_COLS, VIEWPORT_ROWS,
     COLOR_BLACK, COLOR_WHITE, COLOR_YELLOW, COLOR_HUD_BG, COLOR_HUD_TEXT,
     PARTY_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT,
+    TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+    TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
@@ -34,6 +36,18 @@ class Renderer(CombatEffectRendererMixin):
         self.font = pygame.font.SysFont("monospace", 18)
         self.font_med = pygame.font.SysFont("monospace", 16)
         self.font_small = pygame.font.SysFont("monospace", 14)
+
+        # Load unified tile manifest — single source of truth for all sprites
+        from src.tile_manifest import TileManifest
+        self._manifest = TileManifest()
+        self._manifest.load()
+        missing = self._manifest.validate()
+        if missing:
+            import logging
+            for cat, name, path in missing:
+                logging.getLogger(__name__).warning(
+                    "Manifest asset missing: %s/%s -> %s", cat, name, path)
+
         self._load_class_sprites()
         self._load_tile_sheet()
 
@@ -41,20 +55,24 @@ class Renderer(CombatEffectRendererMixin):
         self._action_panel_expand = 0.0
 
     def _load_tile_sheet(self):
-        """Load U3TilesE.gif and extract individual 16x16 tiles, scaled to 32x32."""
+        """Load all terrain, monster, NPC, and object sprites via manifest.
+
+        Populates the same instance variables as before so all downstream
+        rendering code works unchanged — only the loading source changed
+        from scattered hardcoded paths to the unified tile manifest.
+        """
         import os
         assets_dir = os.path.join(os.path.dirname(__file__), "assets")
-        sheet_path = os.path.join(assets_dir, "U3TilesE.gif")
+        dst_ts = 32  # destination tile size
 
-        self._tile_sprites = {}  # (row, col) -> 32x32 pygame surface
-
-        # ── Always initialise tile maps & sprite caches ──
-        # (These must exist even when the sprite sheet is missing.)
+        # ── Always initialise sprite caches ──
+        self._tile_sprites = {}       # tile_id -> 32x32 surface
         self._chest_tile = None
         self._town_gate_tile = None
-        self._monster_tiles = {}
-        self._npc_sprites = {}
-        self._villager_sprites = []
+        self._monster_tiles = {}      # filename -> 32x32 surface
+        self._npc_sprites = {}        # npc_type -> 32x32 surface
+        self._villager_sprites = []   # list of 32x32 surfaces
+        self._dungeon_tiles = {}      # tile_id -> 32x32 surface (NEW)
         self._unique_tile_sprites = {}
         self._assets_dir = assets_dir
 
@@ -64,164 +82,120 @@ class Renderer(CombatEffectRendererMixin):
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
             TILE_DFLOOR, TILE_DWALL, TILE_CHEST,
         )
+
+        # ── Backward-compat tile maps (overworld_tile_map still keyed
+        #    by tile_id but now maps to tile_id itself for _get_tile_sprite) ──
         self._overworld_tile_map = {
-            TILE_WATER:    (0, 0),
-            TILE_GRASS:    (0, 1),
-            TILE_FOREST:   (0, 3),
-            TILE_MOUNTAIN: (0, 4),
-            TILE_DUNGEON:  (0, 5),
-            TILE_DUNGEON_CLEARED: (0, 5),   # same sprite, tinted by procedural overlay
-            TILE_TOWN:     (0, 6),
-            TILE_PATH:     (0, 2),
-            TILE_CHEST:    (0, 9),
+            TILE_WATER: TILE_WATER, TILE_GRASS: TILE_GRASS,
+            TILE_FOREST: TILE_FOREST, TILE_MOUNTAIN: TILE_MOUNTAIN,
+            TILE_DUNGEON: TILE_DUNGEON,
+            TILE_DUNGEON_CLEARED: TILE_DUNGEON,  # same sprite
+            TILE_TOWN: TILE_TOWN, TILE_PATH: TILE_PATH,
+            TILE_CHEST: TILE_CHEST,
         }
         self._town_tile_map = {
-            TILE_FLOOR:    (0, 1),
-            TILE_WALL:     (0, 8),
-            TILE_CHEST:    (0, 9),
-            TILE_EXIT:     (0, 6),
+            TILE_FLOOR: TILE_FLOOR, TILE_WALL: TILE_WALL,
+            TILE_CHEST: TILE_CHEST, TILE_EXIT: TILE_EXIT,
         }
-        self._dungeon_tile_map = {}  # populated below if sheet exists
+        self._dungeon_tile_map = {}
 
-        if not os.path.exists(sheet_path):
-            return
+        m = self._manifest
 
-        sheet = pygame.image.load(sheet_path).convert_alpha()
-        src_ts = 16  # source tile size
-        dst_ts = 32  # destination tile size (our game tile size)
-        cols = sheet.get_width() // src_ts   # 16
-        rows = sheet.get_height() // src_ts  # 5
+        # ── Load overworld terrain tiles from manifest ──
+        for name in m.names_in("overworld"):
+            entry = m.get_entry_by_name("overworld", name)
+            if entry and "tile_id" in entry:
+                sprite = m.get_sprite(entry["tile_id"], dst_ts)
+                if sprite:
+                    self._tile_sprites[entry["tile_id"]] = sprite
 
-        for r in range(rows):
-            for c in range(cols):
-                tile_surf = sheet.subsurface(
-                    pygame.Rect(c * src_ts, r * src_ts, src_ts, src_ts))
-                scaled = pygame.transform.scale(tile_surf, (dst_ts, dst_ts))
-                self._tile_sprites[(r, c)] = scaled
+        # ── Load town interior tiles from manifest ──
+        for name in m.names_in("town"):
+            entry = m.get_entry_by_name("town", name)
+            if entry and "tile_id" in entry:
+                sprite = m.get_sprite(entry["tile_id"], dst_ts)
+                if sprite:
+                    self._tile_sprites[entry["tile_id"]] = sprite
 
-        # ── Load treasure chest tile from reference doc asset ──
-        assets_dir = self._assets_dir
-        chest_path = os.path.join(assets_dir, "chest_tile.png")
-        if os.path.exists(chest_path):
-            raw = pygame.image.load(chest_path).convert_alpha()
-            self._chest_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
+        # ── Load dungeon base tiles from manifest ──
+        for name in m.names_in("dungeon"):
+            entry = m.get_entry_by_name("dungeon", name)
+            if entry and "tile_id" in entry:
+                sprite = m.get_sprite_by_name("dungeon", name, dst_ts)
+                if sprite:
+                    self._dungeon_tiles[entry["tile_id"]] = sprite
 
-        # ── Load town gate tile ──
-        gate_path = os.path.join(assets_dir, "town_gate.png")
-        if os.path.exists(gate_path):
-            raw = pygame.image.load(gate_path).convert_alpha()
-            self._town_gate_tile = pygame.transform.scale(raw, (dst_ts, dst_ts))
+        # ── Load special object tiles from manifest ──
+        self._chest_tile = m.get_sprite_by_name("objects", "chest", dst_ts)
+        self._town_gate_tile = m.get_sprite_by_name(
+            "objects", "town_gate", dst_ts)
 
-        # ── Load monster tile sprites from assets ──
+        # ── Load monster sprites from manifest ──
         from src.monster import MONSTERS
-        for name, data in MONSTERS.items():
+        for mon_name, data in MONSTERS.items():
             tile_file = data.get("tile")
             if tile_file and tile_file not in self._monster_tiles:
-                tile_path = os.path.join(assets_dir, tile_file)
-                if os.path.exists(tile_path):
-                    raw = pygame.image.load(tile_path).convert_alpha()
-                    self._monster_tiles[tile_file] = pygame.transform.scale(
-                        raw, (dst_ts, dst_ts))
+                # Try manifest first, fall back to direct load
+                sprite = None
+                for mname in m.names_in("monsters"):
+                    entry = m.get_entry_by_name("monsters", mname)
+                    if entry and entry["path"].endswith(tile_file):
+                        sprite = m.get_sprite_by_name(
+                            "monsters", mname, dst_ts)
+                        break
+                if sprite is None:
+                    # Direct load fallback for monsters not yet in manifest
+                    tile_path = os.path.join(assets_dir, tile_file)
+                    if os.path.exists(tile_path):
+                        raw = pygame.image.load(tile_path).convert_alpha()
+                        sprite = pygame.transform.scale(raw, (dst_ts, dst_ts))
+                if sprite:
+                    self._monster_tiles[tile_file] = sprite
 
-        # ── Load NPC type sprites from VGA / U4 tiles ──
-        npc_sprite_map = {
-            "shopkeep":  "steele_tiles/vga_tinker_f1.png",
-            "innkeeper": "steele_tiles/vga_bard_f1.png",
-            "elder":     "steele_tiles/vga_lord_f1.png",
-        }
-        villager_files = [
-            "steele_tiles/vga_citizen_f1.png",
-            "steele_tiles/vga_shepherd_f1.png",
-            "steele_tiles/vga_singing_bard_f1.png",
-            "steele_tiles/vga_guard_f1.png",
-            "steele_tiles/vga_beggar_f1.png",
-            "steele_tiles/vga_child_f1.png",
-        ]
-        for ntype, fname in npc_sprite_map.items():
-            npc_path = os.path.join(assets_dir, fname)
-            if os.path.exists(npc_path):
-                raw = pygame.image.load(npc_path).convert_alpha()
-                self._npc_sprites[ntype] = pygame.transform.scale(
-                    raw, (dst_ts, dst_ts))
-        for fname in villager_files:
-            vpath = os.path.join(assets_dir, fname)
-            if os.path.exists(vpath):
-                raw = pygame.image.load(vpath).convert_alpha()
-                self._villager_sprites.append(
-                    pygame.transform.scale(raw, (dst_ts, dst_ts)))
+        # ── Load NPC sprites from manifest ──
+        npc_roles = ["shopkeep", "innkeeper", "elder"]
+        for role in npc_roles:
+            sprite = m.get_sprite_by_name("npcs", role, dst_ts)
+            if sprite:
+                self._npc_sprites[role] = sprite
+
+        for i in range(6):
+            sprite = m.get_sprite_by_name("npcs", f"villager_{i}", dst_ts)
+            if sprite:
+                self._villager_sprites.append(sprite)
+
+        # ── Load skeleton fallback for monster sprite misses ──
+        skel_path = os.path.join(
+            assets_dir, "tile_sheet_extracted", "skeleton_fallback_1_9.png")
+        if os.path.exists(skel_path):
+            raw = pygame.image.load(skel_path).convert_alpha()
+            self._skeleton_fallback = pygame.transform.scale(
+                raw, (dst_ts, dst_ts))
+        else:
+            self._skeleton_fallback = None
 
     def _get_tile_sprite(self, tile_id):
-        """Return the sprite surface for an overworld tile, or None."""
-        pos = self._overworld_tile_map.get(tile_id)
-        if pos:
-            return self._tile_sprites.get(pos)
-        return None
+        """Return the sprite surface for an overworld/town tile, or None."""
+        mapped_id = self._overworld_tile_map.get(tile_id, tile_id)
+        return self._tile_sprites.get(mapped_id)
 
     def _load_class_sprites(self):
-        """Load character class sprites.
+        """Load character class sprites from the tile manifest.
 
-        Primary source: larger Amiga-style sprites in src/assets/.
-        Fallback: U4 16×16 tile sprites in src/assets/u4_tiles/ for any
-        class that doesn't have an Amiga sprite.  The U4 tiles are scaled
-        to 32×32 so they're comparable in size to the Amiga sprites.
+        All class-to-sprite mappings are defined in data/tile_manifest.json
+        under the 'characters' section.  This replaces the previous
+        Amiga-primary / U4-fallback chain with a single manifest lookup.
         """
-        import os
-        sprite_dir = os.path.join(os.path.dirname(__file__), "assets")
-
-        # Primary sprites (Amiga-style, ~28-34 px)
-        sprite_files = {
-            "fighter":     "Ultima3_AMI_sprite_fighter.png",
-            "cleric":      "Ultima3_AMI_sprite_cleric.png",
-            "wizard":      "Ultima3_AMI_sprite_wizard-alcmt-ilsnt.png",
-            "thief":       "Ultima3_AMI_sprite_thief.png",
-            "barbarian":   "Ultima3_AMI_sprite_barbarian.png",
-        }
-
-        # U4 tile fallbacks for classes without Amiga sprites.
-        # Maps class name -> filename in src/assets/u4_tiles/
-        u4_tile_dir = os.path.join(os.path.dirname(__file__), "assets", "u4_tiles")
-        u4_class_tiles = {
-            "alchemist":   "healer_alt_f1.png", # alchemist tile
-            "illusionist": "mage.png",           # blue-robed mage
-            "druid":       "druid.png",          # red-robed druid
-            "paladin":     "paladin.png",        # green-caped paladin
-            "ranger":      "ranger.png",         # orange-clad ranger
-            "lark":        "bard.png",           # bard (closest to lark)
-        }
-
         self._class_sprites = {}       # class name -> original-size surface
         self._class_sprites_big = {}   # class name -> scaled up for party screen
 
-        # Load primary Amiga sprites
-        for cls_name, filename in sprite_files.items():
-            path = os.path.join(sprite_dir, filename)
-            if os.path.exists(path):
-                img = pygame.image.load(path).convert_alpha()
-                self._class_sprites[cls_name] = img
-                big = pygame.transform.scale(
-                    img, (img.get_width() * 3, img.get_height() * 3))
-                self._class_sprites_big[cls_name] = big
-
-        # Load U4 tile sprites for any class still missing
-        for cls_name, filename in u4_class_tiles.items():
-            if cls_name in self._class_sprites:
-                continue  # already loaded from primary source
-            path = os.path.join(u4_tile_dir, filename)
-            if os.path.exists(path):
-                raw = pygame.image.load(path).convert_alpha()
-                # Make black pixels transparent (U4 tiles use black bg)
-                raw = raw.convert_alpha()
-                w, h = raw.get_size()
-                for px in range(w):
-                    for py in range(h):
-                        r, g, b, a = raw.get_at((px, py))
-                        if r == 0 and g == 0 and b == 0:
-                            raw.set_at((px, py), (0, 0, 0, 0))
-                # Scale 16×16 → 32×32 to match game tile size
-                scaled = pygame.transform.scale(raw, (32, 32))
-                self._class_sprites[cls_name] = scaled
-                # 3× big version (32 → 96) for party screen
-                big = pygame.transform.scale(raw, (96, 96))
+        m = self._manifest
+        for cls_name in m.names_in("characters"):
+            sprite = m.get_sprite_by_name("characters", cls_name, 32)
+            if sprite:
+                self._class_sprites[cls_name] = sprite
+                w, h = sprite.get_size()
+                big = pygame.transform.scale(sprite, (w * 3, h * 3))
                 self._class_sprites_big[cls_name] = big
 
         # Create a white-tinted fighter sprite for the party map marker.
@@ -795,11 +769,11 @@ class Renderer(CombatEffectRendererMixin):
             return
 
         # Try town tile map first, then overworld tile map
-        pos = self._town_tile_map.get(tile_id)
-        if pos is None:
-            pos = self._overworld_tile_map.get(tile_id)
-        if pos is not None:
-            sprite = self._tile_sprites.get(pos)
+        mapped_id = self._town_tile_map.get(tile_id)
+        if mapped_id is None:
+            mapped_id = self._overworld_tile_map.get(tile_id)
+        if mapped_id is not None:
+            sprite = self._tile_sprites.get(mapped_id)
             if sprite:
                 self.screen.blit(sprite, (px, py))
                 return
@@ -3451,6 +3425,12 @@ class Renderer(CombatEffectRendererMixin):
         cy = py + ts // 2
         seed = wc * 31 + wr * 17
 
+        # ── Blit base tile sprite from manifest (if available) ──
+        # Procedural overlays below will draw on top of this.
+        base_sprite = self._dungeon_tiles.get(tile_id)
+        if base_sprite:
+            self.screen.blit(base_sprite, (px, py))
+
         if tile_id == TILE_DWALL:
             # Stone blocks — colors from level palette
             pygame.draw.rect(self.screen, palette["wall_base"], rect)
@@ -3867,8 +3847,8 @@ class Renderer(CombatEffectRendererMixin):
             sprite = self._monster_tiles.get(monster.tile)
             if sprite:
                 return sprite
-        # Fallback to tile sheet skeleton
-        return self._tile_sprites.get((1, 9))
+        # Fallback to skeleton sprite from extracted tile sheet
+        return self._skeleton_fallback
 
     def _u3_draw_dungeon_monster(self, monster, cx, cy):
         """Draw a monster in the dungeon using its unique tile sprite."""
@@ -4959,7 +4939,7 @@ class Renderer(CombatEffectRendererMixin):
     def _u3_draw_outdoor_floor_tile(self, px, py, ts, col, row):
         """Grass-style floor tile for outdoor combat arenas."""
         # Use grass sprite from tile sheet if available
-        sprite = self._tile_sprites.get((0, 1))  # grass tile
+        sprite = self._tile_sprites.get(TILE_GRASS)  # grass tile
         if sprite:
             self.screen.blit(sprite, (px, py))
         else:
@@ -4977,7 +4957,7 @@ class Renderer(CombatEffectRendererMixin):
     def _u3_draw_outdoor_edge_tile(self, px, py, ts, col, row):
         """Edge tiles for outdoor arena — forest/tree border."""
         # Use forest sprite from tile sheet if available
-        sprite = self._tile_sprites.get((0, 3))  # forest tile
+        sprite = self._tile_sprites.get(TILE_FOREST)  # forest tile
         if sprite:
             self.screen.blit(sprite, (px, py))
         else:
@@ -5126,7 +5106,7 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_draw_outdoor_floor_tile(px, py, ts, col, row)
         elif tile_type == TILE_FOREST:
             # Darker, denser grass with more undergrowth
-            sprite = self._tile_sprites.get((0, 1))  # grass tile
+            sprite = self._tile_sprites.get(TILE_GRASS)  # grass tile
             if sprite:
                 self.screen.blit(sprite, (px, py))
             else:
