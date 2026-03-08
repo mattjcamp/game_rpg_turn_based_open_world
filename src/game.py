@@ -17,6 +17,7 @@ from src.states.overworld import OverworldState
 from src.states.town import TownState
 from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
+from src.states.examine import ExamineState
 from src.town_generator import generate_town, generate_duskhollow
 from src.music import MusicManager, SoundEffects
 from src.save_load import (save_game, load_game, get_save_info,
@@ -153,6 +154,7 @@ class Game:
             "town": TownState(self),
             "dungeon": DungeonState(self),
             "combat": CombatState(self),
+            "examine": ExamineState(self),
         }
         self.current_state = None
         self.change_state("overworld")

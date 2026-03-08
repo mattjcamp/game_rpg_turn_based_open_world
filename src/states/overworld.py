@@ -330,6 +330,9 @@ class OverworldState(InventoryMixin, BaseState):
                 if event.key == pygame.K_h:
                     self.showing_help = True
                     return
+                if event.key == pygame.K_e:
+                    self.game.change_state("examine")
+                    return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
                     member = self.game.party.members[self.showing_char_detail]

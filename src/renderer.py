@@ -4988,6 +4988,158 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.circle(self.screen, (20, 80, 20), (cx, cy), 10)
             pygame.draw.circle(self.screen, (15, 60, 15), (cx, cy), 7)
 
+    # ── Examine area rendering ──────────────────────────────────
+
+    _EXAMINE_COLS = 12
+    _EXAMINE_ROWS = 14
+    _EXAMINE_TILE = 30  # px per tile
+
+    def draw_examine_area(self, player_col, player_row, tile_type,
+                          ground_items=None, tile_name="",
+                          party_member_name="", pickup_message=""):
+        """Draw the examine-area screen (12×14 grid with themed tiles)."""
+        from src.settings import (
+            TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
+        )
+        self.screen.fill(self._U3_BLACK)
+
+        mx, my = 20, 15
+        ts = self._EXAMINE_TILE
+        cols = self._EXAMINE_COLS
+        rows = self._EXAMINE_ROWS
+
+        # ── 1. draw grid tiles ──
+        for r in range(rows):
+            for c in range(cols):
+                px = mx + c * ts
+                py = my + r * ts
+                is_edge = (c == 0 or c == cols - 1
+                           or r == 0 or r == rows - 1)
+                if is_edge:
+                    self._draw_examine_edge_tile(px, py, ts, tile_type, c, r)
+                else:
+                    self._draw_examine_floor_tile(px, py, ts, tile_type, c, r)
+
+        # ── 2. draw ground items ──
+        if ground_items:
+            from src.party import ITEM_INFO
+            icon_sz = ts - 4
+            for (gc, gr), loot in ground_items.items():
+                gx = mx + gc * ts
+                gy = my + gr * ts
+                icx = gx + ts // 2
+                icy = gy + ts // 2
+                gold_amt = loot.get("gold", 0)
+                item_name = loot.get("item")
+                if gold_amt > 0:
+                    self._draw_item_icon(icx, icy, "chest", icon_sz)
+                elif item_name:
+                    info = ITEM_INFO.get(item_name, {})
+                    icon_type = info.get("icon", "potion")
+                    self._draw_item_icon(icx, icy, icon_type, icon_sz)
+
+        # ── 3. draw player sprite ──
+        self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
+
+        # ── 4. right info panel ──
+        panel_x = mx + cols * ts + 20
+        y = my + 4
+        # Title
+        title_surf = self.font_med.render(f"Examining: {tile_name}",
+                                          True, self._U3_WHITE)
+        self.screen.blit(title_surf, (panel_x, y))
+        y += 30
+
+        # Horizontal separator
+        pygame.draw.line(self.screen, (60, 60, 100),
+                         (panel_x, y), (panel_x + 180, y), 1)
+        y += 12
+
+        # Party member
+        mem_surf = self.font_small.render(party_member_name,
+                                          True, (160, 200, 255))
+        self.screen.blit(mem_surf, (panel_x, y))
+        y += 24
+
+        # Instructions
+        for txt in ("Arrow Keys: Move", "ESC: Return"):
+            inst = self.font_small.render(txt, True, (120, 120, 120))
+            self.screen.blit(inst, (panel_x, y))
+            y += 20
+
+        # Pickup message
+        if pickup_message:
+            y += 12
+            pm = self.font_small.render(pickup_message, True,
+                                        (255, 220, 80))
+            self.screen.blit(pm, (panel_x, y))
+
+    def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):
+        """Draw an interior floor tile themed by overworld tile type."""
+        from src.settings import (
+            TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
+        )
+        if tile_type in (TILE_GRASS, TILE_FOREST):
+            # Reuse the outdoor grass tile from combat
+            self._u3_draw_outdoor_floor_tile(px, py, ts, col, row)
+        elif tile_type == TILE_SAND:
+            # Sandy floor
+            pygame.draw.rect(self.screen, (50, 42, 18),
+                             pygame.Rect(px, py, ts, ts))
+            seed = (col * 31 + row * 17)
+            for i in range(3):
+                s = seed + i * 19
+                dx = (s * 7) % (ts - 6) + 3
+                dy = (s * 13) % (ts - 6) + 3
+                c = (170, 150, 70) if s % 2 else (150, 130, 60)
+                pygame.draw.rect(self.screen, c,
+                                 pygame.Rect(px + dx, py + dy, 2, 2))
+        elif tile_type == TILE_PATH:
+            # Dirt/path floor
+            pygame.draw.rect(self.screen, (60, 42, 22),
+                             pygame.Rect(px, py, ts, ts))
+            seed = (col * 31 + row * 17)
+            if seed % 4 < 2:
+                dx = (seed * 7) % (ts - 8) + 4
+                dy = (seed * 13) % (ts - 8) + 4
+                c = (90, 65, 35) if seed % 3 else (70, 50, 25)
+                pygame.draw.rect(self.screen, c,
+                                 pygame.Rect(px + dx, py + dy, 3, 2))
+        else:
+            # Default: grass
+            self._u3_draw_outdoor_floor_tile(px, py, ts, col, row)
+
+    def _draw_examine_edge_tile(self, px, py, ts, tile_type, col, row):
+        """Draw a border/edge tile themed by overworld tile type."""
+        from src.settings import (
+            TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH, TILE_MOUNTAIN,
+        )
+        if tile_type in (TILE_GRASS, TILE_FOREST):
+            # Forest trees
+            self._u3_draw_outdoor_edge_tile(px, py, ts, col, row)
+        elif tile_type == TILE_SAND:
+            # Sandy rocky border
+            pygame.draw.rect(self.screen, (35, 28, 10),
+                             pygame.Rect(px, py, ts, ts))
+            cx, cy = px + ts // 2, py + ts // 2
+            seed = (col * 13 + row * 7)
+            rc = (100, 85, 50) if seed % 2 else (80, 65, 35)
+            pygame.draw.circle(self.screen, rc, (cx, cy), 8)
+            pygame.draw.circle(self.screen, (60, 48, 25), (cx, cy), 5)
+        elif tile_type == TILE_PATH:
+            # Dense bushes / hedge border
+            pygame.draw.rect(self.screen, (15, 45, 15),
+                             pygame.Rect(px, py, ts, ts))
+            cx, cy = px + ts // 2, py + ts // 2
+            pygame.draw.circle(self.screen, (25, 70, 25), (cx, cy), 10)
+            pygame.draw.circle(self.screen, (18, 55, 18), (cx, cy), 7)
+        elif tile_type == TILE_MOUNTAIN:
+            # Rocky wall
+            self._u3_draw_wall_tile(px, py, ts)
+        else:
+            # Default: forest edge
+            self._u3_draw_outdoor_edge_tile(px, py, ts, col, row)
+
     def _u3_draw_orc_combat_sprite(self, monster, ax, ay, ts, col, row):
         """Draw monster using its unique tile sprite for overworld combat."""
         cx = ax + col * ts + ts // 2
