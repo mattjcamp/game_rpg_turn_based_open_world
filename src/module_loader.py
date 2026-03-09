@@ -90,6 +90,69 @@ _KEY_MATERIALS = [
     "Moonstone", "Opal", "Amethyst",
 ]
 
+# Per-dungeon description templates — shown when the player approaches.
+# {name} is replaced with the dungeon's generated name.
+_DUNGEON_DESCRIPTIONS = [
+    "The entrance to {name} gapes like a wound in the hillside. "
+    "A cold draught carries the scent of damp stone.",
+    "Crumbling pillars mark the way into {name}. "
+    "Faint scratching echoes from deep within.",
+    "Thick vines choke the mouth of {name}. "
+    "Beyond them, torchlight flickers in the gloom.",
+    "A rusted iron gate bars the path into {name}. "
+    "It swings open with a tortured groan at your touch.",
+    "Water seeps from the walls near {name}'s entrance. "
+    "The stone steps descend into darkness.",
+    "Bones litter the threshold of {name}. "
+    "Whatever guards this place does not welcome visitors.",
+    "The air around {name} shimmers with faint heat. "
+    "Strange runes glow along the doorframe.",
+    "A narrow crevice leads into {name}. "
+    "The sound of dripping water echoes endlessly below.",
+    "Moss-covered statues flank the entrance to {name}. "
+    "Their blank eyes seem to follow you.",
+    "A spiral staircase carved from bedrock descends into {name}. "
+    "The temperature drops with every step.",
+]
+
+# Individual quest objective templates — one assigned per dungeon so each
+# quest feels unique.  {key} is replaced with the key/artifact name.
+# {dungeon} is replaced with the dungeon name.
+_QUEST_OBJECTIVES = [
+    {
+        "objective": "Retrieve the {key} from {dungeon}",
+        "hint": "A powerful artifact lies in the deepest chamber.",
+    },
+    {
+        "objective": "Slay the guardian of {dungeon} and claim the {key}",
+        "hint": "A fearsome creature guards the prize.",
+    },
+    {
+        "objective": "Explore {dungeon} and recover the lost {key}",
+        "hint": "The artifact was hidden here long ago by a forgotten order.",
+    },
+    {
+        "objective": "Brave the depths of {dungeon} for the {key}",
+        "hint": "Few who enter these halls return unchanged.",
+    },
+    {
+        "objective": "Purge {dungeon} of evil and secure the {key}",
+        "hint": "Dark forces have claimed this place as their own.",
+    },
+    {
+        "objective": "Descend into {dungeon} and find the {key}",
+        "hint": "The passage grows more treacherous with every floor.",
+    },
+    {
+        "objective": "Search {dungeon} for the hidden {key}",
+        "hint": "Rumors say it was sealed away behind deadly traps.",
+    },
+    {
+        "objective": "Venture into {dungeon} and liberate the {key}",
+        "hint": "The artifact pulses with ancient energy.",
+    },
+]
+
 # Quest themes — each defines a narrative arc different from the gnome quest.
 # The win_condition remains "collect_keys" for now, but the flavour changes.
 _QUEST_THEMES = [
@@ -157,10 +220,17 @@ def _generate_town_names(count):
 
 
 def _generate_dungeon_entries(count, key_materials=None):
-    """Return *count* dungeon dicts with unique names and key names."""
+    """Return *count* dungeon dicts with unique names, keys, descriptions,
+    and quest objectives so every dungeon feels individual."""
     if key_materials is None:
         key_materials = list(_KEY_MATERIALS)
         random.shuffle(key_materials)
+
+    # Shuffle descriptions and objectives so each dungeon gets a unique one
+    descriptions = list(_DUNGEON_DESCRIPTIONS)
+    random.shuffle(descriptions)
+    objectives = list(_QUEST_OBJECTIVES)
+    random.shuffle(objectives)
 
     used_names = set()
     entries = []
@@ -182,12 +252,23 @@ def _generate_dungeon_entries(count, key_materials=None):
         material = key_materials[i % len(key_materials)]
         key_name = f"{material} Key"
 
+        # Unique description for this dungeon
+        desc = descriptions[i % len(descriptions)].format(name=dname)
+
+        # Unique quest objective for this dungeon
+        obj = objectives[i % len(objectives)]
+        quest_objective = obj["objective"].format(key=key_name, dungeon=dname)
+        quest_hint = obj["hint"]
+
         entries.append({
             "id": f"dungeon_key_{i + 1}",
             "name": dname,
             "key_name": key_name,
             "dungeon_number": i + 1,
             "landmark_id": f"dungeon_{i + 1}",
+            "description": desc,
+            "quest_objective": quest_objective,
+            "quest_hint": quest_hint,
         })
     return entries
 

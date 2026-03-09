@@ -3,13 +3,13 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Ironhold to restore the protective ward.",
+    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Hallowcrest to restore the protective ward.",
     "version": "0.1.0"
   },
   "settings": {
     "tile_size": 32,
-    "map_width": 32,
-    "map_height": 24,
+    "map_width": 64,
+    "map_height": 48,
     "viewport_cols": 30,
     "viewport_rows": 26,
     "max_party_size": 4,
@@ -18,7 +18,7 @@
       "year": 1,
       "month": 6,
       "day": 1,
-      "hour": 6,
+      "hour": 12,
       "minute": 0
     }
   },
@@ -27,12 +27,16 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ironhold",
-        "name": "Ironhold"
+        "id": "hallowcrest",
+        "name": "Hallowcrest"
       },
       {
-        "id": "stonehollow",
-        "name": "Stonehollow"
+        "id": "fernwall",
+        "name": "Fernwall"
+      },
+      {
+        "id": "nettleglen",
+        "name": "Nettleglen"
       }
     ],
     "dungeons": []
@@ -49,17 +53,23 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Forsaken Labyrinth",
-        "key_name": "Opal Key",
+        "name": "Hidden Halls",
+        "key_name": "Jade Key",
         "dungeon_number": 1,
-        "landmark_id": "dungeon_1"
+        "landmark_id": "dungeon_1",
+        "description": "Crumbling pillars mark the way into Hidden Halls. Faint scratching echoes from deep within.",
+        "quest_objective": "Search Hidden Halls for the hidden Jade Key",
+        "quest_hint": "Rumors say it was sealed away behind deadly traps."
       },
       {
         "id": "dungeon_key_2",
-        "name": "Blighted Cavern",
-        "key_name": "Copper Key",
+        "name": "Burning Sanctum",
+        "key_name": "Iron Key",
         "dungeon_number": 2,
-        "landmark_id": "dungeon_2"
+        "landmark_id": "dungeon_2",
+        "description": "The entrance to Burning Sanctum gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "quest_objective": "Retrieve the Iron Key from Burning Sanctum",
+        "quest_hint": "A powerful artifact lies in the deepest chamber."
       }
     ]
   }

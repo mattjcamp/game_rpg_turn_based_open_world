@@ -779,12 +779,19 @@ class OverworldState(InventoryMixin, BaseState):
 
         if kd:
             name = kd.get("name", "Key Dungeon")
-            desc = "A dark cave entrance leads deep underground. The air smells of ancient stone and danger."
+            # Use the dungeon's unique description if available
+            desc = kd.get("description") or (
+                "A dark cave entrance leads deep underground. "
+                "The air smells of ancient stone and danger."
+            )
             if kd["status"] == "completed":
                 cleared = True
                 quest_name = f"{kd.get('key_name', 'Key')} (completed)"
             else:
-                quest_name = f"Retrieve the {kd.get('key_name', 'Key')}"
+                # Use the dungeon's unique quest objective if available
+                quest_name = kd.get("quest_objective") or (
+                    f"Retrieve the {kd.get('key_name', 'Key')}"
+                )
             entry_type = "key_dungeon"
         elif (quest
                 and pcol == quest.get("dungeon_col")

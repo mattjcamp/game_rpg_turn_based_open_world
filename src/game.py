@@ -401,14 +401,18 @@ class Game:
                 "dungeon_col": col,
                 "dungeon_row": row,
                 "artifact_name": key_name,
+                "description": kd.get("description", ""),
+                "quest_objective": kd.get("quest_objective", ""),
+                "quest_hint": kd.get("quest_hint", ""),
             }
 
     def _init_module_towns(self):
         """Generate towns for the active module and store in town_data_map.
 
         Reads town landmarks from the overworld config and generates a
-        TownData for each.  The first town becomes ``self.town_data``
-        (the default / hub town).
+        unique TownData for each (using a per-town seed so that layouts,
+        NPCs, and dialogue vary).  The first town becomes
+        ``self.town_data`` (the default / hub town).
         """
         overworld_cfg = self.module_manifest.get("_overworld_cfg", {})
         manifest_towns = self.module_manifest.get("world", {}).get("towns", [])
@@ -417,13 +421,18 @@ class Game:
 
         self.town_data_map = {}
         first_town = None
-        for lm in overworld_cfg.get("landmarks", []):
+        town_ordinal = 0  # guarantees each town gets a different layout
+        for i, lm in enumerate(overworld_cfg.get("landmarks", [])):
             if lm.get("type") != "town":
                 continue
             tid = lm["id"]
             tname = town_names.get(tid, tid.replace("_", " ").title())
             col, row = lm["col"], lm["row"]
-            td = generate_town(tname)
+            # Unique seed per town so NPCs and dialogue vary
+            town_seed = hash((tname, col, row, i)) & 0xFFFFFFFF
+            td = generate_town(tname, seed=town_seed,
+                               layout_index=town_ordinal)
+            town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:
                 first_town = td

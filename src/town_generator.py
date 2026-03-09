@@ -91,30 +91,265 @@ def _place_building(tmap, x, y, w, h, door_side="south"):
     tmap.set_tile(door_col, door_row, TILE_DOOR)
 
 
-def generate_town(name="Thornwall"):
+# ── Town variety pools ──────────────────────────────────────────────
+# Each pool is indexed deterministically by a seed so that every town
+# in a module is unique yet reproducible across saves.
+
+_PRIEST_POOL = [
+    {"name": "Brother Cedric",  "god": "Solarius",  "title": "Temple of Solarius"},
+    {"name": "Sister Miriel",   "god": "Lunara",    "title": "Shrine of Lunara"},
+    {"name": "Father Aldous",   "god": "Terran",    "title": "Chapel of Terran"},
+    {"name": "Mother Ysara",    "god": "Aethis",    "title": "Sanctuary of Aethis"},
+    {"name": "Brother Thane",   "god": "Pyralis",   "title": "Temple of Pyralis"},
+    {"name": "Sister Vesper",   "god": "Noxara",    "title": "Shrine of Noxara"},
+    {"name": "Father Corwin",   "god": "Aquilis",   "title": "Chapel of Aquilis"},
+    {"name": "Mother Elara",    "god": "Verdantis", "title": "Sanctuary of Verdantis"},
+]
+
+_PRIEST_DIALOGUE_POOL = [
+    [
+        "Welcome to the {title}, child.",
+        "The light of {god} heals all wounds.",
+        "We offer healing and resurrection for those in need.",
+        "May {god}'s radiance guide your path.",
+    ],
+    [
+        "Enter freely, traveler. {god} welcomes all.",
+        "The faithful of {god} know no fear.",
+        "Healing and blessings are offered here.",
+        "Go with {god}'s grace.",
+    ],
+    [
+        "Peace be upon you, wanderer.",
+        "In {god}'s name, we mend body and soul.",
+        "Even the gravest wounds yield to {god}'s power.",
+        "Walk always in the light.",
+    ],
+]
+
+_SHOPKEEP_POOL = [
+    {"name": "Gruff",    "shop": "Gruff's Armaments"},
+    {"name": "Mara",     "shop": "Mara's Provisions"},
+    {"name": "Holt",     "shop": "Holt's Outfitters"},
+    {"name": "Venna",    "shop": "Venna's Curiosities"},
+    {"name": "Bram",     "shop": "Bram's Forge"},
+    {"name": "Sigrid",   "shop": "Sigrid's Sundries"},
+    {"name": "Torvin",   "shop": "Torvin's Wares"},
+    {"name": "Lira",     "shop": "Lira's Trading Post"},
+]
+
+_SHOPKEEP_DIALOGUE_POOL = [
+    [
+        "Welcome to {shop}!",
+        "I've got the finest steel this side of the mountains.",
+        "Swords, axes, bows -- you name it, I forge it.",
+        "Come back when you've got more gold!",
+    ],
+    [
+        "Step right in! {shop} has everything you need.",
+        "Potions, scrolls, provisions -- take your pick.",
+        "Fair prices for honest folk.",
+        "Safe travels, adventurer!",
+    ],
+    [
+        "Ah, customers! Welcome to {shop}.",
+        "You won't find better quality anywhere else.",
+        "Every item here has been tested in the field.",
+        "Gold well spent is gold well earned!",
+    ],
+]
+
+_INNKEEPER_POOL = [
+    {"name": "Bertram",  "inn": "The Sleeping Griffin"},
+    {"name": "Aldric",   "inn": "The Brass Lantern"},
+    {"name": "Roslyn",   "inn": "The Copper Kettle"},
+    {"name": "Gareth",   "inn": "The Wanderer's Rest"},
+    {"name": "Nessa",    "inn": "The Silver Stag"},
+    {"name": "Doric",    "inn": "The Hearthstone"},
+    {"name": "Pella",    "inn": "The Rusty Anchor"},
+    {"name": "Orin",     "inn": "The Howling Wind"},
+]
+
+_INNKEEPER_DIALOGUE_POOL = [
+    [
+        "Welcome to {inn} Inn!",
+        "Rest your weary bones. A room is 10 gold per night.",
+        "I hear strange things stir in the wilds...",
+        "Can I get you an ale?",
+    ],
+    [
+        "Come in, come in! {inn} is the warmest spot in town.",
+        "Hot stew and a soft bed -- what more could you want?",
+        "Travelers bring all sorts of stories through here.",
+        "Stay as long as you like!",
+    ],
+    [
+        "Ah, adventurers! {inn} welcomes you.",
+        "You look like you could use a good meal.",
+        "The roads have been dangerous lately, I hear.",
+        "Rest well -- you'll need your strength.",
+    ],
+]
+
+_INNKEEPER_QUEST_POOL = [
+    {
+        "dialogue": [
+            "Psst... adventurer! I've heard rumors of a strange crystal hidden in a nearby dungeon.",
+            "It radiates dark energy and threatens our town. Will you seek it out and bring it back?",
+        ],
+        "choices": ["Yes, I'll find it!", "Not right now."],
+    },
+    {
+        "dialogue": [
+            "Listen... a merchant went missing on the road last week. His wagon was found empty.",
+            "I think bandits are hiding in the caves nearby. Could you investigate?",
+        ],
+        "choices": ["I'll look into it.", "Maybe later."],
+    },
+    {
+        "dialogue": [
+            "I shouldn't say this, but... something's been poisoning our well water.",
+            "I think it's coming from that old ruin to the north. Can you help?",
+        ],
+        "choices": ["I'll check it out.", "Not my problem."],
+    },
+]
+
+_ELDER_POOL = [
+    "Elder Morath", "Elder Gwynn", "Elder Fenn", "Elder Bera",
+    "Elder Cato", "Elder Sybil", "Elder Rowan", "Elder Petra",
+]
+
+_ELDER_DIALOGUE_POOL = [
+    [
+        "Ah, brave adventurers! Our town faces dark times.",
+        "Ancient evils stir in the dungeons beneath the land.",
+        "Seek out the hidden dangers before they find us.",
+        "I sense great potential in you. Do not lose hope.",
+    ],
+    [
+        "Welcome, travelers. I am the keeper of this town's history.",
+        "These lands were peaceful once, before the darkness came.",
+        "Be wary of the wilds -- not all creatures are friendly.",
+        "May fortune smile upon your journey.",
+    ],
+    [
+        "You carry the look of adventurers. Good -- we need heroes.",
+        "Our scouts report growing dangers in every direction.",
+        "The ancient wards are failing. Something must be done.",
+        "I pray you have the courage to see this through.",
+    ],
+]
+
+_VILLAGER_NAME_POOL = [
+    "Tomas", "Elena", "Joric", "Bess", "Finn", "Lysa", "Karl",
+    "Maren", "Pieter", "Wren", "Dorin", "Hanna", "Sven", "Ida",
+    "Calla", "Rodric", "Thea", "Birk", "Ona", "Leif",
+]
+
+_VILLAGER_DIALOGUE_POOL = [
+    ["Beautiful day, isn't it?", "Watch out for wolves in the forest."],
+    ["I lost my cat somewhere near the mountains...", "Have you seen a tabby?"],
+    ["The elder seems worried lately.", "Something about the dungeons."],
+    ["I used to be an adventurer, you know.", "Then I took an arrow to the knee."],
+    ["The harvest was good this year.", "But strange lights appear at night..."],
+    ["My grandmother tells tales of ancient heroes.", "Maybe you'll be one someday!"],
+    ["The road north has been dangerous lately.", "Stick to the main paths."],
+    ["I heard a merchant selling rare herbs.", "Worth checking the shop."],
+    ["The inn serves the best stew in the region!", "You should try it."],
+    ["Don't wander too far from town after dark.", "Things lurk in the shadows."],
+    ["The blacksmith makes fine blades.", "But they don't come cheap."],
+    ["Have you heard about the old ruins?", "They say treasure lies within."],
+]
+
+# Building layout variants — each defines building positions and door sides
+# relative to the interior origin (ox, oy).  Format per building:
+#   (x, y, w, h, door_side, counter_tiles, altar_pos_or_None)
+# 8 variants give <2% chance of identical layout with 2 towns.
+_LAYOUT_POOL = [
+    {   # 0 — classic: shop top-left, inn top-right, temple bottom-left
+        "name": "classic",
+        "shop":   (1,  1,  6, 5, "south",  [(3, 2), (4, 2), (5, 2)]),
+        "inn":    (11, 1,  6, 5, "south",  [(13, 2), (14, 2)]),
+        "temple": (1,  12, 6, 5, "east",   [], (3, 14)),
+    },
+    {   # 1 — mirrored: shop top-right, inn top-left, temple bottom-right
+        "name": "mirrored",
+        "shop":   (11, 1,  6, 5, "south",  [(13, 2), (14, 2), (15, 2)]),
+        "inn":    (1,  1,  6, 5, "south",  [(3, 2), (4, 2)]),
+        "temple": (11, 12, 6, 5, "west",   [], (14, 14)),
+    },
+    {   # 2 — central temple at bottom-centre
+        "name": "central_temple",
+        "shop":   (1,  1,  6, 5, "south",  [(3, 2), (4, 2), (5, 2)]),
+        "inn":    (11, 1,  6, 5, "south",  [(13, 2), (14, 2)]),
+        "temple": (6,  12, 6, 5, "south",  [], (9, 14)),
+    },
+    {   # 3 — L-shape: shop top-left, inn mid-left, temple bottom-right
+        "name": "L_shape",
+        "shop":   (1,  1,  6, 5, "south",  [(3, 2), (4, 2), (5, 2)]),
+        "inn":    (1,  8,  6, 5, "east",   [(3, 9), (4, 9)]),
+        "temple": (11, 12, 6, 5, "west",   [], (14, 14)),
+    },
+    {   # 4 — temple north: temple top-centre, shops below on sides
+        "name": "temple_north",
+        "shop":   (1,  8,  6, 5, "south",  [(3, 9), (4, 9), (5, 9)]),
+        "inn":    (11, 8,  6, 5, "south",  [(13, 9), (14, 9)]),
+        "temple": (6,  1,  6, 5, "south",  [], (9, 3)),
+    },
+    {   # 5 — corridor: all three buildings along the left wall
+        "name": "corridor",
+        "shop":   (1,  1,  6, 5, "east",   [(3, 2), (4, 2), (5, 2)]),
+        "inn":    (1,  7,  6, 5, "east",   [(3, 8), (4, 8)]),
+        "temple": (1,  13, 6, 5, "east",   [], (3, 15)),
+    },
+    {   # 6 — courtyard: buildings form a U around the open centre
+        "name": "courtyard",
+        "shop":   (1,  1,  7, 5, "south",  [(3, 2), (4, 2), (5, 2), (6, 2)]),
+        "inn":    (10, 1,  7, 5, "south",  [(12, 2), (13, 2), (14, 2)]),
+        "temple": (5,  13, 8, 5, "north",  [], (9, 15)),
+    },
+    {   # 7 — diagonal: buildings staggered diagonally
+        "name": "diagonal",
+        "shop":   (1,  1,  6, 5, "south",  [(3, 2), (4, 2), (5, 2)]),
+        "inn":    (6,  7,  6, 5, "south",  [(8, 8), (9, 8)]),
+        "temple": (11, 13, 6, 5, "west",   [], (14, 15)),
+    },
+]
+
+
+def generate_town(name="Thornwall", seed=None, layout_index=None):
     """
     Generate a town map with NPCs and an exit.
+
+    Each town is procedurally varied based on *seed*: different building
+    layout, NPC names, dialogue, shop themes, and god names.  Two towns
+    with different seeds will look and feel distinct.
+
+    *layout_index* — if provided, selects a specific layout from
+    ``_LAYOUT_POOL`` (modulo pool size).  When the caller passes the
+    town's ordinal index (0, 1, 2, …), every town in a module is
+    guaranteed a different base layout (up to 8 towns before wrapping).
+    If *None*, the layout is chosen randomly from the seed.
 
     The playable interior is 18×19 tiles of floor surrounded by a brick wall
     border.  The total map is padded with extra wall tiles on every side so
     the camera (25×17 viewport) never sees out-of-bounds areas.
     """
+    if seed is None:
+        seed = hash(name) & 0xFFFFFFFF
+    rng = random.Random(seed)
+
     # Playable interior dimensions (floor area inside the walls)
     INTERIOR_W = 18
     INTERIOR_H = 19
 
-    # Padding: enough extra wall tiles around the playable area so the
-    # camera can never scroll past the map boundary.
-    # Viewport is 25 cols × 17 rows; half-viewport is the most the camera
-    # can offset from the party position near the edges.
-    PAD_X = 13   # extra wall columns on each side
-    PAD_Y = 9    # extra wall rows on top and bottom
+    PAD_X = 13
+    PAD_Y = 9
 
-    # Total map size
-    W = INTERIOR_W + 2 + PAD_X * 2   # +2 for the brick border itself
+    W = INTERIOR_W + 2 + PAD_X * 2
     H = INTERIOR_H + 2 + PAD_Y * 2
 
-    # The playable brick border starts at (PAD_X, PAD_Y)
     BORDER_X = PAD_X
     BORDER_Y = PAD_Y
     BORDER_W = INTERIOR_W + 2
@@ -132,87 +367,101 @@ def generate_town(name="Thornwall"):
     exit_row = BORDER_Y + BORDER_H - 1
     tmap.set_tile(exit_col, exit_row, TILE_EXIT)
 
-    # --- Helper: convert interior-relative coords to world coords ---
-    # Interior (0,0) is the top-left floor tile inside the wall.
-    ox = BORDER_X + 1   # world col of interior col 0
-    oy = BORDER_Y + 1   # world row of interior row 0
+    ox = BORDER_X + 1
+    oy = BORDER_Y + 1
 
-    # --- Buildings ---
+    # --- Pick a building layout ---
+    # If a layout_index is given, use it (guarantees unique layouts per
+    # town ordinal).  Otherwise fall back to seed-based random choice.
+    if layout_index is not None:
+        layout = _LAYOUT_POOL[layout_index % len(_LAYOUT_POOL)]
+    else:
+        layout = rng.choice(_LAYOUT_POOL)
 
-    # Shop (upper-left, 6 wide × 5 tall, door faces south)
-    _place_building(tmap, ox + 1, oy + 1, 6, 5, door_side="south")
-    # Counter inside the shop
-    tmap.set_tile(ox + 3, oy + 2, TILE_COUNTER)
-    tmap.set_tile(ox + 4, oy + 2, TILE_COUNTER)
-    tmap.set_tile(ox + 5, oy + 2, TILE_COUNTER)
+    # Shop
+    sx, sy, sw, sh, sdoor, scounters = layout["shop"]
+    _place_building(tmap, ox + sx, oy + sy, sw, sh, door_side=sdoor)
+    for cx, cy in scounters:
+        tmap.set_tile(ox + cx, oy + cy, TILE_COUNTER)
 
-    # Inn (upper-right, 6 wide × 5 tall, door faces south)
-    _place_building(tmap, ox + 11, oy + 1, 6, 5, door_side="south")
-    # Bar counter inside the inn
-    tmap.set_tile(ox + 13, oy + 2, TILE_COUNTER)
-    tmap.set_tile(ox + 14, oy + 2, TILE_COUNTER)
+    # Inn
+    ix, iy, iw, ih, idoor, icounters = layout["inn"]
+    _place_building(tmap, ox + ix, oy + iy, iw, ih, door_side=idoor)
+    for cx, cy in icounters:
+        tmap.set_tile(ox + cx, oy + cy, TILE_COUNTER)
 
-    # Temple of Solarius (lower-left, 6 wide × 5 tall, door faces east)
-    _place_building(tmap, ox + 1, oy + 12, 6, 5, door_side="east")
-    # Altar inside the temple
-    tmap.set_tile(ox + 3, oy + 14, TILE_ALTAR)
+    # Temple
+    temple_data = layout["temple"]
+    tx, ty, tw, th, tdoor = temple_data[:5]
+    _tcounters = temple_data[5] if len(temple_data) > 5 else []
+    altar_pos = temple_data[6] if len(temple_data) > 6 else None
+    _place_building(tmap, ox + tx, oy + ty, tw, th, door_side=tdoor)
+    if altar_pos:
+        tmap.set_tile(ox + altar_pos[0], oy + altar_pos[1], TILE_ALTAR)
 
-    # --- NPCs ---
+    # --- Pick unique NPCs from pools ---
     npcs = []
 
-    # Priest inside the temple
-    npcs.append(NPC(ox + 4, oy + 14, "Brother Cedric", [
-        "Welcome to the Temple of Solarius, child.",
-        "The light of Solarius heals all wounds.",
-        "We offer healing and resurrection for those in need.",
-        "May the sun's radiance guide your path.",
-    ], npc_type="priest", god_name="Solarius"))
+    # Priest
+    priest = rng.choice(_PRIEST_POOL)
+    priest_dlg_template = rng.choice(_PRIEST_DIALOGUE_POOL)
+    priest_dlg = [line.format(title=priest["title"], god=priest["god"])
+                  for line in priest_dlg_template]
+    # Place priest near altar (or inside temple)
+    if altar_pos:
+        priest_col, priest_row = ox + altar_pos[0] + 1, oy + altar_pos[1]
+    else:
+        priest_col, priest_row = ox + tx + tw // 2, oy + ty + th // 2
+    npcs.append(NPC(priest_col, priest_row, priest["name"],
+                    priest_dlg, npc_type="priest", god_name=priest["god"]))
 
-    # Shopkeeper inside the shop (behind the counter)
-    npcs.append(NPC(ox + 4, oy + 3, "Gruff", [
-        "Welcome to Gruff's Armaments!",
-        "I've got the finest steel this side of the mountains.",
-        "Swords, axes, bows -- you name it, I forge it.",
-        "Come back when you've got more gold!",
-    ], npc_type="shopkeep"))
+    # Shopkeeper (inside the shop, behind the counter)
+    shopkeep = rng.choice(_SHOPKEEP_POOL)
+    shop_dlg_template = rng.choice(_SHOPKEEP_DIALOGUE_POOL)
+    shop_dlg = [line.format(shop=shopkeep["shop"])
+                for line in shop_dlg_template]
+    shopkeep_col = ox + sx + sw // 2
+    shopkeep_row = oy + sy + sh - 2
+    npcs.append(NPC(shopkeep_col, shopkeep_row, shopkeep["name"],
+                    shop_dlg, npc_type="shopkeep"))
 
-    # Innkeeper inside the inn (behind the bar)
-    npcs.append(NPC(ox + 14, oy + 3, "Bertram", [
-        "Welcome to the Sleeping Griffin Inn!",
-        "Rest your weary bones. A room is 10 gold per night.",
-        "I hear dark things stir in the dungeons to the east...",
-        "Can I get you an ale?",
-    ], npc_type="innkeeper",
-       quest_dialogue=[
-           "Psst... adventurer! I've heard rumors of a Shadow Crystal hidden in a dungeon that appeared near our lands.",
-           "It radiates dark energy and threatens our town. Will you seek it out and bring it back to me?",
-       ],
-       quest_choices=["Yes, I'll find it!", "Not right now."],
-    ))
+    # Innkeeper (inside the inn, behind the bar)
+    innkeeper = rng.choice(_INNKEEPER_POOL)
+    inn_dlg_template = rng.choice(_INNKEEPER_DIALOGUE_POOL)
+    inn_dlg = [line.format(inn=innkeeper["inn"])
+               for line in inn_dlg_template]
+    quest = rng.choice(_INNKEEPER_QUEST_POOL)
+    innkeeper_col = ox + ix + iw // 2
+    innkeeper_row = oy + iy + ih - 2
+    npcs.append(NPC(innkeeper_col, innkeeper_row, innkeeper["name"],
+                    inn_dlg, npc_type="innkeeper",
+                    quest_dialogue=quest["dialogue"],
+                    quest_choices=quest["choices"]))
 
-    # Town elder (wandering in the open area)
-    npcs.append(NPC(ox + 9, oy + 10, "Elder Morath", [
-        "Ah, brave adventurers! Our town is in grave danger.",
-        "A great evil festers in the dungeon to the east.",
-        "You must find the four shrines hidden across the land.",
-        "Only then can the shadow be banished forever.",
-        "I sense great potential in you. Do not lose hope.",
-    ], npc_type="elder"))
+    # Town elder (in the open area, middle of the map)
+    elder_name = rng.choice(_ELDER_POOL)
+    elder_dlg = list(rng.choice(_ELDER_DIALOGUE_POOL))
+    # Insert the town name into the first line
+    elder_dlg[0] = elder_dlg[0].replace("Our town", f"{name}")
+    npcs.append(NPC(ox + 9, oy + 10, elder_name,
+                    elder_dlg, npc_type="elder"))
 
-    # Wandering villagers
-    villager_dialogues = [
-        ["Beautiful day, isn't it?", "Watch out for wolves in the forest."],
-        ["I lost my cat somewhere near the mountains...", "Have you seen a tabby?"],
-        ["The elder seems worried lately.", "Something about the dungeons."],
-        ["I used to be an adventurer, you know.", "Then I took an arrow to the knee."],
+    # Wandering villagers (3, each with unique name and dialogue)
+    available_names = list(_VILLAGER_NAME_POOL)
+    rng.shuffle(available_names)
+    available_dlgs = list(_VILLAGER_DIALOGUE_POOL)
+    rng.shuffle(available_dlgs)
+
+    # Villager positions vary by seed — jitter within safe floor area
+    _base_spots = [(5, 15), (13, 15), (9, 8)]
+    villager_spots = [
+        (ox + bx + rng.randint(-1, 1), oy + by + rng.randint(-1, 1))
+        for bx, by in _base_spots
     ]
-
-    villager_spots = [(ox + 5, oy + 15), (ox + 13, oy + 15), (ox + 9, oy + 8)]
     for i, (vc, vr) in enumerate(villager_spots):
-        name_pool = ["Tomas", "Elena", "Joric", "Bess", "Finn"]
-        npcs.append(NPC(vc, vr, name_pool[i % len(name_pool)],
-                        villager_dialogues[i % len(villager_dialogues)],
-                        npc_type="villager"))
+        vname = available_names[i % len(available_names)]
+        vdlg = available_dlgs[i % len(available_dlgs)]
+        npcs.append(NPC(vc, vr, vname, vdlg, npc_type="villager"))
 
     # Entry point: just inside the exit gate
     entry_col = exit_col

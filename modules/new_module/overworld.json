@@ -1,50 +1,58 @@
 {
   "size": {
-    "width": 32,
-    "height": 24
+    "width": 64,
+    "height": 48
   },
   "start_position": {
-    "col": 16,
-    "row": 10
+    "col": 32,
+    "row": 18
   },
   "landmarks": [
     {
-      "id": "ironhold",
+      "id": "hallowcrest",
       "type": "town",
-      "col": 16,
-      "row": 8,
+      "col": 32,
+      "row": 16,
       "tile": "TILE_TOWN",
       "clear_radius": 3
     },
     {
-      "id": "stonehollow",
+      "id": "fernwall",
       "type": "town",
-      "col": 16,
-      "row": 16,
+      "col": 38,
+      "row": 28,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "nettleglen",
+      "type": "town",
+      "col": 25,
+      "row": 28,
       "tile": "TILE_TOWN",
       "clear_radius": 3
     },
     {
       "id": "town_altar",
       "type": "machine",
-      "col": 18,
-      "row": 8,
+      "col": 34,
+      "row": 16,
       "tile": "TILE_MACHINE",
       "clear_radius": 1
     },
     {
       "id": "dungeon_1",
       "type": "dungeon",
-      "col": 22,
-      "row": 12,
+      "col": 44,
+      "row": 24,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     },
     {
       "id": "dungeon_2",
       "type": "dungeon",
-      "col": 8,
-      "row": 12,
+      "col": 18,
+      "row": 24,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     }
@@ -52,42 +60,52 @@
   "paths": [
     {
       "from": [
-        16,
-        8
+        38,
+        28
       ],
       "to": [
-        22,
-        12
+        44,
+        24
       ]
     },
     {
       "from": [
-        16,
-        8
+        25,
+        28
       ],
       "to": [
-        8,
-        12
+        18,
+        24
       ]
     },
     {
       "from": [
-        16,
-        8
-      ],
-      "to": [
-        16,
+        32,
         16
+      ],
+      "to": [
+        38,
+        28
       ]
     },
     {
       "from": [
-        16,
-        10
+        38,
+        28
       ],
       "to": [
-        16,
-        8
+        25,
+        28
+      ]
+    },
+    {
+      "from": [
+        32,
+        18
+      ],
+      "to": [
+        32,
+        16
       ]
     }
   ]

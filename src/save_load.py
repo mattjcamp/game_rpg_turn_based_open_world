@@ -129,6 +129,9 @@ def _serialize_key_dungeons(game):
             "status": kd["status"],
             "artifact_name": kd.get("artifact_name", kd["key_name"]),
             "current_level": kd.get("current_level", 0),
+            "description": kd.get("description", ""),
+            "quest_objective": kd.get("quest_objective", ""),
+            "quest_hint": kd.get("quest_hint", ""),
         })
     return result
 
@@ -472,6 +475,9 @@ def _restore_key_dungeons(game, save_data):
             "dungeon_col": col,
             "dungeon_row": row,
             "artifact_name": skd.get("artifact_name", key_name),
+            "description": skd.get("description", ""),
+            "quest_objective": skd.get("quest_objective", ""),
+            "quest_hint": skd.get("quest_hint", ""),
         }
 
 
