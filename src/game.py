@@ -365,11 +365,20 @@ class Game:
         Each key dungeon is stored in self.key_dungeons keyed by its
         overworld (col, row) position.  The dungeon levels are generated
         lazily on first entry.
+
+        For the Keys of Shadow module, dungeons start as ``"active"``
+        (the gnome quest acceptance gates visibility).  For all other
+        modules, dungeons start as ``"undiscovered"`` — the quest
+        objective is hidden until the town elder reveals them.
         """
         from src.dungeon_generator import generate_keys_dungeon
 
         overworld_cfg = self.module_manifest.get("_overworld_cfg", {})
         landmarks = {lm["id"]: lm for lm in overworld_cfg.get("landmarks", [])}
+
+        # Determine starting status based on module
+        mod_id = self.module_manifest.get("metadata", {}).get("id", "")
+        initial_status = "active" if mod_id == "keys_of_shadow" else "undiscovered"
 
         # Find the machine landmark
         for lm in overworld_cfg.get("landmarks", []):
@@ -397,7 +406,7 @@ class Game:
                 "key_name": key_name,
                 "levels": levels,
                 "current_level": 0,
-                "status": "active",  # active → artifact_found → completed
+                "status": initial_status,  # undiscovered → active → artifact_found → completed
                 "dungeon_col": col,
                 "dungeon_row": row,
                 "artifact_name": key_name,
@@ -405,6 +414,15 @@ class Game:
                 "quest_objective": kd.get("quest_objective", ""),
                 "quest_hint": kd.get("quest_hint", ""),
             }
+
+    def discover_key_dungeons(self):
+        """Mark all undiscovered key dungeons as active.
+
+        Called when the town elder reveals the quests to the player.
+        """
+        for kd in self.key_dungeons.values():
+            if kd["status"] == "undiscovered":
+                kd["status"] = "active"
 
     def _init_module_towns(self):
         """Generate towns for the active module and store in town_data_map.

@@ -744,6 +744,34 @@ class TownState(InventoryMixin, BaseState):
             # Fall through to normal cycling dialogue
             pass
 
+        # Elder — reveal undiscovered key dungeon quests on first talk
+        if npc.npc_type == "elder":
+            kd_map = getattr(self.game, "key_dungeons", {})
+            undiscovered = [kd for kd in kd_map.values()
+                           if kd.get("status") == "undiscovered"]
+            if undiscovered:
+                self.game.discover_key_dungeons()
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                # Build a summary of the revealed quests
+                if len(undiscovered) == 1:
+                    dung = undiscovered[0]
+                    hint = dung.get("quest_hint", "Be careful.")
+                    self._set_dialogue(
+                        f"{npc.name}: Listen well — the "
+                        f"{dung['name']} holds a powerful artifact. "
+                        f"{hint} Bring it back to save us!")
+                else:
+                    names = ", ".join(d["name"] for d in undiscovered[:3])
+                    if len(undiscovered) > 3:
+                        names += f" and {len(undiscovered) - 3} more"
+                    self._set_dialogue(
+                        f"{npc.name}: Brave adventurers, hear me! "
+                        f"Dangerous places threaten our land: {names}. "
+                        f"Each holds an artifact we desperately need. "
+                        f"Will you seek them out?")
+                return
+
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         line = npc.get_dialogue()

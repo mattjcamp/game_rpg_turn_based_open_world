@@ -784,15 +784,21 @@ class OverworldState(InventoryMixin, BaseState):
                 "A dark cave entrance leads deep underground. "
                 "The air smells of ancient stone and danger."
             )
-            if kd["status"] == "completed":
+            if kd["status"] == "undiscovered":
+                # Player hasn't been told about this quest yet —
+                # show it as a generic explorable dungeon.
+                quest_name = None
+                entry_type = "key_dungeon"
+            elif kd["status"] == "completed":
                 cleared = True
                 quest_name = f"{kd.get('key_name', 'Key')} (completed)"
+                entry_type = "key_dungeon"
             else:
                 # Use the dungeon's unique quest objective if available
                 quest_name = kd.get("quest_objective") or (
                     f"Retrieve the {kd.get('key_name', 'Key')}"
                 )
-            entry_type = "key_dungeon"
+                entry_type = "key_dungeon"
         elif (quest
                 and pcol == quest.get("dungeon_col")
                 and prow == quest.get("dungeon_row")):
