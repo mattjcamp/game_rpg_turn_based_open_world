@@ -33,8 +33,8 @@ The `research/` folder also contains reference screenshots (`example_combat.webp
 
 1. **Clone the repository:**
    ```
-   git clone <repo-url>
-   cd ultima3_clone
+   git clone https://github.com/mattjcamp/game_rpg_turn_based_open_world
+   cd game_rpg_turn_based_open_world
    ```
 
 2. **Install dependencies:**
@@ -93,7 +93,7 @@ That's it. A window should open with the title screen.
 ## Project Structure
 
 ```
-ultima3_clone/
+game_rpg_turn_based_open_world/
 ├── main.py                  ← Entry point — run this to play
 ├── requirements.txt         ← Python dependencies (pygame, numpy)
 ├── STYLE_GUIDE.md           ← Visual design rules
