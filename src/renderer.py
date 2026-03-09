@@ -5026,8 +5026,10 @@ class Renderer(CombatEffectRendererMixin):
                     icon_type = info.get("icon", "potion")
                     self._draw_item_icon(icx, icy, icon_type, icon_sz)
 
-        # ── 3. draw player sprite ──
-        self._u3_draw_player_sprite(mx, my, ts, player_col, player_row)
+        # ── 3. draw player sprite (same white warrior as the overworld) ──
+        pcx = mx + player_col * ts + ts // 2
+        pcy = my + player_row * ts + ts // 2
+        self._u3_draw_overworld_party(pcx, pcy)
 
         # ── 4. right info panel ──
         panel_x = mx + cols * ts + 20
@@ -6523,7 +6525,8 @@ class Renderer(CombatEffectRendererMixin):
 
         self.screen.set_clip(prev_clip)
 
-    def draw_save_load_screen(self, mode, slot_infos, cursor, message=None):
+    def draw_save_load_screen(self, mode, slot_infos, cursor, message=None,
+                              confirm_delete=False):
         """Draw the save/load slot picker screen.
 
         Parameters
@@ -6536,6 +6539,8 @@ class Renderer(CombatEffectRendererMixin):
             Which slot is currently selected (0-based).
         message : str or None
             Feedback message to display (e.g. "Game saved!").
+        confirm_delete : bool
+            If True, the message is a delete-confirmation prompt.
         """
         import time as _time
         self.screen.fill((0, 0, 0))
@@ -6629,16 +6634,19 @@ class Renderer(CombatEffectRendererMixin):
         # Feedback message
         if message:
             msg_y = panel_y + panel_h - 55
+            msg_color = (255, 100, 100) if confirm_delete else (100, 255, 100)
             self._u3_text(message,
                           SCREEN_WIDTH // 2 - len(message) * 5, msg_y,
-                          (100, 255, 100), self.font)
+                          msg_color, self.font)
 
         # Controls hint
         hint_y = panel_y + panel_h - 30
-        action_word = "SAVE" if mode == "save" else "LOAD"
-        self._u3_text(
-            f"[UP/DN] SELECT  [ENTER] {action_word}  [ESC] BACK",
-            panel_x + 16, hint_y, (68, 68, 255), self.font_small)
+        if mode == "save":
+            hint = "[UP/DN] SELECT  [ENTER] SAVE  [ESC] BACK"
+        else:
+            hint = "[UP/DN] SELECT  [ENTER] LOAD  [D] DELETE  [ESC] BACK"
+        self._u3_text(hint, panel_x + 16, hint_y, (68, 68, 255),
+                      self.font_small)
 
         self.screen.set_clip(prev_clip)
 

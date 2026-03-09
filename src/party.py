@@ -1473,7 +1473,7 @@ def create_default_party(start_col=None, start_row=None,
     If start_col/start_row are provided they override the JSON values.
 
     When *start_with_equipment* is False, every member starts with only
-    Cloth armor and a Club, and the shared inventory receives 15 Stones.
+    Cloth armor and a Club, and the shared inventory receives 6 Rocks.
     """
     cfg = _load_party_config()
     if start_col is None:
@@ -1539,7 +1539,7 @@ def create_default_party(start_col=None, start_row=None,
             member._sync_legacy_fields()
             member.personal_inventory = []
         party.shared_inventory = []
-        for _ in range(15):
-            party.shared_inventory.append("Stones")
+        for _ in range(6):
+            party.shared_inventory.append("Rock")
 
     return party

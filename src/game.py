@@ -21,6 +21,7 @@ from src.states.examine import ExamineState
 from src.town_generator import generate_town, generate_duskhollow
 from src.music import MusicManager, SoundEffects
 from src.save_load import (save_game, load_game, get_save_info,
+                           delete_save,
                            NUM_SAVE_SLOTS, load_config, save_config)
 from src.module_loader import load_module_data
 
@@ -124,6 +125,7 @@ class Game:
         self.save_load_cursor = 0        # cursor within save/load slot list
         self.save_load_message = None    # feedback message ("Saved!", "Loaded!", etc.)
         self.save_load_msg_timer = 0.0   # seconds remaining for message display
+        self.save_load_confirm_delete = False  # True while confirming a delete
         self.settings_options = [
             {"label": "MUSIC",
              "value": self._config.get("music_enabled", True),
@@ -254,8 +256,8 @@ class Game:
                     m._sync_legacy_fields()
                     m.personal_inventory = []
                 self.party.shared_inventory = []
-                for _ in range(15):
-                    self.party.shared_inventory.append("Stones")
+                for _ in range(6):
+                    self.party.shared_inventory.append("Rock")
         else:
             # No active party formed — use the default from party.json
             self.party = create_default_party(
@@ -1047,12 +1049,14 @@ class Game:
         self.settings_mode = "save"
         self.save_load_cursor = 0
         self.save_load_message = None
+        self.save_load_confirm_delete = False
 
     def _open_load_screen(self):
         """Switch settings view to the load-slot picker."""
         self.settings_mode = "load"
         self.save_load_cursor = 0
         self.save_load_message = None
+        self.save_load_confirm_delete = False
 
     def _do_save(self, slot):
         """Save game to the given slot and show feedback."""
@@ -1074,6 +1078,16 @@ class Game:
         else:
             self.save_load_message = "No save in that slot!"
             self.save_load_msg_timer = 2.0
+
+    def _do_delete_save(self, slot):
+        """Delete a save from the given slot and show feedback."""
+        ok = delete_save(slot)
+        if ok:
+            self.save_load_message = f"Slot {slot} deleted."
+        else:
+            self.save_load_message = "Nothing to delete!"
+        self.save_load_msg_timer = 2.0
+        self.save_load_confirm_delete = False
 
     def _handle_game_over_input(self, event):
         """Handle input on the game over screen."""
@@ -1149,6 +1163,16 @@ class Game:
 
     def _handle_save_load_input(self, event):
         """Handle input in the save/load slot picker."""
+        # ── Delete confirmation sub-state ──
+        if self.save_load_confirm_delete:
+            if event.key == pygame.K_y:
+                slot = self.save_load_cursor + 1
+                self._do_delete_save(slot)
+            elif event.key in (pygame.K_n, pygame.K_ESCAPE):
+                self.save_load_confirm_delete = False
+                self.save_load_message = None
+            return
+
         if event.key == pygame.K_ESCAPE:
             # If we came from the title screen save/load option, go back to title
             if getattr(self, '_title_load_mode', False):
@@ -1190,6 +1214,13 @@ class Game:
                     elif getattr(self, '_game_over_load_mode', False):
                         self._game_over_load_mode = False
                         self.showing_settings = False
+        elif event.key == pygame.K_d and self.settings_mode == "load":
+            # Only allow delete from the load screen
+            slot = self.save_load_cursor + 1
+            info = get_save_info(slot)
+            if info is not None:
+                self.save_load_confirm_delete = True
+                self.save_load_message = f"Delete Slot {slot}?  Y = Yes  N = No"
 
     def run(self):
         """Main game loop."""
@@ -1307,7 +1338,8 @@ class Game:
                         mode=self.settings_mode,
                         slot_infos=slot_infos,
                         cursor=self.save_load_cursor,
-                        message=self.save_load_message)
+                        message=self.save_load_message,
+                        confirm_delete=self.save_load_confirm_delete)
                 else:
                     self.renderer.draw_settings_screen(
                         self.settings_options, self.settings_cursor)
