@@ -405,11 +405,20 @@ def load_game(slot, game):
 
         # ── Restore town (module-specific) ──────────────────────
         if game.module_manifest:
+            mod_id = game.module_manifest.get(
+                "metadata", {}).get("id", "")
             prog = game.module_manifest.get("progression", {})
             kd_list = prog.get("key_dungeons", [])
             if kd_list:
-                from src.town_generator import generate_duskhollow
-                game.town_data = generate_duskhollow()
+                if mod_id == "keys_of_shadow":
+                    from src.town_generator import generate_duskhollow
+                    game.town_data = generate_duskhollow()
+                else:
+                    from src.town_generator import generate_town
+                    towns = game.module_manifest.get(
+                        "world", {}).get("towns", [])
+                    hub_name = towns[0]["name"] if towns else "Thornwall"
+                    game.town_data = generate_town(hub_name)
 
         # ── Switch to overworld ─────────────────────────────────
         game.change_state("overworld")

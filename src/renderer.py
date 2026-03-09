@@ -1525,8 +1525,8 @@ class Renderer(CombatEffectRendererMixin):
         hint_surface = self.font_small.render(hint, True, (120, 120, 140))
         self.screen.blit(hint_surface, (box_x + text_pad, cur_y + 4))
 
-    def draw_machine_shutdown_effect(self, effect):
-        """Draw the gnome machine shutdown animation overlay.
+    def draw_machine_shutdown_effect(self, effect, town_name="the realm"):
+        """Draw the quest-complete shutdown animation overlay.
 
         Four phases:
         1. Machine overload — red/orange pulsing, energy arcs, screen shake
@@ -1746,7 +1746,7 @@ class Renderer(CombatEffectRendererMixin):
                           (tr, tg, tb), self.font)
 
             # Quest subtitle
-            qname = "Keys of Shadow"
+            qname = "QUEST COMPLETE"
             qw = len(qname) * 8
             qc = int(180 * banner_alpha)
             self._u3_text(qname, cx - qw // 2, by + 44,
@@ -1760,7 +1760,7 @@ class Renderer(CombatEffectRendererMixin):
                           (rc, rc, int(rc * 0.4)), self.font_med)
 
             # Flavour text
-            flavour = "The people of Duskhollow are saved!"
+            flavour = f"The people of {town_name} are saved!"
             fw = len(flavour) * 6
             fc = int(160 * banner_alpha)
             self._u3_text(flavour, cx - fw // 2, by + 98,
@@ -6137,7 +6137,8 @@ class Renderer(CombatEffectRendererMixin):
 
     def draw_module_screen(self, modules, cursor, active_path,
                            message=None, confirm_delete=False,
-                           edit_mode=False, edit_field=0,
+                           edit_mode=False, edit_is_new=False,
+                           edit_field=0,
                            edit_fields=None, edit_buffer=""):
         """Draw the module selection / browser screen.
 
@@ -6148,9 +6149,10 @@ class Renderer(CombatEffectRendererMixin):
         active_path    : path of the currently active module
         message        : feedback/confirmation text to display
         confirm_delete : True when showing delete confirmation
-        edit_mode      : True when editing module metadata
+        edit_mode      : True when editing module fields
+        edit_is_new    : True when creating a new module (vs editing)
         edit_field     : index of the field being edited
-        edit_fields    : list of [label, key, value] for edit mode
+        edit_fields    : list of [label, key, value, type, editable]
         edit_buffer    : current text being typed
         """
         import math
@@ -6315,7 +6317,7 @@ class Renderer(CombatEffectRendererMixin):
         if edit_mode and edit_fields:
             self._draw_module_edit_overlay(
                 right_x, panel_y, right_w, panel_h,
-                edit_fields, edit_field, edit_buffer)
+                edit_fields, edit_field, edit_buffer, edit_is_new)
 
         # ── Feedback / confirmation message ──
         if message:
@@ -6328,9 +6330,12 @@ class Renderer(CombatEffectRendererMixin):
         # ── Footer hints ──
         hint_y = SCREEN_HEIGHT - 45
         hint_color = (68, 68, 200)
-        if edit_mode:
+        if edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
-                    "[LT/RT] Adjust  [ENTER] Save  [ESC] Cancel")
+                    "[LT/RT] Adjust  [ENTER] Create  [ESC] Cancel")
+        elif edit_mode:
+            hint = ("[UP/DN] Field  [TYPE] Edit  "
+                    "[ENTER] Save  [ESC] Cancel")
         else:
             hint = ("[UP/DN] Browse  [ENTER] Select  "
                     "[N] New  [E] Edit  [D] Delete  [ESC] Back")
@@ -6338,8 +6343,9 @@ class Renderer(CombatEffectRendererMixin):
                       hint_y, hint_color, fs)
 
     def _draw_module_edit_overlay(self, rx, ry, rw, rh,
-                                  fields, active_idx, buffer):
-        """Draw the metadata + settings edit form over the detail panel."""
+                                  fields, active_idx, buffer,
+                                  is_new=False):
+        """Draw the edit/create form over the detail panel."""
         fm = self.font_med
         fs = self.font_small
         f = self.font
@@ -6352,16 +6358,18 @@ class Renderer(CombatEffectRendererMixin):
                          (rx, ry, rw, rh), 1)
 
         # Title
-        self._u3_text("EDIT MODULE", rx + 16, ry + 12,
-                       self._U3_ORANGE, f)
+        title = "CREATE MODULE" if is_new else "EDIT MODULE"
+        self._u3_text(title, rx + 16, ry + 12, self._U3_ORANGE, f)
         dy = ry + 44
 
-        settings_keys = {"world_size", "num_towns", "num_quests"}
+        settings_keys = {"world_size", "num_towns", "num_quests",
+                         "season", "time_of_day"}
         drew_separator = False
 
         for i, entry in enumerate(fields):
             label, key, value = entry[0], entry[1], entry[2]
             field_type = entry[3] if len(entry) > 3 else "text"
+            editable = entry[4] if len(entry) > 4 else True
             selected = (i == active_idx)
 
             # Draw a separator before the first settings field
@@ -6375,8 +6383,23 @@ class Renderer(CombatEffectRendererMixin):
                 dy += 20
                 drew_separator = True
 
-            label_color = (255, 255, 100) if selected else (160, 160, 160)
-            self._u3_text(f"{label}:", rx + 16, dy, label_color, fm)
+            # Dim read-only fields
+            if not editable:
+                label_color = (90, 90, 100)
+                text_color = (80, 80, 100)
+                arrow_color = (60, 60, 80)
+            elif selected:
+                label_color = (255, 255, 100)
+                text_color = self._U3_WHITE
+                arrow_color = (255, 255, 100)
+            else:
+                label_color = (160, 160, 160)
+                text_color = (140, 140, 160)
+                arrow_color = (100, 100, 120)
+
+            # Label with lock icon for read-only
+            lock = "" if editable else " (locked)"
+            self._u3_text(f"{label}{lock}:", rx + 16, dy, label_color, fm)
             dy += 18
 
             # Show the buffer for the active field, stored value otherwise
@@ -6384,19 +6407,16 @@ class Renderer(CombatEffectRendererMixin):
             if not display:
                 display = "(empty)"
 
-            text_color = self._U3_WHITE if selected else (140, 140, 160)
-
             if field_type in ("choice", "int"):
-                # Show < value > with arrow indicators
-                arrow_color = (255, 255, 100) if selected else (100, 100, 120)
-                self._u3_text("<", rx + 20, dy, arrow_color, fm)
-                self._u3_text(display, rx + 34, dy, text_color, fm)
-                val_w = fm.size(display.upper())[0]
-                self._u3_text(">", rx + 38 + val_w, dy, arrow_color, fm)
-                if selected and field_type == "choice":
-                    hint_color = (120, 120, 140)
-                    self._u3_text("[LEFT/RIGHT]", rx + 56 + val_w, dy,
-                                  hint_color, fs)
+                if editable:
+                    self._u3_text("<", rx + 20, dy, arrow_color, fm)
+                    self._u3_text(display, rx + 34, dy, text_color, fm)
+                    val_w = fm.size(display.upper())[0]
+                    self._u3_text(">", rx + 38 + val_w, dy,
+                                  arrow_color, fm)
+                else:
+                    # Read-only: just show value, no arrows
+                    self._u3_text(display, rx + 20, dy, text_color, fm)
             else:
                 # Truncate long text to fit panel
                 max_chars = (rw - 40) // 8
@@ -6404,14 +6424,22 @@ class Renderer(CombatEffectRendererMixin):
                     display = display[:max_chars - 2] + ".."
                 self._u3_text(display, rx + 20, dy, text_color, fm)
 
-                # Blinking cursor for active text field
-                if selected:
+                # Blinking cursor for active editable text field
+                if selected and editable:
                     cursor_x = rx + 20 + fm.size(display.upper())[0] + 2
                     if pygame.time.get_ticks() % 800 < 400:
                         pygame.draw.line(self.screen, (255, 255, 255),
                                          (cursor_x, dy),
                                          (cursor_x, dy + 14), 1)
             dy += 28
+
+        # Action label at the bottom of the form
+        dy += 8
+        action_label = "ENTER to Create Module" if is_new \
+            else "ENTER to Save Changes"
+        blink = pygame.time.get_ticks() % 1200 < 800
+        action_color = self._U3_ORANGE if blink else (140, 100, 40)
+        self._u3_text(action_label, rx + 16, dy, action_color, fm)
 
     def draw_game_over_screen(self, options, cursor, elapsed):
         """Draw a grim game-over screen with skull art and menu options.

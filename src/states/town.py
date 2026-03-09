@@ -570,7 +570,7 @@ class TownState(InventoryMixin, BaseState):
                 "It has 8 empty keyhole slots.", 3500)
 
     def _trigger_victory(self):
-        """Called when all 8 keys are inserted — the sun returns!"""
+        """Called when all keys are inserted — quest complete!"""
         # Award rewards immediately (behind the animation)
         for m in self.game.party.alive_members():
             if m.is_alive():
@@ -579,9 +579,11 @@ class TownState(InventoryMixin, BaseState):
                 for msg in msgs:
                     self.game.game_log.append(msg)
         self.game.party.gold += 1000
-        self.game.game_log.append("*** THE MACHINE POWERS DOWN! ***")
-        self.game.game_log.append("Sunlight floods the land once more!")
-        self.game.game_log.append("The people of Duskhollow are saved!")
+        town_name = getattr(self.game, "town_data", None)
+        town_name = town_name.name if town_name else "the realm"
+        self.game.game_log.append("*** QUEST COMPLETE! ***")
+        self.game.game_log.append("Peace returns to the land!")
+        self.game.game_log.append(f"The people of {town_name} are saved!")
         self.game.game_log.append("VICTORY! +500 XP, +1000 Gold")
 
         # Launch the machine shutdown animation — darkness_active is
@@ -715,9 +717,11 @@ class TownState(InventoryMixin, BaseState):
                 if inserted >= total:
                     self.npc_dialogue_active = True
                     self.npc_speaking = npc
+                    town_nm = getattr(self.game, "town_data", None)
+                    town_nm = town_nm.name if town_nm else "the realm"
                     self._set_dialogue(
-                        f"{npc.name}: The sun is restored! "
-                        f"I can never thank you enough. Duskhollow is saved!")
+                        f"{npc.name}: The quest is complete! "
+                        f"I can never thank you enough. {town_nm} is saved!")
                     return
                 elif inserted > 0:
                     self.npc_dialogue_active = True
@@ -1239,7 +1243,10 @@ class TownState(InventoryMixin, BaseState):
 
         # Machine shutdown animation overlay
         if self.machine_shutdown_effect:
-            renderer.draw_machine_shutdown_effect(self.machine_shutdown_effect)
+            _td = getattr(self.game, "town_data", None)
+            _tn = _td.name if _td else "the realm"
+            renderer.draw_machine_shutdown_effect(
+                self.machine_shutdown_effect, town_name=_tn)
             return  # blocks dialogue rendering during animation
 
         # Quest completion celebration overlay

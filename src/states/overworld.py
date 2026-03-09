@@ -130,7 +130,7 @@ class OverworldState(InventoryMixin, BaseState):
                 "It has 8 empty keyhole slots.", 3500)
 
     def _trigger_victory(self):
-        """Called when all 8 keys are inserted — the sun returns!"""
+        """Called when all keys are inserted — quest complete!"""
         self.game.set_darkness(False)
         # Award XP and gold to all alive party members
         for m in self.game.party.alive_members():
@@ -140,12 +140,14 @@ class OverworldState(InventoryMixin, BaseState):
                 for msg in msgs:
                     self.game.game_log.append(msg)
         self.game.party.gold += 1000
-        self.game.game_log.append("*** THE MACHINE POWERS DOWN! ***")
-        self.game.game_log.append("Sunlight floods the land once more!")
-        self.game.game_log.append("The people of Duskhollow are saved!")
+        town_name = getattr(self.game, "town_data", None)
+        town_name = town_name.name if town_name else "the realm"
+        self.game.game_log.append("*** QUEST COMPLETE! ***")
+        self.game.game_log.append("Peace returns to the land!")
+        self.game.game_log.append(f"The people of {town_name} are saved!")
         self.game.game_log.append("VICTORY! +500 XP, +1000 Gold")
         self.show_message(
-            "THE MACHINE POWERS DOWN! Sunlight returns! VICTORY!", 6000)
+            "QUEST COMPLETE! Peace returns! VICTORY!", 6000)
 
     def _spawn_test_spellcaster(self):
         """Place a spell-casting Dark Mage 4 tiles east of the party start.
@@ -719,7 +721,8 @@ class OverworldState(InventoryMixin, BaseState):
         town_data = self.game.town_data
         name = town_data.name if town_data else "Town"
         desc = self._TOWN_DESCRIPTIONS.get(name,
-            "A small settlement rises from the landscape. Smoke drifts from chimneys and voices carry on the wind.")
+            f"The town of {name} rises from the landscape. "
+            "Smoke drifts from chimneys and voices carry on the wind.")
 
         # After the quest is complete, Duskhollow is no longer dark
         if (name == "Duskhollow"

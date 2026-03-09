@@ -107,9 +107,10 @@ class Game:
         self.module_msg_timer = 0.0          # seconds remaining
         self.module_confirm_delete = False   # Y/N delete confirmation
         self.module_edit_mode = False        # editing module metadata
-        self.module_edit_field = 0           # 0=name, 1=author, 2=description
+        self.module_edit_is_new = False      # True = creating new module
+        self.module_edit_field = 0           # active field index
         self.module_edit_buffer = ""         # text being typed
-        self.module_edit_fields = []         # list of [label, key, value]
+        self.module_edit_fields = []         # [label, key, value, type, editable]
         from src.module_loader import get_default_module_path
         self.active_module_path = get_default_module_path()
         self.active_module_name = "Keys of Shadow"
@@ -296,20 +297,29 @@ class Game:
 
         self.visited_dungeons = set()  # {(col, row)} — tracks which dungeon tiles the party has entered
 
-        # ── Keys of Shadow module: set up 8 key dungeons ──
+        # ── Module key-dungeon quests ──
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
         self.keys_inserted = 0  # how many keys placed in the machine
         self.pending_combat_rewards = None  # set by combat victory, consumed by source state
         self.machine_col = None  # overworld position of the machine
         self.machine_row = None
         if self.module_manifest:
+            mod_id = self.module_manifest.get(
+                "metadata", {}).get("id", "")
             prog = self.module_manifest.get("progression", {})
             kd_list = prog.get("key_dungeons", [])
             if kd_list:
                 self._init_key_dungeons(kd_list)
-                self.darkness_active = True
-                # Replace default Thornwall with Duskhollow for this module
-                self.town_data = generate_duskhollow()
+                if mod_id == "keys_of_shadow":
+                    # Duskhollow is unique to Keys of Shadow
+                    self.darkness_active = True
+                    self.town_data = generate_duskhollow()
+                else:
+                    # Other modules get a normal hub town
+                    towns = self.module_manifest.get(
+                        "world", {}).get("towns", [])
+                    hub_name = towns[0]["name"] if towns else "Thornwall"
+                    self.town_data = generate_town(hub_name)
 
         self._game_started = True
         self.showing_title = False
@@ -997,6 +1007,7 @@ class Game:
         self.module_msg_timer = 0.0
         self.module_confirm_delete = False
         self.module_edit_mode = False
+        self.module_edit_is_new = False
 
     def _refresh_module_list(self):
         """Re-scan modules and restore cursor position."""
@@ -1073,19 +1084,22 @@ class Game:
             self._enter_module_edit()
 
     def _do_create_module(self):
-        """Create a new blank module and refresh the list."""
-        from src.module_loader import create_module
-        path = create_module("New Module")
-        self._refresh_module_list()
-        # Select the newly created module
-        for i, mod in enumerate(self.module_list):
-            if mod["path"] == path:
-                self.module_cursor = i
-                break
-        self.module_message = "New module created!"
-        self.module_msg_timer = 2.0
-        # Immediately open edit mode so the user can name it
-        self._enter_module_edit()
+        """Open the edit overlay in 'create new module' mode."""
+        self.module_edit_mode = True
+        self.module_edit_is_new = True
+        self.module_edit_field = 0
+        # All fields are editable in create mode
+        self.module_edit_fields = [
+            ["Name", "name", "New Module", "text", True],
+            ["Author", "author", "Unknown", "text", True],
+            ["Description", "description", "", "text", True],
+            ["World Size", "world_size", "Medium", "choice", True],
+            ["Towns", "num_towns", "1", "int", True],
+            ["Quests", "num_quests", "1", "int", True],
+            ["Season", "season", "Summer", "choice", True],
+            ["Time of Day", "time_of_day", "Noon", "choice", True],
+        ]
+        self.module_edit_buffer = self.module_edit_fields[0][2]
 
     def _do_delete_module(self):
         """Delete the currently selected module."""
@@ -1106,84 +1120,115 @@ class Game:
             self.module_msg_timer = 2.0
 
     def _enter_module_edit(self):
-        """Enter edit mode for the selected module's metadata and settings."""
+        """Enter edit mode for an existing module (metadata only)."""
         if not self.module_list:
             return
         mod = self.module_list[self.module_cursor]
 
-        # Load current settings from the manifest
+        # Load current settings for display (read-only)
         from src.module_loader import get_module_settings
         mod_settings = get_module_settings(mod["path"]) or {
             "world_size": "Medium", "num_towns": 0, "num_quests": 0,
+            "season": "Summer", "time_of_day": "Noon",
         }
 
         self.module_edit_mode = True
+        self.module_edit_is_new = False
         self.module_edit_field = 0
-        # Each entry: [label, key, value, field_type]
-        # field_type: "text" (default), "choice", "int"
+        # Each entry: [label, key, value, field_type, editable]
+        # For existing modules: metadata editable, settings read-only
         self.module_edit_fields = [
-            ["Name", "name", mod["name"], "text"],
-            ["Author", "author", mod["author"], "text"],
+            ["Name", "name", mod["name"], "text", True],
+            ["Author", "author", mod["author"], "text", True],
             ["Description", "description",
-             mod.get("description", ""), "text"],
+             mod.get("description", ""), "text", True],
             ["World Size", "world_size",
-             mod_settings["world_size"], "choice"],
+             mod_settings["world_size"], "choice", False],
             ["Towns", "num_towns",
-             str(mod_settings["num_towns"]), "int"],
+             str(mod_settings["num_towns"]), "int", False],
             ["Quests", "num_quests",
-             str(mod_settings["num_quests"]), "int"],
+             str(mod_settings["num_quests"]), "int", False],
+            ["Season", "season",
+             mod_settings["season"], "choice", False],
+            ["Time of Day", "time_of_day",
+             mod_settings["time_of_day"], "choice", False],
         ]
         self.module_edit_buffer = self.module_edit_fields[0][2]
 
+    def _next_editable_field(self, direction):
+        """Move to the next editable field in the given direction (+1/-1).
+
+        Skips read-only fields.  Wraps around.  If no editable field
+        exists in that direction, stays put.
+        """
+        n = len(self.module_edit_fields)
+        start = self.module_edit_field
+        for _ in range(n):
+            candidate = (start + direction) % n
+            if self.module_edit_fields[candidate][4]:  # editable?
+                return candidate
+            start = candidate
+        return self.module_edit_field  # nothing editable found
+
     def _handle_module_edit_input(self, event):
-        """Handle input while editing module metadata and settings fields."""
+        """Handle input while editing module fields."""
         if event.key == pygame.K_ESCAPE:
             self.module_edit_mode = False
+            self.module_edit_is_new = False
             self.module_message = None
             return
 
         field_entry = self.module_edit_fields[self.module_edit_field]
         field_type = field_entry[3] if len(field_entry) > 3 else "text"
+        editable = field_entry[4] if len(field_entry) > 4 else True
 
         if event.key == pygame.K_UP:
-            # Save current buffer to current field
             field_entry[2] = self.module_edit_buffer
-            self.module_edit_field = (
-                (self.module_edit_field - 1) % len(self.module_edit_fields))
+            self.module_edit_field = self._next_editable_field(-1)
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
         elif event.key == pygame.K_DOWN:
             field_entry[2] = self.module_edit_buffer
-            self.module_edit_field = (
-                (self.module_edit_field + 1) % len(self.module_edit_fields))
+            self.module_edit_field = self._next_editable_field(+1)
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
         elif event.key == pygame.K_RETURN:
-            # Save current field, then commit all changes
             field_entry[2] = self.module_edit_buffer
             self._commit_module_edit()
+        elif not editable:
+            # Field is read-only — ignore all other input
+            return
         elif field_type == "choice":
             # Left/Right to cycle through preset choices
-            from src.module_loader import WORLD_SIZE_NAMES
+            from src.module_loader import (WORLD_SIZE_NAMES,
+                                           SEASON_NAMES,
+                                           TIME_OF_DAY_NAMES)
+            key = field_entry[1]
+            if key == "world_size":
+                choices = WORLD_SIZE_NAMES
+            elif key == "season":
+                choices = SEASON_NAMES
+            elif key == "time_of_day":
+                choices = TIME_OF_DAY_NAMES
+            else:
+                choices = [self.module_edit_buffer]
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 try:
-                    idx = WORLD_SIZE_NAMES.index(self.module_edit_buffer)
+                    idx = choices.index(self.module_edit_buffer)
                 except ValueError:
                     idx = 0
                 if event.key == pygame.K_RIGHT:
-                    idx = (idx + 1) % len(WORLD_SIZE_NAMES)
+                    idx = (idx + 1) % len(choices)
                 else:
-                    idx = (idx - 1) % len(WORLD_SIZE_NAMES)
-                self.module_edit_buffer = WORLD_SIZE_NAMES[idx]
+                    idx = (idx - 1) % len(choices)
+                self.module_edit_buffer = choices[idx]
         elif field_type == "int":
             if event.key == pygame.K_BACKSPACE:
                 self.module_edit_buffer = self.module_edit_buffer[:-1]
             elif event.key == pygame.K_LEFT:
-                # Decrement
                 val = max(0, int(self.module_edit_buffer or "0") - 1)
                 self.module_edit_buffer = str(val)
             elif event.key == pygame.K_RIGHT:
-                # Increment
                 val = int(self.module_edit_buffer or "0") + 1
                 self.module_edit_buffer = str(val)
             elif event.unicode and event.unicode.isdigit():
@@ -1196,37 +1241,59 @@ class Game:
                 self.module_edit_buffer += event.unicode
 
     def _commit_module_edit(self):
-        """Save edited metadata and settings back to the module.json."""
-        from src.module_loader import update_module_metadata, update_module_settings
-        if not self.module_list:
-            self.module_edit_mode = False
-            return
-        mod = self.module_list[self.module_cursor]
-
-        # Separate metadata fields from settings fields
-        meta_kwargs = {}
-        settings_kwargs = {}
-        settings_keys = {"world_size", "num_towns", "num_quests"}
+        """Create a new module or save edits to an existing one."""
+        # Gather all field values into a dict
+        values = {}
         for entry in self.module_edit_fields:
-            label, key, value = entry[0], entry[1], entry[2]
-            if key in settings_keys:
-                if key in ("num_towns", "num_quests"):
-                    settings_kwargs[key] = int(value) if value else 0
-                else:
-                    settings_kwargs[key] = value
+            key, value = entry[1], entry[2]
+            if key in ("num_towns", "num_quests"):
+                values[key] = int(value) if value else 0
             else:
-                meta_kwargs[key] = value
+                values[key] = value
 
-        ok1 = update_module_metadata(mod["path"], **meta_kwargs)
-        ok2 = update_module_settings(mod["path"], **settings_kwargs)
-        self.module_edit_mode = False
-        if ok1 and ok2:
-            self.module_message = "Module updated!"
-            self.module_msg_timer = 2.0
+        if self.module_edit_is_new:
+            # ── Create new module with all settings ──
+            from src.module_loader import create_module
+            path = create_module(
+                name=values.get("name", "New Module"),
+                author=values.get("author", "Unknown"),
+                description=values.get("description", ""),
+                world_size=values.get("world_size", "Medium"),
+                num_towns=values.get("num_towns", 1),
+                num_quests=values.get("num_quests", 1),
+                season=values.get("season", "Summer"),
+                time_of_day=values.get("time_of_day", "Noon"),
+            )
+            self.module_edit_mode = False
+            self.module_edit_is_new = False
             self._refresh_module_list()
-        else:
-            self.module_message = "Update failed!"
+            # Select the newly created module
+            for i, mod in enumerate(self.module_list):
+                if mod["path"] == path:
+                    self.module_cursor = i
+                    break
+            self.module_message = "Module created!"
             self.module_msg_timer = 2.0
+        else:
+            # ── Update existing module (metadata only) ──
+            from src.module_loader import update_module_metadata
+            if not self.module_list:
+                self.module_edit_mode = False
+                return
+            mod = self.module_list[self.module_cursor]
+            meta_kwargs = {}
+            for key in ("name", "author", "description"):
+                if key in values:
+                    meta_kwargs[key] = values[key]
+            ok = update_module_metadata(mod["path"], **meta_kwargs)
+            self.module_edit_mode = False
+            if ok:
+                self.module_message = "Module updated!"
+                self.module_msg_timer = 2.0
+                self._refresh_module_list()
+            else:
+                self.module_message = "Update failed!"
+                self.module_msg_timer = 2.0
 
     # ── Music / settings helpers ────────────────────────────────
 
@@ -1540,6 +1607,7 @@ class Game:
                     message=self.module_message,
                     confirm_delete=self.module_confirm_delete,
                     edit_mode=self.module_edit_mode,
+                    edit_is_new=self.module_edit_is_new,
                     edit_field=self.module_edit_field,
                     edit_fields=self.module_edit_fields,
                     edit_buffer=self.module_edit_buffer)
