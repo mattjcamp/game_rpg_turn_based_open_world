@@ -34,27 +34,45 @@ TERRAIN_OBSTACLES = {
 _DEFAULT_OBSTACLES = ("bush", 0, 1)
 
 # ── Terrain-themed loot tables ───────────────────────────────────
-# Low-value scraps only — nothing you'd be excited to find.
+# Forageable items: rocks are common, reagents less so, healing herbs rare.
 # Each entry is (item_name, weight).
+# The "reagent" entries are placeholders — the actual reagent chosen at
+# spawn time is picked randomly from FORAGE_REAGENTS.
 EXAMINE_LOOT = {
     TILE_GRASS: [
-        ("Stones", 5),
-        ("Torch", 3),
+        ("Rock", 10),
+        ("_reagent_", 4),
+        ("Healing Herb", 2),
     ],
     TILE_FOREST: [
-        ("Stones", 4),
-        ("Torch", 4),
+        ("Rock", 8),
+        ("_reagent_", 6),
+        ("Healing Herb", 3),
     ],
     TILE_SAND: [
-        ("Stones", 7),
-        ("Torch", 3),
+        ("Rock", 12),
+        ("_reagent_", 3),
+        ("Healing Herb", 1),
     ],
     TILE_PATH: [
-        ("Stones", 6),
-        ("Torch", 4),
+        ("Rock", 10),
+        ("_reagent_", 3),
+        ("Healing Herb", 2),
     ],
 }
 _DEFAULT_LOOT = EXAMINE_LOOT[TILE_GRASS]
+
+# Reagent items that can appear when "_reagent_" is rolled.
+FORAGE_REAGENTS = [
+    "Moonpetal",
+    "Glowcap Mushroom",
+    "Serpent Root",
+    "Brimite Ore",
+    "Spring Water",
+]
+
+# Classes whose presence in the party boosts reagent find rates.
+_HERBALIST_CLASSES = {"ranger", "alchemist"}
 
 # ── Player start position (centre of interior) ──────────────────
 _START_COL = 5
@@ -254,11 +272,43 @@ class ExamineState(BaseState):
 
     # ── Item spawning ─────────────────────────────────────────────
 
+    def _has_herbalist(self):
+        """Return True if any alive party member is a Ranger or Alchemist."""
+        for m in self.game.party.members:
+            if m.is_alive() and m.char_class.lower() in _HERBALIST_CLASSES:
+                return True
+        return False
+
+    def _build_loot_table(self):
+        """Return (loot_table, weights) adjusted for party composition.
+
+        If a Ranger or Alchemist is present, reagent weights are doubled.
+        """
+        base = EXAMINE_LOOT.get(self.examined_tile_type, _DEFAULT_LOOT)
+        herbalist = self._has_herbalist()
+        table = []
+        weights = []
+        for item_name, weight in base:
+            table.append(item_name)
+            if herbalist and item_name == "_reagent_":
+                weights.append(weight * 2)
+            else:
+                weights.append(weight)
+        return table, weights
+
+    def _resolve_item_name(self, raw_name):
+        """Turn a loot-table entry into a real item name.
+
+        The placeholder ``_reagent_`` is replaced with a random reagent.
+        """
+        if raw_name == "_reagent_":
+            return random.choice(FORAGE_REAGENTS)
+        return raw_name
+
     def _spawn_examine_items(self):
-        """Occasionally spawn 0–1 low-value items on random interior tiles."""
+        """Occasionally spawn 0–1 forageable items on random interior tiles."""
         self.ground_items.clear()
-        loot_table = EXAMINE_LOOT.get(self.examined_tile_type, _DEFAULT_LOOT)
-        weights = [w for _, w in loot_table]
+        table, weights = self._build_loot_table()
         # Most of the time nothing spawns (60% chance of zero items).
         num_items = random.choices([0, 0, 0, 1, 1], k=1)[0]
 
@@ -272,8 +322,8 @@ class ExamineState(BaseState):
                     continue
                 if (col, row) in self.obstacles:
                     continue
-                choice = random.choices(loot_table, weights=weights, k=1)[0]
-                item_name = choice[0]
+                raw = random.choices(table, weights=weights, k=1)[0]
+                item_name = self._resolve_item_name(raw)
                 self.ground_items[(col, row)] = {"item": item_name, "gold": 0}
                 break
 

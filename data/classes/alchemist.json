@@ -1,5 +1,5 @@
 {
-  "_comment": "Alchemist (Wizard + Crafter). Stealthy sorcerer limited to daggers and cloth.",
+  "_comment": "Alchemist (Wizard + Crafter). Stealthy sorcerer limited to daggers and cloth. Herbalism training grants a higher chance of finding reagents when foraging.",
   "allowed_weapons": [
     "fists",
     "dagger"
@@ -22,5 +22,11 @@
   "mp_source": {
     "ability": "intelligence",
     "percentage": 50
-  }
+  },
+  "class_abilities": [
+    {
+      "name": "Herbalism",
+      "description": "Expert knowledge of ingredients doubles the chance of finding reagents when examining the wilderness."
+    }
+  ]
 }

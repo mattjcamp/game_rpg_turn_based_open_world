@@ -240,19 +240,114 @@ class TestExamineLootTables:
             assert len(EXAMINE_LOOT[tile]) > 0
 
     def test_loot_entries_are_valid_items(self):
-        from src.states.examine import EXAMINE_LOOT
+        """All non-placeholder entries must exist in ITEM_INFO."""
+        from src.states.examine import EXAMINE_LOOT, FORAGE_REAGENTS
         from src.party import ITEM_INFO
         for tile_type, table in EXAMINE_LOOT.items():
             for item_name, weight in table:
+                if item_name == "_reagent_":
+                    # Placeholder — the actual reagents are checked below
+                    continue
                 assert item_name in ITEM_INFO, \
                     f"{item_name} not found in ITEM_INFO (tile {tile_type})"
                 assert weight > 0
+
+    def test_forage_reagents_are_valid_items(self):
+        """Every reagent in the forage list must exist in ITEM_INFO."""
+        from src.states.examine import FORAGE_REAGENTS
+        from src.party import ITEM_INFO
+        for reagent in FORAGE_REAGENTS:
+            assert reagent in ITEM_INFO, \
+                f"Forage reagent {reagent} not found in ITEM_INFO"
 
     def test_default_fallback(self):
         """Unmapped tile types fall back to grass loot."""
         from src.states.examine import EXAMINE_LOOT, _DEFAULT_LOOT
         from src.settings import TILE_GRASS
         assert _DEFAULT_LOOT is EXAMINE_LOOT[TILE_GRASS]
+
+    def test_loot_contains_rocks_reagents_herbs(self):
+        """Each terrain table should have Rock, _reagent_, and Healing Herb."""
+        from src.states.examine import EXAMINE_LOOT
+        for tile_type, table in EXAMINE_LOOT.items():
+            names = [name for name, _ in table]
+            assert "Rock" in names, f"Rock missing from tile {tile_type}"
+            assert "_reagent_" in names, f"_reagent_ missing from tile {tile_type}"
+            assert "Healing Herb" in names, \
+                f"Healing Herb missing from tile {tile_type}"
+
+    def test_rock_is_most_common(self):
+        """Rock should have the highest weight in every terrain."""
+        from src.states.examine import EXAMINE_LOOT
+        for tile_type, table in EXAMINE_LOOT.items():
+            by_name = {name: w for name, w in table}
+            assert by_name["Rock"] > by_name["_reagent_"], \
+                f"Rock not more common than reagents in tile {tile_type}"
+            assert by_name["Rock"] > by_name["Healing Herb"], \
+                f"Rock not more common than herbs in tile {tile_type}"
+
+    def test_reagent_more_common_than_herb(self):
+        """Reagents should be more common than Healing Herb."""
+        from src.states.examine import EXAMINE_LOOT
+        for tile_type, table in EXAMINE_LOOT.items():
+            by_name = {name: w for name, w in table}
+            assert by_name["_reagent_"] > by_name["Healing Herb"], \
+                f"Reagent not more common than herb in tile {tile_type}"
+
+
+# =====================================================================
+# Herbalist class ability (Ranger / Alchemist reagent boost)
+# =====================================================================
+
+class TestExamineHerbalist:
+    def test_has_herbalist_false_by_default(self, examine, game):
+        """Default party (fighters, etc.) has no herbalist."""
+        # Default test party classes are unlikely to be ranger/alchemist
+        # but let's set them explicitly to be safe
+        for m in game.party.members:
+            m.char_class = "Fighter"
+        assert examine._has_herbalist() is False
+
+    def test_has_herbalist_with_ranger(self, examine, game):
+        game.party.members[0].char_class = "Ranger"
+        assert examine._has_herbalist() is True
+
+    def test_has_herbalist_with_alchemist(self, examine, game):
+        game.party.members[0].char_class = "Alchemist"
+        assert examine._has_herbalist() is True
+
+    def test_herbalist_doubles_reagent_weight(self, examine, game):
+        """When a herbalist is present, _reagent_ weight should be doubled."""
+        from src.states.examine import EXAMINE_LOOT
+        from src.settings import TILE_GRASS
+        examine.examined_tile_type = TILE_GRASS
+        base_table = EXAMINE_LOOT[TILE_GRASS]
+        base_reagent_w = next(w for name, w in base_table if name == "_reagent_")
+
+        # No herbalist
+        for m in game.party.members:
+            m.char_class = "Fighter"
+        _, weights_no = examine._build_loot_table()
+        reagent_idx = next(
+            i for i, (name, _) in enumerate(base_table) if name == "_reagent_")
+        assert weights_no[reagent_idx] == base_reagent_w
+
+        # With herbalist
+        game.party.members[0].char_class = "Ranger"
+        _, weights_yes = examine._build_loot_table()
+        assert weights_yes[reagent_idx] == base_reagent_w * 2
+
+    def test_resolve_item_name_reagent(self, examine):
+        """_reagent_ placeholder resolves to a valid reagent name."""
+        from src.states.examine import FORAGE_REAGENTS
+        for _ in range(20):
+            name = examine._resolve_item_name("_reagent_")
+            assert name in FORAGE_REAGENTS
+
+    def test_resolve_item_name_passthrough(self, examine):
+        """Non-placeholder names pass through unchanged."""
+        assert examine._resolve_item_name("Rock") == "Rock"
+        assert examine._resolve_item_name("Healing Herb") == "Healing Herb"
 
 
 # =====================================================================

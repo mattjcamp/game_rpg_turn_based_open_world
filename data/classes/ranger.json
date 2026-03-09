@@ -1,5 +1,5 @@
 {
-  "_comment": "A woodsman who can use light weapons and armor and knows healing magic.",
+  "_comment": "A woodsman who can use light weapons and armor and knows healing magic. Herbalism training grants a higher chance of finding reagents when foraging.",
   "allowed_weapons": [
     "fists",
     "dagger",
@@ -29,5 +29,11 @@
   "mp_source": {
     "ability": "wisdom",
     "percentage": 50
-  }
+  },
+  "class_abilities": [
+    {
+      "name": "Herbalism",
+      "description": "Keen knowledge of flora doubles the chance of finding reagents when examining the wilderness."
+    }
+  ]
 }
