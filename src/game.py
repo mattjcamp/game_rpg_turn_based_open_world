@@ -436,6 +436,10 @@ class Game:
         for kd in self.key_dungeons.values():
             if kd["status"] == "undiscovered":
                 kd["status"] = "active"
+                # Restore proper floor names now that the quest is revealed
+                dname = kd.get("name", "Key Dungeon")
+                for i, level in enumerate(kd.get("levels", [])):
+                    level.name = f"{dname} - Floor {i + 1}"
 
     def _init_module_towns(self):
         """Generate towns for the active module and store in town_data_map.

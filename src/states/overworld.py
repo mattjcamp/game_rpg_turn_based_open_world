@@ -778,22 +778,33 @@ class OverworldState(InventoryMixin, BaseState):
         hq = self.game.get_house_quest()
 
         if kd:
-            name = kd.get("name", "Key Dungeon")
-            # Use the dungeon's unique description if available
-            desc = kd.get("description") or (
-                "A dark cave entrance leads deep underground. "
-                "The air smells of ancient stone and danger."
-            )
             if kd["status"] == "undiscovered":
-                # Player hasn't been told about this quest yet —
-                # show it as a generic explorable dungeon.
+                # Player hasn't accepted this quest yet — show a
+                # generic name and description so quest details
+                # aren't revealed prematurely.
+                name = "Unknown Cave"
+                desc = (
+                    "A dark cave entrance leads deep underground. "
+                    "The air smells of ancient stone and danger."
+                )
                 quest_name = None
                 entry_type = "key_dungeon"
             elif kd["status"] == "completed":
+                name = kd.get("name", "Key Dungeon")
+                desc = kd.get("description") or (
+                    "A dark cave entrance leads deep underground. "
+                    "The air smells of ancient stone and danger."
+                )
                 cleared = True
                 quest_name = f"{kd.get('key_name', 'Key')} (completed)"
                 entry_type = "key_dungeon"
             else:
+                name = kd.get("name", "Key Dungeon")
+                # Use the dungeon's unique description if available
+                desc = kd.get("description") or (
+                    "A dark cave entrance leads deep underground. "
+                    "The air smells of ancient stone and danger."
+                )
                 # Use the dungeon's unique quest objective if available
                 quest_name = kd.get("quest_objective") or (
                     f"Retrieve the {kd.get('key_name', 'Key')}"
@@ -883,6 +894,11 @@ class OverworldState(InventoryMixin, BaseState):
         if entry_type == "key_dungeon":
             kd = self.game.get_key_dungeon(pcol, prow)
             if kd:
+                # If quest hasn't been accepted yet, mask floor names
+                # so they don't reveal quest details.
+                if kd["status"] == "undiscovered":
+                    for i, level in enumerate(kd["levels"]):
+                        level.name = f"Unknown Cave - Floor {i + 1}"
                 dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)
         elif entry_type == "quest":
             quest = self.game.get_quest()

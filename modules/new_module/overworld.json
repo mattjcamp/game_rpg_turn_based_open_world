@@ -1,42 +1,58 @@
 {
   "size": {
-    "width": 32,
-    "height": 24
+    "width": 128,
+    "height": 96
   },
   "start_position": {
-    "col": 16,
-    "row": 10
+    "col": 64,
+    "row": 34
   },
   "landmarks": [
     {
-      "id": "elderreach",
+      "id": "fernridge",
       "type": "town",
-      "col": 16,
-      "row": 8,
+      "col": 64,
+      "row": 32,
       "tile": "TILE_TOWN",
       "clear_radius": 3
     },
     {
-      "id": "town_vault",
+      "id": "stonevale",
+      "type": "town",
+      "col": 64,
+      "row": 64,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "town_shrine",
       "type": "machine",
-      "col": 18,
-      "row": 8,
+      "col": 66,
+      "row": 32,
       "tile": "TILE_MACHINE",
       "clear_radius": 1
     },
     {
       "id": "dungeon_1",
       "type": "dungeon",
-      "col": 22,
-      "row": 12,
+      "col": 88,
+      "row": 48,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     },
     {
       "id": "dungeon_2",
       "type": "dungeon",
-      "col": 8,
-      "row": 12,
+      "col": 51,
+      "row": 70,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    },
+    {
+      "id": "dungeon_3",
+      "type": "dungeon",
+      "col": 49,
+      "row": 23,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     }
@@ -44,32 +60,52 @@
   "paths": [
     {
       "from": [
-        16,
-        8
+        64,
+        32
       ],
       "to": [
-        22,
-        12
+        88,
+        48
       ]
     },
     {
       "from": [
-        16,
-        8
+        64,
+        64
       ],
       "to": [
-        8,
-        12
+        51,
+        70
       ]
     },
     {
       "from": [
-        16,
-        10
+        64,
+        32
       ],
       "to": [
-        16,
-        8
+        49,
+        23
+      ]
+    },
+    {
+      "from": [
+        64,
+        32
+      ],
+      "to": [
+        64,
+        64
+      ]
+    },
+    {
+      "from": [
+        64,
+        34
+      ],
+      "to": [
+        64,
+        32
       ]
     }
   ]

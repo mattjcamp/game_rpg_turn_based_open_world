@@ -76,8 +76,10 @@ class DungeonState(InventoryMixin, BaseState):
         """Return the quest dict that owns this dungeon, or None."""
         oc, orow = self.overworld_col, self.overworld_row
         # Check key dungeons first (Keys of Shadow module)
+        # Include "undiscovered" so the artifact pickup still works
+        # if the player explores before accepting the quest.
         kd = self.game.get_key_dungeon(oc, orow)
-        if kd and kd.get("status") in ("active", "artifact_found"):
+        if kd and kd.get("status") in ("undiscovered", "active", "artifact_found"):
             return kd
         # Check standard quests
         for q in (self.game.get_quest(), self.game.get_house_quest()):
