@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "id": "new_module_2",
+    "name": "New Module",
+    "author": "Hyperbolic",
+    "description": "A test world",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 32,
+    "map_height": 24,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20
+  },
+  "data": {},
+  "world": {
+    "overworld": null,
+    "towns": [
+      {
+        "id": "town_1",
+        "name": "Town 1"
+      },
+      {
+        "id": "town_2",
+        "name": "Town 2"
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_machine"
+    },
+    "starting_quests": [],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Dungeon 1",
+        "key_name": "Key 1",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1"
+      }
+    ]
+  }
+}

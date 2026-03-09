@@ -103,6 +103,13 @@ class Game:
         self.showing_modules = False
         self.module_cursor = 0
         self.module_list = []  # populated when screen opens
+        self.module_message = None           # feedback message
+        self.module_msg_timer = 0.0          # seconds remaining
+        self.module_confirm_delete = False   # Y/N delete confirmation
+        self.module_edit_mode = False        # editing module metadata
+        self.module_edit_field = 0           # 0=name, 1=author, 2=description
+        self.module_edit_buffer = ""         # text being typed
+        self.module_edit_fields = []         # list of [label, key, value]
         from src.module_loader import get_default_module_path
         self.active_module_path = get_default_module_path()
         self.active_module_name = "Keys of Shadow"
@@ -983,27 +990,58 @@ class Game:
 
     def _title_modules(self):
         """Open the module browser from the title screen."""
-        from src.module_loader import scan_modules
-        self.module_list = scan_modules()
-        self.module_cursor = 0
-        # Pre-select the currently active module
-        for i, mod in enumerate(self.module_list):
-            if mod["path"] == self.active_module_path:
-                self.module_cursor = i
-                break
+        self._refresh_module_list()
         self.showing_title = False
         self.showing_modules = True
+        self.module_message = None
+        self.module_msg_timer = 0.0
+        self.module_confirm_delete = False
+        self.module_edit_mode = False
+
+    def _refresh_module_list(self):
+        """Re-scan modules and restore cursor position."""
+        from src.module_loader import scan_modules
+        old_path = None
+        if self.module_list and 0 <= self.module_cursor < len(self.module_list):
+            old_path = self.module_list[self.module_cursor]["path"]
+        self.module_list = scan_modules()
+        self.module_cursor = 0
+        # Try to re-select previously selected module
+        target = old_path or self.active_module_path
+        for i, mod in enumerate(self.module_list):
+            if mod["path"] == target:
+                self.module_cursor = i
+                break
 
     def _handle_module_input(self, event):
         """Handle input on the module selection screen."""
         if event.type != pygame.KEYDOWN:
             return
+
+        # ── Edit mode: typing metadata fields ──
+        if self.module_edit_mode:
+            self._handle_module_edit_input(event)
+            return
+
+        # ── Delete confirmation ──
+        if self.module_confirm_delete:
+            if event.key == pygame.K_y:
+                self._do_delete_module()
+            elif event.key in (pygame.K_n, pygame.K_ESCAPE):
+                self.module_confirm_delete = False
+                self.module_message = None
+            return
+
+        # ── No modules: N to create, ESC to go back ──
         if not self.module_list:
-            # No modules found — ESC or Enter returns to title
-            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+            if event.key == pygame.K_n:
+                self._do_create_module()
+            elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self.showing_modules = False
                 self.showing_title = True
             return
+
+        # ── Normal module browsing ──
         if event.key == pygame.K_UP:
             self.module_cursor = (
                 (self.module_cursor - 1) % len(self.module_list))
@@ -1020,6 +1058,175 @@ class Game:
         elif event.key == pygame.K_ESCAPE:
             self.showing_modules = False
             self.showing_title = True
+        elif event.key == pygame.K_n:
+            self._do_create_module()
+        elif event.key == pygame.K_d:
+            selected = self.module_list[self.module_cursor]
+            if selected["path"] == self.active_module_path:
+                self.module_message = "Cannot delete the active module!"
+                self.module_msg_timer = 2.0
+            else:
+                self.module_confirm_delete = True
+                name = selected["name"]
+                self.module_message = f'Delete "{name}"?  Y = Yes  N = No'
+        elif event.key == pygame.K_e:
+            self._enter_module_edit()
+
+    def _do_create_module(self):
+        """Create a new blank module and refresh the list."""
+        from src.module_loader import create_module
+        path = create_module("New Module")
+        self._refresh_module_list()
+        # Select the newly created module
+        for i, mod in enumerate(self.module_list):
+            if mod["path"] == path:
+                self.module_cursor = i
+                break
+        self.module_message = "New module created!"
+        self.module_msg_timer = 2.0
+        # Immediately open edit mode so the user can name it
+        self._enter_module_edit()
+
+    def _do_delete_module(self):
+        """Delete the currently selected module."""
+        from src.module_loader import delete_module
+        if not self.module_list:
+            return
+        selected = self.module_list[self.module_cursor]
+        ok = delete_module(selected["path"])
+        self.module_confirm_delete = False
+        if ok:
+            self.module_message = f'"{selected["name"]}" deleted.'
+            self.module_msg_timer = 2.0
+            self._refresh_module_list()
+            if self.module_cursor >= len(self.module_list):
+                self.module_cursor = max(0, len(self.module_list) - 1)
+        else:
+            self.module_message = "Delete failed!"
+            self.module_msg_timer = 2.0
+
+    def _enter_module_edit(self):
+        """Enter edit mode for the selected module's metadata and settings."""
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+
+        # Load current settings from the manifest
+        from src.module_loader import get_module_settings
+        mod_settings = get_module_settings(mod["path"]) or {
+            "world_size": "Medium", "num_towns": 0, "num_quests": 0,
+        }
+
+        self.module_edit_mode = True
+        self.module_edit_field = 0
+        # Each entry: [label, key, value, field_type]
+        # field_type: "text" (default), "choice", "int"
+        self.module_edit_fields = [
+            ["Name", "name", mod["name"], "text"],
+            ["Author", "author", mod["author"], "text"],
+            ["Description", "description",
+             mod.get("description", ""), "text"],
+            ["World Size", "world_size",
+             mod_settings["world_size"], "choice"],
+            ["Towns", "num_towns",
+             str(mod_settings["num_towns"]), "int"],
+            ["Quests", "num_quests",
+             str(mod_settings["num_quests"]), "int"],
+        ]
+        self.module_edit_buffer = self.module_edit_fields[0][2]
+
+    def _handle_module_edit_input(self, event):
+        """Handle input while editing module metadata and settings fields."""
+        if event.key == pygame.K_ESCAPE:
+            self.module_edit_mode = False
+            self.module_message = None
+            return
+
+        field_entry = self.module_edit_fields[self.module_edit_field]
+        field_type = field_entry[3] if len(field_entry) > 3 else "text"
+
+        if event.key == pygame.K_UP:
+            # Save current buffer to current field
+            field_entry[2] = self.module_edit_buffer
+            self.module_edit_field = (
+                (self.module_edit_field - 1) % len(self.module_edit_fields))
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+        elif event.key == pygame.K_DOWN:
+            field_entry[2] = self.module_edit_buffer
+            self.module_edit_field = (
+                (self.module_edit_field + 1) % len(self.module_edit_fields))
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+        elif event.key == pygame.K_RETURN:
+            # Save current field, then commit all changes
+            field_entry[2] = self.module_edit_buffer
+            self._commit_module_edit()
+        elif field_type == "choice":
+            # Left/Right to cycle through preset choices
+            from src.module_loader import WORLD_SIZE_NAMES
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                try:
+                    idx = WORLD_SIZE_NAMES.index(self.module_edit_buffer)
+                except ValueError:
+                    idx = 0
+                if event.key == pygame.K_RIGHT:
+                    idx = (idx + 1) % len(WORLD_SIZE_NAMES)
+                else:
+                    idx = (idx - 1) % len(WORLD_SIZE_NAMES)
+                self.module_edit_buffer = WORLD_SIZE_NAMES[idx]
+        elif field_type == "int":
+            if event.key == pygame.K_BACKSPACE:
+                self.module_edit_buffer = self.module_edit_buffer[:-1]
+            elif event.key == pygame.K_LEFT:
+                # Decrement
+                val = max(0, int(self.module_edit_buffer or "0") - 1)
+                self.module_edit_buffer = str(val)
+            elif event.key == pygame.K_RIGHT:
+                # Increment
+                val = int(self.module_edit_buffer or "0") + 1
+                self.module_edit_buffer = str(val)
+            elif event.unicode and event.unicode.isdigit():
+                self.module_edit_buffer += event.unicode
+        else:
+            # text field
+            if event.key == pygame.K_BACKSPACE:
+                self.module_edit_buffer = self.module_edit_buffer[:-1]
+            elif event.unicode and event.unicode.isprintable():
+                self.module_edit_buffer += event.unicode
+
+    def _commit_module_edit(self):
+        """Save edited metadata and settings back to the module.json."""
+        from src.module_loader import update_module_metadata, update_module_settings
+        if not self.module_list:
+            self.module_edit_mode = False
+            return
+        mod = self.module_list[self.module_cursor]
+
+        # Separate metadata fields from settings fields
+        meta_kwargs = {}
+        settings_kwargs = {}
+        settings_keys = {"world_size", "num_towns", "num_quests"}
+        for entry in self.module_edit_fields:
+            label, key, value = entry[0], entry[1], entry[2]
+            if key in settings_keys:
+                if key in ("num_towns", "num_quests"):
+                    settings_kwargs[key] = int(value) if value else 0
+                else:
+                    settings_kwargs[key] = value
+            else:
+                meta_kwargs[key] = value
+
+        ok1 = update_module_metadata(mod["path"], **meta_kwargs)
+        ok2 = update_module_settings(mod["path"], **settings_kwargs)
+        self.module_edit_mode = False
+        if ok1 and ok2:
+            self.module_message = "Module updated!"
+            self.module_msg_timer = 2.0
+            self._refresh_module_list()
+        else:
+            self.module_message = "Update failed!"
+            self.module_msg_timer = 2.0
 
     # ── Music / settings helpers ────────────────────────────────
 
@@ -1257,6 +1464,11 @@ class Game:
             elif self.showing_modules:
                 for event in events:
                     self._handle_module_input(event)
+                # Tick module message timer
+                if self.module_msg_timer > 0:
+                    self.module_msg_timer -= dt
+                    if self.module_msg_timer <= 0:
+                        self.module_message = None
             elif self.showing_game_over:
                 for event in events:
                     self._handle_game_over_input(event)
@@ -1324,7 +1536,13 @@ class Game:
             elif self.showing_modules:
                 self.renderer.draw_module_screen(
                     self.module_list, self.module_cursor,
-                    self.active_module_path)
+                    self.active_module_path,
+                    message=self.module_message,
+                    confirm_delete=self.module_confirm_delete,
+                    edit_mode=self.module_edit_mode,
+                    edit_field=self.module_edit_field,
+                    edit_fields=self.module_edit_fields,
+                    edit_buffer=self.module_edit_buffer)
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

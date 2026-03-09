@@ -6135,14 +6135,23 @@ class Renderer(CombatEffectRendererMixin):
                           SCREEN_HEIGHT - 28,
                           cr_color, self.font_small)
 
-    def draw_module_screen(self, modules, cursor, active_path):
+    def draw_module_screen(self, modules, cursor, active_path,
+                           message=None, confirm_delete=False,
+                           edit_mode=False, edit_field=0,
+                           edit_fields=None, edit_buffer=""):
         """Draw the module selection / browser screen.
 
         Parameters
         ----------
-        modules     : list of module info dicts (id, name, author, description, version, path)
-        cursor      : which module is highlighted
-        active_path : path of the currently active module (for checkmark indicator)
+        modules        : list of module info dicts
+        cursor         : which module is highlighted
+        active_path    : path of the currently active module
+        message        : feedback/confirmation text to display
+        confirm_delete : True when showing delete confirmation
+        edit_mode      : True when editing module metadata
+        edit_field     : index of the field being edited
+        edit_fields    : list of [label, key, value] for edit mode
+        edit_buffer    : current text being typed
         """
         import math
         self.screen.fill((0, 0, 0))
@@ -6160,8 +6169,8 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text("No modules found in modules/ directory.",
                           SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2,
                           (180, 100, 100), fm)
-            self._u3_text("[ESC] Back",
-                          SCREEN_WIDTH // 2 - 40, SCREEN_HEIGHT - 50,
+            self._u3_text("[N] New Module   [ESC] Back",
+                          SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 50,
                           (100, 100, 200), fs)
             return
 
@@ -6302,11 +6311,107 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text(f"ID: {mod['id']}", right_x + 16, id_y,
                           (80, 80, 100), fs)
 
+        # ── Edit mode overlay ──
+        if edit_mode and edit_fields:
+            self._draw_module_edit_overlay(
+                right_x, panel_y, right_w, panel_h,
+                edit_fields, edit_field, edit_buffer)
+
+        # ── Feedback / confirmation message ──
+        if message:
+            msg_color = (255, 100, 100) if confirm_delete else (100, 255, 100)
+            msg_y = SCREEN_HEIGHT - 70
+            self._u3_text(message,
+                          SCREEN_WIDTH // 2 - len(message) * 5, msg_y,
+                          msg_color, f)
+
         # ── Footer hints ──
         hint_y = SCREEN_HEIGHT - 45
         hint_color = (68, 68, 200)
-        self._u3_text("[UP/DOWN] Browse   [ENTER] Select   [ESC] Back",
-                      SCREEN_WIDTH // 2 - 180, hint_y, hint_color, fs)
+        if edit_mode:
+            hint = ("[UP/DN] Field  [TYPE] Edit  "
+                    "[LT/RT] Adjust  [ENTER] Save  [ESC] Cancel")
+        else:
+            hint = ("[UP/DN] Browse  [ENTER] Select  "
+                    "[N] New  [E] Edit  [D] Delete  [ESC] Back")
+        self._u3_text(hint, SCREEN_WIDTH // 2 - len(hint) * 4,
+                      hint_y, hint_color, fs)
+
+    def _draw_module_edit_overlay(self, rx, ry, rw, rh,
+                                  fields, active_idx, buffer):
+        """Draw the metadata + settings edit form over the detail panel."""
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        # Semi-transparent overlay
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        # Title
+        self._u3_text("EDIT MODULE", rx + 16, ry + 12,
+                       self._U3_ORANGE, f)
+        dy = ry + 44
+
+        settings_keys = {"world_size", "num_towns", "num_quests"}
+        drew_separator = False
+
+        for i, entry in enumerate(fields):
+            label, key, value = entry[0], entry[1], entry[2]
+            field_type = entry[3] if len(entry) > 3 else "text"
+            selected = (i == active_idx)
+
+            # Draw a separator before the first settings field
+            if key in settings_keys and not drew_separator:
+                dy += 4
+                pygame.draw.line(self.screen, (80, 70, 50),
+                                 (rx + 16, dy), (rx + rw - 16, dy), 1)
+                dy += 8
+                self._u3_text("SETTINGS", rx + 16, dy,
+                              (180, 140, 60), fs)
+                dy += 20
+                drew_separator = True
+
+            label_color = (255, 255, 100) if selected else (160, 160, 160)
+            self._u3_text(f"{label}:", rx + 16, dy, label_color, fm)
+            dy += 18
+
+            # Show the buffer for the active field, stored value otherwise
+            display = buffer if selected else value
+            if not display:
+                display = "(empty)"
+
+            text_color = self._U3_WHITE if selected else (140, 140, 160)
+
+            if field_type in ("choice", "int"):
+                # Show < value > with arrow indicators
+                arrow_color = (255, 255, 100) if selected else (100, 100, 120)
+                self._u3_text("<", rx + 20, dy, arrow_color, fm)
+                self._u3_text(display, rx + 34, dy, text_color, fm)
+                val_w = fm.size(display.upper())[0]
+                self._u3_text(">", rx + 38 + val_w, dy, arrow_color, fm)
+                if selected and field_type == "choice":
+                    hint_color = (120, 120, 140)
+                    self._u3_text("[LEFT/RIGHT]", rx + 56 + val_w, dy,
+                                  hint_color, fs)
+            else:
+                # Truncate long text to fit panel
+                max_chars = (rw - 40) // 8
+                if len(display) > max_chars:
+                    display = display[:max_chars - 2] + ".."
+                self._u3_text(display, rx + 20, dy, text_color, fm)
+
+                # Blinking cursor for active text field
+                if selected:
+                    cursor_x = rx + 20 + fm.size(display.upper())[0] + 2
+                    if pygame.time.get_ticks() % 800 < 400:
+                        pygame.draw.line(self.screen, (255, 255, 255),
+                                         (cursor_x, dy),
+                                         (cursor_x, dy + 14), 1)
+            dy += 28
 
     def draw_game_over_screen(self, options, cursor, elapsed):
         """Draw a grim game-over screen with skull art and menu options.
