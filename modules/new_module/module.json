@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "new_",
-    "name": "New ",
+    "id": "new_module",
+    "name": "New Module",
     "author": "Unknown",
-    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Ashwood to restore the protective ward.",
+    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Ironhold to restore the protective ward.",
     "version": "0.1.0"
   },
   "settings": {
@@ -16,7 +16,7 @@
     "max_roster_size": 20,
     "start_time": {
       "year": 1,
-      "month": 3,
+      "month": 6,
       "day": 1,
       "hour": 6,
       "minute": 0
@@ -24,15 +24,15 @@
   },
   "data": {},
   "world": {
-    "overworld": null,
+    "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ashwood",
-        "name": "Ashwood"
+        "id": "ironhold",
+        "name": "Ironhold"
       },
       {
-        "id": "ambervale",
-        "name": "Ambervale"
+        "id": "stonehollow",
+        "name": "Stonehollow"
       }
     ],
     "dungeons": []
@@ -49,15 +49,15 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Lost Depths",
-        "key_name": "Copper Key",
+        "name": "Forsaken Labyrinth",
+        "key_name": "Opal Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1"
       },
       {
         "id": "dungeon_key_2",
-        "name": "Ruined Stronghold",
-        "key_name": "Jade Key",
+        "name": "Blighted Cavern",
+        "key_name": "Copper Key",
         "dungeon_number": 2,
         "landmark_id": "dungeon_2"
       }

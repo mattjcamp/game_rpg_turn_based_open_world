@@ -403,7 +403,7 @@ def load_game(slot, game):
         # ── Reset transient state ───────────────────────────────
         game.pending_combat_rewards = None
 
-        # ── Restore town (module-specific) ──────────────────────
+        # ── Restore towns (module-specific) ─────────────────────
         if game.module_manifest:
             mod_id = game.module_manifest.get(
                 "metadata", {}).get("id", "")
@@ -414,11 +414,8 @@ def load_game(slot, game):
                     from src.town_generator import generate_duskhollow
                     game.town_data = generate_duskhollow()
                 else:
-                    from src.town_generator import generate_town
-                    towns = game.module_manifest.get(
-                        "world", {}).get("towns", [])
-                    hub_name = towns[0]["name"] if towns else "Thornwall"
-                    game.town_data = generate_town(hub_name)
+                    # Regenerate all towns from the manifest
+                    game._init_module_towns()
 
         # ── Switch to overworld ─────────────────────────────────
         game.change_state("overworld")

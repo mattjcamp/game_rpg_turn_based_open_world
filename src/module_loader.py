@@ -7,6 +7,7 @@ and references to all game data files needed to run a complete adventure.
 """
 
 import json
+import math
 import os
 import random
 
@@ -191,6 +192,116 @@ def _generate_dungeon_entries(count, key_materials=None):
     return entries
 
 
+def _generate_overworld_json(map_w, map_h, towns, key_dungeons,
+                             deliver_to="town_altar"):
+    """Build an overworld.json dict with procedurally placed landmarks.
+
+    Landmarks are arranged radially:
+    - Towns near the map center
+    - Dungeons fanning outward in order of dungeon_number
+    - A delivery-point landmark beside the first town
+
+    Also generates paths from the start position to the first town,
+    from each town to nearby dungeons, etc.
+    """
+    cx, cy = map_w // 2, map_h // 2
+    # Keep landmarks inside a safe margin so they're not in the ocean
+    margin_x = max(6, map_w // 6)
+    margin_y = max(5, map_h // 6)
+
+    def _clamp(col, row):
+        return (max(margin_x, min(map_w - margin_x, col)),
+                max(margin_y, min(map_h - margin_y, row)))
+
+    landmarks = []
+    paths = []
+
+    # ── Place towns in a ring close to center ──
+    town_radius = min(map_w, map_h) // 6
+    town_positions = []
+    for i, town in enumerate(towns):
+        angle = (2 * math.pi * i / max(len(towns), 1)) - math.pi / 2
+        tc = int(cx + town_radius * math.cos(angle))
+        tr = int(cy + town_radius * math.sin(angle))
+        tc, tr = _clamp(tc, tr)
+        town_positions.append((tc, tr))
+        landmarks.append({
+            "id": town["id"],
+            "type": "town",
+            "col": tc,
+            "row": tr,
+            "tile": "TILE_TOWN",
+            "clear_radius": 3,
+        })
+
+    # ── Place delivery point next to first town ──
+    if town_positions:
+        dc = town_positions[0][0] + 2
+        dr = town_positions[0][1]
+        dc, dr = _clamp(dc, dr)
+    else:
+        dc, dr = cx + 2, cy
+    landmarks.append({
+        "id": deliver_to,
+        "type": "machine",
+        "col": dc,
+        "row": dr,
+        "tile": "TILE_MACHINE",
+        "clear_radius": 1,
+    })
+
+    # ── Place dungeons in an outer ring ──
+    dungeon_radius_base = min(map_w, map_h) // 4
+    for i, dung in enumerate(key_dungeons):
+        angle = (2 * math.pi * i / max(len(key_dungeons), 1))
+        # Dungeons spread further out as dungeon_number increases
+        spread = dungeon_radius_base + (i * 2)
+        dc2 = int(cx + spread * math.cos(angle))
+        dr2 = int(cy + spread * math.sin(angle))
+        dc2, dr2 = _clamp(dc2, dr2)
+        landmarks.append({
+            "id": dung["landmark_id"],
+            "type": "dungeon",
+            "col": dc2,
+            "row": dr2,
+            "tile": "TILE_DUNGEON",
+            "clear_radius": 2,
+        })
+        # Path from nearest town to this dungeon
+        if town_positions:
+            nearest = min(town_positions,
+                          key=lambda p: abs(p[0]-dc2) + abs(p[1]-dr2))
+            paths.append({"from": list(nearest), "to": [dc2, dr2]})
+
+    # ── Paths between towns ──
+    for i in range(len(town_positions) - 1):
+        paths.append({
+            "from": list(town_positions[i]),
+            "to": list(town_positions[i + 1]),
+        })
+
+    # ── Start position near first town ──
+    if town_positions:
+        start_col = town_positions[0][0]
+        start_row = min(town_positions[0][1] + 2, map_h - margin_y)
+    else:
+        start_col, start_row = cx, cy + 2
+
+    # Path from start to first town
+    if town_positions:
+        paths.append({
+            "from": [start_col, start_row],
+            "to": list(town_positions[0]),
+        })
+
+    return {
+        "size": {"width": map_w, "height": map_h},
+        "start_position": {"col": start_col, "row": start_row},
+        "landmarks": landmarks,
+        "paths": paths,
+    }
+
+
 def create_module(name, author="Unknown", description="",
                   world_size="Medium", num_towns=1, num_quests=1,
                   season="Summer", time_of_day="Noon"):
@@ -281,7 +392,7 @@ def create_module(name, author="Unknown", description="",
         },
         "data": {},
         "world": {
-            "overworld": None,
+            "overworld": "overworld.json",
             "towns": towns,
             "dungeons": [],
         },
@@ -299,6 +410,16 @@ def create_module(name, author="Unknown", description="",
     manifest_path = os.path.join(mod_dir, "module.json")
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
+
+    # ── Generate the overworld.json with landmarks ──
+    overworld = _generate_overworld_json(
+        dims["map_width"], dims["map_height"],
+        towns, key_dungeons,
+        deliver_to=theme["deliver_to"],
+    )
+    overworld_path = os.path.join(mod_dir, "overworld.json")
+    with open(overworld_path, "w") as f:
+        json.dump(overworld, f, indent=2)
 
     return os.path.abspath(mod_dir)
 

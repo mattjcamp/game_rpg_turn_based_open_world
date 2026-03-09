@@ -718,7 +718,8 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _show_town_action(self):
         """Show the town entry action screen."""
-        town_data = self.game.town_data
+        pcol, prow = self.game.party.col, self.game.party.row
+        town_data = self.game.get_town_at(pcol, prow)
         name = town_data.name if town_data else "Town"
         desc = self._TOWN_DESCRIPTIONS.get(name,
             f"The town of {name} rises from the landscape. "
@@ -755,12 +756,13 @@ class OverworldState(InventoryMixin, BaseState):
     def _enter_town_confirmed(self):
         """Execute the actual town entry after the player confirms."""
         self.town_action_active = False
+        pcol, prow = self.game.party.col, self.game.party.row
+        town_data = self.game.get_town_at(pcol, prow)
+        # Update game.town_data to the town being entered (for
+        # downstream code that reads it, like victory messages)
+        self.game.town_data = town_data
         town_state = self.game.states["town"]
-        town_state.enter_town(
-            self.game.town_data,
-            self.game.party.col,
-            self.game.party.row
-        )
+        town_state.enter_town(town_data, pcol, prow)
         self.game.change_state("town")
 
     # ── Dungeon action screen ─────────────────────────────────

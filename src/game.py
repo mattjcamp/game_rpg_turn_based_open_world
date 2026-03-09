@@ -56,7 +56,8 @@ class Game:
 
         # --- Town data ---
         # Pre-generate the town so it persists across visits
-        self.town_data = generate_town("Thornwall")
+        self.town_data = generate_town("Thornwall")  # default / current town
+        self.town_data_map = {}  # {(col, row): TownData} for multi-town modules
 
         # --- Quest state ---
         # None when no quest active; dict when quest is in progress
@@ -303,6 +304,7 @@ class Game:
         self.pending_combat_rewards = None  # set by combat victory, consumed by source state
         self.machine_col = None  # overworld position of the machine
         self.machine_row = None
+        self.town_data_map = {}
         if self.module_manifest:
             mod_id = self.module_manifest.get(
                 "metadata", {}).get("id", "")
@@ -315,11 +317,8 @@ class Game:
                     self.darkness_active = True
                     self.town_data = generate_duskhollow()
                 else:
-                    # Other modules get a normal hub town
-                    towns = self.module_manifest.get(
-                        "world", {}).get("towns", [])
-                    hub_name = towns[0]["name"] if towns else "Thornwall"
-                    self.town_data = generate_town(hub_name)
+                    # Generate all towns from the manifest
+                    self._init_module_towns()
 
         self._game_started = True
         self.showing_title = False
@@ -403,6 +402,40 @@ class Game:
                 "dungeon_row": row,
                 "artifact_name": key_name,
             }
+
+    def _init_module_towns(self):
+        """Generate towns for the active module and store in town_data_map.
+
+        Reads town landmarks from the overworld config and generates a
+        TownData for each.  The first town becomes ``self.town_data``
+        (the default / hub town).
+        """
+        overworld_cfg = self.module_manifest.get("_overworld_cfg", {})
+        manifest_towns = self.module_manifest.get("world", {}).get("towns", [])
+        # Build a quick lookup: town_id → town name
+        town_names = {t["id"]: t["name"] for t in manifest_towns}
+
+        self.town_data_map = {}
+        first_town = None
+        for lm in overworld_cfg.get("landmarks", []):
+            if lm.get("type") != "town":
+                continue
+            tid = lm["id"]
+            tname = town_names.get(tid, tid.replace("_", " ").title())
+            col, row = lm["col"], lm["row"]
+            td = generate_town(tname)
+            self.town_data_map[(col, row)] = td
+            if first_town is None:
+                first_town = td
+
+        # Set the default town_data to the first town (hub)
+        if first_town:
+            self.town_data = first_town
+
+    def get_town_at(self, col, row):
+        """Return the TownData for the town landmark at (col, row), or the
+        default town_data if no specific mapping exists."""
+        return self.town_data_map.get((col, row), self.town_data)
 
     # ── Public accessors for game state ─────────────────────────
     # States should use these instead of reaching into internals.
