@@ -3,7 +3,7 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Silverhaven.",
+    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Elderreach.",
     "version": "0.1.0"
   },
   "settings": {
@@ -27,12 +27,8 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "silverhaven",
-        "name": "Silverhaven"
-      },
-      {
-        "id": "stonehollow",
-        "name": "Stonehollow"
+        "id": "elderreach",
+        "name": "Elderreach"
       }
     ],
     "dungeons": []
@@ -40,7 +36,7 @@
   "progression": {
     "win_condition": {
       "type": "collect_keys",
-      "total_keys": 3,
+      "total_keys": 2,
       "deliver_to": "town_vault"
     },
     "starting_quests": [
@@ -49,33 +45,23 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Ruined Crypt",
-        "key_name": "Bronze Key",
+        "name": "Blighted Sanctum",
+        "key_name": "Obsidian Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The air around Ruined Crypt shimmers with faint heat. Strange runes glow along the doorframe.",
-        "quest_objective": "Descend into Ruined Crypt and find the Bronze Key",
-        "quest_hint": "The passage grows more treacherous with every floor."
+        "description": "Water seeps from the walls near Blighted Sanctum's entrance. The stone steps descend into darkness.",
+        "quest_objective": "Retrieve the Obsidian Key from Blighted Sanctum",
+        "quest_hint": "A powerful artifact lies in the deepest chamber."
       },
       {
         "id": "dungeon_key_2",
-        "name": "Iron Vaults",
-        "key_name": "Onyx Key",
+        "name": "Frozen Cavern",
+        "key_name": "Opal Key",
         "dungeon_number": 2,
         "landmark_id": "dungeon_2",
-        "description": "A spiral staircase carved from bedrock descends into Iron Vaults. The temperature drops with every step.",
-        "quest_objective": "Venture into Iron Vaults and liberate the Onyx Key",
-        "quest_hint": "The artifact pulses with ancient energy."
-      },
-      {
-        "id": "dungeon_key_3",
-        "name": "Lost Vaults",
-        "key_name": "Ivory Key",
-        "dungeon_number": 3,
-        "landmark_id": "dungeon_3",
-        "description": "Thick vines choke the mouth of Lost Vaults. Beyond them, torchlight flickers in the gloom.",
-        "quest_objective": "Search Lost Vaults for the hidden Ivory Key",
-        "quest_hint": "Rumors say it was sealed away behind deadly traps."
+        "description": "Crumbling pillars mark the way into Frozen Cavern. Faint scratching echoes from deep within.",
+        "quest_objective": "Slay the guardian of Frozen Cavern and claim the Opal Key",
+        "quest_hint": "A fearsome creature guards the prize."
       }
     ]
   }

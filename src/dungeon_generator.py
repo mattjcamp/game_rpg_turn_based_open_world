@@ -74,6 +74,88 @@ class DungeonData:
         # Fog of war: tiles the party has ever seen
         self.explored_tiles = set()
 
+    # ── Serialization ────────────────────────────────────────────
+
+    def to_dict(self):
+        """Serialize this dungeon to a JSON-safe dict.
+
+        Captures the full tile grid, explored tiles, chest/trap state,
+        and monster positions + HP so dungeons persist across visits
+        and save/load.
+        """
+        # Serialize tile map as a flat 2D list of tile IDs
+        tiles_2d = []
+        for r in range(self.tile_map.height):
+            row_data = []
+            for c in range(self.tile_map.width):
+                row_data.append(self.tile_map.get_tile(c, r))
+            tiles_2d.append(row_data)
+
+        # Serialize monsters (position, HP, and encounter template)
+        monsters_data = []
+        for m in self.monsters:
+            monsters_data.append({
+                "col": m.col,
+                "row": m.row,
+                "hp": m.hp,
+                "max_hp": m.max_hp,
+                "name": m.name,
+                "encounter_template": getattr(m, "encounter_template", None),
+            })
+
+        return {
+            "name": self.name,
+            "width": self.tile_map.width,
+            "height": self.tile_map.height,
+            "tiles": tiles_2d,
+            "entry_col": self.entry_col,
+            "entry_row": self.entry_row,
+            "opened_chests": [list(pos) for pos in self.opened_chests],
+            "triggered_traps": [list(pos) for pos in self.triggered_traps],
+            "detected_traps": [list(pos) for pos in self.detected_traps],
+            "explored_tiles": [list(pos) for pos in self.explored_tiles],
+            "monsters": monsters_data,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Reconstruct a DungeonData from a serialized dict."""
+        from src.tile_map import TileMap
+        from src.monster import create_monster
+
+        width = data["width"]
+        height = data["height"]
+        tmap = TileMap(width, height, default_tile=0)
+        # Restore tile grid
+        for r, row_data in enumerate(data["tiles"]):
+            for c, tile_id in enumerate(row_data):
+                tmap.set_tile(c, r, tile_id)
+
+        # Restore monsters
+        monsters = []
+        for md in data.get("monsters", []):
+            try:
+                m = create_monster(md["name"])
+            except (ValueError, KeyError):
+                continue
+            m.col = md["col"]
+            m.row = md["row"]
+            m.hp = md["hp"]
+            m.max_hp = md["max_hp"]
+            if md.get("encounter_template"):
+                m.encounter_template = md["encounter_template"]
+            monsters.append(m)
+
+        # We don't need to restore rooms — they're only used during
+        # generation.  Pass an empty list.
+        dd = cls(tmap, [], data["entry_col"], data["entry_row"],
+                 name=data.get("name", "The Depths"), monsters=monsters)
+        dd.opened_chests = {tuple(p) for p in data.get("opened_chests", [])}
+        dd.triggered_traps = {tuple(p) for p in data.get("triggered_traps", [])}
+        dd.detected_traps = {tuple(p) for p in data.get("detected_traps", [])}
+        dd.explored_tiles = {tuple(p) for p in data.get("explored_tiles", [])}
+        return dd
+
 
 def _carve_room(tmap, room):
     """Carve a room out of solid wall, filling it with floor."""

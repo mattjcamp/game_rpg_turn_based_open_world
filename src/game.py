@@ -203,6 +203,14 @@ class Game:
 
         Falls back to the full default party if no active members exist.
         """
+        # ── Reset all per-game state so nothing leaks from a prior game ──
+        self.darkness_active = False
+        self.town_data = generate_town("Thornwall")  # safe default
+        self.town_data_map = {}
+        self._gnome_quest_accepted = False
+        self.game_log = []
+        self.dungeon_cache = {}  # clear persisted dungeon layouts
+
         # ── Load module data (items, races, monsters, etc.) ──
         if self.active_module_path:
             self.module_manifest = load_module_data(self.active_module_path)
@@ -297,6 +305,11 @@ class Game:
         self.examined_tiles = {}  # {(col, row): {"obstacles": {}, "ground_items": {}}}
 
         self.visited_dungeons = set()  # {(col, row)} — tracks which dungeon tiles the party has entered
+
+        # Persistent dungeon cache: {(col,row): [DungeonData, ...]}
+        # Stores generated dungeons so re-entry preserves state (explored
+        # tiles, opened chests, triggered traps, killed monsters).
+        self.dungeon_cache = {}
 
         # ── Module key-dungeon quests ──
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
@@ -1327,12 +1340,15 @@ class Game:
             self.module_edit_mode = False
             self.module_edit_is_new = False
             self._refresh_module_list()
-            # Select the newly created module
+            # Select the newly created module as the active module
             for i, mod in enumerate(self.module_list):
                 if mod["path"] == path:
                     self.module_cursor = i
+                    self.active_module_path = mod["path"]
+                    self.active_module_name = mod["name"]
+                    self.active_module_version = mod["version"]
                     break
-            self.module_message = "Module created!"
+            self.module_message = "Module created and selected!"
             self.module_msg_timer = 2.0
         else:
             # ── Update existing module (metadata only) ──

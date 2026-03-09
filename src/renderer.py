@@ -339,6 +339,18 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.rect(self.screen, (60, 40, 15), door_rect, 1)
             # Handle
             pygame.draw.circle(self.screen, COLOR_YELLOW, (cx + 4, cy), 2)
+            # Torches flanking the door
+            import time as _tt, math as _mm
+            _flicker = 0.8 + 0.2 * _mm.sin(_tt.time() * 6 + rect.x * 7)
+            for tx in (rect.x + 2, rect.x + TILE_SIZE - 5):
+                pygame.draw.rect(self.screen, (80, 60, 30),
+                                 pygame.Rect(tx, rect.y + 4, 3, 10))
+                fr = int(255 * _flicker)
+                fg = int(160 * _flicker)
+                pygame.draw.circle(self.screen, (fr, fg, 30),
+                                   (tx + 1, rect.y + 3), 3)
+                pygame.draw.circle(self.screen, (255, 240, 150),
+                                   (tx + 1, rect.y + 2), 1)
 
         elif tile_id == TILE_EXIT:
             # Green arrow pointing down
@@ -579,22 +591,39 @@ class Renderer(CombatEffectRendererMixin):
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
             # Build extra light sources from filled keyslots
-            keyslot_lights = []
+            extra_lights = []
             if keys_inserted > 0 and self._keyslot_index:
                 for (kc, kr), si in self._keyslot_index.items():
                     if si < keys_inserted:
-                        # Convert world coords to screen-tile coords
                         ksc = kc - off_c
                         ksr = kr - off_r
-                        # Each filled keyslot emits light that grows
-                        # slightly with more keys inserted
                         ks_radius = 1.5 + 0.3 * keys_inserted
-                        keyslot_lights.append(
+                        extra_lights.append(
                             (ksc, ksr, ks_radius, 1.5))
+
+            # ── Building torches — doors, altars, and exits emit light ──
+            # Scan visible tiles for light-emitting features; each gets
+            # a warm glow so buildings look inviting at night.
+            from src.settings import TILE_DOOR, TILE_ALTAR, TILE_EXIT
+            for sr in range(rows):
+                for sc in range(cols):
+                    wc = sc + off_c
+                    wr = sr + off_r
+                    tid = tile_map.get_tile(wc, wr)
+                    if tid == TILE_DOOR:
+                        # Torch at the door — moderate warm glow
+                        extra_lights.append((sc, sr, 2.5, 2.0))
+                    elif tid == TILE_ALTAR:
+                        # Altar emits a softer, wider glow
+                        extra_lights.append((sc, sr, 3.0, 2.5))
+                    elif tid == TILE_EXIT:
+                        # Town gate torches — welcoming glow
+                        extra_lights.append((sc, sr, 2.0, 1.5))
+
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
                                           has_light=has_light,
                                           force_night=darkness_active,
-                                          extra_lights=keyslot_lights)
+                                          extra_lights=extra_lights)
             if has_infravision and party.get_equipped_name("light") is None:
                 self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
             elif (has_galadriels
@@ -837,6 +866,21 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.rect(self.screen, (100, 65, 30), door_rect)
             pygame.draw.rect(self.screen, (60, 40, 15), door_rect, 1)
             pygame.draw.circle(self.screen, YELLOW, (cx + 3, cy), 2)
+            # ── Torches flanking the door ──
+            import time as _tt, math as _mm
+            _flicker = 0.8 + 0.2 * _mm.sin(_tt.time() * 6 + wc * 7 + wr * 13)
+            for tx in (px + 2, px + ts - 4):
+                # Bracket
+                pygame.draw.rect(self.screen, (80, 60, 30),
+                                 pygame.Rect(tx, py + 4, 3, 10))
+                # Flame (warm colour shifts with flicker)
+                fr = int(255 * _flicker)
+                fg = int(160 * _flicker)
+                pygame.draw.circle(self.screen, (fr, fg, 30),
+                                   (tx + 1, py + 3), 3)
+                # Bright core
+                pygame.draw.circle(self.screen, (255, 240, 150),
+                                   (tx + 1, py + 2), 1)
 
         elif tile_id == TILE_MACHINE:
             self._draw_machine_tile(px, py, ts, wc, wr)

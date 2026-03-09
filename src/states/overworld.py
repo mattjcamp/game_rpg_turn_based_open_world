@@ -861,7 +861,12 @@ class OverworldState(InventoryMixin, BaseState):
             self.dungeon_action_active = False
 
     def _enter_dungeon_confirmed(self):
-        """Execute the actual dungeon entry after the player confirms."""
+        """Execute the actual dungeon entry after the player confirms.
+
+        Dungeons are persistent — once generated, their state (explored
+        tiles, opened chests, triggered traps, killed monsters) is kept
+        in ``game.dungeon_cache`` and reused on re-entry.
+        """
         args = self.dungeon_action_entry_args
         if not args:
             self.dungeon_action_active = False
@@ -870,17 +875,12 @@ class OverworldState(InventoryMixin, BaseState):
         pcol, prow = args["col"], args["row"]
         entry_type = args["type"]
         dungeon_state = self.game.states["dungeon"]
+        cache = self.game.dungeon_cache
 
         # Mark as visited
         self.game.mark_dungeon_visited(pcol, prow)
 
-        cleared = self.dungeon_action_info.get("cleared", False)
-
-        if cleared:
-            # Completed quest or cleared dungeon — generate a fresh random dungeon
-            dungeon_data = generate_dungeon("The Depths")
-            dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
-        elif entry_type == "key_dungeon":
+        if entry_type == "key_dungeon":
             kd = self.game.get_key_dungeon(pcol, prow)
             if kd:
                 dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)
@@ -893,7 +893,13 @@ class OverworldState(InventoryMixin, BaseState):
             if hq:
                 dungeon_state.enter_quest_dungeon(hq["levels"], pcol, prow)
         else:
-            dungeon_data = generate_dungeon("The Depths")
+            # Random / cleared dungeon — use cached version if available
+            cached = cache.get((pcol, prow))
+            if cached:
+                dungeon_data = cached[0]
+            else:
+                dungeon_data = generate_dungeon("The Depths")
+                cache[(pcol, prow)] = [dungeon_data]
             dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
 
         self.dungeon_action_active = False

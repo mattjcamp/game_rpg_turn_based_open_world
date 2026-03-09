@@ -111,12 +111,40 @@ def _serialize_party(party):
     }
 
 
-def _serialize_key_dungeons(game):
-    """Serialize key dungeon quest state (status, position, metadata).
+def _serialize_dungeon_levels(levels):
+    """Serialize a list of DungeonData objects to JSON-safe dicts."""
+    if not levels:
+        return []
+    return [dd.to_dict() for dd in levels]
 
-    We do NOT serialize the DungeonData/level layouts — those are
-    regenerated from module data on load.  We only persist the quest
-    tracking state.
+
+def _deserialize_dungeon_levels(data_list):
+    """Reconstruct a list of DungeonData from serialized dicts."""
+    from src.dungeon_generator import DungeonData
+    if not data_list:
+        return []
+    return [DungeonData.from_dict(d) for d in data_list]
+
+
+def _serialize_dungeon_cache(game):
+    """Serialize the random dungeon cache: {(col,row): [DungeonData]}."""
+    cache = getattr(game, "dungeon_cache", {})
+    result = []
+    for (col, row), levels in cache.items():
+        result.append({
+            "col": col,
+            "row": row,
+            "levels": _serialize_dungeon_levels(levels),
+        })
+    return result
+
+
+def _serialize_key_dungeons(game):
+    """Serialize key dungeon quest state including full dungeon layouts.
+
+    Persists the complete DungeonData for each floor so that explored
+    tiles, opened chests, triggered traps, and killed monsters survive
+    save/load.
     """
     result = []
     for (col, row), kd in getattr(game, "key_dungeons", {}).items():
@@ -132,15 +160,16 @@ def _serialize_key_dungeons(game):
             "description": kd.get("description", ""),
             "quest_objective": kd.get("quest_objective", ""),
             "quest_hint": kd.get("quest_hint", ""),
+            "levels": _serialize_dungeon_levels(kd.get("levels", [])),
         })
     return result
 
 
 def _serialize_quest(quest):
-    """Serialize a quest dict (quest or house_quest), excluding DungeonData."""
+    """Serialize a quest dict (quest or house_quest), including dungeon levels."""
     if quest is None:
         return None
-    return {
+    data = {
         "status": quest.get("status", "active"),
         "dungeon_col": quest.get("dungeon_col"),
         "dungeon_row": quest.get("dungeon_row"),
@@ -148,6 +177,11 @@ def _serialize_quest(quest):
         "name": quest.get("name"),
         "current_level": quest.get("current_level", 0),
     }
+    # Persist full dungeon layouts so state survives save/load
+    levels = quest.get("levels")
+    if levels:
+        data["levels"] = _serialize_dungeon_levels(levels)
+    return data
 
 
 def _deserialize_member(data):
@@ -310,6 +344,8 @@ def save_game(slot, game):
             "game_log": list(getattr(game, "game_log", [])),
             # ── Visited dungeons ──
             "visited_dungeons": [list(pos) for pos in getattr(game, "visited_dungeons", set())],
+            # ── Persistent dungeon cache (random dungeons) ──
+            "dungeon_cache": _serialize_dungeon_cache(game),
         }
 
         path = _save_path(slot)
@@ -389,8 +425,7 @@ def load_game(slot, game):
         game.machine_col = save_data.get("machine_col")
         game.machine_row = save_data.get("machine_row")
 
-        # Regenerate key dungeon levels from module data, then
-        # restore quest statuses from the save file
+        # Restore key dungeon levels and quest statuses from save
         _restore_key_dungeons(game, save_data)
 
         # ── Restore standard quest and house quest ──────────────
@@ -402,6 +437,15 @@ def load_game(slot, game):
 
         # ── Restore visited dungeons ──────────────────────────
         game.visited_dungeons = {tuple(pos) for pos in save_data.get("visited_dungeons", [])}
+
+        # ── Restore dungeon cache (random dungeon persistence) ──
+        game.dungeon_cache = {}
+        for entry in save_data.get("dungeon_cache", []):
+            col, row = entry["col"], entry["row"]
+            levels_data = entry.get("levels", [])
+            if levels_data:
+                game.dungeon_cache[(col, row)] = _deserialize_dungeon_levels(
+                    levels_data)
 
         # ── Reset transient state ───────────────────────────────
         game.pending_combat_rewards = None
@@ -430,11 +474,12 @@ def load_game(slot, game):
 
 
 def _restore_key_dungeons(game, save_data):
-    """Regenerate key dungeon levels and restore quest statuses.
+    """Restore key dungeon levels and quest statuses from save data.
 
-    The dungeon layouts are regenerated fresh (they're procedural), but
-    the quest tracking state (status, current_level, etc.) is restored
-    from the save data.
+    If the save file contains serialized dungeon levels (v3+ saves),
+    those are restored directly — preserving explored tiles, opened
+    chests, triggered traps, and killed monsters.  Otherwise falls
+    back to regenerating fresh dungeons (backward compat with old saves).
     """
     from src.dungeon_generator import generate_keys_dungeon
 
@@ -443,18 +488,9 @@ def _restore_key_dungeons(game, save_data):
         game.key_dungeons = {}
         return
 
-    # Build a lookup from (col, row) to saved status
-    saved_lookup = {}
-    for skd in saved_kds:
-        key = (skd["col"], skd["row"])
-        saved_lookup[key] = skd
-
-    # If key_dungeons were already initialised (e.g. by module load on
-    # new game), update their statuses.  Otherwise, regenerate them.
     if not getattr(game, "key_dungeons", {}):
         game.key_dungeons = {}
 
-    # Regenerate dungeon levels for each saved key dungeon
     for skd in saved_kds:
         col, row = skd["col"], skd["row"]
         dnum = skd["dungeon_number"]
@@ -462,8 +498,16 @@ def _restore_key_dungeons(game, save_data):
         key_name = skd.get("key_name", f"Key {dnum}")
         status = skd.get("status", "active")
 
-        # Regenerate the multi-floor dungeon
-        levels = generate_keys_dungeon(dnum, name=name)
+        # Restore serialized levels if present, otherwise regenerate
+        saved_levels = skd.get("levels")
+        if saved_levels and isinstance(saved_levels, list) and saved_levels:
+            # Check if first entry is a dict (serialized DungeonData)
+            if isinstance(saved_levels[0], dict):
+                levels = _deserialize_dungeon_levels(saved_levels)
+            else:
+                levels = generate_keys_dungeon(dnum, name=name)
+        else:
+            levels = generate_keys_dungeon(dnum, name=name)
 
         game.key_dungeons[(col, row)] = {
             "dungeon_number": dnum,
@@ -484,9 +528,9 @@ def _restore_key_dungeons(game, save_data):
 def _restore_quest(game, save_data, quest_attr):
     """Restore a quest (quest or house_quest) from save data.
 
-    For quests with status 'active' or 'artifact_found', we regenerate
-    dungeon levels so the player can re-enter.  Completed quests just
-    need their status preserved.
+    If serialized dungeon levels are present in the save, they're
+    restored directly to preserve dungeon state.  Otherwise falls
+    back to regenerating fresh dungeons (backward compat).
     """
     saved_q = save_data.get(quest_attr)
     if saved_q is None:
@@ -509,15 +553,30 @@ def _restore_quest(game, save_data, quest_attr):
     if name:
         quest["name"] = name
 
-    # Regenerate dungeon levels for active/in-progress quests
+    # Restore dungeon levels for active/in-progress quests
     if status in ("active", "artifact_found") and dcol is not None:
-        from src.dungeon_generator import generate_dungeon, generate_house_dungeon
-        if quest_attr == "house_quest":
-            levels = generate_house_dungeon()
-            quest["levels"] = levels
+        saved_levels = saved_q.get("levels")
+        if saved_levels and isinstance(saved_levels, list) and saved_levels:
+            if isinstance(saved_levels[0], dict):
+                quest["levels"] = _deserialize_dungeon_levels(saved_levels)
+            else:
+                # Old save format — regenerate
+                from src.dungeon_generator import (generate_dungeon,
+                                                    generate_house_dungeon)
+                if quest_attr == "house_quest":
+                    quest["levels"] = generate_house_dungeon()
+                else:
+                    quest["levels"] = [generate_dungeon(
+                        name or "Shadow Crystal Dungeon")]
         else:
-            levels = [generate_dungeon(name or "Shadow Crystal Dungeon")]
-            quest["levels"] = levels
+            # No levels saved — regenerate
+            from src.dungeon_generator import (generate_dungeon,
+                                                generate_house_dungeon)
+            if quest_attr == "house_quest":
+                quest["levels"] = generate_house_dungeon()
+            else:
+                quest["levels"] = [generate_dungeon(
+                    name or "Shadow Crystal Dungeon")]
 
     setattr(game, quest_attr, quest)
 
