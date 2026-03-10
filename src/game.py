@@ -4,6 +4,7 @@ Main Game class - the heart of the application.
 Manages the game loop, state machine, and top-level resources.
 """
 
+import os
 import pygame
 
 from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TITLE, COLOR_BLACK
@@ -120,6 +121,24 @@ class Game:
         self.active_module_name = "Keys of Shadow"
         self.active_module_version = "1.0.0"
         self.module_manifest = None  # populated on new game start
+
+        # Restore last-used module from config (if it still exists)
+        saved_mod_path = self._config.get("active_module_path")
+        if saved_mod_path and os.path.isdir(saved_mod_path):
+            manifest_file = os.path.join(saved_mod_path, "module.json")
+            if os.path.isfile(manifest_file):
+                try:
+                    import json as _json
+                    with open(manifest_file, "r") as _f:
+                        _manifest = _json.load(_f)
+                    meta = _manifest.get("metadata", {})
+                    self.active_module_path = saved_mod_path
+                    self.active_module_name = meta.get(
+                        "name", "Unknown Module")
+                    self.active_module_version = meta.get(
+                        "version", "1.0.0")
+                except (OSError, ValueError):
+                    pass  # fall back to default module
 
         # --- Character creation screen ---
         self.showing_char_create = False
@@ -1145,9 +1164,8 @@ class Game:
                 (self.module_cursor + 1) % len(self.module_list))
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             selected = self.module_list[self.module_cursor]
-            self.active_module_path = selected["path"]
-            self.active_module_name = selected["name"]
-            self.active_module_version = selected["version"]
+            self._set_active_module(
+                selected["path"], selected["name"], selected["version"])
             self.showing_modules = False
             self.showing_title = True
         elif event.key == pygame.K_ESCAPE:
@@ -1355,9 +1373,8 @@ class Game:
             for i, mod in enumerate(self.module_list):
                 if mod["path"] == path:
                     self.module_cursor = i
-                    self.active_module_path = mod["path"]
-                    self.active_module_name = mod["name"]
-                    self.active_module_version = mod["version"]
+                    self._set_active_module(
+                        mod["path"], mod["name"], mod["version"])
                     break
             self.module_message = "Module created and selected!"
             self.module_msg_timer = 2.0
@@ -1381,6 +1398,16 @@ class Game:
             else:
                 self.module_message = "Update failed!"
                 self.module_msg_timer = 2.0
+
+    # ── Module / settings helpers ────────────────────────────────
+
+    def _set_active_module(self, path, name, version):
+        """Set the active module and persist the choice to config."""
+        self.active_module_path = path
+        self.active_module_name = name
+        self.active_module_version = version
+        self._config["active_module_path"] = path
+        save_config(self._config)
 
     # ── Music / settings helpers ────────────────────────────────
 

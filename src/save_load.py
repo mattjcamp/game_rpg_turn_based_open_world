@@ -29,6 +29,7 @@ _DEFAULT_CONFIG = {
     "music_enabled": True,
     "smite_enabled": False,
     "start_with_equipment": True,
+    "active_module_path": None,
 }
 
 
@@ -346,6 +347,9 @@ def save_game(slot, game):
             "visited_dungeons": [list(pos) for pos in getattr(game, "visited_dungeons", set())],
             # ── Persistent dungeon cache (random dungeons) ──
             "dungeon_cache": _serialize_dungeon_cache(game),
+            # ── Map seed for reproducible overworld ──
+            "map_seed": getattr(game.tile_map, "seed", None)
+                        if hasattr(game, "tile_map") and game.tile_map else None,
         }
 
         path = _save_path(slot)
@@ -404,7 +408,9 @@ def load_game(slot, game):
         if game.module_manifest:
             overworld_cfg = game.module_manifest.get("_overworld_cfg")
 
+        saved_seed = save_data.get("map_seed")
         game.tile_map = create_test_map(
+            seed=saved_seed,
             overworld_cfg=overworld_cfg,
             data_dir=game.active_module_path if game.module_manifest else None)
         game.camera = Camera(game.tile_map.width, game.tile_map.height)

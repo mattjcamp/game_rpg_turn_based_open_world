@@ -308,6 +308,7 @@ def create_test_map(seed=None, overworld_cfg=None, data_dir=None):
         seed = p["seed"] if p["seed"] is not None else random.randint(0, 2 ** 31)
 
     tmap = TileMap(map_w, map_h, default_tile=TILE_GRASS)
+    tmap.seed = seed  # store seed for save/load reproducibility
 
     # ── 1. Generate elevation / moisture noise fields ──
     elev = [[0.0] * map_w for _ in range(map_h)]
