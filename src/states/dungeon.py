@@ -14,7 +14,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
-    TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS,
+    TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
 
 
@@ -40,6 +40,7 @@ class DungeonState(InventoryMixin, BaseState):
         # Quest dungeon multi-level support
         self.quest_levels = None   # list of DungeonData if this is a quest dungeon
         self.current_level = 0     # 0 or 1
+        self._torch_lit_cache = None  # cached set of tiles lit by wall torches
 
         # Message queued by combat state on return
         self.pending_combat_message = None
@@ -71,6 +72,7 @@ class DungeonState(InventoryMixin, BaseState):
         self.current_level = 0
         self._entered = False
         self.pending_combat_message = None
+        self._invalidate_torch_cache()
 
     def _get_active_quest(self):
         """Return the quest dict that owns this dungeon, or None."""
@@ -101,6 +103,7 @@ class DungeonState(InventoryMixin, BaseState):
         self.overworld_row = overworld_row
         self._entered = False
         self.pending_combat_message = None
+        self._invalidate_torch_cache()
 
     def enter(self):
         """Called when this state becomes active."""
@@ -416,6 +419,10 @@ class DungeonState(InventoryMixin, BaseState):
         With a torch: recursive shadowcasting reveals all tiles in line of sight,
         with walls blocking light naturally.  Walls themselves are visible if a
         ray reaches them, but light does not pass through.
+
+        Wall torches on the dungeon walls illuminate their surroundings
+        once the party has discovered them (the torch tile is in the
+        party's current or previously-explored visible set).
         """
         party = self.game.party
         pc, pr = party.col, party.row
@@ -430,30 +437,79 @@ class DungeonState(InventoryMixin, BaseState):
             for dc in (-1, 0, 1):
                 for dr in (-1, 0, 1):
                     visible.add((pc + dc, pr + dr))
-            return visible
+        else:
+            # Torch lit — use recursive shadowcasting for full line-of-sight
+            tile_map = self.dungeon_data.tile_map
+            max_radius = max(tile_map.width, tile_map.height)
 
-        # Torch lit — use recursive shadowcasting for full line-of-sight
-        tile_map = self.dungeon_data.tile_map
-        max_radius = max(tile_map.width, tile_map.height)
+            octants = [
+                ( 1,  0,  0,  1),   # ENE
+                ( 0,  1,  1,  0),   # NNE
+                ( 0, -1,  1,  0),   # NNW
+                (-1,  0,  0,  1),   # WNW
+                (-1,  0,  0, -1),   # WSW
+                ( 0, -1, -1,  0),   # SSW
+                ( 0,  1, -1,  0),   # SSE
+                ( 1,  0,  0, -1),   # ESE
+            ]
+            for xx, xy, yx, yy in octants:
+                self._cast_light(visible, tile_map, pc, pr,
+                                 1, 1.0, 0.0, max_radius,
+                                 xx, xy, yx, yy)
 
-        # Eight octants cover all 360 degrees
-        # Each octant is defined by multipliers (xx, xy, yx, yy) that map
-        # (row along ray, column offset) to (dx, dy) world offsets.
-        octants = [
-            ( 1,  0,  0,  1),   # ENE
-            ( 0,  1,  1,  0),   # NNE
-            ( 0, -1,  1,  0),   # NNW
-            (-1,  0,  0,  1),   # WNW
-            (-1,  0,  0, -1),   # WSW
-            ( 0, -1, -1,  0),   # SSW
-            ( 0,  1, -1,  0),   # SSE
-            ( 1,  0,  0, -1),   # ESE
-        ]
-        for xx, xy, yx, yy in octants:
-            self._cast_light(visible, tile_map, pc, pr,
-                             1, 1.0, 0.0, max_radius,
-                             xx, xy, yx, yy)
+        # ── Wall torches illuminate their surroundings ──
+        # A torch activates when the party can see it (torch is in the
+        # visible set from shadowcasting) OR the party is close enough
+        # to be inside the torch's own light radius.  This lets torches
+        # light the way even when the party carries no light source.
+        # When the party moves away, the torch-lit area fades back to
+        # the normal explored (dimmed) state via fog of war.
+        party_pos = (pc, pr)
+        torch_map = self._get_torch_lit_map()
+        for torch_pos, lit_tiles in torch_map.items():
+            if torch_pos in visible or party_pos in lit_tiles:
+                visible.update(lit_tiles)
+
         return visible
+
+    def _get_torch_lit_map(self):
+        """Return cached per-torch illumination map.
+
+        Returns a dict: ``{(torch_col, torch_row): set_of_lit_tiles}``.
+        Computed once per dungeon level and cached.  Uses the same
+        shadowcasting algorithm with a limited radius so walls properly
+        block the torch light.
+        """
+        if hasattr(self, '_torch_lit_cache') and self._torch_lit_cache is not None:
+            return self._torch_lit_cache
+
+        tile_map = self.dungeon_data.tile_map
+        torch_radius = 4
+        result = {}
+
+        octants = [
+            ( 1,  0,  0,  1), ( 0,  1,  1,  0),
+            ( 0, -1,  1,  0), (-1,  0,  0,  1),
+            (-1,  0,  0, -1), ( 0, -1, -1,  0),
+            ( 0,  1, -1,  0), ( 1,  0,  0, -1),
+        ]
+
+        for wr in range(tile_map.height):
+            for wc in range(tile_map.width):
+                if tile_map.get_tile(wc, wr) == TILE_WALL_TORCH:
+                    lit = {(wc, wr)}
+                    for xx, xy, yx, yy in octants:
+                        self._cast_light(lit, tile_map, wc, wr,
+                                         1, 1.0, 0.0, torch_radius,
+                                         xx, xy, yx, yy)
+                    result[(wc, wr)] = lit
+
+        self._torch_lit_cache = result
+        return result
+
+    def _invalidate_torch_cache(self):
+        """Clear the wall-torch visibility cache (call on level change)."""
+        self._torch_lit_cache = None
 
     def _cast_light(self, visible, tile_map, cx, cy,
                     row, start_slope, end_slope, max_radius,
@@ -947,6 +1003,7 @@ class DungeonState(InventoryMixin, BaseState):
                 # Descend to next level
                 self.current_level += 1
                 self.dungeon_data = self.quest_levels[self.current_level]
+                self._invalidate_torch_cache()
                 self.game.party.col = self.dungeon_data.entry_col
                 self.game.party.row = self.dungeon_data.entry_row
                 self.game.camera.map_width = self.dungeon_data.tile_map.width
@@ -1076,6 +1133,7 @@ class DungeonState(InventoryMixin, BaseState):
             return  # Already at top
         self.current_level -= 1
         self.dungeon_data = self.quest_levels[self.current_level]
+        self._invalidate_torch_cache()
         # Find the stairs-down tile on the level above to place the party
         tmap = self.dungeon_data.tile_map
         placed = False

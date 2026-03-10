@@ -64,6 +64,15 @@ class Game:
         # None when no quest active; dict when quest is in progress
         self.quest = None
         self.house_quest = None
+        self._gnome_quest_accepted = False
+        self.key_dungeons = {}
+        self.keys_inserted = 0
+        self.visited_dungeons = set()
+        self.dungeon_cache = {}
+        self.machine_col = None
+        self.machine_row = None
+        self.pending_combat_rewards = None
+        self.examined_tiles = {}
 
         # --- Darkness effect (Keys of Shadow module) ---
         self.darkness_active = False
@@ -623,6 +632,32 @@ class Game:
         if kd_map:
             gnome_accepted = self._gnome_quest_accepted
             inserted = self.keys_inserted
+
+            # Determine module-appropriate text for return/delivery
+            mod_id = ""
+            deliver_to = ""
+            if self.module_manifest:
+                mod_id = self.module_manifest.get(
+                    "metadata", {}).get("id", "")
+                deliver_to = self.module_manifest.get(
+                    "progression", {}).get(
+                    "win_condition", {}).get("deliver_to", "")
+
+            is_kos = (mod_id == "keys_of_shadow")
+
+            # Friendly name for where keys are returned
+            if is_kos:
+                return_dest = "Fizzwick"
+            else:
+                _dest_names = {
+                    "town_altar": "the town altar",
+                    "town_vault": "the town vault",
+                    "town_shrine": "the town shrine",
+                    "town_armory": "the town armory",
+                    "town_fountain": "the town fountain",
+                }
+                return_dest = _dest_names.get(deliver_to, "town")
+
             for pos, kd in kd_map.items():
                 kd_status = kd.get("status", "undiscovered")
                 if kd_status == "undiscovered":
@@ -637,7 +672,7 @@ class Game:
                                  kd.get("dungeon_row", pos[1]))},
                     {"description": f"Find the {key_name}",
                      "done": kd_status in ("artifact_found", "completed")},
-                    {"description": f"Bring the {key_name} to Fizzwick",
+                    {"description": f"Bring the {key_name} to {return_dest}",
                      "done": kd_status == "completed"},
                 ]
                 quests.append({
@@ -646,19 +681,33 @@ class Game:
                     "steps": steps,
                 })
 
-            # ── Machine / final goal ──
+            # ── Final goal ──
             if gnome_accepted or any(
                     kd.get("status") != "undiscovered"
                     for kd in kd_map.values()):
                 total = len(kd_map)
                 all_done = inserted >= total
+                if is_kos:
+                    goal_name = "Activate the Ancient Machine"
+                    goal_step = "Insert all keys into the machine"
+                else:
+                    _goal_names = {
+                        "town_altar": "Restore the Protective Ward",
+                        "town_vault": "Reclaim the Royal Treasury",
+                        "town_shrine": "Break the Enchantment",
+                        "town_armory": "Forge the Weapons",
+                        "town_fountain": "Purify the Fountain",
+                    }
+                    goal_name = _goal_names.get(
+                        deliver_to, "Complete the Quest")
+                    goal_step = f"Deliver all keys to {return_dest}"
                 quests.append({
-                    "name": "Activate the Ancient Machine",
+                    "name": goal_name,
                     "status": "completed" if all_done else "active",
                     "steps": [
-                        {"description": f"Collect all {total} keys ({inserted}/{total} inserted)",
+                        {"description": f"Collect all {total} keys ({inserted}/{total} delivered)",
                          "done": all_done},
-                        {"description": "Insert all keys into the machine",
+                        {"description": goal_step,
                          "done": all_done},
                     ],
                 })
