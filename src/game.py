@@ -650,14 +650,7 @@ class Game:
             if is_kos:
                 return_dest = "Fizzwick"
             else:
-                _dest_names = {
-                    "town_altar": "the town altar",
-                    "town_vault": "the town vault",
-                    "town_shrine": "the town shrine",
-                    "town_armory": "the town armory",
-                    "town_fountain": "the town fountain",
-                }
-                return_dest = _dest_names.get(deliver_to, "town")
+                return_dest = "the Elder"
 
             for pos, kd in kd_map.items():
                 kd_status = kd.get("status", "undiscovered")
@@ -682,33 +675,22 @@ class Game:
                     "steps": steps,
                 })
 
-            # ── Final goal ──
-            if gnome_accepted or any(
+            # ── Final goal (Keys of Shadow only) ──
+            # Only show the meta-quest when there's an actual machine
+            # to activate.  For other modules the Elder handles each
+            # dungeon quest individually — no separate end-goal needed.
+            if is_kos and (gnome_accepted or any(
                     kd.get("status") != "undiscovered"
-                    for kd in kd_map.values()):
+                    for kd in kd_map.values())):
                 total = len(kd_map)
                 all_done = inserted >= total
-                if is_kos:
-                    goal_name = "Activate the Ancient Machine"
-                    goal_step = "Insert all keys into the machine"
-                else:
-                    _goal_names = {
-                        "town_altar": "Restore the Protective Ward",
-                        "town_vault": "Reclaim the Royal Treasury",
-                        "town_shrine": "Break the Enchantment",
-                        "town_armory": "Forge the Weapons",
-                        "town_fountain": "Purify the Fountain",
-                    }
-                    goal_name = _goal_names.get(
-                        deliver_to, "Complete the Quest")
-                    goal_step = f"Deliver all keys to {return_dest}"
                 quests.append({
-                    "name": goal_name,
+                    "name": "Activate the Ancient Machine",
                     "status": "completed" if all_done else "active",
                     "steps": [
                         {"description": f"Collect all {total} keys ({inserted}/{total} delivered)",
                          "done": all_done},
-                        {"description": goal_step,
+                        {"description": "Insert all keys into the machine",
                          "done": all_done},
                     ],
                 })
