@@ -712,13 +712,21 @@ class TownState(InventoryMixin, BaseState):
             if quest and quest["status"] == "active":
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                self._set_dialogue(f"{npc.name}: Have you found the Shadow Crystal yet? It's out there somewhere...")
+                hint = getattr(npc, "hint_active", None)
+                if not hint:
+                    artifact = quest.get("artifact_name", "the artifact")
+                    hint = f"Have you found the {artifact} yet? It's out there somewhere..."
+                self._set_dialogue(f"{npc.name}: {hint}")
                 return
             # Quest completed — display item dialogue
             if quest and quest["status"] == "completed":
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                self._set_dialogue(f"{npc.name}: The Shadow Crystal sits safely behind my counter. You've earned a hero's welcome here!")
+                done_text = getattr(npc, "text_complete", None)
+                if not done_text:
+                    artifact = quest.get("artifact_name", "artifact")
+                    done_text = f"The {artifact} is safe. You've earned a hero's welcome here!"
+                self._set_dialogue(f"{npc.name}: {done_text}")
                 return
 
         # Gnome (Fizzwick) — Keys of Shadow quest-giver
@@ -820,9 +828,39 @@ class TownState(InventoryMixin, BaseState):
                 # Temporarily set quest_choices so the Y/N prompt appears
                 npc.quest_choices = ["Yes, we'll do it!", "Not right now."]
                 return
+            # Check for artifacts the party is carrying back
+            found = [kd for kd in kd_map.values()
+                     if kd.get("status") == "artifact_found"]
+            if found:
+                party = self.game.party
+                turned_in = []
+                for kd in found:
+                    art = kd.get("artifact_name", kd.get("key_name", ""))
+                    if art and party.inv_count(art) > 0:
+                        party.inv_remove(art)
+                        kd["status"] = "completed"
+                        turned_in.append(art)
+                if turned_in:
+                    reward_gold = 150 * len(turned_in)
+                    reward_xp = 75 * len(turned_in)
+                    party.gold += reward_gold
+                    for member in party.alive_members():
+                        member.exp += reward_xp
+                    names = ", ".join(turned_in)
+                    self.npc_dialogue_active = True
+                    self.npc_speaking = npc
+                    self.quest_complete_effect = QuestCompleteEffect(
+                        reward_gold, item_name=turned_in[0])
+                    self.game.sfx.play("quest_complete")
+                    self._set_dialogue(
+                        f"{npc.name}: You recovered the {names}! "
+                        f"Here is {reward_gold} gold for your bravery!")
+                    self._refresh_quest_highlights()
+                    return
+
             # Active quests still in progress — give progress hint
             active = [kd for kd in kd_map.values()
-                      if kd.get("status") in ("active", "artifact_found")]
+                      if kd.get("status") == "active"]
             if active:
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
@@ -936,8 +974,12 @@ class TownState(InventoryMixin, BaseState):
         """Accept the innkeeper's quest: place a dungeon on the overworld."""
         npc = self.npc_speaking
 
+        # Use the quest metadata from the innkeeper NPC
+        quest_name = getattr(npc, "quest_name", "The Shadow Crystal")
+        artifact_name = getattr(npc, "artifact_name", "Shadow Crystal")
+
         # Generate the two-level quest dungeon
-        levels = generate_quest_dungeon("Shadow Dungeon")
+        levels = generate_quest_dungeon(quest_name)
 
         # Find a random accessible tile on the overworld for the dungeon
         dc, dr = self._find_quest_dungeon_location()
@@ -947,13 +989,13 @@ class TownState(InventoryMixin, BaseState):
 
         # Store quest state
         self.game.set_quest({
-            "name": "The Shadow Crystal",
+            "name": quest_name,
             "status": "active",
             "dungeon_col": dc,
             "dungeon_row": dr,
             "levels": levels,
             "current_level": 0,
-            "artifact_name": "Shadow Crystal",
+            "artifact_name": artifact_name,
         })
 
         # Show confirmation
@@ -992,9 +1034,11 @@ class TownState(InventoryMixin, BaseState):
     def _complete_quest(self, npc):
         """Complete the quest: remove artifact, give reward, play celebration."""
         party = self.game.party
+        quest = self.game.get_quest()
+        artifact = quest.get("artifact_name", "Shadow Crystal") if quest else "Shadow Crystal"
 
-        # Remove the Shadow Crystal from inventory
-        party.inv_remove("Shadow Crystal")
+        # Remove the artifact from inventory
+        party.inv_remove(artifact)
 
         # Give gold reward
         reward = 200
@@ -1005,16 +1049,22 @@ class TownState(InventoryMixin, BaseState):
             member.exp += 50
 
         # Mark quest completed
-        self.game.get_quest()["status"] = "completed"
+        quest["status"] = "completed"
 
         # Launch celebration animation and play fanfare
-        self.quest_complete_effect = QuestCompleteEffect(reward)
+        self.quest_complete_effect = QuestCompleteEffect(reward, item_name=artifact)
         self.game.sfx.play("quest_complete")
 
-        # Dialogue will show after the animation finishes
+        # Dialogue — use per-NPC text if available, else generic
+        complete_text = getattr(npc, "text_complete", None)
+        if complete_text:
+            dialogue = f"{npc.name}: {complete_text}"
+        else:
+            dialogue = f"{npc.name}: You found the {artifact}! Here's {reward} gold for your bravery!"
+
         self.npc_dialogue_active = True
         self.npc_speaking = npc
-        self._set_dialogue(f"{npc.name}: You found the Shadow Crystal! Here's {reward} gold for your bravery!")
+        self._set_dialogue(dialogue)
         self._refresh_quest_highlights()
 
     # ── Shop ──────────────────────────────────────────────────────
@@ -1278,8 +1328,9 @@ class TownState(InventoryMixin, BaseState):
             cursor = (self.shop_cursor if self.shop_mode == "buy"
                       else self.shop_sell_cursor)
             quest = self.game.get_quest()
-            quest_complete = (quest is not None
-                              and quest.get("status") == "completed")
+            quest_complete = (quest.get("artifact_name", "Shadow Crystal")
+                              if quest and quest.get("status") == "completed"
+                              else False)
             renderer.draw_shop_u3(
                 self.game.party, self.shop_mode, cursor,
                 self.shop_message,
@@ -1332,8 +1383,9 @@ class TownState(InventoryMixin, BaseState):
         # Use the new sprite-tile-based town renderer
         msg = self.message
         quest = self.game.get_quest()
-        quest_complete = (quest is not None
-                          and quest.get("status") == "completed")
+        quest_complete = (quest.get("artifact_name", "Shadow Crystal")
+                          if quest and quest.get("status") == "completed"
+                          else False)
         # Screen shake offset during machine shutdown Phase 1
         shake_x, shake_y = (0, 0)
         if self.machine_shutdown_effect:

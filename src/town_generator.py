@@ -12,7 +12,7 @@ import random
 from src.tile_map import TileMap
 from src.settings import (
     TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
-    TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR,
+    TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR, TILE_GRASS,
 )
 
 
@@ -20,7 +20,9 @@ class NPC:
     """A non-player character inside a town."""
 
     def __init__(self, col, row, name, dialogue, npc_type="villager",
-                 quest_dialogue=None, quest_choices=None, god_name=None):
+                 quest_dialogue=None, quest_choices=None, god_name=None,
+                 quest_name=None, artifact_name=None,
+                 hint_active=None, text_complete=None):
         self.col = col
         self.row = row
         self.name = name
@@ -30,6 +32,11 @@ class NPC:
         # Quest support — only used for quest-giving NPCs
         self.quest_dialogue = quest_dialogue  # list of strings for quest offer
         self.quest_choices = quest_choices    # e.g. ["Yes, I'll do it!", "Not right now."]
+        # Innkeeper quest metadata (from quest pool)
+        self.quest_name = quest_name or "The Shadow Crystal"
+        self.artifact_name = artifact_name or "Shadow Crystal"
+        self.hint_active = hint_active
+        self.text_complete = text_complete
         # Priest support
         self.god_name = god_name or "The Divine"
         # Quest highlight — set True by the town state when this NPC
@@ -201,20 +208,32 @@ _INNKEEPER_QUEST_POOL = [
             "It radiates dark energy and threatens our town. Will you seek it out and bring it back?",
         ],
         "choices": ["Yes, I'll find it!", "Not right now."],
+        "quest_name": "The Shadow Crystal",
+        "artifact_name": "Shadow Crystal",
+        "hint_active": "Have you found the Shadow Crystal yet? It's out there somewhere...",
+        "text_complete": "The Shadow Crystal sits safely behind my counter. You've earned a hero's welcome here!",
     },
     {
         "dialogue": [
-            "Listen... a merchant went missing on the road last week. His wagon was found empty.",
-            "I think bandits are hiding in the caves nearby. Could you investigate?",
+            "Listen... a merchant's amulet was stolen and hidden deep in a dungeon nearby.",
+            "It's a powerful relic and dangerous in the wrong hands. Could you retrieve it?",
         ],
         "choices": ["I'll look into it.", "Maybe later."],
+        "quest_name": "The Merchant's Amulet",
+        "artifact_name": "Merchant's Amulet",
+        "hint_active": "Any sign of the Merchant's Amulet? I heard the dungeon is treacherous...",
+        "text_complete": "The Merchant's Amulet is back where it belongs. You have my deepest thanks!",
     },
     {
         "dialogue": [
             "I shouldn't say this, but... something's been poisoning our well water.",
-            "I think it's coming from that old ruin to the north. Can you help?",
+            "A cursed relic in the ruins nearby is the source. Can you recover it before it's too late?",
         ],
         "choices": ["I'll check it out.", "Not my problem."],
+        "quest_name": "The Cursed Relic",
+        "artifact_name": "Cursed Relic",
+        "hint_active": "Our well water grows darker by the day. Please hurry and find that relic!",
+        "text_complete": "The Cursed Relic is safely contained. The well water is already clearing up!",
     },
 ]
 
@@ -358,7 +377,15 @@ def generate_town(name="Thornwall", seed=None, layout_index=None):
     BORDER_W = INTERIOR_W + 2
     BORDER_H = INTERIOR_H + 2
 
-    tmap = TileMap(W, H, default_tile=TILE_WALL)
+    tmap = TileMap(W, H, default_tile=TILE_GRASS)
+
+    # --- Single-row brick wall border around the town ---
+    for col in range(BORDER_X, BORDER_X + BORDER_W):
+        tmap.set_tile(col, BORDER_Y, TILE_WALL)                # top
+        tmap.set_tile(col, BORDER_Y + BORDER_H - 1, TILE_WALL) # bottom
+    for row in range(BORDER_Y, BORDER_Y + BORDER_H):
+        tmap.set_tile(BORDER_X, row, TILE_WALL)                # left
+        tmap.set_tile(BORDER_X + BORDER_W - 1, row, TILE_WALL) # right
 
     # --- Floor inside the brick border ---
     for row in range(BORDER_Y + 1, BORDER_Y + BORDER_H - 1):
@@ -439,7 +466,11 @@ def generate_town(name="Thornwall", seed=None, layout_index=None):
     npcs.append(NPC(innkeeper_col, innkeeper_row, innkeeper["name"],
                     inn_dlg, npc_type="innkeeper",
                     quest_dialogue=quest["dialogue"],
-                    quest_choices=quest["choices"]))
+                    quest_choices=quest["choices"],
+                    quest_name=quest.get("quest_name"),
+                    artifact_name=quest.get("artifact_name"),
+                    hint_active=quest.get("hint_active"),
+                    text_complete=quest.get("text_complete")))
 
     # Town elder (in the open area, middle of the map)
     elder_name = rng.choice(_ELDER_POOL)
@@ -496,7 +527,15 @@ def generate_duskhollow():
     BORDER_W = INTERIOR_W + 2
     BORDER_H = INTERIOR_H + 2
 
-    tmap = TileMap(W, H, default_tile=TILE_WALL)
+    tmap = TileMap(W, H, default_tile=TILE_GRASS)
+
+    # --- Single-row brick wall border around the town ---
+    for col in range(BORDER_X, BORDER_X + BORDER_W):
+        tmap.set_tile(col, BORDER_Y, TILE_WALL)                # top
+        tmap.set_tile(col, BORDER_Y + BORDER_H - 1, TILE_WALL) # bottom
+    for row in range(BORDER_Y, BORDER_Y + BORDER_H):
+        tmap.set_tile(BORDER_X, row, TILE_WALL)                # left
+        tmap.set_tile(BORDER_X + BORDER_W - 1, row, TILE_WALL) # right
 
     # --- Floor inside the brick border ---
     for row in range(BORDER_Y + 1, BORDER_Y + BORDER_H - 1):

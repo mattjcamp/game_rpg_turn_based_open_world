@@ -2023,7 +2023,7 @@ class Renderer(CombatEffectRendererMixin):
                           (tr, tg, tb), self.font)
 
             # Quest name
-            qname = "The Shadow Crystal"
+            qname = getattr(effect, "item_name", "Shadow Crystal")
             qw = len(qname) * 8
             qc = int(180 * banner_alpha)
             self._u3_text(qname,
@@ -2039,7 +2039,7 @@ class Renderer(CombatEffectRendererMixin):
                           (rc, rc, int(rc * 0.4)), self.font_med)
 
             # Item display hint
-            item_text = "The Shadow Crystal is now on display at the inn!"
+            item_text = f"The {qname} has been secured!"
             iw = len(item_text) * 6
             ic = int(140 * banner_alpha)
             self._u3_text(item_text,
@@ -8017,9 +8017,12 @@ class Renderer(CombatEffectRendererMixin):
             ]
             pygame.draw.polygon(self.screen, (220, 200, 255), ipts)
 
-            # Item name
-            self._u3_text("Shadow Crystal",
-                          gem_cx - 55, gem_cy + bob + size + 6,
+            # Item name — quest_complete may be an artifact name string
+            trophy_name = (quest_complete if isinstance(quest_complete, str)
+                           else "Shadow Crystal")
+            tw = len(trophy_name) * 6
+            self._u3_text(trophy_name,
+                          gem_cx - tw // 2, gem_cy + bob + size + 6,
                           (180, 140, 255), self.font_small)
 
         # ── Gold display ──

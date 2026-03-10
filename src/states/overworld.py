@@ -813,13 +813,14 @@ class OverworldState(InventoryMixin, BaseState):
         elif (quest
                 and pcol == quest.get("dungeon_col")
                 and prow == quest.get("dungeon_row")):
+            artifact = quest.get("artifact_name", "Shadow Crystal")
             name = quest.get("name", "The Shadow Crystal")
-            desc = "A foreboding passage descends into darkness. Somewhere below lies the Shadow Crystal."
+            desc = f"A foreboding passage descends into darkness. Somewhere below lies the {artifact}."
             if quest["status"] == "completed":
                 cleared = True
-                quest_name = f"{quest.get('name', 'The Shadow Crystal')} (completed)"
+                quest_name = f"{name} (completed)"
             else:
-                quest_name = quest.get("name", "The Shadow Crystal")
+                quest_name = name
             entry_type = "quest"
         elif (hq
                 and pcol == hq.get("dungeon_col")

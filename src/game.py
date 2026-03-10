@@ -604,10 +604,11 @@ class Game:
         """
         quests = []
 
-        # ── Innkeeper quest (The Shadow Crystal) ──
+        # ── Innkeeper quest ──
         quest = self.quest
         if quest is not None:
             status = quest.get("status", "active")
+            artifact = quest.get("artifact_name", "Shadow Crystal")
             steps = [
                 {"description": "Accept the quest from the innkeeper",
                  "done": True},
@@ -616,9 +617,9 @@ class Game:
                          and self.is_dungeon_visited(
                              quest.get("dungeon_col", -1),
                              quest.get("dungeon_row", -1))},
-                {"description": f"Retrieve the {quest.get('artifact_name', 'Shadow Crystal')}",
+                {"description": f"Retrieve the {artifact}",
                  "done": status in ("artifact_found", "completed")},
-                {"description": "Return the artifact to the innkeeper",
+                {"description": f"Return the {artifact} to the innkeeper",
                  "done": status == "completed"},
             ]
             quests.append({
