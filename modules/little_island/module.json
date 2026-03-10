@@ -1,0 +1,68 @@
+{
+  "metadata": {
+    "id": "little_island",
+    "name": "LIttle island",
+    "author": "Unknown",
+    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Nettlemarch to restore the protective ward.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 32,
+    "map_height": 24,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "nettlemarch",
+        "name": "Nettlemarch"
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 2,
+      "deliver_to": "town_altar"
+    },
+    "starting_quests": [
+      "restore"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Shattered Grotto",
+        "key_name": "Opal Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Moss-covered statues flank the entrance to Shattered Grotto. Their blank eyes seem to follow you.",
+        "quest_objective": "Explore Shattered Grotto and recover the lost Opal Key",
+        "quest_hint": "The artifact was hidden here long ago by a forgotten order."
+      },
+      {
+        "id": "dungeon_key_2",
+        "name": "Flooded Grotto",
+        "key_name": "Coral Key",
+        "dungeon_number": 2,
+        "landmark_id": "dungeon_2",
+        "description": "The air around Flooded Grotto shimmers with faint heat. Strange runes glow along the doorframe.",
+        "quest_objective": "Brave the depths of Flooded Grotto for the Coral Key",
+        "quest_hint": "Few who enter these halls return unchanged."
+      }
+    ]
+  }
+}
