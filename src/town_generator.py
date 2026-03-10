@@ -32,6 +32,9 @@ class NPC:
         self.quest_choices = quest_choices    # e.g. ["Yes, I'll do it!", "Not right now."]
         # Priest support
         self.god_name = god_name or "The Divine"
+        # Quest highlight — set True by the town state when this NPC
+        # is offering a quest or waiting for quest resolution.
+        self.quest_highlight = False
 
     def get_dialogue(self):
         """Return the next line of dialogue and advance the index."""

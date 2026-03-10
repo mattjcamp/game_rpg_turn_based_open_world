@@ -173,6 +173,10 @@ class Game:
              "type": "toggle", "action": self._toggle_start_equipment},
         ]
 
+        # --- Quest log screen ---
+        self.showing_quest_log = False
+        self.quest_log_scroll = 0
+
         # --- Game Over screen ---
         self.showing_game_over = False
         self.game_over_cursor = 0
@@ -580,6 +584,93 @@ class Game:
     def set_gnome_quest_accepted(self):
         """Mark the gnome quest as accepted."""
         self._gnome_quest_accepted = True
+
+    def _build_quest_log(self):
+        """Build a list of quest entries for the quest log screen.
+
+        Each entry is a dict with:
+            name:   str   — quest title
+            status: str   — 'active', 'completed', etc.
+            steps:  list  — [{description: str, done: bool}, ...]
+        """
+        quests = []
+
+        # ── Innkeeper quest (The Shadow Crystal) ──
+        quest = self.quest
+        if quest is not None:
+            status = quest.get("status", "active")
+            steps = [
+                {"description": "Accept the quest from the innkeeper",
+                 "done": True},
+                {"description": "Find and enter the quest dungeon",
+                 "done": status in ("active", "artifact_found", "completed")
+                         and self.is_dungeon_visited(
+                             quest.get("dungeon_col", -1),
+                             quest.get("dungeon_row", -1))},
+                {"description": f"Retrieve the {quest.get('artifact_name', 'Shadow Crystal')}",
+                 "done": status in ("artifact_found", "completed")},
+                {"description": "Return the artifact to the innkeeper",
+                 "done": status == "completed"},
+            ]
+            quests.append({
+                "name": quest.get("name", "The Shadow Crystal"),
+                "status": status,
+                "steps": steps,
+            })
+
+        # ── Key dungeon quests (one entry per dungeon) ──
+        kd_map = self.key_dungeons
+        if kd_map:
+            gnome_accepted = self._gnome_quest_accepted
+            inserted = self.keys_inserted
+            for pos, kd in kd_map.items():
+                kd_status = kd.get("status", "undiscovered")
+                if kd_status == "undiscovered":
+                    continue  # don't show quests the player hasn't learned about
+                key_name = kd.get("key_name", "Key")
+                dname = kd.get("name", "Key Dungeon")
+                steps = [
+                    {"description": f"Enter {dname}",
+                     "done": kd_status in ("active", "artifact_found", "completed")
+                             and self.is_dungeon_visited(
+                                 kd.get("dungeon_col", pos[0]),
+                                 kd.get("dungeon_row", pos[1]))},
+                    {"description": f"Find the {key_name}",
+                     "done": kd_status in ("artifact_found", "completed")},
+                    {"description": f"Bring the {key_name} to Fizzwick",
+                     "done": kd_status == "completed"},
+                ]
+                quests.append({
+                    "name": f"{dname}: {key_name}",
+                    "status": kd_status,
+                    "steps": steps,
+                })
+
+            # ── Machine / final goal ──
+            if gnome_accepted or any(
+                    kd.get("status") != "undiscovered"
+                    for kd in kd_map.values()):
+                total = len(kd_map)
+                all_done = inserted >= total
+                quests.append({
+                    "name": "Activate the Ancient Machine",
+                    "status": "completed" if all_done else "active",
+                    "steps": [
+                        {"description": f"Collect all {total} keys ({inserted}/{total} inserted)",
+                         "done": all_done},
+                        {"description": "Insert all keys into the machine",
+                         "done": all_done},
+                    ],
+                })
+
+        if not quests:
+            quests.append({
+                "name": "No active quests",
+                "status": "none",
+                "steps": [{"description": "Explore the world and talk to NPCs to discover quests.", "done": False}],
+            })
+
+        return quests
 
     def _title_save_game(self):
         """Open the save screen from the title."""
@@ -1679,6 +1770,16 @@ class Game:
                 for event in events:
                     self._handle_game_over_input(event)
                 self.game_over_elapsed += dt
+            elif self.showing_quest_log:
+                for event in events:
+                    if event.type != pygame.KEYDOWN:
+                        continue
+                    if event.key in (pygame.K_ESCAPE, pygame.K_q):
+                        self.showing_quest_log = False
+                    elif event.key == pygame.K_UP:
+                        self.quest_log_scroll = max(0, self.quest_log_scroll - 1)
+                    elif event.key == pygame.K_DOWN:
+                        self.quest_log_scroll += 1
             elif self.showing_settings:
                 # Settings screen intercepts all input
                 for event in events:
@@ -1693,6 +1794,10 @@ class Game:
                 for event in events:
                     if event.type != pygame.KEYDOWN:
                         continue
+                    if event.key == pygame.K_q and not self.showing_quest_log:
+                        self.showing_quest_log = True
+                        self.quest_log_scroll = 0
+                        break
                     if event.key == pygame.K_m:
                         self.showing_title = True
                         self.title_cursor = 0
@@ -1724,7 +1829,8 @@ class Game:
                     and not self.showing_game_over
                     and not self.showing_char_create
                     and not self.showing_form_party
-                    and not self.showing_modules):
+                    and not self.showing_modules
+                    and not self.showing_quest_log):
                 self.current_state.update(dt)
                 self.camera.update(self.party.col, self.party.row)
 
@@ -1754,6 +1860,10 @@ class Game:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,
                     self.game_over_elapsed)
+            elif self.showing_quest_log:
+                quest_data = self._build_quest_log()
+                self.renderer.draw_quest_screen(
+                    quest_data, self.quest_log_scroll)
             elif self.showing_settings:
                 if self.settings_mode in ("save", "load"):
                     # Build slot info list for the renderer

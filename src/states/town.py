@@ -281,6 +281,47 @@ class TownState(InventoryMixin, BaseState):
             self.game.camera.map_width = self.town_data.tile_map.width
             self.game.camera.map_height = self.town_data.tile_map.height
             self.game.camera.update(self.game.party.col, self.game.party.row)
+            self._refresh_quest_highlights()
+
+    def _refresh_quest_highlights(self):
+        """Update quest_highlight on all NPCs based on current quest state."""
+        if not self.town_data:
+            return
+        quest = self.game.get_quest()
+        kd_map = getattr(self.game, "key_dungeons", {})
+        inserted = getattr(self.game, "keys_inserted", 0)
+        total = len(kd_map) if kd_map else 0
+        gnome_accepted = getattr(self.game, "_gnome_quest_accepted", False)
+
+        for npc in self.town_data.npcs:
+            npc.quest_highlight = False
+
+            if npc.npc_type == "innkeeper":
+                # Highlight when offering a quest or waiting for resolution
+                if quest is None and npc.quest_dialogue:
+                    npc.quest_highlight = True
+                elif quest and quest.get("status") in (
+                        "active", "artifact_found"):
+                    npc.quest_highlight = True
+
+            elif npc.npc_type == "gnome":
+                # Highlight when quest not accepted, or keys still needed
+                if npc.quest_dialogue and not gnome_accepted:
+                    npc.quest_highlight = True
+                elif kd_map and inserted < total:
+                    npc.quest_highlight = True
+
+            elif npc.npc_type == "elder":
+                # Highlight when there are undiscovered quests to reveal,
+                # or while any key dungeon quests are still in progress
+                has_undiscovered = any(
+                    kd.get("status") == "undiscovered"
+                    for kd in kd_map.values())
+                has_active = any(
+                    kd.get("status") in ("active", "artifact_found")
+                    for kd in kd_map.values())
+                if has_undiscovered or has_active:
+                    npc.quest_highlight = True
 
     def exit(self):
         """Called when leaving this state — reset all transient UI state."""
@@ -698,6 +739,7 @@ class TownState(InventoryMixin, BaseState):
                         inserted = self.game.insert_key()
                     n = len(held_keys)
                     names = ", ".join(held_keys)
+                    self._refresh_quest_highlights()
                     self.npc_dialogue_active = True
                     self.npc_speaking = npc
                     if inserted >= total:
@@ -744,32 +786,51 @@ class TownState(InventoryMixin, BaseState):
             # Fall through to normal cycling dialogue
             pass
 
-        # Elder — reveal undiscovered key dungeon quests on first talk
+        # Elder — offer to reveal undiscovered key dungeon quests
         if npc.npc_type == "elder":
             kd_map = getattr(self.game, "key_dungeons", {})
             undiscovered = [kd for kd in kd_map.values()
                            if kd.get("status") == "undiscovered"]
             if undiscovered:
-                self.game.discover_key_dungeons()
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                # Build a summary of the revealed quests
+                # Build quest offer dialogue lines
                 if len(undiscovered) == 1:
                     dung = undiscovered[0]
                     hint = dung.get("quest_hint", "Be careful.")
-                    self._set_dialogue(
-                        f"{npc.name}: Listen well — the "
+                    self.quest_dialogue_lines = [
+                        f"Listen well — the "
                         f"{dung['name']} holds a powerful artifact. "
-                        f"{hint} Bring it back to save us!")
+                        f"{hint}",
+                        "Will you seek it out and bring it back to save us?",
+                    ]
                 else:
                     names = ", ".join(d["name"] for d in undiscovered[:3])
                     if len(undiscovered) > 3:
                         names += f" and {len(undiscovered) - 3} more"
-                    self._set_dialogue(
-                        f"{npc.name}: Brave adventurers, hear me! "
+                    self.quest_dialogue_lines = [
+                        f"Brave adventurers, hear me! "
                         f"Dangerous places threaten our land: {names}. "
-                        f"Each holds an artifact we desperately need. "
-                        f"Will you seek them out?")
+                        f"Each holds an artifact we desperately need.",
+                        "Will you seek them out?",
+                    ]
+                self.quest_dialogue_index = 0
+                self._set_dialogue(
+                    f"{npc.name}: {self.quest_dialogue_lines[0]}")
+                # Temporarily set quest_choices so the Y/N prompt appears
+                npc.quest_choices = ["Yes, we'll do it!", "Not right now."]
+                return
+            # Active quests still in progress — give progress hint
+            active = [kd for kd in kd_map.values()
+                      if kd.get("status") in ("active", "artifact_found")]
+            if active:
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                n = len(active)
+                self._set_dialogue(
+                    f"{npc.name}: There are still {n} dungeon"
+                    f"{'s' if n > 1 else ''} to clear. "
+                    f"We're counting on you!")
                 return
 
         self.npc_dialogue_active = True
@@ -823,6 +884,8 @@ class TownState(InventoryMixin, BaseState):
             # Accepted
             if npc and npc.npc_type == "gnome":
                 self._accept_gnome_quest()
+            elif npc and npc.npc_type == "elder":
+                self._accept_elder_quest()
             else:
                 self._accept_quest()
         else:
@@ -832,6 +895,9 @@ class TownState(InventoryMixin, BaseState):
             self.quest_choices = []
             self.quest_dialogue_lines = []
             self.quest_dialogue_index = 0
+            # Clean up temporary quest_choices for elder NPCs
+            if npc and npc.npc_type == "elder":
+                npc.quest_choices = None
             # Keep dialogue active to show the decline message
 
     def _accept_gnome_quest(self):
@@ -848,6 +914,23 @@ class TownState(InventoryMixin, BaseState):
         self.quest_choices = []
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
+        self._refresh_quest_highlights()
+
+    def _accept_elder_quest(self):
+        """Accept the Elder's quest: reveal all undiscovered key dungeons."""
+        npc = self.npc_speaking
+        self.game.discover_key_dungeons()
+        self._set_dialogue(
+            f"{npc.name}: Thank you, brave souls! "
+            f"I've marked the locations on your map. "
+            f"Be careful out there!")
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
+        # Clean up temporary quest_choices on the NPC
+        npc.quest_choices = None
+        self._refresh_quest_highlights()
 
     def _accept_quest(self):
         """Accept the innkeeper's quest: place a dungeon on the overworld."""
@@ -879,6 +962,7 @@ class TownState(InventoryMixin, BaseState):
         self.quest_choices = []
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
+        self._refresh_quest_highlights()
 
     def _find_quest_dungeon_location(self):
         """Find a random walkable overworld tile for the quest dungeon.
@@ -931,6 +1015,7 @@ class TownState(InventoryMixin, BaseState):
         self.npc_dialogue_active = True
         self.npc_speaking = npc
         self._set_dialogue(f"{npc.name}: You found the Shadow Crystal! Here's {reward} gold for your bravery!")
+        self._refresh_quest_highlights()
 
     # ── Shop ──────────────────────────────────────────────────────
 

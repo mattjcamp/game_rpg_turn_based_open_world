@@ -1319,11 +1319,25 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.line(self.screen, color, (cx, cy + 4), (cx - 5, cy + 12), 2)
             pygame.draw.line(self.screen, color, (cx, cy + 4), (cx + 5, cy + 12), 2)
 
-        # Name tag above
-        name_surf = self.font_small.render(npc.name.upper(), True, (255, 255, 255))
+        # Name tag above — pulsing gold with glow if quest-active
+        if npc.quest_highlight:
+            import math as _m, time as _t
+            pulse = 0.6 + 0.4 * _m.sin(_t.time() * 4.0)
+            name_color = (255, int(200 * pulse + 55), 0)
+        else:
+            name_color = (255, 255, 255)
+        name_surf = self.font_small.render(npc.name.upper(), True, name_color)
         name_rect = name_surf.get_rect(center=(cx, cy - 20))
         bg = name_rect.inflate(4, 2)
+        if npc.quest_highlight:
+            # Bright gold border around the tag for visibility
+            glow_rect = bg.inflate(4, 4)
+            pygame.draw.rect(self.screen, (200, 160, 0), glow_rect, 1)
         pygame.draw.rect(self.screen, (0, 0, 0), bg)
+        if npc.quest_highlight:
+            # Exclamation marker
+            ex_surf = self.font_small.render("!", True, (255, 220, 0))
+            self.screen.blit(ex_surf, (name_rect.right + 2, name_rect.y))
         self.screen.blit(name_surf, name_rect)
 
     def _draw_gnome_sprite(self, npc, cx, cy):
@@ -1399,11 +1413,22 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.line(self.screen, (220, 220, 220),
                          (cx + 2, beard_y), (cx, beard_y + 4), 1)
 
-        # Name tag above (yellow for quest-giver)
-        name_surf = self.font_small.render(npc.name.upper(), True, (255, 255, 100))
+        # Name tag above — pulsing gold with glow if quest-active
+        if npc.quest_highlight:
+            pulse = 0.6 + 0.4 * _math.sin(t * 4.0)
+            name_color = (255, int(200 * pulse + 55), 0)
+        else:
+            name_color = (255, 255, 255)
+        name_surf = self.font_small.render(npc.name.upper(), True, name_color)
         name_rect = name_surf.get_rect(center=(cx, cy + bob - 24))
         bg = name_rect.inflate(4, 2)
+        if npc.quest_highlight:
+            glow_rect = bg.inflate(4, 4)
+            pygame.draw.rect(self.screen, (200, 160, 0), glow_rect, 1)
         pygame.draw.rect(self.screen, (0, 0, 0), bg)
+        if npc.quest_highlight:
+            ex_surf = self.font_small.render("!", True, (255, 220, 0))
+            self.screen.blit(ex_surf, (name_rect.right + 2, name_rect.y))
         self.screen.blit(name_surf, name_rect)
 
     def draw_hud_town(self, party, town_data):
@@ -3355,23 +3380,36 @@ class Renderer(CombatEffectRendererMixin):
         body_font = self.font          # 18px
         hint_font = self.font_small    # 14px
 
+        # ── Helper: word-wrap text to fit content width ──
+        def _wrap(text, font, max_w):
+            lines = []
+            for word in text.split():
+                if lines and font.size(lines[-1] + " " + word)[0] <= max_w:
+                    lines[-1] += " " + word
+                else:
+                    lines.append(word)
+            return lines or [""]
+
         # ── Word-wrap the description ──
-        desc_lines = []
-        for word in desc.split():
-            if desc_lines and body_font.size(desc_lines[-1] + " " + word)[0] <= content_w:
-                desc_lines[-1] += " " + word
-            else:
-                desc_lines.append(word)
+        desc_lines = _wrap(desc, body_font, content_w)
+
+        # ── Word-wrap the quest line ──
+        quest_lines = []
+        if quest_name:
+            quest_lines = _wrap(f"Quest: {quest_name}", body_font, content_w)
+
+        # ── Word-wrap the title ──
+        title_lines = _wrap(name, title_font, content_w)
 
         # ── Calculate panel height ──
         h = pad  # top padding
-        h += 28  # title
+        h += len(title_lines) * 28  # title
         h += 12  # gap
         h += len(desc_lines) * line_h  # description
         h += 14  # gap
         h += line_h  # status line
-        if quest_name:
-            h += line_h  # quest line
+        if quest_lines:
+            h += len(quest_lines) * line_h  # quest line(s)
         h += 16  # gap
         h += line_h * 2  # two options
         h += 12  # gap
@@ -3391,10 +3429,12 @@ class Renderer(CombatEffectRendererMixin):
 
         y = panel_y + pad
 
-        # ── Title (dungeon name in gold) ──
-        title_surf = title_font.render(name, True, (255, 200, 80))
-        self.screen.blit(title_surf, (panel_x + pad, y))
-        y += 28 + 12
+        # ── Title (dungeon name in gold, word-wrapped) ──
+        for tline in title_lines:
+            title_surf = title_font.render(tline, True, (255, 200, 80))
+            self.screen.blit(title_surf, (panel_x + pad, y))
+            y += 28
+        y += 12
 
         # ── Description (white, word-wrapped) ──
         for line in desc_lines:
@@ -3417,9 +3457,9 @@ class Renderer(CombatEffectRendererMixin):
         self.screen.blit(status_surf, (panel_x + pad, y))
         y += line_h
 
-        # ── Quest line (if applicable) ──
-        if quest_name:
-            quest_surf = body_font.render(f"Quest: {quest_name}", True, (255, 220, 100))
+        # ── Quest line (if applicable, word-wrapped) ──
+        for qline in quest_lines:
+            quest_surf = body_font.render(qline, True, (255, 220, 100))
             self.screen.blit(quest_surf, (panel_x + pad, y))
             y += line_h
         y += 16
@@ -6716,6 +6756,120 @@ class Renderer(CombatEffectRendererMixin):
                       panel_x + 16, hint_y, (68, 68, 255), self.font_small)
 
         self.screen.set_clip(prev_clip)
+
+    def draw_quest_screen(self, quests, scroll=0):
+        """Draw the quest log screen showing all quests and their steps.
+
+        Parameters
+        ----------
+        quests : list of dict
+            Each dict has 'name', 'status', 'steps'.
+            steps is a list of {'description': str, 'done': bool}.
+        scroll : int
+            Number of lines to scroll down.
+        """
+        self.screen.fill((0, 0, 0))
+
+        # Title bar
+        self._u3_panel(0, 0, SCREEN_WIDTH, 30)
+        title_str = "QUEST LOG"
+        tw, _ = self.font.size(title_str)
+        self._u3_text(title_str, (SCREEN_WIDTH - tw) // 2, 8,
+                       (255, 170, 85), self.font)
+
+        # Main panel
+        panel_w = min(600, SCREEN_WIDTH - 40)
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = 50
+        panel_h = SCREEN_HEIGHT - 90
+        self._u3_panel(panel_x, panel_y, panel_w, panel_h)
+
+        # Clip to panel interior
+        prev_clip = self.screen.get_clip()
+        inner_x = panel_x + 12
+        inner_w = panel_w - 24
+        inner_y = panel_y + 8
+        inner_h = panel_h - 40
+        self.screen.set_clip(pygame.Rect(inner_x, inner_y, inner_w, inner_h))
+
+        # Build all renderable lines: list of (text, color, indent, is_step)
+        lines = []
+        for qi, q in enumerate(quests):
+            if qi > 0:
+                lines.append(("", (0, 0, 0), 0, False))  # spacer
+
+            # Quest header
+            status = q.get("status", "active")
+            if status == "completed":
+                qcolor = (80, 200, 80)   # green
+                marker = "[COMPLETE] "
+            elif status == "none":
+                qcolor = (160, 160, 160)
+                marker = ""
+            else:
+                qcolor = (255, 200, 60)  # gold
+                marker = ""
+            lines.append((f"{marker}{q['name']}", qcolor, 0, False))
+
+            # Steps
+            for step in q.get("steps", []):
+                done = step.get("done", False)
+                if done:
+                    check = "[X] "
+                    scolor = (80, 200, 80)
+                else:
+                    check = "[ ] "
+                    scolor = (180, 180, 180)
+                desc = step.get("description", "")
+                # Word-wrap long step descriptions
+                max_step_w = inner_w - 30
+                words = desc.split()
+                wrapped = []
+                cur = ""
+                for w in words:
+                    test = f"{cur} {w}" if cur else w
+                    tw2, _ = self.font_small.size(test.upper())
+                    if tw2 > max_step_w and cur:
+                        wrapped.append(cur)
+                        cur = w
+                    else:
+                        cur = test
+                if cur:
+                    wrapped.append(cur)
+                for li, line_text in enumerate(wrapped):
+                    prefix = check if li == 0 else "    "
+                    lines.append((f"{prefix}{line_text}", scolor, 16, True))
+
+        # Apply scroll (clamped)
+        visible_lines = inner_h // 20
+        max_scroll = max(0, len(lines) - visible_lines)
+        scroll = max(0, min(scroll, max_scroll))
+        visible = lines[scroll:scroll + visible_lines]
+
+        y = inner_y + 4
+        for text, color, indent, is_step in visible:
+            if text == "":
+                y += 10
+                continue
+            self._u3_text(text, inner_x + indent, y, color, self.font_small)
+            y += 20
+
+        self.screen.set_clip(prev_clip)
+
+        # Scroll indicator
+        if max_scroll > 0:
+            if scroll > 0:
+                self._u3_text("^ UP ^", panel_x + panel_w // 2 - 24,
+                              panel_y + 2, (100, 100, 200), self.font_small)
+            if scroll < max_scroll:
+                self._u3_text("v DOWN v", panel_x + panel_w // 2 - 30,
+                              panel_y + panel_h - 32, (100, 100, 200),
+                              self.font_small)
+
+        # Controls hint
+        hint_y = panel_y + panel_h - 18
+        self._u3_text("[UP/DN] SCROLL  [Q/ESC] CLOSE",
+                      panel_x + 16, hint_y, (68, 68, 255), self.font_small)
 
     def draw_save_load_screen(self, mode, slot_infos, cursor, message=None,
                               confirm_delete=False):
