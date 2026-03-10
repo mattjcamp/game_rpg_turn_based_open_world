@@ -1,1 +1,0 @@
-- The lights in dungeon are not working as expected. When the party has no light source, they cannot see any torches. But when the party has a light source, the torches illuminate their area which is good, but they appear before the party would have seen them. Everything in a dungeon should be in a fog of war state until the objects appear in the parties line of sight

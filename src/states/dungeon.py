@@ -428,6 +428,29 @@ class DungeonState(InventoryMixin, BaseState):
         pc, pr = party.col, party.row
         visible = {(pc, pr)}
 
+        tile_map = self.dungeon_data.tile_map
+        max_radius = max(tile_map.width, tile_map.height)
+
+        octants = [
+            ( 1,  0,  0,  1),   # ENE
+            ( 0,  1,  1,  0),   # NNE
+            ( 0, -1,  1,  0),   # NNW
+            (-1,  0,  0,  1),   # WNW
+            (-1,  0,  0, -1),   # WSW
+            ( 0, -1, -1,  0),   # SSW
+            ( 0,  1, -1,  0),   # SSE
+            ( 1,  0,  0, -1),   # ESE
+        ]
+
+        # Always compute full line-of-sight so we know which torches
+        # the party could see (even without their own light source,
+        # a torch down a corridor is visible from its glow).
+        full_los = {(pc, pr)}
+        for xx, xy, yx, yy in octants:
+            self._cast_light(full_los, tile_map, pc, pr,
+                             1, 1.0, 0.0, max_radius,
+                             xx, xy, yx, yy)
+
         has_light = (self.torch_active or self._has_torch_equipped()
                      or party.has_effect("Infravision")
                      or (party.has_effect("Galadriel's Light")
@@ -438,36 +461,19 @@ class DungeonState(InventoryMixin, BaseState):
                 for dr in (-1, 0, 1):
                     visible.add((pc + dc, pr + dr))
         else:
-            # Torch lit — use recursive shadowcasting for full line-of-sight
-            tile_map = self.dungeon_data.tile_map
-            max_radius = max(tile_map.width, tile_map.height)
-
-            octants = [
-                ( 1,  0,  0,  1),   # ENE
-                ( 0,  1,  1,  0),   # NNE
-                ( 0, -1,  1,  0),   # NNW
-                (-1,  0,  0,  1),   # WNW
-                (-1,  0,  0, -1),   # WSW
-                ( 0, -1, -1,  0),   # SSW
-                ( 0,  1, -1,  0),   # SSE
-                ( 1,  0,  0, -1),   # ESE
-            ]
-            for xx, xy, yx, yy in octants:
-                self._cast_light(visible, tile_map, pc, pr,
-                                 1, 1.0, 0.0, max_radius,
-                                 xx, xy, yx, yy)
+            # Party carries light — they can see everything in LOS
+            visible.update(full_los)
 
         # ── Wall torches illuminate their surroundings ──
-        # A torch activates when the party can see it (torch is in the
-        # visible set from shadowcasting) OR the party is close enough
-        # to be inside the torch's own light radius.  This lets torches
-        # light the way even when the party carries no light source.
-        # When the party moves away, the torch-lit area fades back to
-        # the normal explored (dimmed) state via fog of war.
-        party_pos = (pc, pr)
+        # A torch activates when it falls within the party's full
+        # line-of-sight (unobstructed path exists), regardless of
+        # whether the party carries their own light.  You can see
+        # a torch's glow from far down a corridor.  When the party
+        # moves away and LOS is broken, the torch-lit area fades
+        # back to the normal explored (dimmed) state via fog of war.
         torch_map = self._get_torch_lit_map()
         for torch_pos, lit_tiles in torch_map.items():
-            if torch_pos in visible or party_pos in lit_tiles:
+            if torch_pos in full_los:
                 visible.update(lit_tiles)
 
         return visible
@@ -547,8 +553,12 @@ class DungeonState(InventoryMixin, BaseState):
                 # This tile is visible (including walls — you can see them)
                 visible.add((map_x, map_y))
 
-                # Check if this tile blocks light
-                is_wall = not tile_map.is_walkable(map_x, map_y)
+                # Check if this tile blocks light — walls and closed
+                # doors are opaque (you can see the door itself but
+                # not through it).
+                tid = tile_map.get_tile(map_x, map_y)
+                is_wall = (not tile_map.is_walkable(map_x, map_y)
+                           or tid == TILE_DDOOR)
 
                 if blocked:
                     if is_wall:
