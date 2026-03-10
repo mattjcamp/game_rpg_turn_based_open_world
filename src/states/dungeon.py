@@ -1056,13 +1056,10 @@ class DungeonState(InventoryMixin, BaseState):
 
         elif tile_id == TILE_PORTAL:
             # Portal whisks the party back to the overworld
-            active_q = self._get_active_quest()
-            if active_q and active_q.get("status") == "artifact_found":
-                # Key dungeon quests stay "artifact_found" — the party
-                # must return the artifact to the quest-giver in town.
-                # Only non-key quests (innkeeper) complete on portal exit.
-                if "key_name" not in active_q:
-                    active_q["status"] = "completed"
+            # Quest stays "artifact_found" — the party must return the
+            # artifact to the quest-giver in town for the completion
+            # ceremony and reward.  The overworld tile is cleared so
+            # the dungeon entrance vanishes.
             # Swap the dungeon tile on the overworld to show it's cleared
             self.game.tile_map.set_tile(
                 self.overworld_col, self.overworld_row,
