@@ -19,7 +19,7 @@ from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.states.examine import ExamineState
 from src.town_generator import generate_town, generate_duskhollow
-from src.music import MusicManager, SoundEffects
+from src.music import MusicManager, SoundEffects, SOUNDTRACK_STYLES
 from src.save_load import (save_game, load_game, get_save_info,
                            delete_save,
                            NUM_SAVE_SLOTS, load_config, save_config)
@@ -71,16 +71,19 @@ class Game:
         # Accumulates all messages from every state for the log overlay
         self.game_log = []
 
-        # --- Music & Sound Effects ---
-        self.music = MusicManager()
-        self.sfx = SoundEffects()
-
         # --- Load persistent player config ---
         self._config = load_config()
-        if not self._config.get("music_enabled", True):
-            self.music.toggle_mute()   # start muted if saved that way
         self.smite_enabled = self._config.get("smite_enabled", False)
         self.start_with_equipment = self._config.get("start_with_equipment", True)
+
+        # --- Music & Sound Effects ---
+        saved_style = self._config.get("soundtrack_style", "Classic")
+        if saved_style not in SOUNDTRACK_STYLES:
+            saved_style = "Classic"
+        self.music = MusicManager(style=saved_style)
+        self.sfx = SoundEffects()
+        if not self._config.get("music_enabled", True):
+            self.music.toggle_mute()   # start muted if saved that way
 
         # --- Game-in-progress flag ---
         # True once the player has started or loaded a game.
@@ -139,6 +142,10 @@ class Game:
             {"label": "MUSIC",
              "value": self._config.get("music_enabled", True),
              "type": "toggle", "action": self._toggle_music},
+            {"label": "SOUNDTRACK",
+             "value": self.music.style,
+             "choices": SOUNDTRACK_STYLES,
+             "type": "choice", "action": self._cycle_soundtrack},
             {"label": "SMITE (DEBUG)",
              "value": self._config.get("smite_enabled", False),
              "type": "toggle", "action": self._toggle_smite},
@@ -1384,17 +1391,32 @@ class Game:
         self._config["music_enabled"] = not muted
         save_config(self._config)
 
+    def _cycle_soundtrack(self, direction=1):
+        """Cycle through available soundtrack styles and apply immediately.
+
+        direction: +1 for next, -1 for previous.
+        """
+        opt = self.settings_options[1]  # SOUNDTRACK entry
+        choices = opt["choices"]
+        cur_idx = choices.index(opt["value"]) if opt["value"] in choices else 0
+        new_idx = (cur_idx + direction) % len(choices)
+        new_style = choices[new_idx]
+        opt["value"] = new_style
+        self.music.set_style(new_style)
+        self._config["soundtrack_style"] = new_style
+        save_config(self._config)
+
     def _toggle_smite(self):
         """Toggle the Smite debug action in combat menus."""
         self.smite_enabled = not self.smite_enabled
-        self.settings_options[1]["value"] = self.smite_enabled
+        self.settings_options[2]["value"] = self.smite_enabled
         self._config["smite_enabled"] = self.smite_enabled
         save_config(self._config)
 
     def _toggle_start_equipment(self):
         """Toggle whether new games start with full equipment or minimal gear."""
         self.start_with_equipment = not self.start_with_equipment
-        self.settings_options[2]["value"] = self.start_with_equipment
+        self.settings_options[3]["value"] = self.start_with_equipment
         self._config["start_with_equipment"] = self.start_with_equipment
         save_config(self._config)
 
@@ -1508,10 +1530,20 @@ class Game:
         elif event.key == pygame.K_DOWN:
             self.settings_cursor = (
                 (self.settings_cursor + 1) % len(self.settings_options))
+        elif event.key == pygame.K_LEFT:
+            opt = self.settings_options[self.settings_cursor]
+            if opt["type"] == "choice":
+                opt["action"](direction=-1)
+        elif event.key == pygame.K_RIGHT:
+            opt = self.settings_options[self.settings_cursor]
+            if opt["type"] == "choice":
+                opt["action"](direction=1)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             opt = self.settings_options[self.settings_cursor]
             if opt["type"] == "toggle":
                 opt["action"]()
+            elif opt["type"] == "choice":
+                opt["action"](direction=1)
             elif opt["type"] == "action":
                 opt["action"]()
 

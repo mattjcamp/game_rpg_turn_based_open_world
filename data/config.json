@@ -1,5 +1,6 @@
 {
-  "music_enabled": false,
+  "music_enabled": true,
   "smite_enabled": true,
-  "start_with_equipment": false
+  "start_with_equipment": false,
+  "soundtrack_style": "Twin Peaks"
 }

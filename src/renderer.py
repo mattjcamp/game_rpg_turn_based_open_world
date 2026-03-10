@@ -6687,8 +6687,23 @@ class Renderer(CombatEffectRendererMixin):
                 tx = panel_x + panel_w - 80
                 self._u3_text(f"[ {val_text} ]", tx, y, val_color, self.font)
 
+            # Value for choice type (cycles through options via LEFT/RIGHT)
+            elif setting['type'] == 'choice':
+                val_text = str(setting['value'])
+                val_color = (100, 200, 255) if selected else (140, 180, 220)
+                display = f"< {val_text} >"
+                # Measure actual pixel width and right-align with padding
+                text_w, _ = self.font.size(display.upper())
+                right_margin = 16
+                tx = panel_x + panel_w - right_margin - text_w
+                # Clamp to panel left edge so it never overflows
+                min_tx = panel_x + 16
+                if tx < min_tx:
+                    tx = min_tx
+                self._u3_text(display, tx, y, val_color, self.font)
+
             # Value for action type
-            if setting['type'] == 'action':
+            elif setting['type'] == 'action':
                 # Draw a right arrow to indicate sub-screen
                 tx = panel_x + panel_w - 80
                 self._u3_text(">>>", tx, y,
@@ -6697,7 +6712,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Controls hint
         hint_y = panel_y + panel_h - 30
-        self._u3_text("[UP/DN] SELECT  [ENTER] CHOOSE  [M/ESC] CLOSE",
+        self._u3_text("[UP/DN] SELECT  [ENTER/L/R] CHANGE  [M/ESC] CLOSE",
                       panel_x + 16, hint_y, (68, 68, 255), self.font_small)
 
         self.screen.set_clip(prev_clip)
