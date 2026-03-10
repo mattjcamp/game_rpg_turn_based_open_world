@@ -505,7 +505,8 @@ class Game:
             # Unique seed per town so NPCs and dialogue vary
             town_seed = hash((tname, col, row, i)) & 0xFFFFFFFF
             td = generate_town(tname, seed=town_seed,
-                               layout_index=town_ordinal)
+                               layout_index=town_ordinal,
+                               has_key_dungeons=bool(self.key_dungeons))
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:

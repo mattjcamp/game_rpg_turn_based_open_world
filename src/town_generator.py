@@ -340,7 +340,8 @@ _LAYOUT_POOL = [
 ]
 
 
-def generate_town(name="Thornwall", seed=None, layout_index=None):
+def generate_town(name="Thornwall", seed=None, layout_index=None,
+                   has_key_dungeons=False):
     """
     Generate a town map with NPCs and an exit.
 
@@ -456,21 +457,28 @@ def generate_town(name="Thornwall", seed=None, layout_index=None):
                     shop_dlg, npc_type="shopkeep"))
 
     # Innkeeper (inside the inn, behind the bar)
+    # The innkeeper only offers a quest when the module has no key
+    # dungeons — if the Elder already gives dungeon quests, the
+    # innkeeper just runs the inn.
     innkeeper = rng.choice(_INNKEEPER_POOL)
     inn_dlg_template = rng.choice(_INNKEEPER_DIALOGUE_POOL)
     inn_dlg = [line.format(inn=innkeeper["inn"])
                for line in inn_dlg_template]
-    quest = rng.choice(_INNKEEPER_QUEST_POOL)
     innkeeper_col = ox + ix + iw // 2
     innkeeper_row = oy + iy + ih - 2
-    npcs.append(NPC(innkeeper_col, innkeeper_row, innkeeper["name"],
-                    inn_dlg, npc_type="innkeeper",
-                    quest_dialogue=quest["dialogue"],
-                    quest_choices=quest["choices"],
-                    quest_name=quest.get("quest_name"),
-                    artifact_name=quest.get("artifact_name"),
-                    hint_active=quest.get("hint_active"),
-                    text_complete=quest.get("text_complete")))
+    if has_key_dungeons:
+        npcs.append(NPC(innkeeper_col, innkeeper_row, innkeeper["name"],
+                        inn_dlg, npc_type="innkeeper"))
+    else:
+        quest = rng.choice(_INNKEEPER_QUEST_POOL)
+        npcs.append(NPC(innkeeper_col, innkeeper_row, innkeeper["name"],
+                        inn_dlg, npc_type="innkeeper",
+                        quest_dialogue=quest["dialogue"],
+                        quest_choices=quest["choices"],
+                        quest_name=quest.get("quest_name"),
+                        artifact_name=quest.get("artifact_name"),
+                        hint_active=quest.get("hint_active"),
+                        text_complete=quest.get("text_complete")))
 
     # Town elder (in the open area, middle of the map)
     elder_name = rng.choice(_ELDER_POOL)

@@ -3,13 +3,13 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ashford.",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ravenvale.",
     "version": "0.1.0"
   },
   "settings": {
     "tile_size": 32,
-    "map_width": 32,
-    "map_height": 24,
+    "map_width": 64,
+    "map_height": 48,
     "viewport_cols": 30,
     "viewport_rows": 26,
     "max_party_size": 4,
@@ -27,8 +27,8 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ashford",
-        "name": "Ashford"
+        "id": "ravenvale",
+        "name": "Ravenvale"
       }
     ],
     "dungeons": []
@@ -45,13 +45,13 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Iron Lair",
-        "key_name": "Sapphire Key",
+        "name": "Obsidian Warren",
+        "key_name": "Crystal Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "A narrow crevice leads into Iron Lair. The sound of dripping water echoes endlessly below.",
-        "quest_objective": "Search Iron Lair for the hidden Sapphire Key",
-        "quest_hint": "Rumors say it was sealed away behind deadly traps."
+        "description": "Thick vines choke the mouth of Obsidian Warren. Beyond them, torchlight flickers in the gloom.",
+        "quest_objective": "Explore Obsidian Warren and recover the lost Crystal Key",
+        "quest_hint": "The artifact was hidden here long ago by a forgotten order."
       }
     ]
   }
