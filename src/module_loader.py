@@ -84,11 +84,8 @@ _DUNGEON_NOUNS = [
 ]
 
 # ── Quest types ────────────────────────────────────────────────────
-QUEST_TYPE_NAMES = ["Retrieve Artifact", "Kill Monsters"]
-QUEST_TYPE_KEYS = ["retrieve", "kill"]  # internal keys matching names
-
-QUEST_STYLE_NAMES = ["Elder", "Gnome Machine"]
-QUEST_STYLE_KEYS = ["elder", "gnome_machine"]  # internal keys matching names
+QUEST_TYPE_NAMES = ["Retrieve Artifact", "Kill Monsters", "Gnome Machine"]
+QUEST_TYPE_KEYS = ["retrieve", "kill", "gnome_machine"]  # internal keys
 
 # Monsters that can be targets for kill quests
 KILL_QUEST_MONSTERS = [

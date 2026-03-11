@@ -307,9 +307,15 @@ class TownState(InventoryMixin, BaseState):
 
             elif npc.npc_type == "gnome":
                 # Highlight when quest not accepted, or keys still needed
+                gnome_total = sum(
+                    1 for kd in kd_map.values()
+                    if kd.get("quest_type") == "gnome_machine")
+                # Keys of Shadow: all quests count
+                if total > 0 and gnome_total == 0:
+                    gnome_total = total  # KoS compat
                 if npc.quest_dialogue and not gnome_accepted:
                     npc.quest_highlight = True
-                elif kd_map and inserted < total:
+                elif kd_map and inserted < gnome_total:
                     npc.quest_highlight = True
 
             elif npc.npc_type == "elder":
@@ -582,17 +588,37 @@ class TownState(InventoryMixin, BaseState):
             self.show_message("A strange machine hums ominously.", 2000)
             return
 
+        # Filter to only gnome_machine quest keys (or all for KoS)
+        mod_id = ""
+        if self.game.module_manifest:
+            mod_id = self.game.module_manifest.get(
+                "metadata", {}).get("id", "")
+        if mod_id == "keys_of_shadow":
+            gnome_kds = kd
+        else:
+            gnome_kds = {k: v for k, v in kd.items()
+                         if v.get("quest_type") == "gnome_machine"}
+        if not gnome_kds:
+            self.show_message("A strange machine hums ominously.", 2000)
+            return
+
         party = self.game.party
-        key_names = [d["key_name"] for d in kd.values()]
+        key_names = [d["key_name"] for d in gnome_kds.values()]
         held_keys = [k for k in key_names if party.inv_count(k) > 0]
 
-        total = len(kd)
+        total = len(gnome_kds)
         inserted = self.game.get_keys_inserted()
 
         if held_keys:
             for key in held_keys:
                 party.inv_remove(key)
                 inserted = self.game.insert_key()
+                # Mark the matching key dungeon as completed
+                for gkd in gnome_kds.values():
+                    if (gkd.get("key_name") == key
+                            and gkd.get("status") != "completed"):
+                        gkd["status"] = "completed"
+                        break
             names = ", ".join(held_keys)
             self.show_message(
                 f"Inserted {names}! ({inserted}/{total} keys placed)", 3500)
@@ -786,18 +812,34 @@ class TownState(InventoryMixin, BaseState):
         if npc.npc_type == "gnome":
             kd = getattr(self.game, "key_dungeons", {})
             inserted = getattr(self.game, "keys_inserted", 0)
-            total = len(kd) if kd else 8
+            # Count gnome_machine quests (or all for KoS)
+            mod_id = ""
+            if self.game.module_manifest:
+                mod_id = self.game.module_manifest.get(
+                    "metadata", {}).get("id", "")
+            if mod_id == "keys_of_shadow":
+                gnome_kds = kd
+            else:
+                gnome_kds = {k: v for k, v in kd.items()
+                             if v.get("quest_type") == "gnome_machine"}
+            total = len(gnome_kds) if gnome_kds else 8
 
-            if kd:
+            if gnome_kds:
                 # Check for held keys and auto-insert them
                 party = self.game.party
-                key_names = [d["key_name"] for d in kd.values()]
+                key_names = [d["key_name"] for d in gnome_kds.values()]
                 held_keys = [k for k in key_names if party.inv_count(k) > 0]
 
                 if held_keys:
                     for key in held_keys:
                         party.inv_remove(key)
                         inserted = self.game.insert_key()
+                        # Mark the matching key dungeon as completed
+                        for gkd in gnome_kds.values():
+                            if (gkd.get("key_name") == key
+                                    and gkd.get("status") != "completed"):
+                                gkd["status"] = "completed"
+                                break
                     n = len(held_keys)
                     names = ", ".join(held_keys)
                     self._refresh_quest_highlights()
