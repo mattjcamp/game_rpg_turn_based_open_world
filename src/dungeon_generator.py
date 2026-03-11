@@ -578,11 +578,12 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
     return [level_0, level_1]
 
 
-def generate_keys_dungeon(dungeon_number, name=None):
+def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True):
     """Generate a progressive dungeon for the Keys of Shadow module.
 
     Dungeon N has N floors. Floor K (0-indexed) has encounters at level K+1.
-    The artifact (key) is on the deepest floor.
+    The artifact (key) is on the deepest floor (unless *place_artifact* is
+    False, e.g. for kill-type quests where the portal spawns on kill count).
 
     Parameters
     ----------
@@ -590,6 +591,8 @@ def generate_keys_dungeon(dungeon_number, name=None):
         Which dungeon (1-8). Determines number of floors and max difficulty.
     name : str or None
         Display name. Defaults to "Dungeon of Key N".
+    place_artifact : bool
+        Whether to place a quest artifact on the deepest floor (default True).
 
     Returns
     -------
@@ -617,7 +620,7 @@ def generate_keys_dungeon(dungeon_number, name=None):
             width=w, height=h,
             min_rooms=min_r, max_rooms=max_r,
             place_stairs_down=not is_last,
-            place_artifact=is_last,
+            place_artifact=(is_last and place_artifact),
             place_doors=False,
             encounter_area="dungeon",
             encounter_min_level=enc_level,

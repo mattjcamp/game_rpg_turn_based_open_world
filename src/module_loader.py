@@ -83,6 +83,16 @@ _DUNGEON_NOUNS = [
     "Labyrinth", "Den", "Ruins",
 ]
 
+# ── Quest types ────────────────────────────────────────────────────
+QUEST_TYPE_NAMES = ["Retrieve Artifact", "Kill Monsters"]
+QUEST_TYPE_KEYS = ["retrieve", "kill"]  # internal keys matching names
+
+# Monsters that can be targets for kill quests
+KILL_QUEST_MONSTERS = [
+    "Giant Rat", "Skeleton", "Orc", "Goblin", "Zombie",
+    "Wolf", "Dark Mage", "Troll", "Orc Shaman",
+]
+
 _KEY_MATERIALS = [
     "Iron", "Bronze", "Silver", "Gold", "Crystal", "Ruby",
     "Obsidian", "Diamond", "Jade", "Onyx", "Amber", "Ivory",
@@ -281,8 +291,11 @@ def _generate_dungeon_entries(count, key_materials=None):
             "dungeon_number": i + 1,
             "landmark_id": f"dungeon_{i + 1}",
             "description": desc,
+            "quest_type": "retrieve",
             "quest_objective": quest_objective,
             "quest_hint": quest_hint,
+            "kill_target": "",
+            "kill_count": 0,
         })
     return entries
 

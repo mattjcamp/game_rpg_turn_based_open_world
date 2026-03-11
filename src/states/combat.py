@@ -4831,6 +4831,10 @@ class CombatState(BaseState):
         total_xp = sum(m.xp_reward for m in self.monsters)
         total_gold = sum(m.gold_reward for m in self.monsters)
 
+        # Store killed monster names for kill-quest tracking
+        killed_names = [m.name for m in self.monsters if not m.is_alive()]
+        self.game.pending_killed_monsters = killed_names
+
         # Store pending XP — gold is picked up during loot phase
         self.game.set_combat_rewards({
             "xp": total_xp,

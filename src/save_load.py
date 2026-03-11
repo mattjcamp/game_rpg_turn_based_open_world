@@ -161,6 +161,10 @@ def _serialize_key_dungeons(game):
             "description": kd.get("description", ""),
             "quest_objective": kd.get("quest_objective", ""),
             "quest_hint": kd.get("quest_hint", ""),
+            "quest_type": kd.get("quest_type", "retrieve"),
+            "kill_target": kd.get("kill_target", ""),
+            "kill_count": kd.get("kill_count", 0),
+            "kill_progress": kd.get("kill_progress", 0),
             "levels": _serialize_dungeon_levels(kd.get("levels", [])),
         })
     return result
@@ -504,16 +508,21 @@ def _restore_key_dungeons(game, save_data):
         key_name = skd.get("key_name", f"Key {dnum}")
         status = skd.get("status", "active")
 
+        quest_type = skd.get("quest_type", "retrieve")
+
         # Restore serialized levels if present, otherwise regenerate
         saved_levels = skd.get("levels")
+        needs_artifact = (quest_type != "kill")
         if saved_levels and isinstance(saved_levels, list) and saved_levels:
             # Check if first entry is a dict (serialized DungeonData)
             if isinstance(saved_levels[0], dict):
                 levels = _deserialize_dungeon_levels(saved_levels)
             else:
-                levels = generate_keys_dungeon(dnum, name=name)
+                levels = generate_keys_dungeon(
+                    dnum, name=name, place_artifact=needs_artifact)
         else:
-            levels = generate_keys_dungeon(dnum, name=name)
+            levels = generate_keys_dungeon(
+                dnum, name=name, place_artifact=needs_artifact)
 
         game.key_dungeons[(col, row)] = {
             "dungeon_number": dnum,
@@ -528,6 +537,10 @@ def _restore_key_dungeons(game, save_data):
             "description": skd.get("description", ""),
             "quest_objective": skd.get("quest_objective", ""),
             "quest_hint": skd.get("quest_hint", ""),
+            "quest_type": quest_type,
+            "kill_target": skd.get("kill_target", ""),
+            "kill_count": int(skd.get("kill_count", 0)),
+            "kill_progress": int(skd.get("kill_progress", 0)),
         }
 
 

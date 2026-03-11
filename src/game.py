@@ -72,6 +72,7 @@ class Game:
         self.machine_col = None
         self.machine_row = None
         self.pending_combat_rewards = None
+        self.pending_killed_monsters = []
         self.examined_tiles = {}
 
         # --- Darkness effect (Keys of Shadow module) ---
@@ -203,6 +204,7 @@ class Game:
 
         # Combat rewards (must be set before change_state triggers enter())
         self.pending_combat_rewards = None
+        self.pending_killed_monsters = []
         # Examine tile persistence (must exist before examine state enter())
         self.examined_tiles = {}
 
@@ -360,6 +362,7 @@ class Game:
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
         self.keys_inserted = 0  # how many keys placed in the machine
         self.pending_combat_rewards = None  # set by combat victory, consumed by source state
+        self.pending_killed_monsters = []   # monster names killed in last combat
         self.machine_col = None  # overworld position of the machine
         self.machine_row = None
         self.town_data_map = {}
@@ -455,9 +458,14 @@ class Game:
             name = kd.get("name", f"Key Dungeon {dnum}")
             key_name = kd.get("key_name", f"Key {dnum}")
 
-            # Generate the multi-floor dungeon
-            levels = generate_keys_dungeon(dnum, name=name)
+            quest_type = kd.get("quest_type", "retrieve")
 
+            # Generate the multi-floor dungeon
+            # Kill quests don't need an artifact tile — the portal
+            # spawns when enough monsters are killed instead.
+            levels = generate_keys_dungeon(
+                dnum, name=name,
+                place_artifact=(quest_type != "kill"))
             self.key_dungeons[(col, row)] = {
                 "dungeon_number": dnum,
                 "name": name,
@@ -471,6 +479,10 @@ class Game:
                 "description": kd.get("description", ""),
                 "quest_objective": kd.get("quest_objective", ""),
                 "quest_hint": kd.get("quest_hint", ""),
+                "quest_type": quest_type,
+                "kill_target": kd.get("kill_target", ""),
+                "kill_count": int(kd.get("kill_count", 0)),
+                "kill_progress": 0,  # runtime kill counter
             }
 
     def discover_key_dungeons(self):
@@ -665,19 +677,50 @@ class Game:
                     continue  # don't show quests the player hasn't learned about
                 key_name = kd.get("key_name", "Key")
                 dname = kd.get("name", "Key Dungeon")
-                steps = [
-                    {"description": f"Enter {dname}",
-                     "done": kd_status in ("active", "artifact_found", "completed")
-                             and self.is_dungeon_visited(
-                                 kd.get("dungeon_col", pos[0]),
-                                 kd.get("dungeon_row", pos[1]))},
-                    {"description": f"Find the {key_name}",
-                     "done": kd_status in ("artifact_found", "completed")},
-                    {"description": f"Bring the {key_name} to {return_dest}",
-                     "done": kd_status == "completed"},
-                ]
+                qtype = kd.get("quest_type", "retrieve")
+
+                if qtype == "kill":
+                    # Kill quest: track monster kills
+                    kill_target = kd.get("kill_target", "Monster")
+                    kill_count = kd.get("kill_count", 1)
+                    kill_progress = kd.get("kill_progress", 0)
+                    visited = (kd_status in ("active", "artifact_found",
+                                             "completed")
+                               and self.is_dungeon_visited(
+                                   kd.get("dungeon_col", pos[0]),
+                                   kd.get("dungeon_row", pos[1])))
+                    steps = [
+                        {"description": f"Enter {dname}",
+                         "done": visited},
+                        {"description": (
+                            f"Defeat {kill_count} {kill_target}"
+                            f" ({kill_progress}/{kill_count})"),
+                         "done": kd_status in ("artifact_found",
+                                               "completed")},
+                        {"description": f"Report to {return_dest}",
+                         "done": kd_status == "completed"},
+                    ]
+                    quest_title = f"{dname}: {kd.get('quest_objective', key_name)}"
+                else:
+                    # Retrieve quest: find the artifact
+                    steps = [
+                        {"description": f"Enter {dname}",
+                         "done": kd_status in ("active", "artifact_found",
+                                               "completed")
+                                 and self.is_dungeon_visited(
+                                     kd.get("dungeon_col", pos[0]),
+                                     kd.get("dungeon_row", pos[1]))},
+                        {"description": f"Find the {key_name}",
+                         "done": kd_status in ("artifact_found",
+                                               "completed")},
+                        {"description":
+                            f"Bring the {key_name} to {return_dest}",
+                         "done": kd_status == "completed"},
+                    ]
+                    quest_title = f"{dname}: {key_name}"
+
                 quests.append({
-                    "name": f"{dname}: {key_name}",
+                    "name": quest_title,
                     "status": kd_status,
                     "steps": steps,
                 })
@@ -1431,17 +1474,31 @@ class Game:
             })
 
         # 4) Each dungeon as its own section
+        from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
         dungeons = manifest.get("progression", {}).get(
             "key_dungeons", [])
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
+            # Map internal quest_type key to display name
+            qt_key = dung.get("quest_type", "retrieve")
+            try:
+                qt_display = QUEST_TYPE_NAMES[
+                    QUEST_TYPE_KEYS.index(qt_key)]
+            except (ValueError, IndexError):
+                qt_display = QUEST_TYPE_NAMES[0]
             sections.append({
                 "label": dname,
                 "icon": "D",
                 "fields": [
                     ["Name", f"dung_{i}_name", dname, "text", True],
+                    ["Quest Type", f"dung_{i}_qtype",
+                     qt_display, "choice", True],
                     ["Key Name", f"dung_{i}_key",
                      dung.get("key_name", "Key"), "text", True],
+                    ["Kill Target", f"dung_{i}_ktarget",
+                     dung.get("kill_target", ""), "choice", True],
+                    ["Kill Count", f"dung_{i}_kcount",
+                     str(dung.get("kill_count", 0)), "int", True],
                     ["Description", f"dung_{i}_desc",
                      dung.get("description", ""), "text", True],
                     ["Quest Objective", f"dung_{i}_obj",
@@ -1586,6 +1643,26 @@ class Game:
         elif cursor >= self.module_edit_section_scroll + max_visible:
             self.module_edit_section_scroll = cursor - max_visible + 1
 
+    @staticmethod
+    def _get_choices_for_field(key):
+        """Return the list of valid choices for a choice-type field."""
+        from src.module_loader import (WORLD_SIZE_NAMES,
+                                       SEASON_NAMES,
+                                       TIME_OF_DAY_NAMES,
+                                       QUEST_TYPE_NAMES,
+                                       KILL_QUEST_MONSTERS)
+        if key == "world_size":
+            return WORLD_SIZE_NAMES
+        elif key == "season":
+            return SEASON_NAMES
+        elif key == "time_of_day":
+            return TIME_OF_DAY_NAMES
+        elif key.endswith("_qtype"):
+            return QUEST_TYPE_NAMES
+        elif key.endswith("_ktarget"):
+            return [""] + KILL_QUEST_MONSTERS
+        return []
+
     def _handle_field_editor_input(self, event):
         """Handle input at the field editor level (level 1)."""
         field_entry = self.module_edit_fields[self.module_edit_field]
@@ -1607,17 +1684,8 @@ class Game:
         elif not editable:
             return
         elif field_type == "choice":
-            from src.module_loader import (WORLD_SIZE_NAMES,
-                                           SEASON_NAMES,
-                                           TIME_OF_DAY_NAMES)
-            key = field_entry[1]
-            if key == "world_size":
-                choices = WORLD_SIZE_NAMES
-            elif key == "season":
-                choices = SEASON_NAMES
-            elif key == "time_of_day":
-                choices = TIME_OF_DAY_NAMES
-            else:
+            choices = self._get_choices_for_field(field_entry[1])
+            if not choices:
                 choices = [self.module_edit_buffer]
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 try:
@@ -1678,17 +1746,8 @@ class Game:
         elif not editable:
             return
         elif field_type == "choice":
-            from src.module_loader import (WORLD_SIZE_NAMES,
-                                           SEASON_NAMES,
-                                           TIME_OF_DAY_NAMES)
-            key = field_entry[1]
-            if key == "world_size":
-                choices = WORLD_SIZE_NAMES
-            elif key == "season":
-                choices = SEASON_NAMES
-            elif key == "time_of_day":
-                choices = TIME_OF_DAY_NAMES
-            else:
+            choices = self._get_choices_for_field(field_entry[1])
+            if not choices:
                 choices = [self.module_edit_buffer]
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 try:
@@ -1805,6 +1864,7 @@ class Game:
                     towns[idx][json_key] = val
 
             # ── Dungeon / quest fields (dung_<i>_<field>) ──
+            from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
             dungeons = data.get("progression", {}).get(
                 "key_dungeons", [])
             dung_field_map = {
@@ -1813,6 +1873,8 @@ class Game:
                 "desc": "description",
                 "obj": "quest_objective",
                 "hint": "quest_hint",
+                "ktarget": "kill_target",
+                "kcount": "kill_count",
             }
             for key, val in values.items():
                 if not key.startswith("dung_"):
@@ -1825,9 +1887,21 @@ class Game:
                 except ValueError:
                     continue
                 suffix = parts[2]
-                json_key = dung_field_map.get(suffix)
-                if json_key and 0 <= idx < len(dungeons):
-                    dungeons[idx][json_key] = val
+                if suffix == "qtype":
+                    # Convert display name back to internal key
+                    try:
+                        qi = QUEST_TYPE_NAMES.index(val)
+                        dungeons[idx]["quest_type"] = QUEST_TYPE_KEYS[qi]
+                    except (ValueError, IndexError):
+                        dungeons[idx]["quest_type"] = "retrieve"
+                elif suffix == "kcount":
+                    if 0 <= idx < len(dungeons):
+                        dungeons[idx]["kill_count"] = \
+                            int(val) if val else 0
+                else:
+                    json_key = dung_field_map.get(suffix)
+                    if json_key and 0 <= idx < len(dungeons):
+                        dungeons[idx][json_key] = val
 
             # Write back
             try:

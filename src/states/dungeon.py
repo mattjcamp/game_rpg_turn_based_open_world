@@ -91,6 +91,48 @@ class DungeonState(InventoryMixin, BaseState):
                 return q
         return None
 
+    def _check_kill_quest_progress(self):
+        """After combat, check if killed monsters count toward a kill quest.
+
+        Reads ``game.pending_killed_monsters`` (set by combat victory),
+        increments the quest's ``kill_progress``, and spawns a portal
+        when the required kill count is reached.
+        """
+        killed = getattr(self.game, "pending_killed_monsters", [])
+        if not killed:
+            return
+        # Consume the list so it doesn't get counted again
+        self.game.pending_killed_monsters = []
+
+        active_q = self._get_active_quest()
+        if not active_q or active_q.get("quest_type") != "kill":
+            return
+
+        target = active_q.get("kill_target", "")
+        if not target:
+            return
+
+        count = sum(1 for name in killed if name == target)
+        if count <= 0:
+            return
+
+        progress = active_q.get("kill_progress", 0) + count
+        active_q["kill_progress"] = progress
+        needed = active_q.get("kill_count", 1)
+
+        if progress >= needed and active_q.get("status") != "artifact_found":
+            active_q["status"] = "artifact_found"
+            # Spawn a portal near the party so they can leave
+            pcol, prow = self.game.party.col, self.game.party.row
+            self._place_portal(pcol, prow)
+            self.game.sfx.play("critical")
+            self.show_message(
+                f"Quest complete! {progress}/{needed} {target}s defeated! "
+                f"A portal appears!", 3500)
+        else:
+            self.show_message(
+                f"{target} defeated! ({progress}/{needed})", 2000)
+
     def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
         """
         Set up a multi-level quest dungeon.
@@ -108,6 +150,7 @@ class DungeonState(InventoryMixin, BaseState):
     def enter(self):
         """Called when this state becomes active."""
         self._apply_pending_combat_rewards()
+        self._check_kill_quest_progress()
         # Returning from combat — keep party position, just show message
         if self._entered and self.dungeon_data:
             if self.pending_combat_message:

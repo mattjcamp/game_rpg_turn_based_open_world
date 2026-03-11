@@ -806,55 +806,96 @@ class TownState(InventoryMixin, BaseState):
                 if len(undiscovered) == 1:
                     dung = undiscovered[0]
                     hint = dung.get("quest_hint", "Be careful.")
-                    self.quest_dialogue_lines = [
-                        f"Listen well — the "
-                        f"{dung['name']} holds a powerful artifact. "
-                        f"{hint}",
-                        "Will you seek it out and bring it back to save us?",
-                    ]
+                    obj = dung.get("quest_objective", "")
+                    qtype = dung.get("quest_type", "retrieve")
+                    if qtype == "kill" and obj:
+                        self.quest_dialogue_lines = [
+                            f"Listen well — in the "
+                            f"{dung['name']}, you must {obj}. "
+                            f"{hint}",
+                            "Will you take on this challenge?",
+                        ]
+                    else:
+                        self.quest_dialogue_lines = [
+                            f"Listen well — the "
+                            f"{dung['name']} holds a powerful artifact. "
+                            f"{hint}",
+                            "Will you seek it out and bring it back to save us?",
+                        ]
                 else:
                     names = ", ".join(d["name"] for d in undiscovered[:3])
                     if len(undiscovered) > 3:
                         names += f" and {len(undiscovered) - 3} more"
-                    self.quest_dialogue_lines = [
-                        f"Brave adventurers, hear me! "
-                        f"Dangerous places threaten our land: {names}. "
-                        f"Each holds an artifact we desperately need.",
-                        "Will you seek them out?",
-                    ]
+                    # Check if any are kill quests
+                    has_kill = any(d.get("quest_type") == "kill"
+                                  for d in undiscovered)
+                    if has_kill:
+                        self.quest_dialogue_lines = [
+                            f"Brave adventurers, hear me! "
+                            f"Dangerous places threaten our land: {names}. "
+                            f"Each holds a perilous challenge.",
+                            "Will you seek them out?",
+                        ]
+                    else:
+                        self.quest_dialogue_lines = [
+                            f"Brave adventurers, hear me! "
+                            f"Dangerous places threaten our land: {names}. "
+                            f"Each holds an artifact we desperately need.",
+                            "Will you seek them out?",
+                        ]
                 self.quest_dialogue_index = 0
                 self._set_dialogue(
                     f"{npc.name}: {self.quest_dialogue_lines[0]}")
                 # Temporarily set quest_choices so the Y/N prompt appears
                 npc.quest_choices = ["Yes, we'll do it!", "Not right now."]
                 return
-            # Check for artifacts the party is carrying back
+            # Check for quests ready to turn in (artifact_found status)
             found = [kd for kd in kd_map.values()
                      if kd.get("status") == "artifact_found"]
             if found:
                 party = self.game.party
                 turned_in = []
+                kill_turned_in = []
                 for kd in found:
-                    art = kd.get("artifact_name", kd.get("key_name", ""))
-                    if art and party.inv_count(art) > 0:
-                        party.inv_remove(art)
+                    qtype = kd.get("quest_type", "retrieve")
+                    if qtype == "kill":
+                        # Kill quests: no artifact to check, just complete
                         kd["status"] = "completed"
-                        turned_in.append(art)
-                if turned_in:
-                    reward_gold = 150 * len(turned_in)
-                    reward_xp = 75 * len(turned_in)
+                        kill_turned_in.append(kd.get("name", "Dungeon"))
+                    else:
+                        # Retrieve quests: check inventory for the artifact
+                        art = kd.get("artifact_name", kd.get("key_name", ""))
+                        if art and party.inv_count(art) > 0:
+                            party.inv_remove(art)
+                            kd["status"] = "completed"
+                            turned_in.append(art)
+                all_completed = turned_in + kill_turned_in
+                if all_completed:
+                    reward_gold = 150 * len(all_completed)
+                    reward_xp = 75 * len(all_completed)
                     party.gold += reward_gold
                     for member in party.alive_members():
                         member.exp += reward_xp
-                    names = ", ".join(turned_in)
                     self.npc_dialogue_active = True
                     self.npc_speaking = npc
+                    first_name = turned_in[0] if turned_in else kill_turned_in[0]
                     self.quest_complete_effect = QuestCompleteEffect(
-                        reward_gold, item_name=turned_in[0])
+                        reward_gold, item_name=first_name)
                     self.game.sfx.play("quest_complete")
-                    self._set_dialogue(
-                        f"{npc.name}: You recovered the {names}! "
-                        f"Here is {reward_gold} gold for your bravery!")
+                    if turned_in and not kill_turned_in:
+                        names = ", ".join(turned_in)
+                        self._set_dialogue(
+                            f"{npc.name}: You recovered the {names}! "
+                            f"Here is {reward_gold} gold for your bravery!")
+                    elif kill_turned_in and not turned_in:
+                        names = ", ".join(kill_turned_in)
+                        self._set_dialogue(
+                            f"{npc.name}: You cleared the {names}! "
+                            f"Here is {reward_gold} gold for your bravery!")
+                    else:
+                        self._set_dialogue(
+                            f"{npc.name}: Excellent work! "
+                            f"Here is {reward_gold} gold for your bravery!")
                     self._refresh_quest_highlights()
                     return
 
