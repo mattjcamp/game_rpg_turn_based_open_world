@@ -1,0 +1,62 @@
+{
+  "metadata": {
+    "id": "new_module_2",
+    "name": "New Module",
+    "author": "Unknown",
+    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Jadegate.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 128,
+    "map_height": 96,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "jadegate",
+        "name": "Jadegate",
+        "description": "A forest clearing settlement where druids and woodsmen live side by side."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_armory"
+    },
+    "starting_quests": [
+      "defend"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Crumbling Barrow",
+        "key_name": "Copper Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "A rusted iron gate bars the path into Crumbling Barrow. It swings open with a tortured groan at your touch.",
+        "quest_type": "kill",
+        "quest_objective": "kill 3 orcs",
+        "quest_hint": "The artifact pulses with ancient energy.",
+        "kill_target": "Orc",
+        "kill_count": 2
+      }
+    ]
+  }
+}
