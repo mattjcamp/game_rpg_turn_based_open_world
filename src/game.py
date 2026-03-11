@@ -137,6 +137,8 @@ class Game:
         self.module_edit_dungeon_levels = {} # {dungeon_idx: [level_data]}
         self.module_edit_active_dung = -1    # which dungeon index is active
         self.module_edit_active_level = -1   # which level index (-1=props)
+        self.module_edit_starting_loot = []  # [{item, count}]
+        self.module_edit_in_loot = False     # True when editing loot fields
         from src.module_loader import get_default_module_path
         self.active_module_path = get_default_module_path()
         self.active_module_name = "Keys of Shadow"
@@ -352,6 +354,17 @@ class Game:
                     minute=start_time.get("minute", 0),
                 )
 
+        # ── Apply module-defined starting loot ──
+        if self.module_manifest:
+            starting_loot = self.module_manifest.get(
+                "progression", {}).get("starting_loot", [])
+            for loot_entry in starting_loot:
+                item_name = loot_entry.get("item")
+                count = max(1, int(loot_entry.get("count", 1)))
+                if item_name:
+                    for _ in range(count):
+                        self.party.inv_add(item_name)
+
         self.quest = None
         self.house_quest = None
         self.examined_tiles = {}  # {(col, row): {"obstacles": {}, "ground_items": {}}}
@@ -493,6 +506,7 @@ class Game:
                 "kill_count": int(kd.get("kill_count", 0)),
                 "kill_progress": 0,  # runtime kill counter
                 "module_levels": module_levels,  # original specs
+                "exit_portal": kd.get("exit_portal", True),
             }
 
     def discover_key_dungeons(self):
@@ -1483,10 +1497,27 @@ class Game:
                 ],
             })
 
-        # 4) Each dungeon as its own section
+        # 4) Each dungeon as its own section (dungeon properties only)
         from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
         dungeons = manifest.get("progression", {}).get(
             "key_dungeons", [])
+        for i, dung in enumerate(dungeons):
+            dname = dung.get("name", f"Dungeon {i+1}")
+            n_levels = len(dung.get("levels", []))
+            sections.append({
+                "label": dname,
+                "icon": "D",
+                "dung_idx": i,
+                "fields": [
+                    ["Name", f"dung_{i}_name", dname, "text", True],
+                    ["Description", f"dung_{i}_desc",
+                     dung.get("description", ""), "text", True],
+                ],
+                "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
+                             if n_levels > 0 else "no levels"),
+            })
+
+        # 5) Each quest as its own section (quest properties only)
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
             # Map internal quest_type key to display name
@@ -1496,31 +1527,40 @@ class Game:
                     QUEST_TYPE_KEYS.index(qt_key)]
             except (ValueError, IndexError):
                 qt_display = QUEST_TYPE_NAMES[0]
-            n_levels = len(dung.get("levels", []))
             sections.append({
-                "label": dname,
-                "icon": "D",
-                "dung_idx": i,
+                "label": f"{dname} Quest",
+                "icon": "Q",
                 "fields": [
-                    ["Name", f"dung_{i}_name", dname, "text", True],
-                    ["Quest Type", f"dung_{i}_qtype",
+                    ["Quest Type", f"quest_{i}_qtype",
                      qt_display, "choice", True],
-                    ["Key Name", f"dung_{i}_key",
+                    ["Key / Artifact", f"quest_{i}_key",
                      dung.get("key_name", "Key"), "text", True],
-                    ["Kill Target", f"dung_{i}_ktarget",
+                    ["Kill Target", f"quest_{i}_ktarget",
                      dung.get("kill_target", ""), "choice", True],
-                    ["Kill Count", f"dung_{i}_kcount",
+                    ["Kill Count", f"quest_{i}_kcount",
                      str(dung.get("kill_count", 0)), "int", True],
-                    ["Description", f"dung_{i}_desc",
-                     dung.get("description", ""), "text", True],
-                    ["Quest Objective", f"dung_{i}_obj",
+                    ["Objective", f"quest_{i}_obj",
                      dung.get("quest_objective", ""), "text", True],
-                    ["Quest Hint", f"dung_{i}_hint",
+                    ["Hint", f"quest_{i}_hint",
                      dung.get("quest_hint", ""), "text", True],
+                    ["Exit Portal", f"quest_{i}_exitportal",
+                     "Yes" if dung.get("exit_portal", True) else "No",
+                     "choice", True],
                 ],
-                "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
-                             if n_levels > 0 else "no levels"),
             })
+
+        # 6) Starting Loot section
+        starting_loot = manifest.get("progression", {}).get(
+            "starting_loot", [])
+        n_loot = len(starting_loot)
+        sections.append({
+            "label": "Starting Loot",
+            "icon": "S",
+            "is_loot": True,
+            "fields": [],  # fields built dynamically when drilled into
+            "subtitle": (f"{n_loot} item{'s' if n_loot != 1 else ''}"
+                         if n_loot > 0 else "no items"),
+        })
 
         self.module_edit_sections = sections
         self.module_edit_section_cursor = 0
@@ -1535,6 +1575,9 @@ class Game:
         self.module_edit_nav_stack = []
         self.module_edit_active_dung = -1
         self.module_edit_active_level = -1
+        # Starting loot data for editing
+        self.module_edit_starting_loot = list(starting_loot)
+        self.module_edit_in_loot = False
         # Store dungeon levels for editing
         self.module_edit_dungeon_levels = {}
         for i, dung in enumerate(dungeons):
@@ -1556,6 +1599,11 @@ class Game:
             dung_idx = self.module_edit_active_dung
             level_idx = sec["level_idx"]
             self._enter_level_encounters(dung_idx, level_idx)
+            return
+
+        # ── Starting Loot section drills into loot field editor ──
+        if sec.get("is_loot"):
+            self._enter_loot_fields()
             return
 
         # ── Properties and other sections: flat field editor ──
@@ -1639,6 +1687,12 @@ class Game:
         fields.append(["Level Name", f"lvl_{level_idx}_name",
                         level.get("name", f"Floor {level_idx + 1}"),
                         "text", True])
+        # Include random encounters toggle
+        fields.append(["Random Encounters",
+                        f"lvl_{level_idx}_randenc",
+                        "Yes" if level.get("random_encounters", False)
+                        else "No",
+                        "choice", True])
 
         for ei, enc in enumerate(encounters):
             # Section header for each encounter
@@ -1673,6 +1727,11 @@ class Game:
             self._save_encounter_fields_to_level()
             self.module_edit_active_level = -1
 
+        # If we were editing loot, save back to in-memory loot list
+        if self.module_edit_in_loot:
+            self._save_loot_fields()
+            self.module_edit_in_loot = False
+
         self.module_edit_level = 0
 
     def _save_encounter_fields_to_level(self):
@@ -1684,11 +1743,12 @@ class Game:
             return
         level = levels[level_idx]
 
-        # Read back level name
+        # Read back level name and random encounters flag
         for entry in self.module_edit_fields:
             if entry[1] == f"lvl_{level_idx}_name":
                 level["name"] = entry[2]
-                break
+            elif entry[1] == f"lvl_{level_idx}_randenc":
+                level["random_encounters"] = (entry[2] == "Yes")
 
         # Read back encounters
         encounters = []
@@ -1815,6 +1875,101 @@ class Game:
         # Rebuild encounter fields
         self._enter_level_encounters(dung_idx, level_idx)
 
+    # ── Starting Loot editing ─────────────────────────────────────
+
+    def _enter_loot_fields(self):
+        """Build field list for editing starting loot items."""
+        self.module_edit_in_loot = True
+        loot = self.module_edit_starting_loot
+        fields = []
+        for li, entry in enumerate(loot):
+            fields.append([f"-- Item {li + 1} --",
+                           f"loot_{li}_hdr", "", "section", False])
+            fields.append(["Item", f"loot_{li}_item",
+                           entry.get("item", "Healing Herb"),
+                           "choice", True])
+            fields.append(["Qty", f"loot_{li}_qty",
+                           str(entry.get("count", 1)),
+                           "int", True])
+        self.module_edit_fields = fields
+        self.module_edit_field = 0
+        self.module_edit_scroll = 0
+        self.module_edit_level = 1
+        self.module_edit_field = self._next_editable_field(0)
+        if self.module_edit_fields:
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+
+    def _save_loot_fields(self):
+        """Persist loot field edits back to the in-memory loot list."""
+        loot = []
+        li = 0
+        while True:
+            item_key = f"loot_{li}_item"
+            qty_key = f"loot_{li}_qty"
+            item_val = None
+            qty_val = None
+            for entry in self.module_edit_fields:
+                if entry[1] == item_key:
+                    item_val = entry[2]
+                elif entry[1] == qty_key:
+                    qty_val = entry[2]
+            if item_val is None:
+                break
+            loot.append({
+                "item": item_val,
+                "count": max(1, int(qty_val)) if qty_val else 1,
+            })
+            li += 1
+        self.module_edit_starting_loot = loot
+
+    def _add_loot_item(self):
+        """Add a new item to the starting loot list."""
+        # Save current field edits first
+        if self.module_edit_fields:
+            entry = self.module_edit_fields[self.module_edit_field]
+            entry[2] = self.module_edit_buffer
+        self._save_loot_fields()
+        self.module_edit_starting_loot.append(
+            {"item": "Healing Herb", "count": 1})
+        self._enter_loot_fields()
+        # Move cursor to the new item
+        if self.module_edit_fields:
+            self.module_edit_field = max(
+                0, len(self.module_edit_fields) - 2)
+            self.module_edit_field = self._next_editable_field(0)
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+            self._adjust_module_edit_scroll()
+
+    def _remove_loot_item(self):
+        """Remove the currently selected loot item."""
+        loot = self.module_edit_starting_loot
+        if len(loot) <= 0:
+            return  # Nothing to remove
+        # Save current edits
+        if self.module_edit_fields:
+            entry = self.module_edit_fields[self.module_edit_field]
+            entry[2] = self.module_edit_buffer
+        self._save_loot_fields()
+        loot = self.module_edit_starting_loot
+        if not loot:
+            return
+        # Figure out which loot item the cursor is on
+        # Fields: (hdr, item, qty) * N — groups of 3
+        cursor = self.module_edit_field
+        loot_idx = cursor // 3
+        loot_idx = min(loot_idx, len(loot) - 1)
+        loot.pop(loot_idx)
+        self.module_edit_starting_loot = loot
+        if loot:
+            self._enter_loot_fields()
+        else:
+            # No items left — rebuild empty field list
+            self.module_edit_fields = []
+            self.module_edit_field = 0
+            self.module_edit_buffer = ""
+
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
 
@@ -1881,8 +2036,9 @@ class Game:
         if (event.key == pygame.K_s
                 and event.mod & pygame.KMOD_CTRL):
             # Save from within field editor
-            entry = self.module_edit_fields[self.module_edit_field]
-            entry[2] = self.module_edit_buffer
+            if self.module_edit_fields:
+                entry = self.module_edit_fields[self.module_edit_field]
+                entry[2] = self.module_edit_buffer
             self._commit_module_edit()
             return
         # Encounter add/remove (only when editing a dungeon level)
@@ -1893,6 +2049,15 @@ class Game:
                 return
             if event.key == pygame.K_DELETE:
                 self._remove_encounter_from_level()
+                return
+        # Loot add/remove (only when editing starting loot)
+        if self.module_edit_in_loot:
+            if (event.key == pygame.K_a
+                    and event.mod & pygame.KMOD_CTRL):
+                self._add_loot_item()
+                return
+            if event.key == pygame.K_DELETE:
+                self._remove_loot_item()
                 return
 
         self._handle_field_editor_input(event)
@@ -1981,10 +2146,23 @@ class Game:
             return [""] + KILL_QUEST_MONSTERS
         elif key.endswith("_mon"):
             return ENCOUNTER_MONSTERS
+        elif key.endswith("_exitportal"):
+            return ["Yes", "No"]
+        elif key.endswith("_randenc"):
+            return ["Yes", "No"]
+        elif key.endswith("_item") and key.startswith("loot_"):
+            from src.module_loader import LOOT_ITEMS
+            return LOOT_ITEMS
+        # No match
+
         return []
 
     def _handle_field_editor_input(self, event):
         """Handle input at the field editor level (level 1)."""
+        if not self.module_edit_fields:
+            # Empty field list (e.g. loot with no items) —
+            # only ESC to go back is meaningful here.
+            return
         field_entry = self.module_edit_fields[self.module_edit_field]
         field_type = field_entry[3] if len(field_entry) > 3 else "text"
         editable = field_entry[4] if len(field_entry) > 4 else True
@@ -2105,6 +2283,9 @@ class Game:
             # If editing encounters, save back to level data
             if self.module_edit_active_level >= 0:
                 self._save_encounter_fields_to_level()
+            # If editing loot, save back to in-memory loot list
+            if self.module_edit_in_loot:
+                self._save_loot_fields()
 
         # Gather all field values into a dict.
         # For create-new, fields live in self.module_edit_fields.
@@ -2198,18 +2379,13 @@ class Game:
                 if json_key and 0 <= idx < len(towns):
                     towns[idx][json_key] = val
 
-            # ── Dungeon / quest fields (dung_<i>_<field>) ──
+            # ── Dungeon fields (dung_<i>_<field>) ──
             from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
             dungeons = data.get("progression", {}).get(
                 "key_dungeons", [])
             dung_field_map = {
                 "name": "name",
-                "key": "key_name",
                 "desc": "description",
-                "obj": "quest_objective",
-                "hint": "quest_hint",
-                "ktarget": "kill_target",
-                "kcount": "kill_count",
             }
             for key, val in values.items():
                 if not key.startswith("dung_"):
@@ -2222,19 +2398,47 @@ class Game:
                 except ValueError:
                     continue
                 suffix = parts[2]
+                json_key = dung_field_map.get(suffix)
+                if json_key and 0 <= idx < len(dungeons):
+                    dungeons[idx][json_key] = val
+
+            # ── Quest fields (quest_<i>_<field>) ──
+            quest_field_map = {
+                "key": "key_name",
+                "obj": "quest_objective",
+                "hint": "quest_hint",
+                "ktarget": "kill_target",
+            }
+            for key, val in values.items():
+                if not key.startswith("quest_"):
+                    continue
+                parts = key.split("_", 2)   # quest, <i>, <field>
+                if len(parts) < 3:
+                    continue
+                try:
+                    idx = int(parts[1])
+                except ValueError:
+                    continue
+                suffix = parts[2]
                 if suffix == "qtype":
-                    # Convert display name back to internal key
                     try:
                         qi = QUEST_TYPE_NAMES.index(val)
-                        dungeons[idx]["quest_type"] = QUEST_TYPE_KEYS[qi]
+                        if 0 <= idx < len(dungeons):
+                            dungeons[idx]["quest_type"] = \
+                                QUEST_TYPE_KEYS[qi]
                     except (ValueError, IndexError):
-                        dungeons[idx]["quest_type"] = "retrieve"
+                        if 0 <= idx < len(dungeons):
+                            dungeons[idx]["quest_type"] = "retrieve"
                 elif suffix == "kcount":
                     if 0 <= idx < len(dungeons):
                         dungeons[idx]["kill_count"] = \
                             int(val) if val else 0
+                elif suffix == "exitportal":
+                    if 0 <= idx < len(dungeons):
+                        dungeons[idx]["exit_portal"] = \
+                            (val == "Yes")
                 else:
-                    json_key = dung_field_map.get(suffix)
+                    json_key = quest_field_map.get(suffix)
                     if json_key and 0 <= idx < len(dungeons):
                         dungeons[idx][json_key] = val
 
@@ -2243,6 +2447,13 @@ class Game:
                     self.module_edit_dungeon_levels.items():
                 if 0 <= dung_idx < len(dungeons):
                     dungeons[dung_idx]["levels"] = levels_data
+
+            # ── Starting loot ──
+            prog = data.setdefault("progression", {})
+            if self.module_edit_starting_loot:
+                prog["starting_loot"] = self.module_edit_starting_loot
+            else:
+                prog.pop("starting_loot", None)
 
             # Write back
             try:
@@ -2256,6 +2467,7 @@ class Game:
             self.module_edit_nav_stack = []
             self.module_edit_active_dung = -1
             self.module_edit_active_level = -1
+            self.module_edit_in_loot = False
             if ok:
                 self.module_message = "Module updated!"
                 self.module_msg_timer = 2.0
@@ -2637,7 +2849,8 @@ class Game:
                     edit_section_scroll=self.module_edit_section_scroll,
                     edit_nav_depth=len(self.module_edit_nav_stack),
                     edit_in_encounters=(
-                        self.module_edit_active_level >= 0))
+                        self.module_edit_active_level >= 0
+                        or self.module_edit_in_loot))
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

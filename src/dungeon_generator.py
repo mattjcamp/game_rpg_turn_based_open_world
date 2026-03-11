@@ -381,7 +381,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      encounter_area="dungeon",
                      encounter_min_level=None,
                      encounter_max_level=None,
-                     custom_encounters=None):
+                     custom_encounters=None,
+                     include_random_encounters=True):
     """
     Generate a procedural dungeon.
 
@@ -402,6 +403,10 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             in the dungeon instead of randomly-rolled encounters from
             encounters.json.  Each entry produces one map monster whose
             encounter_template contains *count* copies of *monster*.
+        include_random_encounters: If True (default), random encounters
+            are generated for rooms not already occupied by custom
+            encounters.  When custom_encounters is provided and this is
+            False, only the custom encounters appear.
 
     Returns:
         DungeonData with the generated map and metadata.
@@ -478,15 +483,18 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # The full encounter data is stored on the monster so combat can
     # use it instead of rolling a new random encounter.
     monsters = []
+    # Track which rooms already have a custom encounter placed
+    used_rooms = set()
+
     if custom_encounters:
         # ── Module-defined encounters: place specific monsters ──
-        # Distribute custom encounters across available rooms
         available_rooms = list(rooms[1:])  # skip entrance
         random.shuffle(available_rooms)
         for ei, enc_spec in enumerate(custom_encounters):
             if ei >= len(available_rooms):
                 break  # more encounters than rooms — stop
             room = available_rooms[ei]
+            used_rooms.add(id(room))
             mx, my = room.center
             mx += random.randint(-1, 1)
             my += random.randint(-1, 1)
@@ -503,9 +511,13 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                 "monster_party_tile": mon_name,
             }
             monsters.append(monster)
-    else:
-        # ── Standard random encounters from encounters.json ──
+
+    if include_random_encounters:
+        # ── Random encounters from encounters.json ──
+        # Skip entrance room and any rooms already used by custom encounters
         for room in rooms[1:]:
+            if id(room) in used_rooms:
+                continue
             if random.random() < 0.5:  # 50% chance per room
                 mx, my = room.center
                 mx += random.randint(-1, 1)
@@ -665,9 +677,11 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             # Ensure encounters is a proper list of dicts
             if not custom_enc or not isinstance(custom_enc, list):
                 custom_enc = None
+            include_random = ml.get("random_encounters", False)
         else:
             floor_name = f"Floor {floor + 1}"
             custom_enc = None
+            include_random = True  # procedural floors always random
 
         level_data = generate_dungeon(
             name=f"{name} - {floor_name}",
@@ -680,6 +694,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
             custom_encounters=custom_enc,
+            include_random_encounters=include_random,
         )
         levels.append(level_data)
 

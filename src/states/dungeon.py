@@ -122,13 +122,19 @@ class DungeonState(InventoryMixin, BaseState):
 
         if progress >= needed and active_q.get("status") != "artifact_found":
             active_q["status"] = "artifact_found"
-            # Spawn a portal near the party so they can leave
             pcol, prow = self.game.party.col, self.game.party.row
-            self._place_portal(pcol, prow)
-            self.game.sfx.play("critical")
-            self.show_message(
-                f"Quest complete! {progress}/{needed} {target}s defeated! "
-                f"A portal appears!", 3500)
+            # Only spawn a portal if exit_portal is enabled
+            if active_q.get("exit_portal", True):
+                self._place_portal(pcol, prow)
+                self.game.sfx.play("critical")
+                self.show_message(
+                    f"Quest complete! {progress}/{needed} {target}s defeated! "
+                    f"A portal appears!", 3500)
+            else:
+                self.game.sfx.play("critical")
+                self.show_message(
+                    f"Quest complete! {progress}/{needed} {target}s defeated!",
+                    3500)
         else:
             self.show_message(
                 f"{target} defeated! ({progress}/{needed})", 2000)
@@ -1084,8 +1090,10 @@ class DungeonState(InventoryMixin, BaseState):
             self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
             if active_q:
                 active_q["status"] = "artifact_found"
-            # Spawn a portal doorway on an adjacent floor tile
-            self._place_portal(col, row)
+            # Only spawn a portal if exit_portal is enabled
+            spawn_portal = active_q.get("exit_portal", True) if active_q else True
+            if spawn_portal:
+                self._place_portal(col, row)
             # Play pickup animation
             self.artifact_pickup_anim = {
                 "col": col,
@@ -1095,7 +1103,10 @@ class DungeonState(InventoryMixin, BaseState):
                 "name": artifact,
             }
             self.game.sfx.play("critical")
-            self.show_message(f"Found the {artifact}! A portal appears!", 3000)
+            if spawn_portal:
+                self.show_message(f"Found the {artifact}! A portal appears!", 3000)
+            else:
+                self.show_message(f"Found the {artifact}!", 3000)
 
         elif tile_id == TILE_PORTAL:
             # Portal whisks the party back to the overworld

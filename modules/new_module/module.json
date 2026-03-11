@@ -52,7 +52,7 @@
         "landmark_id": "dungeon_1",
         "description": "A narrow crevice leads into Frozen Stronghold. The sound of dripping water echoes endlessly below.",
         "quest_type": "kill",
-        "quest_objective": "Descend into Frozen Stronghold and find the Ivory Key",
+        "quest_objective": "Descend into Frozen Stronghold and kill two giant rats",
         "quest_hint": "The passage grows more treacherous with every floor.",
         "kill_target": "Giant Rat",
         "kill_count": 2,
@@ -64,9 +64,27 @@
                 "monster": "Giant Rat",
                 "count": 4
               }
-            ]
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Black lodge",
+            "encounters": [
+              {
+                "monster": "Skeleton Archer",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
           }
-        ]
+        ],
+        "exit_portal": false
+      }
+    ],
+    "starting_loot": [
+      {
+        "item": "Lockpick",
+        "count": 10
       }
     ]
   }

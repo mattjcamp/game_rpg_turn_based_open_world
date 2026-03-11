@@ -99,6 +99,21 @@ ENCOUNTER_MONSTERS = [
     "Zombie", "Wolf", "Dark Mage", "Troll", "Orc Shaman",
 ]
 
+# Items available for starting loot selection in the module editor
+LOOT_ITEMS = [
+    "Healing Herb", "Healing Potion", "Antidote", "Torch",
+    "Lockpick", "Rock", "Stones", "Arrows", "Bolts",
+    "Camping Supplies", "Fire Oil", "Spring Water",
+    "Glowcap Mushroom", "Moonpetal", "Serpent Root", "Brimite Ore",
+    "Smoke Bomb", "Holy Water", "Mana Potion", "Rope",
+    "Elixir of Strength", "Elixir of Warding",
+    "Poison Vial", "Lingering Venom", "Paralytic Poison",
+    "Weakening Poison",
+    "Dagger", "Club", "Sword", "Axe", "Mace", "Spear",
+    "Short Bow", "Long Bow", "Sling", "Crossbow",
+    "Cloth", "Leather", "Chain", "Gloves",
+]
+
 _KEY_MATERIALS = [
     "Iron", "Bronze", "Silver", "Gold", "Crystal", "Ruby",
     "Obsidian", "Diamond", "Jade", "Onyx", "Amber", "Ivory",

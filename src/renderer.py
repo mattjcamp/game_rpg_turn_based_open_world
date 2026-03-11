@@ -6495,7 +6495,7 @@ class Renderer(CombatEffectRendererMixin):
                     edit_sections, edit_section_cursor,
                     edit_section_scroll,
                     nav_depth=edit_nav_depth)
-            elif edit_level == 1 and edit_fields:
+            elif edit_level == 1:
                 # Field editor within a section (level 1)
                 sec_label = ""
                 if edit_sections and 0 <= edit_section_cursor < len(
@@ -6503,10 +6503,27 @@ class Renderer(CombatEffectRendererMixin):
                     sec_label = edit_sections[edit_section_cursor]["label"]
                 if edit_in_encounters:
                     sec_label = f"Encounters: {sec_label}"
-                self._draw_module_edit_overlay(
-                    right_x, panel_y, right_w, panel_h,
-                    edit_fields, edit_field, edit_buffer, False,
-                    edit_scroll, section_title=sec_label)
+                if edit_fields:
+                    self._draw_module_edit_overlay(
+                        right_x, panel_y, right_w, panel_h,
+                        edit_fields, edit_field, edit_buffer, False,
+                        edit_scroll, section_title=sec_label)
+                else:
+                    # Empty field list — show a helpful message
+                    overlay = pygame.Surface((right_w, panel_h),
+                                            pygame.SRCALPHA)
+                    overlay.fill((20, 15, 10, 220))
+                    self.screen.blit(overlay, (right_x, panel_y))
+                    if sec_label:
+                        self._u3_text(sec_label.upper(),
+                                      right_x + 16, panel_y + 12,
+                                      (200, 180, 120), fm)
+                    self._u3_text("No items defined.",
+                                  right_x + 24, panel_y + 50,
+                                  (140, 140, 140), fs)
+                    self._u3_text("Press [CTRL+A] to add an item.",
+                                  right_x + 24, panel_y + 72,
+                                  (100, 160, 200), fs)
 
         # ── Feedback / confirmation message ──
         if message:
@@ -6778,9 +6795,15 @@ class Renderer(CombatEffectRendererMixin):
             elif icon == "D":
                 badge_color = (160, 80, 80)
                 badge_text = "D"
+            elif icon == "Q":
+                badge_color = (180, 140, 50)
+                badge_text = "Q"
             elif icon == "L":
                 badge_color = (120, 100, 160)
                 badge_text = "L"
+            elif icon == "S":
+                badge_color = (100, 160, 180)
+                badge_text = "S"
             elif icon == "+":
                 badge_color = (80, 140, 80)
                 badge_text = "+"

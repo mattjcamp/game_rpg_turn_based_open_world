@@ -166,6 +166,7 @@ def _serialize_key_dungeons(game):
             "kill_count": kd.get("kill_count", 0),
             "kill_progress": kd.get("kill_progress", 0),
             "module_levels": kd.get("module_levels"),
+            "exit_portal": kd.get("exit_portal", True),
             "levels": _serialize_dungeon_levels(kd.get("levels", [])),
         })
     return result
@@ -547,6 +548,7 @@ def _restore_key_dungeons(game, save_data):
             "kill_count": int(skd.get("kill_count", 0)),
             "module_levels": skd.get("module_levels"),
             "kill_progress": int(skd.get("kill_progress", 0)),
+            "exit_portal": skd.get("exit_portal", True),
         }
 
 
