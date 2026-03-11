@@ -93,6 +93,12 @@ KILL_QUEST_MONSTERS = [
     "Wolf", "Dark Mage", "Troll", "Orc Shaman",
 ]
 
+# All monsters available for encounter editing (includes Skeleton Archer)
+ENCOUNTER_MONSTERS = [
+    "Giant Rat", "Skeleton", "Skeleton Archer", "Orc", "Goblin",
+    "Zombie", "Wolf", "Dark Mage", "Troll", "Orc Shaman",
+]
+
 _KEY_MATERIALS = [
     "Iron", "Bronze", "Silver", "Gold", "Crystal", "Ruby",
     "Obsidian", "Diamond", "Jade", "Onyx", "Amber", "Ivory",

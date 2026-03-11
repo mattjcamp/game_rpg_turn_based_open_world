@@ -6280,21 +6280,25 @@ class Renderer(CombatEffectRendererMixin):
                            edit_scroll=0,
                            edit_level=0, edit_sections=None,
                            edit_section_cursor=0,
-                           edit_section_scroll=0):
+                           edit_section_scroll=0,
+                           edit_nav_depth=0,
+                           edit_in_encounters=False):
         """Draw the module selection / browser screen.
 
         Parameters
         ----------
-        modules        : list of module info dicts
-        cursor         : which module is highlighted
-        active_path    : path of the currently active module
-        message        : feedback/confirmation text to display
-        confirm_delete : True when showing delete confirmation
-        edit_mode      : True when editing module fields
-        edit_is_new    : True when creating a new module (vs editing)
-        edit_field     : index of the field being edited
-        edit_fields    : list of [label, key, value, type, editable]
-        edit_buffer    : current text being typed
+        modules          : list of module info dicts
+        cursor           : which module is highlighted
+        active_path      : path of the currently active module
+        message          : feedback/confirmation text to display
+        confirm_delete   : True when showing delete confirmation
+        edit_mode        : True when editing module fields
+        edit_is_new      : True when creating a new module (vs editing)
+        edit_field       : index of the field being edited
+        edit_fields      : list of [label, key, value, type, editable]
+        edit_buffer      : current text being typed
+        edit_nav_depth   : nesting depth in section navigation
+        edit_in_encounters : True when editing encounters within a level
         """
         import math
         self.screen.fill((0, 0, 0))
@@ -6489,13 +6493,16 @@ class Renderer(CombatEffectRendererMixin):
                 self._draw_section_browser(
                     right_x, panel_y, right_w, panel_h,
                     edit_sections, edit_section_cursor,
-                    edit_section_scroll)
+                    edit_section_scroll,
+                    nav_depth=edit_nav_depth)
             elif edit_level == 1 and edit_fields:
                 # Field editor within a section (level 1)
                 sec_label = ""
                 if edit_sections and 0 <= edit_section_cursor < len(
                         edit_sections):
                     sec_label = edit_sections[edit_section_cursor]["label"]
+                if edit_in_encounters:
+                    sec_label = f"Encounters: {sec_label}"
                 self._draw_module_edit_overlay(
                     right_x, panel_y, right_w, panel_h,
                     edit_fields, edit_field, edit_buffer, False,
@@ -6515,9 +6522,16 @@ class Renderer(CombatEffectRendererMixin):
         if edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
+        elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
+            # Inside dungeon sub-sections
+            hint = ("[UP/DN] Browse  [ENTER] Open  "
+                    "[A] Add Level  [D] Remove  [ESC] Back")
         elif edit_mode and edit_level == 0:
             hint = ("[UP/DN] Browse  [ENTER] Open  "
                     "[CTRL+S] Save  [ESC] Back")
+        elif edit_mode and edit_level == 1 and edit_in_encounters:
+            hint = ("[UP/DN] Field  [LT/RT] Adjust  "
+                    "[CTRL+A] Add  [DEL] Remove  [ESC] Back")
         elif edit_mode and edit_level == 1:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[CTRL+S] Save  [ESC] Back")
@@ -6703,7 +6717,8 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(action_label, rx + 16, dy, action_color, fm)
 
     def _draw_section_browser(self, rx, ry, rw, rh,
-                               sections, cursor, scroll=0):
+                               sections, cursor, scroll=0,
+                               nav_depth=0):
         """Draw the section browser (level 0 of hierarchical edit)."""
         fm = self.font_med
         fs = self.font_small
@@ -6716,9 +6731,13 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (140, 120, 60),
                          (rx, ry, rw, rh), 1)
 
-        # Title
-        self._u3_text("EDIT MODULE", rx + 16, ry + 12,
-                      self._U3_ORANGE, f)
+        # Title with breadcrumb
+        if nav_depth > 0:
+            self._u3_text("EDIT DUNGEON", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+        else:
+            self._u3_text("EDIT MODULE", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
 
         # Scrollable section list
         content_top = ry + 44
@@ -6759,6 +6778,12 @@ class Renderer(CombatEffectRendererMixin):
             elif icon == "D":
                 badge_color = (160, 80, 80)
                 badge_text = "D"
+            elif icon == "L":
+                badge_color = (120, 100, 160)
+                badge_text = "L"
+            elif icon == "+":
+                badge_color = (80, 140, 80)
+                badge_text = "+"
             else:
                 badge_color = (100, 100, 160)
                 badge_text = ">"
@@ -6784,14 +6809,22 @@ class Renderer(CombatEffectRendererMixin):
                 label += ".."
             self._u3_text(label, rx + 46, dy + 4, label_color, fm)
 
-            # Subtitle: field count
-            nfields = len(sec.get("fields", []))
-            editable = sum(1 for fl in sec.get("fields", [])
-                           if fl[4])
-            sub = f"{editable} editable" if editable else "read-only"
+            # Subtitle: custom or field count
+            custom_sub = sec.get("subtitle")
+            if custom_sub:
+                sub = custom_sub
+            elif sec.get("action"):
+                sub = ""
+            else:
+                nfields = len(sec.get("fields", []))
+                editable = sum(1 for fl in sec.get("fields", [])
+                               if len(fl) > 4 and fl[4])
+                sub = (f"{editable} editable"
+                       if editable else "read-only")
             sub_color = (120, 120, 140) if not selected \
                 else (160, 160, 180)
-            self._u3_text(sub, rx + 46, dy + 22, sub_color, fs)
+            if sub:
+                self._u3_text(sub, rx + 46, dy + 22, sub_color, fs)
 
             # Arrow indicator
             if selected:

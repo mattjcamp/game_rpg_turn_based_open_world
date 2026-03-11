@@ -380,7 +380,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      place_doors=False,
                      encounter_area="dungeon",
                      encounter_min_level=None,
-                     encounter_max_level=None):
+                     encounter_max_level=None,
+                     custom_encounters=None):
     """
     Generate a procedural dungeon.
 
@@ -396,6 +397,11 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         place_stairs_down: If True, place stairs-down in the last room
         place_artifact: If True, place the quest artifact in the last room
         place_doors: If True, place doors at room/corridor junctions
+        custom_encounters: Optional list of {"monster": str, "count": int}
+            dicts.  When provided, these specific encounters are placed
+            in the dungeon instead of randomly-rolled encounters from
+            encounters.json.  Each entry produces one map monster whose
+            encounter_template contains *count* copies of *monster*.
 
     Returns:
         DungeonData with the generated map and metadata.
@@ -472,30 +478,53 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # The full encounter data is stored on the monster so combat can
     # use it instead of rolling a new random encounter.
     monsters = []
-    for room in rooms[1:]:
-        if random.random() < 0.5:  # 50% chance of a monster per room
-            # Place near center of the room
+    if custom_encounters:
+        # ── Module-defined encounters: place specific monsters ──
+        # Distribute custom encounters across available rooms
+        available_rooms = list(rooms[1:])  # skip entrance
+        random.shuffle(available_rooms)
+        for ei, enc_spec in enumerate(custom_encounters):
+            if ei >= len(available_rooms):
+                break  # more encounters than rooms — stop
+            room = available_rooms[ei]
             mx, my = room.center
-            # Offset slightly so monsters aren't all dead-center
             mx += random.randint(-1, 1)
             my += random.randint(-1, 1)
-            # Make sure we're on a floor tile (not a chest/trap/stairs)
-            if tmap.get_tile(mx, my) == TILE_DFLOOR:
-                enc = create_encounter(encounter_area,
-                                       min_level=encounter_min_level,
-                                       max_level=encounter_max_level)
-                # Create the map-visible monster using the party tile
-                monster = create_monster(enc["monster_party_tile"])
-                monster.col = mx
-                monster.row = my
-                # Stash encounter template (names only) so combat can
-                # recreate fresh monsters with full HP each fight
-                monster.encounter_template = {
-                    "name": enc["name"],
-                    "monster_names": [m.name for m in enc["monsters"]],
-                    "monster_party_tile": enc["monster_party_tile"],
-                }
-                monsters.append(monster)
+            if tmap.get_tile(mx, my) != TILE_DFLOOR:
+                mx, my = room.center  # fallback to exact center
+            mon_name = enc_spec.get("monster", "Giant Rat")
+            mon_count = max(1, int(enc_spec.get("count", 1)))
+            monster = create_monster(mon_name)
+            monster.col = mx
+            monster.row = my
+            monster.encounter_template = {
+                "name": f"{mon_name} x{mon_count}",
+                "monster_names": [mon_name] * mon_count,
+                "monster_party_tile": mon_name,
+            }
+            monsters.append(monster)
+    else:
+        # ── Standard random encounters from encounters.json ──
+        for room in rooms[1:]:
+            if random.random() < 0.5:  # 50% chance per room
+                mx, my = room.center
+                mx += random.randint(-1, 1)
+                my += random.randint(-1, 1)
+                if tmap.get_tile(mx, my) == TILE_DFLOOR:
+                    enc = create_encounter(encounter_area,
+                                           min_level=encounter_min_level,
+                                           max_level=encounter_max_level)
+                    monster = create_monster(enc["monster_party_tile"])
+                    monster.col = mx
+                    monster.row = my
+                    monster.encounter_template = {
+                        "name": enc["name"],
+                        "monster_names": [
+                            m.name for m in enc["monsters"]],
+                        "monster_party_tile": enc[
+                            "monster_party_tile"],
+                    }
+                    monsters.append(monster)
 
     # --- Optional: place stairs down in the last (deepest) room ---
     if place_stairs_down and len(rooms) >= 2:
@@ -578,21 +607,28 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
     return [level_0, level_1]
 
 
-def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True):
-    """Generate a progressive dungeon for the Keys of Shadow module.
+def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
+                          module_levels=None):
+    """Generate a progressive dungeon for a module.
 
-    Dungeon N has N floors. Floor K (0-indexed) has encounters at level K+1.
-    The artifact (key) is on the deepest floor (unless *place_artifact* is
-    False, e.g. for kill-type quests where the portal spawns on kill count).
+    When *module_levels* is provided (from the module editor), the floor
+    count and encounter placement follow those specifications.  Otherwise
+    the dungeon is generated procedurally: dungeon N has N floors, with
+    floor K having encounters at difficulty level K+1.
 
     Parameters
     ----------
     dungeon_number : int
-        Which dungeon (1-8). Determines number of floors and max difficulty.
+        Which dungeon (1-8). Determines default floor count and scaling.
     name : str or None
         Display name. Defaults to "Dungeon of Key N".
     place_artifact : bool
         Whether to place a quest artifact on the deepest floor (default True).
+    module_levels : list or None
+        Optional list of level dicts from the module manifest, each with
+        ``"name"`` and ``"encounters"`` (list of ``{"monster", "count"}``).
+        When provided, overrides the default floor count and encounter
+        generation.
 
     Returns
     -------
@@ -602,12 +638,18 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True):
     if name is None:
         name = f"Dungeon of Key {dungeon_number}"
 
-    num_floors = dungeon_number
+    # Use module-defined floors if available, otherwise default to
+    # dungeon_number floors with procedural encounters.
+    if module_levels:
+        num_floors = max(1, len(module_levels))
+    else:
+        num_floors = dungeon_number
+
     levels = []
 
     for floor in range(num_floors):
         is_last = (floor == num_floors - 1)
-        enc_level = floor + 1  # floor 0 → level 1, floor 1 → level 2, etc.
+        enc_level = floor + 1
 
         # Dungeons get slightly bigger with depth
         w = min(40, 28 + floor * 2)
@@ -615,8 +657,20 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True):
         min_r = min(8, 4 + floor)
         max_r = min(12, 6 + floor)
 
+        # Determine floor name and encounters from module specs
+        if module_levels and floor < len(module_levels):
+            ml = module_levels[floor]
+            floor_name = ml.get("name", f"Floor {floor + 1}")
+            custom_enc = ml.get("encounters")
+            # Ensure encounters is a proper list of dicts
+            if not custom_enc or not isinstance(custom_enc, list):
+                custom_enc = None
+        else:
+            floor_name = f"Floor {floor + 1}"
+            custom_enc = None
+
         level_data = generate_dungeon(
-            name=f"{name} - Floor {floor + 1}",
+            name=f"{name} - {floor_name}",
             width=w, height=h,
             min_rooms=min_r, max_rooms=max_r,
             place_stairs_down=not is_last,
@@ -625,6 +679,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True):
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
+            custom_encounters=custom_enc,
         )
         levels.append(level_data)
 

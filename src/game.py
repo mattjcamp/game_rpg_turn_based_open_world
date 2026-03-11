@@ -132,6 +132,11 @@ class Game:
         self.module_edit_sections = []       # list of section dicts
         self.module_edit_section_cursor = 0  # highlighted section
         self.module_edit_section_scroll = 0  # scroll for section list
+        # Navigation stack for nested section browsing (dungeon sub-sections)
+        self.module_edit_nav_stack = []      # [(sections, cursor, scroll)]
+        self.module_edit_dungeon_levels = {} # {dungeon_idx: [level_data]}
+        self.module_edit_active_dung = -1    # which dungeon index is active
+        self.module_edit_active_level = -1   # which level index (-1=props)
         from src.module_loader import get_default_module_path
         self.active_module_path = get_default_module_path()
         self.active_module_name = "Keys of Shadow"
@@ -459,13 +464,17 @@ class Game:
             key_name = kd.get("key_name", f"Key {dnum}")
 
             quest_type = kd.get("quest_type", "retrieve")
+            module_levels = kd.get("levels") or None
 
-            # Generate the multi-floor dungeon
+            # Generate the multi-floor dungeon.
+            # If the module defines levels with encounters, those
+            # specs drive the floor count and monster placement.
             # Kill quests don't need an artifact tile — the portal
             # spawns when enough monsters are killed instead.
             levels = generate_keys_dungeon(
                 dnum, name=name,
-                place_artifact=(quest_type != "kill"))
+                place_artifact=(quest_type != "kill"),
+                module_levels=module_levels)
             self.key_dungeons[(col, row)] = {
                 "dungeon_number": dnum,
                 "name": name,
@@ -483,6 +492,7 @@ class Game:
                 "kill_target": kd.get("kill_target", ""),
                 "kill_count": int(kd.get("kill_count", 0)),
                 "kill_progress": 0,  # runtime kill counter
+                "module_levels": module_levels,  # original specs
             }
 
     def discover_key_dungeons(self):
@@ -1486,9 +1496,11 @@ class Game:
                     QUEST_TYPE_KEYS.index(qt_key)]
             except (ValueError, IndexError):
                 qt_display = QUEST_TYPE_NAMES[0]
+            n_levels = len(dung.get("levels", []))
             sections.append({
                 "label": dname,
                 "icon": "D",
+                "dung_idx": i,
                 "fields": [
                     ["Name", f"dung_{i}_name", dname, "text", True],
                     ["Quest Type", f"dung_{i}_qtype",
@@ -1506,6 +1518,8 @@ class Game:
                     ["Quest Hint", f"dung_{i}_hint",
                      dung.get("quest_hint", ""), "text", True],
                 ],
+                "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
+                             if n_levels > 0 else "no levels"),
             })
 
         self.module_edit_sections = sections
@@ -1517,18 +1531,135 @@ class Game:
         self.module_edit_field = 0
         self.module_edit_buffer = ""
         self.module_edit_scroll = 0
+        # Clear navigation stack and dungeon level data
+        self.module_edit_nav_stack = []
+        self.module_edit_active_dung = -1
+        self.module_edit_active_level = -1
+        # Store dungeon levels for editing
+        self.module_edit_dungeon_levels = {}
+        for i, dung in enumerate(dungeons):
+            self.module_edit_dungeon_levels[i] = list(
+                dung.get("levels", []))
 
     def _enter_section_fields(self):
         """Drill into the selected section's fields for editing."""
         sec = self.module_edit_sections[self.module_edit_section_cursor]
+
+        # ── Dungeon sections drill into a sub-section browser ──
+        if sec.get("icon") == "D" and sec.get("dung_idx") is not None:
+            dung_idx = sec["dung_idx"]
+            self._enter_dungeon_sub(dung_idx)
+            return
+
+        # ── Level sections drill into encounter fields ──
+        if sec.get("icon") == "L" and sec.get("level_idx") is not None:
+            dung_idx = self.module_edit_active_dung
+            level_idx = sec["level_idx"]
+            self._enter_level_encounters(dung_idx, level_idx)
+            return
+
+        # ── Properties and other sections: flat field editor ──
         self.module_edit_fields = sec["fields"]
         self.module_edit_field = 0
         self.module_edit_scroll = 0
         self.module_edit_level = 1
         # Find first editable field
         self.module_edit_field = self._next_editable_field(0)
-        self.module_edit_buffer = \
-            self.module_edit_fields[self.module_edit_field][2]
+        if self.module_edit_fields:
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+
+    def _enter_dungeon_sub(self, dung_idx):
+        """Push current section browser and show dungeon sub-sections."""
+        # Push current state onto nav stack
+        self.module_edit_nav_stack.append((
+            self.module_edit_sections,
+            self.module_edit_section_cursor,
+            self.module_edit_section_scroll,
+        ))
+        self.module_edit_active_dung = dung_idx
+        self._rebuild_dungeon_sub_sections(dung_idx)
+
+    def _rebuild_dungeon_sub_sections(self, dung_idx):
+        """Build the sub-section list for a dungeon (Properties + Levels)."""
+        # Find the original dungeon section to get its property fields
+        parent_sec = None
+        for sec in self.module_edit_nav_stack[-1][0]:
+            if sec.get("dung_idx") == dung_idx:
+                parent_sec = sec
+                break
+
+        sub_sections = []
+        # 1) Properties section
+        sub_sections.append({
+            "label": "Properties",
+            "icon": ">",
+            "fields": parent_sec["fields"] if parent_sec else [],
+        })
+
+        # 2) One section per dungeon level
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        for li, level in enumerate(levels):
+            lname = level.get("name", f"Floor {li + 1}")
+            enc_count = len(level.get("encounters", []))
+            sub_sections.append({
+                "label": lname,
+                "icon": "L",
+                "level_idx": li,
+                "fields": [],  # built on drill-in
+                "subtitle": f"{enc_count} encounter{'s' if enc_count != 1 else ''}",
+            })
+
+        # 3) [+] Add Level action
+        sub_sections.append({
+            "label": "[+] Add Level",
+            "icon": "+",
+            "fields": [],
+            "action": "add_level",
+        })
+
+        self.module_edit_sections = sub_sections
+        self.module_edit_section_cursor = 0
+        self.module_edit_section_scroll = 0
+        # Stay at level 0 (section browser)
+        self.module_edit_level = 0
+
+    def _enter_level_encounters(self, dung_idx, level_idx):
+        """Drill into a dungeon level to edit its encounters."""
+        self.module_edit_active_level = level_idx
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if level_idx < 0 or level_idx >= len(levels):
+            return
+        level = levels[level_idx]
+        encounters = level.get("encounters", [])
+
+        # Build field list for encounters
+        fields = []
+        # Level name
+        fields.append(["Level Name", f"lvl_{level_idx}_name",
+                        level.get("name", f"Floor {level_idx + 1}"),
+                        "text", True])
+
+        for ei, enc in enumerate(encounters):
+            # Section header for each encounter
+            fields.append([f"-- Encounter {ei + 1} --",
+                           f"lvl_{level_idx}_enc_{ei}_hdr",
+                           "", "section", False])
+            fields.append(["Monster", f"lvl_{level_idx}_enc_{ei}_mon",
+                           enc.get("monster", "Giant Rat"),
+                           "choice", True])
+            fields.append(["Count", f"lvl_{level_idx}_enc_{ei}_cnt",
+                           str(enc.get("count", 1)),
+                           "int", True])
+
+        self.module_edit_fields = fields
+        self.module_edit_field = 0
+        self.module_edit_scroll = 0
+        self.module_edit_level = 1
+        self.module_edit_field = self._next_editable_field(0)
+        if self.module_edit_fields:
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
 
     def _leave_section_fields(self):
         """Go back from field editing to the section browser."""
@@ -1536,7 +1667,153 @@ class Game:
         if self.module_edit_fields:
             entry = self.module_edit_fields[self.module_edit_field]
             entry[2] = self.module_edit_buffer
+
+        # If we were editing encounters, save them back to level data
+        if self.module_edit_active_level >= 0:
+            self._save_encounter_fields_to_level()
+            self.module_edit_active_level = -1
+
         self.module_edit_level = 0
+
+    def _save_encounter_fields_to_level(self):
+        """Persist encounter field edits back to the in-memory level data."""
+        dung_idx = self.module_edit_active_dung
+        level_idx = self.module_edit_active_level
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if level_idx < 0 or level_idx >= len(levels):
+            return
+        level = levels[level_idx]
+
+        # Read back level name
+        for entry in self.module_edit_fields:
+            if entry[1] == f"lvl_{level_idx}_name":
+                level["name"] = entry[2]
+                break
+
+        # Read back encounters
+        encounters = []
+        ei = 0
+        while True:
+            mon_key = f"lvl_{level_idx}_enc_{ei}_mon"
+            cnt_key = f"lvl_{level_idx}_enc_{ei}_cnt"
+            mon_val = None
+            cnt_val = None
+            for entry in self.module_edit_fields:
+                if entry[1] == mon_key:
+                    mon_val = entry[2]
+                elif entry[1] == cnt_key:
+                    cnt_val = entry[2]
+            if mon_val is None:
+                break
+            encounters.append({
+                "monster": mon_val,
+                "count": int(cnt_val) if cnt_val else 1,
+            })
+            ei += 1
+        level["encounters"] = encounters
+
+    def _leave_dungeon_sub(self):
+        """Pop the nav stack to return from dungeon sub-sections."""
+        if self.module_edit_nav_stack:
+            prev = self.module_edit_nav_stack.pop()
+            self.module_edit_sections = prev[0]
+            self.module_edit_section_cursor = prev[1]
+            self.module_edit_section_scroll = prev[2]
+        self.module_edit_active_dung = -1
+        self.module_edit_active_level = -1
+        self.module_edit_level = 0
+
+    def _add_dungeon_level(self):
+        """Add a new level to the active dungeon."""
+        dung_idx = self.module_edit_active_dung
+        if dung_idx < 0:
+            return
+        levels = self.module_edit_dungeon_levels.setdefault(dung_idx, [])
+        floor_num = len(levels) + 1
+        levels.append({
+            "name": f"Floor {floor_num}",
+            "encounters": [{"monster": "Giant Rat", "count": 1}],
+        })
+        # Rebuild sub-sections to show the new level
+        self._rebuild_dungeon_sub_sections(dung_idx)
+        # Move cursor to the newly added level
+        # (it's the second-to-last entry, before [+] Add Level)
+        self.module_edit_section_cursor = max(
+            0, len(self.module_edit_sections) - 2)
+        self._adjust_section_scroll()
+
+    def _remove_dungeon_level(self, level_idx):
+        """Remove a level from the active dungeon."""
+        dung_idx = self.module_edit_active_dung
+        if dung_idx < 0:
+            return
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if 0 <= level_idx < len(levels):
+            levels.pop(level_idx)
+            # Rebuild sub-sections
+            self._rebuild_dungeon_sub_sections(dung_idx)
+            # Clamp cursor
+            n = len(self.module_edit_sections)
+            if self.module_edit_section_cursor >= n:
+                self.module_edit_section_cursor = max(0, n - 1)
+            self._adjust_section_scroll()
+
+    def _add_encounter_to_level(self):
+        """Add a new encounter to the active dungeon level."""
+        dung_idx = self.module_edit_active_dung
+        level_idx = self.module_edit_active_level
+        if dung_idx < 0 or level_idx < 0:
+            return
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if level_idx >= len(levels):
+            return
+        # First save current field edits
+        self._save_encounter_fields_to_level()
+        # Add new encounter
+        levels[level_idx].setdefault("encounters", []).append(
+            {"monster": "Giant Rat", "count": 1})
+        # Rebuild encounter fields
+        self._enter_level_encounters(dung_idx, level_idx)
+        # Move to last encounter's monster field
+        if self.module_edit_fields:
+            self.module_edit_field = max(
+                0, len(self.module_edit_fields) - 2)
+            self.module_edit_field = self._next_editable_field(0)
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+            self._adjust_module_edit_scroll()
+
+    def _remove_encounter_from_level(self):
+        """Remove the currently selected encounter from the level."""
+        dung_idx = self.module_edit_active_dung
+        level_idx = self.module_edit_active_level
+        if dung_idx < 0 or level_idx < 0:
+            return
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if level_idx >= len(levels):
+            return
+        level = levels[level_idx]
+        encounters = level.get("encounters", [])
+        if len(encounters) <= 1:
+            return  # Keep at least one encounter
+
+        # Figure out which encounter the cursor is on
+        # Fields: [level_name, (hdr, mon, cnt) * N]
+        # After level_name, groups of 3 per encounter
+        cursor = self.module_edit_field
+        if cursor <= 0:
+            enc_idx = 0  # on level name — remove first
+        else:
+            enc_idx = (cursor - 1) // 3  # 3 fields per encounter
+        enc_idx = min(enc_idx, len(encounters) - 1)
+
+        # Save current edits first
+        self._save_encounter_fields_to_level()
+        # Remove the encounter
+        encounters.pop(enc_idx)
+        level["encounters"] = encounters
+        # Rebuild encounter fields
+        self._enter_level_encounters(dung_idx, level_idx)
 
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
@@ -1608,6 +1885,15 @@ class Game:
             entry[2] = self.module_edit_buffer
             self._commit_module_edit()
             return
+        # Encounter add/remove (only when editing a dungeon level)
+        if self.module_edit_active_level >= 0:
+            if (event.key == pygame.K_a
+                    and event.mod & pygame.KMOD_CTRL):
+                self._add_encounter_to_level()
+                return
+            if event.key == pygame.K_DELETE:
+                self._remove_encounter_from_level()
+                return
 
         self._handle_field_editor_input(event)
 
@@ -1615,9 +1901,17 @@ class Game:
         """Handle input at the section browser level (level 0)."""
         n = len(self.module_edit_sections)
         if event.key == pygame.K_ESCAPE:
-            self.module_edit_mode = False
-            self.module_edit_is_new = False
-            self.module_message = None
+            # If in a dungeon sub-browser, pop back up
+            if self.module_edit_nav_stack:
+                self._leave_dungeon_sub()
+            else:
+                self.module_edit_mode = False
+                self.module_edit_is_new = False
+                self.module_message = None
+        elif event.key == pygame.K_LEFT:
+            # Left also goes back from sub-browser
+            if self.module_edit_nav_stack:
+                self._leave_dungeon_sub()
         elif event.key == pygame.K_UP:
             self.module_edit_section_cursor = (
                 (self.module_edit_section_cursor - 1) % n)
@@ -1627,7 +1921,30 @@ class Game:
                 (self.module_edit_section_cursor + 1) % n)
             self._adjust_section_scroll()
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
-            self._enter_section_fields()
+            sec = self.module_edit_sections[
+                self.module_edit_section_cursor]
+            # Handle action sections
+            action = sec.get("action")
+            if action == "add_level":
+                self._add_dungeon_level()
+            elif action == "remove_level":
+                pass  # handled by 'd' key
+            else:
+                self._enter_section_fields()
+        elif event.key == pygame.K_a:
+            # 'A' to add a level (in dungeon sub) or encounter (in level)
+            if (self.module_edit_nav_stack
+                    and self.module_edit_active_dung >= 0):
+                self._add_dungeon_level()
+        elif event.key in (pygame.K_d, pygame.K_DELETE):
+            # 'D' or Delete to remove current level
+            if (self.module_edit_nav_stack
+                    and self.module_edit_active_dung >= 0):
+                sec = self.module_edit_sections[
+                    self.module_edit_section_cursor]
+                if sec.get("icon") == "L" and sec.get(
+                        "level_idx") is not None:
+                    self._remove_dungeon_level(sec["level_idx"])
         elif (event.key == pygame.K_s
               and event.mod & pygame.KMOD_CTRL):
             self._commit_module_edit()
@@ -1650,7 +1967,8 @@ class Game:
                                        SEASON_NAMES,
                                        TIME_OF_DAY_NAMES,
                                        QUEST_TYPE_NAMES,
-                                       KILL_QUEST_MONSTERS)
+                                       KILL_QUEST_MONSTERS,
+                                       ENCOUNTER_MONSTERS)
         if key == "world_size":
             return WORLD_SIZE_NAMES
         elif key == "season":
@@ -1661,6 +1979,8 @@ class Game:
             return QUEST_TYPE_NAMES
         elif key.endswith("_ktarget"):
             return [""] + KILL_QUEST_MONSTERS
+        elif key.endswith("_mon"):
+            return ENCOUNTER_MONSTERS
         return []
 
     def _handle_field_editor_input(self, event):
@@ -1778,14 +2098,29 @@ class Game:
 
     def _commit_module_edit(self):
         """Create a new module or save edits to an existing one."""
+        # Persist any in-progress buffer before gathering
+        if self.module_edit_level == 1 and self.module_edit_fields:
+            entry = self.module_edit_fields[self.module_edit_field]
+            entry[2] = self.module_edit_buffer
+            # If editing encounters, save back to level data
+            if self.module_edit_active_level >= 0:
+                self._save_encounter_fields_to_level()
+
         # Gather all field values into a dict.
         # For create-new, fields live in self.module_edit_fields.
-        # For existing modules, fields are spread across sections.
+        # For existing modules, fields are spread across ALL sections
+        # including those on the nav stack.
         values = {}
         if self.module_edit_is_new:
             sources = [self.module_edit_fields]
         else:
-            sources = [s["fields"] for s in self.module_edit_sections]
+            # Collect from nav stack (parent sections) + current sections
+            all_sections = []
+            for stack_entry in self.module_edit_nav_stack:
+                all_sections.extend(stack_entry[0])
+            all_sections.extend(self.module_edit_sections)
+            sources = [s["fields"] for s in all_sections
+                       if s.get("fields")]
         for field_list in sources:
             for entry in field_list:
                 key, value = entry[1], entry[2]
@@ -1903,6 +2238,12 @@ class Game:
                     if json_key and 0 <= idx < len(dungeons):
                         dungeons[idx][json_key] = val
 
+            # ── Dungeon levels and encounters ──
+            for dung_idx, levels_data in \
+                    self.module_edit_dungeon_levels.items():
+                if 0 <= dung_idx < len(dungeons):
+                    dungeons[dung_idx]["levels"] = levels_data
+
             # Write back
             try:
                 with open(manifest_path, "w") as fh:
@@ -1912,6 +2253,9 @@ class Game:
                 ok = False
 
             self.module_edit_mode = False
+            self.module_edit_nav_stack = []
+            self.module_edit_active_dung = -1
+            self.module_edit_active_level = -1
             if ok:
                 self.module_message = "Module updated!"
                 self.module_msg_timer = 2.0
@@ -2290,7 +2634,10 @@ class Game:
                     edit_level=self.module_edit_level,
                     edit_sections=self.module_edit_sections,
                     edit_section_cursor=self.module_edit_section_cursor,
-                    edit_section_scroll=self.module_edit_section_scroll)
+                    edit_section_scroll=self.module_edit_section_scroll,
+                    edit_nav_depth=len(self.module_edit_nav_stack),
+                    edit_in_encounters=(
+                        self.module_edit_active_level >= 0))
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

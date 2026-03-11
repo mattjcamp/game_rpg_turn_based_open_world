@@ -1,34 +1,34 @@
 {
   "size": {
-    "width": 128,
-    "height": 96
+    "width": 32,
+    "height": 24
   },
   "start_position": {
-    "col": 64,
-    "row": 34
+    "col": 16,
+    "row": 10
   },
   "landmarks": [
     {
-      "id": "jadegate",
+      "id": "mapleshire",
       "type": "town",
-      "col": 64,
-      "row": 32,
+      "col": 16,
+      "row": 8,
       "tile": "TILE_TOWN",
       "clear_radius": 3
     },
     {
-      "id": "town_armory",
+      "id": "town_vault",
       "type": "machine",
-      "col": 66,
-      "row": 32,
+      "col": 18,
+      "row": 8,
       "tile": "TILE_MACHINE",
       "clear_radius": 1
     },
     {
       "id": "dungeon_1",
       "type": "dungeon",
-      "col": 88,
-      "row": 48,
+      "col": 22,
+      "row": 12,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     }
@@ -36,22 +36,22 @@
   "paths": [
     {
       "from": [
-        64,
-        32
+        16,
+        8
       ],
       "to": [
-        88,
-        48
+        22,
+        12
       ]
     },
     {
       "from": [
-        64,
-        34
+        16,
+        10
       ],
       "to": [
-        64,
-        32
+        16,
+        8
       ]
     }
   ]
