@@ -168,6 +168,7 @@ def _serialize_key_dungeons(game):
             "module_levels": kd.get("module_levels"),
             "exit_portal": kd.get("exit_portal", True),
             "keys_needed": kd.get("keys_needed", 1),
+            "gnome_town": kd.get("gnome_town", ""),
             "levels": _serialize_dungeon_levels(kd.get("levels", [])),
         })
     return result
@@ -560,6 +561,7 @@ def _restore_key_dungeons(game, save_data):
             "kill_progress": int(skd.get("kill_progress", 0)),
             "exit_portal": skd.get("exit_portal", True),
             "keys_needed": int(skd.get("keys_needed", 1)),
+            "gnome_town": skd.get("gnome_town", ""),
         }
 
 

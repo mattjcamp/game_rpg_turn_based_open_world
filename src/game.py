@@ -511,6 +511,7 @@ class Game:
                 "module_levels": module_levels,  # original specs
                 "exit_portal": kd.get("exit_portal", True),
                 "keys_needed": int(kd.get("keys_needed", 1)),
+                "gnome_town": kd.get("gnome_town", ""),
             }
 
     def discover_key_dungeons(self):
@@ -560,6 +561,16 @@ class Game:
         if mod_id == "keys_of_shadow":
             gnome_keys_needed = max(gnome_keys_needed,
                                     len(self.key_dungeons))
+        # Determine which town the gnome machine should be placed in.
+        # The user can choose via the "Gnome Town" quest field.
+        # For KoS, it always goes in the first town.
+        gnome_town_name = ""
+        if has_gnome_machine and mod_id != "keys_of_shadow":
+            for kd in self.key_dungeons.values():
+                if kd.get("quest_type") == "gnome_machine":
+                    gnome_town_name = kd.get("gnome_town", "")
+                    if gnome_town_name:
+                        break
 
         self.town_data_map = {}
         first_town = None
@@ -572,8 +583,15 @@ class Game:
             col, row = lm["col"], lm["row"]
             # Unique seed per town so NPCs and dialogue vary
             town_seed = hash((tname, col, row, i)) & 0xFFFFFFFF
-            # Only place the gnome machine in the first (hub) town
-            place_machine = has_gnome_machine and first_town is None
+            # Place the gnome machine in the chosen town, or the first
+            # town if none was explicitly chosen.
+            if has_gnome_machine:
+                if gnome_town_name:
+                    place_machine = (tname == gnome_town_name)
+                else:
+                    place_machine = (first_town is None)
+            else:
+                place_machine = False
             td = generate_town(tname, seed=town_seed,
                                layout_index=town_ordinal,
                                has_key_dungeons=bool(self.key_dungeons),
@@ -1572,37 +1590,19 @@ class Game:
             })
 
         # 5) Each quest as its own section (quest properties only)
+        # Build a list of town names for gnome machine town selection
+        town_name_list = [t.get("name", f"Town {j+1}")
+                          for j, t in enumerate(towns)]
+        self._module_edit_town_names = town_name_list
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
-            # Map internal quest_type key to display name
-            qt_key = dung.get("quest_type", "retrieve")
-            try:
-                qt_display = QUEST_TYPE_NAMES[
-                    QUEST_TYPE_KEYS.index(qt_key)]
-            except (ValueError, IndexError):
-                qt_display = QUEST_TYPE_NAMES[0]
+            fields = self._quest_fields_for_type(
+                i, dung, town_name_list)
             sections.append({
                 "label": f"{dname} Quest",
                 "icon": "Q",
-                "fields": [
-                    ["Quest Type", f"quest_{i}_qtype",
-                     qt_display, "choice", True],
-                    ["Key / Artifact", f"quest_{i}_key",
-                     dung.get("key_name", "Key"), "text", True],
-                    ["Kill Target", f"quest_{i}_ktarget",
-                     dung.get("kill_target", ""), "choice", True],
-                    ["Kill Count", f"quest_{i}_kcount",
-                     str(dung.get("kill_count", 0)), "int", True],
-                    ["Keys Needed", f"quest_{i}_keysneeded",
-                     str(dung.get("keys_needed", 1)), "int", True],
-                    ["Objective", f"quest_{i}_obj",
-                     dung.get("quest_objective", ""), "text", True],
-                    ["Hint", f"quest_{i}_hint",
-                     dung.get("quest_hint", ""), "text", True],
-                    ["Exit Portal", f"quest_{i}_exitportal",
-                     "Yes" if dung.get("exit_portal", True) else "No",
-                     "choice", True],
-                ],
+                "quest_idx": i,
+                "fields": fields,
             })
 
         # 6) Starting Loot section
@@ -1639,6 +1639,133 @@ class Game:
         for i, dung in enumerate(dungeons):
             self.module_edit_dungeon_levels[i] = list(
                 dung.get("levels", []))
+
+    def _quest_fields_for_type(self, quest_idx, dung, town_name_list):
+        """Return the field list for a quest section based on quest type.
+
+        Only fields relevant to the selected quest type are shown:
+        - Retrieve: Key/Artifact, Objective, Hint, Exit Portal
+        - Kill: Kill Target, Kill Count, Exit Portal
+        - Gnome Machine: Keys Needed, Gnome Town, Objective, Hint
+        """
+        from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
+        i = quest_idx
+        qt_key = dung.get("quest_type", "retrieve")
+        try:
+            qt_display = QUEST_TYPE_NAMES[
+                QUEST_TYPE_KEYS.index(qt_key)]
+        except (ValueError, IndexError):
+            qt_display = QUEST_TYPE_NAMES[0]
+
+        fields = [
+            ["Quest Type", f"quest_{i}_qtype",
+             qt_display, "choice", True],
+        ]
+        if qt_key == "retrieve":
+            fields += [
+                ["Key / Artifact", f"quest_{i}_key",
+                 dung.get("key_name", "Key"), "text", True],
+                ["Objective", f"quest_{i}_obj",
+                 dung.get("quest_objective", ""), "text", True],
+                ["Hint", f"quest_{i}_hint",
+                 dung.get("quest_hint", ""), "text", True],
+                ["Exit Portal", f"quest_{i}_exitportal",
+                 "Yes" if dung.get("exit_portal", True) else "No",
+                 "choice", True],
+            ]
+        elif qt_key == "kill":
+            fields += [
+                ["Kill Target", f"quest_{i}_ktarget",
+                 dung.get("kill_target", ""), "choice", True],
+                ["Kill Count", f"quest_{i}_kcount",
+                 str(dung.get("kill_count", 0)), "int", True],
+                ["Objective", f"quest_{i}_obj",
+                 dung.get("quest_objective", ""), "text", True],
+                ["Hint", f"quest_{i}_hint",
+                 dung.get("quest_hint", ""), "text", True],
+                ["Exit Portal", f"quest_{i}_exitportal",
+                 "Yes" if dung.get("exit_portal", True) else "No",
+                 "choice", True],
+            ]
+        elif qt_key == "gnome_machine":
+            # Determine current gnome town selection
+            gnome_town = dung.get("gnome_town", "")
+            if not gnome_town and town_name_list:
+                gnome_town = town_name_list[0]
+            fields += [
+                ["Keys Needed", f"quest_{i}_keysneeded",
+                 str(dung.get("keys_needed", 1)), "int", True],
+                ["Gnome Town", f"quest_{i}_gnometown",
+                 gnome_town, "choice", True],
+                ["Key / Artifact", f"quest_{i}_key",
+                 dung.get("key_name", "Key"), "text", True],
+                ["Objective", f"quest_{i}_obj",
+                 dung.get("quest_objective", ""), "text", True],
+                ["Hint", f"quest_{i}_hint",
+                 dung.get("quest_hint", ""), "text", True],
+            ]
+        return fields
+
+    def _on_quest_type_changed(self, field_key):
+        """Rebuild the quest section fields after the quest type is cycled.
+
+        Preserves any shared field values (like Objective / Hint) from
+        the old field list while switching to the appropriate set of
+        fields for the newly selected quest type.
+        """
+        from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
+        # Parse quest index from the field key (quest_<i>_qtype)
+        parts = field_key.split("_")
+        try:
+            quest_idx = int(parts[1])
+        except (IndexError, ValueError):
+            return
+        # Map display name → internal key
+        new_display = self.module_edit_buffer
+        try:
+            qt_key = QUEST_TYPE_KEYS[QUEST_TYPE_NAMES.index(new_display)]
+        except (ValueError, IndexError):
+            qt_key = "retrieve"
+        # Collect current field values so we can carry over shared ones
+        old_vals = {}
+        for entry in self.module_edit_fields:
+            old_vals[entry[1]] = entry[2]
+        # Build a dummy dung dict from old values for the helper
+        i = quest_idx
+        dung = {
+            "quest_type": qt_key,
+            "key_name": old_vals.get(f"quest_{i}_key", "Key"),
+            "kill_target": old_vals.get(f"quest_{i}_ktarget", ""),
+            "kill_count": int(old_vals.get(f"quest_{i}_kcount", "0")
+                              or "0"),
+            "keys_needed": int(old_vals.get(f"quest_{i}_keysneeded", "1")
+                               or "1"),
+            "gnome_town": old_vals.get(f"quest_{i}_gnometown", ""),
+            "quest_objective": old_vals.get(f"quest_{i}_obj", ""),
+            "quest_hint": old_vals.get(f"quest_{i}_hint", ""),
+            "exit_portal": old_vals.get(
+                f"quest_{i}_exitportal", "Yes") == "Yes",
+        }
+        town_names = getattr(self, "_module_edit_town_names", [])
+        new_fields = self._quest_fields_for_type(
+            quest_idx, dung, town_names)
+        # Replace the fields in both the active list and the section
+        self.module_edit_fields[:] = new_fields
+        # Also update the section object so commit gathers the right keys
+        for sec in self.module_edit_sections:
+            if sec.get("quest_idx") == quest_idx:
+                sec["fields"] = new_fields
+                break
+        # Also check nav stack sections
+        for stack_entry in getattr(
+                self, "module_edit_nav_stack", []):
+            for sec in stack_entry[0]:
+                if sec.get("quest_idx") == quest_idx:
+                    sec["fields"] = new_fields
+                    break
+        # Reset cursor to the first field (Quest Type) and refresh buffer
+        self.module_edit_field = 0
+        self.module_edit_buffer = new_fields[0][2]
 
     def _enter_section_fields(self):
         """Drill into the selected section's fields for editing."""
@@ -2202,6 +2329,8 @@ class Game:
             return [""] + KILL_QUEST_MONSTERS
         elif key.endswith("_mon"):
             return ENCOUNTER_MONSTERS
+        elif key.endswith("_gnometown"):
+            return getattr(self, "_module_edit_town_names", []) or ["(none)"]
         elif key.endswith("_exitportal"):
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
@@ -2253,6 +2382,9 @@ class Game:
                 else:
                     idx = (idx - 1) % len(choices)
                 self.module_edit_buffer = choices[idx]
+                # When quest type changes, rebuild the field list
+                if field_entry[1].endswith("_qtype"):
+                    self._on_quest_type_changed(field_entry[1])
         elif field_type == "int":
             if event.key == pygame.K_BACKSPACE:
                 self.module_edit_buffer = self.module_edit_buffer[:-1]
@@ -2506,6 +2638,9 @@ class Game:
                     if 0 <= idx < len(dungeons):
                         dungeons[idx]["exit_portal"] = \
                             (val == "Yes")
+                elif suffix == "gnometown":
+                    if 0 <= idx < len(dungeons):
+                        dungeons[idx]["gnome_town"] = val
                 else:
                     json_key = quest_field_map.get(suffix)
                     if json_key and 0 <= idx < len(dungeons):

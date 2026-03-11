@@ -1,34 +1,42 @@
 {
   "size": {
-    "width": 64,
-    "height": 48
+    "width": 32,
+    "height": 24
   },
   "start_position": {
-    "col": 32,
-    "row": 18
+    "col": 16,
+    "row": 10
   },
   "landmarks": [
     {
-      "id": "driftshire",
+      "id": "maplecrest",
       "type": "town",
-      "col": 32,
+      "col": 16,
+      "row": 8,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "stonekeep",
+      "type": "town",
+      "col": 16,
       "row": 16,
       "tile": "TILE_TOWN",
       "clear_radius": 3
     },
     {
-      "id": "town_shrine",
+      "id": "town_vault",
       "type": "machine",
-      "col": 34,
-      "row": 16,
+      "col": 18,
+      "row": 8,
       "tile": "TILE_MACHINE",
       "clear_radius": 1
     },
     {
       "id": "dungeon_1",
       "type": "dungeon",
-      "col": 44,
-      "row": 24,
+      "col": 22,
+      "row": 12,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     }
@@ -36,22 +44,32 @@
   "paths": [
     {
       "from": [
-        32,
-        16
+        16,
+        8
       ],
       "to": [
-        44,
-        24
+        22,
+        12
       ]
     },
     {
       "from": [
-        32,
-        18
+        16,
+        8
       ],
       "to": [
-        32,
+        16,
         16
+      ]
+    },
+    {
+      "from": [
+        16,
+        10
+      ],
+      "to": [
+        16,
+        8
       ]
     }
   ]
