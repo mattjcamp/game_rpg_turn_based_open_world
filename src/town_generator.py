@@ -368,8 +368,13 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     rng = random.Random(seed)
 
     # Playable interior dimensions (floor area inside the walls)
-    INTERIOR_W = 18
-    INTERIOR_H = 19
+    # Expanded when gnome_machine is True to make room for a town square.
+    if gnome_machine:
+        INTERIOR_W = 24
+        INTERIOR_H = 26
+    else:
+        INTERIOR_W = 18
+        INTERIOR_H = 19
 
     PAD_X = 13
     PAD_Y = 9
@@ -490,7 +495,10 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     elder_dlg = list(rng.choice(_ELDER_DIALOGUE_POOL))
     # Insert the town name into the first line
     elder_dlg[0] = elder_dlg[0].replace("Our town", f"{name}")
-    npcs.append(NPC(ox + 9, oy + 10, elder_name,
+    # Position scales with interior — stays in the open area
+    elder_x = ox + INTERIOR_W // 2
+    elder_y = oy + min(10, INTERIOR_H // 2)
+    npcs.append(NPC(elder_x, elder_y, elder_name,
                     elder_dlg, npc_type="elder"))
 
     # Wandering villagers (3, each with unique name and dialogue)
@@ -500,7 +508,12 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     rng.shuffle(available_dlgs)
 
     # Villager positions vary by seed — jitter within safe floor area
-    _base_spots = [(5, 15), (13, 15), (9, 8)]
+    # Scale with interior size so they don't bunch up in larger towns
+    v_mid_y = min(15, INTERIOR_H - 4)
+    v_top_y = min(8, INTERIOR_H // 3)
+    _base_spots = [(5, v_mid_y),
+                   (INTERIOR_W - 5, v_mid_y),
+                   (INTERIOR_W // 2, v_top_y)]
     villager_spots = [
         (ox + bx + rng.randint(-1, 1), oy + by + rng.randint(-1, 1))
         for bx, by in _base_spots
@@ -511,11 +524,25 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
         npcs.append(NPC(vc, vr, vname, vdlg, npc_type="villager"))
 
     # ── Optional gnome machine (for "Gnome Machine" quest style) ──
+    # The expanded town (24×26) has a dedicated open town square in the
+    # lower-centre area (below the buildings) where the machine sits.
+    # The gnome NPC stands to the right of the machine with guaranteed
+    # clear floor tiles so the player can always reach him.
     if gnome_machine:
-        # Place a small machine in the upper-middle area of the town
-        mc = ox + 9
-        mr = oy + 3
+        # Town square centre — well below the building zone
+        sq_cx = ox + INTERIOR_W // 2     # horizontal centre
+        sq_cy = oy + INTERIOR_H - 5      # 5 tiles from the bottom wall
+
+        # Clear a 7×5 floor area around the square centre to guarantee
+        # no stray wall/counter tiles from building layouts overlap
+        for dr in range(-2, 3):
+            for dc in range(-3, 4):
+                tmap.set_tile(sq_cx + dc, sq_cy + dr, TILE_FLOOR)
+
+        # Machine at the square centre
+        mc, mr = sq_cx, sq_cy
         tmap.set_tile(mc, mr, TILE_MACHINE)
+
         # Key slot ring around the machine (decorative)
         key_total = max(1, min(8, keys_needed))
         slot_offsets = [(-1, 0), (1, 0), (0, -1), (0, 1),
@@ -524,7 +551,11 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
             sc = mc + slot_offsets[si][0]
             sr = mr + slot_offsets[si][1]
             tmap.set_tile(sc, sr, TILE_KEYSLOT)
-        # Gnome NPC — quest-giver, stands next to the machine
+
+        # Gnome NPC — quest-giver, stands 3 tiles right of the machine
+        # with guaranteed open floor around him
+        gnome_col = mc + 3
+        gnome_row = mr
         gnome_name = rng.choice(["Fizzwick", "Tinkleton", "Cogsworth",
                                  "Sprocket", "Wizzle", "Ratchet"])
         gnome_dlg = [
@@ -540,7 +571,7 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
             f"Each one is guarded by fearsome creatures.",
             f"Will you help me recover them?",
         ]
-        npcs.append(NPC(mc + 2, mr, gnome_name, gnome_dlg,
+        npcs.append(NPC(gnome_col, gnome_row, gnome_name, gnome_dlg,
                         npc_type="gnome",
                         quest_dialogue=gnome_quest_dlg,
                         quest_choices=["We'll find the keys!",
