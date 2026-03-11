@@ -3,7 +3,7 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Mapleshire.",
+    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Amberhollow to break the spell.",
     "version": "0.1.0"
   },
   "settings": {
@@ -27,9 +27,9 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "mapleshire",
-        "name": "Mapleshire",
-        "description": "A sleepy village surrounded by ancient oaks and whispering meadows."
+        "id": "amberhollow",
+        "name": "Amberhollow",
+        "description": "A walled outpost on the frontier, always on guard against the wilds."
       }
     ],
     "dungeons": []
@@ -38,54 +38,29 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_vault"
+      "deliver_to": "town_shrine"
     },
     "starting_quests": [
-      "reclaim"
+      "awaken"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Frozen Stronghold",
-        "key_name": "Ivory Key",
+        "name": "Forgotten Tomb",
+        "key_name": "Diamond Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "A narrow crevice leads into Frozen Stronghold. The sound of dripping water echoes endlessly below.",
-        "quest_type": "kill",
-        "quest_objective": "Descend into Frozen Stronghold and kill two giant rats",
-        "quest_hint": "The passage grows more treacherous with every floor.",
-        "kill_target": "Giant Rat",
-        "kill_count": 2,
-        "levels": [
-          {
-            "name": "Floor Wazzoers",
-            "encounters": [
-              {
-                "monster": "Giant Rat",
-                "count": 4
-              }
-            ],
-            "random_encounters": true
-          },
-          {
-            "name": "Black lodge",
-            "encounters": [
-              {
-                "monster": "Skeleton Archer",
-                "count": 1
-              }
-            ],
-            "random_encounters": true
-          }
-        ],
-        "exit_portal": false
+        "description": "Water seeps from the walls near Forgotten Tomb's entrance. The stone steps descend into darkness.",
+        "quest_type": "retrieve",
+        "quest_objective": "Venture into Forgotten Tomb and liberate the Diamond Key",
+        "quest_hint": "The artifact pulses with ancient energy.",
+        "kill_target": "",
+        "kill_count": 0,
+        "exit_portal": true,
+        "levels": []
       }
     ],
-    "starting_loot": [
-      {
-        "item": "Lockpick",
-        "count": 10
-      }
-    ]
+    "innkeeper_quests": false,
+    "quest_style": "gnome_machine"
   }
 }

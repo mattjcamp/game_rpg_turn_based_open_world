@@ -349,6 +349,8 @@ def save_game(slot, game):
             "keys_inserted": getattr(game, "keys_inserted", 0),
             "machine_col": getattr(game, "machine_col", None),
             "machine_row": getattr(game, "machine_row", None),
+            "gnome_quest_accepted": getattr(
+                game, "_gnome_quest_accepted", False),
             "darkness_active": getattr(game, "darkness_active", False),
             "quest": _serialize_quest(getattr(game, "quest", None)),
             "house_quest": _serialize_quest(getattr(game, "house_quest", None)),
@@ -441,6 +443,8 @@ def load_game(slot, game):
         game.keys_inserted = save_data.get("keys_inserted", 0)
         game.machine_col = save_data.get("machine_col")
         game.machine_row = save_data.get("machine_row")
+        game._gnome_quest_accepted = save_data.get(
+            "gnome_quest_accepted", False)
 
         # Restore key dungeon levels and quest statuses from save
         _restore_key_dungeons(game, save_data)

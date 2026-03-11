@@ -344,7 +344,8 @@ _LAYOUT_POOL = [
 
 
 def generate_town(name="Thornwall", seed=None, layout_index=None,
-                   has_key_dungeons=False, innkeeper_quests=False):
+                   has_key_dungeons=False, innkeeper_quests=False,
+                   gnome_machine=False, keys_needed=0):
     """
     Generate a town map with NPCs and an exit.
 
@@ -508,6 +509,42 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
         vname = available_names[i % len(available_names)]
         vdlg = available_dlgs[i % len(available_dlgs)]
         npcs.append(NPC(vc, vr, vname, vdlg, npc_type="villager"))
+
+    # ── Optional gnome machine (for "Gnome Machine" quest style) ──
+    if gnome_machine:
+        # Place a small machine in the upper-middle area of the town
+        mc = ox + 9
+        mr = oy + 3
+        tmap.set_tile(mc, mr, TILE_MACHINE)
+        # Key slot ring around the machine (decorative)
+        key_total = max(1, min(8, keys_needed))
+        slot_offsets = [(-1, 0), (1, 0), (0, -1), (0, 1),
+                        (-1, -1), (1, -1), (-1, 1), (1, 1)]
+        for si in range(min(key_total, len(slot_offsets))):
+            sc = mc + slot_offsets[si][0]
+            sr = mr + slot_offsets[si][1]
+            tmap.set_tile(sc, sr, TILE_KEYSLOT)
+        # Gnome NPC — quest-giver, stands next to the machine
+        gnome_name = rng.choice(["Fizzwick", "Tinkleton", "Cogsworth",
+                                 "Sprocket", "Wizzle", "Ratchet"])
+        gnome_dlg = [
+            f"I built this machine to channel the ancient energy...",
+            f"But it needs {key_total} keys to function!",
+            f"The keys are scattered across the dungeons of the land.",
+            f"Please, bring me the keys!",
+        ]
+        gnome_quest_dlg = [
+            f"Adventurers! I am {gnome_name}, and I need your help.",
+            f"My machine requires {key_total} keys hidden in "
+            f"dungeons across the land.",
+            f"Each one is guarded by fearsome creatures.",
+            f"Will you help me recover them?",
+        ]
+        npcs.append(NPC(mc + 2, mr, gnome_name, gnome_dlg,
+                        npc_type="gnome",
+                        quest_dialogue=gnome_quest_dlg,
+                        quest_choices=["We'll find the keys!",
+                                       "Not right now."]))
 
     # Entry point: just inside the exit gate
     entry_col = exit_col

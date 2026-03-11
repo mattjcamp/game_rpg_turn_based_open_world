@@ -536,8 +536,14 @@ class Game:
         town_names = {t["id"]: t["name"] for t in manifest_towns}
 
         # Check if module enables innkeeper quests
-        inn_quests = self.module_manifest.get(
-            "progression", {}).get("innkeeper_quests", False)
+        prog = self.module_manifest.get("progression", {})
+        inn_quests = prog.get("innkeeper_quests", False)
+
+        # Check quest style (elder vs gnome_machine)
+        quest_style = prog.get("quest_style", "elder")
+        is_gnome_machine = (quest_style == "gnome_machine")
+        keys_needed = prog.get("win_condition", {}).get("total_keys",
+                                                         len(self.key_dungeons))
 
         self.town_data_map = {}
         first_town = None
@@ -550,10 +556,14 @@ class Game:
             col, row = lm["col"], lm["row"]
             # Unique seed per town so NPCs and dialogue vary
             town_seed = hash((tname, col, row, i)) & 0xFFFFFFFF
+            # Only place the gnome machine in the first (hub) town
+            place_machine = is_gnome_machine and first_town is None
             td = generate_town(tname, seed=town_seed,
                                layout_index=town_ordinal,
                                has_key_dungeons=bool(self.key_dungeons),
-                               innkeeper_quests=inn_quests)
+                               innkeeper_quests=inn_quests,
+                               gnome_machine=place_machine,
+                               keys_needed=keys_needed)
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:
@@ -703,20 +713,21 @@ class Game:
             inserted = self.keys_inserted
 
             # Determine module-appropriate text for return/delivery
-            mod_id = ""
-            deliver_to = ""
+            quest_style = ""
             if self.module_manifest:
+                quest_style = self.module_manifest.get(
+                    "progression", {}).get("quest_style", "elder")
                 mod_id = self.module_manifest.get(
                     "metadata", {}).get("id", "")
-                deliver_to = self.module_manifest.get(
-                    "progression", {}).get(
-                    "win_condition", {}).get("deliver_to", "")
+                # Keys of Shadow is always gnome_machine style
+                if mod_id == "keys_of_shadow":
+                    quest_style = "gnome_machine"
 
-            is_kos = (mod_id == "keys_of_shadow")
+            is_gnome_machine = (quest_style == "gnome_machine")
 
             # Friendly name for where keys are returned
-            if is_kos:
-                return_dest = "Fizzwick"
+            if is_gnome_machine:
+                return_dest = "the Gnome"
             else:
                 return_dest = "the Elder"
 
@@ -774,11 +785,11 @@ class Game:
                     "steps": steps,
                 })
 
-            # ── Final goal (Keys of Shadow only) ──
-            # Only show the meta-quest when there's an actual machine
-            # to activate.  For other modules the Elder handles each
-            # dungeon quest individually — no separate end-goal needed.
-            if is_kos and (gnome_accepted or any(
+            # ── Final goal (Gnome Machine modules) ──
+            # Show the meta-quest when the module uses gnome machine
+            # quest style.  For elder modules, each dungeon quest is
+            # handled individually — no separate end-goal needed.
+            if is_gnome_machine and (gnome_accepted or any(
                     kd.get("status") != "undiscovered"
                     for kd in kd_map.values())):
                 total = len(kd_map)
@@ -1493,6 +1504,19 @@ class Game:
         # 2) Settings (read-only except innkeeper quests toggle)
         innkeeper_quests = manifest.get("progression", {}).get(
             "innkeeper_quests", False)
+        # Quest style: elder (default) or gnome_machine
+        from src.module_loader import QUEST_STYLE_NAMES, QUEST_STYLE_KEYS
+        quest_style_key = manifest.get("progression", {}).get(
+            "quest_style", "elder")
+        try:
+            qs_display = QUEST_STYLE_NAMES[
+                QUEST_STYLE_KEYS.index(quest_style_key)]
+        except (ValueError, IndexError):
+            qs_display = QUEST_STYLE_NAMES[0]
+        # Keys needed (1-8) for gnome machine quest
+        keys_needed = manifest.get("progression", {}).get(
+            "win_condition", {}).get("total_keys",
+            mod_settings["num_quests"])
         sections.append({
             "label": "Settings",
             "icon": ">",
@@ -1509,6 +1533,10 @@ class Game:
                  mod_settings["time_of_day"], "choice", False],
                 ["Innkeeper Quests", "innkeeper_quests",
                  "Yes" if innkeeper_quests else "No", "choice", True],
+                ["Quest Style", "quest_style",
+                 qs_display, "choice", True],
+                ["Keys Needed", "keys_needed",
+                 str(keys_needed), "int", True],
             ],
         })
 
@@ -2179,6 +2207,9 @@ class Game:
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
             return ["Yes", "No"]
+        elif key == "quest_style":
+            from src.module_loader import QUEST_STYLE_NAMES
+            return QUEST_STYLE_NAMES
         elif key.endswith("_randenc"):
             return ["Yes", "No"]
         elif key.endswith("_item") and key.startswith("loot_"):
@@ -2394,6 +2425,28 @@ class Game:
                 prog = data.setdefault("progression", {})
                 prog["innkeeper_quests"] = (
                     values["innkeeper_quests"] == "Yes")
+
+            # ── Quest style (elder / gnome_machine) ──
+            if "quest_style" in values:
+                from src.module_loader import (QUEST_STYLE_NAMES,
+                                               QUEST_STYLE_KEYS)
+                prog = data.setdefault("progression", {})
+                try:
+                    qi = QUEST_STYLE_NAMES.index(values["quest_style"])
+                    prog["quest_style"] = QUEST_STYLE_KEYS[qi]
+                except (ValueError, IndexError):
+                    prog["quest_style"] = "elder"
+
+            # ── Keys needed (1-8) ──
+            if "keys_needed" in values:
+                prog = data.setdefault("progression", {})
+                win = prog.setdefault("win_condition", {
+                    "type": "collect_keys", "total_keys": 1,
+                    "deliver_to": "town_altar",
+                })
+                kn = int(values["keys_needed"]) if values["keys_needed"] else 1
+                kn = max(1, min(8, kn))
+                win["total_keys"] = kn
 
             # ── Town fields (town_<i>_<field>) ──
             towns = data.get("world", {}).get("towns", [])

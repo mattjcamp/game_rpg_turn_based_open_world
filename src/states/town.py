@@ -608,8 +608,8 @@ class TownState(InventoryMixin, BaseState):
                 f"{remaining} more needed.", 3000)
         else:
             self.show_message(
-                "A massive gnomish machine blocks the sun! "
-                "It has 8 empty keyhole slots.", 3500)
+                f"A massive gnomish machine hums with power! "
+                f"It has {total} empty keyhole slots.", 3500)
 
     def _trigger_victory(self):
         """Called when all keys are inserted — quest complete!"""
@@ -1033,15 +1033,16 @@ class TownState(InventoryMixin, BaseState):
             # Keep dialogue active to show the decline message
 
     def _accept_gnome_quest(self):
-        """Accept Fizzwick's Keys of Shadow quest."""
+        """Accept the gnome's machine quest (Keys of Shadow or custom)."""
         npc = self.npc_speaking
         self.game.set_gnome_quest_accepted()
-        inserted = self.game.get_keys_inserted()
+        # Also reveal all undiscovered key dungeons on the map
+        self.game.discover_key_dungeons()
         total = self.game.get_total_keys()
         self._set_dialogue(
-            f"{npc.name}: Thank you! The 8 dungeons are scattered across "
-            f"the land. Start with the closest one — it's the easiest. "
-            f"Bring the keys back to me!")
+            f"{npc.name}: Thank you! The {total} dungeons are scattered "
+            f"across the land. Start with the closest one — it's the "
+            f"easiest. Bring the keys back to me!")
         self.quest_choice_active = False
         self.quest_choices = []
         self.quest_dialogue_lines = []

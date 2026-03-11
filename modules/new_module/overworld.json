@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "mapleshire",
+      "id": "amberhollow",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -17,7 +17,7 @@
       "clear_radius": 3
     },
     {
-      "id": "town_vault",
+      "id": "town_shrine",
       "type": "machine",
       "col": 18,
       "row": 8,
