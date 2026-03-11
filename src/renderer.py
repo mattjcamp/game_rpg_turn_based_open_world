@@ -478,7 +478,8 @@ class Renderer(CombatEffectRendererMixin):
 
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False, darkness_active=False,
-                      keys_inserted=0, shake_offset=(0, 0)):
+                      keys_inserted=0, total_keys=8,
+                      shake_offset=(0, 0)):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
@@ -583,7 +584,7 @@ class Renderer(CombatEffectRendererMixin):
         # After all keys are inserted and darkness_active is cleared,
         # the town is permanently lit — skip even normal night darkness.
         clock = party.clock
-        darkness_lifted = (keys_inserted >= 8 and not darkness_active)
+        darkness_lifted = (keys_inserted >= total_keys and not darkness_active)
         has_infravision = party.has_effect("Infravision")
         has_galadriels = (party.has_effect("Galadriel's Light")
                           and party.galadriels_light_steps > 0)

@@ -1613,6 +1613,7 @@ class TownState(InventoryMixin, BaseState):
             quest_complete=quest_complete,
             darkness_active=getattr(self.game, "darkness_active", False),
             keys_inserted=getattr(self.game, "keys_inserted", 0),
+            total_keys=self.game.get_total_keys(),
             shake_offset=(shake_x, shake_y),
         )
         # Pickpocket targeting overlay

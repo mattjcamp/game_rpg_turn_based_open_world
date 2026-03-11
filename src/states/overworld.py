@@ -725,12 +725,22 @@ class OverworldState(InventoryMixin, BaseState):
             f"The town of {name} rises from the landscape. "
             "Smoke drifts from chimneys and voices carry on the wind.")
 
-        # After the quest is complete, Duskhollow is no longer dark
-        if (name == "Duskhollow"
-                and not getattr(self.game, "darkness_active", False)):
-            desc = ("Once shrouded in eternal darkness, Duskhollow now basks "
-                    "in warm sunlight. The townsfolk celebrate their freedom "
-                    "as life returns to normal.")
+        # After a gnome machine quest is complete, darkness lifts
+        has_gnome_machine = any(
+            kd.get("quest_type") == "gnome_machine"
+            for kd in getattr(self.game, "key_dungeons", {}).values())
+        mod_id = ""
+        if self.game.module_manifest:
+            mod_id = self.game.module_manifest.get(
+                "metadata", {}).get("id", "")
+        if mod_id == "keys_of_shadow":
+            has_gnome_machine = True
+        if (has_gnome_machine
+                and not getattr(self.game, "darkness_active", False)
+                and getattr(self.game, "keys_inserted", 0) > 0):
+            desc = (f"Once shrouded in eternal darkness, {name} now basks "
+                    f"in warm sunlight. The townsfolk celebrate their freedom "
+                    f"as life returns to normal.")
 
         self.town_action_info = {
             "name": name,
@@ -1115,6 +1125,7 @@ class OverworldState(InventoryMixin, BaseState):
             unique_pos=self.unique_tile_pos,
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
+            darkness_active=getattr(self.game, "darkness_active", False),
         )
         if self.town_action_active:
             renderer.draw_town_action_screen(

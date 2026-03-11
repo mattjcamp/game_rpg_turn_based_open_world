@@ -398,6 +398,10 @@ class Game:
                 else:
                     # Generate all towns from the manifest
                     self._init_module_towns()
+                    # Enable darkness if any quest uses gnome_machine
+                    if any(kd.get("quest_type") == "gnome_machine"
+                           for kd in self.key_dungeons.values()):
+                        self.darkness_active = True
 
         self._game_started = True
         self.showing_title = False
