@@ -4227,6 +4227,59 @@ class Renderer(CombatEffectRendererMixin):
         surf = f.render(text.upper(), True, c)
         self.screen.blit(surf, (x, y))
 
+    @staticmethod
+    def _wrap_text_px(text, font, max_width, max_lines=4):
+        """Word-wrap *text* into lines that fit within *max_width* pixels.
+
+        Returns a list of strings.  Long words that exceed a full line
+        are broken mid-word.  At most *max_lines* lines are returned;
+        the last line is truncated with '..' if the text doesn't fit.
+        """
+        if not text:
+            return ["(empty)"]
+        if font.size(text.upper())[0] <= max_width:
+            return [text]
+
+        words = text.split()
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip() if current else word
+            if font.size(test.upper())[0] <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                # If the word itself is too wide, break it
+                if font.size(word.upper())[0] > max_width:
+                    while word:
+                        chunk = word
+                        while (len(chunk) > 1
+                               and font.size(chunk.upper())[0]
+                               > max_width):
+                            chunk = chunk[:-1]
+                        lines.append(chunk)
+                        word = word[len(chunk):]
+                    current = ""
+                else:
+                    current = word
+            if len(lines) >= max_lines:
+                break
+        if current and len(lines) < max_lines:
+            lines.append(current)
+
+        # Enforce max_lines and truncate last line if needed
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+        if len(lines) == max_lines and current and current != lines[-1]:
+            # There's leftover text; mark truncation
+            last = lines[-1]
+            while (len(last) > 2
+                   and font.size((last + "..").upper())[0] > max_width):
+                last = last[:-1]
+            lines[-1] = last + ".."
+        return lines if lines else ["(empty)"]
+
     def _draw_floating_message(self, message, y=16, max_width=None):
         """Draw a word-wrapped floating message box centred on screen.
 
@@ -6224,7 +6277,10 @@ class Renderer(CombatEffectRendererMixin):
                            edit_mode=False, edit_is_new=False,
                            edit_field=0,
                            edit_fields=None, edit_buffer="",
-                           edit_scroll=0):
+                           edit_scroll=0,
+                           edit_level=0, edit_sections=None,
+                           edit_section_cursor=0,
+                           edit_section_scroll=0):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -6319,8 +6375,15 @@ class Renderer(CombatEffectRendererMixin):
             if is_active:
                 marker = " *"
 
-            self._u3_text(f"{prefix}{mod['name']}{marker}",
-                          left_x + 10, y, name_color, fm)
+            # Truncate name to fit left panel
+            left_max_pw = left_w - 24  # 10px left pad + 14px right
+            disp_name = mod['name']
+            mod_label = f"{prefix}{disp_name}{marker}"
+            while (len(disp_name) > 2
+                   and fm.size(mod_label.upper())[0] > left_max_pw):
+                disp_name = disp_name[:len(disp_name) - 1]
+                mod_label = f"{prefix}{disp_name}..{marker}"
+            self._u3_text(mod_label, left_x + 10, y, name_color, fm)
 
             # Version in small text
             ver_color = (100, 100, 120) if not selected else (140, 140, 160)
@@ -6341,12 +6404,23 @@ class Renderer(CombatEffectRendererMixin):
             mod = modules[cursor]
             dy = panel_y + 12
 
-            # Module name
-            self._u3_text(mod["name"], right_x + 16, dy, self._U3_WHITE, f)
+            # Module name — truncate to fit right panel
+            right_max_pw = right_w - 36
+            dname = mod["name"]
+            while (len(dname) > 2
+                   and f.size(dname.upper())[0] > right_max_pw):
+                dname = dname[:len(dname) - 1]
+            if len(dname) < len(mod["name"]):
+                dname += ".."
+            self._u3_text(dname, right_x + 16, dy, self._U3_WHITE, f)
             dy += 28
 
-            # Author
-            self._u3_text(f"by {mod['author']}", right_x + 16, dy,
+            # Author — truncate to fit
+            auth_text = f"by {mod['author']}"
+            while (len(auth_text) > 4
+                   and fm.size(auth_text.upper())[0] > right_max_pw):
+                auth_text = auth_text[:len(auth_text) - 3] + ".."
+            self._u3_text(auth_text, right_x + 16, dy,
                           (160, 160, 180), fm)
             dy += 22
 
@@ -6393,17 +6467,39 @@ class Renderer(CombatEffectRendererMixin):
                                   (180, 180, 200), fm)
                     dy += 18
 
-            # Module ID (for debugging / reference)
+            # Module ID (for debugging / reference) — truncate to fit
             id_y = max(dy + 16, panel_y + panel_h - 28)
-            self._u3_text(f"ID: {mod['id']}", right_x + 16, id_y,
+            id_text = f"ID: {mod['id']}"
+            while (len(id_text) > 5
+                   and fs.size(id_text.upper())[0] > right_max_pw):
+                id_text = id_text[:len(id_text) - 3] + ".."
+            self._u3_text(id_text, right_x + 16, id_y,
                           (80, 80, 100), fs)
 
         # ── Edit mode overlay ──
-        if edit_mode and edit_fields:
-            self._draw_module_edit_overlay(
-                right_x, panel_y, right_w, panel_h,
-                edit_fields, edit_field, edit_buffer, edit_is_new,
-                edit_scroll)
+        if edit_mode:
+            if edit_is_new and edit_fields:
+                # Flat field editor for create-new mode
+                self._draw_module_edit_overlay(
+                    right_x, panel_y, right_w, panel_h,
+                    edit_fields, edit_field, edit_buffer, True,
+                    edit_scroll)
+            elif edit_level == 0 and edit_sections:
+                # Section browser (level 0)
+                self._draw_section_browser(
+                    right_x, panel_y, right_w, panel_h,
+                    edit_sections, edit_section_cursor,
+                    edit_section_scroll)
+            elif edit_level == 1 and edit_fields:
+                # Field editor within a section (level 1)
+                sec_label = ""
+                if edit_sections and 0 <= edit_section_cursor < len(
+                        edit_sections):
+                    sec_label = edit_sections[edit_section_cursor]["label"]
+                self._draw_module_edit_overlay(
+                    right_x, panel_y, right_w, panel_h,
+                    edit_fields, edit_field, edit_buffer, False,
+                    edit_scroll, section_title=sec_label)
 
         # ── Feedback / confirmation message ──
         if message:
@@ -6418,19 +6514,23 @@ class Renderer(CombatEffectRendererMixin):
         hint_color = (68, 68, 200)
         if edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
-                    "[LT/RT] Adjust  [ENTER] Create  [ESC] Cancel")
-        elif edit_mode:
+                    "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
+        elif edit_mode and edit_level == 0:
+            hint = ("[UP/DN] Browse  [ENTER] Open  "
+                    "[CTRL+S] Save  [ESC] Back")
+        elif edit_mode and edit_level == 1:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
-                    "[ENTER] Save  [ESC] Cancel")
+                    "[CTRL+S] Save  [ESC] Back")
         else:
-            hint = ("[UP/DN] Browse  [ENTER] Select  "
+            hint = ("[UP/DN] Browse  [S] Select  "
                     "[N] New  [E] Edit  [D] Delete  [ESC] Back")
         self._u3_text(hint, SCREEN_WIDTH // 2 - len(hint) * 4,
                       hint_y, hint_color, fs)
 
     def _draw_module_edit_overlay(self, rx, ry, rw, rh,
                                   fields, active_idx, buffer,
-                                  is_new=False, scroll=0):
+                                  is_new=False, scroll=0,
+                                  section_title=""):
         """Draw the edit/create form over the detail panel."""
         fm = self.font_med
         fs = self.font_small
@@ -6444,7 +6544,18 @@ class Renderer(CombatEffectRendererMixin):
                          (rx, ry, rw, rh), 1)
 
         # Title
-        title = "CREATE MODULE" if is_new else "EDIT MODULE"
+        if is_new:
+            title = "CREATE MODULE"
+        elif section_title:
+            title = section_title
+        else:
+            title = "EDIT MODULE"
+        # Truncate title to fit panel
+        while (len(title) > 3
+               and f.size(title.upper())[0] > rw - 36):
+            title = title[:-1]
+        if section_title and len(title) < len(section_title):
+            title += ".."
         self._u3_text(title, rx + 16, ry + 12, self._U3_ORANGE, f)
 
         # Clip area for scrollable content
@@ -6495,10 +6606,18 @@ class Renderer(CombatEffectRendererMixin):
             # Only draw if within visible area (with a bit of margin)
             visible = content_top - 30 < dy < content_bottom + 50
 
+            # Maximum pixel width for any text in this panel
+            max_pw = rw - 36          # 16px left pad + 20px right pad
+
             # Label with lock icon for read-only
             lock = "" if editable else " (locked)"
+            lbl_text = f"{label}{lock}:"
             if visible:
-                self._u3_text(f"{label}{lock}:", rx + 16, dy,
+                # Truncate label if it exceeds panel width
+                while (len(lbl_text) > 4
+                       and fm.size(lbl_text.upper())[0] > max_pw):
+                    lbl_text = lbl_text[:len(lbl_text) - 4] + "..:"
+                self._u3_text(lbl_text, rx + 16, dy,
                               label_color, fm)
             dy += 18
 
@@ -6507,34 +6626,58 @@ class Renderer(CombatEffectRendererMixin):
             if not display:
                 display = "(empty)"
 
+            # Available pixel width for values (starts at rx+20)
+            val_max_pw = rw - 40      # 20px left + 20px right
+
             if visible:
                 if field_type in ("choice", "int"):
                     if editable:
-                        self._u3_text("<", rx + 20, dy, arrow_color, fm)
-                        self._u3_text(display, rx + 34, dy,
+                        # arrows take ~18px each side
+                        inner_pw = val_max_pw - 36
+                        trunc = display
+                        while (len(trunc) > 2
+                               and fm.size(trunc.upper())[0]
+                               > inner_pw):
+                            trunc = trunc[:len(trunc) - 3] + ".."
+                        self._u3_text("<", rx + 20, dy,
+                                      arrow_color, fm)
+                        self._u3_text(trunc, rx + 34, dy,
                                       text_color, fm)
-                        val_w = fm.size(display.upper())[0]
-                        self._u3_text(">", rx + 38 + val_w, dy,
+                        val_w = fm.size(trunc.upper())[0]
+                        arrow_x = min(rx + 38 + val_w,
+                                      rx + rw - 20)
+                        self._u3_text(">", arrow_x, dy,
                                       arrow_color, fm)
                     else:
-                        self._u3_text(display, rx + 20, dy,
+                        trunc = display
+                        while (len(trunc) > 2
+                               and fm.size(trunc.upper())[0]
+                               > val_max_pw):
+                            trunc = trunc[:len(trunc) - 3] + ".."
+                        self._u3_text(trunc, rx + 20, dy,
                                       text_color, fm)
                 else:
-                    # Truncate long text to fit panel
-                    max_chars = (rw - 40) // 8
-                    if len(display) > max_chars:
-                        display = display[:max_chars - 2] + ".."
-                    self._u3_text(display, rx + 20, dy, text_color, fm)
-
-                    # Blinking cursor for active editable text field
-                    if selected and editable:
-                        cursor_x = (rx + 20
-                                    + fm.size(display.upper())[0] + 2)
-                        if pygame.time.get_ticks() % 800 < 400:
-                            pygame.draw.line(
-                                self.screen, (255, 255, 255),
-                                (cursor_x, dy),
-                                (cursor_x, dy + 14), 1)
+                    # Word-wrap long text fields across multiple lines
+                    lines = self._wrap_text_px(display, fm, val_max_pw)
+                    for li, line in enumerate(lines):
+                        line_vis = (content_top - 20 < dy
+                                    < content_bottom + 20)
+                        if line_vis:
+                            self._u3_text(line, rx + 20, dy,
+                                          text_color, fm)
+                        # Cursor on last line of active field
+                        if (li == len(lines) - 1 and selected
+                                and editable and line_vis):
+                            cursor_x = (rx + 20
+                                        + fm.size(line.upper())[0] + 2)
+                            cursor_x = min(cursor_x, rx + rw - 16)
+                            if pygame.time.get_ticks() % 800 < 400:
+                                pygame.draw.line(
+                                    self.screen, (255, 255, 255),
+                                    (cursor_x, dy),
+                                    (cursor_x, dy + 14), 1)
+                        if li < len(lines) - 1:
+                            dy += 16   # line spacing within wrapped text
             dy += 28
 
         # Restore clipping
@@ -6553,11 +6696,118 @@ class Renderer(CombatEffectRendererMixin):
 
         # Action label at the bottom of the form
         dy += 8
-        action_label = "ENTER to Create Module" if is_new \
-            else "ENTER to Save Changes"
+        action_label = "CTRL+S to Create Module" if is_new \
+            else "CTRL+S to Save Changes"
         blink = pygame.time.get_ticks() % 1200 < 800
         action_color = self._U3_ORANGE if blink else (140, 100, 40)
         self._u3_text(action_label, rx + 16, dy, action_color, fm)
+
+    def _draw_section_browser(self, rx, ry, rw, rh,
+                               sections, cursor, scroll=0):
+        """Draw the section browser (level 0 of hierarchical edit)."""
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        # Semi-transparent overlay
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        # Title
+        self._u3_text("EDIT MODULE", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+
+        # Scrollable section list
+        content_top = ry + 44
+        content_bottom = ry + rh - 8
+        content_height = content_bottom - content_top
+        row_h = 40
+        max_visible = content_height // row_h
+
+        # Category labels (derived from icon type)
+        prev_icon = None
+        dy = content_top
+
+        for vi, si in enumerate(range(
+                scroll, min(scroll + max_visible, len(sections)))):
+            sec = sections[si]
+            icon = sec.get("icon", ">")
+            selected = (si == cursor)
+
+            # Category separator when icon type changes
+            if icon != prev_icon and prev_icon is not None:
+                cat_y = dy - 2
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 16, cat_y),
+                                 (rx + rw - 16, cat_y), 1)
+            prev_icon = icon
+
+            # Selection highlight
+            if selected:
+                bar = pygame.Surface((rw - 4, row_h - 4),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (rx + 2, dy))
+
+            # Icon badge
+            if icon == "T":
+                badge_color = (80, 160, 80)
+                badge_text = "T"
+            elif icon == "D":
+                badge_color = (160, 80, 80)
+                badge_text = "D"
+            else:
+                badge_color = (100, 100, 160)
+                badge_text = ">"
+
+            badge_rect = pygame.Rect(rx + 16, dy + 6, 22, 22)
+            pygame.draw.rect(self.screen, badge_color, badge_rect, 0,
+                             border_radius=3)
+            pygame.draw.rect(self.screen, (40, 30, 20), badge_rect, 1,
+                             border_radius=3)
+            bx = rx + 16 + 11 - fs.size(badge_text.upper())[0] // 2
+            self._u3_text(badge_text, bx, dy + 8,
+                          self._U3_WHITE, fs)
+
+            # Label
+            label = sec["label"]
+            label_color = self._U3_WHITE if selected else (180, 180, 180)
+            # Truncate to fit
+            max_pw = rw - 80
+            while (len(label) > 2
+                   and fm.size(label.upper())[0] > max_pw):
+                label = label[:-1]
+            if len(label) < len(sec["label"]):
+                label += ".."
+            self._u3_text(label, rx + 46, dy + 4, label_color, fm)
+
+            # Subtitle: field count
+            nfields = len(sec.get("fields", []))
+            editable = sum(1 for fl in sec.get("fields", [])
+                           if fl[4])
+            sub = f"{editable} editable" if editable else "read-only"
+            sub_color = (120, 120, 140) if not selected \
+                else (160, 160, 180)
+            self._u3_text(sub, rx + 46, dy + 22, sub_color, fs)
+
+            # Arrow indicator
+            if selected:
+                arrow_x = rx + rw - 28
+                self._u3_text(">", arrow_x, dy + 8,
+                              self._U3_ORANGE, fm)
+
+            dy += row_h
+
+        # Scroll indicators
+        if scroll > 0:
+            self._u3_text("^^^", rx + rw // 2 - 12, content_top - 2,
+                          (180, 140, 60), fs)
+        if scroll + max_visible < len(sections):
+            self._u3_text("vvv", rx + rw // 2 - 12,
+                          content_bottom - 14, (180, 140, 60), fs)
 
     def draw_game_over_screen(self, options, cursor, elapsed):
         """Draw a grim game-over screen with skull art and menu options.

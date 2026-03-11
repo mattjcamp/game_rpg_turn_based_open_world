@@ -126,6 +126,11 @@ class Game:
         self.module_edit_buffer = ""         # text being typed
         self.module_edit_fields = []         # [label, key, value, type, editable]
         self.module_edit_scroll = 0          # scroll offset for long field lists
+        # ── Hierarchical navigation (edit existing modules) ──
+        self.module_edit_level = 0           # 0=section browser, 1=field editor
+        self.module_edit_sections = []       # list of section dicts
+        self.module_edit_section_cursor = 0  # highlighted section
+        self.module_edit_section_scroll = 0  # scroll for section list
         from src.module_loader import get_default_module_path
         self.active_module_path = get_default_module_path()
         self.active_module_name = "Keys of Shadow"
@@ -1287,7 +1292,7 @@ class Game:
         elif event.key == pygame.K_DOWN:
             self.module_cursor = (
                 (self.module_cursor + 1) % len(self.module_list))
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+        elif event.key == pygame.K_s:
             selected = self.module_list[self.module_cursor]
             self._set_active_module(
                 selected["path"], selected["name"], selected["version"])
@@ -1314,6 +1319,7 @@ class Game:
         """Open the edit overlay in 'create new module' mode."""
         self.module_edit_mode = True
         self.module_edit_is_new = True
+        self.module_edit_level = 0
         self.module_edit_field = 0
         self.module_edit_scroll = 0
         # All fields are editable in create mode
@@ -1353,7 +1359,7 @@ class Game:
             self.module_msg_timer = 2.0
 
     def _enter_module_edit(self):
-        """Enter edit mode for an existing module — full content editing."""
+        """Enter edit mode for an existing module — hierarchical navigation."""
         if not self.module_list:
             return
         mod = self.module_list[self.module_cursor]
@@ -1369,75 +1375,111 @@ class Game:
         import json, os
         manifest_path = os.path.join(mod["path"], "module.json")
         try:
-            with open(manifest_path, "r") as f:
-                manifest = json.load(f)
+            with open(manifest_path, "r") as fh:
+                manifest = json.load(fh)
         except (OSError, json.JSONDecodeError):
             manifest = {}
 
         self.module_edit_mode = True
         self.module_edit_is_new = False
-        self.module_edit_field = 0
-        self.module_edit_scroll = 0
 
-        # Each entry: [label, key, value, field_type, editable]
-        # Special: field_type "section" is a non-editable header row
-        fields = [
-            # ── Metadata ──
-            ["DETAILS", "", "", "section", False],
-            ["Name", "name", mod["name"], "text", True],
-            ["Author", "author", mod["author"], "text", True],
-            ["Description", "description",
-             mod.get("description", ""), "text", True],
-            # ── Settings (read-only) ──
-            ["SETTINGS", "", "", "section", False],
-            ["World Size", "world_size",
-             mod_settings["world_size"], "choice", False],
-            ["Towns", "num_towns",
-             str(mod_settings["num_towns"]), "int", False],
-            ["Quests", "num_quests",
-             str(mod_settings["num_quests"]), "int", False],
-            ["Season", "season",
-             mod_settings["season"], "choice", False],
-            ["Time of Day", "time_of_day",
-             mod_settings["time_of_day"], "choice", False],
-        ]
+        # ── Build section list for hierarchical navigation ──
+        sections = []
 
-        # ── Towns ──
+        # 1) Module Details
+        sections.append({
+            "label": "Module Details",
+            "icon": ">",
+            "fields": [
+                ["Name", "name", mod["name"], "text", True],
+                ["Author", "author", mod["author"], "text", True],
+                ["Description", "description",
+                 mod.get("description", ""), "text", True],
+            ],
+        })
+
+        # 2) Settings (read-only)
+        sections.append({
+            "label": "Settings",
+            "icon": ">",
+            "fields": [
+                ["World Size", "world_size",
+                 mod_settings["world_size"], "choice", False],
+                ["Towns", "num_towns",
+                 str(mod_settings["num_towns"]), "int", False],
+                ["Quests", "num_quests",
+                 str(mod_settings["num_quests"]), "int", False],
+                ["Season", "season",
+                 mod_settings["season"], "choice", False],
+                ["Time of Day", "time_of_day",
+                 mod_settings["time_of_day"], "choice", False],
+            ],
+        })
+
+        # 3) Each town as its own section
         towns = manifest.get("world", {}).get("towns", [])
-        if towns:
-            fields.append(["TOWNS", "", "", "section", False])
-            for i, town in enumerate(towns):
-                fields.append([
-                    f"Town {i+1} Name", f"town_{i}_name",
-                    town.get("name", f"Town {i+1}"), "text", True])
+        for i, town in enumerate(towns):
+            tname = town.get("name", f"Town {i+1}")
+            sections.append({
+                "label": tname,
+                "icon": "T",
+                "fields": [
+                    ["Name", f"town_{i}_name", tname, "text", True],
+                    ["Description", f"town_{i}_desc",
+                     town.get("description", ""), "text", True],
+                ],
+            })
 
-        # ── Dungeons & Quests ──
+        # 4) Each dungeon as its own section
         dungeons = manifest.get("progression", {}).get(
             "key_dungeons", [])
-        if dungeons:
-            fields.append(["DUNGEONS & QUESTS", "", "", "section", False])
-            for i, dung in enumerate(dungeons):
-                fields.append([
-                    f"Dungeon {i+1} Name", f"dung_{i}_name",
-                    dung.get("name", f"Dungeon {i+1}"), "text", True])
-                fields.append([
-                    f"  Key Name", f"dung_{i}_key",
-                    dung.get("key_name", "Key"), "text", True])
-                fields.append([
-                    f"  Description", f"dung_{i}_desc",
-                    dung.get("description", ""), "text", True])
-                fields.append([
-                    f"  Quest Objective", f"dung_{i}_obj",
-                    dung.get("quest_objective", ""), "text", True])
-                fields.append([
-                    f"  Quest Hint", f"dung_{i}_hint",
-                    dung.get("quest_hint", ""), "text", True])
+        for i, dung in enumerate(dungeons):
+            dname = dung.get("name", f"Dungeon {i+1}")
+            sections.append({
+                "label": dname,
+                "icon": "D",
+                "fields": [
+                    ["Name", f"dung_{i}_name", dname, "text", True],
+                    ["Key Name", f"dung_{i}_key",
+                     dung.get("key_name", "Key"), "text", True],
+                    ["Description", f"dung_{i}_desc",
+                     dung.get("description", ""), "text", True],
+                    ["Quest Objective", f"dung_{i}_obj",
+                     dung.get("quest_objective", ""), "text", True],
+                    ["Quest Hint", f"dung_{i}_hint",
+                     dung.get("quest_hint", ""), "text", True],
+                ],
+            })
 
-        self.module_edit_fields = fields
-        # Skip to first editable field
+        self.module_edit_sections = sections
+        self.module_edit_section_cursor = 0
+        self.module_edit_section_scroll = 0
+        self.module_edit_level = 0
+        # Clear field-level state
+        self.module_edit_fields = []
+        self.module_edit_field = 0
+        self.module_edit_buffer = ""
+        self.module_edit_scroll = 0
+
+    def _enter_section_fields(self):
+        """Drill into the selected section's fields for editing."""
+        sec = self.module_edit_sections[self.module_edit_section_cursor]
+        self.module_edit_fields = sec["fields"]
+        self.module_edit_field = 0
+        self.module_edit_scroll = 0
+        self.module_edit_level = 1
+        # Find first editable field
         self.module_edit_field = self._next_editable_field(0)
         self.module_edit_buffer = \
             self.module_edit_fields[self.module_edit_field][2]
+
+    def _leave_section_fields(self):
+        """Go back from field editing to the section browser."""
+        # Persist any in-progress buffer back to the field
+        if self.module_edit_fields:
+            entry = self.module_edit_fields[self.module_edit_field]
+            entry[2] = self.module_edit_buffer
+        self.module_edit_level = 0
 
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
@@ -1447,6 +1489,8 @@ class Game:
         first editable field from the current position forward.
         """
         n = len(self.module_edit_fields)
+        if n == 0:
+            return 0
         step = direction if direction != 0 else 1
         start = self.module_edit_field
         # When direction is 0, check the current field first
@@ -1461,33 +1505,89 @@ class Game:
 
     def _adjust_module_edit_scroll(self):
         """Auto-scroll the edit form to keep the active field visible."""
-        # Compute the Y offset of the active field from the top of
-        # the scrollable content area.  Must match renderer layout.
+        CHARS_PER_LINE = 49
         y = 0
+        field_h = 0
         for i, entry in enumerate(self.module_edit_fields):
             field_type = entry[3] if len(entry) > 3 else "text"
-            if field_type == "section":
-                y += 6 + 8 + 22          # spacing + line + header text
+            val = entry[2] or ""
+            if field_type == "text" and len(val) > CHARS_PER_LINE:
+                nlines = min(4, max(1,
+                    (len(val) + CHARS_PER_LINE - 1) // CHARS_PER_LINE))
+                extra = (nlines - 1) * 16
             else:
-                if i == self.module_edit_field:
-                    break
-                y += 18 + 28              # label + value rows
-        # visible_height ~ panel height minus title area minus margin
-        # The panel is roughly 550px; content area starts 44px down.
+                extra = 0
+            h = 18 + 28 + extra
+            if i == self.module_edit_field:
+                field_h = h
+                break
+            y += h
         visible_height = 480
         if y < self.module_edit_scroll:
             self.module_edit_scroll = max(0, y - 10)
-        elif y + 50 > self.module_edit_scroll + visible_height:
-            self.module_edit_scroll = y + 50 - visible_height
+        elif y + field_h + 10 > self.module_edit_scroll + visible_height:
+            self.module_edit_scroll = y + field_h + 10 - visible_height
 
     def _handle_module_edit_input(self, event):
-        """Handle input while editing module fields."""
+        """Handle input while editing module (hierarchical navigation)."""
+        # ── Create-new mode uses flat field list (no hierarchy) ──
+        if self.module_edit_is_new:
+            self._handle_module_edit_input_flat(event)
+            return
+
+        # ── Level 0: section browser ──
+        if self.module_edit_level == 0:
+            self._handle_section_browser_input(event)
+            return
+
+        # ── Level 1: field editor within a section ──
+        if event.key == pygame.K_ESCAPE:
+            self._leave_section_fields()
+            return
+        if (event.key == pygame.K_s
+                and event.mod & pygame.KMOD_CTRL):
+            # Save from within field editor
+            entry = self.module_edit_fields[self.module_edit_field]
+            entry[2] = self.module_edit_buffer
+            self._commit_module_edit()
+            return
+
+        self._handle_field_editor_input(event)
+
+    def _handle_section_browser_input(self, event):
+        """Handle input at the section browser level (level 0)."""
+        n = len(self.module_edit_sections)
         if event.key == pygame.K_ESCAPE:
             self.module_edit_mode = False
             self.module_edit_is_new = False
             self.module_message = None
-            return
+        elif event.key == pygame.K_UP:
+            self.module_edit_section_cursor = (
+                (self.module_edit_section_cursor - 1) % n)
+            self._adjust_section_scroll()
+        elif event.key == pygame.K_DOWN:
+            self.module_edit_section_cursor = (
+                (self.module_edit_section_cursor + 1) % n)
+            self._adjust_section_scroll()
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            self._enter_section_fields()
+        elif (event.key == pygame.K_s
+              and event.mod & pygame.KMOD_CTRL):
+            self._commit_module_edit()
 
+    def _adjust_section_scroll(self):
+        """Keep the section cursor visible in the section list."""
+        row_h = 36
+        visible_height = 480
+        max_visible = visible_height // row_h
+        cursor = self.module_edit_section_cursor
+        if cursor < self.module_edit_section_scroll:
+            self.module_edit_section_scroll = cursor
+        elif cursor >= self.module_edit_section_scroll + max_visible:
+            self.module_edit_section_scroll = cursor - max_visible + 1
+
+    def _handle_field_editor_input(self, event):
+        """Handle input at the field editor level (level 1)."""
         field_entry = self.module_edit_fields[self.module_edit_field]
         field_type = field_entry[3] if len(field_entry) > 3 else "text"
         editable = field_entry[4] if len(field_entry) > 4 else True
@@ -1504,14 +1604,9 @@ class Game:
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
             self._adjust_module_edit_scroll()
-        elif event.key == pygame.K_RETURN:
-            field_entry[2] = self.module_edit_buffer
-            self._commit_module_edit()
         elif not editable:
-            # Field is read-only — ignore all other input
             return
         elif field_type == "choice":
-            # Left/Right to cycle through preset choices
             from src.module_loader import (WORLD_SIZE_NAMES,
                                            SEASON_NAMES,
                                            TIME_OF_DAY_NAMES)
@@ -1552,16 +1647,93 @@ class Game:
             elif event.unicode and event.unicode.isprintable():
                 self.module_edit_buffer += event.unicode
 
+    def _handle_module_edit_input_flat(self, event):
+        """Handle input for the flat create-new-module form."""
+        if event.key == pygame.K_ESCAPE:
+            self.module_edit_mode = False
+            self.module_edit_is_new = False
+            self.module_message = None
+            return
+
+        field_entry = self.module_edit_fields[self.module_edit_field]
+        field_type = field_entry[3] if len(field_entry) > 3 else "text"
+        editable = field_entry[4] if len(field_entry) > 4 else True
+
+        if event.key == pygame.K_UP:
+            field_entry[2] = self.module_edit_buffer
+            self.module_edit_field = self._next_editable_field(-1)
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+            self._adjust_module_edit_scroll()
+        elif event.key == pygame.K_DOWN:
+            field_entry[2] = self.module_edit_buffer
+            self.module_edit_field = self._next_editable_field(+1)
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+            self._adjust_module_edit_scroll()
+        elif (event.key == pygame.K_s
+              and event.mod & pygame.KMOD_CTRL):
+            field_entry[2] = self.module_edit_buffer
+            self._commit_module_edit()
+        elif not editable:
+            return
+        elif field_type == "choice":
+            from src.module_loader import (WORLD_SIZE_NAMES,
+                                           SEASON_NAMES,
+                                           TIME_OF_DAY_NAMES)
+            key = field_entry[1]
+            if key == "world_size":
+                choices = WORLD_SIZE_NAMES
+            elif key == "season":
+                choices = SEASON_NAMES
+            elif key == "time_of_day":
+                choices = TIME_OF_DAY_NAMES
+            else:
+                choices = [self.module_edit_buffer]
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                try:
+                    idx = choices.index(self.module_edit_buffer)
+                except ValueError:
+                    idx = 0
+                if event.key == pygame.K_RIGHT:
+                    idx = (idx + 1) % len(choices)
+                else:
+                    idx = (idx - 1) % len(choices)
+                self.module_edit_buffer = choices[idx]
+        elif field_type == "int":
+            if event.key == pygame.K_BACKSPACE:
+                self.module_edit_buffer = self.module_edit_buffer[:-1]
+            elif event.key == pygame.K_LEFT:
+                val = max(0, int(self.module_edit_buffer or "0") - 1)
+                self.module_edit_buffer = str(val)
+            elif event.key == pygame.K_RIGHT:
+                val = int(self.module_edit_buffer or "0") + 1
+                self.module_edit_buffer = str(val)
+            elif event.unicode and event.unicode.isdigit():
+                self.module_edit_buffer += event.unicode
+        else:
+            if event.key == pygame.K_BACKSPACE:
+                self.module_edit_buffer = self.module_edit_buffer[:-1]
+            elif event.unicode and event.unicode.isprintable():
+                self.module_edit_buffer += event.unicode
+
     def _commit_module_edit(self):
         """Create a new module or save edits to an existing one."""
-        # Gather all field values into a dict
+        # Gather all field values into a dict.
+        # For create-new, fields live in self.module_edit_fields.
+        # For existing modules, fields are spread across sections.
         values = {}
-        for entry in self.module_edit_fields:
-            key, value = entry[1], entry[2]
-            if key in ("num_towns", "num_quests"):
-                values[key] = int(value) if value else 0
-            else:
-                values[key] = value
+        if self.module_edit_is_new:
+            sources = [self.module_edit_fields]
+        else:
+            sources = [s["fields"] for s in self.module_edit_sections]
+        for field_list in sources:
+            for entry in field_list:
+                key, value = entry[1], entry[2]
+                if key in ("num_towns", "num_quests"):
+                    values[key] = int(value) if value else 0
+                else:
+                    values[key] = value
 
         if self.module_edit_is_new:
             # ── Create new module with all settings ──
@@ -1611,17 +1783,26 @@ class Game:
                 if key in values:
                     meta[key] = values[key]
 
-            # ── Town fields (town_<i>_name) ──
+            # ── Town fields (town_<i>_<field>) ──
             towns = data.get("world", {}).get("towns", [])
+            town_field_map = {
+                "name": "name",
+                "desc": "description",
+            }
             for key, val in values.items():
-                if key.startswith("town_") and key.endswith("_name"):
-                    idx_str = key.split("_")[1]
-                    try:
-                        idx = int(idx_str)
-                    except ValueError:
-                        continue
-                    if 0 <= idx < len(towns):
-                        towns[idx]["name"] = val
+                if not key.startswith("town_"):
+                    continue
+                parts = key.split("_", 2)   # town, <i>, <field>
+                if len(parts) < 3:
+                    continue
+                try:
+                    idx = int(parts[1])
+                except ValueError:
+                    continue
+                suffix = parts[2]
+                json_key = town_field_map.get(suffix)
+                if json_key and 0 <= idx < len(towns):
+                    towns[idx][json_key] = val
 
             # ── Dungeon / quest fields (dung_<i>_<field>) ──
             dungeons = data.get("progression", {}).get(
@@ -2031,7 +2212,11 @@ class Game:
                     edit_field=self.module_edit_field,
                     edit_fields=self.module_edit_fields,
                     edit_buffer=self.module_edit_buffer,
-                    edit_scroll=self.module_edit_scroll)
+                    edit_scroll=self.module_edit_scroll,
+                    edit_level=self.module_edit_level,
+                    edit_sections=self.module_edit_sections,
+                    edit_section_cursor=self.module_edit_section_cursor,
+                    edit_section_scroll=self.module_edit_section_scroll)
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

@@ -204,6 +204,20 @@ _QUEST_THEMES = [
 ]
 
 
+_TOWN_DESCRIPTIONS = [
+    "A bustling market town where traders from distant lands hawk exotic wares.",
+    "A quiet hamlet nestled among rolling hills, known for its warm hearths.",
+    "A fortified settlement perched on a rocky bluff overlooking the valley.",
+    "A riverside town whose docks hum with the comings and goings of barges.",
+    "A sleepy village surrounded by ancient oaks and whispering meadows.",
+    "A crossroads town where adventurers gather to share rumours and ale.",
+    "A walled outpost on the frontier, always on guard against the wilds.",
+    "A seaside port battered by salt winds and rich with the smell of fish.",
+    "A hillside town whose cobbled streets wind between stone cottages.",
+    "A forest clearing settlement where druids and woodsmen live side by side.",
+]
+
+
 def _generate_town_names(count):
     """Return *count* unique town names."""
     names = set()
@@ -435,13 +449,17 @@ def create_module(name, author="Unknown", description="",
     # Resolve start_time from season + time_of_day
     start_time = _build_start_time(season, time_of_day)
 
-    # Build towns list with unique generated names
+    # Build towns list with unique generated names and descriptions
     num_towns = max(0, int(num_towns))
     town_names = _generate_town_names(num_towns)
+    town_descs = list(_TOWN_DESCRIPTIONS)
+    random.shuffle(town_descs)
     towns = []
     for i, tname in enumerate(town_names):
         town_id = tname.lower().replace(" ", "_")
-        towns.append({"id": town_id, "name": tname})
+        tdesc = town_descs[i % len(town_descs)] if town_descs else ""
+        towns.append({"id": town_id, "name": tname,
+                      "description": tdesc})
 
     # Build key_dungeons with unique dungeon/key names
     num_quests = max(0, int(num_quests))
@@ -708,6 +726,8 @@ def update_module_settings(module_path, *, world_size=None,
             existing_names = {t.get("name", "") for t in towns}
             needed = num_towns - len(towns)
             new_names = _generate_town_names(needed + 10)
+            descs = list(_TOWN_DESCRIPTIONS)
+            random.shuffle(descs)
             added = 0
             for tname in new_names:
                 if added >= needed:
@@ -715,7 +735,9 @@ def update_module_settings(module_path, *, world_size=None,
                 if tname in existing_names:
                     continue
                 town_id = tname.lower().replace(" ", "_")
-                towns.append({"id": town_id, "name": tname})
+                tdesc = descs[added % len(descs)] if descs else ""
+                towns.append({"id": town_id, "name": tname,
+                              "description": tdesc})
                 existing_names.add(tname)
                 added += 1
         towns = towns[:num_towns]
