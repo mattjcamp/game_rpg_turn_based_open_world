@@ -1606,12 +1606,24 @@ class TownState(InventoryMixin, BaseState):
         if self.machine_shutdown_effect:
             shake_x, shake_y = self.machine_shutdown_effect.shake_offset
 
+        # Town is dark if global darkness is on (KoS) OR if the town
+        # has an active gnome machine quest (custom modules — town-only).
+        town_dark = getattr(self.game, "darkness_active", False)
+        if not town_dark:
+            kd_map = getattr(self.game, "key_dungeons", {})
+            inserted = getattr(self.game, "keys_inserted", 0)
+            gnome_total = sum(
+                1 for kd in kd_map.values()
+                if kd.get("quest_type") == "gnome_machine")
+            if gnome_total > 0 and inserted < gnome_total:
+                town_dark = True
+
         renderer.draw_town_u3(
             self.game.party,
             self.town_data,
             message=msg,
             quest_complete=quest_complete,
-            darkness_active=getattr(self.game, "darkness_active", False),
+            darkness_active=town_dark,
             keys_inserted=getattr(self.game, "keys_inserted", 0),
             total_keys=self.game.get_total_keys(),
             shake_offset=(shake_x, shake_y),
