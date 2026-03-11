@@ -6223,7 +6223,8 @@ class Renderer(CombatEffectRendererMixin):
                            message=None, confirm_delete=False,
                            edit_mode=False, edit_is_new=False,
                            edit_field=0,
-                           edit_fields=None, edit_buffer=""):
+                           edit_fields=None, edit_buffer="",
+                           edit_scroll=0):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -6401,7 +6402,8 @@ class Renderer(CombatEffectRendererMixin):
         if edit_mode and edit_fields:
             self._draw_module_edit_overlay(
                 right_x, panel_y, right_w, panel_h,
-                edit_fields, edit_field, edit_buffer, edit_is_new)
+                edit_fields, edit_field, edit_buffer, edit_is_new,
+                edit_scroll)
 
         # ── Feedback / confirmation message ──
         if message:
@@ -6428,7 +6430,7 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_module_edit_overlay(self, rx, ry, rw, rh,
                                   fields, active_idx, buffer,
-                                  is_new=False):
+                                  is_new=False, scroll=0):
         """Draw the edit/create form over the detail panel."""
         fm = self.font_med
         fs = self.font_small
@@ -6444,11 +6446,18 @@ class Renderer(CombatEffectRendererMixin):
         # Title
         title = "CREATE MODULE" if is_new else "EDIT MODULE"
         self._u3_text(title, rx + 16, ry + 12, self._U3_ORANGE, f)
-        dy = ry + 44
 
-        settings_keys = {"world_size", "num_towns", "num_quests",
-                         "season", "time_of_day"}
-        drew_separator = False
+        # Clip area for scrollable content
+        content_top = ry + 44
+        content_bottom = ry + rh - 8
+        content_height = content_bottom - content_top
+
+        # Set up clipping rectangle
+        clip_rect = pygame.Rect(rx, content_top, rw, content_height)
+        old_clip = self.screen.get_clip()
+        self.screen.set_clip(clip_rect)
+
+        dy = content_top - scroll
 
         for i, entry in enumerate(fields):
             label, key, value = entry[0], entry[1], entry[2]
@@ -6456,16 +6465,18 @@ class Renderer(CombatEffectRendererMixin):
             editable = entry[4] if len(entry) > 4 else True
             selected = (i == active_idx)
 
-            # Draw a separator before the first settings field
-            if key in settings_keys and not drew_separator:
-                dy += 4
-                pygame.draw.line(self.screen, (80, 70, 50),
-                                 (rx + 16, dy), (rx + rw - 16, dy), 1)
+            # ── Section header ──
+            if field_type == "section":
+                dy += 6
+                if content_top - 20 < dy < content_bottom:
+                    pygame.draw.line(self.screen, (80, 70, 50),
+                                     (rx + 16, dy), (rx + rw - 16, dy), 1)
                 dy += 8
-                self._u3_text("SETTINGS", rx + 16, dy,
-                              (180, 140, 60), fs)
-                dy += 20
-                drew_separator = True
+                if content_top - 20 < dy < content_bottom:
+                    self._u3_text(label, rx + 16, dy,
+                                  (180, 140, 60), fs)
+                dy += 22
+                continue
 
             # Dim read-only fields
             if not editable:
@@ -6481,9 +6492,14 @@ class Renderer(CombatEffectRendererMixin):
                 text_color = (140, 140, 160)
                 arrow_color = (100, 100, 120)
 
+            # Only draw if within visible area (with a bit of margin)
+            visible = content_top - 30 < dy < content_bottom + 50
+
             # Label with lock icon for read-only
             lock = "" if editable else " (locked)"
-            self._u3_text(f"{label}{lock}:", rx + 16, dy, label_color, fm)
+            if visible:
+                self._u3_text(f"{label}{lock}:", rx + 16, dy,
+                              label_color, fm)
             dy += 18
 
             # Show the buffer for the active field, stored value otherwise
@@ -6491,31 +6507,49 @@ class Renderer(CombatEffectRendererMixin):
             if not display:
                 display = "(empty)"
 
-            if field_type in ("choice", "int"):
-                if editable:
-                    self._u3_text("<", rx + 20, dy, arrow_color, fm)
-                    self._u3_text(display, rx + 34, dy, text_color, fm)
-                    val_w = fm.size(display.upper())[0]
-                    self._u3_text(">", rx + 38 + val_w, dy,
-                                  arrow_color, fm)
+            if visible:
+                if field_type in ("choice", "int"):
+                    if editable:
+                        self._u3_text("<", rx + 20, dy, arrow_color, fm)
+                        self._u3_text(display, rx + 34, dy,
+                                      text_color, fm)
+                        val_w = fm.size(display.upper())[0]
+                        self._u3_text(">", rx + 38 + val_w, dy,
+                                      arrow_color, fm)
+                    else:
+                        self._u3_text(display, rx + 20, dy,
+                                      text_color, fm)
                 else:
-                    # Read-only: just show value, no arrows
+                    # Truncate long text to fit panel
+                    max_chars = (rw - 40) // 8
+                    if len(display) > max_chars:
+                        display = display[:max_chars - 2] + ".."
                     self._u3_text(display, rx + 20, dy, text_color, fm)
-            else:
-                # Truncate long text to fit panel
-                max_chars = (rw - 40) // 8
-                if len(display) > max_chars:
-                    display = display[:max_chars - 2] + ".."
-                self._u3_text(display, rx + 20, dy, text_color, fm)
 
-                # Blinking cursor for active editable text field
-                if selected and editable:
-                    cursor_x = rx + 20 + fm.size(display.upper())[0] + 2
-                    if pygame.time.get_ticks() % 800 < 400:
-                        pygame.draw.line(self.screen, (255, 255, 255),
-                                         (cursor_x, dy),
-                                         (cursor_x, dy + 14), 1)
+                    # Blinking cursor for active editable text field
+                    if selected and editable:
+                        cursor_x = (rx + 20
+                                    + fm.size(display.upper())[0] + 2)
+                        if pygame.time.get_ticks() % 800 < 400:
+                            pygame.draw.line(
+                                self.screen, (255, 255, 255),
+                                (cursor_x, dy),
+                                (cursor_x, dy + 14), 1)
             dy += 28
+
+        # Restore clipping
+        self.screen.set_clip(old_clip)
+
+        # Scroll indicators
+        if scroll > 0:
+            for sx in range(3):
+                self._u3_text("^", rx + rw // 2 - 8 + sx * 8,
+                              content_top, (180, 140, 60), fs)
+        total_content = dy + scroll - content_top
+        if total_content > content_height + scroll:
+            for sx in range(3):
+                self._u3_text("v", rx + rw // 2 - 8 + sx * 8,
+                              content_bottom - 14, (180, 140, 60), fs)
 
         # Action label at the bottom of the form
         dy += 8

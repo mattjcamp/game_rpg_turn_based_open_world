@@ -1,9 +1,9 @@
 {
   "metadata": {
     "id": "new_module",
-    "name": "New Module",
-    "author": "Unknown",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ravenvale.",
+    "name": "Weird module",
+    "author": "me",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in ss",
     "version": "0.1.0"
   },
   "settings": {
@@ -28,7 +28,7 @@
     "towns": [
       {
         "id": "ravenvale",
-        "name": "Ravenvale"
+        "name": "Twin peaks"
       }
     ],
     "dungeons": []
