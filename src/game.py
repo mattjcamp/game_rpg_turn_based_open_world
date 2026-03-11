@@ -2308,8 +2308,7 @@ class Game:
         elif cursor >= self.module_edit_section_scroll + max_visible:
             self.module_edit_section_scroll = cursor - max_visible + 1
 
-    @staticmethod
-    def _get_choices_for_field(key):
+    def _get_choices_for_field(self, key):
         """Return the list of valid choices for a choice-type field."""
         from src.module_loader import (WORLD_SIZE_NAMES,
                                        SEASON_NAMES,
