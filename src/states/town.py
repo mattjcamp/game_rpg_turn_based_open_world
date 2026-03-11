@@ -17,7 +17,8 @@ from src.settings import (
     TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
     TILE_TOWN, TILE_MACHINE,
 )
-from src.dungeon_generator import generate_quest_dungeon
+from src.dungeon_generator import (generate_quest_dungeon,
+                                   generate_innkeeper_quest_dungeon)
 
 
 class QuestCompleteEffect:
@@ -696,36 +697,88 @@ class TownState(InventoryMixin, BaseState):
         # Innkeeper quest logic
         if npc.npc_type == "innkeeper":
             quest = self.game.get_quest()
+            inn_quests = getattr(npc, "innkeeper_quests", False)
+            # Quest completed + innkeeper_quests — clear and offer new
+            if quest and quest["status"] == "completed" and inn_quests:
+                self.game.set_quest(None)
+                quest = None  # fall through to "no quest" below
             # No quest yet — offer one
             if quest is None and npc.quest_dialogue:
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                self.quest_dialogue_lines = list(npc.quest_dialogue)
+                if inn_quests:
+                    # Generate fresh random quest dialogue
+                    q = self._generate_random_innkeeper_quest(npc)
+                    qt = q.get("quest_type", "retrieve")
+                    if qt == "kill":
+                        lines = [
+                            f"I've been hearing reports of {q['kill_target']}s "
+                            f"lurking in a dungeon nearby.",
+                            f"Could you clear out {q['kill_count']} of them "
+                            f"before they become a bigger threat?",
+                        ]
+                    else:
+                        lines = [
+                            f"I've heard about a {q['artifact_name']} hidden "
+                            f"somewhere in a dangerous dungeon.",
+                            "Could you seek it out and bring it back safely?",
+                        ]
+                    # Store pending quest data on the NPC for _accept_quest
+                    npc._pending_innkeeper_quest = q
+                    npc.quest_name = q["name"]
+                    npc.artifact_name = q.get("artifact_name", "artifact")
+                    self.quest_dialogue_lines = lines
+                else:
+                    self.quest_dialogue_lines = list(npc.quest_dialogue)
                 self.quest_dialogue_index = 0
-                self._set_dialogue(f"{npc.name}: {self.quest_dialogue_lines[0]}")
+                self._set_dialogue(
+                    f"{npc.name}: {self.quest_dialogue_lines[0]}")
                 return
-            # Player has the artifact — complete the quest
+            # Player has the artifact / kill count — complete the quest
             if quest and quest["status"] == "artifact_found":
-                self._complete_quest(npc)
+                q_type = quest.get("quest_type", "retrieve")
+                if q_type == "kill":
+                    self._complete_quest(npc)
+                else:
+                    # Retrieve: check that the artifact is in inventory
+                    artifact = quest.get("artifact_name", "Shadow Crystal")
+                    if self.game.party.inv_count(artifact) > 0:
+                        self._complete_quest(npc)
+                    else:
+                        self.npc_dialogue_active = True
+                        self.npc_speaking = npc
+                        self._set_dialogue(
+                            f"{npc.name}: You seem to have lost the "
+                            f"{artifact}... Please find it!")
                 return
             # Quest already active — hint
             if quest and quest["status"] == "active":
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
+                q_type = quest.get("quest_type", "retrieve")
                 hint = getattr(npc, "hint_active", None)
                 if not hint:
-                    artifact = quest.get("artifact_name", "the artifact")
-                    hint = f"Have you found the {artifact} yet? It's out there somewhere..."
+                    if q_type == "kill":
+                        target = quest.get("kill_target", "monsters")
+                        progress = quest.get("kill_progress", 0)
+                        needed = quest.get("kill_count", 1)
+                        hint = (f"Keep hunting those {target}s! "
+                                f"({progress}/{needed} so far)")
+                    else:
+                        artifact = quest.get("artifact_name", "the artifact")
+                        hint = (f"Have you found the {artifact} yet? "
+                                f"It's out there somewhere...")
                 self._set_dialogue(f"{npc.name}: {hint}")
                 return
-            # Quest completed — display item dialogue
+            # Quest completed (non-repeatable) — display item dialogue
             if quest and quest["status"] == "completed":
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
                 done_text = getattr(npc, "text_complete", None)
                 if not done_text:
                     artifact = quest.get("artifact_name", "artifact")
-                    done_text = f"The {artifact} is safe. You've earned a hero's welcome here!"
+                    done_text = (f"The {artifact} is safe. You've earned "
+                                 f"a hero's welcome here!")
                 self._set_dialogue(f"{npc.name}: {done_text}")
                 return
 
@@ -1019,8 +1072,29 @@ class TownState(InventoryMixin, BaseState):
         quest_name = getattr(npc, "quest_name", "The Shadow Crystal")
         artifact_name = getattr(npc, "artifact_name", "Shadow Crystal")
 
-        # Generate the two-level quest dungeon
-        levels = generate_quest_dungeon(quest_name)
+        # If innkeeper_quests mode: use the pending quest data
+        # that was generated during the dialogue offer
+        inn_quests = getattr(npc, "innkeeper_quests", False)
+        pending = getattr(npc, "_pending_innkeeper_quest", None)
+        if inn_quests and pending:
+            quest_data = pending
+            npc._pending_innkeeper_quest = None
+        else:
+            quest_data = {
+                "name": quest_name,
+                "quest_type": "retrieve",
+                "artifact_name": artifact_name,
+            }
+
+        q_type = quest_data.get("quest_type", "retrieve")
+        q_name = quest_data["name"]
+
+        # Generate a multi-level quest dungeon (1-4 floors)
+        num_floors = random.randint(1, 4) if inn_quests else 2
+        place_artifact = (q_type != "kill")
+        levels = generate_innkeeper_quest_dungeon(
+            q_name, num_floors=num_floors,
+            place_artifact=place_artifact)
 
         # Find a random accessible tile on the overworld for the dungeon
         dc, dr = self._find_quest_dungeon_location()
@@ -1029,23 +1103,71 @@ class TownState(InventoryMixin, BaseState):
         self.game.tile_map.set_tile(dc, dr, TILE_DUNGEON)
 
         # Store quest state
-        self.game.set_quest({
-            "name": quest_name,
+        quest = {
+            "name": q_name,
             "status": "active",
             "dungeon_col": dc,
             "dungeon_row": dr,
             "levels": levels,
             "current_level": 0,
-            "artifact_name": artifact_name,
-        })
+            "artifact_name": quest_data.get("artifact_name", artifact_name),
+            "quest_type": q_type,
+            "exit_portal": True,
+        }
+        if q_type == "kill":
+            quest["kill_target"] = quest_data.get("kill_target", "Skeleton")
+            quest["kill_count"] = quest_data.get("kill_count", 3)
+            quest["kill_progress"] = 0
+        self.game.set_quest(quest)
 
         # Show confirmation
-        self._set_dialogue(f"{npc.name}: Thank you! I've marked a suspicious location on your map. Be careful down there!")
+        self._set_dialogue(
+            f"{npc.name}: Thank you! I've marked a suspicious "
+            f"location on your map. Be careful down there!")
         self.quest_choice_active = False
         self.quest_choices = []
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
         self._refresh_quest_highlights()
+
+    # ── Random innkeeper quest pools ─────────────────────────────
+
+    _RANDOM_RETRIEVE_QUESTS = [
+        {"name": "The Lost Chalice", "artifact": "Golden Chalice"},
+        {"name": "The Stolen Tome", "artifact": "Ancient Tome"},
+        {"name": "The Missing Pendant", "artifact": "Silver Pendant"},
+        {"name": "The Dark Orb", "artifact": "Shadow Orb"},
+        {"name": "The Cursed Idol", "artifact": "Cursed Idol"},
+        {"name": "The Hidden Crown", "artifact": "Forgotten Crown"},
+        {"name": "The Ember Stone", "artifact": "Ember Stone"},
+        {"name": "The Frost Shard", "artifact": "Frost Shard"},
+    ]
+
+    _RANDOM_KILL_TARGETS = [
+        "Giant Rat", "Skeleton", "Orc", "Goblin", "Zombie",
+        "Wolf", "Dark Mage", "Troll",
+    ]
+
+    def _generate_random_innkeeper_quest(self, npc):
+        """Generate a random quest — retrieve or kill — for the innkeeper."""
+        q_type = random.choice(["retrieve", "kill"])
+        if q_type == "retrieve":
+            template = random.choice(self._RANDOM_RETRIEVE_QUESTS)
+            return {
+                "name": template["name"],
+                "quest_type": "retrieve",
+                "artifact_name": template["artifact"],
+            }
+        else:
+            target = random.choice(self._RANDOM_KILL_TARGETS)
+            count = random.randint(2, 6)
+            return {
+                "name": f"Hunt the {target}s",
+                "quest_type": "kill",
+                "kill_target": target,
+                "kill_count": count,
+                "artifact_name": target,  # not really used for kill
+            }
 
     def _find_quest_dungeon_location(self):
         """Find a random walkable overworld tile for the quest dungeon.
@@ -1076,10 +1198,12 @@ class TownState(InventoryMixin, BaseState):
         """Complete the quest: remove artifact, give reward, play celebration."""
         party = self.game.party
         quest = self.game.get_quest()
+        q_type = quest.get("quest_type", "retrieve") if quest else "retrieve"
         artifact = quest.get("artifact_name", "Shadow Crystal") if quest else "Shadow Crystal"
 
-        # Remove the artifact from inventory
-        party.inv_remove(artifact)
+        # Remove the artifact from inventory (retrieve quests only)
+        if q_type != "kill" and party.inv_count(artifact) > 0:
+            party.inv_remove(artifact)
 
         # Give gold reward
         reward = 200
@@ -1093,15 +1217,22 @@ class TownState(InventoryMixin, BaseState):
         quest["status"] = "completed"
 
         # Launch celebration animation and play fanfare
-        self.quest_complete_effect = QuestCompleteEffect(reward, item_name=artifact)
+        display_name = artifact if q_type != "kill" else quest.get("name", "Quest")
+        self.quest_complete_effect = QuestCompleteEffect(
+            reward, item_name=display_name)
         self.game.sfx.play("quest_complete")
 
         # Dialogue — use per-NPC text if available, else generic
         complete_text = getattr(npc, "text_complete", None)
-        if complete_text:
+        if complete_text and not getattr(npc, "innkeeper_quests", False):
             dialogue = f"{npc.name}: {complete_text}"
+        elif q_type == "kill":
+            target = quest.get("kill_target", "monsters")
+            dialogue = (f"{npc.name}: The {target}s have been dealt with! "
+                        f"Here's {reward} gold for your bravery!")
         else:
-            dialogue = f"{npc.name}: You found the {artifact}! Here's {reward} gold for your bravery!"
+            dialogue = (f"{npc.name}: You found the {artifact}! "
+                        f"Here's {reward} gold for your bravery!")
 
         self.npc_dialogue_active = True
         self.npc_speaking = npc

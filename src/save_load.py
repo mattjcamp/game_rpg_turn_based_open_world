@@ -183,6 +183,11 @@ def _serialize_quest(quest):
         "artifact_name": quest.get("artifact_name"),
         "name": quest.get("name"),
         "current_level": quest.get("current_level", 0),
+        "quest_type": quest.get("quest_type", "retrieve"),
+        "kill_target": quest.get("kill_target"),
+        "kill_count": quest.get("kill_count", 0),
+        "kill_progress": quest.get("kill_progress", 0),
+        "exit_portal": quest.get("exit_portal", True),
     }
     # Persist full dungeon layouts so state survives save/load
     levels = quest.get("levels")
@@ -576,6 +581,11 @@ def _restore_quest(game, save_data, quest_attr):
         "dungeon_row": drow,
         "artifact_name": artifact,
         "current_level": saved_q.get("current_level", 0),
+        "quest_type": saved_q.get("quest_type", "retrieve"),
+        "kill_target": saved_q.get("kill_target"),
+        "kill_count": int(saved_q.get("kill_count", 0)),
+        "kill_progress": int(saved_q.get("kill_progress", 0)),
+        "exit_portal": saved_q.get("exit_portal", True),
     }
     if name:
         quest["name"] = name

@@ -535,6 +535,10 @@ class Game:
         # Build a quick lookup: town_id → town name
         town_names = {t["id"]: t["name"] for t in manifest_towns}
 
+        # Check if module enables innkeeper quests
+        inn_quests = self.module_manifest.get(
+            "progression", {}).get("innkeeper_quests", False)
+
         self.town_data_map = {}
         first_town = None
         town_ordinal = 0  # guarantees each town gets a different layout
@@ -548,7 +552,8 @@ class Game:
             town_seed = hash((tname, col, row, i)) & 0xFFFFFFFF
             td = generate_town(tname, seed=town_seed,
                                layout_index=town_ordinal,
-                               has_key_dungeons=bool(self.key_dungeons))
+                               has_key_dungeons=bool(self.key_dungeons),
+                               innkeeper_quests=inn_quests)
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:
@@ -651,20 +656,40 @@ class Game:
         quest = self.quest
         if quest is not None:
             status = quest.get("status", "active")
-            artifact = quest.get("artifact_name", "Shadow Crystal")
-            steps = [
-                {"description": "Accept the quest from the innkeeper",
-                 "done": True},
-                {"description": "Find and enter the quest dungeon",
-                 "done": status in ("active", "artifact_found", "completed")
-                         and self.is_dungeon_visited(
-                             quest.get("dungeon_col", -1),
-                             quest.get("dungeon_row", -1))},
-                {"description": f"Retrieve the {artifact}",
-                 "done": status in ("artifact_found", "completed")},
-                {"description": f"Return the {artifact} to the innkeeper",
-                 "done": status == "completed"},
-            ]
+            qtype = quest.get("quest_type", "retrieve")
+            visited = (status in ("active", "artifact_found", "completed")
+                       and self.is_dungeon_visited(
+                           quest.get("dungeon_col", -1),
+                           quest.get("dungeon_row", -1)))
+
+            if qtype == "kill":
+                kill_target = quest.get("kill_target", "Monster")
+                kill_count = quest.get("kill_count", 1)
+                kill_progress = quest.get("kill_progress", 0)
+                steps = [
+                    {"description": "Accept the quest from the innkeeper",
+                     "done": True},
+                    {"description": "Find and enter the quest dungeon",
+                     "done": visited},
+                    {"description": (
+                        f"Defeat {kill_count} {kill_target}"
+                        f" ({kill_progress}/{kill_count})"),
+                     "done": status in ("artifact_found", "completed")},
+                    {"description": "Report back to the innkeeper",
+                     "done": status == "completed"},
+                ]
+            else:
+                artifact = quest.get("artifact_name", "Shadow Crystal")
+                steps = [
+                    {"description": "Accept the quest from the innkeeper",
+                     "done": True},
+                    {"description": "Find and enter the quest dungeon",
+                     "done": visited},
+                    {"description": f"Retrieve the {artifact}",
+                     "done": status in ("artifact_found", "completed")},
+                    {"description": f"Return the {artifact} to the innkeeper",
+                     "done": status == "completed"},
+                ]
             quests.append({
                 "name": quest.get("name", "The Shadow Crystal"),
                 "status": status,
@@ -1465,7 +1490,9 @@ class Game:
             ],
         })
 
-        # 2) Settings (read-only)
+        # 2) Settings (read-only except innkeeper quests toggle)
+        innkeeper_quests = manifest.get("progression", {}).get(
+            "innkeeper_quests", False)
         sections.append({
             "label": "Settings",
             "icon": ">",
@@ -1480,6 +1507,8 @@ class Game:
                  mod_settings["season"], "choice", False],
                 ["Time of Day", "time_of_day",
                  mod_settings["time_of_day"], "choice", False],
+                ["Innkeeper Quests", "innkeeper_quests",
+                 "Yes" if innkeeper_quests else "No", "choice", True],
             ],
         })
 
@@ -2148,6 +2177,8 @@ class Game:
             return ENCOUNTER_MONSTERS
         elif key.endswith("_exitportal"):
             return ["Yes", "No"]
+        elif key == "innkeeper_quests":
+            return ["Yes", "No"]
         elif key.endswith("_randenc"):
             return ["Yes", "No"]
         elif key.endswith("_item") and key.startswith("loot_"):
@@ -2357,6 +2388,12 @@ class Game:
             for key in ("name", "author", "description"):
                 if key in values:
                     meta[key] = values[key]
+
+            # ── Innkeeper quests toggle ──
+            if "innkeeper_quests" in values:
+                prog = data.setdefault("progression", {})
+                prog["innkeeper_quests"] = (
+                    values["innkeeper_quests"] == "Yes")
 
             # ── Town fields (town_<i>_<field>) ──
             towns = data.get("world", {}).get("towns", [])

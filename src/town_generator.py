@@ -22,7 +22,8 @@ class NPC:
     def __init__(self, col, row, name, dialogue, npc_type="villager",
                  quest_dialogue=None, quest_choices=None, god_name=None,
                  quest_name=None, artifact_name=None,
-                 hint_active=None, text_complete=None):
+                 hint_active=None, text_complete=None,
+                 innkeeper_quests=False):
         self.col = col
         self.row = row
         self.name = name
@@ -37,6 +38,8 @@ class NPC:
         self.artifact_name = artifact_name or "Shadow Crystal"
         self.hint_active = hint_active
         self.text_complete = text_complete
+        # Innkeeper repeatable quests flag
+        self.innkeeper_quests = innkeeper_quests
         # Priest support
         self.god_name = god_name or "The Divine"
         # Quest highlight — set True by the town state when this NPC
@@ -341,7 +344,7 @@ _LAYOUT_POOL = [
 
 
 def generate_town(name="Thornwall", seed=None, layout_index=None,
-                   has_key_dungeons=False):
+                   has_key_dungeons=False, innkeeper_quests=False):
     """
     Generate a town map with NPCs and an exit.
 
@@ -466,7 +469,7 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
                for line in inn_dlg_template]
     innkeeper_col = ox + ix + iw // 2
     innkeeper_row = oy + iy + ih - 2
-    if has_key_dungeons:
+    if has_key_dungeons and not innkeeper_quests:
         npcs.append(NPC(innkeeper_col, innkeeper_row, innkeeper["name"],
                         inn_dlg, npc_type="innkeeper"))
     else:
@@ -478,7 +481,8 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
                         quest_name=quest.get("quest_name"),
                         artifact_name=quest.get("artifact_name"),
                         hint_active=quest.get("hint_active"),
-                        text_complete=quest.get("text_complete")))
+                        text_complete=quest.get("text_complete"),
+                        innkeeper_quests=innkeeper_quests))
 
     # Town elder (in the open area, middle of the map)
     elder_name = rng.choice(_ELDER_POOL)

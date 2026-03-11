@@ -619,6 +619,49 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
     return [level_0, level_1]
 
 
+def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
+                                     place_artifact=True):
+    """Generate a random multi-level dungeon for an innkeeper quest.
+
+    Parameters
+    ----------
+    name : str
+        Display name for the dungeon.
+    num_floors : int or None
+        Number of floors (1–4).  If None, chosen randomly.
+    place_artifact : bool
+        Whether to place a quest artifact on the deepest floor.
+
+    Returns
+    -------
+    list of DungeonData
+    """
+    if num_floors is None:
+        num_floors = random.randint(1, 4)
+    num_floors = max(1, min(4, num_floors))
+
+    levels = []
+    for floor in range(num_floors):
+        is_last = (floor == num_floors - 1)
+        enc_level = floor + 1
+        w = min(40, 28 + floor * 2)
+        h = min(30, 22 + floor * 2)
+        level = generate_dungeon(
+            name=f"{name} - Level {floor + 1}",
+            width=w, height=h,
+            min_rooms=max(4, 4 + floor),
+            max_rooms=max(6, 6 + floor),
+            place_stairs_down=not is_last,
+            place_artifact=(is_last and place_artifact),
+            place_doors=False,
+            encounter_area="dungeon",
+            encounter_min_level=enc_level,
+            encounter_max_level=enc_level,
+        )
+        levels.append(level)
+    return levels
+
+
 def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
                           module_levels=None):
     """Generate a progressive dungeon for a module.
