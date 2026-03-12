@@ -200,6 +200,8 @@ The game runs on a **state machine**. `game.py` owns the main loop and switches 
 
 Pre-built versions of the game are available on the [Releases](../../releases) page. Download the zip for your platform, unzip it, and run the `RealmOfShadow` executable inside.
 
+> **First launch:** The game may take 10–20 seconds to appear the first time you run it while your system unpacks and caches the bundled libraries. Subsequent launches will be faster.
+
 ### macOS
 
 macOS quarantines apps downloaded from the internet, which will prevent the game from opening. After unzipping, open Terminal and run:

@@ -14,7 +14,7 @@
 		</data>
 		<key>_internal/base_library.zip</key>
 		<data>
-		6Pkh7FTYgfie0Tztko1clC0XCYg=
+		5DdqUFL6MruoTAEGrYUppjXJtas=
 		</data>
 		<key>_internal/data/character_tiles.json</key>
 		<data>
@@ -711,6 +711,10 @@
 		<key>_internal/python3.9/lib-dynload/zlib.cpython-39-darwin.so</key>
 		<data>
 		f3/ZFm2e8eMFfi5C9xUZDhBQVHg=
+		</data>
+		<key>_internal/splash.png</key>
+		<data>
+		X4IMd6IWOpwWWEey3sxZHeMWWvc=
 		</data>
 		<key>_internal/src/assets/archive/U3TilesE.gif</key>
 		<data>
@@ -2677,7 +2681,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			W/lXDUUl/EHHhhRJ2GXGpmF1xy8VqB+5tgcxZ1wnSWE=
+			5Exa3UkQ2zVE1STYZrweoT1PbIzHypnoVSegDNfHRD8=
 			</data>
 		</dict>
 		<key>_internal/data/character_tiles.json</key>
@@ -4031,6 +4035,13 @@
 			<key>hash2</key>
 			<data>
 			iq/guXOGpTiHjiqetI7DnU+MyAG8mutohH7fTw02nhQ=
+			</data>
+		</dict>
+		<key>_internal/splash.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			6/mZl3iQsQokogn0g6NNl4oioAbP451Ob0NzbO4HxMU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/archive/U3TilesE.gif</key>

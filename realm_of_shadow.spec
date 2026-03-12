@@ -30,6 +30,8 @@ a = Analysis(
         ('modules', 'modules'),
         # Documentation (optional — nice to include for players)
         ('docs/manuals', 'docs/manuals'),
+        # Splash screen image
+        ('splash.png', '.'),
     ],
     hiddenimports=[
         'numpy',
@@ -62,8 +64,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,          # windowed app, no terminal
-    icon=None,              # add an .ico/.icns later if desired
+    console=False,              # windowed app, no terminal
+    icon=None,                  # add an .ico/.icns later if desired
 )
 
 coll = COLLECT(
