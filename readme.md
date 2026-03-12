@@ -8,13 +8,14 @@ This is a hobby project. The programming was done with the help of AI (primarily
 
 Before diving into the code, these documents give useful context on the game's design and mechanics:
 
-- **[Player's Manual](manuals/players_manual.md)** — races, classes, combat, spells, items, and controls from the player's perspective. There is also a [.docx version](manuals/players_manual.docx) and illustrations in `manuals/images/`.
-- **[Visual Style Guide](STYLE_GUIDE.md)** — color palette, layout rules, sprite specs, and tile patterns. Derived from the Ultima III reference screenshots in `research/`.
-- **[Combat Mechanics](data/COMBAT_MECHANICS.md)** — the single source of truth for how attacks, damage, defense, and spells work under the hood.
-- **[Ultima III Character Reference](research/ULTIMA3_CHARACTERS.md)** — original game's race/class/attribute system, used as a design template.
+- **[Player's Manual](docs/manuals/players_manual.md)** — races, classes, combat, spells, quests, items, and controls from the player's perspective. Illustrations are in `docs/manuals/images/`.
+- **[Visual Style Guide](docs/dev_guides/STYLE_GUIDE.md)** — color palette, layout rules, sprite specs, and tile patterns. Derived from the Ultima III reference screenshots in `docs/research/`.
+- **[Graphics Reference](docs/dev_guides/GRAPHICS_REFERENCE.md)** — tile IDs, sprite assignments, and asset file locations for every visual element.
+- **[Combat Mechanics](docs/dev_guides/COMBAT_MECHANICS.md)** — the single source of truth for how attacks, damage, defense, and spells work under the hood.
+- **[Ultima III Character Reference](docs/research/ULTIMA3_CHARACTERS.md)** — original game's race/class/attribute system, used as a design template.
 - **[Ultima III StrategyWiki](https://strategywiki.org/wiki/Ultima_III:_Exodus)** — external reference for the original game.
 
-The `research/` folder also contains reference screenshots (`example_combat.webp`, `example_overview_map.png`, etc.) and sprite reference material in `research/example_graphics/` that were used to guide the visual style.
+The `docs/research/` folder also contains reference screenshots (`example_combat.webp`, `example_overview_map.png`, etc.) and sprite reference material in `docs/research/example_graphics/` that were used to guide the visual style.
 
 ---
 
@@ -96,7 +97,6 @@ That's it. A window should open with the title screen.
 game_rpg_turn_based_open_world/
 ├── main.py                  ← Entry point — run this to play
 ├── requirements.txt         ← Python dependencies (pygame, numpy)
-├── STYLE_GUIDE.md           ← Visual design rules
 │
 ├── data/                    ← Game data (all JSON, easy to edit)
 │   ├── items.json           ← Weapons, armor, consumables, shop inventories
@@ -111,7 +111,6 @@ game_rpg_turn_based_open_world/
 │   ├── character_tiles.json ← Character sprite assignments
 │   ├── unique_tiles.json    ← Special overworld tile definitions
 │   ├── u4_tiles.json        ← Tile mapping for Ultima IV–style sprites
-│   ├── COMBAT_MECHANICS.md  ← Combat math reference
 │   ├── classes/             ← One JSON file per character class
 │   │   ├── fighter.json
 │   │   ├── cleric.json
@@ -122,6 +121,22 @@ game_rpg_turn_based_open_world/
 │   │   ├── druid.json
 │   │   └── alchemist.json
 │   └── saves/               ← Save game slots
+│
+├── docs/                    ← All documentation
+│   ├── dev_guides/          ← Developer reference
+│   │   ├── COMBAT_MECHANICS.md  ← Combat math reference
+│   │   ├── GRAPHICS_REFERENCE.md ← Tile IDs, sprites, asset paths
+│   │   └── STYLE_GUIDE.md      ← Visual design rules
+│   ├── manuals/             ← Player-facing documentation
+│   │   ├── players_manual.md
+│   │   └── images/          ← Manual illustrations
+│   └── research/            ← Design reference material
+│       ├── ULTIMA3_CHARACTERS.md
+│       ├── dnd_5e_cleric_spells_reference.md
+│       ├── example_combat.webp
+│       ├── example_overview_map.png
+│       ├── example_dungeon.jpg
+│       └── example_graphics/ ← Sprite reference images
 │
 ├── src/                     ← Game source code
 │   ├── game.py              ← Main game loop, state machine, menus
@@ -155,18 +170,6 @@ game_rpg_turn_based_open_world/
 │   └── keys_of_shadow/      ← Default adventure module
 │       ├── module.json      ← Module manifest and progression config
 │       └── overworld.json   ← Custom overworld map data
-│
-├── manuals/                 ← Player-facing documentation
-│   ├── players_manual.md
-│   ├── players_manual.docx
-│   └── images/              ← Manual illustrations
-│
-├── research/                ← Design reference material
-│   ├── ULTIMA3_CHARACTERS.md
-│   ├── example_combat.webp
-│   ├── example_overview_map.png
-│   ├── example_dungeon.jpg
-│   └── example_graphics/    ← Sprite reference images
 │
 ├── tests/                   ← Test suite (166 tests)
 │   ├── conftest.py          ← Headless pygame mock and shared fixtures
@@ -214,7 +217,7 @@ Most of the code in this project was written with the help of AI, primarily usin
 
 1. **Start a conversation** in the Claude app (claude.ai) or Claude Code (command-line tool).
 
-2. **Give Claude context.** Share the relevant file(s) you want to change. For example, if you want to add a new monster, you might paste in `data/monsters.json` and a snippet from `src/monster.py` and ask Claude to add one. If you want to change how combat works, share `src/states/combat.py` and `data/COMBAT_MECHANICS.md`.
+2. **Give Claude context.** Share the relevant file(s) you want to change. For example, if you want to add a new monster, you might paste in `data/monsters.json` and a snippet from `src/monster.py` and ask Claude to add one. If you want to change how combat works, share `src/states/combat.py` and `docs/dev_guides/COMBAT_MECHANICS.md`.
 
 3. **Describe what you want in plain language.** You don't need to specify exact code. Examples of good prompts:
    - "Add a new monster called Shadow Wolf with 30 HP, 14 AC, that does 2d6 damage and drops 50 XP"
@@ -236,7 +239,7 @@ Most of the code in this project was written with the help of AI, primarily usin
 
 - **Ask for tests.** When Claude adds new features, ask it to write tests too. The existing test suite in `tests/` provides good examples of the testing patterns used.
 
-- **Share the style guide.** If you want UI or visual changes that match the game's aesthetic, share `STYLE_GUIDE.md` with Claude so it follows the established color palette and layout conventions.
+- **Share the style guide.** If you want UI or visual changes that match the game's aesthetic, share `docs/dev_guides/STYLE_GUIDE.md` with Claude so it follows the established color palette and layout conventions.
 
 ---
 
