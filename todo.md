@@ -1,0 +1,3 @@
+- when random quests say to kill X number of creatures, make sure that there are at least that number of creatures in the dungeon
+- when items spawn after a battle make sure that they are not on top of a character
+- add ability to choose different characters to move after a battle by pressing 1-4

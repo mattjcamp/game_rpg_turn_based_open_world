@@ -1,0 +1,112 @@
+{
+  "size": {
+    "width": 64,
+    "height": 48
+  },
+  "start_position": {
+    "col": 32,
+    "row": 18
+  },
+  "landmarks": [
+    {
+      "id": "copperfield",
+      "type": "town",
+      "col": 32,
+      "row": 16,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "kestrelbrook",
+      "type": "town",
+      "col": 38,
+      "row": 28,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "hallowridge",
+      "type": "town",
+      "col": 25,
+      "row": 28,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "town_armory",
+      "type": "machine",
+      "col": 34,
+      "row": 16,
+      "tile": "TILE_MACHINE",
+      "clear_radius": 1
+    },
+    {
+      "id": "dungeon_1",
+      "type": "dungeon",
+      "col": 44,
+      "row": 24,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    },
+    {
+      "id": "dungeon_2",
+      "type": "dungeon",
+      "col": 18,
+      "row": 24,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    }
+  ],
+  "paths": [
+    {
+      "from": [
+        38,
+        28
+      ],
+      "to": [
+        44,
+        24
+      ]
+    },
+    {
+      "from": [
+        25,
+        28
+      ],
+      "to": [
+        18,
+        24
+      ]
+    },
+    {
+      "from": [
+        32,
+        16
+      ],
+      "to": [
+        38,
+        28
+      ]
+    },
+    {
+      "from": [
+        38,
+        28
+      ],
+      "to": [
+        25,
+        28
+      ]
+    },
+    {
+      "from": [
+        32,
+        18
+      ],
+      "to": [
+        32,
+        16
+      ]
+    }
+  ]
+}
