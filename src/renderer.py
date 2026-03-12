@@ -1308,10 +1308,11 @@ class Renderer(CombatEffectRendererMixin):
         else:
             # Fallback: colored stick figure
             npc_colors = {
-                "shopkeep": (200, 160, 60),
-                "innkeeper": (60, 160, 200),
-                "elder":     (180, 80, 200),
-                "villager":  (100, 180, 100),
+                "shopkeep":     (200, 160, 60),
+                "innkeeper":    (60, 160, 200),
+                "elder":        (180, 80, 200),
+                "villager":     (100, 180, 100),
+                "quest_giver":  (220, 180, 60),
             }
             color = npc_colors.get(npc.npc_type, (100, 180, 100))
             pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)

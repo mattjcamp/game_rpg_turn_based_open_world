@@ -354,6 +354,8 @@ def save_game(slot, game):
             "gnome_quest_accepted": getattr(
                 game, "_gnome_quest_accepted", False),
             "darkness_active": getattr(game, "darkness_active", False),
+            "quest_npc_assignments": getattr(
+                game, "quest_npc_assignments", {}),
             "quest": _serialize_quest(getattr(game, "quest", None)),
             "house_quest": _serialize_quest(getattr(game, "house_quest", None)),
             # ── Game log ──
@@ -472,6 +474,10 @@ def load_game(slot, game):
 
         # ── Reset transient state ───────────────────────────────
         game.pending_combat_rewards = None
+
+        # ── Restore quest NPC assignments (before town generation) ─
+        game.quest_npc_assignments = save_data.get(
+            "quest_npc_assignments", {})
 
         # ── Restore towns (module-specific) ─────────────────────
         if game.module_manifest:

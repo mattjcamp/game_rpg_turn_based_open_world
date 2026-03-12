@@ -266,6 +266,12 @@ _ELDER_DIALOGUE_POOL = [
     ],
 ]
 
+_QUEST_GIVER_POOL = [
+    "Alaric the Wanderer", "Seraphina", "Old Bartholomew", "Mirabel",
+    "Captain Drake", "Sage Elara", "Brother Aldric", "Dame Isolde",
+    "Wanderer Kael", "Mystic Theron", "Lady Revenna", "Fen the Bold",
+]
+
 _VILLAGER_NAME_POOL = [
     "Tomas", "Elena", "Joric", "Bess", "Finn", "Lysa", "Karl",
     "Maren", "Pieter", "Wren", "Dorin", "Hanna", "Sven", "Ida",
@@ -582,6 +588,87 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     entry_row = exit_row - 1
 
     return TownData(tmap, npcs, name, entry_col, entry_row)
+
+
+def add_quest_giver_npc(town_data, quest_giver_name, dungeon_key_str,
+                        dungeon_name, quest_hint, quest_objective,
+                        quest_type, seed=0):
+    """Inject a quest-giver NPC into an existing town.
+
+    The NPC is placed on an open floor tile near the town centre.  It
+    holds exactly one quest (identified by *dungeon_key_str*, a string
+    like ``"5,10"``).  When the player accepts the quest, only that
+    single key dungeon is revealed.
+
+    Parameters
+    ----------
+    town_data : TownData
+    quest_giver_name : str   – NPC display name
+    dungeon_key_str : str    – ``"col,row"`` key into ``game.key_dungeons``
+    dungeon_name : str       – display name of the dungeon
+    quest_hint : str         – hint shown in quest dialogue
+    quest_objective : str    – objective text (for kill quests)
+    quest_type : str         – ``"retrieve"`` or ``"kill"``
+    seed : int               – for deterministic position jitter
+    """
+    rng = random.Random(seed)
+    tmap = town_data.tile_map
+    occupied = {(n.col, n.row) for n in town_data.npcs}
+    occupied.add((town_data.entry_col, town_data.entry_row))
+
+    # Try to find an open floor tile near the centre of town
+    cx = tmap.width // 2
+    cy = tmap.height // 2
+    placed = None
+    for ring in range(0, 10):
+        candidates = []
+        for dc in range(-ring, ring + 1):
+            for dr in range(-ring, ring + 1):
+                if ring > 0 and max(abs(dc), abs(dr)) != ring:
+                    continue
+                c, r = cx + dc, cy + dr
+                if (0 <= c < tmap.width and 0 <= r < tmap.height
+                        and tmap.get_tile(c, r) == TILE_FLOOR
+                        and (c, r) not in occupied):
+                    candidates.append((c, r))
+        if candidates:
+            placed = rng.choice(candidates)
+            break
+    if placed is None:
+        # Absolute fallback — just put them at town centre
+        placed = (cx, cy)
+
+    col, row = placed
+
+    # Build quest-offer dialogue
+    if quest_type == "kill" and quest_objective:
+        q_dialogue = [
+            f"I've been searching for someone brave enough to help.",
+            f"In the {dungeon_name}, you must {quest_objective}. {quest_hint}",
+            f"Will you take on this challenge?",
+        ]
+    else:
+        q_dialogue = [
+            f"I've been searching for someone brave enough to help.",
+            f"The {dungeon_name} holds a powerful artifact. {quest_hint}",
+            f"Will you seek it out and bring it back?",
+        ]
+
+    ambient = [
+        "The world needs heroes like you.",
+        "I sense great potential in your party.",
+        "Be wary of the dangers that lurk in the dungeons.",
+    ]
+
+    npc = NPC(col, row, quest_giver_name, ambient,
+              npc_type="quest_giver",
+              quest_dialogue=q_dialogue,
+              quest_choices=["Yes, we'll do it!", "Not right now."])
+    # Store which dungeon this quest-giver reveals
+    npc.dungeon_key_str = dungeon_key_str
+    npc.dungeon_name = dungeon_name
+    town_data.npcs.append(npc)
+    return npc
 
 
 def generate_duskhollow():

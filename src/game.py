@@ -5,6 +5,7 @@ Manages the game loop, state machine, and top-level resources.
 """
 
 import os
+import random
 import pygame
 
 from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TITLE, COLOR_BLACK
@@ -620,6 +621,102 @@ class Game:
         # Set the default town_data to the first town (hub)
         if first_town:
             self.town_data = first_town
+
+        # Distribute non-gnome quests as individual NPCs across towns
+        self._assign_quest_npcs()
+
+    def _assign_quest_npcs(self):
+        """Distribute non-gnome key dungeon quests across towns as NPCs.
+
+        Each quest gets its own quest_giver NPC placed in a randomly
+        chosen town.  The mapping is stored in
+        ``self.quest_npc_assignments`` so it can be persisted across
+        saves / town regeneration.
+        """
+        from src.town_generator import add_quest_giver_npc, _QUEST_GIVER_POOL
+
+        # Collect non-gnome quests that need distributing
+        quests_to_assign = []
+        for pos_key, kd in self.key_dungeons.items():
+            if kd.get("quest_type") == "gnome_machine":
+                continue
+            quests_to_assign.append((pos_key, kd))
+
+        if not quests_to_assign or not self.town_data_map:
+            self.quest_npc_assignments = {}
+            return
+
+        # Get list of town names / keys for round-robin assignment
+        town_keys = list(self.town_data_map.keys())  # (col, row) list
+
+        # Use a deterministic RNG seeded from the module for reproducibility
+        mod_id = ""
+        if self.module_manifest:
+            mod_id = self.module_manifest.get("metadata", {}).get("id", "")
+        assign_rng = random.Random(hash(mod_id + "_quest_npcs") & 0xFFFFFFFF)
+        assign_rng.shuffle(town_keys)
+
+        # If we already have saved assignments, use those instead
+        if getattr(self, "quest_npc_assignments", None):
+            assignments = self.quest_npc_assignments
+        else:
+            # Randomly assign each quest to any town independently.
+            # Two quests may end up in the same town — that's fine.
+            # Some towns may get no quest at all.
+            assignments = {}
+            available_names = list(_QUEST_GIVER_POOL)
+            assign_rng.shuffle(available_names)
+            for i, (pos_key, kd) in enumerate(quests_to_assign):
+                town_key = assign_rng.choice(town_keys)
+                td = self.town_data_map[town_key]
+                dk_str = f"{pos_key[0]},{pos_key[1]}"
+                npc_name = available_names[i % len(available_names)]
+                assignments[dk_str] = {
+                    "town_name": td.name,
+                    "npc_name": npc_name,
+                }
+            self.quest_npc_assignments = assignments
+
+        # Now inject quest_giver NPCs into the appropriate towns
+        # Build town lookup by name
+        town_by_name = {}
+        for tk, td in self.town_data_map.items():
+            town_by_name[td.name] = td
+
+        name_idx = 0
+        for pos_key, kd in quests_to_assign:
+            dk_str = f"{pos_key[0]},{pos_key[1]}"
+            info = assignments.get(dk_str)
+            if not info:
+                continue
+            td = town_by_name.get(info["town_name"])
+            if not td:
+                # Town name mismatch (shouldn't happen) — put in first town
+                td = next(iter(self.town_data_map.values()))
+            seed = hash(dk_str) & 0xFFFFFFFF
+            add_quest_giver_npc(
+                td,
+                quest_giver_name=info["npc_name"],
+                dungeon_key_str=dk_str,
+                dungeon_name=kd.get("name", "Unknown Dungeon"),
+                quest_hint=kd.get("quest_hint", "Be careful."),
+                quest_objective=kd.get("quest_objective", ""),
+                quest_type=kd.get("quest_type", "retrieve"),
+                seed=seed,
+            )
+
+    def discover_single_key_dungeon(self, dungeon_key_str):
+        """Reveal a single key dungeon by its ``'col,row'`` string key."""
+        parts = dungeon_key_str.split(",")
+        if len(parts) != 2:
+            return
+        col, row = int(parts[0]), int(parts[1])
+        kd = self.key_dungeons.get((col, row))
+        if kd and kd["status"] == "undiscovered":
+            kd["status"] = "active"
+            dname = kd.get("name", "Key Dungeon")
+            for i, level in enumerate(kd.get("levels", [])):
+                level.name = f"{dname} - Floor {i + 1}"
 
     def get_town_at(self, col, row):
         """Return the TownData for the town landmark at (col, row), or the

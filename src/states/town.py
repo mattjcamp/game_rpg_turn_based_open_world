@@ -318,19 +318,31 @@ class TownState(InventoryMixin, BaseState):
                 elif kd_map and inserted < gnome_total:
                     npc.quest_highlight = True
 
+            elif npc.npc_type == "quest_giver":
+                # Highlight when this NPC's quest is undiscovered or
+                # the quest is active/artifact_found
+                dk_str = getattr(npc, "dungeon_key_str", "")
+                if dk_str:
+                    parts = dk_str.split(",")
+                    if len(parts) == 2:
+                        kd = kd_map.get((int(parts[0]), int(parts[1])))
+                        if kd and kd.get("status") in (
+                                "undiscovered", "active", "artifact_found"):
+                            npc.quest_highlight = True
+
             elif npc.npc_type == "elder":
-                # Highlight when there are undiscovered quests to reveal,
-                # or while any key dungeon quests are still in progress.
-                # Gnome machine quests are the gnome's responsibility.
+                # Highlight only when the elder has something actionable:
+                # quest turn-ins or active quests to give hints about.
+                # Undiscovered quests are the quest_giver NPCs' job.
                 elder_kds = [kd for kd in kd_map.values()
                              if kd.get("quest_type") != "gnome_machine"]
-                has_undiscovered = any(
-                    kd.get("status") == "undiscovered"
+                has_turnin = any(
+                    kd.get("status") == "artifact_found"
                     for kd in elder_kds)
                 has_active = any(
-                    kd.get("status") in ("active", "artifact_found")
+                    kd.get("status") == "active"
                     for kd in elder_kds)
-                if has_undiscovered or has_active:
+                if has_turnin or has_active:
                     npc.quest_highlight = True
 
     def exit(self):
@@ -892,66 +904,83 @@ class TownState(InventoryMixin, BaseState):
             # Fall through to normal cycling dialogue
             pass
 
-        # Elder — offer to reveal undiscovered key dungeon quests
-        # (gnome_machine quests are handled by the gnome, not the elder)
-        if npc.npc_type == "elder":
+        # Quest giver — offers a single specific quest
+        if npc.npc_type == "quest_giver":
+            dk_str = getattr(npc, "dungeon_key_str", "")
+            dname = getattr(npc, "dungeon_name", "a dungeon")
             kd_map = getattr(self.game, "key_dungeons", {})
-            undiscovered = [kd for kd in kd_map.values()
-                           if kd.get("status") == "undiscovered"
-                           and kd.get("quest_type") != "gnome_machine"]
-            if undiscovered:
+            # Find the specific key dungeon this NPC is linked to
+            kd = None
+            if dk_str:
+                parts = dk_str.split(",")
+                if len(parts) == 2:
+                    kd = kd_map.get((int(parts[0]), int(parts[1])))
+            if kd and kd.get("status") == "undiscovered":
+                # Offer the quest
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                # Build quest offer dialogue lines
-                if len(undiscovered) == 1:
-                    dung = undiscovered[0]
-                    hint = dung.get("quest_hint", "Be careful.")
-                    obj = dung.get("quest_objective", "")
-                    qtype = dung.get("quest_type", "retrieve")
-                    if qtype == "kill" and obj:
-                        self.quest_dialogue_lines = [
-                            f"Listen well — in the "
-                            f"{dung['name']}, you must {obj}. "
-                            f"{hint}",
-                            "Will you take on this challenge?",
-                        ]
-                    else:
-                        self.quest_dialogue_lines = [
-                            f"Listen well — the "
-                            f"{dung['name']} holds a powerful artifact. "
-                            f"{hint}",
-                            "Will you seek it out and bring it back to save us?",
-                        ]
-                else:
-                    names = ", ".join(d["name"] for d in undiscovered[:3])
-                    if len(undiscovered) > 3:
-                        names += f" and {len(undiscovered) - 3} more"
-                    # Check if any are kill quests
-                    has_kill = any(d.get("quest_type") == "kill"
-                                  for d in undiscovered)
-                    if has_kill:
-                        self.quest_dialogue_lines = [
-                            f"Brave adventurers, hear me! "
-                            f"Dangerous places threaten our land: {names}. "
-                            f"Each holds a perilous challenge.",
-                            "Will you seek them out?",
-                        ]
-                    else:
-                        self.quest_dialogue_lines = [
-                            f"Brave adventurers, hear me! "
-                            f"Dangerous places threaten our land: {names}. "
-                            f"Each holds an artifact we desperately need.",
-                            "Will you seek them out?",
-                        ]
+                self.quest_dialogue_lines = list(npc.quest_dialogue or [])
                 self.quest_dialogue_index = 0
                 self._set_dialogue(
                     f"{npc.name}: {self.quest_dialogue_lines[0]}")
-                # Temporarily set quest_choices so the Y/N prompt appears
-                npc.quest_choices = ["Yes, we'll do it!", "Not right now."]
                 return
+            elif kd and kd.get("status") == "artifact_found":
+                # Turn in this specific quest
+                party = self.game.party
+                qtype = kd.get("quest_type", "retrieve")
+                completed = False
+                if qtype == "kill":
+                    kd["status"] = "completed"
+                    completed = True
+                    label = kd.get("name", "Dungeon")
+                else:
+                    art = kd.get("artifact_name", kd.get("key_name", ""))
+                    if art and party.inv_count(art) > 0:
+                        party.inv_remove(art)
+                        kd["status"] = "completed"
+                        completed = True
+                        label = art
+                if completed:
+                    reward_gold = 150
+                    reward_xp = 75
+                    party.gold += reward_gold
+                    for member in party.alive_members():
+                        member.exp += reward_xp
+                    self.npc_dialogue_active = True
+                    self.npc_speaking = npc
+                    self.quest_complete_effect = QuestCompleteEffect(
+                        reward_gold, item_name=label)
+                    self.game.sfx.play("quest_complete")
+                    if qtype == "kill":
+                        self._set_dialogue(
+                            f"{npc.name}: You cleared the {label}! "
+                            f"Here is {reward_gold} gold for your bravery!")
+                    else:
+                        self._set_dialogue(
+                            f"{npc.name}: You recovered the {label}! "
+                            f"Here is {reward_gold} gold for your bravery!")
+                    self._refresh_quest_highlights()
+                    return
+            elif kd and kd.get("status") == "active":
+                # Quest in progress hint
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self._set_dialogue(
+                    f"{npc.name}: The {dname} still needs to be cleared. "
+                    f"We're counting on you!")
+                return
+            # Quest completed — fall through to normal dialogue
+
+        # Elder — gives progress hints about remaining quests
+        # (individual quest_giver NPCs handle quest discovery now;
+        #  gnome_machine quests are handled by the gnome)
+        if npc.npc_type == "elder":
+            kd_map = getattr(self.game, "key_dungeons", {})
             # Check for quests ready to turn in (artifact_found status)
+            # Elder can still accept completed quests as a fallback
             found = [kd for kd in kd_map.values()
-                     if kd.get("status") == "artifact_found"]
+                     if kd.get("status") == "artifact_found"
+                     and kd.get("quest_type") != "gnome_machine"]
             if found:
                 party = self.game.party
                 turned_in = []
@@ -959,11 +988,9 @@ class TownState(InventoryMixin, BaseState):
                 for kd in found:
                     qtype = kd.get("quest_type", "retrieve")
                     if qtype == "kill":
-                        # Kill quests: no artifact to check, just complete
                         kd["status"] = "completed"
                         kill_turned_in.append(kd.get("name", "Dungeon"))
                     else:
-                        # Retrieve quests: check inventory for the artifact
                         art = kd.get("artifact_name", kd.get("key_name", ""))
                         if art and party.inv_count(art) > 0:
                             party.inv_remove(art)
@@ -1000,8 +1027,12 @@ class TownState(InventoryMixin, BaseState):
                     return
 
             # Active quests still in progress — give progress hint
-            active = [kd for kd in kd_map.values()
+            non_gnome = [kd for kd in kd_map.values()
+                         if kd.get("quest_type") != "gnome_machine"]
+            active = [kd for kd in non_gnome
                       if kd.get("status") == "active"]
+            undiscovered = [kd for kd in non_gnome
+                           if kd.get("status") == "undiscovered"]
             if active:
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
@@ -1010,6 +1041,13 @@ class TownState(InventoryMixin, BaseState):
                     f"{npc.name}: There are still {n} dungeon"
                     f"{'s' if n > 1 else ''} to clear. "
                     f"We're counting on you!")
+                return
+            if undiscovered:
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self._set_dialogue(
+                    f"{npc.name}: Seek out the travelers in our towns. "
+                    f"They know of dangers that threaten the land.")
                 return
 
         self.npc_dialogue_active = True
@@ -1063,6 +1101,8 @@ class TownState(InventoryMixin, BaseState):
             # Accepted
             if npc and npc.npc_type == "gnome":
                 self._accept_gnome_quest()
+            elif npc and npc.npc_type == "quest_giver":
+                self._accept_quest_giver_quest()
             elif npc and npc.npc_type == "elder":
                 self._accept_elder_quest()
             else:
@@ -1074,10 +1114,23 @@ class TownState(InventoryMixin, BaseState):
             self.quest_choices = []
             self.quest_dialogue_lines = []
             self.quest_dialogue_index = 0
-            # Clean up temporary quest_choices for elder NPCs
-            if npc and npc.npc_type == "elder":
-                npc.quest_choices = None
             # Keep dialogue active to show the decline message
+
+    def _accept_quest_giver_quest(self):
+        """Accept a quest_giver NPC's quest: reveal one key dungeon."""
+        npc = self.npc_speaking
+        dk_str = getattr(npc, "dungeon_key_str", "")
+        dname = getattr(npc, "dungeon_name", "the dungeon")
+        self.game.discover_single_key_dungeon(dk_str)
+        self._set_dialogue(
+            f"{npc.name}: Thank you, brave souls! "
+            f"I've marked the {dname} on your map. "
+            f"Be careful out there!")
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
+        self._refresh_quest_highlights()
 
     def _accept_gnome_quest(self):
         """Accept the gnome's machine quest (Keys of Shadow or custom)."""
@@ -1105,19 +1158,19 @@ class TownState(InventoryMixin, BaseState):
         self._refresh_quest_highlights()
 
     def _accept_elder_quest(self):
-        """Accept the Elder's quest: reveal undiscovered non-gnome dungeons."""
+        """Legacy fallback — elder no longer gives quests directly.
+
+        Individual quest_giver NPCs handle quest discovery now.
+        This method exists only as a safety net.
+        """
         npc = self.npc_speaking
-        self.game.discover_key_dungeons(
-            exclude_types={"gnome_machine"})
         self._set_dialogue(
-            f"{npc.name}: Thank you, brave souls! "
-            f"I've marked the locations on your map. "
-            f"Be careful out there!")
+            f"{npc.name}: Seek out the travelers in the towns. "
+            f"They know of the dangers that threaten our land.")
         self.quest_choice_active = False
         self.quest_choices = []
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
-        # Clean up temporary quest_choices on the NPC
         npc.quest_choices = None
         self._refresh_quest_highlights()
 
