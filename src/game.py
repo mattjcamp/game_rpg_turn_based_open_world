@@ -490,11 +490,13 @@ class Game:
             needs_artifact = (quest_type != "kill")
             kt = kd.get("kill_target", "") if quest_type == "kill" else None
             kc = int(kd.get("kill_count", 0)) if quest_type == "kill" else 0
+            td = kd.get("torch_density", "medium")
             levels = generate_keys_dungeon(
                 dnum, name=name,
                 place_artifact=needs_artifact,
                 module_levels=module_levels,
-                kill_target=kt, kill_count=kc)
+                kill_target=kt, kill_count=kc,
+                torch_density=td)
             self.key_dungeons[(col, row)] = {
                 "dungeon_number": dnum,
                 "name": name,
@@ -1706,9 +1708,13 @@ class Game:
         dungeons = manifest.get("progression", {}).get(
             "key_dungeons", [])
         dungeon_children = []
+        _TORCH_DENSITY_NAMES = {"high": "High", "medium": "Medium",
+                                "low": "Low"}
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
             n_levels = len(dung.get("levels", []))
+            td_raw = dung.get("torch_density", "medium")
+            td_display = _TORCH_DENSITY_NAMES.get(td_raw, "Medium")
             dungeon_children.append({
                 "label": dname,
                 "icon": "D",
@@ -1717,6 +1723,8 @@ class Game:
                     ["Name", f"dung_{i}_name", dname, "text", True],
                     ["Description", f"dung_{i}_desc",
                      dung.get("description", ""), "text", True],
+                    ["Torch Density", f"dung_{i}_tdensity",
+                     td_display, "choice", True],
                 ],
                 "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
                              if n_levels > 0 else "no levels"),
@@ -2056,6 +2064,13 @@ class Game:
                         "Yes" if level.get("random_encounters", False)
                         else "No",
                         "choice", True])
+        # Torch density per level
+        _td_map = {"high": "High", "medium": "Medium", "low": "Low"}
+        td_raw = level.get("torch_density", "medium")
+        fields.append(["Torch Density",
+                        f"lvl_{level_idx}_tdensity",
+                        _td_map.get(td_raw, "Medium"),
+                        "choice", True])
 
         for ei, enc in enumerate(encounters):
             # Section header for each encounter
@@ -2106,12 +2121,14 @@ class Game:
             return
         level = levels[level_idx]
 
-        # Read back level name and random encounters flag
+        # Read back level name, random encounters flag, and torch density
         for entry in self.module_edit_fields:
             if entry[1] == f"lvl_{level_idx}_name":
                 level["name"] = entry[2]
             elif entry[1] == f"lvl_{level_idx}_randenc":
                 level["random_encounters"] = (entry[2] == "Yes")
+            elif entry[1] == f"lvl_{level_idx}_tdensity":
+                level["torch_density"] = entry[2].lower()
 
         # Read back encounters
         encounters = []
@@ -2515,6 +2532,8 @@ class Game:
             return ENCOUNTER_MONSTERS
         elif key.endswith("_gnometown"):
             return getattr(self, "_module_edit_town_names", []) or ["(none)"]
+        elif key.endswith("_tdensity"):
+            return ["High", "Medium", "Low"]
         elif key.endswith("_exitportal"):
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
@@ -2772,6 +2791,7 @@ class Game:
             dung_field_map = {
                 "name": "name",
                 "desc": "description",
+                "tdensity": "torch_density",
             }
             for key, val in values.items():
                 if not key.startswith("dung_"):
@@ -2786,6 +2806,9 @@ class Game:
                 suffix = parts[2]
                 json_key = dung_field_map.get(suffix)
                 if json_key and 0 <= idx < len(dungeons):
+                    # Torch density: convert display name to key
+                    if suffix == "tdensity":
+                        val = val.lower()
                     dungeons[idx][json_key] = val
 
             # ── Quest fields (quest_<i>_<field>) ──

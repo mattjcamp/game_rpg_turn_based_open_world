@@ -287,11 +287,33 @@ def _place_locked_doors(tmap, rooms):
             tmap.set_tile(ec, er, TILE_LOCKED_DOOR)
 
 
-def _place_decorations(tmap, rooms, width, height):
-    """Sprinkle cosmetic decorations: puddles, moss, and wall torches."""
+def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
+    """Sprinkle cosmetic decorations: puddles, moss, and wall torches.
+
+    Parameters
+    ----------
+    torch_density : str
+        ``"high"`` — well-lit; torches on most walls, party rarely
+        needs light spells.  ``"medium"`` — moderate lighting (default).
+        ``"low"`` — a few torches here and there, mostly dark.
+    """
+
+    # --- Torch density parameters ---
+    # min_spacing: minimum Manhattan distance between torches
+    # max_torches: cap as a multiplier of room count
+    if torch_density == "high":
+        min_spacing = 2
+        max_multiplier = 5  # up to 5 per room
+    elif torch_density == "low":
+        min_spacing = 8
+        max_multiplier = 0.5  # roughly 1 per 2 rooms
+    else:  # medium (default)
+        min_spacing = 4
+        max_multiplier = 2  # up to 2 per room
+
+    max_torches = max(1, int(len(rooms) * max_multiplier))
 
     # --- Wall torches: place on wall tiles that border a floor tile ---
-    # Torches are spaced out so they don't cluster; aim for ~1 per room.
     torch_candidates = []
     for room in rooms:
         # Check wall tiles along room edges
@@ -316,20 +338,38 @@ def _place_decorations(tmap, rooms, width, height):
                                 torch_candidates.append((x, y))
                                 break
 
-    # Deduplicate and space them out (min 4 tiles apart)
-    random.shuffle(torch_candidates)
+    # Also add corridor wall candidates for high density
+    if torch_density == "high":
+        for y in range(height):
+            for x in range(width):
+                if tmap.get_tile(x, y) == TILE_DWALL and (x, y) not in torch_candidates:
+                    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < width and 0 <= ny < height:
+                            if tmap.get_tile(nx, ny) == TILE_DFLOOR:
+                                torch_candidates.append((x, y))
+                                break
+
+    # Deduplicate and space them out
+    seen = set()
+    unique_candidates = []
+    for pos in torch_candidates:
+        if pos not in seen:
+            seen.add(pos)
+            unique_candidates.append(pos)
+    random.shuffle(unique_candidates)
+
     placed_torches = []
-    for tc, tr in torch_candidates:
+    for tc, tr in unique_candidates:
         too_close = False
         for ptc, ptr in placed_torches:
-            if abs(tc - ptc) + abs(tr - ptr) < 4:
+            if abs(tc - ptc) + abs(tr - ptr) < min_spacing:
                 too_close = True
                 break
         if not too_close:
             tmap.set_tile(tc, tr, TILE_WALL_TORCH)
             placed_torches.append((tc, tr))
-            # Limit to roughly 1-2 per room
-            if len(placed_torches) >= len(rooms) * 2:
+            if len(placed_torches) >= max_torches:
                 break
 
     # --- Puddles: small water patches on floor tiles ---
@@ -382,7 +422,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      encounter_min_level=None,
                      encounter_max_level=None,
                      custom_encounters=None,
-                     include_random_encounters=True):
+                     include_random_encounters=True,
+                     torch_density="medium"):
     """
     Generate a procedural dungeon.
 
@@ -554,7 +595,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     _place_locked_doors(tmap, rooms)
 
     # --- Place cosmetic decorations (puddles, moss, wall torches) ---
-    _place_decorations(tmap, rooms, width, total_height)
+    _place_decorations(tmap, rooms, width, total_height,
+                       torch_density=torch_density)
 
     # Entry point is on the stairs
     entry_col = stairs_col
@@ -621,7 +663,8 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
 
 def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
                                      place_artifact=True,
-                                     kill_target=None, kill_count=0):
+                                     kill_target=None, kill_count=0,
+                                     torch_density="medium"):
     """Generate a random multi-level dungeon for an innkeeper quest.
 
     Parameters
@@ -687,6 +730,7 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
             custom_encounters=custom_enc,
+            torch_density=torch_density,
         )
         levels.append(level)
     return levels
@@ -694,7 +738,8 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
 
 def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
                           module_levels=None,
-                          kill_target=None, kill_count=0):
+                          kill_target=None, kill_count=0,
+                          torch_density="medium"):
     """Generate a progressive dungeon for a module.
 
     When *module_levels* is provided (from the module editor), the floor
@@ -761,6 +806,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
         max_r = min(12, 6 + floor)
 
         # Determine floor name and encounters from module specs
+        floor_torch = torch_density  # default to dungeon-level setting
         if module_levels and floor < len(module_levels):
             ml = module_levels[floor]
             floor_name = ml.get("name", f"Floor {floor + 1}")
@@ -769,6 +815,8 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             if not custom_enc or not isinstance(custom_enc, list):
                 custom_enc = None
             include_random = ml.get("random_encounters", False)
+            # Per-level torch density overrides dungeon default
+            floor_torch = ml.get("torch_density", torch_density)
         else:
             floor_name = f"Floor {floor + 1}"
             custom_enc = None
@@ -791,6 +839,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             encounter_max_level=enc_level,
             custom_encounters=custom_enc,
             include_random_encounters=include_random,
+            torch_density=floor_torch,
         )
         levels.append(level_data)
 

@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "id": "new_module",
+    "name": "New Module",
+    "author": "Unknown",
+    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Ironmarch.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 64,
+    "map_height": 48,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "ironmarch",
+        "name": "Ironmarch",
+        "description": "A crossroads town where adventurers gather to share rumours and ale."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_armory"
+    },
+    "starting_quests": [
+      "defend"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Crimson Vaults",
+        "key_name": "Onyx Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Bones litter the threshold of Crimson Vaults. Whatever guards this place does not welcome visitors.",
+        "quest_type": "retrieve",
+        "quest_objective": "Slay the guardian of Crimson Vaults and claim the Onyx Key",
+        "quest_hint": "A fearsome creature guards the prize.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": false,
+            "torch_density": "low"
+          }
+        ]
+      }
+    ],
+    "innkeeper_quests": false
+  }
+}
