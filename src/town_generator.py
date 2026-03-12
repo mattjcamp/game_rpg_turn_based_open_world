@@ -472,9 +472,9 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
                     shop_dlg, npc_type="shopkeep"))
 
     # Innkeeper (inside the inn, behind the bar)
-    # The innkeeper only offers a quest when the module has no key
-    # dungeons — if the Elder already gives dungeon quests, the
-    # innkeeper just runs the inn.
+    # When innkeeper_quests is True, the innkeeper offers an endless
+    # supply of randomly generated quests.  When False AND the module
+    # has key dungeons, the innkeeper just runs the inn.
     innkeeper = rng.choice(_INNKEEPER_POOL)
     inn_dlg_template = rng.choice(_INNKEEPER_DIALOGUE_POOL)
     inn_dlg = [line.format(inn=innkeeper["inn"])

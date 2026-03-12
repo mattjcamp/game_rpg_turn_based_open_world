@@ -299,10 +299,14 @@ class TownState(InventoryMixin, BaseState):
 
             if npc.npc_type == "innkeeper":
                 # Highlight when offering a quest or waiting for resolution
+                inn_quests = getattr(npc, "innkeeper_quests", False)
                 if quest is None and npc.quest_dialogue:
                     npc.quest_highlight = True
                 elif quest and quest.get("status") in (
                         "active", "artifact_found"):
+                    npc.quest_highlight = True
+                elif quest and quest.get("status") == "completed" and inn_quests:
+                    # Repeatable innkeeper — highlight to signal new quest ready
                     npc.quest_highlight = True
 
             elif npc.npc_type == "gnome":
@@ -1337,8 +1341,9 @@ class TownState(InventoryMixin, BaseState):
         self.game.sfx.play("quest_complete")
 
         # Dialogue — use per-NPC text if available, else generic
+        inn_quests = getattr(npc, "innkeeper_quests", False)
         complete_text = getattr(npc, "text_complete", None)
-        if complete_text and not getattr(npc, "innkeeper_quests", False):
+        if complete_text and not inn_quests:
             dialogue = f"{npc.name}: {complete_text}"
         elif q_type == "kill":
             target = quest.get("kill_target", "monsters")
@@ -1347,6 +1352,8 @@ class TownState(InventoryMixin, BaseState):
         else:
             dialogue = (f"{npc.name}: You found the {artifact}! "
                         f"Here's {reward} gold for your bravery!")
+        if inn_quests:
+            dialogue += " Talk to me again when you're ready for more work."
 
         self.npc_dialogue_active = True
         self.npc_speaking = npc

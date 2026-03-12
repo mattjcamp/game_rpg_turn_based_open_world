@@ -137,6 +137,12 @@
         ]
       }
     ],
-    "innkeeper_quests": true
+    "innkeeper_quests": true,
+    "starting_loot": [
+      {
+        "item": "Lockpick",
+        "count": 3
+      }
+    ]
   }
 }
