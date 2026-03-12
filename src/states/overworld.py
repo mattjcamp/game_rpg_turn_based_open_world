@@ -405,7 +405,7 @@ class OverworldState(InventoryMixin, BaseState):
 
             if moved:
                 self.move_cooldown = MOVE_REPEAT_DELAY
-                party.clock.advance(10)
+                party.clock.advance(5)
                 self.game.tile_map.tick_cooldowns()
                 self._check_tile_events()
                 # Move orcs after party moves
