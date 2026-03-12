@@ -196,6 +196,38 @@ The game runs on a **state machine**. `game.py` owns the main loop and switches 
 
 ---
 
+## Building a Standalone Executable
+
+You can package the game into a standalone app that runs without a Python installation. This is the easiest way to share the game with people who aren't developers.
+
+### Prerequisites
+
+```
+pip3 install pyinstaller
+```
+
+### Build
+
+```
+python3 build_game.py
+```
+
+This runs PyInstaller using the included `realm_of_shadow.spec` and produces a ready-to-distribute folder at `dist/RealmOfShadow/`. The build takes a minute or two.
+
+### Distribute
+
+Zip the output folder and share it:
+
+```
+cd dist && zip -r RealmOfShadow-mac.zip RealmOfShadow/
+```
+
+Upload the zip to [itch.io](https://itch.io), attach it to a GitHub Release, or send it directly. Recipients just unzip and run the `RealmOfShadow` executable inside.
+
+> **Note:** You need to build on each platform you want to support — a Mac produces a Mac build, Windows produces a Windows build, etc.
+
+---
+
 ## Running the Tests
 
 The test suite runs entirely headless (no display needed) using a mock pygame layer defined in `tests/conftest.py`.
