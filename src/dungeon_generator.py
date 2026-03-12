@@ -620,7 +620,8 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
 
 
 def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
-                                     place_artifact=True):
+                                     place_artifact=True,
+                                     kill_target=None, kill_count=0):
     """Generate a random multi-level dungeon for an innkeeper quest.
 
     Parameters
@@ -631,6 +632,13 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
         Number of floors (1–4).  If None, chosen randomly.
     place_artifact : bool
         Whether to place a quest artifact on the deepest floor.
+    kill_target : str or None
+        For kill quests, the monster name the player must defeat.
+        When given, enough of this creature are placed across the
+        dungeon floors to satisfy *kill_count*.
+    kill_count : int
+        Minimum number of *kill_target* creatures required across
+        all floors.
 
     Returns
     -------
@@ -640,12 +648,33 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
         num_floors = random.randint(1, 4)
     num_floors = max(1, min(4, num_floors))
 
+    # For kill quests, distribute guaranteed encounters across floors
+    # so the player can always reach the required kill count.
+    floor_kill_encounters = [[] for _ in range(num_floors)]
+    if kill_target and kill_count > 0:
+        # Spread targets evenly across floors, at least 1 per floor
+        remaining = kill_count
+        for f in range(num_floors):
+            # Give each floor a fair share, heavier on later floors
+            floors_left = num_floors - f
+            share = max(1, (remaining + floors_left - 1) // floors_left)
+            share = min(share, remaining)
+            if share > 0:
+                floor_kill_encounters[f].append({
+                    "monster": kill_target,
+                    "count": share,
+                })
+                remaining -= share
+            if remaining <= 0:
+                break
+
     levels = []
     for floor in range(num_floors):
         is_last = (floor == num_floors - 1)
         enc_level = floor + 1
         w = min(40, 28 + floor * 2)
         h = min(30, 22 + floor * 2)
+        custom_enc = floor_kill_encounters[floor] or None
         level = generate_dungeon(
             name=f"{name} - Level {floor + 1}",
             width=w, height=h,
@@ -657,13 +686,15 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
+            custom_encounters=custom_enc,
         )
         levels.append(level)
     return levels
 
 
 def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
-                          module_levels=None):
+                          module_levels=None,
+                          kill_target=None, kill_count=0):
     """Generate a progressive dungeon for a module.
 
     When *module_levels* is provided (from the module editor), the floor
@@ -700,6 +731,23 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
     else:
         num_floors = dungeon_number
 
+    # For kill quests, distribute guaranteed encounters across floors
+    floor_kill_encounters = [[] for _ in range(num_floors)]
+    if kill_target and kill_count > 0:
+        remaining = kill_count
+        for f in range(num_floors):
+            floors_left = num_floors - f
+            share = max(1, (remaining + floors_left - 1) // floors_left)
+            share = min(share, remaining)
+            if share > 0:
+                floor_kill_encounters[f].append({
+                    "monster": kill_target,
+                    "count": share,
+                })
+                remaining -= share
+            if remaining <= 0:
+                break
+
     levels = []
 
     for floor in range(num_floors):
@@ -725,6 +773,11 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             floor_name = f"Floor {floor + 1}"
             custom_enc = None
             include_random = True  # procedural floors always random
+
+        # Merge kill-quest guaranteed encounters with any custom ones
+        kill_enc = floor_kill_encounters[floor]
+        if kill_enc:
+            custom_enc = list(custom_enc or []) + kill_enc
 
         level_data = generate_dungeon(
             name=f"{name} - {floor_name}",

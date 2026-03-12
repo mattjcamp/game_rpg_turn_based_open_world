@@ -1149,9 +1149,13 @@ class TownState(InventoryMixin, BaseState):
         # Generate a multi-level quest dungeon (1-4 floors)
         num_floors = random.randint(1, 4) if inn_quests else 2
         place_artifact = (q_type != "kill")
+        kill_target = quest_data.get("kill_target") if q_type == "kill" else None
+        kill_count = quest_data.get("kill_count", 0) if q_type == "kill" else 0
         levels = generate_innkeeper_quest_dungeon(
             q_name, num_floors=num_floors,
-            place_artifact=place_artifact)
+            place_artifact=place_artifact,
+            kill_target=kill_target,
+            kill_count=kill_count)
 
         # Find a random accessible tile on the overworld for the dungeon
         dc, dr = self._find_quest_dungeon_location()

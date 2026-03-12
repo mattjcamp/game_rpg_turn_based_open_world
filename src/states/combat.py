@@ -775,8 +775,17 @@ class CombatState(BaseState):
 
             # ── PHASE_LOOT: free movement + leave encounter ──
             elif self.phase == PHASE_LOOT:
+                # 1-4: switch which party member is the looter
+                if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
+                    idx = event.key - pygame.K_1  # 0-based
+                    alive = [f for f in self.fighters if f.is_alive()]
+                    if 0 <= idx < len(alive):
+                        self.looter_fighter = alive[idx]
+                        self.active_idx = self.fighters.index(self.looter_fighter)
+                        self.combat_log.append(
+                            f"{self.looter_fighter.name} takes over looting.")
                 # WASD movement for the looter
-                if event.key == pygame.K_w:
+                elif event.key == pygame.K_w:
                     self._try_loot_move(0, -1)
                 elif event.key == pygame.K_s:
                     self._try_loot_move(0, 1)
@@ -4745,10 +4754,21 @@ class CombatState(BaseState):
         """Find an unoccupied floor tile near (near_col, near_row).
 
         Tries the given position first, then spirals outward checking
-        adjacent tiles.  Returns (col, row) or None.
+        adjacent tiles.  Avoids tiles occupied by party members.
+        Returns (col, row) or None.
         """
-        if ((near_col, near_row) not in self.ground_items
-                and not self._is_arena_wall(near_col, near_row)):
+        # Build set of tiles occupied by alive fighters
+        occupied = set()
+        for f, pos in self.fighter_positions.items():
+            if f.is_alive():
+                occupied.add(pos)
+
+        def _tile_ok(c, r):
+            return (not self._is_arena_wall(c, r)
+                    and (c, r) not in self.ground_items
+                    and (c, r) not in occupied)
+
+        if _tile_ok(near_col, near_row):
             return (near_col, near_row)
 
         # Spiral outward (Chebyshev rings 1..5)
@@ -4759,8 +4779,7 @@ class CombatState(BaseState):
                     if max(abs(dc), abs(dr)) != ring:
                         continue
                     c, r = near_col + dc, near_row + dr
-                    if (not self._is_arena_wall(c, r)
-                            and (c, r) not in self.ground_items):
+                    if _tile_ok(c, r):
                         candidates.append((c, r))
             if candidates:
                 return random.choice(candidates)

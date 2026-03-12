@@ -1,5 +1,5 @@
 {
-  "music_enabled": true,
+  "music_enabled": false,
   "smite_enabled": false,
   "start_with_equipment": false,
   "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/riven_dale",

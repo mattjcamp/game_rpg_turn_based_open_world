@@ -487,10 +487,13 @@ class Game:
             # Gnome machine quests ARE retrieve quests (collect a key)
             # so they need an artifact tile.
             needs_artifact = (quest_type != "kill")
+            kt = kd.get("kill_target", "") if quest_type == "kill" else None
+            kc = int(kd.get("kill_count", 0)) if quest_type == "kill" else 0
             levels = generate_keys_dungeon(
                 dnum, name=name,
                 place_artifact=needs_artifact,
-                module_levels=module_levels)
+                module_levels=module_levels,
+                kill_target=kt, kill_count=kc)
             self.key_dungeons[(col, row)] = {
                 "dungeon_number": dnum,
                 "name": name,
