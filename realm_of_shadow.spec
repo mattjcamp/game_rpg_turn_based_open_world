@@ -33,7 +33,10 @@ a = Analysis(
     ],
     hiddenimports=[
         'numpy',
+        'numpy.random',
+        'numpy.random.bit_generator',
         'pygame',
+        'secrets',
     ],
     hookspath=[],
     hooksconfig={},
@@ -41,10 +44,6 @@ a = Analysis(
     excludes=[
         'tkinter',
         'unittest',
-        'email',
-        'html',
-        'http',
-        'xml',
         'pydoc',
     ],
     noarchive=False,

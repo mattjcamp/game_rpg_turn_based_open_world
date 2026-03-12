@@ -60,6 +60,30 @@ def ensure_writable_dirs():
             f.write("{}")
 
 
+def codesign_mac():
+    """Ad-hoc code sign on macOS so Gatekeeper treats the bundle as one app.
+
+    Without this, macOS quarantine flags every .so and .dylib individually,
+    forcing the user to approve each one in System Settings.  Ad-hoc signing
+    is free and doesn't require an Apple Developer account.
+    """
+    if platform.system() != "Darwin":
+        return
+
+    print("\nCode-signing for macOS (ad-hoc)...")
+    try:
+        subprocess.check_call([
+            "codesign", "--force", "--deep", "--sign", "-",
+            DIST,
+        ])
+        print("  Signed successfully.")
+    except FileNotFoundError:
+        print("  codesign not found — skipping (are you on macOS?)")
+    except subprocess.CalledProcessError as exc:
+        print(f"  codesign failed ({exc}) — the build is still usable,")
+        print("  but users may need to run:  xattr -cr dist/RealmOfShadow/")
+
+
 def report():
     """Print the build result."""
     if os.path.isdir(DIST):
@@ -72,6 +96,9 @@ def report():
         print(f"Total size: {size_mb:.1f} MB")
         print(f"\nTo distribute, zip the folder:")
         print(f"  cd dist && zip -r RealmOfShadow-{platform.system().lower()}.zip RealmOfShadow/")
+        if platform.system() == "Darwin":
+            print(f"\nIf a Mac user has trouble opening the app, tell them to run:")
+            print(f"  xattr -cr path/to/RealmOfShadow/")
     else:
         print("\nBuild failed — dist/RealmOfShadow/ was not created.")
         sys.exit(1)
@@ -81,4 +108,5 @@ if __name__ == "__main__":
     check_pyinstaller()
     build()
     ensure_writable_dirs()
+    codesign_mac()
     report()
