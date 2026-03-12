@@ -945,7 +945,7 @@ class TownState(InventoryMixin, BaseState):
                         completed = True
                         label = art
                 if completed:
-                    reward_gold = 150
+                    reward_gold = 37
                     reward_xp = 75
                     party.gold += reward_gold
                     for member in party.alive_members():
@@ -1002,7 +1002,7 @@ class TownState(InventoryMixin, BaseState):
                             turned_in.append(art)
                 all_completed = turned_in + kill_turned_in
                 if all_completed:
-                    reward_gold = 150 * len(all_completed)
+                    reward_gold = 37 * len(all_completed)
                     reward_xp = 75 * len(all_completed)
                     party.gold += reward_gold
                     for member in party.alive_members():
@@ -1324,7 +1324,7 @@ class TownState(InventoryMixin, BaseState):
             party.inv_remove(artifact)
 
         # Give gold reward
-        reward = 200
+        reward = 50
         party.gold += reward
 
         # Give XP reward to all alive members
