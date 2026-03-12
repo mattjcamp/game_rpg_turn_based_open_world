@@ -18,9 +18,12 @@
 10. [Items & Consumables](#items--consumables)
 11. [Experience & Leveling](#experience--leveling)
 12. [Monsters & Bestiary](#monsters--bestiary)
-13. [Temples](#temples)
-14. [Settings](#settings)
-15. [Controls & Interface](#controls--interface)
+13. [Quests & Objectives](#quests--objectives)
+14. [The Overworld](#the-overworld)
+15. [Dungeons](#dungeons)
+16. [Temples](#temples)
+17. [Settings](#settings)
+18. [Controls & Interface](#controls--interface)
 
 ---
 
@@ -446,6 +449,12 @@ Sleeping monsters skip their turn. Invisible party members are ignored by monste
 | **Blessed** | Bless spell | 4 turns | +2 attack bonus for all allies |
 | **Shielded** | Shield spell | 3 turns | +1 AC bonus |
 
+### Post-Battle Loot
+
+After winning a battle, any gold and items dropped by defeated monsters are scattered across the arena. The game enters a **loot phase** where you control one character to walk over items and pick them up. Items are placed so they never land on top of a party member's position.
+
+During the loot phase, press **1–4** to switch which party member is collecting loot. This lets you move a character who is closer to distant drops rather than walking the default looter across the entire arena. Press **Enter** or **ESC** to end the loot phase once you've grabbed everything.
+
 ### Death & Revival
 
 When a character's HP reaches 0, they are **incapacitated** and can no longer act. If the entire party falls, combat is lost — but surviving members are revived with 1 HP afterward. A total party wipe triggers a game over.
@@ -827,17 +836,77 @@ As a rule of thumb, your party should be around the encounter's level to have a 
 
 ---
 
+## Quests & Objectives
+
+Realm of Shadow uses a quest-driven progression system. Your party must complete objectives — retrieving artifacts, slaying creatures, or assembling machine parts — to advance the story and ultimately win the module.
+
+### Quest Givers
+
+Quests are handed out by named NPCs scattered across the world's towns. Each quest giver holds a single quest tied to a specific dungeon. When you speak to a quest giver and accept their task, the location of the relevant dungeon is revealed on the overworld map. Quest givers are highlighted with a golden glow so they stand out from regular townsfolk.
+
+Not every town will have a quest giver. Quests are distributed randomly across the module's towns, so one town might have two quest givers while another has none. Explore every settlement to make sure you don't miss anything.
+
+### Quest Types
+
+There are three types of quests you may encounter, depending on the module:
+
+- **Retrieve quests** — Travel to the indicated dungeon and find the quest artifact. Once you have it, return to the quest giver (or the town Elder) to turn it in.
+- **Kill quests** — Enter the dungeon and defeat a required number of a specific creature type. The quest giver will tell you what to hunt and how many. Progress is tracked automatically. Return to turn in once the count is met.
+- **Gnome Machine quests** — Collect special keys scattered across multiple dungeons and bring them to the gnome's machine to assemble a device. These multi-part objectives are the module's grand quest line.
+
+### The Town Elder
+
+The Elder no longer hands out quests directly. Instead, the Elder serves as a turn-in point: once you have completed a quest (retrieved the artifact or met the kill count), you can speak to the Elder to receive your reward. The Elder also provides hints about your overall progress. If you haven't found all the quest givers yet, the Elder will suggest seeking out travelers in the towns.
+
+### Innkeeper Quests
+
+If the module has innkeeper quests enabled, the innkeeper in each town offers an endless supply of randomly generated side quests. These are repeatable — after completing one innkeeper quest, speak to the innkeeper again to receive a new one immediately. Innkeeper quests send you into a procedurally generated dungeon that appears temporarily on the overworld. They are a reliable way to earn gold and experience between story quests.
+
+### Quest Rewards
+
+Completing a quest giver or Elder quest rewards the party with **37 gold**. Innkeeper quests pay **50 gold** on completion. Beyond gold, quests are the primary way to advance the module's story toward victory.
+
+---
+
+## The Overworld
+
+The overworld is the large map connecting towns, dungeons, and other points of interest. Your party moves as a single unit across the terrain.
+
+### Movement & Time
+
+Each step on the overworld advances the in-game clock by **5 minutes**. Time of day affects lighting and may influence encounters. Use camping supplies to rest and restore HP/MP when the party is worn down — resting advances the clock by 10 hours.
+
+### Encounters
+
+While traveling, the party may be ambushed by roaming monsters. Encounter difficulty scales with the region. Stick to roads and familiar areas early on, and venture into wilder territory as your party grows stronger.
+
+---
+
+## Dungeons
+
+Dungeons are multi-floor underground areas filled with monsters, traps, treasure, and quest objectives. Each floor is a maze of rooms and corridors that must be explored carefully.
+
+### Torch Density & Lighting
+
+Dungeons vary in how well-lit they are. The **torch density** setting (configured by the module creator) controls how many wall-mounted torches appear on each floor:
+
+- **High** — Abundant torches line the walls of rooms and corridors. The dungeon is well-lit and easy to navigate without additional light sources.
+- **Medium** — A moderate number of torches illuminate rooms but leave some corridors dark. A torch or Light spell is helpful.
+- **Low** — Only a few torches are scattered throughout the floor. Most of the dungeon is shrouded in darkness. Bring torches, use a Light spell, or rely on a Dwarf's Infravision.
+
+Each floor of a dungeon can have its own torch density, so deeper levels may be darker and more dangerous than upper ones.
+
+### Exploration Tips
+
+- A Thief's Detect Traps ability or careful exploration can save the party from nasty surprises.
+- Locked doors can be opened with lockpicks (Thief), the Knock spell (Wizard/Alchemist/Druid), or by finding the matching key.
+- Keep an eye on your torch charges — running out of light in a low-density dungeon is dangerous.
+
+---
+
 ## Temples
 
-Each town has a temple dedicated to its patron deity, staffed by a priest who offers divine services in exchange for gold.
-
-### Thornwall — Temple of Solarius
-
-Brother Cedric tends the Temple of Solarius, god of light and the sun. The temple is located in the southwest area of Thornwall. Approach Brother Cedric and press Enter to access services.
-
-### Duskhollow — Temple of Lunara
-
-Sister Vesper keeps vigil at the Temple of Lunara, goddess of the moon and stars. The temple is found in the southern quarter of Duskhollow.
+Each town has a temple staffed by a priest who offers divine services in exchange for gold. The specific deity and priest name vary by module. Look for the temple building in each town and approach the priest inside — press Enter to access services.
 
 ### Temple Services
 
@@ -885,6 +954,14 @@ The Settings screen is accessible from the title menu. All settings are saved to
 | L | Open combat log |
 | H | Help overlay |
 | ESC | Back / cancel |
+
+### Loot Phase Controls
+
+| Key | Action |
+|-----|--------|
+| W/A/S/D | Move the looter to collect items |
+| 1–4 | Switch which party member collects loot |
+| Enter / ESC | End loot phase |
 
 ### Combat Menu Options
 

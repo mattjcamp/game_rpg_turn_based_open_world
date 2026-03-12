@@ -49,9 +49,8 @@ Compare the total to the **defender's AC**:
 
 ### Player Attack Bonus
 
-    attack_bonus = STR modifier
-
-_(Weapon-specific bonuses may be added later.)_
+    melee attack_bonus  = STR modifier
+    ranged attack_bonus = DEX modifier
 
 ### Monster Attack Bonus
 
@@ -94,14 +93,17 @@ Weapon power determines the dice used:
 
 | Weapon Power | Damage Dice |
 |--------------|-------------|
-| 0–2          | 1d4         |
-| 3–5          | 1d6         |
+| 0            | 1 (flat)    |
+| 1            | 1d4−1       |
+| 2–3          | 1d4         |
+| 4–5          | 1d6         |
 | 6–8          | 1d8         |
-| 9–10         | 1d10        |
+| 9+           | 1d10        |
 
 The final damage roll is:
 
-    damage = (damage_dice) + STR modifier
+    melee damage  = (damage_dice) + STR modifier
+    ranged damage = (damage_dice) + DEX modifier
     minimum 1 damage on any hit
 
 On a **critical hit**, the dice count is doubled (but the STR modifier
@@ -124,8 +126,8 @@ Ranged weapons come in two flavors:
 
 ### Standard Ranged (Bows, Slings)
 
-The weapon has `ranged: true` in its data. The attack uses the same
-d20 + STR mod vs AC formula. The weapon is **not consumed** — the
+The weapon has `ranged: true` in its data. The attack uses
+d20 + DEX mod vs AC formula. The weapon is **not consumed** — the
 character can fire indefinitely.
 
 ### Throwable Weapons (Daggers)
@@ -136,7 +138,7 @@ inventory or the party's shared inventory. When all copies are
 exhausted, the character can no longer make ranged attacks with that
 weapon (but can still use it in melee if it has `melee: true`).
 
-Attack resolution is the same: d20 + STR mod vs AC.
+Attack resolution is the same: d20 + DEX mod vs AC.
 
 ---
 
@@ -232,4 +234,4 @@ fields for weapons:
 
 ---
 
-*Last updated: Feb 2026*
+*Last updated: Mar 2026*
