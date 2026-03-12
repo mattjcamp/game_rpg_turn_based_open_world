@@ -1,7 +1,7 @@
 {
-  "music_enabled": false,
+  "music_enabled": true,
   "smite_enabled": true,
   "start_with_equipment": false,
-  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/new_module",
+  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/the_expanse",
   "soundtrack_style": "Quiet"
 }

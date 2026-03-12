@@ -1,0 +1,241 @@
+{
+  "metadata": {
+    "id": "the_expanse",
+    "name": "The Expanse",
+    "author": "hyperbolic",
+    "description": "Navigate through a long dark world",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 128,
+    "map_height": 96,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 9,
+      "day": 1,
+      "hour": 6,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "driftwood",
+        "name": "Driftwood",
+        "description": "A sleepy village surrounded by ancient oaks and whispering meadows."
+      },
+      {
+        "id": "copperhollow",
+        "name": "Copperhollow",
+        "description": "A crossroads town where adventurers gather to share rumours and ale."
+      },
+      {
+        "id": "ashdale",
+        "name": "Ashdale",
+        "description": "A seaside port battered by salt winds and rich with the smell of fish."
+      },
+      {
+        "id": "jadeport",
+        "name": "Jadeport",
+        "description": "A riverside town whose docks hum with the comings and goings of barges."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 4,
+      "deliver_to": "town_armory"
+    },
+    "starting_quests": [
+      "defend"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Iron Warren",
+        "key_name": "Diamond Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "A spiral staircase carved from bedrock descends into Iron Warren. The temperature drops with every step.",
+        "quest_type": "retrieve",
+        "quest_objective": "Slay the guardian of Iron Warren and claim the Diamond Key",
+        "quest_hint": "A fearsome creature guards the prize.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Orc Shaman",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "medium"
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": false,
+            "torch_density": "medium"
+          },
+          {
+            "name": "Floor 3",
+            "encounters": [
+              {
+                "monster": "Troll",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "low"
+          },
+          {
+            "name": "Floor 4",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "medium"
+          },
+          {
+            "name": "Floor 5",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "high"
+          }
+        ]
+      },
+      {
+        "id": "dungeon_key_2",
+        "name": "Twisted Tomb",
+        "key_name": "Amber Key",
+        "dungeon_number": 2,
+        "landmark_id": "dungeon_2",
+        "description": "A narrow crevice leads into Twisted Tomb. The sound of dripping water echoes endlessly below.",
+        "quest_type": "retrieve",
+        "quest_objective": "Retrieve the Amber Key from Twisted Tomb",
+        "quest_hint": "A powerful artifact lies in the deepest chamber.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "medium"
+          }
+        ]
+      },
+      {
+        "id": "dungeon_key_3",
+        "name": "Silent Warren",
+        "key_name": "Onyx Key",
+        "dungeon_number": 3,
+        "landmark_id": "dungeon_3",
+        "description": "Thick vines choke the mouth of Silent Warren. Beyond them, torchlight flickers in the gloom.",
+        "quest_type": "retrieve",
+        "quest_objective": "Brave the depths of Silent Warren for the Onyx Key",
+        "quest_hint": "Few who enter these halls return unchanged.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "low"
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Dark Mage",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "low"
+          }
+        ]
+      },
+      {
+        "id": "dungeon_key_4",
+        "name": "Twisted Lair",
+        "key_name": "Gold Key",
+        "dungeon_number": 4,
+        "landmark_id": "dungeon_4",
+        "description": "The entrance to Twisted Lair gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "quest_type": "retrieve",
+        "quest_objective": "Explore Twisted Lair and recover the lost Gold Key",
+        "quest_hint": "The artifact was hidden here long ago by a forgotten order.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": false,
+            "torch_density": "medium"
+          }
+        ]
+      }
+    ],
+    "innkeeper_quests": true
+  }
+}

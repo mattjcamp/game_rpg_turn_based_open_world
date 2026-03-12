@@ -2061,7 +2061,7 @@ class Game:
         # Include random encounters toggle
         fields.append(["Random Encounters",
                         f"lvl_{level_idx}_randenc",
-                        "Yes" if level.get("random_encounters", False)
+                        "Yes" if level.get("random_encounters", True)
                         else "No",
                         "choice", True])
         # Torch density per level
@@ -2178,6 +2178,7 @@ class Game:
         levels.append({
             "name": f"Floor {floor_num}",
             "encounters": [{"monster": "Giant Rat", "count": 1}],
+            "random_encounters": True,
         })
         # Rebuild sub-sections to show the new level
         self._rebuild_dungeon_sub_sections(dung_idx)
