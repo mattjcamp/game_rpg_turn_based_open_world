@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "test",
-    "name": "Test",
+    "id": "the_real_deal",
+    "name": "The Real deal",
     "author": "Unknown",
-    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Maplecrest.",
+    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Emberhollow to restore the protective ward.",
     "version": "0.1.0"
   },
   "settings": {
@@ -27,14 +27,14 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "maplecrest",
-        "name": "Maplecrest",
+        "id": "emberhollow",
+        "name": "Emberhollow",
         "description": "A sleepy village surrounded by ancient oaks and whispering meadows."
       },
       {
-        "id": "stonekeep",
-        "name": "Stonekeep",
-        "description": "A forest clearing settlement where druids and woodsmen live side by side."
+        "id": "frostbrook",
+        "name": "Frostbrook",
+        "description": "A walled outpost on the frontier, always on guard against the wilds."
       }
     ],
     "dungeons": []
@@ -43,29 +43,35 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_vault"
+      "deliver_to": "town_altar"
     },
     "starting_quests": [
-      "reclaim"
+      "restore"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Hidden Stronghold",
+        "name": "Lost Halls",
         "key_name": "Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The entrance to Hidden Stronghold gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "description": "A narrow crevice leads into Lost Halls. The sound of dripping water echoes endlessly below.",
         "quest_type": "gnome_machine",
-        "quest_objective": "Brave the depths of Hidden Stronghold for the Ivory Key",
-        "quest_hint": "Few who enter these halls return unchanged.",
+        "quest_objective": "Explore Lost Halls and recover the lost Emerald Key",
+        "quest_hint": "The artifact was hidden here long ago by a forgotten order.",
         "kill_target": "",
         "kill_count": 0,
-        "keys_needed": 2,
-        "gnome_town": "Stonekeep",
+        "keys_needed": 1,
+        "gnome_town": "Emberhollow",
         "levels": []
       }
     ],
-    "innkeeper_quests": false
+    "innkeeper_quests": false,
+    "starting_loot": [
+      {
+        "item": "Lockpick",
+        "count": 2
+      }
+    ]
   }
 }

@@ -514,18 +514,29 @@ class Game:
                 "gnome_town": kd.get("gnome_town", ""),
             }
 
-    def discover_key_dungeons(self):
-        """Mark all undiscovered key dungeons as active.
+    def discover_key_dungeons(self, only_types=None, exclude_types=None):
+        """Mark undiscovered key dungeons as active.
 
-        Called when the town elder reveals the quests to the player.
+        Parameters
+        ----------
+        only_types : set or None
+            If given, only reveal dungeons whose quest_type is in this set.
+        exclude_types : set or None
+            If given, skip dungeons whose quest_type is in this set.
         """
         for kd in self.key_dungeons.values():
-            if kd["status"] == "undiscovered":
-                kd["status"] = "active"
-                # Restore proper floor names now that the quest is revealed
-                dname = kd.get("name", "Key Dungeon")
-                for i, level in enumerate(kd.get("levels", [])):
-                    level.name = f"{dname} - Floor {i + 1}"
+            if kd["status"] != "undiscovered":
+                continue
+            qt = kd.get("quest_type", "retrieve")
+            if only_types and qt not in only_types:
+                continue
+            if exclude_types and qt in exclude_types:
+                continue
+            kd["status"] = "active"
+            # Restore proper floor names now that the quest is revealed
+            dname = kd.get("name", "Key Dungeon")
+            for i, level in enumerate(kd.get("levels", [])):
+                level.name = f"{dname} - Floor {i + 1}"
 
     def _init_module_towns(self):
         """Generate towns for the active module and store in town_data_map.
@@ -641,8 +652,17 @@ class Game:
         return self.keys_inserted
 
     def get_total_keys(self):
-        """Return the total number of key dungeons (= total keys needed)."""
-        return len(self.key_dungeons)
+        """Return the total number of keys needed for the gnome machine.
+
+        For Keys of Shadow (all quests are gnome-style), this is the
+        total number of key dungeons.  For custom modules, it counts
+        only dungeons whose quest_type is ``"gnome_machine"``.  Falls
+        back to all dungeons if none are explicitly gnome_machine.
+        """
+        gnome_count = sum(
+            1 for kd in self.key_dungeons.values()
+            if kd.get("quest_type") == "gnome_machine")
+        return gnome_count if gnome_count else len(self.key_dungeons)
 
     def set_darkness(self, active):
         """Enable or disable the darkness overlay."""
@@ -821,10 +841,12 @@ class Game:
             # Show the meta-quest when the module uses gnome machine
             # quest style.  For elder modules, each dungeon quest is
             # handled individually — no separate end-goal needed.
+            gnome_kds = [kd for kd in kd_map.values()
+                         if kd.get("quest_type") == "gnome_machine"]
             if is_gnome_machine and (gnome_accepted or any(
                     kd.get("status") != "undiscovered"
-                    for kd in kd_map.values())):
-                total = len(kd_map)
+                    for kd in gnome_kds)):
+                total = len(gnome_kds) if gnome_kds else len(kd_map)
                 all_done = inserted >= total
                 quests.append({
                     "name": "Activate the Ancient Machine",

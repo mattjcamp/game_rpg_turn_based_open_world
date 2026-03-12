@@ -320,13 +320,16 @@ class TownState(InventoryMixin, BaseState):
 
             elif npc.npc_type == "elder":
                 # Highlight when there are undiscovered quests to reveal,
-                # or while any key dungeon quests are still in progress
+                # or while any key dungeon quests are still in progress.
+                # Gnome machine quests are the gnome's responsibility.
+                elder_kds = [kd for kd in kd_map.values()
+                             if kd.get("quest_type") != "gnome_machine"]
                 has_undiscovered = any(
                     kd.get("status") == "undiscovered"
-                    for kd in kd_map.values())
+                    for kd in elder_kds)
                 has_active = any(
                     kd.get("status") in ("active", "artifact_found")
-                    for kd in kd_map.values())
+                    for kd in elder_kds)
                 if has_undiscovered or has_active:
                     npc.quest_highlight = True
 
@@ -890,10 +893,12 @@ class TownState(InventoryMixin, BaseState):
             pass
 
         # Elder — offer to reveal undiscovered key dungeon quests
+        # (gnome_machine quests are handled by the gnome, not the elder)
         if npc.npc_type == "elder":
             kd_map = getattr(self.game, "key_dungeons", {})
             undiscovered = [kd for kd in kd_map.values()
-                           if kd.get("status") == "undiscovered"]
+                           if kd.get("status") == "undiscovered"
+                           and kd.get("quest_type") != "gnome_machine"]
             if undiscovered:
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
@@ -1078,8 +1083,16 @@ class TownState(InventoryMixin, BaseState):
         """Accept the gnome's machine quest (Keys of Shadow or custom)."""
         npc = self.npc_speaking
         self.game.set_gnome_quest_accepted()
-        # Also reveal all undiscovered key dungeons on the map
-        self.game.discover_key_dungeons()
+        # Reveal only gnome_machine key dungeons (KoS reveals all)
+        mod_id = ""
+        if self.game.module_manifest:
+            mod_id = self.game.module_manifest.get(
+                "metadata", {}).get("id", "")
+        if mod_id == "keys_of_shadow":
+            self.game.discover_key_dungeons()
+        else:
+            self.game.discover_key_dungeons(
+                only_types={"gnome_machine"})
         total = self.game.get_total_keys()
         self._set_dialogue(
             f"{npc.name}: Thank you! The {total} dungeons are scattered "
@@ -1092,9 +1105,10 @@ class TownState(InventoryMixin, BaseState):
         self._refresh_quest_highlights()
 
     def _accept_elder_quest(self):
-        """Accept the Elder's quest: reveal all undiscovered key dungeons."""
+        """Accept the Elder's quest: reveal undiscovered non-gnome dungeons."""
         npc = self.npc_speaking
-        self.game.discover_key_dungeons()
+        self.game.discover_key_dungeons(
+            exclude_types={"gnome_machine"})
         self._set_dialogue(
             f"{npc.name}: Thank you, brave souls! "
             f"I've marked the locations on your map. "
