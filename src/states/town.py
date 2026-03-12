@@ -1622,8 +1622,12 @@ class TownState(InventoryMixin, BaseState):
 
         # Town is dark if global darkness is on (KoS) OR if THIS town
         # is the gnome machine town and the quest is still incomplete.
+        # Keep darkness active while the shutdown animation is playing
+        # so the town doesn't light up before the cinematic transition.
         town_dark = getattr(self.game, "darkness_active", False)
-        if not town_dark:
+        if self.machine_shutdown_effect:
+            town_dark = True
+        elif not town_dark:
             kd_map = getattr(self.game, "key_dungeons", {})
             inserted = getattr(self.game, "keys_inserted", 0)
             current_name = self.town_data.name if self.town_data else ""

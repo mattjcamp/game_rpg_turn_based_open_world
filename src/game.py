@@ -1577,11 +1577,12 @@ class Game:
             ],
         })
 
-        # 3) Each town as its own section
+        # 3) Towns folder
         towns = manifest.get("world", {}).get("towns", [])
+        town_children = []
         for i, town in enumerate(towns):
             tname = town.get("name", f"Town {i+1}")
-            sections.append({
+            town_children.append({
                 "label": tname,
                 "icon": "T",
                 "fields": [
@@ -1590,15 +1591,25 @@ class Game:
                      town.get("description", ""), "text", True],
                 ],
             })
+        n_towns = len(towns)
+        sections.append({
+            "label": "Towns",
+            "icon": "F",
+            "folder": "towns",
+            "children": town_children,
+            "subtitle": (f"{n_towns} town{'s' if n_towns != 1 else ''}"
+                         if n_towns else "none"),
+        })
 
-        # 4) Each dungeon as its own section (dungeon properties only)
+        # 4) Dungeons folder
         from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
         dungeons = manifest.get("progression", {}).get(
             "key_dungeons", [])
+        dungeon_children = []
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
             n_levels = len(dung.get("levels", []))
-            sections.append({
+            dungeon_children.append({
                 "label": dname,
                 "icon": "D",
                 "dung_idx": i,
@@ -1610,22 +1621,40 @@ class Game:
                 "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
                              if n_levels > 0 else "no levels"),
             })
+        n_dungeons = len(dungeons)
+        sections.append({
+            "label": "Dungeons",
+            "icon": "F",
+            "folder": "dungeons",
+            "children": dungeon_children,
+            "subtitle": (f"{n_dungeons} dungeon{'s' if n_dungeons != 1 else ''}"
+                         if n_dungeons else "none"),
+        })
 
-        # 5) Each quest as its own section (quest properties only)
-        # Build a list of town names for gnome machine town selection
+        # 5) Quests folder
         town_name_list = [t.get("name", f"Town {j+1}")
                           for j, t in enumerate(towns)]
         self._module_edit_town_names = town_name_list
+        quest_children = []
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
             fields = self._quest_fields_for_type(
                 i, dung, town_name_list)
-            sections.append({
+            quest_children.append({
                 "label": f"{dname} Quest",
                 "icon": "Q",
                 "quest_idx": i,
                 "fields": fields,
             })
+        n_quests = len(dungeons)
+        sections.append({
+            "label": "Quests",
+            "icon": "F",
+            "folder": "quests",
+            "children": quest_children,
+            "subtitle": (f"{n_quests} quest{'s' if n_quests != 1 else ''}"
+                         if n_quests else "none"),
+        })
 
         # 6) Starting Loot section
         starting_loot = manifest.get("progression", {}).get(
@@ -1651,6 +1680,7 @@ class Game:
         self.module_edit_scroll = 0
         # Clear navigation stack and dungeon level data
         self.module_edit_nav_stack = []
+        self._module_edit_folder_label = ""
         self.module_edit_active_dung = -1
         self.module_edit_active_level = -1
         # Starting loot data for editing
@@ -1774,17 +1804,21 @@ class Game:
         # Replace the fields in both the active list and the section
         self.module_edit_fields[:] = new_fields
         # Also update the section object so commit gathers the right keys
-        for sec in self.module_edit_sections:
-            if sec.get("quest_idx") == quest_idx:
-                sec["fields"] = new_fields
-                break
-        # Also check nav stack sections
-        for stack_entry in getattr(
-                self, "module_edit_nav_stack", []):
-            for sec in stack_entry[0]:
+        # (may be in current sections, folder children, or nav stack)
+        def _update_quest_sec(sec_list):
+            for sec in sec_list:
                 if sec.get("quest_idx") == quest_idx:
                     sec["fields"] = new_fields
-                    break
+                    return True
+                for child in sec.get("children", []):
+                    if child.get("quest_idx") == quest_idx:
+                        child["fields"] = new_fields
+                        return True
+            return False
+        _update_quest_sec(self.module_edit_sections)
+        for stack_entry in getattr(
+                self, "module_edit_nav_stack", []):
+            _update_quest_sec(stack_entry[0])
         # Reset cursor to the first field (Quest Type) and refresh buffer
         self.module_edit_field = 0
         self.module_edit_buffer = new_fields[0][2]
@@ -1792,6 +1826,11 @@ class Game:
     def _enter_section_fields(self):
         """Drill into the selected section's fields for editing."""
         sec = self.module_edit_sections[self.module_edit_section_cursor]
+
+        # ── Folder sections drill into child section list ──
+        if sec.get("folder"):
+            self._enter_folder(sec)
+            return
 
         # ── Dungeon sections drill into a sub-section browser ──
         if sec.get("icon") == "D" and sec.get("dung_idx") is not None:
@@ -1822,14 +1861,33 @@ class Game:
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
 
-    def _enter_dungeon_sub(self, dung_idx):
-        """Push current section browser and show dungeon sub-sections."""
-        # Push current state onto nav stack
+    def _enter_folder(self, sec):
+        """Push the current section list and show a folder's children."""
         self.module_edit_nav_stack.append((
             self.module_edit_sections,
             self.module_edit_section_cursor,
             self.module_edit_section_scroll,
+            getattr(self, "_module_edit_folder_label", ""),
         ))
+        self.module_edit_sections = list(sec.get("children", []))
+        self.module_edit_section_cursor = 0
+        self.module_edit_section_scroll = 0
+        self.module_edit_level = 0
+        # Store folder name for breadcrumb display
+        self._module_edit_folder_label = sec.get("label", "")
+
+    def _enter_dungeon_sub(self, dung_idx):
+        """Push current section browser and show dungeon sub-sections."""
+        # Push current state onto nav stack (with current folder label)
+        self.module_edit_nav_stack.append((
+            self.module_edit_sections,
+            self.module_edit_section_cursor,
+            self.module_edit_section_scroll,
+            getattr(self, "_module_edit_folder_label", ""),
+        ))
+        # Remember dungeon name for breadcrumb
+        sec = self.module_edit_sections[self.module_edit_section_cursor]
+        self._module_edit_folder_label = sec.get("label", "Dungeon")
         self.module_edit_active_dung = dung_idx
         self._rebuild_dungeon_sub_sections(dung_idx)
 
@@ -1978,12 +2036,17 @@ class Game:
         level["encounters"] = encounters
 
     def _leave_dungeon_sub(self):
-        """Pop the nav stack to return from dungeon sub-sections."""
+        """Pop the nav stack to return from sub-sections or folder."""
         if self.module_edit_nav_stack:
             prev = self.module_edit_nav_stack.pop()
             self.module_edit_sections = prev[0]
             self.module_edit_section_cursor = prev[1]
             self.module_edit_section_scroll = prev[2]
+            # Restore the breadcrumb label from the stack
+            self._module_edit_folder_label = (
+                prev[3] if len(prev) > 3 else "")
+        else:
+            self._module_edit_folder_label = ""
         self.module_edit_active_dung = -1
         self.module_edit_active_level = -1
         self.module_edit_level = 0
@@ -2511,7 +2574,13 @@ class Game:
             for stack_entry in self.module_edit_nav_stack:
                 all_sections.extend(stack_entry[0])
             all_sections.extend(self.module_edit_sections)
-            sources = [s["fields"] for s in all_sections
+            # Flatten: also include children of folder sections
+            expanded = []
+            for s in all_sections:
+                expanded.append(s)
+                if s.get("children"):
+                    expanded.extend(s["children"])
+            sources = [s["fields"] for s in expanded
                        if s.get("fields")]
         for field_list in sources:
             for entry in field_list:
@@ -3073,9 +3142,13 @@ class Game:
                     edit_section_cursor=self.module_edit_section_cursor,
                     edit_section_scroll=self.module_edit_section_scroll,
                     edit_nav_depth=len(self.module_edit_nav_stack),
+                    edit_nav_label=getattr(
+                        self, "_module_edit_folder_label", ""),
                     edit_in_encounters=(
                         self.module_edit_active_level >= 0
-                        or self.module_edit_in_loot))
+                        or self.module_edit_in_loot),
+                    edit_in_dungeon_sub=(
+                        self.module_edit_active_dung >= 0))
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

@@ -6283,7 +6283,9 @@ class Renderer(CombatEffectRendererMixin):
                            edit_section_cursor=0,
                            edit_section_scroll=0,
                            edit_nav_depth=0,
-                           edit_in_encounters=False):
+                           edit_nav_label="",
+                           edit_in_encounters=False,
+                           edit_in_dungeon_sub=False):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -6495,7 +6497,8 @@ class Renderer(CombatEffectRendererMixin):
                     right_x, panel_y, right_w, panel_h,
                     edit_sections, edit_section_cursor,
                     edit_section_scroll,
-                    nav_depth=edit_nav_depth)
+                    nav_depth=edit_nav_depth,
+                    nav_label=edit_nav_label)
             elif edit_level == 1:
                 # Field editor within a section (level 1)
                 sec_label = ""
@@ -6540,10 +6543,15 @@ class Renderer(CombatEffectRendererMixin):
         if edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
-        elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
-            # Inside dungeon sub-sections
+        elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
+                and edit_in_dungeon_sub:
+            # Inside dungeon sub-sections (levels/encounters)
             hint = ("[UP/DN] Browse  [ENTER] Open  "
                     "[A] Add Level  [D] Remove  [ESC] Back")
+        elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
+            # Inside a folder or other sub-section
+            hint = ("[UP/DN] Browse  [ENTER] Open  "
+                    "[CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_level == 0:
             hint = ("[UP/DN] Browse  [ENTER] Open  "
                     "[CTRL+S] Save  [ESC] Back")
@@ -6736,7 +6744,7 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_section_browser(self, rx, ry, rw, rh,
                                sections, cursor, scroll=0,
-                               nav_depth=0):
+                               nav_depth=0, nav_label=""):
         """Draw the section browser (level 0 of hierarchical edit)."""
         fm = self.font_med
         fs = self.font_small
@@ -6750,7 +6758,10 @@ class Renderer(CombatEffectRendererMixin):
                          (rx, ry, rw, rh), 1)
 
         # Title with breadcrumb
-        if nav_depth > 0:
+        if nav_depth > 0 and nav_label:
+            self._u3_text(nav_label.upper(), rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+        elif nav_depth > 0:
             self._u3_text("EDIT DUNGEON", rx + 16, ry + 12,
                           self._U3_ORANGE, f)
         else:
@@ -6802,6 +6813,9 @@ class Renderer(CombatEffectRendererMixin):
             elif icon == "L":
                 badge_color = (120, 100, 160)
                 badge_text = "L"
+            elif icon == "F":
+                badge_color = (140, 120, 60)
+                badge_text = "F"
             elif icon == "S":
                 badge_color = (100, 160, 180)
                 badge_text = "S"
