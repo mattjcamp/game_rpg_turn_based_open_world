@@ -1,4 +1,4 @@
-# Realm of Shadow — Screenshots (v0.2.0)
+# Realm of Shadow — Visual Tour (v0.2.0)
 
 A tour through the game as of the v0.2.0 build, March 2026.
 
