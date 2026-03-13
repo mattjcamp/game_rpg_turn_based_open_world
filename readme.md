@@ -4,7 +4,11 @@ An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. 
 
 This is a hobby project. The programming was done with the help of AI (primarily Anthropic's Claude), and the codebase is designed to be approachable for anyone who wants to tinker, extend, or learn from it. See the section on [working with AI](#working-with-ai) below for tips on how to make changes yourself — even if you're not a programmer.
 
-**[Screenshots (v0.2.0)](docs/blog/screenshots_v0.2.0.md)** — a visual tour of the game showing the title screen, party creation, overworld, combat, dungeons, towns, and more.
+---
+
+**[Check out the key features of the game here](docs/blog/screenshots_v0.2.0.md)** — here is a visual tour of the game showing the title screen, party creation, overworld, combat, dungeons, towns, and more.
+
+---
 
 ## Downloading & Playing
 
