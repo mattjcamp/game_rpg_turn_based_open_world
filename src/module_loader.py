@@ -829,8 +829,15 @@ def update_module_settings(module_path, *, world_size=None,
 
 
 def get_default_module_path():
-    """Return the absolute path to the default module (keys_of_shadow)."""
-    return os.path.abspath(os.path.join(_MODULES_DIR, "keys_of_shadow"))
+    """Return the absolute path to the first available module.
+
+    Scans the modules/ directory and returns the first one found.
+    Returns None if no modules are installed.
+    """
+    modules = scan_modules()
+    if modules:
+        return modules[0]["path"]
+    return None
 
 
 def load_module_data(module_path):

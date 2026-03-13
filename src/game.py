@@ -140,10 +140,10 @@ class Game:
         self.module_edit_active_level = -1   # which level index (-1=props)
         self.module_edit_starting_loot = []  # [{item, count}]
         self.module_edit_in_loot = False     # True when editing loot fields
-        from src.module_loader import get_default_module_path
-        self.active_module_path = get_default_module_path()
-        self.active_module_name = "Keys of Shadow"
-        self.active_module_version = "1.0.0"
+        from src.module_loader import get_default_module_path, scan_modules
+        self.active_module_path = None
+        self.active_module_name = "No Module"
+        self.active_module_version = "0.0.0"
         self.module_manifest = None  # populated on new game start
 
         # Restore last-used module from config (if it still exists)
@@ -162,7 +162,25 @@ class Game:
                     self.active_module_version = meta.get(
                         "version", "1.0.0")
                 except (OSError, ValueError):
-                    pass  # fall back to default module
+                    pass  # fall through to default
+
+        # If no valid saved module, pick the first available one
+        if not self.active_module_path:
+            default_path = get_default_module_path()
+            if default_path:
+                manifest_file = os.path.join(default_path, "module.json")
+                try:
+                    import json as _json
+                    with open(manifest_file, "r") as _f:
+                        _manifest = _json.load(_f)
+                    meta = _manifest.get("metadata", {})
+                    self.active_module_path = default_path
+                    self.active_module_name = meta.get(
+                        "name", "Unknown Module")
+                    self.active_module_version = meta.get(
+                        "version", "0.0.0")
+                except (OSError, ValueError):
+                    pass
 
         # --- Character creation screen ---
         self.showing_char_create = False

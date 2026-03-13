@@ -53,11 +53,19 @@ def ensure_writable_dirs():
     saves_dir = os.path.join(DIST, "data", "saves")
     os.makedirs(saves_dir, exist_ok=True)
 
-    # Ensure an empty config exists so first-run writes succeed
+    # Always write a clean default config so builds never ship with
+    # the developer's personal settings (e.g., absolute module paths).
     config_path = os.path.join(DIST, "data", "config.json")
-    if not os.path.exists(config_path):
-        with open(config_path, "w") as f:
-            f.write("{}")
+    import json
+    clean_config = {
+        "music_enabled": True,
+        "smite_enabled": False,
+        "start_with_equipment": True,
+        "active_module_path": None,
+        "soundtrack_style": "Dark & Moody",
+    }
+    with open(config_path, "w") as f:
+        json.dump(clean_config, f, indent=2)
 
 
 def codesign_mac():
