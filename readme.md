@@ -4,6 +4,23 @@ An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. 
 
 This is a hobby project. The programming was done with the help of AI (primarily Anthropic's Claude), and the codebase is designed to be approachable for anyone who wants to tinker, extend, or learn from it. See the section on [working with AI](#working-with-ai) below for tips on how to make changes yourself — even if you're not a programmer.
 
+## Downloading & Playing
+
+A pre-built macOS version is available on the [Releases](../../releases) page. To get started:
+
+1. Download the `.zip` file from the latest release.
+2. Unzip it — you'll get a folder called `RealmOfShadow`.
+3. Open Terminal and run the following command to clear macOS security quarantine:
+   ```
+   xattr -cr ~/Downloads/RealmOfShadow/
+   ```
+   If you unzipped it somewhere other than Downloads, adjust the path — or drag the folder onto the Terminal window to fill it in automatically.
+4. Open the `RealmOfShadow` folder and double-click the file called **`RealmOfShadow`** (the one with no file extension) to launch the game.
+
+> **First launch:** The game may take 10–20 seconds to appear the first time you run it while your system unpacks and caches the bundled libraries. Subsequent launches will be faster.
+
+---
+
 ## Documentation & Reference
 
 Before diving into the code, these documents give useful context on the game's design and mechanics:
@@ -196,37 +213,6 @@ The game runs on a **state machine**. `game.py` owns the main loop and switches 
 
 ---
 
-## Downloading & Playing (No Python Required)
-
-Pre-built versions of the game are available on the [Releases](../../releases) page. Download the zip for your platform, unzip it, and run the `RealmOfShadow` executable inside.
-
-> **First launch:** The game may take 10–20 seconds to appear the first time you run it while your system unpacks and caches the bundled libraries. Subsequent launches will be faster.
-
-### macOS
-
-macOS quarantines apps downloaded from the internet, which will prevent the game from opening. After unzipping, open Terminal and run:
-
-```
-xattr -cr ~/Downloads/RealmOfShadow/
-```
-
-If you unzipped it somewhere other than Downloads, adjust the path accordingly — or drag the folder onto the Terminal window to fill it in automatically. After that, double-click `RealmOfShadow` to play.
-
-### Windows
-
-Unzip the folder and double-click `RealmOfShadow.exe`. If Windows Defender SmartScreen shows a warning, click "More info" and then "Run anyway."
-
-### Linux
-
-Unzip the folder, then in a terminal:
-
-```
-chmod +x RealmOfShadow/RealmOfShadow
-./RealmOfShadow/RealmOfShadow
-```
-
----
-
 ## Building a Standalone Executable
 
 If you want to build the game yourself (or build for a platform not listed in Releases), you can package it into a standalone app using PyInstaller.
@@ -256,6 +242,16 @@ cd dist && zip -r RealmOfShadow-mac.zip RealmOfShadow/
 ```
 
 Upload the zip to [itch.io](https://itch.io), attach it to a GitHub Release, or send it directly.
+
+### Platform Notes for Recipients
+
+**Windows** — Unzip the folder and double-click `RealmOfShadow.exe`. If Windows Defender SmartScreen shows a warning, click "More info" and then "Run anyway."
+
+**Linux** — Unzip the folder, then in a terminal:
+```
+chmod +x RealmOfShadow/RealmOfShadow
+./RealmOfShadow/RealmOfShadow
+```
 
 ---
 
