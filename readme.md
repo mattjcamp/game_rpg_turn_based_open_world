@@ -10,11 +10,11 @@ A pre-built macOS version is available on the [Releases](../../releases) page. T
 
 1. Download the `.zip` file from the latest release.
 2. Unzip it — you'll get a folder called `RealmOfShadow`.
-3. Open Terminal and run the following command to clear macOS security quarantine:
+3. **Important:** Open Terminal and run the following command to clear macOS security quarantine:
    ```
    xattr -cr ~/Downloads/RealmOfShadow/
    ```
-   If you unzipped it somewhere other than Downloads, adjust the path — or drag the folder onto the Terminal window to fill it in automatically.
+   If you unzipped it somewhere other than Downloads, adjust the path — or drag the folder onto the Terminal window to fill it in automatically. This step is required because macOS flags every file in a downloaded app individually — without it, the system will block the game from running and ask you to approve each bundled library one at a time.
 4. Open the `RealmOfShadow` folder and double-click the file called **`RealmOfShadow`** (the one with no file extension) to launch the game.
 
 > **First launch:** The game may take 10–20 seconds to appear the first time you run it while your system unpacks and caches the bundled libraries. Subsequent launches will be faster.
