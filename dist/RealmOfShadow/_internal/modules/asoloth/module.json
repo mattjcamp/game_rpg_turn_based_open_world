@@ -1,0 +1,321 @@
+{
+  "metadata": {
+    "id": "asoloth",
+    "name": "asoloth",
+    "author": "hyperbolic",
+    "description": "a world lost to the ages",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 128,
+    "map_height": 96,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "ivygate",
+        "name": "Ivygate",
+        "description": "A hillside town whose cobbled streets wind between stone cottages."
+      },
+      {
+        "id": "briarreach",
+        "name": "Briarreach",
+        "description": "A forest clearing settlement where druids and woodsmen live side by side."
+      },
+      {
+        "id": "briarvale",
+        "name": "Briarvale",
+        "description": "A seaside port battered by salt winds and rich with the smell of fish."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 4,
+      "deliver_to": "town_vault"
+    },
+    "starting_quests": [
+      "reclaim"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Ashen Warren",
+        "key_name": "Crystal Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Bones litter the threshold of Ashen Warren. Whatever guards this place does not welcome visitors.",
+        "quest_type": "retrieve",
+        "quest_objective": "Explore Ashen Warren and recover the lost Crystal Key",
+        "quest_hint": "The artifact was hidden here long ago by a forgotten order.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": false,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 10
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "medium"
+          }
+        ]
+      },
+      {
+        "id": "dungeon_key_2",
+        "name": "Silent Sanctum",
+        "key_name": "Ruby Key",
+        "dungeon_number": 2,
+        "landmark_id": "dungeon_2",
+        "description": "A narrow crevice leads into Silent Sanctum. The sound of dripping water echoes endlessly below.",
+        "quest_type": "gnome_machine",
+        "quest_objective": "Retrieve the Ruby Key from Silent Sanctum",
+        "quest_hint": "A powerful artifact lies in the deepest chamber.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 3",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "medium"
+          },
+          {
+            "name": "Floor 4",
+            "encounters": [
+              {
+                "monster": "Skeleton Archer",
+                "count": 5
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "high"
+          }
+        ],
+        "keys_needed": 1,
+        "gnome_town": "Ivygate"
+      },
+      {
+        "id": "dungeon_key_3",
+        "name": "Burning Crypt",
+        "key_name": "Platinum Key",
+        "dungeon_number": 3,
+        "landmark_id": "dungeon_3",
+        "description": "The entrance to Burning Crypt gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "quest_type": "kill",
+        "quest_objective": "Purge Burning Crypt of evil and secure the Platinum Key",
+        "quest_hint": "Dark forces have claimed this place as their own.",
+        "kill_target": "Orc Shaman",
+        "kill_count": 1,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 3",
+            "encounters": [
+              {
+                "monster": "Troll",
+                "count": 3
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "medium"
+          }
+        ]
+      },
+      {
+        "id": "dungeon_key_4",
+        "name": "Iron Labyrinth",
+        "key_name": "Gold Key",
+        "dungeon_number": 4,
+        "landmark_id": "dungeon_4",
+        "description": "A spiral staircase carved from bedrock descends into Iron Labyrinth. The temperature drops with every step.",
+        "quest_type": "retrieve",
+        "quest_objective": "Slay the guardian of Iron Labyrinth and claim the Gold Key",
+        "quest_hint": "A fearsome creature guards the prize.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 3",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 4",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 5",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 6",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 7",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 8",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 9",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 10",
+            "encounters": [
+              {
+                "monster": "Dark Mage",
+                "count": 10
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "low"
+          }
+        ]
+      }
+    ],
+    "innkeeper_quests": false,
+    "starting_loot": [
+      {
+        "item": "Lockpick",
+        "count": 1
+      }
+    ]
+  }
+}
