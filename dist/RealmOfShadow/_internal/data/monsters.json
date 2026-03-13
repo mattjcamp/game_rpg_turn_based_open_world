@@ -1,0 +1,341 @@
+{
+    "_comment": "Monster definitions for Realm of Shadow. Edit this file to add, remove, or tweak monsters without touching code.",
+    "monsters": {
+        "Giant Rat": {
+            "description": "A large rat. Weak but fast.",
+            "undead": false,
+            "humanoid": false,
+            "hp": 8,
+            "ac": 12,
+            "attack_bonus": 2,
+            "damage_dice": 1,
+            "damage_sides": 4,
+            "damage_bonus": 0,
+            "xp_reward": 15,
+            "gold_min": 2,
+            "gold_max": 8,
+            "color": [
+                140,
+                100,
+                80
+            ],
+            "spawn_weight": 40,
+            "tile": "game/monsters/giant_rat.png"
+        },
+        "Skeleton": {
+            "description": "An undead skeleton warrior. Medium difficulty.",
+            "undead": true,
+            "humanoid": false,
+            "hp": 16,
+            "ac": 13,
+            "attack_bonus": 3,
+            "damage_dice": 1,
+            "damage_sides": 6,
+            "damage_bonus": 1,
+            "xp_reward": 30,
+            "gold_min": 5,
+            "gold_max": 20,
+            "color": [
+                220,
+                220,
+                200
+            ],
+            "spawn_weight": 35,
+            "tile": "game/monsters/skeleton.png"
+        },
+        "Skeleton Archer": {
+            "description": "A skeletal bowman that fires arrows from a distance.",
+            "undead": true,
+            "humanoid": false,
+            "hp": 12,
+            "ac": 12,
+            "attack_bonus": 3,
+            "damage_dice": 1,
+            "damage_sides": 4,
+            "damage_bonus": 0,
+            "xp_reward": 35,
+            "gold_min": 5,
+            "gold_max": 18,
+            "color": [
+                220,
+                220,
+                200
+            ],
+            "spawn_weight": 20,
+            "tile": "game/monsters/skeleton.png",
+            "ranged": {
+                "range": 6,
+                "attack_bonus": 4,
+                "damage_dice": 1,
+                "damage_sides": 6,
+                "damage_bonus": 0,
+                "projectile_color": [
+                    255,
+                    255,
+                    200
+                ],
+                "projectile_symbol": "-",
+                "label": "bone arrow"
+            }
+        },
+        "Orc": {
+            "description": "A brutal orc. Tough fight.",
+            "undead": false,
+            "humanoid": true,
+            "hp": 22,
+            "ac": 13,
+            "attack_bonus": 5,
+            "damage_dice": 1,
+            "damage_sides": 8,
+            "damage_bonus": 2,
+            "xp_reward": 50,
+            "gold_min": 10,
+            "gold_max": 30,
+            "color": [
+                80,
+                140,
+                60
+            ],
+            "spawn_weight": 25,
+            "tile": "game/monsters/orc.png",
+            "ranged": {
+                "range": 3,
+                "attack_bonus": 3,
+                "damage_dice": 1,
+                "damage_sides": 6,
+                "damage_bonus": 1,
+                "projectile_color": [
+                    180,
+                    140,
+                    80
+                ],
+                "projectile_symbol": "/",
+                "label": "javelin"
+            }
+        },
+        "Goblin": {
+            "description": "A small, sneaky goblin. Attacks in groups.",
+            "undead": false,
+            "humanoid": true,
+            "hp": 6,
+            "ac": 11,
+            "attack_bonus": 2,
+            "damage_dice": 1,
+            "damage_sides": 4,
+            "damage_bonus": 0,
+            "xp_reward": 10,
+            "gold_min": 1,
+            "gold_max": 6,
+            "color": [
+                100,
+                160,
+                60
+            ],
+            "spawn_weight": 40,
+            "tile": "game/monsters/goblin.png",
+            "ranged": {
+                "range": 4,
+                "attack_bonus": 2,
+                "damage_dice": 1,
+                "damage_sides": 3,
+                "damage_bonus": 0,
+                "projectile_color": [
+                    160,
+                    140,
+                    120
+                ],
+                "projectile_symbol": ".",
+                "label": "thrown rock"
+            }
+        },
+        "Zombie": {
+            "description": "A shambling corpse. Slow but durable.",
+            "undead": true,
+            "humanoid": false,
+            "hp": 20,
+            "ac": 10,
+            "attack_bonus": 2,
+            "damage_dice": 1,
+            "damage_sides": 6,
+            "damage_bonus": 1,
+            "xp_reward": 25,
+            "gold_min": 3,
+            "gold_max": 12,
+            "color": [
+                100,
+                120,
+                80
+            ],
+            "spawn_weight": 30,
+            "tile": "game/monsters/zombie.png"
+        },
+        "Wolf": {
+            "description": "A fierce grey wolf. Fast and cunning.",
+            "undead": false,
+            "humanoid": false,
+            "hp": 12,
+            "ac": 13,
+            "attack_bonus": 4,
+            "damage_dice": 1,
+            "damage_sides": 6,
+            "damage_bonus": 1,
+            "xp_reward": 20,
+            "gold_min": 0,
+            "gold_max": 5,
+            "color": [
+                150,
+                150,
+                160
+            ],
+            "spawn_weight": 35,
+            "tile": "game/monsters/wolf.png"
+        },
+        "Dark Mage": {
+            "description": "A robed figure crackling with dark energy.",
+            "undead": false,
+            "humanoid": true,
+            "hp": 14,
+            "ac": 12,
+            "attack_bonus": 4,
+            "damage_dice": 2,
+            "damage_sides": 4,
+            "damage_bonus": 1,
+            "xp_reward": 45,
+            "gold_min": 10,
+            "gold_max": 35,
+            "color": [
+                100,
+                40,
+                140
+            ],
+            "spawn_weight": 15,
+            "tile": "game/monsters/dark_mage.png",
+            "ranged": {
+                "range": 7,
+                "attack_bonus": 5,
+                "damage_dice": 2,
+                "damage_sides": 4,
+                "damage_bonus": 1,
+                "projectile_color": [
+                    160,
+                    60,
+                    220
+                ],
+                "projectile_symbol": "*",
+                "label": "dark bolt"
+            },
+            "spells": [
+                {
+                    "type": "sleep",
+                    "name": "Dark Slumber",
+                    "range": 6,
+                    "cast_chance": 30,
+                    "save_dc": 12,
+                    "duration": 3,
+                    "max_target_hp": 25
+                },
+                {
+                    "type": "curse",
+                    "name": "Hex",
+                    "range": 6,
+                    "cast_chance": 25,
+                    "duration": 3,
+                    "ac_penalty": 2,
+                    "attack_penalty": 2
+                }
+            ]
+        },
+        "Troll": {
+            "description": "A massive brute with thick hide. Hits hard and regenerates.",
+            "undead": false,
+            "humanoid": true,
+            "hp": 30,
+            "ac": 14,
+            "attack_bonus": 6,
+            "damage_dice": 2,
+            "damage_sides": 6,
+            "damage_bonus": 2,
+            "xp_reward": 75,
+            "gold_min": 15,
+            "gold_max": 40,
+            "color": [
+                80,
+                100,
+                60
+            ],
+            "spawn_weight": 10,
+            "tile": "game/monsters/troll.png",
+            "spells": [
+                {
+                    "type": "heal_self",
+                    "name": "Regenerate",
+                    "cast_chance": 40,
+                    "heal_dice": 1,
+                    "heal_sides": 6,
+                    "heal_bonus": 2
+                }
+            ]
+        },
+        "Orc Shaman": {
+            "description": "An orc witch doctor who bolsters allies and curses foes.",
+            "undead": false,
+            "humanoid": true,
+            "hp": 16,
+            "ac": 11,
+            "attack_bonus": 3,
+            "damage_dice": 1,
+            "damage_sides": 4,
+            "damage_bonus": 0,
+            "xp_reward": 55,
+            "gold_min": 12,
+            "gold_max": 35,
+            "color": [
+                80,
+                140,
+                60
+            ],
+            "spawn_weight": 10,
+            "tile": "game/monsters/orc.png",
+            "spells": [
+                {
+                    "type": "heal_ally",
+                    "name": "Mend Wounds",
+                    "range": 6,
+                    "cast_chance": 40,
+                    "heal_dice": 1,
+                    "heal_sides": 8,
+                    "heal_bonus": 2
+                },
+                {
+                    "type": "poison",
+                    "name": "Poison Spit",
+                    "range": 5,
+                    "cast_chance": 30,
+                    "save_dc": 11,
+                    "damage_per_turn": 2,
+                    "duration": 4
+                }
+            ]
+        }
+    },
+    "spawn_tables": {
+        "overworld": [
+            "Giant Rat",
+            "Orc",
+            "Wolf",
+            "Goblin"
+        ],
+        "dungeon": [
+            "Giant Rat",
+            "Skeleton",
+            "Skeleton Archer",
+            "Orc",
+            "Orc Shaman",
+            "Goblin",
+            "Zombie",
+            "Wolf",
+            "Dark Mage",
+            "Troll"
+        ]
+    }
+}
