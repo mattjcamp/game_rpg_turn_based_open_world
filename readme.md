@@ -6,7 +6,18 @@ This is a hobby project. The programming was done with the help of AI (primarily
 
 ---
 
-**[Check out the key features of the game here](docs/blog/screenshots_v0.2.0.md)** — here is a visual tour of the game showing the title screen, party creation, overworld, combat, dungeons, towns, and more.
+<table>
+<tr>
+<td align="center"><img src="docs/blog/screens_v0.2.0/01_title_screen.png" width="400" alt="Title Screen"></td>
+<td align="center"><img src="docs/blog/screens_v0.2.0/05_overworld.png" width="400" alt="Overworld Exploration"></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/blog/screens_v0.2.0/09_combat.png" width="400" alt="Tactical Combat"></td>
+<td align="center"><img src="docs/blog/screens_v0.2.0/10_dungeon.png" width="400" alt="Dungeon Delving"></td>
+</tr>
+</table>
+
+**[See the full visual tour &rarr;](docs/blog/screenshots_v0.2.0.md)** — title screen, party creation, overworld, combat, dungeons, towns, and more.
 
 ---
 
