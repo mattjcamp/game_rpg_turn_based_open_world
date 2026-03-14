@@ -5368,7 +5368,8 @@ class Renderer(CombatEffectRendererMixin):
                           obstacles=None, ground_items=None, tile_name="",
                           party_member_name="", pickup_message="",
                           drop_mode=False, drop_items=None, drop_cursor=0,
-                          drop_message=""):
+                          drop_message="",
+                          tile_description="", tile_graphic=None):
         """Draw the examine-area screen (12×14 grid with themed tiles)."""
         from src.settings import (
             TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
@@ -5417,6 +5418,15 @@ class Renderer(CombatEffectRendererMixin):
                     icon_type = info.get("icon", "potion")
                     self._draw_item_icon(icx, icy, icon_type, icon_sz)
 
+        # ── 2b. draw unique tile graphic at grid centre ──
+        if tile_graphic:
+            sprite_sz = ts * 2
+            sprite = self._get_unique_tile_sprite(tile_graphic, sprite_sz)
+            if sprite:
+                cx = mx + (cols * ts - sprite_sz) // 2
+                cy = my + (rows * ts - sprite_sz) // 2
+                self.screen.blit(sprite, (cx, cy))
+
         # ── 3. draw player sprite (same white warrior as the overworld) ──
         pcx = mx + player_col * ts + ts // 2
         pcy = my + player_row * ts + ts // 2
@@ -5435,6 +5445,28 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.line(self.screen, (60, 60, 100),
                          (panel_x, y), (panel_x + 180, y), 1)
         y += 12
+
+        # Unique tile description (word-wrapped)
+        if tile_description:
+            max_desc_w = 220
+            words = tile_description.split()
+            line = ""
+            for word in words:
+                test = f"{line} {word}".strip()
+                tw = self.font_small.size(test)[0]
+                if tw > max_desc_w and line:
+                    desc_s = self.font_small.render(line, True,
+                                                    (180, 180, 200))
+                    self.screen.blit(desc_s, (panel_x, y))
+                    y += 18
+                    line = word
+                else:
+                    line = test
+            if line:
+                desc_s = self.font_small.render(line, True, (180, 180, 200))
+                self.screen.blit(desc_s, (panel_x, y))
+                y += 18
+            y += 6
 
         # Party member (only if provided)
         if party_member_name:

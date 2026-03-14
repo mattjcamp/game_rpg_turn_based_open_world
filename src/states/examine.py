@@ -92,6 +92,8 @@ class ExamineState(BaseState):
         self.pickup_message = ""
         self.pickup_msg_timer = 0         # ms remaining
         self.tile_name = ""
+        self.tile_description = ""        # unique tile description (if any)
+        self.tile_graphic = None           # unique tile graphic path (if any)
         self.party_member_name = ""
         # Drop mode state
         self.drop_mode = False
@@ -102,12 +104,45 @@ class ExamineState(BaseState):
 
     # ── Lifecycle ─────────────────────────────────────────────────
 
+    # Map base_tile name strings → tile type constants
+    _BASE_TILE_TO_TYPE = None
+
+    @classmethod
+    def _get_base_tile_map(cls):
+        if cls._BASE_TILE_TO_TYPE is None:
+            from src.settings import (
+                TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
+                TILE_MOUNTAIN,
+            )
+            cls._BASE_TILE_TO_TYPE = {
+                "grass": TILE_GRASS,
+                "forest": TILE_FOREST,
+                "sand": TILE_SAND,
+                "path": TILE_PATH,
+                "mountain": TILE_MOUNTAIN,
+            }
+        return cls._BASE_TILE_TO_TYPE
+
     def enter(self):
         party = self.game.party
         self.examined_tile_type = self.game.tile_map.get_tile(
             party.col, party.row)
         self.tile_name = TILE_DEFS.get(
             self.examined_tile_type, {}).get("name", "Area")
+        self.tile_description = ""
+        self.tile_graphic = None
+
+        # Check if the party is standing on a unique tile — if so, use its
+        # data for the examine screen theming and display.
+        utile = self.game.tile_map.get_unique(party.col, party.row)
+        if utile:
+            bt_map = self._get_base_tile_map()
+            base_name = utile.get("base_tile", "grass")
+            self.examined_tile_type = bt_map.get(
+                base_name, self.examined_tile_type)
+            self.tile_name = utile.get("name", self.tile_name)
+            self.tile_description = utile.get("description", "")
+            self.tile_graphic = utile.get("tile")
 
         self.party_member_name = ""
 
@@ -232,6 +267,8 @@ class ExamineState(BaseState):
             drop_items=self.drop_items,
             drop_cursor=self.drop_cursor,
             drop_message=self.drop_message,
+            tile_description=self.tile_description,
+            tile_graphic=self.tile_graphic,
         )
 
     # ── Movement ──────────────────────────────────────────────────
