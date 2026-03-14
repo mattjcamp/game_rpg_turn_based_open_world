@@ -5369,7 +5369,8 @@ class Renderer(CombatEffectRendererMixin):
                           party_member_name="", pickup_message="",
                           drop_mode=False, drop_items=None, drop_cursor=0,
                           drop_message="",
-                          tile_description="", tile_graphic=None):
+                          tile_description="", tile_graphic=None,
+                          examine_layout=None):
         """Draw the examine-area screen (12×14 grid with themed tiles)."""
         from src.settings import (
             TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
@@ -5426,6 +5427,15 @@ class Renderer(CombatEffectRendererMixin):
                 cx = mx + (cols * ts - sprite_sz) // 2
                 cy = my + (rows * ts - sprite_sz) // 2
                 self.screen.blit(sprite, (cx, cy))
+
+        # ── 2c. draw editor-painted examine layout sprites ──
+        if examine_layout:
+            for (lc, lr), gfx in examine_layout.items():
+                if gfx:
+                    lsprite = self._get_unique_tile_sprite(gfx, ts)
+                    if lsprite:
+                        self.screen.blit(lsprite,
+                                         (mx + lc * ts, my + lr * ts))
 
         # ── 3. draw player sprite (same white warrior as the overworld) ──
         pcx = mx + player_col * ts + ts // 2
@@ -5522,15 +5532,24 @@ class Renderer(CombatEffectRendererMixin):
             self.screen.blit(item_surf, (x + 6, iy))
             iy += 20
 
-    # ── Unique-tile examine preview (module editor) ───────────
+    # ── Unique-tile examine preview / editor (module editor) ───
+    @staticmethod
+    def _brush_friendly_name(brush):
+        """Convert a brush path to a short display name."""
+        if brush == "eraser":
+            return "Eraser"
+        import os
+        base = os.path.splitext(os.path.basename(brush))[0]
+        return base.replace("_", " ").title()
+
     def _draw_utile_examine_preview(self, rx, ry, rw, rh, preview):
-        """Draw a miniature examine-area preview in the module editor panel.
+        """Draw the interactive examine-area editor in the module panel.
 
         Parameters
         ----------
         rx, ry, rw, rh : panel rectangle
-        preview : dict with keys tile_type, tile_name, description,
-                  tile_graphic (path or None)
+        preview : dict with tile_type, tile_name, description,
+                  tile_graphic, painted, cursor_col, cursor_row, brush
         """
         from src.settings import TILE_GRASS
         fm = self.font_med
@@ -5545,33 +5564,34 @@ class Renderer(CombatEffectRendererMixin):
 
         tile_type = preview.get("tile_type", TILE_GRASS)
         tile_name = preview.get("tile_name", "Unknown")
-        description = preview.get("description", "")
-        tile_graphic = preview.get("tile_graphic")
+        painted = preview.get("painted", {})
+        cursor_col = preview.get("cursor_col", 5)
+        cursor_row = preview.get("cursor_row", 6)
+        brush = preview.get("brush", "eraser")
 
         # ── Header ──
-        dy = ry + 10
-        self._u3_text("EXAMINE PREVIEW", rx + 16, dy,
+        dy = ry + 8
+        self._u3_text("EXAMINE EDITOR", rx + 16, dy,
                        (200, 180, 120), fm)
-        dy += 24
+        dy += 20
         self._u3_text(tile_name, rx + 16, dy,
-                       self._U3_WHITE, fm)
-        dy += 22
+                       self._U3_WHITE, fs)
+        dy += 16
         pygame.draw.line(self.screen, (60, 60, 100),
                          (rx + 12, dy), (rx + rw - 12, dy), 1)
-        dy += 8
+        dy += 6
 
         # ── Miniature examine grid ──
         cols = self._EXAMINE_COLS
         rows = self._EXAMINE_ROWS
-        # Scale tile size to fit the panel width with margins
-        margin_x = 20
+        margin_x = 16
         ts = min(20, (rw - margin_x * 2) // cols)
         grid_w = cols * ts
         grid_h = rows * ts
         gx = rx + (rw - grid_w) // 2
-        gy = dy + 4
+        gy = dy + 2
 
-        # Draw the grid
+        # Draw the terrain grid
         for r in range(rows):
             for c in range(cols):
                 px = gx + c * ts
@@ -5585,63 +5605,60 @@ class Renderer(CombatEffectRendererMixin):
                     self._draw_examine_floor_tile(px, py, ts, tile_type,
                                                   c, r)
 
-        # Draw a few sample obstacles based on tile type
-        from src.states.examine import TERRAIN_OBSTACLES, _DEFAULT_OBSTACLES
-        kind, lo, hi = TERRAIN_OBSTACLES.get(tile_type, _DEFAULT_OBSTACLES)
-        # Place a fixed set of sample obstacles for visual flavour
-        sample_obs = []
-        import hashlib
-        seed = hash(tile_name) & 0xFFFFFFFF
-        rng = __import__("random").Random(seed)
-        n_obs = rng.randint(lo, max(lo, hi))
-        for _ in range(n_obs):
-            for _att in range(30):
-                oc = rng.randint(1, cols - 2)
-                orr = rng.randint(1, rows - 2)
-                if (oc, orr) not in [(o[0], o[1]) for o in sample_obs]:
-                    sample_obs.append((oc, orr))
-                    break
-        for (oc, orr) in sample_obs:
-            opx = gx + oc * ts
-            opy = gy + orr * ts
-            self._draw_examine_obstacle(opx, opy, ts, kind, oc, orr)
+        # Draw painted sprites on top of floor tiles
+        for (pc, pr), gfx in painted.items():
+            if gfx:
+                sprite = self._get_unique_tile_sprite(gfx, ts)
+                if sprite:
+                    self.screen.blit(sprite, (gx + pc * ts, gy + pr * ts))
 
-        # Draw tile graphic sprite at centre of grid if available
-        if tile_graphic:
-            sprite_sz = min(ts * 2, 32)
-            sprite = self._get_unique_tile_sprite(tile_graphic, sprite_sz)
+        # Draw cursor highlight (blinking amber outline)
+        import time
+        blink = int(time.time() * 4) % 2 == 0
+        cur_color = (255, 200, 60) if blink else (180, 140, 40)
+        cur_rect = pygame.Rect(gx + cursor_col * ts, gy + cursor_row * ts,
+                               ts, ts)
+        pygame.draw.rect(self.screen, cur_color, cur_rect, 2)
+
+        dy = gy + grid_h + 6
+
+        # ── Brush selector ──
+        self._u3_text("Brush:", rx + 12, dy,
+                       (160, 160, 180), fs)
+        brush_name = self._brush_friendly_name(brush)
+        # Render brush name with arrows
+        arrow_color = (100, 180, 255)
+        name_x = rx + 62
+        self._u3_text("<", rx + 52, dy, arrow_color, fs)
+        self._u3_text(brush_name, name_x, dy,
+                       (255, 255, 200), fs)
+        name_w = fs.size(brush_name.upper())[0]
+        self._u3_text(">", name_x + name_w + 6, dy, arrow_color, fs)
+        dy += 18
+
+        # Brush preview sprite
+        if brush != "eraser":
+            preview_sz = min(32, ts * 2)
+            sprite = self._get_unique_tile_sprite(brush, preview_sz)
             if sprite:
-                sx = gx + (grid_w - sprite_sz) // 2
-                sy = gy + (grid_h - sprite_sz) // 2
-                self.screen.blit(sprite, (sx, sy))
+                self.screen.blit(sprite, (rx + 16, dy))
+            dy += preview_sz + 4
+        else:
+            # Draw small X for eraser
+            ex, ey = rx + 16, dy
+            esz = 16
+            pygame.draw.line(self.screen, (200, 80, 80),
+                             (ex, ey), (ex + esz, ey + esz), 2)
+            pygame.draw.line(self.screen, (200, 80, 80),
+                             (ex + esz, ey), (ex, ey + esz), 2)
+            dy += esz + 6
 
-        dy = gy + grid_h + 10
-
-        # ── Description ──
-        if description:
-            max_pw = rw - 32
-            words = description.split()
-            line = ""
-            for word in words:
-                test = f"{line} {word}".strip()
-                tw = fs.size(test.upper())[0]
-                if tw > max_pw and line:
-                    if dy < ry + rh - 40:
-                        self._u3_text(line, rx + 16, dy,
-                                      (180, 180, 200), fs)
-                    dy += 16
-                    line = word
-                else:
-                    line = test
-            if line and dy < ry + rh - 40:
-                self._u3_text(line, rx + 16, dy,
-                              (180, 180, 200), fs)
-                dy += 16
-
-        # ── Footer hint ──
-        hint_y = ry + rh - 24
-        self._u3_text("[ESC] Back", rx + 16, hint_y,
-                       (100, 100, 200), fs)
+        # ── Footer hints ──
+        hint_y = ry + rh - 36
+        self._u3_text("[Arrows] Move  [ENTER] Paint",
+                       rx + 10, hint_y, (100, 100, 200), fs)
+        self._u3_text("[TAB/B] Brush  [ESC] Done",
+                       rx + 10, hint_y + 14, (100, 100, 200), fs)
 
     def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):
         """Draw an interior floor tile themed by overworld tile type."""
@@ -6955,7 +6972,7 @@ class Renderer(CombatEffectRendererMixin):
         hint_y = SCREEN_HEIGHT - 45
         hint_color = (68, 68, 200)
         if edit_utile_preview:
-            hint = "[ESC / LEFT] Return to tile editor"
+            hint = ""   # hints are rendered inside the preview panel
         elif edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")

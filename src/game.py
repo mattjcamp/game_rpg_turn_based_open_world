@@ -2630,6 +2630,27 @@ class Game:
             }
         return cls._BASE_TILE_TO_TYPE
 
+    # Brush palette for the examine editor.  "eraser" clears a cell.
+    # The rest are asset paths rendered as sprites on the grid.
+    _EXAMINE_BRUSHES = [
+        "eraser",
+        "game/landmarks/moongate_active.png",
+        "game/landmarks/moongate_dormant.png",
+        "game/landmarks/ruined_tower.png",
+        "game/landmarks/treasure_hoard.png",
+        "game/landmarks/lava_vent.png",
+        "game/landmarks/poison_swamp.png",
+        "game/landmarks/smuggler_tunnel.png",
+        "game/landmarks/sunken_shipwreck.png",
+        "game/terrain/altar.png",
+        "game/terrain/bridge.png",
+        "game/terrain/door.png",
+        "game/dungeon/portal_open.png",
+        "game/dungeon/chest_tile.png",
+        "game/dungeon/sparkle.png",
+        "game/dungeon/torch_post.png",
+    ]
+
     def _enter_utile_examine_preview(self):
         """Enter examine-screen preview mode for the active unique tile."""
         idx = self.module_edit_active_utile
@@ -2638,10 +2659,69 @@ class Game:
         # Save current field values before switching to preview
         self._save_single_utile_fields()
         self.module_edit_utile_preview = True
+        # Editor cursor starts at centre of interior
+        self._examine_cursor_col = 5
+        self._examine_cursor_row = 6
+        self._examine_brush_idx = 0
+        # Load any existing painted layout into a working dict
+        utile = self.module_edit_unique_tiles[idx]
+        raw = utile.get("examine_layout") or {}
+        self._examine_painted = {}
+        for pos_key, gfx in raw.items():
+            try:
+                c, r = pos_key.split(",")
+                self._examine_painted[(int(c), int(r))] = gfx
+            except (ValueError, AttributeError):
+                pass
 
     def _leave_utile_examine_preview(self):
-        """Exit examine-screen preview and return to the field editor."""
+        """Exit examine-screen preview and persist painted layout."""
+        idx = self.module_edit_active_utile
+        if 0 <= idx < len(self.module_edit_unique_tiles):
+            # Persist the painted layout back to the in-memory tile dict
+            layout = {}
+            for (c, r), gfx in self._examine_painted.items():
+                layout[f"{c},{r}"] = gfx
+            self.module_edit_unique_tiles[idx]["examine_layout"] = layout
         self.module_edit_utile_preview = False
+
+    def _handle_examine_preview_input(self, event):
+        """Handle input in the examine preview editor."""
+        from src.states.examine import EXAMINE_COLS, EXAMINE_ROWS
+
+        # Movement — arrow keys move cursor within interior (1..cols-2)
+        if event.key in (pygame.K_UP, pygame.K_w):
+            if self._examine_cursor_row > 1:
+                self._examine_cursor_row -= 1
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            if self._examine_cursor_row < EXAMINE_ROWS - 2:
+                self._examine_cursor_row += 1
+        elif event.key in (pygame.K_LEFT, pygame.K_a):
+            if self._examine_cursor_col > 1:
+                self._examine_cursor_col -= 1
+        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+            if self._examine_cursor_col < EXAMINE_COLS - 2:
+                self._examine_cursor_col += 1
+        # Paint — Enter places current brush
+        elif event.key == pygame.K_RETURN:
+            pos = (self._examine_cursor_col, self._examine_cursor_row)
+            brush = self._EXAMINE_BRUSHES[self._examine_brush_idx]
+            if brush == "eraser":
+                self._examine_painted.pop(pos, None)
+            else:
+                self._examine_painted[pos] = brush
+        # Cycle brush — Tab / B forward, Shift+Tab backward
+        elif event.key in (pygame.K_TAB, pygame.K_b):
+            n = len(self._EXAMINE_BRUSHES)
+            if event.mod & pygame.KMOD_SHIFT:
+                self._examine_brush_idx = (
+                    self._examine_brush_idx - 1) % n
+            else:
+                self._examine_brush_idx = (
+                    self._examine_brush_idx + 1) % n
+        # Escape / Backspace exits preview
+        elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+            self._leave_utile_examine_preview()
 
     def _get_utile_preview_data(self):
         """Return a dict with the preview data for the active tile."""
@@ -2657,6 +2737,11 @@ class Game:
             "tile_name": utile.get("name", "Unknown"),
             "description": utile.get("description", ""),
             "tile_graphic": utile.get("tile"),
+            "painted": getattr(self, "_examine_painted", {}),
+            "cursor_col": getattr(self, "_examine_cursor_col", 5),
+            "cursor_row": getattr(self, "_examine_cursor_row", 6),
+            "brush": self._EXAMINE_BRUSHES[
+                getattr(self, "_examine_brush_idx", 0)],
         }
 
     def _next_editable_field(self, direction):
@@ -2713,10 +2798,9 @@ class Game:
             self._handle_module_edit_input_flat(event)
             return
 
-        # ── Examine preview mode — only Escape exits ──
+        # ── Examine preview editor mode ──
         if getattr(self, "module_edit_utile_preview", False):
-            if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
-                self._leave_utile_examine_preview()
+            self._handle_examine_preview_input(event)
             return
 
         # ── Level 0: section browser ──
@@ -3248,12 +3332,16 @@ class Game:
                 tid = utile.get("id", "")
                 if not tid:
                     continue
-                ut_dict[tid] = {
+                entry = {
                     "name": utile.get("name", ""),
                     "description": utile.get("description", ""),
                     "tile": utile.get("tile"),
                     "base_tile": utile.get("base_tile", "grass"),
                 }
+                el = utile.get("examine_layout")
+                if el:
+                    entry["examine_layout"] = el
+                ut_dict[tid] = entry
             if ut_dict:
                 data["unique_tiles"] = ut_dict
             else:

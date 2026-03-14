@@ -94,6 +94,7 @@ class ExamineState(BaseState):
         self.tile_name = ""
         self.tile_description = ""        # unique tile description (if any)
         self.tile_graphic = None           # unique tile graphic path (if any)
+        self.examine_layout = {}           # {(col, row): graphic_path} painted in editor
         self.party_member_name = ""
         # Drop mode state
         self.drop_mode = False
@@ -143,6 +144,15 @@ class ExamineState(BaseState):
             self.tile_name = utile.get("name", self.tile_name)
             self.tile_description = utile.get("description", "")
             self.tile_graphic = utile.get("tile")
+            # Load editor-painted examine layout
+            raw_layout = utile.get("examine_layout") or {}
+            self.examine_layout = {}
+            for pos_key, gfx in raw_layout.items():
+                try:
+                    c, r = pos_key.split(",")
+                    self.examine_layout[(int(c), int(r))] = gfx
+                except (ValueError, AttributeError):
+                    pass
 
         self.party_member_name = ""
 
@@ -269,6 +279,7 @@ class ExamineState(BaseState):
             drop_message=self.drop_message,
             tile_description=self.tile_description,
             tile_graphic=self.tile_graphic,
+            examine_layout=self.examine_layout,
         )
 
     # ── Movement ──────────────────────────────────────────────────
@@ -282,6 +293,9 @@ class ExamineState(BaseState):
                 and 1 <= new_row <= EXAMINE_ROWS - 2):
             return
         if (new_col, new_row) in self.obstacles:
+            return
+        # Editor-painted tiles also block movement
+        if (new_col, new_row) in self.examine_layout:
             return
         self.player_col = new_col
         self.player_row = new_row
@@ -299,6 +313,9 @@ class ExamineState(BaseState):
             for _attempt in range(40):
                 col = random.randint(1, EXAMINE_COLS - 2)
                 row = random.randint(1, EXAMINE_ROWS - 2)
+                # Don't place on editor-painted cells
+                if (col, row) in self.examine_layout:
+                    continue
                 if (col, row) == (_START_COL, _START_ROW):
                     continue
                 if (col, row) in self.obstacles:

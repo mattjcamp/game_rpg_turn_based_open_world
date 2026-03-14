@@ -28,7 +28,13 @@
       "name": "Moongate",
       "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say. sweet bruh.",
       "tile": "game/landmarks/poison_swamp.png",
-      "base_tile": "grass"
+      "base_tile": "grass",
+      "examine_layout": {
+        "2,10": "game/landmarks/treasure_hoard.png",
+        "4,10": "game/landmarks/treasure_hoard.png",
+        "6,10": "game/landmarks/treasure_hoard.png",
+        "8,10": "game/landmarks/sunken_shipwreck.png"
+      }
     },
     "whispering_stones": {
       "name": "Whispering Stones",
