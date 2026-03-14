@@ -5612,37 +5612,80 @@ class Renderer(CombatEffectRendererMixin):
                 if sprite:
                     self.screen.blit(sprite, (gx + pc * ts, gy + pr * ts))
 
+        # Draw placed items on top of floor tiles
+        placed_items = preview.get("placed_items", {})
+        if placed_items:
+            from src.party import ITEM_INFO
+            icon_sz = max(ts - 4, 8)
+            for (ic, ir), item_name in placed_items.items():
+                icx = gx + ic * ts + ts // 2
+                icy = gy + ir * ts + ts // 2
+                info = ITEM_INFO.get(item_name, {})
+                icon_type = info.get("icon", "potion")
+                self._draw_item_icon(icx, icy, icon_type, icon_sz)
+
         # Draw cursor highlight (blinking amber outline)
         import time
+        mode = preview.get("mode", "tile")
         blink = int(time.time() * 4) % 2 == 0
-        cur_color = (255, 200, 60) if blink else (180, 140, 40)
+        if mode == "tile":
+            cur_color = (255, 200, 60) if blink else (180, 140, 40)
+        else:
+            cur_color = (100, 255, 160) if blink else (50, 160, 90)
         cur_rect = pygame.Rect(gx + cursor_col * ts, gy + cursor_row * ts,
                                ts, ts)
         pygame.draw.rect(self.screen, cur_color, cur_rect, 2)
 
         dy = gy + grid_h + 6
 
-        # ── Brush selector ──
-        self._u3_text("Brush:", rx + 12, dy,
-                       (160, 160, 180), fs)
-        brush_name = self._brush_friendly_name(brush)
-        # Render brush name with arrows
+        # ── Mode indicator ──
+        tile_label_color = (255, 200, 100) if mode == "tile" \
+            else (120, 120, 140)
+        item_label_color = (100, 255, 160) if mode == "item" \
+            else (120, 120, 140)
+        self._u3_text("Tiles", rx + 12, dy, tile_label_color, fs)
+        self._u3_text("/", rx + 55, dy, (120, 120, 140), fs)
+        self._u3_text("Items", rx + 63, dy, item_label_color, fs)
+        mode_hint = "[I] switch"
+        mhw = fs.size(mode_hint.upper())[0]
+        self._u3_text(mode_hint, rx + rw - mhw - 12, dy,
+                       (80, 80, 160), fs)
+        dy += 16
+
+        # ── Brush / item selector ──
+        brush = preview.get("brush", "eraser")
         arrow_color = (100, 180, 255)
-        name_x = rx + 62
-        self._u3_text("<", rx + 52, dy, arrow_color, fs)
+        if mode == "tile":
+            label = "Brush:"
+            brush_name = self._brush_friendly_name(brush)
+        else:
+            label = "Item:"
+            brush_name = brush  # item names are already friendly
+        self._u3_text(label, rx + 12, dy, (160, 160, 180), fs)
+        label_w = fs.size(label.upper())[0]
+        name_x = rx + 14 + label_w + 4
+        self._u3_text("<", name_x - 10, dy, arrow_color, fs)
         self._u3_text(brush_name, name_x, dy,
                        (255, 255, 200), fs)
         name_w = fs.size(brush_name.upper())[0]
         self._u3_text(">", name_x + name_w + 6, dy, arrow_color, fs)
         dy += 18
 
-        # Brush preview sprite
+        # Preview of current brush / item
         if brush != "eraser":
-            preview_sz = min(32, ts * 2)
-            sprite = self._get_unique_tile_sprite(brush, preview_sz)
-            if sprite:
-                self.screen.blit(sprite, (rx + 16, dy))
-            dy += preview_sz + 4
+            if mode == "tile":
+                preview_sz = min(32, ts * 2)
+                sprite = self._get_unique_tile_sprite(brush, preview_sz)
+                if sprite:
+                    self.screen.blit(sprite, (rx + 16, dy))
+                dy += preview_sz + 4
+            else:
+                # Draw item icon preview
+                from src.party import ITEM_INFO
+                info = ITEM_INFO.get(brush, {})
+                icon_type = info.get("icon", "potion")
+                self._draw_item_icon(rx + 30, dy + 14, icon_type, 24)
+                dy += 32
         else:
             # Draw small X for eraser
             ex, ey = rx + 16, dy
@@ -5655,9 +5698,10 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Footer hints ──
         hint_y = ry + rh - 36
-        self._u3_text("[Arrows] Move  [ENTER] Paint",
+        action = "Paint" if mode == "tile" else "Place"
+        self._u3_text(f"[Arrows] Move  [ENTER] {action}",
                        rx + 10, hint_y, (100, 100, 200), fs)
-        self._u3_text("[TAB/B] Brush  [ESC] Done",
+        self._u3_text("[TAB/B] Cycle  [I] Mode  [ESC] Done",
                        rx + 10, hint_y + 14, (100, 100, 200), fs)
 
     def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):

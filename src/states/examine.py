@@ -95,6 +95,7 @@ class ExamineState(BaseState):
         self.tile_description = ""        # unique tile description (if any)
         self.tile_graphic = None           # unique tile graphic path (if any)
         self.examine_layout = {}           # {(col, row): graphic_path} painted in editor
+        self._editor_items = {}            # {(col, row): item_name} from module editor
         self.party_member_name = ""
         # Drop mode state
         self.drop_mode = False
@@ -153,6 +154,15 @@ class ExamineState(BaseState):
                     self.examine_layout[(int(c), int(r))] = gfx
                 except (ValueError, AttributeError):
                     pass
+            # Load editor-placed items (used to seed ground_items on first visit)
+            raw_items = utile.get("examine_items") or {}
+            self._editor_items = {}
+            for pos_key, item_name in raw_items.items():
+                try:
+                    c, r = pos_key.split(",")
+                    self._editor_items[(int(c), int(r))] = item_name
+                except (ValueError, AttributeError):
+                    pass
 
         self.party_member_name = ""
 
@@ -174,6 +184,7 @@ class ExamineState(BaseState):
         else:
             self._spawn_obstacles()
             self._spawn_examine_items()
+            self._place_editor_items()
 
     def exit(self):
         # Save the current layout before leaving
@@ -379,6 +390,23 @@ class ExamineState(BaseState):
                 item_name = self._resolve_item_name(raw)
                 self.ground_items[(col, row)] = {"item": item_name, "gold": 0}
                 break
+
+    # ── Editor-placed items ──────────────────────────────────────
+
+    def _place_editor_items(self):
+        """Place items defined in the module editor onto the ground.
+
+        These are added on first visit only (after random spawning),
+        placed at their exact grid positions unless blocked.
+        """
+        for (col, row), item_name in self._editor_items.items():
+            if (col, row) in self.obstacles:
+                continue
+            if (col, row) in self.examine_layout:
+                continue
+            if (col, row) in self.ground_items:
+                continue
+            self.ground_items[(col, row)] = {"item": item_name, "gold": 0}
 
     # ── Pickup ────────────────────────────────────────────────────
 

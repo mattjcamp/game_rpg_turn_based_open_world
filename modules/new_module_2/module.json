@@ -1,0 +1,99 @@
+{
+  "metadata": {
+    "id": "new_module_2",
+    "name": "New Module 2",
+    "author": "Unknown",
+    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Hallowdale.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 64,
+    "map_height": 48,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "tile": "game/landmarks/moongate_active.png",
+      "base_tile": "grass",
+      "examine_layout": {
+        "7,4": "game/dungeon/portal_open.png",
+        "4,6": "game/dungeon/sparkle.png",
+        "1,1": "game/landmarks/lava_vent.png",
+        "2,1": "game/landmarks/lava_vent.png",
+        "3,1": "game/landmarks/lava_vent.png"
+      },
+      "examine_items": {
+        "7,10": "Rope",
+        "8,10": "Rope",
+        "9,10": "Rope"
+      }
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "tile": null,
+      "base_tile": "grass"
+    }
+  },
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "hallowdale",
+        "name": "Hallowdale",
+        "description": "A seaside port battered by salt winds and rich with the smell of fish.",
+        "town_config": {
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
+        }
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_vault"
+    },
+    "starting_quests": [
+      "reclaim"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Frozen Crypt",
+        "key_name": "Iron Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Crumbling pillars mark the way into Frozen Crypt. Faint scratching echoes from deep within.",
+        "quest_type": "retrieve",
+        "quest_objective": "Slay the guardian of Frozen Crypt and claim the Iron Key",
+        "quest_hint": "A fearsome creature guards the prize.",
+        "kill_target": "",
+        "kill_count": 0,
+        "torch_density": "medium",
+        "exit_portal": true,
+        "levels": []
+      }
+    ],
+    "innkeeper_quests": false
+  }
+}

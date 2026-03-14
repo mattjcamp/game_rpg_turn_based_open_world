@@ -2651,6 +2651,32 @@ class Game:
         "game/dungeon/torch_post.png",
     ]
 
+    # Item palette for the examine editor.  "eraser" clears an item.
+    _EXAMINE_ITEMS = [
+        "eraser",
+        "Rock",
+        "Healing Herb",
+        "Healing Potion",
+        "Mana Potion",
+        "Antidote",
+        "Torch",
+        "Arrows",
+        "Bolts",
+        "Stones",
+        "Rope",
+        "Holy Water",
+        "Scroll of Fire",
+        "Lockpick",
+        "Smoke Bomb",
+        "Camping Supplies",
+        "Moonpetal",
+        "Glowcap Mushroom",
+        "Serpent Root",
+        "Brimite Ore",
+        "Spring Water",
+        "Fire Oil",
+    ]
+
     def _enter_utile_examine_preview(self):
         """Enter examine-screen preview mode for the active unique tile."""
         idx = self.module_edit_active_utile
@@ -2663,6 +2689,8 @@ class Game:
         self._examine_cursor_col = 5
         self._examine_cursor_row = 6
         self._examine_brush_idx = 0
+        self._examine_item_idx = 0
+        self._examine_mode = "tile"   # "tile" or "item"
         # Load any existing painted layout into a working dict
         utile = self.module_edit_unique_tiles[idx]
         raw = utile.get("examine_layout") or {}
@@ -2673,9 +2701,18 @@ class Game:
                 self._examine_painted[(int(c), int(r))] = gfx
             except (ValueError, AttributeError):
                 pass
+        # Load any existing placed items
+        raw_items = utile.get("examine_items") or {}
+        self._examine_items = {}
+        for pos_key, item_name in raw_items.items():
+            try:
+                c, r = pos_key.split(",")
+                self._examine_items[(int(c), int(r))] = item_name
+            except (ValueError, AttributeError):
+                pass
 
     def _leave_utile_examine_preview(self):
-        """Exit examine-screen preview and persist painted layout."""
+        """Exit examine-screen preview and persist painted layout + items."""
         idx = self.module_edit_active_utile
         if 0 <= idx < len(self.module_edit_unique_tiles):
             # Persist the painted layout back to the in-memory tile dict
@@ -2683,6 +2720,11 @@ class Game:
             for (c, r), gfx in self._examine_painted.items():
                 layout[f"{c},{r}"] = gfx
             self.module_edit_unique_tiles[idx]["examine_layout"] = layout
+            # Persist placed items
+            items = {}
+            for (c, r), item_name in self._examine_items.items():
+                items[f"{c},{r}"] = item_name
+            self.module_edit_unique_tiles[idx]["examine_items"] = items
         self.module_edit_utile_preview = False
 
     def _handle_examine_preview_input(self, event):
@@ -2702,23 +2744,49 @@ class Game:
         elif event.key in (pygame.K_RIGHT, pygame.K_d):
             if self._examine_cursor_col < EXAMINE_COLS - 2:
                 self._examine_cursor_col += 1
-        # Paint — Enter places current brush
+
+        # Toggle mode — I switches between tile and item modes
+        elif event.key == pygame.K_i:
+            if self._examine_mode == "tile":
+                self._examine_mode = "item"
+            else:
+                self._examine_mode = "tile"
+
+        # Paint / place — Enter
         elif event.key == pygame.K_RETURN:
             pos = (self._examine_cursor_col, self._examine_cursor_row)
-            brush = self._EXAMINE_BRUSHES[self._examine_brush_idx]
-            if brush == "eraser":
-                self._examine_painted.pop(pos, None)
+            if self._examine_mode == "tile":
+                brush = self._EXAMINE_BRUSHES[self._examine_brush_idx]
+                if brush == "eraser":
+                    self._examine_painted.pop(pos, None)
+                else:
+                    self._examine_painted[pos] = brush
             else:
-                self._examine_painted[pos] = brush
-        # Cycle brush — Tab / B forward, Shift+Tab backward
+                item = self._EXAMINE_ITEMS[self._examine_item_idx]
+                if item == "eraser":
+                    self._examine_items.pop(pos, None)
+                else:
+                    self._examine_items[pos] = item
+
+        # Cycle brush/item — Tab / B forward, Shift+Tab backward
         elif event.key in (pygame.K_TAB, pygame.K_b):
-            n = len(self._EXAMINE_BRUSHES)
-            if event.mod & pygame.KMOD_SHIFT:
-                self._examine_brush_idx = (
-                    self._examine_brush_idx - 1) % n
+            if self._examine_mode == "tile":
+                n = len(self._EXAMINE_BRUSHES)
+                if event.mod & pygame.KMOD_SHIFT:
+                    self._examine_brush_idx = (
+                        self._examine_brush_idx - 1) % n
+                else:
+                    self._examine_brush_idx = (
+                        self._examine_brush_idx + 1) % n
             else:
-                self._examine_brush_idx = (
-                    self._examine_brush_idx + 1) % n
+                n = len(self._EXAMINE_ITEMS)
+                if event.mod & pygame.KMOD_SHIFT:
+                    self._examine_item_idx = (
+                        self._examine_item_idx - 1) % n
+                else:
+                    self._examine_item_idx = (
+                        self._examine_item_idx + 1) % n
+
         # Escape / Backspace exits preview
         elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
             self._leave_utile_examine_preview()
@@ -2731,6 +2799,13 @@ class Game:
         utile = self.module_edit_unique_tiles[idx]
         bt_map = self._get_base_tile_map()
         from src.settings import TILE_GRASS
+        mode = getattr(self, "_examine_mode", "tile")
+        if mode == "tile":
+            current_brush = self._EXAMINE_BRUSHES[
+                getattr(self, "_examine_brush_idx", 0)]
+        else:
+            current_brush = self._EXAMINE_ITEMS[
+                getattr(self, "_examine_item_idx", 0)]
         return {
             "tile_type": bt_map.get(
                 utile.get("base_tile", "grass"), TILE_GRASS),
@@ -2738,10 +2813,11 @@ class Game:
             "description": utile.get("description", ""),
             "tile_graphic": utile.get("tile"),
             "painted": getattr(self, "_examine_painted", {}),
+            "placed_items": getattr(self, "_examine_items", {}),
             "cursor_col": getattr(self, "_examine_cursor_col", 5),
             "cursor_row": getattr(self, "_examine_cursor_row", 6),
-            "brush": self._EXAMINE_BRUSHES[
-                getattr(self, "_examine_brush_idx", 0)],
+            "brush": current_brush,
+            "mode": mode,
         }
 
     def _next_editable_field(self, direction):
@@ -3341,6 +3417,9 @@ class Game:
                 el = utile.get("examine_layout")
                 if el:
                     entry["examine_layout"] = el
+                ei = utile.get("examine_items")
+                if ei:
+                    entry["examine_items"] = ei
                 ut_dict[tid] = entry
             if ut_dict:
                 data["unique_tiles"] = ut_dict
