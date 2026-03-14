@@ -1869,6 +1869,7 @@ class Game:
         # Unique tiles state (list already built above for section 7)
         self.module_edit_in_unique_tiles = False
         self.module_edit_active_utile = -1
+        self.module_edit_utile_preview = False
         # Store dungeon levels for editing
         self.module_edit_dungeon_levels = {}
         for i, dung in enumerate(dungeons):
@@ -2498,6 +2499,8 @@ class Game:
              raw_tile, "choice", True],
             ["Base Tile", f"utile_{idx}_basetile",
              tdef.get("base_tile", "grass"), "choice", True],
+            [">> Examine Screen Preview",
+             f"utile_{idx}_examine", "", "action", True],
         ]
         return {
             "label": tname,
@@ -2604,6 +2607,58 @@ class Game:
         self.module_edit_unique_tiles = tiles
         self._rebuild_unique_tiles_children()
 
+    # ── Examine preview for unique tiles ────────────────────────
+
+    # Map base_tile names → tile type constants
+    _BASE_TILE_TO_TYPE = None  # built lazily
+
+    @classmethod
+    def _get_base_tile_map(cls):
+        if cls._BASE_TILE_TO_TYPE is None:
+            from src.settings import (
+                TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
+                TILE_MOUNTAIN, TILE_DFLOOR, TILE_FLOOR,
+            )
+            cls._BASE_TILE_TO_TYPE = {
+                "grass": TILE_GRASS,
+                "forest": TILE_FOREST,
+                "sand": TILE_SAND,
+                "path": TILE_PATH,
+                "mountain": TILE_MOUNTAIN,
+                "dungeon_floor": TILE_DFLOOR,
+                "floor": TILE_FLOOR,
+            }
+        return cls._BASE_TILE_TO_TYPE
+
+    def _enter_utile_examine_preview(self):
+        """Enter examine-screen preview mode for the active unique tile."""
+        idx = self.module_edit_active_utile
+        if idx < 0 or idx >= len(self.module_edit_unique_tiles):
+            return
+        # Save current field values before switching to preview
+        self._save_single_utile_fields()
+        self.module_edit_utile_preview = True
+
+    def _leave_utile_examine_preview(self):
+        """Exit examine-screen preview and return to the field editor."""
+        self.module_edit_utile_preview = False
+
+    def _get_utile_preview_data(self):
+        """Return a dict with the preview data for the active tile."""
+        idx = self.module_edit_active_utile
+        if idx < 0 or idx >= len(self.module_edit_unique_tiles):
+            return None
+        utile = self.module_edit_unique_tiles[idx]
+        bt_map = self._get_base_tile_map()
+        from src.settings import TILE_GRASS
+        return {
+            "tile_type": bt_map.get(
+                utile.get("base_tile", "grass"), TILE_GRASS),
+            "tile_name": utile.get("name", "Unknown"),
+            "description": utile.get("description", ""),
+            "tile_graphic": utile.get("tile"),
+        }
+
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
 
@@ -2656,6 +2711,12 @@ class Game:
         # ── Create-new mode uses flat field list (no hierarchy) ──
         if self.module_edit_is_new:
             self._handle_module_edit_input_flat(event)
+            return
+
+        # ── Examine preview mode — only Escape exits ──
+        if getattr(self, "module_edit_utile_preview", False):
+            if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+                self._leave_utile_examine_preview()
             return
 
         # ── Level 0: section browser ──
@@ -2838,6 +2899,13 @@ class Game:
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
             self._adjust_module_edit_scroll()
+        elif field_type == "action":
+            # Action fields respond to Enter/Right
+            if event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                key = field_entry[1]
+                if key.endswith("_examine"):
+                    self._enter_utile_examine_preview()
+            return
         elif not editable:
             return
         elif field_type == "choice":
@@ -3592,7 +3660,11 @@ class Game:
                         self.module_edit_active_level >= 0
                         or self.module_edit_in_loot),
                     edit_in_dungeon_sub=(
-                        self.module_edit_active_dung >= 0))
+                        self.module_edit_active_dung >= 0),
+                    edit_utile_preview=(
+                        self._get_utile_preview_data()
+                        if getattr(self, "module_edit_utile_preview", False)
+                        else None))
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,
