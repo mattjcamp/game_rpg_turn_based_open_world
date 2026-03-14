@@ -109,8 +109,7 @@ class ExamineState(BaseState):
         self.tile_name = TILE_DEFS.get(
             self.examined_tile_type, {}).get("name", "Area")
 
-        alive = [m for m in party.members if m.is_alive()]
-        self.party_member_name = alive[0].name if alive else "Party"
+        self.party_member_name = ""
 
         # Reset position and messages
         self.player_col = _START_COL

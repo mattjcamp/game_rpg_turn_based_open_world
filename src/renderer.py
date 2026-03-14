@@ -5436,11 +5436,12 @@ class Renderer(CombatEffectRendererMixin):
                          (panel_x, y), (panel_x + 180, y), 1)
         y += 12
 
-        # Party member
-        mem_surf = self.font_small.render(party_member_name,
-                                          True, (160, 200, 255))
-        self.screen.blit(mem_surf, (panel_x, y))
-        y += 24
+        # Party member (only if provided)
+        if party_member_name:
+            mem_surf = self.font_small.render(party_member_name,
+                                              True, (160, 200, 255))
+            self.screen.blit(mem_surf, (panel_x, y))
+            y += 24
 
         # Instructions
         for txt in ("Arrow Keys: Move", "L: Drop Item", "E / ESC: Return"):

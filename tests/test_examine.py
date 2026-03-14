@@ -53,9 +53,9 @@ class TestExamineEnter:
         assert isinstance(examine.tile_name, str)
         assert len(examine.tile_name) > 0
 
-    def test_sets_party_member_name(self, examine, game):
-        alive = [m for m in game.party.members if m.is_alive()]
-        assert examine.party_member_name == alive[0].name
+    def test_party_member_name_is_empty(self, examine, game):
+        """Examine screen should not display an individual member name."""
+        assert examine.party_member_name == ""
 
     def test_spawns_items_within_bounds(self, examine):
         from src.states.examine import EXAMINE_COLS, EXAMINE_ROWS
