@@ -521,7 +521,8 @@ class Renderer(CombatEffectRendererMixin):
                 py = sr * ts + sy
                 self._u3_draw_town_tile(tid, px, py, ts, wc, wr,
                                         keys_inserted=keys_inserted,
-                                        palette=palette)
+                                        palette=palette,
+                                        town_style=town_style)
 
         # ── 2. NPC sprites ──
         for npc in town_data.npcs:
@@ -787,12 +788,18 @@ class Renderer(CombatEffectRendererMixin):
             8, prompt_y, (220, 180, 50))
 
     def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr,
-                            keys_inserted=0, palette=None):
+                            keys_inserted=0, palette=None,
+                            town_style="medieval"):
         """Draw a single town tile using sprite sheet art when available.
 
         *palette* is a dict from ``_TOWN_PALETTES`` that supplies all
         colours for the procedural fallback.  When *None*, the medieval
         palette is used.
+
+        When *town_style* is not ``"medieval"``, interior tiles (floor,
+        wall, door, counter, exit) skip the sprite lookup so the
+        palette-coloured procedural art is used instead — this makes
+        each town style visually distinct.
         """
         from src.settings import (
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
@@ -802,20 +809,29 @@ class Renderer(CombatEffectRendererMixin):
         if palette is None:
             palette = self._TOWN_PALETTES["medieval"]
 
+        # Tiles whose look should change per town style — skip sprites
+        # for non-default styles so the palette procedural path is used.
+        _PALETTE_SENSITIVE = {
+            TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_COUNTER, TILE_EXIT,
+        }
+        use_sprites = (town_style == "medieval"
+                       or tile_id not in _PALETTE_SENSITIVE)
+
         # Use extracted town gate tile for exit
-        if tile_id == TILE_EXIT and self._town_gate_tile:
+        if tile_id == TILE_EXIT and self._town_gate_tile and use_sprites:
             self.screen.blit(self._town_gate_tile, (px, py))
             return
 
         # Try town tile map first, then overworld tile map
-        mapped_id = self._town_tile_map.get(tile_id)
-        if mapped_id is None:
-            mapped_id = self._overworld_tile_map.get(tile_id)
-        if mapped_id is not None:
-            sprite = self._tile_sprites.get(mapped_id)
-            if sprite:
-                self.screen.blit(sprite, (px, py))
-                return
+        if use_sprites:
+            mapped_id = self._town_tile_map.get(tile_id)
+            if mapped_id is None:
+                mapped_id = self._overworld_tile_map.get(tile_id)
+            if mapped_id is not None:
+                sprite = self._tile_sprites.get(mapped_id)
+                if sprite:
+                    self.screen.blit(sprite, (px, py))
+                    return
 
         # Procedural fallback for unmapped / unloaded tiles
         BLACK = (0, 0, 0)
