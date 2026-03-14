@@ -133,6 +133,98 @@ Music is procedurally generated at runtime using numpy waveforms — square wave
 
 ---
 
+## Vocabulary Reference
+
+Use these terms when describing what you want to change — whether you're filing an issue, talking to another developer, or prompting an AI. Each entry lists the name as used in conversation, what it refers to, and where the code lives.
+
+### Game Screens (States)
+
+These are the major modes of play, each implemented as a state class in `src/states/`.
+
+| Term | What it is | Code |
+|------|-----------|------|
+| **Title Screen** | The main menu shown at launch with New Game, Continue, Settings, and Modules options. | `game.py` (`showing_title`), `renderer.draw_title_screen()` |
+| **Character Creation** | Screen where the player picks race, class, and name for a new character. | `game.py` (`showing_char_create`), `renderer.draw_char_create_screen()` |
+| **Form Party** | Screen where the player assembles a party of up to four characters before starting a game. | `game.py` (`showing_form_party`), `renderer.draw_form_party_screen()` |
+| **Overworld / Overworld Map** | The main top-down tile map where the party explores, discovers towns and dungeons. | `src/states/overworld.py`, `renderer.draw_overworld_u3()` |
+| **Town** | Interior of a town — the party walks around, talks to NPCs, visits shops and temples. | `src/states/town.py`, `renderer.draw_town_u3()` |
+| **Dungeon** | Multi-level dungeon crawling with corridors, rooms, monsters, and chests. | `src/states/dungeon.py`, `renderer.draw_dungeon_u3()` |
+| **Combat / Combat Arena** | Tactical grid battle between the party and monsters. Turn-based with movement, melee, ranged attacks, and spells. | `src/states/combat.py`, `renderer.draw_combat_arena()` |
+| **Examine Screen / Examine Mode** | Zoomed-in 12×14 tile grid of the current overworld tile. The player walks around, picks up items, and drops items. Opened by pressing E on the overworld. | `src/states/examine.py`, `renderer.draw_examine_area()` |
+| **Game Over** | Shown when the entire party is defeated. Offers restart or return to title. | `game.py` (`showing_game_over`), `renderer.draw_game_over_screen()` |
+
+### Overlay Screens
+
+These appear on top of a game state — they're not standalone states but modal screens drawn over the current view.
+
+| Term | What it is | Code |
+|------|-----------|------|
+| **Party Screen** | Summary of all party members showing HP, MP, class, and level. Opened with C or I depending on context. | `renderer.draw_party_screen_u3()` |
+| **Character Sheet** | Detailed view of one party member — stats, equipment, spells. Drill into from the Party Screen. | `renderer.draw_character_sheet_u3()` |
+| **Inventory / Party Inventory** | Full inventory list with use, equip, and drop actions. | `renderer.draw_party_inventory_u3()` |
+| **Shop** | Buy/sell interface when talking to a merchant NPC in town. | `renderer.draw_shop_u3()` |
+| **Temple Service Menu** | Healing and resurrection services at a temple NPC. | `renderer.draw_temple_service_menu()` |
+| **Quest Log** | List of active and completed quests. Opened with Q on the overworld. | `renderer.draw_quest_screen()` |
+| **Save / Load Screen** | Slot-based save and load interface. | `renderer.draw_save_load_screen()` |
+| **Settings Screen** | Music volume, display options, and other preferences. | `renderer.draw_settings_screen()` |
+| **Help Overlay** | Controls reference shown with H on the overworld or in combat. | `renderer.draw_overworld_help_overlay()`, `renderer.draw_combat_help_overlay()` |
+| **Combat Log** | Scrollable log of recent combat actions and dice rolls. | `renderer.draw_log_overlay()` |
+| **Spell List** | List of spells a character can cast, shown during combat or from inventory. | Part of `inventory_mixin.py` |
+| **Brew List** | Alchemy crafting menu for alchemist characters. | Part of `inventory_mixin.py` |
+| **Item Examine** | Detail popup showing an item's description and stats. | `renderer.draw_item_examine()` |
+| **Dialogue Box** | NPC conversation text shown at the bottom of the town screen. | `renderer.draw_dialogue_box()` |
+| **Town Action Screen** | Context menu for NPC interactions (Talk, Trade, Pickpocket, etc.). | `renderer.draw_town_action_screen()` |
+| **Dungeon Action Screen** | Context menu for dungeon interactions (Open Chest, Disarm Trap, etc.). | `renderer.draw_dungeon_action_screen()` |
+
+### Module Editor
+
+The module editor is accessed from the Title Screen via the Modules option. It lets players create and customize game content without editing JSON.
+
+| Term | What it is | Code |
+|------|-----------|------|
+| **Module Browser** | List of available modules with select, create, edit, and delete options. | `renderer.draw_module_screen()` (left panel) |
+| **Module Detail Panel** | Right-side panel showing the selected module's name, author, description, and ID. | `renderer.draw_module_screen()` (right panel) |
+| **Section Browser** | Hierarchical list of editable sections when editing a module (Metadata, Towns, Dungeons, Unique Tiles, etc.). Navigated with arrows and Enter. | `renderer._draw_section_browser()` |
+| **Field Editor** | Form-style editor for a section's fields — text inputs, choice selectors, and action items. | `renderer._draw_module_edit_overlay()` |
+| **Unique Tiles Folder** | The section within the module editor listing all unique tiles with add/remove controls. | `game.py` `_build_unique_tiles_sections()` |
+| **Unique Tile Detail** | Field editor for one unique tile — ID, Name, Description, Tile Graphic, Base Tile, and Examine Screen Preview. | `game.py` `_build_utile_child()` |
+| **Tile Graphic Chooser** | Choice field that cycles through available tile graphics with a sprite preview. | `renderer._draw_module_edit_overlay()` (tilegfx handling) |
+| **Examine Editor** | Interactive grid editor opened from the Unique Tile Detail. Has two modes: Tiles mode for painting graphics and Items mode for placing pickupable items. | `game.py` `_handle_examine_preview_input()`, `renderer._draw_utile_examine_preview()` |
+
+### World and Map Concepts
+
+| Term | What it is | Code |
+|------|-----------|------|
+| **Tile Map** | The 2D grid of terrain tiles that makes up the overworld. Generated procedurally from a seed. | `src/tile_map.py` |
+| **Tile Type** | An integer ID representing a terrain kind (grass, forest, sand, water, mountain, etc.). Defined in `settings.py` as `TILE_GRASS`, `TILE_FOREST`, etc. | `src/settings.py` |
+| **Unique Tile** | A special one-of-a-kind map feature placed on the overworld (e.g., Moongate, Whispering Stones). Has its own name, description, graphic, base terrain, and optionally a custom examine layout. | `tile_map.py` `unique_tiles`, `data/unique_tiles.json` |
+| **Examine Layout** | The grid of painted tile graphics defined in the Examine Editor for a unique tile. Stored as `examine_layout` in the unique tile data. | `examine.py`, module `module.json` |
+| **Examine Items** | Items placed on the examine grid via the Examine Editor. Appear as ground items on first visit. Stored as `examine_items` in the unique tile data. | `examine.py` `_place_editor_items()` |
+| **Module** | A self-contained content pack defining an adventure — overworld, towns, dungeons, quests, unique tiles, and progression. Lives in `modules/`. | `src/module_loader.py` |
+| **Base Tile** | The terrain type a unique tile sits on, used to theme its examine screen (obstacle types, floor appearance). One of grass, forest, sand, path, mountain, etc. | Unique tile `base_tile` field |
+
+### Combat Concepts
+
+| Term | What it is | Code |
+|------|-----------|------|
+| **Combat Arena** | The tactical grid where combat takes place. Party members and monsters move and fight on it. | `renderer.draw_combat_arena()` |
+| **Combat Engine** | The rules system that resolves attacks, damage, defense, and spell effects using D&D-style dice rolls. | `src/combat_engine.py` |
+| **Combat Effects** | Buffs, debuffs, and status conditions applied during combat (poison, stun, bless, etc.). | `src/states/combat_effects.py`, `data/effects.json` |
+| **Action Menu** | The list of actions available to a party member on their combat turn (Attack, Spell, Item, Defend, Flee). | Part of `combat.py` draw logic |
+| **HUD** | The status bar area showing party HP/MP, location, and time of day. Different versions for overworld, town, and dungeon. | `renderer.draw_hud()`, `draw_hud_town()`, `draw_hud_dungeon()` |
+
+### Data and Items
+
+| Term | What it is | Code |
+|------|-----------|------|
+| **ITEM_INFO** | The master dictionary of all item metadata (description, icon type, effects). Built at load time from `items.json`. | `src/party.py`, `src/data_loader.py` |
+| **Item Icon** | A pixel-art icon drawn programmatically for each item type (sword, potion, herb, rock, scroll, etc.). | `renderer._draw_item_icon()` |
+| **Ground Items** | Items lying on the floor of an examine-area grid, available for pickup. | `examine.py` `ground_items` |
+| **Encounter Table** | Definitions of which monsters appear in which terrain or dungeon level. | `data/encounters.json` |
+| **Loot Table** | Weighted item lists that determine what spawns in examine areas or drops from monsters. | `examine.py` `EXAMINE_LOOT`, `data/monsters.json` |
+
+---
+
 ## Running the Tests
 
 The test suite runs entirely headless (no display needed) using a mock pygame layer defined in `tests/conftest.py`.
