@@ -97,18 +97,35 @@ class TileMap:
 # ── Unique tile loader ──────────────────────────────────────────
 
 def load_unique_tiles(data_dir=None):
-    """Load unique tile definitions from unique_tiles.json.
+    """Load unique tile definitions.
 
-    Checks *data_dir* first (if given), then falls back to the
-    default ``data/`` directory.
+    Resolution order:
+    1. ``module.json`` — ``unique_tiles`` key inside the manifest
+       (this is where the module editor stores them).
+    2. ``unique_tiles.json`` in the module directory.
+    3. ``data/unique_tiles.json`` — the global fallback.
     """
     if data_dir is not None:
+        # 1. Check module.json manifest first
+        manifest_path = os.path.join(data_dir, "module.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+                ut = manifest.get("unique_tiles")
+                if ut:
+                    return ut
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # 2. Check standalone unique_tiles.json in module dir
         mod_path = os.path.join(data_dir, "unique_tiles.json")
         if os.path.exists(mod_path):
             with open(mod_path, "r") as f:
                 data = json.load(f)
             return data.get("unique_tiles", {})
-    # Fallback to default data/ directory
+
+    # 3. Fallback to default data/ directory
     path = os.path.join(os.path.dirname(__file__), "..", "data", "unique_tiles.json")
     if not os.path.exists(path):
         return {}
@@ -231,13 +248,7 @@ def _get_overworld_params(overworld_cfg):
     for tile_id, pos in utp.get("fixed", {}).items():
         fixed_placements[tile_id] = (pos["col"], pos["row"])
     scatter_tiles = utp.get("scatter", [
-        "ancient_shrine", "war_memorial", "whispering_stones",
-        "old_campfire", "fairy_ring", "hermit_camp",
-        "enchanted_spring", "oracle_pool", "forgotten_grave",
-        "dragon_bones", "sunken_shipwreck", "wandering_ghost",
-        "merchant_wagon", "bandit_cache", "shadow_mark",
-        "ancient_battlefield", "moongate", "cursed_well",
-        "poison_swamp",
+        "moongate", "whispering_stones",
     ])
 
     return {
@@ -278,8 +289,7 @@ def _get_overworld_params(overworld_cfg):
         # World features
         "landmarks": landmarks,
         "paths": paths,
-        "fixed_placements": fixed_placements if fixed_placements else {
-            "elara_npc": (8, 12), "signpost": (12, 14)},
+        "fixed_placements": fixed_placements if fixed_placements else {},
         "scatter_tiles": scatter_tiles,
     }
 

@@ -3,7 +3,7 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Ravenvale.",
+    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Ivygate to break the spell.",
     "version": "0.1.0"
   },
   "settings": {
@@ -23,97 +23,39 @@
     }
   },
   "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate 4",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "tile": null,
+      "visible": true,
+      "walkable": true,
+      "base_tile": "grass",
+      "category": "portal",
+      "interact_type": "teleport",
+      "interact_text": "You step through the moongate. The world blurs and reforms around you.",
+      "interact_data": {}
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "tile": null,
+      "visible": false,
+      "walkable": true,
+      "base_tile": "grass",
+      "category": "lore",
+      "interact_type": "message",
+      "interact_text": "The stones whisper: 'Seek the shadow beneath the mountain. The key lies where light cannot reach.'",
+      "interact_data": {}
+    }
+  },
   "world": {
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ravenvale",
-        "name": "Ravenvale",
-        "description": "A riverside town whose docks hum with the comings and goings of barges.",
-        "town_config": {
-          "size": "small",
-          "style": "medieval",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "driftglen",
-        "name": "Driftglen",
-        "description": "A crossroads town where adventurers gather to share rumours and ale.",
-        "town_config": {
-          "size": "small",
-          "style": "desert",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "briarhold",
-        "name": "Briarhold",
-        "description": "A fortified settlement perched on a rocky bluff overlooking the valley.",
-        "town_config": {
-          "size": "small",
-          "style": "coastal",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "fernford",
-        "name": "Fernford",
-        "description": "A quiet hamlet nestled among rolling hills, known for its warm hearths.",
-        "town_config": {
-          "size": "small",
-          "style": "forest",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "amberport",
-        "name": "Amberport",
-        "description": "A walled outpost on the frontier, always on guard against the wilds.",
-        "town_config": {
-          "size": "small",
-          "style": "mountain",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "frostgate",
-        "name": "IGNORE",
-        "description": "A sleepy village surrounded by ancient oaks and whispering meadows.",
-        "town_config": {
-          "size": "medium",
-          "style": "medieval",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "eldercrest",
-        "name": "IGNORE",
-        "description": "A hillside town whose cobbled streets wind between stone cottages.",
-        "town_config": {
-          "size": "medium",
-          "style": "medieval",
-          "buildings": [
-            "shrine"
-          ]
-        }
-      },
-      {
-        "id": "stormmarch",
-        "name": "IGNORE",
-        "description": "A forest clearing settlement where druids and woodsmen live side by side.",
+        "id": "ivygate",
+        "name": "Ivygate",
+        "description": "A bustling market town where traders from distant lands hawk exotic wares.",
         "town_config": {
           "size": "medium",
           "style": "medieval",
@@ -129,22 +71,22 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_vault"
+      "deliver_to": "town_shrine"
     },
     "starting_quests": [
-      "reclaim"
+      "awaken"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Rotting Stronghold",
-        "key_name": "Obsidian Key",
+        "name": "Howling Vaults",
+        "key_name": "Amber Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The air around Rotting Stronghold shimmers with faint heat. Strange runes glow along the doorframe.",
+        "description": "A narrow crevice leads into Howling Vaults. The sound of dripping water echoes endlessly below.",
         "quest_type": "retrieve",
-        "quest_objective": "Purge Rotting Stronghold of evil and secure the Obsidian Key",
-        "quest_hint": "Dark forces have claimed this place as their own.",
+        "quest_objective": "Slay the guardian of Howling Vaults and claim the Amber Key",
+        "quest_hint": "A fearsome creature guards the prize.",
         "kill_target": "",
         "kill_count": 0,
         "torch_density": "medium",
