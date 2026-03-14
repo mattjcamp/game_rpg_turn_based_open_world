@@ -628,6 +628,38 @@ TIME_OF_DAY_NAMES = ["Dawn", "Noon", "Dusk", "Midnight"]
 _SEASON_MONTHS = {"Spring": 3, "Summer": 6, "Autumn": 9, "Winter": 12}
 _TIME_HOURS = {"Dawn": 6, "Noon": 12, "Dusk": 18, "Midnight": 0}
 
+# ── Town customization presets ──────────────────────────────────────
+TOWN_SIZE_NAMES = ["Small", "Medium", "Large"]
+TOWN_SIZE_KEYS = ["small", "medium", "large"]
+
+TOWN_STYLE_NAMES = ["Medieval", "Desert", "Coastal", "Forest", "Mountain"]
+TOWN_STYLE_KEYS = ["medieval", "desert", "coastal", "forest", "mountain"]
+
+# Buildings that always exist (cannot be toggled off)
+TOWN_REQUIRED_BUILDINGS = ["general_shop", "inn"]
+
+# Optional buildings the player can toggle on/off
+TOWN_OPTIONAL_BUILDINGS = [
+    ("shrine", "Shrine"),
+    ("reagent_shop", "Reagent Shop"),
+    ("potion_shop", "Potion Shop"),
+    ("weapons_shop", "Weapons Shop"),
+    ("armor_shop", "Armor Shop"),
+    ("book_shop", "Book Shop"),
+    ("map_shop", "Map Shop"),
+    ("town_hall", "Town Hall"),
+    ("tavern", "Tavern"),
+]
+TOWN_BUILDING_KEYS = [b[0] for b in TOWN_OPTIONAL_BUILDINGS]
+TOWN_BUILDING_NAMES = [b[1] for b in TOWN_OPTIONAL_BUILDINGS]
+
+# Default town config applied when none is specified in the manifest
+DEFAULT_TOWN_CONFIG = {
+    "size": "medium",
+    "style": "medieval",
+    "buildings": ["shrine"],  # only shrine enabled by default
+}
+
 
 def _build_start_time(season, time_of_day):
     """Return a start_time dict from human-readable season + time."""

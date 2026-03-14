@@ -572,8 +572,10 @@ class Game:
         """
         overworld_cfg = self.module_manifest.get("_overworld_cfg", {})
         manifest_towns = self.module_manifest.get("world", {}).get("towns", [])
-        # Build a quick lookup: town_id → town name
+        # Build a quick lookup: town_id → town name and config
         town_names = {t["id"]: t["name"] for t in manifest_towns}
+        town_configs = {t["id"]: t.get("town_config", {})
+                        for t in manifest_towns}
 
         # Check if module enables innkeeper quests
         prog = self.module_manifest.get("progression", {})
@@ -627,12 +629,14 @@ class Game:
                     place_machine = (first_town is None)
             else:
                 place_machine = False
+            tc = town_configs.get(tid, {})
             td = generate_town(tname, seed=town_seed,
                                layout_index=town_ordinal,
                                has_key_dungeons=bool(self.key_dungeons),
                                innkeeper_quests=inn_quests,
                                gnome_machine=place_machine,
-                               keys_needed=gnome_keys_needed)
+                               keys_needed=gnome_keys_needed,
+                               town_config=tc)
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:
@@ -1698,18 +1702,51 @@ class Game:
         })
 
         # 3) Towns folder
+        from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
+                                       TOWN_STYLE_NAMES, TOWN_STYLE_KEYS,
+                                       TOWN_BUILDING_KEYS,
+                                       TOWN_BUILDING_NAMES,
+                                       DEFAULT_TOWN_CONFIG)
         towns = manifest.get("world", {}).get("towns", [])
         town_children = []
         for i, town in enumerate(towns):
             tname = town.get("name", f"Town {i+1}")
+            tc = town.get("town_config", {})
+            # Resolve size display name
+            tc_size = tc.get("size", DEFAULT_TOWN_CONFIG["size"])
+            try:
+                size_display = TOWN_SIZE_NAMES[
+                    TOWN_SIZE_KEYS.index(tc_size)]
+            except (ValueError, IndexError):
+                size_display = "Medium"
+            # Resolve style display name
+            tc_style = tc.get("style", DEFAULT_TOWN_CONFIG["style"])
+            try:
+                style_display = TOWN_STYLE_NAMES[
+                    TOWN_STYLE_KEYS.index(tc_style)]
+            except (ValueError, IndexError):
+                style_display = "Medieval"
+            # Build fields
+            fields = [
+                ["Name", f"town_{i}_name", tname, "text", True],
+                ["Description", f"town_{i}_desc",
+                 town.get("description", ""), "text", True],
+                ["Size", f"town_{i}_size", size_display, "choice", True],
+                ["Style", f"town_{i}_style", style_display, "choice", True],
+            ]
+            # Add a Yes/No toggle for each optional building
+            tc_buildings = tc.get("buildings",
+                                  DEFAULT_TOWN_CONFIG["buildings"])
+            for bkey, bname in zip(TOWN_BUILDING_KEYS,
+                                   TOWN_BUILDING_NAMES):
+                enabled = "Yes" if bkey in tc_buildings else "No"
+                fields.append(
+                    [bname, f"town_{i}_bldg_{bkey}", enabled,
+                     "choice", True])
             town_children.append({
                 "label": tname,
                 "icon": "T",
-                "fields": [
-                    ["Name", f"town_{i}_name", tname, "text", True],
-                    ["Description", f"town_{i}_desc",
-                     town.get("description", ""), "text", True],
-                ],
+                "fields": fields,
             })
         n_towns = len(towns)
         sections.append({
@@ -2557,6 +2594,14 @@ class Game:
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
             return ["Yes", "No"]
+        elif key.endswith("_size") and key.startswith("town_"):
+            from src.module_loader import TOWN_SIZE_NAMES
+            return TOWN_SIZE_NAMES
+        elif key.endswith("_style") and key.startswith("town_"):
+            from src.module_loader import TOWN_STYLE_NAMES
+            return TOWN_STYLE_NAMES
+        elif "_bldg_" in key and key.startswith("town_"):
+            return ["Yes", "No"]
         elif key.endswith("_randenc"):
             return ["Yes", "No"]
         elif key.endswith("_item") and key.startswith("loot_"):
@@ -2783,6 +2828,10 @@ class Game:
                     values["innkeeper_quests"] == "Yes")
 
             # ── Town fields (town_<i>_<field>) ──
+            from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
+                                           TOWN_STYLE_NAMES,
+                                           TOWN_STYLE_KEYS,
+                                           TOWN_BUILDING_KEYS)
             towns = data.get("world", {}).get("towns", [])
             town_field_map = {
                 "name": "name",
@@ -2799,9 +2848,35 @@ class Game:
                 except ValueError:
                     continue
                 suffix = parts[2]
+                if not (0 <= idx < len(towns)):
+                    continue
                 json_key = town_field_map.get(suffix)
-                if json_key and 0 <= idx < len(towns):
+                if json_key:
                     towns[idx][json_key] = val
+                elif suffix == "size":
+                    # Convert display name to key
+                    tc = towns[idx].setdefault("town_config", {})
+                    try:
+                        si = TOWN_SIZE_NAMES.index(val)
+                        tc["size"] = TOWN_SIZE_KEYS[si]
+                    except (ValueError, IndexError):
+                        tc["size"] = "medium"
+                elif suffix == "style":
+                    tc = towns[idx].setdefault("town_config", {})
+                    try:
+                        si = TOWN_STYLE_NAMES.index(val)
+                        tc["style"] = TOWN_STYLE_KEYS[si]
+                    except (ValueError, IndexError):
+                        tc["style"] = "medieval"
+                elif suffix.startswith("bldg_"):
+                    bldg_key = suffix[5:]  # strip "bldg_"
+                    if bldg_key in TOWN_BUILDING_KEYS:
+                        tc = towns[idx].setdefault("town_config", {})
+                        blist = tc.setdefault("buildings", [])
+                        if val == "Yes" and bldg_key not in blist:
+                            blist.append(bldg_key)
+                        elif val == "No" and bldg_key in blist:
+                            blist.remove(bldg_key)
 
             # ── Dungeon fields (dung_<i>_<field>) ──
             from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS

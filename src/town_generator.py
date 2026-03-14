@@ -302,6 +302,233 @@ _VILLAGER_DIALOGUE_POOL = [
     ["Have you heard about the old ruins?", "They say treasure lies within."],
 ]
 
+# ── NPC pools for optional buildings ─────────────────────────────
+_OPTIONAL_BUILDING_NPCS = {
+    "reagent_shop": {
+        "names": ["Sage Willa", "Herbalist Fen", "Alchemist Rowe",
+                   "Apothecary Nell"],
+        "dialogues": [
+            [
+                "Welcome to the Reagent Shop!",
+                "I have rare herbs and spell components.",
+                "Wizards and clerics swear by my stock.",
+                "Need bat wings? Moonstone dust? I've got it all.",
+            ],
+            [
+                "Come in! Fresh reagents, just gathered.",
+                "These components enhance any spell.",
+                "Handle the nightshade carefully, if you please.",
+                "Good luck on your adventures!",
+            ],
+        ],
+        "npc_type": "shopkeep",
+    },
+    "potion_shop": {
+        "names": ["Elixia", "Master Dram", "Brewer Cask", "Vial"],
+        "dialogues": [
+            [
+                "Potions for every ailment!",
+                "Health potions, mana tonics, antidotes...",
+                "My brews are the finest in the land.",
+                "Drink responsibly!",
+            ],
+            [
+                "Step into the Potion Emporium!",
+                "Every potion is brewed fresh daily.",
+                "Need something for the road? I've got you covered.",
+                "Come back anytime!",
+            ],
+        ],
+        "npc_type": "shopkeep",
+    },
+    "weapons_shop": {
+        "names": ["Ironhand", "Steelforge Gorm", "Blademaiden Yara",
+                   "Whetstone Dirk"],
+        "dialogues": [
+            [
+                "Welcome to the Weapon Forge!",
+                "Swords, axes, maces -- forged with care.",
+                "Every blade is tested before it leaves my shop.",
+                "Arm yourself well, adventurer!",
+            ],
+            [
+                "Looking for steel? You've come to the right place.",
+                "I forge weapons that can cut through shadow itself.",
+                "Quality steel isn't cheap, but it'll save your life.",
+                "Choose wisely!",
+            ],
+        ],
+        "npc_type": "shopkeep",
+    },
+    "armor_shop": {
+        "names": ["Platewright", "Tanner Husk", "Shieldmaiden Bryn",
+                   "Armorer Keld"],
+        "dialogues": [
+            [
+                "Welcome to the Armor Shop!",
+                "Leather, chain, plate -- I've got it all.",
+                "A good shield is worth its weight in gold.",
+                "Don't go into a dungeon unprotected!",
+            ],
+            [
+                "Step in! Let me fit you for some proper armor.",
+                "My chainmail has saved many a life.",
+                "The monsters out there don't pull their punches.",
+                "Invest in defense -- it pays off.",
+            ],
+        ],
+        "npc_type": "shopkeep",
+    },
+    "book_shop": {
+        "names": ["Scribe Lorewick", "Inkwell", "Sage Pagelore",
+                   "Librarian Quill"],
+        "dialogues": [
+            [
+                "Welcome to the Book Shop!",
+                "Spell tomes, histories, bestiaries...",
+                "Knowledge is the greatest weapon of all.",
+                "Browse to your heart's content!",
+            ],
+            [
+                "Ah, a fellow seeker of knowledge!",
+                "I have rare texts from across the realms.",
+                "Some of these books contain powerful secrets.",
+                "Handle the ancient ones with care!",
+            ],
+        ],
+        "npc_type": "shopkeep",
+    },
+    "map_shop": {
+        "names": ["Cartographer Finn", "Explorer Maris", "Mapmaker Gale",
+                   "Navigator Thorn"],
+        "dialogues": [
+            [
+                "Welcome! Need a map of the region?",
+                "I've charted every trail and dungeon entrance.",
+                "A good map can be the difference between life and death.",
+                "The wilds hold many secrets -- my maps reveal them.",
+            ],
+            [
+                "Maps! Charts! Surveys of the land!",
+                "I've explored every corner of this region.",
+                "Want to know where the dungeons are? Ask me.",
+                "Safe travels, adventurer!",
+            ],
+        ],
+        "npc_type": "shopkeep",
+    },
+    "town_hall": {
+        "names": ["Mayor Aldwyn", "Reeve Selene", "Magistrate Horace",
+                   "Councilor Petra"],
+        "dialogues": [
+            [
+                "Welcome to the Town Hall.",
+                "I oversee the affairs of this settlement.",
+                "If you seek quests, speak to the townsfolk.",
+                "We're grateful for any help against the darkness.",
+            ],
+            [
+                "Greetings, adventurer. This is the seat of government.",
+                "Our records show increasing monster activity nearby.",
+                "The town's coffers are thin, but we offer what we can.",
+                "Speak with me if you need information about the area.",
+            ],
+        ],
+        "npc_type": "elder",
+    },
+    "tavern": {
+        "names": ["Barkeep Rudo", "Tavernmaster Ivy", "Brewmaster Ogg",
+                   "Bard Celeste"],
+        "dialogues": [
+            [
+                "Welcome to the tavern! Pull up a chair!",
+                "We've got ale, wine, and stories aplenty.",
+                "The bard plays every evening -- don't miss it!",
+                "Drink up and enjoy the music!",
+            ],
+            [
+                "Come in from the cold! Drinks are on tap.",
+                "Travelers share the best tales in here.",
+                "I've heard rumors of treasure in the old ruins...",
+                "Enjoy yourself -- you've earned a rest!",
+            ],
+        ],
+        "npc_type": "villager",
+    },
+}
+
+
+def _find_open_floor_spot(tmap, npcs, ox, oy, iw, ih, rng,
+                          min_x=2, min_y=2, size_w=4, size_h=4):
+    """Find a position for a small building that fits on open floor.
+
+    Returns (col, row) of the top-left corner, or None if no spot found.
+    The building footprint is size_w × size_h.
+    """
+    occupied_npc = {(n.col, n.row) for n in npcs}
+    candidates = []
+    # Scan the interior for positions where the full building fits on floor
+    for by in range(oy + min_y, oy + ih - size_h - 1):
+        for bx in range(ox + min_x, ox + iw - size_w - 1):
+            fits = True
+            for dr in range(size_h):
+                for dc in range(size_w):
+                    tc, tr = bx + dc, by + dr
+                    tile = tmap.get_tile(tc, tr)
+                    if tile != TILE_FLOOR:
+                        fits = False
+                        break
+                    if (tc, tr) in occupied_npc:
+                        fits = False
+                        break
+                if not fits:
+                    break
+            if fits:
+                candidates.append((bx, by))
+    if not candidates:
+        return None
+    return rng.choice(candidates)
+
+
+def _place_optional_buildings(tmap, npcs, ox, oy, iw, ih,
+                              building_keys, rng):
+    """Place optional buildings and their NPCs in the town.
+
+    Each optional building is a small 4×4 structure placed on open floor.
+    A shopkeeper or thematic NPC is placed inside.
+    """
+    for bkey in building_keys:
+        if bkey == "shrine":
+            # Shrine is the same as the existing temple — already placed
+            # by the base layout, so skip it.
+            continue
+
+        npc_pool = _OPTIONAL_BUILDING_NPCS.get(bkey)
+        if not npc_pool:
+            continue
+
+        # Find a spot for a 4×4 building
+        spot = _find_open_floor_spot(tmap, npcs, ox, oy, iw, ih, rng,
+                                     min_x=1, min_y=1, size_w=4, size_h=4)
+        if spot is None:
+            continue  # not enough room — skip this building
+
+        bx, by = spot
+        _place_building(tmap, bx, by, 4, 4, door_side="south")
+        # Place a counter inside
+        tmap.set_tile(bx + 1, by + 1, TILE_COUNTER)
+        tmap.set_tile(bx + 2, by + 1, TILE_COUNTER)
+
+        # Create the NPC inside the building
+        npc_name = rng.choice(npc_pool["names"])
+        npc_dlg = list(rng.choice(npc_pool["dialogues"]))
+        npc_type = npc_pool["npc_type"]
+        npc_col = bx + 2
+        npc_row = by + 2
+        npcs.append(NPC(npc_col, npc_row, npc_name, npc_dlg,
+                        npc_type=npc_type))
+
+
 # Building layout variants — each defines building positions and door sides
 # relative to the interior origin (ox, oy).  Format per building:
 #   (x, y, w, h, door_side, counter_tiles, altar_pos_or_None)
@@ -360,7 +587,8 @@ _LAYOUT_POOL = [
 
 def generate_town(name="Thornwall", seed=None, layout_index=None,
                    has_key_dungeons=False, innkeeper_quests=False,
-                   gnome_machine=False, keys_needed=0):
+                   gnome_machine=False, keys_needed=0,
+                   town_config=None):
     """
     Generate a town map with NPCs and an exit.
 
@@ -374,22 +602,41 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     guaranteed a different base layout (up to 8 towns before wrapping).
     If *None*, the layout is chosen randomly from the seed.
 
-    The playable interior is 18×19 tiles of floor surrounded by a brick wall
-    border.  The total map is padded with extra wall tiles on every side so
-    the camera (25×17 viewport) never sees out-of-bounds areas.
+    *town_config* — optional dict with keys ``size`` (small/medium/large),
+    ``style`` (medieval/desert/coastal/forest/mountain), and ``buildings``
+    (list of optional building keys like ``"tavern"``, ``"weapons_shop"``).
+    When *None*, defaults are used.
+
+    The playable interior is surrounded by a brick wall border.  The total
+    map is padded with extra wall tiles on every side so the camera
+    (25×17 viewport) never sees out-of-bounds areas.
     """
     if seed is None:
         seed = hash(name) & 0xFFFFFFFF
     rng = random.Random(seed)
 
-    # Playable interior dimensions (floor area inside the walls)
-    # Expanded when gnome_machine is True to make room for a town square.
+    # Parse town config
+    if town_config is None:
+        town_config = {}
+    town_size = town_config.get("size", "medium")
+    town_style = town_config.get("style", "medieval")
+    optional_buildings = town_config.get("buildings", [])
+
+    # Playable interior dimensions based on size setting
+    # Gnome machine towns get extra space regardless
+    _SIZE_DIMS = {
+        "small":  (14, 15),
+        "medium": (18, 19),
+        "large":  (24, 26),
+    }
+    base_w, base_h = _SIZE_DIMS.get(town_size, (18, 19))
     if gnome_machine:
-        INTERIOR_W = 24
-        INTERIOR_H = 26
+        # Ensure enough room for the machine square
+        INTERIOR_W = max(base_w, 24)
+        INTERIOR_H = max(base_h, 26)
     else:
-        INTERIOR_W = 18
-        INTERIOR_H = 19
+        INTERIOR_W = base_w
+        INTERIOR_H = base_h
 
     PAD_X = 13
     PAD_Y = 9
@@ -537,6 +784,11 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
         vname = available_names[i % len(available_names)]
         vdlg = available_dlgs[i % len(available_dlgs)]
         npcs.append(NPC(vc, vr, vname, vdlg, npc_type="villager"))
+
+    # ── Optional buildings from town_config ──
+    # Place additional small buildings and their NPCs on open floor space.
+    _place_optional_buildings(tmap, npcs, ox, oy, INTERIOR_W, INTERIOR_H,
+                              optional_buildings, rng)
 
     # ── Optional gnome machine (for "Gnome Machine" quest style) ──
     # The expanded town (24×26) has a dedicated open town square in the

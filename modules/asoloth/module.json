@@ -29,17 +29,39 @@
       {
         "id": "ivygate",
         "name": "Ivygate",
-        "description": "A hillside town whose cobbled streets wind between stone cottages."
+        "description": "A hillside town whose cobbled streets wind between stone cottages.",
+        "town_config": {
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine",
+            "town_hall"
+          ]
+        }
       },
       {
         "id": "briarreach",
         "name": "Briarreach",
-        "description": "A forest clearing settlement where druids and woodsmen live side by side."
+        "description": "A forest clearing settlement where druids and woodsmen live side by side.",
+        "town_config": {
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
+        }
       },
       {
         "id": "briarvale",
         "name": "Briarvale",
-        "description": "A seaside port battered by salt winds and rich with the smell of fish."
+        "description": "A seaside port battered by salt winds and rich with the smell of fish.",
+        "town_config": {
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
+        }
       }
     ],
     "dungeons": []
