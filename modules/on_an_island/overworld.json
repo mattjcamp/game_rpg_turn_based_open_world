@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "larkport",
+      "id": "ashdale",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -31,6 +31,22 @@
       "row": 12,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
+    },
+    {
+      "id": "dungeon_2",
+      "type": "dungeon",
+      "col": 12,
+      "row": 18,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    },
+    {
+      "id": "dungeon_3",
+      "type": "dungeon",
+      "col": 10,
+      "row": 5,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
     }
   ],
   "paths": [
@@ -42,6 +58,26 @@
       "to": [
         22,
         12
+      ]
+    },
+    {
+      "from": [
+        16,
+        8
+      ],
+      "to": [
+        12,
+        18
+      ]
+    },
+    {
+      "from": [
+        16,
+        8
+      ],
+      "to": [
+        10,
+        5
       ]
     },
     {
