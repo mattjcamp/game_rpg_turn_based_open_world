@@ -247,9 +247,7 @@ def _get_overworld_params(overworld_cfg):
     fixed_placements = {}
     for tile_id, pos in utp.get("fixed", {}).items():
         fixed_placements[tile_id] = (pos["col"], pos["row"])
-    scatter_tiles = utp.get("scatter", [
-        "moongate", "whispering_stones",
-    ])
+    scatter_tiles = utp.get("scatter", None)  # resolved at placement time
 
     return {
         "map_w": size.get("width", _MAP_W),
@@ -471,12 +469,18 @@ def _place_unique_tiles(tmap, unique_defs, seed, p):
     """Place unique tiles at random walkable locations.
 
     Reads fixed and scatter tile lists from the overworld params *p*.
+    If no scatter list is specified, all unique tile IDs are scattered
+    so that every module-defined tile appears on the map.
     """
     map_w, map_h = tmap.width, tmap.height
     rng = random.Random(seed + 777)
 
     fixed_placements = p.get("fixed_placements", {})
-    scatter_tiles = p.get("scatter_tiles", [])
+    scatter_tiles = p.get("scatter_tiles")
+    if scatter_tiles is None:
+        # Default: scatter every defined unique tile that isn't fixed
+        scatter_tiles = [tid for tid in unique_defs
+                         if tid not in fixed_placements]
 
     # Place fixed ones first
     for tile_id, (c, r) in fixed_placements.items():
