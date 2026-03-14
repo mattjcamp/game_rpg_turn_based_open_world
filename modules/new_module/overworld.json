@@ -9,10 +9,34 @@
   },
   "landmarks": [
     {
-      "id": "ravenridge",
+      "id": "fernreach",
       "type": "town",
       "col": 16,
       "row": 8,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "oakford",
+      "type": "town",
+      "col": 20,
+      "row": 12,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "ironhaven",
+      "type": "town",
+      "col": 16,
+      "row": 16,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "amberwood",
+      "type": "town",
+      "col": 12,
+      "row": 12,
       "tile": "TILE_TOWN",
       "clear_radius": 3
     },
@@ -36,11 +60,41 @@
   "paths": [
     {
       "from": [
+        20,
+        12
+      ],
+      "to": [
+        22,
+        12
+      ]
+    },
+    {
+      "from": [
         16,
         8
       ],
       "to": [
-        22,
+        20,
+        12
+      ]
+    },
+    {
+      "from": [
+        20,
+        12
+      ],
+      "to": [
+        16,
+        16
+      ]
+    },
+    {
+      "from": [
+        16,
+        16
+      ],
+      "to": [
+        12,
         12
       ]
     },

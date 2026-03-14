@@ -90,11 +90,111 @@ class TownData:
         return None
 
 
+def _clamp_building(bx, by, bw, bh, iw, ih, counters, altar_pos=None):
+    """Clamp a building's position so it fits within the interior.
+
+    Returns (clamped_bx, clamped_by, adjusted_counters, adjusted_altar).
+    Leaves a 1-tile margin on all sides so doors always have a walkable
+    approach tile inside the town interior.
+    """
+    # Maximum position that keeps the building + 1-tile approach inside
+    max_x = iw - bw - 1   # 1-tile margin on the right
+    max_y = ih - bh - 1   # 1-tile margin on the bottom
+    min_x = 1             # 1-tile margin on the left
+    min_y = 1             # 1-tile margin on the top
+
+    cx = max(min_x, min(bx, max_x))
+    cy = max(min_y, min(by, max_y))
+    dx = cx - bx
+    dy = cy - by
+
+    adj_counters = [(c + dx, r + dy) for c, r in counters]
+    adj_altar = (altar_pos[0] + dx, altar_pos[1] + dy) if altar_pos else None
+    return cx, cy, adj_counters, adj_altar
+
+
+def _ensure_all_doors_accessible(tmap, entry_col, entry_row):
+    """Post-placement pass: guarantee every door is reachable from the entry.
+
+    Uses flood-fill from the town entry point to find the reachable area.
+    For each door that is NOT reachable, carves a shortest path through
+    walls to connect it to the reachable walkable area.
+    """
+    from collections import deque
+
+    _WALKABLE = {TILE_FLOOR, TILE_DOOR, TILE_EXIT}
+
+    def _flood():
+        """Return set of all (col, row) reachable from entry."""
+        visited = set()
+        q = deque([(entry_col, entry_row)])
+        visited.add((entry_col, entry_row))
+        while q:
+            c, r = q.popleft()
+            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                nc, nr = c + dc, r + dr
+                if ((nc, nr) not in visited
+                        and 0 <= nc < tmap.width
+                        and 0 <= nr < tmap.height
+                        and tmap.get_tile(nc, nr) in _WALKABLE):
+                    visited.add((nc, nr))
+                    q.append((nc, nr))
+        return visited
+
+    def _carve_path(door_c, door_r, reachable):
+        """BFS from *door* through walls until a reachable tile is found.
+
+        Converts every wall tile along the shortest path to TILE_FLOOR
+        so the door connects to the walkable area.
+        """
+        parent = {}
+        q = deque()
+        # Seed BFS with the door's non-reachable wall neighbours
+        for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+            nc, nr = door_c + dc, door_r + dr
+            if 0 <= nc < tmap.width and 0 <= nr < tmap.height:
+                if (nc, nr) in reachable:
+                    return  # already connected
+                if tmap.get_tile(nc, nr) == TILE_WALL:
+                    q.append((nc, nr))
+                    parent[(nc, nr)] = None
+        while q:
+            c, r = q.popleft()
+            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                nc, nr = c + dc, r + dr
+                if (nc, nr) in reachable:
+                    # Trace back and carve every wall tile to floor
+                    cur = (c, r)
+                    while cur is not None:
+                        tmap.set_tile(cur[0], cur[1], TILE_FLOOR)
+                        cur = parent[cur]
+                    return
+                if ((nc, nr) not in parent
+                        and 0 <= nc < tmap.width
+                        and 0 <= nr < tmap.height
+                        and tmap.get_tile(nc, nr) == TILE_WALL):
+                    parent[(nc, nr)] = (c, r)
+                    q.append((nc, nr))
+
+    # Iterate — each carve may unlock additional doors behind it
+    for _ in range(8):
+        reachable = _flood()
+        fixed_any = False
+        for r in range(tmap.height):
+            for c in range(tmap.width):
+                if tmap.get_tile(c, r) == TILE_DOOR and (c, r) not in reachable:
+                    _carve_path(c, r, reachable)
+                    fixed_any = True
+        if not fixed_any:
+            break
+
+
 def _place_building(tmap, x, y, w, h, door_side="south"):
     """
     Place a rectangular building on the town map.
 
     Walls on the perimeter, floor inside, one door opening.
+    The tile just outside the door is guaranteed to be walkable floor.
     """
     for row in range(y, y + h):
         for col in range(x, x + w):
@@ -118,6 +218,19 @@ def _place_building(tmap, x, y, w, h, door_side="south"):
         door_row = y + h // 2
 
     tmap.set_tile(door_col, door_row, TILE_DOOR)
+
+    # Ensure the approach tile outside the door is walkable floor
+    approach = {
+        "south": (door_col, door_row + 1),
+        "north": (door_col, door_row - 1),
+        "east":  (door_col + 1, door_row),
+        "west":  (door_col - 1, door_row),
+    }
+    ac, ar = approach[door_side]
+    if 0 <= ac < tmap.width and 0 <= ar < tmap.height:
+        tile = tmap.get_tile(ac, ar)
+        if tile not in (TILE_FLOOR, TILE_EXIT, TILE_DOOR):
+            tmap.set_tile(ac, ar, TILE_FLOOR)
 
 
 # ── Town variety pools ──────────────────────────────────────────────
@@ -735,41 +848,47 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     # ── Building signs — collect as we place buildings ──
     building_signs = []
 
-    # Shop
+    # Shop — clamp position to fit interior
     sx, sy, sw, sh, sdoor, scounters = layout["shop"]
+    sx, sy, scounters, _ = _clamp_building(
+        sx, sy, sw, sh, INTERIOR_W, INTERIOR_H, scounters)
     _place_building(tmap, ox + sx, oy + sy, sw, sh, door_side=sdoor)
     for cx, cy in scounters:
         tmap.set_tile(ox + cx, oy + cy, TILE_COUNTER)
     building_signs.append({
         "text": "General Store",
-        "row": oy + sy,           # top wall
+        "row": oy + sy,
         "col": ox + sx,
         "width": sw,
     })
 
-    # Inn
+    # Inn — clamp position to fit interior
     ix, iy, iw, ih, idoor, icounters = layout["inn"]
+    ix, iy, icounters, _ = _clamp_building(
+        ix, iy, iw, ih, INTERIOR_W, INTERIOR_H, icounters)
     _place_building(tmap, ox + ix, oy + iy, iw, ih, door_side=idoor)
     for cx, cy in icounters:
         tmap.set_tile(ox + cx, oy + cy, TILE_COUNTER)
     building_signs.append({
         "text": "Inn",
-        "row": oy + iy,           # top wall
+        "row": oy + iy,
         "col": ox + ix,
         "width": iw,
     })
 
-    # Temple
+    # Temple — clamp position to fit interior
     temple_data = layout["temple"]
     tx, ty, tw, th, tdoor = temple_data[:5]
     _tcounters = temple_data[5] if len(temple_data) > 5 else []
     altar_pos = temple_data[6] if len(temple_data) > 6 else None
+    tx, ty, _tcounters, altar_pos = _clamp_building(
+        tx, ty, tw, th, INTERIOR_W, INTERIOR_H, _tcounters, altar_pos)
     _place_building(tmap, ox + tx, oy + ty, tw, th, door_side=tdoor)
     if altar_pos:
         tmap.set_tile(ox + altar_pos[0], oy + altar_pos[1], TILE_ALTAR)
     building_signs.append({
         "text": "Temple",
-        "row": oy + ty,           # top wall
+        "row": oy + ty,
         "col": ox + tx,
         "width": tw,
     })
@@ -863,6 +982,12 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     _place_optional_buildings(tmap, npcs, ox, oy, INTERIOR_W, INTERIOR_H,
                               optional_buildings, rng,
                               building_signs=building_signs)
+
+    # ── Ensure every door is reachable ──
+    # Buildings may overlap or optional buildings may seal off a core
+    # building's door.  This pass uses flood-fill from the entry point
+    # and carves short paths through walls to connect any isolated doors.
+    _ensure_all_doors_accessible(tmap, exit_col, exit_row - 1)
 
     # ── Optional gnome machine (for "Gnome Machine" quest style) ──
     # The expanded town (24×26) has a dedicated open town square in the

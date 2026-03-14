@@ -3,7 +3,7 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ravenridge.",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Fernreach.",
     "version": "0.1.0"
   },
   "settings": {
@@ -27,15 +27,54 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ravenridge",
-        "name": "Ravenridge",
-        "description": "A quiet hamlet nestled among rolling hills, known for its warm hearths.",
+        "id": "fernreach",
+        "name": "Fernreach",
+        "description": "A seaside port battered by salt winds and rich with the smell of fish.",
         "town_config": {
-          "size": "large",
-          "style": "coastal",
+          "size": "medium",
+          "style": "medieval",
           "buildings": [
             "shrine",
             "reagent_shop"
+          ]
+        }
+      },
+      {
+        "id": "oakford",
+        "name": "Oakford",
+        "description": "A walled outpost on the frontier, always on guard against the wilds.",
+        "town_config": {
+          "size": "medium",
+          "style": "coastal",
+          "buildings": [
+            "potion_shop"
+          ]
+        }
+      },
+      {
+        "id": "ironhaven",
+        "name": "Ironhaven",
+        "description": "A forest clearing settlement where druids and woodsmen live side by side.",
+        "town_config": {
+          "size": "small",
+          "style": "mountain",
+          "buildings": [
+            "book_shop"
+          ]
+        }
+      },
+      {
+        "id": "amberwood",
+        "name": "Amberwood",
+        "description": "A bustling market town where traders from distant lands hawk exotic wares.",
+        "town_config": {
+          "size": "large",
+          "style": "forest",
+          "buildings": [
+            "shrine",
+            "map_shop",
+            "town_hall",
+            "tavern"
           ]
         }
       }
@@ -54,13 +93,13 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Silent Halls",
-        "key_name": "Amethyst Key",
+        "name": "Forgotten Den",
+        "key_name": "Emerald Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The entrance to Silent Halls gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "description": "The entrance to Forgotten Den gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
         "quest_type": "retrieve",
-        "quest_objective": "Purge Silent Halls of evil and secure the Amethyst Key",
+        "quest_objective": "Purge Forgotten Den of evil and secure the Emerald Key",
         "quest_hint": "Dark forces have claimed this place as their own.",
         "kill_target": "",
         "kill_count": 0,
