@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "fernreach",
+      "id": "ravenvale",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -17,7 +17,15 @@
       "clear_radius": 3
     },
     {
-      "id": "oakford",
+      "id": "driftglen",
+      "type": "town",
+      "col": 18,
+      "row": 9,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "briarhold",
       "type": "town",
       "col": 20,
       "row": 12,
@@ -25,7 +33,15 @@
       "clear_radius": 3
     },
     {
-      "id": "ironhaven",
+      "id": "fernford",
+      "type": "town",
+      "col": 18,
+      "row": 14,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "amberport",
       "type": "town",
       "col": 16,
       "row": 16,
@@ -33,7 +49,15 @@
       "clear_radius": 3
     },
     {
-      "id": "amberwood",
+      "id": "frostgate",
+      "type": "town",
+      "col": 13,
+      "row": 14,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "eldercrest",
       "type": "town",
       "col": 12,
       "row": 12,
@@ -41,7 +65,15 @@
       "clear_radius": 3
     },
     {
-      "id": "town_fountain",
+      "id": "stormmarch",
+      "type": "town",
+      "col": 13,
+      "row": 9,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "town_vault",
       "type": "machine",
       "col": 18,
       "row": 8,
@@ -74,6 +106,16 @@
         8
       ],
       "to": [
+        18,
+        9
+      ]
+    },
+    {
+      "from": [
+        18,
+        9
+      ],
+      "to": [
         20,
         12
       ]
@@ -84,6 +126,16 @@
         12
       ],
       "to": [
+        18,
+        14
+      ]
+    },
+    {
+      "from": [
+        18,
+        14
+      ],
+      "to": [
         16,
         16
       ]
@@ -92,10 +144,30 @@
       "from": [
         16,
         16
+      ],
+      "to": [
+        13,
+        14
+      ]
+    },
+    {
+      "from": [
+        13,
+        14
       ],
       "to": [
         12,
         12
+      ]
+    },
+    {
+      "from": [
+        12,
+        12
+      ],
+      "to": [
+        13,
+        9
       ]
     },
     {

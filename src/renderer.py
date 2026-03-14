@@ -5443,7 +5443,7 @@ class Renderer(CombatEffectRendererMixin):
         y += 24
 
         # Instructions
-        for txt in ("Arrow Keys: Move", "Q: Drop Item", "ESC: Return"):
+        for txt in ("Arrow Keys: Move", "L: Drop Item", "E / ESC: Return"):
             inst = self.font_small.render(txt, True, (120, 120, 120))
             self.screen.blit(inst, (panel_x, y))
             y += 20

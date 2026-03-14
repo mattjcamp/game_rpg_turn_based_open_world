@@ -543,19 +543,19 @@ class TestExaminePersistence:
 # =====================================================================
 
 class TestExamineDrop:
-    def test_q_opens_drop_mode(self, examine, game):
-        """Pressing Q with items in inventory opens drop mode."""
+    def test_l_opens_drop_mode(self, examine, game):
+        """Pressing L with items in inventory opens drop mode."""
         game.party.inv_add("Torch")
-        examine.handle_input([make_event(pygame.K_q)], [0] * 512)
+        examine.handle_input([make_event(pygame.K_l)], [0] * 512)
         assert examine.drop_mode is True
         assert len(examine.drop_items) > 0
 
-    def test_q_with_empty_inventory_shows_message(self, examine, game):
-        """Pressing Q with no inventory shows a 'nothing to drop' message."""
+    def test_l_with_empty_inventory_shows_message(self, examine, game):
+        """Pressing L with no inventory shows a 'nothing to drop' message."""
         game.party.shared_inventory.clear()
-        examine.handle_input([make_event(pygame.K_q)], [0] * 512)
+        examine.handle_input([make_event(pygame.K_l)], [0] * 512)
         assert examine.drop_mode is False
-        assert "Nothing" in examine.pickup_message
+        assert "empty" in examine.pickup_message.lower()
 
     def test_drop_mode_cursor_navigation(self, examine, game):
         """Up/Down arrows navigate the drop cursor."""
@@ -678,3 +678,23 @@ class TestExamineDrop:
         # Player shouldn't move (RIGHT is consumed by drop mode)
         assert examine.player_col == start_col
         assert examine.player_row == start_row
+
+    def test_default_party_has_items_for_drop(self, game):
+        """A fresh game should have shared inventory items available to drop."""
+        # Verify the default party has items in shared_inventory
+        assert len(game.party.shared_inventory) > 0, \
+            "Default party should have items in shared_inventory"
+        names = game.party.inv_names()
+        assert len(names) > 0, "inv_names() should return items"
+        assert "Rock" in names, "Default inventory should include Rock"
+
+        # Enter examine and verify drop mode works
+        game.change_state("examine")
+        examine = game.states["examine"]
+        examine.handle_input([make_event(pygame.K_l)], [0] * 512)
+        assert examine.drop_mode is True, \
+            "Drop mode should activate with items in inventory"
+        assert len(examine.drop_items) > 0, \
+            "Drop list should contain items"
+        assert "Rock" in examine.drop_items, \
+            "Drop list should include Rock"

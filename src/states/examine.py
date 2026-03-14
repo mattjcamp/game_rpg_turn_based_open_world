@@ -3,10 +3,10 @@ Examine state — zoomed-in local area view of the current overworld tile.
 
 Pressing E on the overworld opens this state, which shows a 12×14 tile grid
 themed to match the terrain.  The player walks a single character around and
-can pick up randomly-spawned items.  Press ESC to return to the overworld.
+can pick up randomly-spawned items.  Press E or ESC to return to the overworld.
 
 Tile layouts (obstacles and ground items) are persisted so revisiting a tile
-shows the same layout.  The player can drop inventory items with Q.
+shows the same layout.  The player can drop inventory items with L.
 """
 
 import random
@@ -175,7 +175,7 @@ class ExamineState(BaseState):
             if self.drop_mode:
                 self._handle_drop_input(event)
                 return
-            if event.key == pygame.K_ESCAPE:
+            if event.key in (pygame.K_ESCAPE, pygame.K_e):
                 self.game.change_state("overworld")
                 return
             if event.key in (pygame.K_UP, pygame.K_w):
@@ -186,7 +186,7 @@ class ExamineState(BaseState):
                 self._try_move(-1, 0)
             elif event.key in (pygame.K_RIGHT, pygame.K_d):
                 self._try_move(1, 0)
-            elif event.key == pygame.K_q:
+            elif event.key == pygame.K_l:
                 self._enter_drop_mode()
 
     def _handle_drop_input(self, event):
@@ -355,8 +355,8 @@ class ExamineState(BaseState):
         """Open the drop-item selector from current inventory."""
         names = self.game.party.inv_names()
         if not names:
-            self.pickup_message = "Nothing to drop."
-            self.pickup_msg_timer = 1500
+            self.pickup_message = "Stash is empty — nothing to drop."
+            self.pickup_msg_timer = 2500
             return
         # Deduplicate while preserving order
         seen = set()
