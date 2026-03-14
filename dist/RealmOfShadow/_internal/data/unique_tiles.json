@@ -1,0 +1,15 @@
+{
+    "_comment": "Unique tile definitions for Realm of Shadow. These are special one-of-a-kind map features that enrich the world with lore, landmarks, secrets, and interactive points of interest.",
+    "unique_tiles": {
+        "moongate": {
+            "name": "Moongate",
+            "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+            "base_tile": "grass"
+        },
+        "whispering_stones": {
+            "name": "Whispering Stones",
+            "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+            "base_tile": "grass"
+        }
+    }
+}

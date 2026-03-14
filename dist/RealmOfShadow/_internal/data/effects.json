@@ -1,0 +1,34 @@
+{
+  "_comment": "Effect definitions for Realm of Shadow. Each effect can be slotted into one of the party's 4 effect slots. Duration is a step count or 'permanent'. Requirements use ALL-match logic: every listed field must be satisfied. For class/race, the party must have a member of that class/race. For max_level, the party's highest level must be at or below that value.",
+
+  "effects": [
+    {
+      "id": "detect_traps",
+      "name": "Detect Traps",
+      "description": "Traps are revealed before the party steps on them.",
+      "duration": "permanent",
+      "requirements": {
+        "class": "Thief",
+        "min_level": 1
+      }
+    },
+    {
+      "id": "infravision",
+      "name": "Infravision",
+      "description": "Dwarven eyes pierce the darkness, revealing the world in shades of red.",
+      "duration": "permanent",
+      "requirements": {
+        "race": "Dwarf"
+      }
+    },
+    {
+      "id": "galadriels_light",
+      "name": "Galadriel's Light",
+      "description": "Elven starlight illuminates the darkness with a soft blue radiance. Lasts 500 steps.",
+      "duration": 500,
+      "requirements": {
+        "race": "Elf"
+      }
+    }
+  ]
+}
