@@ -19,6 +19,9 @@ from src.settings import (
 class NPC:
     """A non-player character inside a town."""
 
+    # NPC types that stay in place (inside buildings or at fixed posts)
+    STATIONARY_TYPES = {"shopkeep", "innkeeper", "priest", "gnome"}
+
     def __init__(self, col, row, name, dialogue, npc_type="villager",
                  quest_dialogue=None, quest_choices=None, god_name=None,
                  quest_name=None, artifact_name=None,
@@ -45,6 +48,12 @@ class NPC:
         # Quest highlight — set True by the town state when this NPC
         # is offering a quest or waiting for quest resolution.
         self.quest_highlight = False
+
+        # Wandering support — NPCs not in STATIONARY_TYPES will roam
+        self.home_col = col
+        self.home_row = row
+        self.wander_timer = random.uniform(1.0, 3.0)  # seconds until next move
+        self.wander_range = 4  # max tiles from home position
 
     def get_dialogue(self):
         """Return the next line of dialogue and advance the index."""

@@ -1603,6 +1603,78 @@ class TownState(InventoryMixin, BaseState):
         # Tick level-up animations
         self._update_level_up_queue(dt_ms)
 
+        # NPC wandering
+        self._update_npc_wandering(dt)
+
+    def _update_npc_wandering(self, dt):
+        """Move wandering NPCs around the town at random intervals.
+
+        Stationary NPC types (shopkeepers, innkeepers, priests, gnomes)
+        stay in place.  Everyone else drifts randomly within a few tiles
+        of their starting position, avoiding walls, other NPCs, and the
+        player.
+        """
+        if not self.town_data:
+            return
+        # Don't move NPCs while the player is in dialogue or a menu
+        if (self.npc_dialogue_active or self.quest_choice_active
+                or self.showing_shop or self.showing_temple_service
+                or self.pickpocket_targeting):
+            return
+
+        from src.town_generator import NPC as NPCClass
+        tmap = self.town_data.tile_map
+        party = self.game.party
+
+        # Build a set of occupied positions (other NPCs + player)
+        occupied = set()
+        for npc in self.town_data.npcs:
+            occupied.add((npc.col, npc.row))
+        occupied.add((party.col, party.row))
+
+        directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+
+        for npc in self.town_data.npcs:
+            # Skip stationary NPC types
+            if npc.npc_type in NPCClass.STATIONARY_TYPES:
+                continue
+
+            npc.wander_timer -= dt
+            if npc.wander_timer > 0:
+                continue
+
+            # Reset timer for next move (randomised pace)
+            npc.wander_timer = random.uniform(1.5, 4.0)
+
+            # Pick a random direction
+            random.shuffle(directions)
+            moved = False
+            for dc, dr in directions:
+                nc, nr = npc.col + dc, npc.row + dr
+
+                # Stay within wander range of home position
+                if (abs(nc - npc.home_col) > npc.wander_range
+                        or abs(nr - npc.home_row) > npc.wander_range):
+                    continue
+
+                # Must be a walkable tile
+                if not tmap.is_walkable(nc, nr):
+                    continue
+
+                # Can't step on another NPC or the player
+                if (nc, nr) in occupied:
+                    continue
+
+                # Move the NPC
+                occupied.discard((npc.col, npc.row))
+                npc.col = nc
+                npc.row = nr
+                occupied.add((nc, nr))
+                moved = True
+                break
+
+            # If stuck, just wait for next timer tick (no movement)
+
     def draw(self, renderer):
         """Draw the town in Ultima III style."""
         if self.showing_temple_service:
