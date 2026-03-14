@@ -66,7 +66,8 @@ class TownData:
     """Holds everything about a town: map, NPCs, name, entry point."""
 
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
-                 keyslot_positions=None, town_style="medieval"):
+                 keyslot_positions=None, town_style="medieval",
+                 building_signs=None):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -76,6 +77,10 @@ class TownData:
         self.keyslot_positions = keyslot_positions or []
         # Visual style key — used by the renderer to pick a colour palette
         self.town_style = town_style
+        # Building name signs — list of dicts with keys:
+        #   text (str), row (int), col (int), width (int in tiles)
+        # Used by the renderer to overlay text on building walls.
+        self.building_signs = building_signs or []
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""
@@ -492,13 +497,42 @@ def _find_open_floor_spot(tmap, npcs, ox, oy, iw, ih, rng,
     return rng.choice(candidates)
 
 
+# Display names for optional building types
+_OPTIONAL_BUILDING_LABELS = {
+    "reagent_shop":  "Reagents",
+    "potion_shop":   "Potions",
+    "weapons_shop":  "Weapons",
+    "armor_shop":    "Armor",
+    "book_shop":     "Books",
+    "map_shop":      "Maps",
+    "town_hall":     "Town Hall",
+    "tavern":        "Tavern",
+}
+
+# Layout variants for optional buildings — each is (width, height,
+# counter_offsets, npc_offset, door_side).  Cycled through so
+# adjacent buildings look different.
+_OPT_BUILDING_LAYOUTS = [
+    # wide counter at top
+    (6, 5, [(1, 1), (2, 1), (3, 1)], (2, 3), "south"),
+    # L-shaped counter
+    (6, 5, [(1, 1), (2, 1), (1, 2)], (3, 3), "south"),
+    # counter on the right
+    (6, 5, [(4, 1), (4, 2), (4, 3)], (2, 2), "south"),
+    # compact counter in middle
+    (6, 5, [(2, 2), (3, 2)], (3, 3), "south"),
+]
+
+
 def _place_optional_buildings(tmap, npcs, ox, oy, iw, ih,
-                              building_keys, rng):
+                              building_keys, rng, building_signs=None):
     """Place optional buildings and their NPCs in the town.
 
-    Each optional building is a small 4×4 structure placed on open floor.
-    A shopkeeper or thematic NPC is placed inside.
+    Each optional building is a 6×5 structure placed on open floor.
+    A shopkeeper or thematic NPC is placed inside.  Different buildings
+    get varied interior layouts.
     """
+    layout_idx = 0
     for bkey in building_keys:
         if bkey == "shrine":
             # Shrine is the same as the existing temple — already placed
@@ -509,26 +543,42 @@ def _place_optional_buildings(tmap, npcs, ox, oy, iw, ih,
         if not npc_pool:
             continue
 
-        # Find a spot for a 4×4 building
+        # Pick a layout variant for this building
+        blayout = _OPT_BUILDING_LAYOUTS[layout_idx % len(_OPT_BUILDING_LAYOUTS)]
+        bw, bh = blayout[0], blayout[1]
+        layout_idx += 1
+
+        # Find a spot for the building
         spot = _find_open_floor_spot(tmap, npcs, ox, oy, iw, ih, rng,
-                                     min_x=1, min_y=1, size_w=4, size_h=4)
+                                     min_x=1, min_y=1,
+                                     size_w=bw, size_h=bh)
         if spot is None:
             continue  # not enough room — skip this building
 
         bx, by = spot
-        _place_building(tmap, bx, by, 4, 4, door_side="south")
-        # Place a counter inside
-        tmap.set_tile(bx + 1, by + 1, TILE_COUNTER)
-        tmap.set_tile(bx + 2, by + 1, TILE_COUNTER)
+        _place_building(tmap, bx, by, bw, bh, door_side=blayout[4])
+        # Place counters from the layout
+        for dc, dr in blayout[2]:
+            tmap.set_tile(bx + dc, by + dr, TILE_COUNTER)
 
         # Create the NPC inside the building
         npc_name = rng.choice(npc_pool["names"])
         npc_dlg = list(rng.choice(npc_pool["dialogues"]))
         npc_type = npc_pool["npc_type"]
-        npc_col = bx + 2
-        npc_row = by + 2
+        npc_col = bx + blayout[3][0]
+        npc_row = by + blayout[3][1]
         npcs.append(NPC(npc_col, npc_row, npc_name, npc_dlg,
                         npc_type=npc_type))
+
+        # Record building sign
+        if building_signs is not None:
+            label = _OPTIONAL_BUILDING_LABELS.get(bkey, bkey.replace("_", " ").title())
+            building_signs.append({
+                "text": label,
+                "row": by,       # top wall
+                "col": bx,
+                "width": bw,
+            })
 
 
 # Building layout variants — each defines building positions and door sides
@@ -682,17 +732,32 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     else:
         layout = rng.choice(_LAYOUT_POOL)
 
+    # ── Building signs — collect as we place buildings ──
+    building_signs = []
+
     # Shop
     sx, sy, sw, sh, sdoor, scounters = layout["shop"]
     _place_building(tmap, ox + sx, oy + sy, sw, sh, door_side=sdoor)
     for cx, cy in scounters:
         tmap.set_tile(ox + cx, oy + cy, TILE_COUNTER)
+    building_signs.append({
+        "text": "General Store",
+        "row": oy + sy,           # top wall
+        "col": ox + sx,
+        "width": sw,
+    })
 
     # Inn
     ix, iy, iw, ih, idoor, icounters = layout["inn"]
     _place_building(tmap, ox + ix, oy + iy, iw, ih, door_side=idoor)
     for cx, cy in icounters:
         tmap.set_tile(ox + cx, oy + cy, TILE_COUNTER)
+    building_signs.append({
+        "text": "Inn",
+        "row": oy + iy,           # top wall
+        "col": ox + ix,
+        "width": iw,
+    })
 
     # Temple
     temple_data = layout["temple"]
@@ -702,6 +767,12 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     _place_building(tmap, ox + tx, oy + ty, tw, th, door_side=tdoor)
     if altar_pos:
         tmap.set_tile(ox + altar_pos[0], oy + altar_pos[1], TILE_ALTAR)
+    building_signs.append({
+        "text": "Temple",
+        "row": oy + ty,           # top wall
+        "col": ox + tx,
+        "width": tw,
+    })
 
     # --- Pick unique NPCs from pools ---
     npcs = []
@@ -788,9 +859,10 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
         npcs.append(NPC(vc, vr, vname, vdlg, npc_type="villager"))
 
     # ── Optional buildings from town_config ──
-    # Place additional small buildings and their NPCs on open floor space.
+    # Place additional buildings and their NPCs on open floor space.
     _place_optional_buildings(tmap, npcs, ox, oy, INTERIOR_W, INTERIOR_H,
-                              optional_buildings, rng)
+                              optional_buildings, rng,
+                              building_signs=building_signs)
 
     # ── Optional gnome machine (for "Gnome Machine" quest style) ──
     # The expanded town (24×26) has a dedicated open town square in the
@@ -851,7 +923,8 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     entry_row = exit_row - 1
 
     return TownData(tmap, npcs, name, entry_col, entry_row,
-                    town_style=town_style)
+                    town_style=town_style,
+                    building_signs=building_signs)
 
 
 def add_quest_giver_npc(town_data, quest_giver_name, dungeon_key_str,

@@ -524,6 +524,12 @@ class Renderer(CombatEffectRendererMixin):
                                         palette=palette,
                                         town_style=town_style)
 
+        # ── 1b. Building name signs ──
+        # Render building names on the top wall row of each building.
+        # Text is painted *on* the bricks so it appears under NPCs.
+        self._draw_building_signs(town_data, off_c, off_r, ts, cols, rows,
+                                  palette, sx, sy)
+
         # ── 2. NPC sprites ──
         for npc in town_data.npcs:
             nsc = npc.col - off_c
@@ -786,6 +792,113 @@ class Renderer(CombatEffectRendererMixin):
             f"PICKPOCKET: {hname} -> {name.upper()}   "
             f"[ARROWS] SELECT  [ENTER] ATTEMPT  [ESC] CANCEL",
             8, prompt_y, (220, 180, 50))
+
+    # ── Tiny bitmap font for building signs ──────────────────────
+    # 3×5 pixel glyphs — compact enough to paint on brick walls and
+    # still readable at 32px tile size.  Each glyph is stored as a
+    # tuple of 5 ints (one per row); each int is 3-bit wide.
+    _SIGN_GLYPHS = {
+        'A': (0b010, 0b101, 0b111, 0b101, 0b101),
+        'B': (0b110, 0b101, 0b110, 0b101, 0b110),
+        'C': (0b011, 0b100, 0b100, 0b100, 0b011),
+        'D': (0b110, 0b101, 0b101, 0b101, 0b110),
+        'E': (0b111, 0b100, 0b110, 0b100, 0b111),
+        'F': (0b111, 0b100, 0b110, 0b100, 0b100),
+        'G': (0b011, 0b100, 0b101, 0b101, 0b011),
+        'H': (0b101, 0b101, 0b111, 0b101, 0b101),
+        'I': (0b111, 0b010, 0b010, 0b010, 0b111),
+        'J': (0b001, 0b001, 0b001, 0b101, 0b010),
+        'K': (0b101, 0b110, 0b100, 0b110, 0b101),
+        'L': (0b100, 0b100, 0b100, 0b100, 0b111),
+        'M': (0b101, 0b111, 0b111, 0b101, 0b101),
+        'N': (0b101, 0b111, 0b111, 0b101, 0b101),
+        'O': (0b010, 0b101, 0b101, 0b101, 0b010),
+        'P': (0b110, 0b101, 0b110, 0b100, 0b100),
+        'Q': (0b010, 0b101, 0b101, 0b110, 0b011),
+        'R': (0b110, 0b101, 0b110, 0b101, 0b101),
+        'S': (0b011, 0b100, 0b010, 0b001, 0b110),
+        'T': (0b111, 0b010, 0b010, 0b010, 0b010),
+        'U': (0b101, 0b101, 0b101, 0b101, 0b010),
+        'V': (0b101, 0b101, 0b101, 0b010, 0b010),
+        'W': (0b101, 0b101, 0b111, 0b111, 0b101),
+        'X': (0b101, 0b101, 0b010, 0b101, 0b101),
+        'Y': (0b101, 0b101, 0b010, 0b010, 0b010),
+        'Z': (0b111, 0b001, 0b010, 0b100, 0b111),
+        ' ': (0b000, 0b000, 0b000, 0b000, 0b000),
+        "'": (0b010, 0b010, 0b000, 0b000, 0b000),
+        '.': (0b000, 0b000, 0b000, 0b000, 0b010),
+        '-': (0b000, 0b000, 0b111, 0b000, 0b000),
+    }
+    _SIGN_GLYPH_W = 3   # pixels per glyph column
+    _SIGN_GLYPH_H = 5   # pixels per glyph row
+    _SIGN_SPACING = 1    # 1-pixel gap between glyphs
+
+    def _draw_building_signs(self, town_data, off_c, off_r, ts,
+                              cols, rows, palette, sx, sy):
+        """Overlay building names on the top wall row of each building.
+
+        Each sign is rendered using the tiny bitmap font so it looks
+        like carved or painted lettering on the brick walls.
+        """
+        signs = getattr(town_data, "building_signs", [])
+        if not signs:
+            return
+
+        # Sign text colour — pick a warm highlight from the palette
+        # that contrasts with the wall base.  Fall back to gold.
+        text_col = palette.get("sign_text", (220, 190, 100))
+        shadow_col = (0, 0, 0)
+
+        gw = self._SIGN_GLYPH_W
+        gh = self._SIGN_GLYPH_H
+        sp = self._SIGN_SPACING
+        scale = 2  # render each glyph pixel as a 2×2 block
+
+        for sign in signs:
+            text = sign["text"].upper()
+            s_row = sign["row"]
+            s_col = sign["col"]
+            s_width = sign["width"]
+
+            # Check if any part of the sign is visible
+            screen_col_start = s_col - off_c
+            screen_col_end = s_col + s_width - off_c
+            screen_row = s_row - off_r
+            if screen_row < 0 or screen_row >= rows:
+                continue
+            if screen_col_end <= 0 or screen_col_start >= cols:
+                continue
+
+            # Pixel span of the building's top wall
+            wall_px_start = screen_col_start * ts + sx
+            wall_px_width = s_width * ts
+            wall_py = screen_row * ts + sy
+
+            # Compute total text width in pixels
+            char_w = (gw * scale) + sp
+            total_text_w = len(text) * char_w - sp  # no trailing gap
+
+            # Centre the text in the wall span
+            text_start_x = wall_px_start + (wall_px_width - total_text_w) // 2
+            # Vertically centre in the tile
+            text_start_y = wall_py + (ts - gh * scale) // 2
+
+            # Draw each glyph
+            for ci, ch in enumerate(text):
+                glyph = self._SIGN_GLYPHS.get(ch)
+                if glyph is None:
+                    continue  # skip unknown characters
+                gx = text_start_x + ci * char_w
+                for gy_off, row_bits in enumerate(glyph):
+                    for gx_off in range(gw):
+                        if row_bits & (1 << (gw - 1 - gx_off)):
+                            px = gx + gx_off * scale
+                            py = text_start_y + gy_off * scale
+                            # 1-pixel shadow for readability
+                            pygame.draw.rect(self.screen, shadow_col,
+                                             (px + 1, py + 1, scale, scale))
+                            pygame.draw.rect(self.screen, text_col,
+                                             (px, py, scale, scale))
 
     def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr,
                             keys_inserted=0, palette=None,
@@ -2657,6 +2770,7 @@ class Renderer(CombatEffectRendererMixin):
             "grass_base":     (20, 100, 15),      # outside green
             "exit_arch":      (130, 130, 130),     # stone arch
             "exit_inner":     (60, 60, 60),        # arch opening
+            "sign_text":      (220, 190, 100),     # gold lettering
         },
         "desert": {
             "floor_base":     (70, 60, 42),    # sandy stone
@@ -2675,6 +2789,7 @@ class Renderer(CombatEffectRendererMixin):
             "grass_base":     (160, 140, 80),  # sand outside
             "exit_arch":      (180, 160, 110),  # sandstone arch
             "exit_inner":     (100, 80, 50),
+            "sign_text":      (60, 30, 10),      # dark burnt umber
         },
         "coastal": {
             "floor_base":     (55, 60, 65),    # grey-blue stone
@@ -2693,6 +2808,7 @@ class Renderer(CombatEffectRendererMixin):
             "grass_base":     (40, 100, 90),   # sea-green
             "exit_arch":      (130, 140, 150),  # sea-worn stone
             "exit_inner":     (50, 65, 75),
+            "sign_text":      (240, 250, 255),   # white chalk
         },
         "forest": {
             "floor_base":     (38, 45, 32),    # mossy stone
@@ -2711,6 +2827,7 @@ class Renderer(CombatEffectRendererMixin):
             "grass_base":     (15, 80, 20),    # deep forest green
             "exit_arch":      (90, 100, 70),    # moss-covered stone
             "exit_inner":     (40, 50, 30),
+            "sign_text":      (200, 220, 140),   # pale leaf-green
         },
         "mountain": {
             "floor_base":     (52, 50, 55),    # dark granite
@@ -2729,6 +2846,7 @@ class Renderer(CombatEffectRendererMixin):
             "grass_base":     (50, 70, 45),    # alpine scrub
             "exit_arch":      (140, 135, 145),  # pale granite
             "exit_inner":     (70, 65, 75),
+            "sign_text":      (220, 200, 160),   # pale gold
         },
     }
 
