@@ -17,6 +17,9 @@ import pygame
 from src.states.base_state import BaseState
 from src.party import SPELLS_DATA
 from src.monster import Monster
+from src.settings import (
+    TILE_GRASS, TILE_FOREST, TILE_MOUNTAIN, TILE_SAND, TILE_PATH,
+)
 from src.combat_engine import (
     roll_initiative, roll_attack, roll_damage, roll_d20, roll_dice,
     format_modifier, get_modifier,
@@ -50,6 +53,17 @@ class _DualLog(list):
 # ── Arena constants ──────────────────────────────────────────────
 ARENA_COLS = 18
 ARENA_ROWS = 21
+
+# ── Terrain-based obstacle tables ────────────────────────────────
+# Each entry: (min_count, max_count, obstacle_types)
+# obstacle_types are weighted: (type_name, weight)
+_TERRAIN_OBSTACLES = {
+    TILE_FOREST:   (5, 9,  [("tree", 4), ("rock", 1)]),
+    TILE_GRASS:    (2, 5,  [("tree", 2), ("rock", 1)]),
+    TILE_MOUNTAIN: (3, 7,  [("rock", 5), ("boulder", 2)]),
+    TILE_SAND:     (1, 4,  [("rock", 3), ("cactus", 1)]),
+    TILE_PATH:     (1, 3,  [("rock", 2), ("tree", 1)]),
+}
 
 PHASE_INIT        = "init"
 PHASE_PLAYER      = "player"         # menu selection (up/down + enter)
@@ -255,6 +269,9 @@ class CombatState(BaseState):
         self.curse_effects = []          # active CurseEffect objects
         self.curse_buffs = {}            # Monster -> {"ac_penalty": int, "attack_penalty": int, "turns_left": int}
 
+        # Arena obstacles: {(col, row): "tree"|"rock"|"boulder"|"cactus"}
+        self.arena_obstacles = {}
+
         # Callback info for returning to source state
         self.source_state = "dungeon"
 
@@ -312,6 +329,42 @@ class CombatState(BaseState):
                 return True
         return False
 
+    def _is_obstacle(self, col, row):
+        """True if an arena obstacle occupies (col, row)."""
+        return (col, row) in self.arena_obstacles
+
+    def _spawn_arena_obstacles(self, terrain_tile, used_positions):
+        """Place terrain-appropriate obstacles in the arena interior.
+
+        Obstacles are placed in the middle band of the arena (rows 7-14)
+        so they don't crowd the spawn zones of either party or monsters.
+        """
+        self.arena_obstacles = {}
+
+        if terrain_tile not in _TERRAIN_OBSTACLES:
+            return
+
+        min_n, max_n, weighted_types = _TERRAIN_OBSTACLES[terrain_tile]
+        count = random.randint(min_n, max_n)
+        # Build weighted list for random.choices
+        types = [t for t, _ in weighted_types]
+        weights = [w for _, w in weighted_types]
+
+        placed = 0
+        for _attempt in range(count * 10):
+            if placed >= count:
+                break
+            col = random.randint(2, ARENA_COLS - 3)
+            row = random.randint(7, 14)  # mid-band only
+            if (col, row) in used_positions:
+                continue
+            if self._is_arena_wall(col, row):
+                continue
+            obs_type = random.choices(types, weights)[0]
+            self.arena_obstacles[(col, row)] = obs_type
+            used_positions.add((col, row))
+            placed += 1
+
     @property
     def active_fighter(self):
         """The party member whose turn it is."""
@@ -340,7 +393,8 @@ class CombatState(BaseState):
     # ── Setup ────────────────────────────────────────────────────
 
     def start_combat(self, fighter, monsters, source_state="dungeon",
-                     encounter_name=None, map_monster_refs=None):
+                     encounter_name=None, map_monster_refs=None,
+                     terrain_tile=None):
         """Start combat with one or more monsters.
 
         Parameters
@@ -357,6 +411,9 @@ class CombatState(BaseState):
             Original monster refs from the dungeon/overworld map that
             should be removed after combat. If None, defaults to the
             combat monster list.
+        terrain_tile : int or None
+            Overworld tile type (TILE_FOREST, TILE_GRASS, etc.) for
+            spawning terrain-appropriate obstacles in the arena.
         """
         # Normalise to list
         if not isinstance(monsters, (list, tuple)):
@@ -455,6 +512,12 @@ class CombatState(BaseState):
                     self.monster_positions[mon] = (mc, mr)
                     used.add((mc, mr))
                     break
+
+        # Spawn terrain obstacles for overworld combat
+        if source_state == "overworld" and terrain_tile is not None:
+            self._spawn_arena_obstacles(terrain_tile, used)
+        else:
+            self.arena_obstacles = {}
 
         # Keep a reference to the first fighter for backward compat
         self.fighter = fighter
@@ -981,6 +1044,8 @@ class CombatState(BaseState):
                         self._cast_aoe_fireball(f, tc, tr)
                 elif self._is_arena_wall(tc, tr):
                     self.combat_log.append("Can't teleport into a wall!")
+                elif self._is_obstacle(tc, tr):
+                    self.combat_log.append("An obstacle is in the way!")
                 elif self._is_monster_tile(tc, tr):
                     self.combat_log.append("A monster is in the way!")
                 elif self._is_occupied_by_ally(tc, tr, exclude=f):
@@ -1269,6 +1334,10 @@ class CombatState(BaseState):
         if self._is_occupied_by_ally(new_col, new_row, exclude=f):
             return
 
+        # Can't walk onto an obstacle
+        if self._is_obstacle(new_col, new_row):
+            return
+
         # Normal movement — spend one move step
         if not self._is_arena_wall(new_col, new_row):
             self.fighter_positions[f] = (new_col, new_row)
@@ -1290,6 +1359,10 @@ class CombatState(BaseState):
 
         # Can't walk through walls
         if self._is_arena_wall(new_col, new_row):
+            return
+
+        # Can't walk through obstacles
+        if self._is_obstacle(new_col, new_row):
             return
 
         # Can't walk through other party members
@@ -1430,12 +1503,20 @@ class CombatState(BaseState):
         col, row = self.fighter_positions[f]
 
         # Trace a ray from the fighter in direction (dcol, drow)
-        # to find the first alive monster or hit a wall
+        # to find the first alive monster or hit a wall/obstacle
         tc, tr = col + dcol, row + drow
         hit_monster = None  # the Monster object hit, or None
         end_col, end_row = col, row
 
         while not self._is_arena_wall(tc, tr):
+            # Obstacle blocks the projectile
+            if self._is_obstacle(tc, tr):
+                end_col = tc - dcol
+                end_row = tr - drow
+                if end_col == col and end_row == row:
+                    end_col = tc
+                    end_row = tr
+                break
             m = self._get_monster_at(tc, tr)
             if m:
                 hit_monster = m
@@ -1444,7 +1525,7 @@ class CombatState(BaseState):
             tc += dcol
             tr += drow
 
-        if not hit_monster:
+        if not hit_monster and not self._is_obstacle(tc, tr):
             # Arrow flies to wall edge
             # Step back to last non-wall tile
             end_col = tc - dcol
@@ -1507,12 +1588,21 @@ class CombatState(BaseState):
 
         col, row = self.fighter_positions[f]
 
-        # Trace ray to find first alive monster or wall
+        # Trace ray to find first alive monster or wall/obstacle
         tc, tr = col + dcol, row + drow
         hit_monster = None  # Monster object or None
         end_col, end_row = col, row
+        hit_obstacle = False
 
         while not self._is_arena_wall(tc, tr):
+            if self._is_obstacle(tc, tr):
+                end_col = tc - dcol
+                end_row = tr - drow
+                if end_col == col and end_row == row:
+                    end_col = tc
+                    end_row = tr
+                hit_obstacle = True
+                break
             m = self._get_monster_at(tc, tr)
             if m:
                 hit_monster = m
@@ -1521,7 +1611,7 @@ class CombatState(BaseState):
             tc += dcol
             tr += drow
 
-        if not hit_monster:
+        if not hit_monster and not hit_obstacle:
             end_col = tc - dcol
             end_row = tr - drow
             if end_col == col and end_row == row:
@@ -1998,14 +2088,23 @@ class CombatState(BaseState):
 
         col, row = self.fighter_positions[f]
 
-        # Trace ray to find first alive monster or wall (capped by spell range)
+        # Trace ray to find first alive monster or wall/obstacle (capped by spell range)
         spell_range = SPELLS_DATA["fireball"].get("range", 99)
         tc, tr = col + dcol, row + drow
         hit_monster = None  # Monster object or None
         end_col, end_row = col, row
         steps = 0
+        hit_obstacle = False
 
         while not self._is_arena_wall(tc, tr) and steps < spell_range:
+            if self._is_obstacle(tc, tr):
+                end_col = tc - dcol
+                end_row = tr - drow
+                if end_col == col and end_row == row:
+                    end_col = tc
+                    end_row = tr
+                hit_obstacle = True
+                break
             m = self._get_monster_at(tc, tr)
             if m:
                 hit_monster = m
@@ -2015,7 +2114,7 @@ class CombatState(BaseState):
             tr += drow
             steps += 1
 
-        if not hit_monster:
+        if not hit_monster and not hit_obstacle:
             end_col = tc - dcol
             end_row = tr - drow
             if end_col == col and end_row == row:
@@ -2263,10 +2362,12 @@ class CombatState(BaseState):
 
         col, row = self.fighter_positions[f]
 
-        # Trace the full line from caster to arena wall
+        # Trace the full line from caster to arena wall (stops at obstacles)
         bolt_tiles = []
         tc, tr = col + dcol, row + drow
         while not self._is_arena_wall(tc, tr):
+            if self._is_obstacle(tc, tr):
+                break  # lightning stops at obstacles
             bolt_tiles.append((tc, tr))
             tc += dcol
             tr += drow
@@ -3899,6 +4000,8 @@ class CombatState(BaseState):
                 continue
             if self._is_arena_wall(nc, nr):
                 continue
+            if self._is_obstacle(nc, nr):
+                continue
             dist = max(abs(nc - tc), abs(nr - tr))
             if dist < best_dist:
                 candidates = [(nc, nr)]
@@ -4002,14 +4105,23 @@ class CombatState(BaseState):
         dcol = (1 if dx > 0 else -1) if dx != 0 else 0
         drow = (1 if dy > 0 else -1) if dy != 0 else 0
 
-        # Trace ray from monster toward target — stop at first fighter or wall
+        # Trace ray from monster toward target — stop at first fighter, obstacle, or wall
         sc, sr = mc + dcol, mr + drow
         hit_target = None
         end_col, end_row = mc, mr
         steps = 0
         max_range = ranged.get("range", 6)
+        hit_obstacle = False
 
         while steps < max_range and not self._is_arena_wall(sc, sr):
+            if self._is_obstacle(sc, sr):
+                end_col = sc - dcol
+                end_row = sr - drow
+                if end_col == mc and end_row == mr:
+                    end_col = sc
+                    end_row = sr
+                hit_obstacle = True
+                break
             fighter_hit = self._get_fighter_at(sc, sr)
             if fighter_hit:
                 hit_target = fighter_hit
@@ -4019,7 +4131,7 @@ class CombatState(BaseState):
             sr += drow
             steps += 1
 
-        if not hit_target:
+        if not hit_target and not hit_obstacle:
             # Arrow flies to last non-wall tile
             end_col = sc - dcol
             end_row = sr - drow
@@ -4461,6 +4573,8 @@ class CombatState(BaseState):
             if occupied:
                 continue
             if self._is_arena_wall(nc, nr):
+                continue
+            if self._is_obstacle(nc, nr):
                 continue
             dist = max(abs(nc - tc), abs(nr - tr))
             if dist < best_dist:
@@ -5007,6 +5121,7 @@ class CombatState(BaseState):
             encounter_name=self.encounter_name,
             ground_items=self.ground_items if self.phase == PHASE_LOOT else None,
             loot_message=self.loot_message,
+            arena_obstacles=self.arena_obstacles,
         )
         # DEBUG: smite flash overlay
         if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):

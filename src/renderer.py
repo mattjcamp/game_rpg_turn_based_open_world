@@ -4828,7 +4828,8 @@ class Renderer(CombatEffectRendererMixin):
                           selected_use_item=None,
                           monsters=None, monster_positions=None,
                           encounter_name=None,
-                          ground_items=None, loot_message=""):
+                          ground_items=None, loot_message="",
+                          arena_obstacles=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -4855,6 +4856,13 @@ class Renderer(CombatEffectRendererMixin):
                         self._u3_draw_wall_tile(px, py, ts)
                     else:
                         self._u3_draw_floor_tile(px, py, ts, c, r)
+
+        # ── 1a. arena obstacles (trees, rocks, boulders, cacti) ──
+        if arena_obstacles:
+            for (oc, orow), obs_type in arena_obstacles.items():
+                ox = mx + oc * ts
+                oy = my + orow * ts
+                self._u3_draw_arena_obstacle(ox, oy, ts, obs_type)
 
         # ── 1b. ground loot items (one drop per tile) ──
         if ground_items:
@@ -5357,6 +5365,87 @@ class Renderer(CombatEffectRendererMixin):
             cx, cy = px + ts // 2, py + ts // 2
             pygame.draw.circle(self.screen, (20, 80, 20), (cx, cy), 10)
             pygame.draw.circle(self.screen, (15, 60, 15), (cx, cy), 7)
+
+    def _u3_draw_arena_obstacle(self, px, py, ts, obs_type):
+        """Draw a procedural obstacle sprite on the combat arena grid."""
+        cx = px + ts // 2
+        cy = px + ts // 2  # intentional: use px for both to centre in tile
+        cy = py + ts // 2
+
+        if obs_type == "tree":
+            # Dark green tree: brown trunk + green canopy
+            trunk_w = max(3, ts // 8)
+            trunk_h = ts // 3
+            trunk_x = cx - trunk_w // 2
+            trunk_y = py + ts - trunk_h - 2
+            pygame.draw.rect(self.screen, (100, 60, 20),
+                             pygame.Rect(trunk_x, trunk_y, trunk_w, trunk_h))
+            # Canopy: layered circles
+            canopy_r = ts // 3
+            canopy_cy = trunk_y - canopy_r // 2
+            pygame.draw.circle(self.screen, (15, 70, 15), (cx, canopy_cy), canopy_r)
+            pygame.draw.circle(self.screen, (25, 95, 25),
+                               (cx - canopy_r // 3, canopy_cy + 2), canopy_r - 2)
+            pygame.draw.circle(self.screen, (20, 80, 20),
+                               (cx + canopy_r // 4, canopy_cy - 1), canopy_r - 3)
+            # Highlight
+            pygame.draw.circle(self.screen, (40, 110, 40),
+                               (cx - 1, canopy_cy - 2), canopy_r // 3)
+
+        elif obs_type == "rock":
+            # Gray rock: irregular polygon
+            r = ts // 3
+            pts = [
+                (cx - r, cy + r // 2),
+                (cx - r // 2, cy - r + 2),
+                (cx + r // 3, cy - r),
+                (cx + r, cy - r // 3),
+                (cx + r - 2, cy + r // 2),
+            ]
+            pygame.draw.polygon(self.screen, (120, 115, 110), pts)
+            # Highlight edge
+            pygame.draw.polygon(self.screen, (150, 145, 140), pts, 1)
+            # Shadow detail
+            pygame.draw.line(self.screen, (90, 85, 80),
+                             (cx - r // 3, cy), (cx + r // 4, cy - 1), 1)
+
+        elif obs_type == "boulder":
+            # Larger, darker rock
+            r = ts * 2 // 5
+            pygame.draw.circle(self.screen, (95, 90, 85), (cx, cy), r)
+            pygame.draw.circle(self.screen, (110, 105, 100), (cx, cy), r, 1)
+            # Highlight
+            pygame.draw.circle(self.screen, (130, 125, 120),
+                               (cx - r // 4, cy - r // 4), r // 3)
+            # Crack detail
+            pygame.draw.line(self.screen, (70, 65, 60),
+                             (cx - 2, cy - r // 3),
+                             (cx + r // 4, cy + r // 4), 1)
+
+        elif obs_type == "cactus":
+            # Green cactus body + arms
+            body_w = max(4, ts // 5)
+            body_h = ts * 2 // 3
+            body_x = cx - body_w // 2
+            body_y = py + ts - body_h - 2
+            pygame.draw.rect(self.screen, (30, 120, 30),
+                             pygame.Rect(body_x, body_y, body_w, body_h))
+            # Left arm
+            arm_y = body_y + body_h // 3
+            pygame.draw.rect(self.screen, (30, 120, 30),
+                             pygame.Rect(body_x - body_w, arm_y, body_w, body_w))
+            pygame.draw.rect(self.screen, (30, 120, 30),
+                             pygame.Rect(body_x - body_w, arm_y - body_h // 4,
+                                         body_w, body_h // 4))
+            # Right arm
+            pygame.draw.rect(self.screen, (30, 120, 30),
+                             pygame.Rect(body_x + body_w, arm_y + 2, body_w, body_w))
+            pygame.draw.rect(self.screen, (30, 120, 30),
+                             pygame.Rect(body_x + body_w, arm_y - body_h // 5,
+                                         body_w, body_h // 5 + 2))
+            # Highlight stripe
+            pygame.draw.line(self.screen, (50, 150, 50),
+                             (cx, body_y + 2), (cx, body_y + body_h - 2), 1)
 
     # ── Examine area rendering ──────────────────────────────────
 

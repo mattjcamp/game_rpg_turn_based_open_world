@@ -601,10 +601,15 @@ class OverworldState(InventoryMixin, BaseState):
             m.row = orc.row
 
         self.game.sfx.play("encounter")
+        # Pass the terrain tile the party is standing on so the combat
+        # arena can spawn appropriate obstacles (trees, rocks, etc.)
+        terrain_tile = self.game.tile_map.get_tile(
+            self.game.party.col, self.game.party.row)
         combat_state.start_combat(fighter, monsters,
                                   source_state="overworld",
                                   encounter_name=enc_name,
-                                  map_monster_refs=[orc])
+                                  map_monster_refs=[orc],
+                                  terrain_tile=terrain_tile)
         self.game.change_state("combat")
 
     # ── Tile events ───────────────────────────────────────────────
