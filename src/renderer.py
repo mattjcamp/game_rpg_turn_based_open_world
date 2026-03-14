@@ -2334,9 +2334,9 @@ class Renderer(CombatEffectRendererMixin):
                 py = sr * ts
                 self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr)
 
-        # ── 1b. draw visible unique tile sprites ──
+        # ── 1b. draw unique tile sprites (tiles with a graphic) ──
         for (uc, ur), utile in tile_map.unique_tiles.items():
-            if not utile.get("visible") or not utile.get("tile"):
+            if not utile.get("tile"):
                 continue
             usc = uc - off_c
             usr = ur - off_r
@@ -6923,9 +6923,59 @@ class Renderer(CombatEffectRendererMixin):
             # Available pixel width for values (starts at rx+20)
             val_max_pw = rw - 40      # 20px left + 20px right
 
+            # Is this a tile graphic chooser field?
+            is_tilegfx = key.endswith("_tilegfx")
+
             if visible:
                 if field_type in ("choice", "int"):
-                    if editable:
+                    if is_tilegfx and editable:
+                        # ── Tile graphic chooser ──
+                        # Derive a friendly name from the filepath
+                        if display == "none" or not display:
+                            friendly = "None (invisible)"
+                        else:
+                            friendly = os.path.splitext(
+                                os.path.basename(display))[0]
+                            friendly = friendly.replace("_", " ").title()
+
+                        # Row 1: < Name > (same layout as normal choice)
+                        inner_pw = val_max_pw - 36
+                        trunc = friendly
+                        while (len(trunc) > 2
+                               and fm.size(trunc.upper())[0]
+                               > inner_pw):
+                            trunc = trunc[:len(trunc) - 3] + ".."
+                        self._u3_text("<", rx + 20, dy,
+                                      arrow_color, fm)
+                        self._u3_text(trunc, rx + 34, dy,
+                                      text_color, fm)
+                        val_w = fm.size(trunc.upper())[0]
+                        arrow_x = min(rx + 38 + val_w,
+                                      rx + rw - 20)
+                        self._u3_text(">", arrow_x, dy,
+                                      arrow_color, fm)
+                        dy += 22
+
+                        # Row 2: sprite preview (32x32)
+                        sprite_size = 32
+                        sprite_x = rx + 34
+                        if display != "none" and display:
+                            sprite = self._get_unique_tile_sprite(
+                                display, sprite_size)
+                            if sprite:
+                                self.screen.blit(sprite,
+                                                 (sprite_x, dy))
+                        else:
+                            box = pygame.Rect(sprite_x, dy,
+                                              sprite_size, sprite_size)
+                            pygame.draw.rect(self.screen,
+                                             (60, 60, 70), box, 1)
+                            pygame.draw.line(self.screen, (80, 60, 60),
+                                             box.topleft, box.bottomright)
+                            pygame.draw.line(self.screen, (80, 60, 60),
+                                             box.topright, box.bottomleft)
+                        dy += sprite_size + 4
+                    elif editable:
                         # arrows take ~18px each side
                         inner_pw = val_max_pw - 36
                         trunc = display

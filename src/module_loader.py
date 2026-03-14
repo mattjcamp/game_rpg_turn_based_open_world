@@ -513,20 +513,7 @@ def create_module(name, author="Unknown", description="",
                 "A shimmering ring of blue light hovers above the ground. "
                 "The air crackles with energy. Where it leads, none can say."
             ),
-            "tile": "game/landmarks/moongate_active.png",
-            "visible": True,
-            "walkable": True,
             "base_tile": "grass",
-            "category": "portal",
-            "interact_type": "teleport",
-            "interact_text": (
-                "You step through the moongate. "
-                "The world blurs and reforms around you."
-            ),
-            "interact_data": {
-                "destination": None,
-                "requires_item": None,
-            },
         },
         "whispering_stones": {
             "name": "Whispering Stones",
@@ -534,19 +521,7 @@ def create_module(name, author="Unknown", description="",
                 "Three tall standing stones arranged in a triangle. "
                 "When the wind blows through them, you can almost hear words."
             ),
-            "tile": None,
-            "visible": False,
-            "walkable": True,
             "base_tile": "grass",
-            "category": "lore",
-            "interact_type": "message",
-            "interact_text": (
-                "The stones whisper: 'Seek the shadow beneath the mountain. "
-                "The key lies where light cannot reach.'"
-            ),
-            "interact_data": {
-                "hint_for": "shadow_dungeon_quest",
-            },
         },
     }
 

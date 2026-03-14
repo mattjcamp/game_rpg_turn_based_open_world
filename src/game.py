@@ -1832,14 +1832,19 @@ class Game:
                          if n_loot > 0 else "no items"),
         })
 
-        # 7) Unique Tiles section
+        # 7) Unique Tiles folder — each tile is a child section
         unique_tiles_data = manifest.get("unique_tiles", {})
-        n_utiles = len(unique_tiles_data)
+        utile_children = []
+        for tid, tdef in unique_tiles_data.items():
+            tname = tdef.get("name", tid)
+            utile_children.append(
+                self._build_utile_child(len(utile_children), tid, tdef))
+        n_utiles = len(utile_children)
         sections.append({
             "label": "Unique Tiles",
-            "icon": "U",
-            "is_unique_tiles": True,
-            "fields": [],  # fields built dynamically when drilled into
+            "icon": "F",
+            "folder": "unique_tiles",
+            "children": utile_children,
             "subtitle": (f"{n_utiles} tile{'s' if n_utiles != 1 else ''}"
                          if n_utiles > 0 else "no tiles"),
         })
@@ -1867,6 +1872,7 @@ class Game:
             for tid, tdef in unique_tiles_data.items()
         ]
         self.module_edit_in_unique_tiles = False
+        self.module_edit_active_utile = -1
         # Store dungeon levels for editing
         self.module_edit_dungeon_levels = {}
         for i, dung in enumerate(dungeons):
@@ -2031,9 +2037,9 @@ class Game:
             self._enter_loot_fields()
             return
 
-        # ── Unique Tiles section drills into unique tile field editor ──
-        if sec.get("is_unique_tiles"):
-            self._enter_unique_tiles_fields()
+        # ── Individual unique tile drills into its field editor ──
+        if sec.get("utile_idx") is not None:
+            self._enter_single_utile_fields(sec["utile_idx"])
             return
 
         # ── Properties and other sections: flat field editor ──
@@ -2188,10 +2194,16 @@ class Game:
             self._save_loot_fields()
             self.module_edit_in_loot = False
 
-        # If we were editing unique tiles, save back to in-memory list
+        # If we were editing a unique tile, save back to in-memory list
+        # and rebuild the children so tile labels update
         if self.module_edit_in_unique_tiles:
-            self._save_unique_tiles_fields()
+            self._save_single_utile_fields()
             self.module_edit_in_unique_tiles = False
+            self.module_edit_active_utile = -1
+            # Rebuild children list to reflect any name changes
+            if (self._module_edit_folder_label == "Unique Tiles"
+                    and self.module_edit_nav_stack):
+                self._rebuild_unique_tiles_children()
 
         self.module_edit_level = 0
 
@@ -2441,54 +2453,92 @@ class Game:
 
     # ── Unique Tiles editing ─────────────────────────────────────
 
-    # Category and interact_type choice lists for the editor
-    _UTILE_CATEGORIES = [
-        "landmark", "portal", "secret", "lore", "npc", "hazard",
-        "trap", "quest", "event", "rest", "dungeon_feature",
-    ]
-    _UTILE_INTERACT_TYPES = [
-        "message", "heal", "restore_mp", "buff", "loot", "damage",
-        "trap", "teleport", "enter_dungeon", "encounter", "dialogue",
-        "quest_trigger", "sacrifice", "wish", "rest", "obstacle", "multi",
-    ]
+    # Base tile choice list for the editor
     _UTILE_BASE_TILES = [
         "grass", "forest", "sand", "path", "mountain",
         "dungeon_floor", "floor",
     ]
 
-    def _enter_unique_tiles_fields(self):
-        """Build field list for editing unique tiles."""
+    # Tile graphic choices — "none" means invisible (text-only discovery).
+    # Paths are relative to the assets directory.
+    _UTILE_TILE_GRAPHICS = [
+        "none",
+        "game/landmarks/moongate_active.png",
+        "game/landmarks/moongate_dormant.png",
+        "game/landmarks/ruined_tower.png",
+        "game/landmarks/treasure_hoard.png",
+        "game/landmarks/lava_vent.png",
+        "game/landmarks/poison_swamp.png",
+        "game/landmarks/smuggler_tunnel.png",
+        "game/landmarks/sunken_shipwreck.png",
+        "game/terrain/altar.png",
+        "game/terrain/bridge.png",
+        "game/terrain/door.png",
+        "game/dungeon/portal_open.png",
+        "game/dungeon/chest_tile.png",
+        "game/dungeon/sparkle.png",
+        "game/dungeon/torch_post.png",
+    ]
+
+    def _in_unique_tiles_folder(self):
+        """Return True if the section browser is inside the Unique Tiles folder."""
+        return (self._module_edit_folder_label == "Unique Tiles"
+                and self.module_edit_nav_stack
+                and self.module_edit_level == 0)
+
+    def _build_utile_child(self, idx, tid, tdef):
+        """Build a single child section dict for a unique tile."""
+        tname = tdef.get("name", tid)
+        # Resolve tile graphic for display — None/empty → "none"
+        raw_tile = tdef.get("tile") or "none"
+        fields = [
+            ["ID", f"utile_{idx}_id",
+             tid, "text", True],
+            ["Name", f"utile_{idx}_name",
+             tname, "text", True],
+            ["Description", f"utile_{idx}_desc",
+             tdef.get("description", ""), "text", True],
+            ["Tile Graphic", f"utile_{idx}_tilegfx",
+             raw_tile, "choice", True],
+            ["Base Tile", f"utile_{idx}_basetile",
+             tdef.get("base_tile", "grass"), "choice", True],
+        ]
+        return {
+            "label": tname,
+            "icon": "U",
+            "utile_idx": idx,
+            "fields": fields,
+        }
+
+    def _rebuild_unique_tiles_children(self):
+        """Rebuild the children list in the Unique Tiles folder from
+        the in-memory tile list and refresh the section browser."""
+        children = []
+        for i, utile in enumerate(self.module_edit_unique_tiles):
+            tid = utile.get("id", f"tile_{i}")
+            children.append(self._build_utile_child(i, tid, utile))
+        self.module_edit_sections = children
+        n = len(children)
+        self.module_edit_section_cursor = min(
+            self.module_edit_section_cursor, max(0, n - 1))
+        self._adjust_section_scroll()
+        # Also update the parent folder's subtitle in the nav stack
+        if self.module_edit_nav_stack:
+            parent_sections = self.module_edit_nav_stack[-1][0]
+            for sec in parent_sections:
+                if sec.get("folder") == "unique_tiles":
+                    sec["children"] = children
+                    sec["subtitle"] = (
+                        f"{n} tile{'s' if n != 1 else ''}"
+                        if n > 0 else "no tiles")
+                    break
+
+    def _enter_single_utile_fields(self, utile_idx):
+        """Drill into a single unique tile's fields for editing."""
         self.module_edit_in_unique_tiles = True
-        tiles = self.module_edit_unique_tiles
-        fields = []
-        for ti, utile in enumerate(tiles):
-            tname = utile.get("name", f"Tile {ti+1}")
-            fields.append([f"-- {tname} --",
-                           f"utile_{ti}_hdr", "", "section", False])
-            fields.append(["ID", f"utile_{ti}_id",
-                           utile.get("id", ""), "text", True])
-            fields.append(["Name", f"utile_{ti}_name",
-                           tname, "text", True])
-            fields.append(["Description", f"utile_{ti}_desc",
-                           utile.get("description", ""), "text", True])
-            fields.append(["Visible", f"utile_{ti}_visible",
-                           "Yes" if utile.get("visible", False) else "No",
-                           "choice", True])
-            fields.append(["Walkable", f"utile_{ti}_walkable",
-                           "Yes" if utile.get("walkable", True) else "No",
-                           "choice", True])
-            fields.append(["Base Tile", f"utile_{ti}_basetile",
-                           utile.get("base_tile", "grass"),
-                           "choice", True])
-            fields.append(["Category", f"utile_{ti}_category",
-                           utile.get("category", "landmark"),
-                           "choice", True])
-            fields.append(["Interact Type", f"utile_{ti}_interact",
-                           utile.get("interact_type", "message"),
-                           "choice", True])
-            fields.append(["Interact Text", f"utile_{ti}_itext",
-                           utile.get("interact_text", ""), "text", True])
-        self.module_edit_fields = fields
+        self.module_edit_active_utile = utile_idx
+        sec = self.module_edit_sections[self.module_edit_section_cursor]
+        self.module_edit_fields = sec["fields"]
         self.module_edit_field = 0
         self.module_edit_scroll = 0
         self.module_edit_level = 1
@@ -2497,92 +2547,53 @@ class Game:
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
 
-    def _save_unique_tiles_fields(self):
-        """Persist unique tile field edits back to in-memory list."""
-        tiles = []
-        ti = 0
-        while True:
-            id_key = f"utile_{ti}_id"
-            id_val = None
-            vals = {}
-            for entry in self.module_edit_fields:
-                k = entry[1]
-                if k == id_key:
-                    id_val = entry[2]
-                elif k.startswith(f"utile_{ti}_"):
-                    suffix = k[len(f"utile_{ti}_"):]
-                    vals[suffix] = entry[2]
-            if id_val is None:
-                break
-            tiles.append({
-                "id": id_val,
-                "name": vals.get("name", ""),
-                "description": vals.get("desc", ""),
-                "visible": vals.get("visible", "No") == "Yes",
-                "walkable": vals.get("walkable", "Yes") == "Yes",
-                "base_tile": vals.get("basetile", "grass"),
-                "category": vals.get("category", "landmark"),
-                "interact_type": vals.get("interact", "message"),
-                "interact_text": vals.get("itext", ""),
-                "interact_data": {},
-            })
-            ti += 1
-        self.module_edit_unique_tiles = tiles
+    def _save_single_utile_fields(self):
+        """Persist the current tile's field edits back to in-memory list."""
+        idx = self.module_edit_active_utile
+        if idx < 0 or idx >= len(self.module_edit_unique_tiles):
+            return
+        vals = {}
+        for entry in self.module_edit_fields:
+            k = entry[1]
+            prefix = f"utile_{idx}_"
+            if k.startswith(prefix):
+                suffix = k[len(prefix):]
+                vals[suffix] = entry[2]
+        utile = self.module_edit_unique_tiles[idx]
+        utile["id"] = vals.get("id", utile.get("id", ""))
+        utile["name"] = vals.get("name", utile.get("name", ""))
+        utile["description"] = vals.get("desc", utile.get("description", ""))
+        # Tile graphic: "none" means no sprite (invisible)
+        gfx = vals.get("tilegfx", "none")
+        utile["tile"] = None if gfx == "none" else gfx
+        utile["base_tile"] = vals.get("basetile", utile.get("base_tile", "grass"))
 
     def _add_unique_tile(self):
-        """Add a new unique tile to the list."""
-        if self.module_edit_fields:
-            entry = self.module_edit_fields[self.module_edit_field]
-            entry[2] = self.module_edit_buffer
-        self._save_unique_tiles_fields()
+        """Add a new unique tile and refresh the tile list browser."""
         n = len(self.module_edit_unique_tiles)
         self.module_edit_unique_tiles.append({
             "id": f"new_tile_{n + 1}",
             "name": f"New Tile {n + 1}",
             "description": "A mysterious feature.",
-            "visible": False,
-            "walkable": True,
             "base_tile": "grass",
-            "category": "lore",
-            "interact_type": "message",
-            "interact_text": "You notice something unusual here.",
-            "interact_data": {},
         })
-        self._enter_unique_tiles_fields()
+        self._rebuild_unique_tiles_children()
         # Move cursor to the new tile
-        if self.module_edit_fields:
-            # Jump to the last tile's first editable field (ID)
-            self.module_edit_field = max(
-                0, len(self.module_edit_fields) - 9)
-            self.module_edit_field = self._next_editable_field(0)
-            self.module_edit_buffer = \
-                self.module_edit_fields[self.module_edit_field][2]
-            self._adjust_module_edit_scroll()
+        self.module_edit_section_cursor = len(
+            self.module_edit_unique_tiles) - 1
+        self._adjust_section_scroll()
 
     def _remove_unique_tile(self):
-        """Remove the currently selected unique tile."""
+        """Remove the selected unique tile and refresh the tile list."""
         tiles = self.module_edit_unique_tiles
         if not tiles:
             return
-        if self.module_edit_fields:
-            entry = self.module_edit_fields[self.module_edit_field]
-            entry[2] = self.module_edit_buffer
-        self._save_unique_tiles_fields()
-        tiles = self.module_edit_unique_tiles
-        if not tiles:
+        idx = self.module_edit_section_cursor
+        if idx < 0 or idx >= len(tiles):
             return
-        # Each tile uses 10 fields (hdr + 9 editable)
-        cursor = self.module_edit_field
-        tile_idx = cursor // 10
-        tile_idx = min(tile_idx, len(tiles) - 1)
-        tiles.pop(tile_idx)
+        tiles.pop(idx)
         self.module_edit_unique_tiles = tiles
-        if tiles:
-            self._enter_unique_tiles_fields()
-        else:
-            self.module_edit_fields = []
-            self.module_edit_field = 0
-            self.module_edit_buffer = ""
+        self._rebuild_unique_tiles_children()
 
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
@@ -2673,15 +2684,7 @@ class Game:
             if event.key == pygame.K_DELETE:
                 self._remove_loot_item()
                 return
-        # Unique tile add/remove
-        if self.module_edit_in_unique_tiles:
-            if (event.key == pygame.K_a
-                    and event.mod & pygame.KMOD_CTRL):
-                self._add_unique_tile()
-                return
-            if event.key == pygame.K_DELETE:
-                self._remove_unique_tile()
-                return
+        # (Unique tile add/remove is now at the section browser level)
 
         self._handle_field_editor_input(event)
 
@@ -2720,13 +2723,17 @@ class Game:
             else:
                 self._enter_section_fields()
         elif event.key == pygame.K_a:
-            # 'A' to add a level (in dungeon sub) or encounter (in level)
-            if (self.module_edit_nav_stack
+            # 'A' to add a level (in dungeon sub) or a unique tile
+            if self._in_unique_tiles_folder():
+                self._add_unique_tile()
+            elif (self.module_edit_nav_stack
                     and self.module_edit_active_dung >= 0):
                 self._add_dungeon_level()
         elif event.key in (pygame.K_d, pygame.K_DELETE):
-            # 'D' or Delete to remove current level
-            if (self.module_edit_nav_stack
+            # 'D' or Delete to remove current level or unique tile
+            if self._in_unique_tiles_folder():
+                self._remove_unique_tile()
+            elif (self.module_edit_nav_stack
                     and self.module_edit_active_dung >= 0):
                 sec = self.module_edit_sections[
                     self.module_edit_section_cursor]
@@ -2790,16 +2797,10 @@ class Game:
             from src.module_loader import LOOT_ITEMS
             return LOOT_ITEMS
         # Unique tile choices
-        elif key.endswith("_visible") and key.startswith("utile_"):
-            return ["Yes", "No"]
-        elif key.endswith("_walkable") and key.startswith("utile_"):
-            return ["Yes", "No"]
+        elif key.endswith("_tilegfx") and key.startswith("utile_"):
+            return self._UTILE_TILE_GRAPHICS
         elif key.endswith("_basetile") and key.startswith("utile_"):
             return self._UTILE_BASE_TILES
-        elif key.endswith("_category") and key.startswith("utile_"):
-            return self._UTILE_CATEGORIES
-        elif key.endswith("_interact") and key.startswith("utile_"):
-            return self._UTILE_INTERACT_TYPES
         # No match
 
         return []
@@ -2936,9 +2937,9 @@ class Game:
             # If editing loot, save back to in-memory loot list
             if self.module_edit_in_loot:
                 self._save_loot_fields()
-            # If editing unique tiles, save back to in-memory list
+            # If editing a unique tile, save back to in-memory list
             if self.module_edit_in_unique_tiles:
-                self._save_unique_tiles_fields()
+                self._save_single_utile_fields()
 
         # Gather all field values into a dict.
         # For create-new, fields live in self.module_edit_fields.
@@ -3171,14 +3172,8 @@ class Game:
                 ut_dict[tid] = {
                     "name": utile.get("name", ""),
                     "description": utile.get("description", ""),
-                    "tile": None,
-                    "visible": utile.get("visible", False),
-                    "walkable": utile.get("walkable", True),
+                    "tile": utile.get("tile"),
                     "base_tile": utile.get("base_tile", "grass"),
-                    "category": utile.get("category", "landmark"),
-                    "interact_type": utile.get("interact_type", "message"),
-                    "interact_text": utile.get("interact_text", ""),
-                    "interact_data": utile.get("interact_data", {}),
                 }
             if ut_dict:
                 data["unique_tiles"] = ut_dict
@@ -3199,6 +3194,7 @@ class Game:
             self.module_edit_active_level = -1
             self.module_edit_in_loot = False
             self.module_edit_in_unique_tiles = False
+            self.module_edit_active_utile = -1
             if ok:
                 self.module_message = "Module updated!"
                 self.module_msg_timer = 2.0

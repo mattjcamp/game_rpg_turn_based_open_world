@@ -3,7 +3,7 @@
     "id": "new_module",
     "name": "New Module",
     "author": "Unknown",
-    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Ivygate to break the spell.",
+    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Thornmarch to break the spell.",
     "version": "0.1.0"
   },
   "settings": {
@@ -24,38 +24,26 @@
   },
   "data": {},
   "unique_tiles": {
-    "moongate": {
-      "name": "Moongate 4",
-      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
-      "tile": null,
-      "visible": true,
-      "walkable": true,
-      "base_tile": "grass",
-      "category": "portal",
-      "interact_type": "teleport",
-      "interact_text": "You step through the moongate. The world blurs and reforms around you.",
-      "interact_data": {}
+    "moongate 4": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say. sweet bruh.",
+      "tile": "game/landmarks/poison_swamp.png",
+      "base_tile": "grass"
     },
     "whispering_stones": {
       "name": "Whispering Stones",
       "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
       "tile": null,
-      "visible": false,
-      "walkable": true,
-      "base_tile": "grass",
-      "category": "lore",
-      "interact_type": "message",
-      "interact_text": "The stones whisper: 'Seek the shadow beneath the mountain. The key lies where light cannot reach.'",
-      "interact_data": {}
+      "base_tile": "grass"
     }
   },
   "world": {
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ivygate",
-        "name": "Ivygate",
-        "description": "A bustling market town where traders from distant lands hawk exotic wares.",
+        "id": "thornmarch",
+        "name": "Thornmarch",
+        "description": "A forest clearing settlement where druids and woodsmen live side by side.",
         "town_config": {
           "size": "medium",
           "style": "medieval",
@@ -79,14 +67,14 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Howling Vaults",
-        "key_name": "Amber Key",
+        "name": "Sunken Stronghold",
+        "key_name": "Copper Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "A narrow crevice leads into Howling Vaults. The sound of dripping water echoes endlessly below.",
+        "description": "The entrance to Sunken Stronghold gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
         "quest_type": "retrieve",
-        "quest_objective": "Slay the guardian of Howling Vaults and claim the Amber Key",
-        "quest_hint": "A fearsome creature guards the prize.",
+        "quest_objective": "Search Sunken Stronghold for the hidden Copper Key",
+        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
         "kill_target": "",
         "kill_count": 0,
         "torch_density": "medium",
