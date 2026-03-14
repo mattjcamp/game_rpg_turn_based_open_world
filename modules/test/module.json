@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "new_module",
-    "name": "New Module",
+    "id": "test",
+    "name": "test",
     "author": "Unknown",
-    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Thornmarch to break the spell.",
+    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Larkport.",
     "version": "0.1.0"
   },
   "settings": {
@@ -24,16 +24,25 @@
   },
   "data": {},
   "unique_tiles": {
-    "moongate 4": {
+    "moongate": {
       "name": "Moongate",
-      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say. sweet bruh.",
-      "tile": "game/landmarks/poison_swamp.png",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "tile": "game/landmarks/moongate_active.png",
       "base_tile": "grass",
       "examine_layout": {
-        "2,10": "game/landmarks/treasure_hoard.png",
-        "4,10": "game/landmarks/treasure_hoard.png",
-        "6,10": "game/landmarks/treasure_hoard.png",
-        "8,10": "game/landmarks/sunken_shipwreck.png"
+        "2,2": "game/landmarks/moongate_dormant.png",
+        "4,2": "game/landmarks/moongate_dormant.png",
+        "6,2": "game/landmarks/moongate_dormant.png",
+        "2,4": "game/landmarks/lava_vent.png",
+        "3,4": "game/landmarks/lava_vent.png",
+        "4,4": "game/landmarks/lava_vent.png",
+        "5,4": "game/landmarks/lava_vent.png",
+        "6,4": "game/landmarks/lava_vent.png"
+      },
+      "examine_items": {
+        "2,6": "Healing Herb",
+        "4,6": "Healing Herb",
+        "6,6": "Healing Herb"
       }
     },
     "whispering_stones": {
@@ -41,21 +50,15 @@
       "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
       "tile": null,
       "base_tile": "grass"
-    },
-    "new_tile_3": {
-      "name": "New Tile 3",
-      "description": "A mysterious feature.",
-      "tile": "game/landmarks/moongate_dormant.png",
-      "base_tile": "grass"
     }
   },
   "world": {
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "thornmarch",
-        "name": "Thornmarch",
-        "description": "A forest clearing settlement where druids and woodsmen live side by side.",
+        "id": "larkport",
+        "name": "Larkport",
+        "description": "A bustling market town where traders from distant lands hawk exotic wares.",
         "town_config": {
           "size": "medium",
           "style": "medieval",
@@ -71,22 +74,22 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_shrine"
+      "deliver_to": "town_armory"
     },
     "starting_quests": [
-      "awaken"
+      "defend"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Sunken Stronghold",
-        "key_name": "Copper Key",
+        "name": "Crimson Tunnels",
+        "key_name": "Jade Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The entrance to Sunken Stronghold gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "description": "Bones litter the threshold of Crimson Tunnels. Whatever guards this place does not welcome visitors.",
         "quest_type": "retrieve",
-        "quest_objective": "Search Sunken Stronghold for the hidden Copper Key",
-        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
+        "quest_objective": "Descend into Crimson Tunnels and find the Jade Key",
+        "quest_hint": "The passage grows more treacherous with every floor.",
         "kill_target": "",
         "kill_count": 0,
         "torch_density": "medium",

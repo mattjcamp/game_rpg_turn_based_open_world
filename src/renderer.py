@@ -5419,16 +5419,7 @@ class Renderer(CombatEffectRendererMixin):
                     icon_type = info.get("icon", "potion")
                     self._draw_item_icon(icx, icy, icon_type, icon_sz)
 
-        # ── 2b. draw unique tile graphic at grid centre ──
-        if tile_graphic:
-            sprite_sz = ts * 2
-            sprite = self._get_unique_tile_sprite(tile_graphic, sprite_sz)
-            if sprite:
-                cx = mx + (cols * ts - sprite_sz) // 2
-                cy = my + (rows * ts - sprite_sz) // 2
-                self.screen.blit(sprite, (cx, cy))
-
-        # ── 2c. draw editor-painted examine layout sprites ──
+        # ── 2b. draw editor-painted examine layout sprites ──
         if examine_layout:
             for (lc, lr), gfx in examine_layout.items():
                 if gfx:
