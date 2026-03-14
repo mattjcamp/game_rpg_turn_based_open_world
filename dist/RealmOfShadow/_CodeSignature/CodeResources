@@ -14,7 +14,7 @@
 		</data>
 		<key>_internal/base_library.zip</key>
 		<data>
-		cRKuO/HOFcfpATFnk+kI6pK8zf8=
+		vhUGjh+VM/VFk2vLGvewrP0lrS4=
 		</data>
 		<key>_internal/data/character_tiles.json</key>
 		<data>
@@ -54,7 +54,7 @@
 		</data>
 		<key>_internal/data/config.json</key>
 		<data>
-		J69UCsRdrtcMhFx3Z32deuuhPEc=
+		ce1GyG1AIo+HW5ud8WN+lnZtP0U=
 		</data>
 		<key>_internal/data/effects.json</key>
 		<data>
@@ -84,6 +84,10 @@
 		<data>
 		OvvJgQ+zPSGPxo3+6gUTNJnLiMI=
 		</data>
+		<key>_internal/data/saves/save_1.json</key>
+		<data>
+		WgFy78RbtxS8MLkrn8t7Pr3vvj4=
+		</data>
 		<key>_internal/data/spells.json</key>
 		<data>
 		w2x4BUIfzQR94I5x4nhV6xibR70=
@@ -98,7 +102,7 @@
 		</data>
 		<key>_internal/data/unique_tiles.json</key>
 		<data>
-		eBvoTG5C9kLWj0QdEEQKNOV6Vo0=
+		lEgeax6/cepbVcITondQGcNlaw4=
 		</data>
 		<key>_internal/docs/manuals/images/class_alchemist.png</key>
 		<data>
@@ -236,21 +240,13 @@
 		<data>
 		METXHW5+SsrmJQapedCV5Oz5xaw=
 		</data>
-		<key>_internal/modules/asoloth/module.json</key>
+		<key>_internal/modules/on_an_island/module.json</key>
 		<data>
-		2bKVgPF30Xnn3vWoE7IgVOrKcZ4=
+		0DRlx1w1xLju2gQOz0wSGdsSh6w=
 		</data>
-		<key>_internal/modules/asoloth/overworld.json</key>
+		<key>_internal/modules/on_an_island/overworld.json</key>
 		<data>
-		L01WsoWuQz2xZJPZqVjoNudBCfo=
-		</data>
-		<key>_internal/modules/sea_world/module.json</key>
-		<data>
-		afkMhPIgjXadWRJ9mc+YWaRLc/I=
-		</data>
-		<key>_internal/modules/sea_world/overworld.json</key>
-		<data>
-		+QoisAeJ7VRuiwy825aU9GD89TU=
+		cS/v5HOG3foqbnXoUzwsBu5WM0Q=
 		</data>
 		<key>_internal/numpy/_core/_multiarray_tests.cpython-39-darwin.so</key>
 		<data>
@@ -2685,7 +2681,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			pGTHLhHaWOXS7MtbvdgvwEfBKrSJUErYtuqNmCW2rmc=
+			vYlOCxp+PCdkPq2jjCMcLL7juCT/vWvKJJcNUQljxp8=
 			</data>
 		</dict>
 		<key>_internal/data/character_tiles.json</key>
@@ -2755,7 +2751,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			sd2o/hjJhL8itfvLSG4oEBxYKqcqtWEojC5YGOxUn3c=
+			3AgPEQh3naEZudgviNsRGvqDKbYHiNXbWuYDfJ7psLo=
 			</data>
 		</dict>
 		<key>_internal/data/effects.json</key>
@@ -2807,6 +2803,13 @@
 			KkNdOaGhGaAZOfy91CaRn6cWAMkkJQfj4fmXGCNYalw=
 			</data>
 		</dict>
+		<key>_internal/data/saves/save_1.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			wgiHAY6kJHVhtNL6o764izwPGkJgXkzRxujTbqRd5Qc=
+			</data>
+		</dict>
 		<key>_internal/data/spells.json</key>
 		<dict>
 			<key>hash2</key>
@@ -2832,7 +2835,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			P5cA+EeS5uxeUIlK9RKI1OECeX0FHrerSAcNE6THdH4=
+			Y6LsALW9hNpFka3T8O/ifAKe5ZmQ8rQ0t6fs3tjVx1k=
 			</data>
 		</dict>
 		<key>_internal/docs/manuals/images/class_alchemist.png</key>
@@ -3208,32 +3211,18 @@
 			<key>symlink</key>
 			<string>pygame/.dylibs/libz.1.2.11.zlib-ng.dylib</string>
 		</dict>
-		<key>_internal/modules/asoloth/module.json</key>
+		<key>_internal/modules/on_an_island/module.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			vvdDXUpbmgFrVELTHkXfu3l6XovNzBl73s8KqABlYw0=
+			VKrYbTdL1DdIzd8Fj5fzE1u9klePEHZMjBHyD4Vdr0w=
 			</data>
 		</dict>
-		<key>_internal/modules/asoloth/overworld.json</key>
+		<key>_internal/modules/on_an_island/overworld.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			jWmN9u+ejNkt0X3OaJoTEzhk5GDqkRodL3GOwf0omfo=
-			</data>
-		</dict>
-		<key>_internal/modules/sea_world/module.json</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			ZbUQeYLE/dxjjzMyYgxV66gZWmEmzt4lsvNnJ+y3/+o=
-			</data>
-		</dict>
-		<key>_internal/modules/sea_world/overworld.json</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			NWJXQdcyTtPnX4FOLX1UMkTYjvfKoRLl6I8y4ULG6Es=
+			JpJzXBmH9eOlvLuc6tfCnZwTeKAejAawc2r805Cq3GE=
 			</data>
 		</dict>
 		<key>_internal/numpy/_core/_multiarray_tests.cpython-39-darwin.so</key>
