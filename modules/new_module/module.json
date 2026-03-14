@@ -35,6 +35,12 @@
       "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
       "tile": null,
       "base_tile": "grass"
+    },
+    "new_tile_3": {
+      "name": "New Tile 3",
+      "description": "A mysterious feature.",
+      "tile": "game/landmarks/moongate_dormant.png",
+      "base_tile": "grass"
     }
   },
   "world": {

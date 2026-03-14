@@ -1832,14 +1832,14 @@ class Game:
                          if n_loot > 0 else "no items"),
         })
 
-        # 7) Unique Tiles folder — each tile is a child section
+        # 7) Unique Tiles folder — each tile is a child + [+] Add Tile
         unique_tiles_data = manifest.get("unique_tiles", {})
-        utile_children = []
-        for tid, tdef in unique_tiles_data.items():
-            tname = tdef.get("name", tid)
-            utile_children.append(
-                self._build_utile_child(len(utile_children), tid, tdef))
-        n_utiles = len(utile_children)
+        self.module_edit_unique_tiles = [
+            {"id": tid, **tdef}
+            for tid, tdef in unique_tiles_data.items()
+        ]
+        utile_children = self._build_unique_tiles_sections()
+        n_utiles = len(self.module_edit_unique_tiles)
         sections.append({
             "label": "Unique Tiles",
             "icon": "F",
@@ -1866,11 +1866,7 @@ class Game:
         # Starting loot data for editing
         self.module_edit_starting_loot = list(starting_loot)
         self.module_edit_in_loot = False
-        # Unique tiles data for editing
-        self.module_edit_unique_tiles = [
-            {"id": tid, **tdef}
-            for tid, tdef in unique_tiles_data.items()
-        ]
+        # Unique tiles state (list already built above for section 7)
         self.module_edit_in_unique_tiles = False
         self.module_edit_active_utile = -1
         # Store dungeon levels for editing
@@ -2510,17 +2506,30 @@ class Game:
             "fields": fields,
         }
 
-    def _rebuild_unique_tiles_children(self):
-        """Rebuild the children list in the Unique Tiles folder from
-        the in-memory tile list and refresh the section browser."""
+    def _build_unique_tiles_sections(self):
+        """Build the full section list for the Unique Tiles folder:
+        one child per tile, plus a [+] Add Tile action at the end."""
         children = []
         for i, utile in enumerate(self.module_edit_unique_tiles):
             tid = utile.get("id", f"tile_{i}")
             children.append(self._build_utile_child(i, tid, utile))
+        children.append({
+            "label": "[+] Add Tile",
+            "icon": "+",
+            "fields": [],
+            "action": "add_tile",
+        })
+        return children
+
+    def _rebuild_unique_tiles_children(self):
+        """Rebuild the children list in the Unique Tiles folder from
+        the in-memory tile list and refresh the section browser."""
+        children = self._build_unique_tiles_sections()
         self.module_edit_sections = children
-        n = len(children)
+        n_tiles = len(self.module_edit_unique_tiles)
         self.module_edit_section_cursor = min(
-            self.module_edit_section_cursor, max(0, n - 1))
+            self.module_edit_section_cursor,
+            max(0, len(children) - 1))
         self._adjust_section_scroll()
         # Also update the parent folder's subtitle in the nav stack
         if self.module_edit_nav_stack:
@@ -2529,8 +2538,8 @@ class Game:
                 if sec.get("folder") == "unique_tiles":
                     sec["children"] = children
                     sec["subtitle"] = (
-                        f"{n} tile{'s' if n != 1 else ''}"
-                        if n > 0 else "no tiles")
+                        f"{n_tiles} tile{'s' if n_tiles != 1 else ''}"
+                        if n_tiles > 0 else "no tiles")
                     break
 
     def _enter_single_utile_fields(self, utile_idx):
@@ -2718,6 +2727,8 @@ class Game:
             action = sec.get("action")
             if action == "add_level":
                 self._add_dungeon_level()
+            elif action == "add_tile":
+                self._add_unique_tile()
             elif action == "remove_level":
                 pass  # handled by 'd' key
             else:
