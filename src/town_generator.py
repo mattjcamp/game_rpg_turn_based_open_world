@@ -66,7 +66,7 @@ class TownData:
     """Holds everything about a town: map, NPCs, name, entry point."""
 
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
-                 keyslot_positions=None):
+                 keyslot_positions=None, town_style="medieval"):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -74,6 +74,8 @@ class TownData:
         self.entry_row = entry_row
         # Ordered list of (col, row) for the 8 key slots (index = slot number)
         self.keyslot_positions = keyslot_positions or []
+        # Visual style key — used by the renderer to pick a colour palette
+        self.town_style = town_style
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""
@@ -848,7 +850,8 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     entry_col = exit_col
     entry_row = exit_row - 1
 
-    return TownData(tmap, npcs, name, entry_col, entry_row)
+    return TownData(tmap, npcs, name, entry_col, entry_row,
+                    town_style=town_style)
 
 
 def add_quest_giver_npc(town_data, quest_giver_name, dungeon_key_str,

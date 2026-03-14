@@ -509,6 +509,8 @@ class Renderer(CombatEffectRendererMixin):
             self._keyslot_index[pos] = idx
 
         # ── 1. draw map tiles ──
+        town_style = getattr(town_data, "town_style", "medieval")
+        palette = self._get_town_palette(town_style)
         sx, sy = self._shake_offset
         for sr in range(rows):
             for sc in range(cols):
@@ -518,7 +520,8 @@ class Renderer(CombatEffectRendererMixin):
                 px = sc * ts + sx
                 py = sr * ts + sy
                 self._u3_draw_town_tile(tid, px, py, ts, wc, wr,
-                                        keys_inserted=keys_inserted)
+                                        keys_inserted=keys_inserted,
+                                        palette=palette)
 
         # ── 2. NPC sprites ──
         for npc in town_data.npcs:
@@ -784,13 +787,20 @@ class Renderer(CombatEffectRendererMixin):
             8, prompt_y, (220, 180, 50))
 
     def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr,
-                            keys_inserted=0):
-        """Draw a single town tile using sprite sheet art when available."""
+                            keys_inserted=0, palette=None):
+        """Draw a single town tile using sprite sheet art when available.
+
+        *palette* is a dict from ``_TOWN_PALETTES`` that supplies all
+        colours for the procedural fallback.  When *None*, the medieval
+        palette is used.
+        """
         from src.settings import (
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
             TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR,
         )
+        if palette is None:
+            palette = self._TOWN_PALETTES["medieval"]
 
         # Use extracted town gate tile for exit
         if tile_id == TILE_EXIT and self._town_gate_tile:
@@ -809,9 +819,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # Procedural fallback for unmapped / unloaded tiles
         BLACK = (0, 0, 0)
-        BROWN = (140, 100, 50)
-        ORANGE = (255, 170, 85)
-        YELLOW = (255, 255, 0)
 
         rect = pygame.Rect(px, py, ts, ts)
         cx = px + ts // 2
@@ -819,37 +826,41 @@ class Renderer(CombatEffectRendererMixin):
         seed = wc * 31 + wr * 17
 
         if tile_id == TILE_FLOOR:
-            # Indoor floor — dark grey stone
-            base = 45 + (seed % 15)
-            pygame.draw.rect(self.screen, (base, base, base), rect)
-            # Subtle stone-slab lines
-            pygame.draw.line(self.screen, (base - 10, base - 10, base - 10),
+            # Indoor floor — styled stone
+            fb = palette["floor_base"]
+            jitter = seed % 15
+            col = (fb[0] + jitter, fb[1] + jitter, fb[2] + jitter)
+            pygame.draw.rect(self.screen, col, rect)
+            fl = palette["floor_line"]
+            pygame.draw.line(self.screen, fl,
                              (px, py + ts // 2), (px + ts, py + ts // 2), 1)
-            pygame.draw.line(self.screen, (base - 10, base - 10, base - 10),
+            pygame.draw.line(self.screen, fl,
                              (px + ts // 2, py), (px + ts // 2, py + ts), 1)
 
         elif tile_id == TILE_WALL:
             # Brick wall
-            pygame.draw.rect(self.screen, (120, 80, 50), rect)
+            pygame.draw.rect(self.screen, palette["wall_base"], rect)
+            mortar = palette["wall_mortar"]
             for iy in range(0, ts, 8):
                 offset = 6 if (iy // 8) % 2 else 0
                 for ix in range(offset, ts, 12):
                     brick = pygame.Rect(px + ix, py + iy, 10, 6)
-                    pygame.draw.rect(self.screen, (100, 65, 40), brick, 1)
+                    pygame.draw.rect(self.screen, mortar, brick, 1)
 
         elif tile_id == TILE_EXIT:
-            # Gate / exit — green field with archway
-            pygame.draw.rect(self.screen, (20, 100, 15), rect)
-            # Stone arch
+            # Gate / exit
+            pygame.draw.rect(self.screen, palette["grass_base"], rect)
             arch_w = ts - 8
-            pygame.draw.rect(self.screen, (130, 130, 130),
+            pygame.draw.rect(self.screen, palette["exit_arch"],
                              pygame.Rect(px + 4, py + 6, arch_w, ts - 6))
-            pygame.draw.rect(self.screen, (60, 60, 60),
+            pygame.draw.rect(self.screen, palette["exit_inner"],
                              pygame.Rect(px + 8, py + 10, arch_w - 8, ts - 10))
 
         elif tile_id == TILE_GRASS:
-            base_g = 100 + (seed % 30)
-            pygame.draw.rect(self.screen, (20, base_g, 15), rect)
+            gb = palette["grass_base"]
+            jitter = seed % 30
+            col = (gb[0], gb[1] + jitter, gb[2])
+            pygame.draw.rect(self.screen, col, rect)
 
         elif tile_id == TILE_WATER:
             pygame.draw.rect(self.screen, (15, 30, 120), rect)
@@ -857,30 +868,37 @@ class Renderer(CombatEffectRendererMixin):
         elif tile_id == TILE_COUNTER:
             pygame.draw.rect(self.screen, BLACK, rect)
             top = pygame.Rect(px + 3, py + 8, ts - 6, ts - 14)
-            pygame.draw.rect(self.screen, BROWN, top)
-            pygame.draw.rect(self.screen, (100, 70, 30), top, 1)
-            pygame.draw.circle(self.screen, YELLOW, (cx, cy), 3)
+            pygame.draw.rect(self.screen, palette["counter_top"], top)
+            pygame.draw.rect(self.screen, palette["counter_edge"], top, 1)
+            pygame.draw.circle(self.screen, palette["counter_dot"],
+                               (cx, cy), 3)
 
         elif tile_id == TILE_DOOR:
             pygame.draw.rect(self.screen, BLACK, rect)
             door_rect = pygame.Rect(px + 7, py + 2, ts - 14, ts - 4)
-            pygame.draw.rect(self.screen, (100, 65, 30), door_rect)
-            pygame.draw.rect(self.screen, (60, 40, 15), door_rect, 1)
-            pygame.draw.circle(self.screen, YELLOW, (cx + 3, cy), 2)
+            pygame.draw.rect(self.screen, palette["door_panel"], door_rect)
+            pygame.draw.rect(self.screen, palette["door_outline"],
+                             door_rect, 1)
+            pygame.draw.circle(self.screen, palette["door_knob"],
+                               (cx + 3, cy), 2)
             # ── Torches flanking the door ──
             import time as _tt, math as _mm
-            _flicker = 0.8 + 0.2 * _mm.sin(_tt.time() * 6 + wc * 7 + wr * 13)
+            _flicker = 0.8 + 0.2 * _mm.sin(
+                _tt.time() * 6 + wc * 7 + wr * 13)
+            tw = palette["torch_warm"]
+            tc = palette["torch_core"]
             for tx in (px + 2, px + ts - 4):
                 # Bracket
-                pygame.draw.rect(self.screen, (80, 60, 30),
+                pygame.draw.rect(self.screen, palette["torch_bracket"],
                                  pygame.Rect(tx, py + 4, 3, 10))
-                # Flame (warm colour shifts with flicker)
-                fr = int(255 * _flicker)
-                fg = int(160 * _flicker)
-                pygame.draw.circle(self.screen, (fr, fg, 30),
+                # Flame (colour shifts with flicker)
+                fr = int(tw[0] * _flicker)
+                fg = int(tw[1] * _flicker)
+                fb_c = int(tw[2] * _flicker)
+                pygame.draw.circle(self.screen, (fr, fg, fb_c),
                                    (tx + 1, py + 3), 3)
                 # Bright core
-                pygame.draw.circle(self.screen, (255, 240, 150),
+                pygame.draw.circle(self.screen, tc,
                                    (tx + 1, py + 2), 1)
 
         elif tile_id == TILE_MACHINE:
@@ -2601,6 +2619,106 @@ class Renderer(CombatEffectRendererMixin):
     _U3_DG_TS   = 32
     _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 960
     _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 640
+
+    # ── town style palettes ─────────────────────────────────
+    # Each palette defines the visual theme for a town style.
+    # Keys match the procedural drawing in _u3_draw_town_tile.
+    _TOWN_PALETTES = {
+        "medieval": {
+            "floor_base":     (45, 42, 40),    # grey stone
+            "floor_line":     (35, 32, 30),     # slab outlines
+            "wall_base":      (120, 80, 50),    # warm brick
+            "wall_mortar":    (100, 65, 40),     # darker mortar
+            "door_panel":     (100, 65, 30),     # brown wood
+            "door_outline":   (60, 40, 15),      # dark trim
+            "door_knob":      (255, 255, 0),     # gold handle
+            "counter_top":    (140, 100, 50),     # oak counter
+            "counter_edge":   (100, 70, 30),      # edge shadow
+            "counter_dot":    (255, 255, 0),      # gold accent
+            "torch_bracket":  (80, 60, 30),       # iron bracket
+            "torch_warm":     (255, 160, 30),     # flame orange
+            "torch_core":     (255, 240, 150),    # flame core
+            "grass_base":     (20, 100, 15),      # outside green
+            "exit_arch":      (130, 130, 130),     # stone arch
+            "exit_inner":     (60, 60, 60),        # arch opening
+        },
+        "desert": {
+            "floor_base":     (70, 60, 42),    # sandy stone
+            "floor_line":     (58, 48, 32),
+            "wall_base":      (170, 140, 90),  # sandstone
+            "wall_mortar":    (140, 115, 72),
+            "door_panel":     (120, 90, 50),   # weathered wood
+            "door_outline":   (80, 55, 25),
+            "door_knob":      (200, 170, 60),  # brass
+            "counter_top":    (160, 130, 80),   # light wood
+            "counter_edge":   (120, 95, 55),
+            "counter_dot":    (200, 170, 60),
+            "torch_bracket":  (100, 80, 40),
+            "torch_warm":     (255, 140, 20),  # warm amber
+            "torch_core":     (255, 220, 120),
+            "grass_base":     (160, 140, 80),  # sand outside
+            "exit_arch":      (180, 160, 110),  # sandstone arch
+            "exit_inner":     (100, 80, 50),
+        },
+        "coastal": {
+            "floor_base":     (55, 60, 65),    # grey-blue stone
+            "floor_line":     (42, 48, 55),
+            "wall_base":      (100, 110, 130), # sea-weathered stone
+            "wall_mortar":    (75, 85, 105),
+            "door_panel":     (70, 85, 95),    # driftwood blue
+            "door_outline":   (45, 60, 70),
+            "door_knob":      (180, 220, 255), # sea-glass blue
+            "counter_top":    (110, 120, 130),  # grey-blue wood
+            "counter_edge":   (80, 90, 100),
+            "counter_dot":    (180, 220, 255),
+            "torch_bracket":  (60, 75, 85),
+            "torch_warm":     (200, 220, 255), # cool blue-white
+            "torch_core":     (220, 240, 255),
+            "grass_base":     (40, 100, 90),   # sea-green
+            "exit_arch":      (130, 140, 150),  # sea-worn stone
+            "exit_inner":     (50, 65, 75),
+        },
+        "forest": {
+            "floor_base":     (38, 45, 32),    # mossy stone
+            "floor_line":     (28, 35, 22),
+            "wall_base":      (70, 90, 55),    # mossy wood-green
+            "wall_mortar":    (50, 65, 38),
+            "door_panel":     (80, 60, 35),    # dark oak
+            "door_outline":   (50, 35, 18),
+            "door_knob":      (180, 200, 80),  # leaf-green
+            "counter_top":    (100, 80, 50),    # dark wood
+            "counter_edge":   (70, 55, 30),
+            "counter_dot":    (180, 200, 80),
+            "torch_bracket":  (55, 70, 35),
+            "torch_warm":     (200, 255, 80),  # greenish firefly
+            "torch_core":     (230, 255, 150),
+            "grass_base":     (15, 80, 20),    # deep forest green
+            "exit_arch":      (90, 100, 70),    # moss-covered stone
+            "exit_inner":     (40, 50, 30),
+        },
+        "mountain": {
+            "floor_base":     (52, 50, 55),    # dark granite
+            "floor_line":     (40, 38, 42),
+            "wall_base":      (90, 85, 95),    # granite
+            "wall_mortar":    (65, 60, 72),
+            "door_panel":     (85, 70, 55),    # heavy timber
+            "door_outline":   (55, 42, 30),
+            "door_knob":      (220, 200, 160), # pale gold
+            "counter_top":    (120, 110, 100),  # stone slab
+            "counter_edge":   (85, 78, 68),
+            "counter_dot":    (220, 200, 160),
+            "torch_bracket":  (70, 65, 75),
+            "torch_warm":     (255, 180, 80),  # amber
+            "torch_core":     (255, 230, 170),
+            "grass_base":     (50, 70, 45),    # alpine scrub
+            "exit_arch":      (140, 135, 145),  # pale granite
+            "exit_inner":     (70, 65, 75),
+        },
+    }
+
+    def _get_town_palette(self, style):
+        """Return the palette dict for the given town style key."""
+        return self._TOWN_PALETTES.get(style, self._TOWN_PALETTES["medieval"])
 
     # ── dungeon level palettes ──────────────────────────────
     # Each palette defines the visual theme for a dungeon depth.
