@@ -282,6 +282,62 @@ def _place_locked_doors(tmap, rooms):
             tmap.set_tile(dc, dr, TILE_LOCKED_DOOR)
 
 
+def _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row):
+    """Revert locked doors that disconnect rooms from the entrance.
+
+    After doors and locked doors are placed, BFS from the stairs to find
+    all reachable tiles (treating regular doors as walkable but locked
+    doors as impassable).  Any room whose center is unreachable is
+    blocked by a locked door.  For each such room, downgrade its locked
+    door(s) back to regular (walkable) doors, then re-check until all
+    rooms are reachable.
+    """
+    width = tmap.width
+    height = tmap.height
+
+    WALKABLE_FOR_CHECK = {TILE_DFLOOR, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
+                          TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PUDDLE,
+                          TILE_MOSS, TILE_DDOOR}
+
+    def bfs_reachable(start_c, start_r):
+        visited = set()
+        queue = [(start_c, start_r)]
+        while queue:
+            c, r = queue.pop(0)
+            if (c, r) in visited:
+                continue
+            if c < 0 or c >= width or r < 0 or r >= height:
+                continue
+            if tmap.get_tile(c, r) not in WALKABLE_FOR_CHECK:
+                continue
+            visited.add((c, r))
+            for dc, dr in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                queue.append((c + dc, r + dr))
+        return visited
+
+    # Iterate until stable — each pass may unlock one more room,
+    # exposing further blocked rooms behind it.
+    for _ in range(len(rooms)):
+        reachable = bfs_reachable(stairs_col, stairs_row)
+        all_ok = True
+        for room in rooms:
+            cx, cy = room.center
+            if (cx, cy) in reachable:
+                continue
+            # Room unreachable — find locked doors on its wall ring
+            all_ok = False
+            for c in range(room.x, room.x2):
+                for wr in (room.y - 1, room.y2):
+                    if tmap.get_tile(c, wr) == TILE_LOCKED_DOOR:
+                        tmap.set_tile(c, wr, TILE_DDOOR)
+            for r in range(room.y, room.y2):
+                for wc in (room.x - 1, room.x2):
+                    if tmap.get_tile(wc, r) == TILE_LOCKED_DOOR:
+                        tmap.set_tile(wc, r, TILE_DDOOR)
+        if all_ok:
+            break
+
+
 def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
     """Sprinkle cosmetic decorations: puddles, moss, and wall torches.
 
@@ -609,10 +665,14 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         tmap.set_tile(ac, ar, TILE_ARTIFACT)
 
     # --- Place doors flush against walls where corridors enter rooms ---
-    _place_doors(tmap, rooms)
+    if place_doors:
+        _place_doors(tmap, rooms)
 
-    # --- Upgrade single-entrance rooms to locked doors ---
-    _place_locked_doors(tmap, rooms)
+        # --- Upgrade single-entrance rooms to locked doors ---
+        _place_locked_doors(tmap, rooms)
+
+    # --- Connectivity check: revert locked doors that break access -----
+    _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row)
 
     # --- Place cosmetic decorations (puddles, moss, wall torches) ---
     _place_decorations(tmap, rooms, width, total_height,
