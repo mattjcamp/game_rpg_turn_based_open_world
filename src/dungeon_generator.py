@@ -445,11 +445,11 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         place_stairs_down: If True, place stairs-down in the last room
         place_artifact: If True, place the quest artifact in the last room
         place_doors: If True, place doors at room/corridor junctions
-        custom_encounters: Optional list of {"monster": str, "count": int}
-            dicts.  When provided, these specific encounters are placed
-            in the dungeon instead of randomly-rolled encounters from
-            encounters.json.  Each entry produces one map monster whose
-            encounter_template contains *count* copies of *monster*.
+        custom_encounters: Optional list of encounter dicts.  New format:
+            ``{"monsters": ["Orc", "Skeleton", ...]}``.  Legacy format
+            ``{"monster": str, "count": int}`` is also supported.
+            When provided, these specific encounters are placed in the
+            dungeon instead of randomly-rolled encounters.
         include_random_encounters: If True (default), random encounters
             are generated for rooms not already occupied by custom
             encounters.  When custom_encounters is provided and this is
@@ -547,15 +547,21 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             my += random.randint(-1, 1)
             if tmap.get_tile(mx, my) != TILE_DFLOOR:
                 mx, my = room.center  # fallback to exact center
-            mon_name = enc_spec.get("monster", "Giant Rat")
-            mon_count = max(1, int(enc_spec.get("count", 1)))
-            monster = create_monster(mon_name)
+            # Support both new {"monsters": [...]} and legacy {"monster", "count"}
+            if "monsters" in enc_spec:
+                mon_names = list(enc_spec["monsters"])
+            else:
+                mn = enc_spec.get("monster", "Giant Rat")
+                mc = max(1, int(enc_spec.get("count", 1)))
+                mon_names = [mn] * mc
+            lead_name = mon_names[0] if mon_names else "Giant Rat"
+            monster = create_monster(lead_name)
             monster.col = mx
             monster.row = my
             monster.encounter_template = {
-                "name": f"{mon_name} x{mon_count}",
-                "monster_names": [mon_name] * mon_count,
-                "monster_party_tile": mon_name,
+                "name": f"Custom ({len(mon_names)})",
+                "monster_names": mon_names,
+                "monster_party_tile": lead_name,
             }
             monsters.append(monster)
 
@@ -714,8 +720,7 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
             share = min(share, remaining)
             if share > 0:
                 floor_kill_encounters[f].append({
-                    "monster": kill_target,
-                    "count": share,
+                    "monsters": [kill_target] * share,
                 })
                 remaining -= share
             if remaining <= 0:
@@ -786,9 +791,9 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
         Whether to place a quest artifact on the deepest floor (default True).
     module_levels : list or None
         Optional list of level dicts from the module manifest, each with
-        ``"name"`` and ``"encounters"`` (list of ``{"monster", "count"}``).
-        When provided, overrides the default floor count and encounter
-        generation.
+        ``"name"`` and ``"encounters"`` (list of ``{"monsters": [...]}``,
+        or legacy ``{"monster", "count"}``).  When provided, overrides
+        the default floor count and encounter generation.
     dungeon_size : str
         "small", "medium", or "large". Controls the base floor area.
 
@@ -817,8 +822,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             share = min(share, remaining)
             if share > 0:
                 floor_kill_encounters[f].append({
-                    "monster": kill_target,
-                    "count": share,
+                    "monsters": [kill_target] * share,
                 })
                 remaining -= share
             if remaining <= 0:

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "dorg",
-    "name": "Dorg",
-    "author": "you",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Amberfield.",
+    "id": "test",
+    "name": "test",
+    "author": "me",
+    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Elderreach to restore the protective ward.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,12 +41,12 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "amberfield",
-        "name": "Amberfield",
-        "description": "A riverside town whose docks hum with the comings and goings of barges.",
+        "id": "elderreach",
+        "name": "Elderreach",
+        "description": "A walled outpost on the frontier, always on guard against the wilds.",
         "town_config": {
           "size": "medium",
-          "style": "forest",
+          "style": "medieval",
           "buildings": [
             "shrine"
           ]
@@ -59,26 +59,26 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_fountain"
+      "deliver_to": "town_altar"
     },
     "starting_quests": [
-      "purify"
+      "restore"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Lost Den",
-        "key_name": "Opal Key",
+        "name": "Forsaken Keep",
+        "key_name": "Coral Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "Crumbling pillars mark the way into Lost Den. Faint scratching echoes from deep within.",
+        "description": "Bones litter the threshold of Forsaken Keep. Whatever guards this place does not welcome visitors.",
         "quest_type": "retrieve",
-        "quest_objective": "Explore Lost Den and recover the lost Opal Key",
-        "quest_hint": "The artifact was hidden here long ago by a forgotten order.",
+        "quest_objective": "Search Forsaken Keep for the hidden Coral Key",
+        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
         "kill_target": "",
         "kill_count": 0,
-        "size": "small",
-        "torch_density": "high",
+        "size": "medium",
+        "torch_density": "medium",
         "random_encounters": true,
         "exit_portal": true,
         "levels": [
@@ -86,33 +86,19 @@
             "name": "Floor 1",
             "encounters": [
               {
-                "monster": "Giant Rat",
-                "count": 1
+                "monsters": [
+                  "Orc",
+                  "Skeleton"
+                ]
               }
             ],
-            "random_encounters": "inherit",
-            "torch_density": "inherit",
-            "size": "inherit"
-          },
-          {
-            "name": "Floor 2",
-            "encounters": [
-              {
-                "monster": "Giant Rat",
-                "count": 1
-              }
-            ],
-            "random_encounters": "inherit"
+            "random_encounters": false,
+            "torch_density": "high",
+            "size": "small"
           }
         ]
       }
     ],
-    "innkeeper_quests": false,
-    "starting_loot": [
-      {
-        "item": "Lockpick",
-        "count": 2
-      }
-    ]
+    "innkeeper_quests": false
   }
 }

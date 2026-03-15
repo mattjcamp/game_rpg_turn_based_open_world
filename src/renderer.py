@@ -7138,8 +7138,13 @@ class Renderer(CombatEffectRendererMixin):
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
         elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
+                and edit_in_encounters:
+            # Inside level sub-sections (encounters list)
+            hint = ("[UP/DN] Browse  [ENTER] Open  "
+                    "[A] Add  [D] Remove  [ESC] Back")
+        elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
                 and edit_in_dungeon_sub:
-            # Inside dungeon sub-sections (levels/encounters)
+            # Inside dungeon sub-sections (levels)
             hint = ("[UP/DN] Browse  [ENTER] Open  "
                     "[A] Add Level  [D] Remove  [ESC] Back")
         elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
@@ -7151,7 +7156,7 @@ class Renderer(CombatEffectRendererMixin):
                     "[CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_level == 1 and edit_in_encounters:
             hint = ("[UP/DN] Field  [LT/RT] Adjust  "
-                    "[CTRL+A] Add  [DEL] Remove  [ESC] Back")
+                    "[CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_level == 1:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[CTRL+S] Save  [ESC] Back")
@@ -7463,6 +7468,12 @@ class Renderer(CombatEffectRendererMixin):
             elif icon == "S":
                 badge_color = (100, 160, 180)
                 badge_text = "S"
+            elif icon == "E":
+                badge_color = (160, 120, 80)
+                badge_text = "E"
+            elif icon == "M":
+                badge_color = (140, 80, 80)
+                badge_text = "M"
             elif icon == "U":
                 badge_color = (140, 100, 160)
                 badge_text = "U"
