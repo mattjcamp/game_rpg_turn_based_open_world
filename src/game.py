@@ -1897,6 +1897,7 @@ class Game:
         self.module_edit_in_unique_tiles = False
         self.module_edit_active_utile = -1
         self.module_edit_utile_preview = False
+        self._battle_screen_active = False
         # Store dungeon levels for editing
         self.module_edit_dungeon_levels = {}
         for i, dung in enumerate(dungeons):
@@ -2071,6 +2072,11 @@ class Game:
             self._editing_level_settings = False
             # Just enter the field editor for this monster's choice
             pass  # fall through to normal field editing below
+
+        # ── Battle Screen section drills into battle screen painter ──
+        if sec.get("is_battle_screen"):
+            self._enter_battle_screen_editor(sec["enc_idx"])
+            return
 
         # ── Individual unique tile drills into its field editor ──
         if sec.get("utile_idx") is not None:
@@ -2274,11 +2280,14 @@ class Game:
 
         self.module_edit_active_enc = enc_idx
 
-        # Normalize legacy format to monsters list
+        # Normalize legacy format to monsters list, preserving extra keys
         enc = encounters[enc_idx]
         monsters = _normalize_encounter(enc)
-        # Store back in new format
-        encounters[enc_idx] = {"monsters": monsters}
+        # Update in place — keep battle_screen and other extra keys
+        enc.pop("monster", None)
+        enc.pop("count", None)
+        enc["monsters"] = monsters
+        encounters[enc_idx] = enc
 
         # Push current sections onto nav stack
         self.module_edit_nav_stack.append((
@@ -2313,6 +2322,23 @@ class Game:
                      mon_name, "choice", True],
                 ],
             })
+
+        # Battle Screen section
+        bs = enc.get("battle_screen") or {}
+        bs_style = bs.get("style", "dungeon")
+        bs_music = bs.get("music", "Default")
+        n_obs = len(bs.get("obstacles", []))
+        n_painted = len(bs.get("painted", {}))
+        bs_subtitle = bs_style.title()
+        if n_obs or n_painted:
+            bs_subtitle += f" ({n_obs} obs, {n_painted} tiles)"
+        sub_sections.append({
+            "label": "Battle Screen",
+            "icon": "B",
+            "enc_idx": enc_idx,
+            "is_battle_screen": True,
+            "subtitle": bs_subtitle,
+        })
 
         # [+] Add Monster action
         sub_sections.append({
@@ -2431,7 +2457,7 @@ class Game:
                         monsters[mi] = entry[2]
                 except (ValueError, IndexError):
                     pass
-        encounters[enc_idx] = {"monsters": monsters}
+        enc["monsters"] = monsters
 
     def _leave_dungeon_sub(self):
         """Pop the nav stack to return from sub-sections or folder."""
@@ -2632,6 +2658,217 @@ class Game:
         if self.module_edit_section_cursor >= n:
             self.module_edit_section_cursor = max(0, n - 1)
         self._adjust_section_scroll()
+
+    # ── Battle Screen editor ─────────────────────────────────────
+
+    # Arena style choices for the battle screen
+    _BATTLE_STYLES = ["dungeon", "outdoor"]
+
+    # Music override choices
+    _BATTLE_MUSIC = ["Default", "Standard", "Dark & Moody", "Quiet",
+                     "Twin Peaks", "Epic Fantasy"]
+
+    # Obstacle palette for painting obstacles on the battle screen
+    _BATTLE_OBSTACLE_TYPES = [
+        "eraser", "tree", "rock", "boulder", "cactus", "pillar", "rubble",
+    ]
+
+    def _enter_battle_screen_editor(self, enc_idx):
+        """Enter the battle screen painter for an encounter."""
+        dung_idx = self.module_edit_active_dung
+        level_idx = self.module_edit_active_level
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if level_idx < 0 or level_idx >= len(levels):
+            return
+        enc = levels[level_idx]["encounters"][enc_idx]
+        bs = enc.get("battle_screen") or {}
+
+        self._battle_screen_active = True
+        self._battle_screen_enc_idx = enc_idx
+        self._battle_screen_style_idx = max(
+            0, self._BATTLE_STYLES.index(bs.get("style", "dungeon"))
+            if bs.get("style", "dungeon") in self._BATTLE_STYLES else 0)
+        self._battle_screen_music_idx = max(
+            0, self._BATTLE_MUSIC.index(bs.get("music", "Default"))
+            if bs.get("music", "Default") in self._BATTLE_MUSIC else 0)
+
+        # Load obstacle placements: list of {"type", "col", "row"}
+        self._battle_screen_obstacles = {}
+        for obs in bs.get("obstacles", []):
+            c, r = obs.get("col", 0), obs.get("row", 0)
+            self._battle_screen_obstacles[(c, r)] = obs.get("type", "rock")
+
+        # Load painted tiles: "col,row" -> sprite_path
+        self._battle_screen_painted = {}
+        for pos_key, gfx in bs.get("painted", {}).items():
+            try:
+                c, r = pos_key.split(",")
+                self._battle_screen_painted[(int(c), int(r))] = gfx
+            except (ValueError, AttributeError):
+                pass
+
+        # Editor cursor and brush
+        self._battle_cursor_col = 9
+        self._battle_cursor_row = 10
+        self._battle_brush_idx = 0  # index into _BATTLE_OBSTACLE_TYPES
+        self._battle_mode = "obstacle"  # "obstacle", "tile", "settings"
+        self._battle_tile_brush_idx = 0  # index into examine brushes
+        self._battle_settings_cursor = 0  # 0=style, 1=music
+
+    def _leave_battle_screen_editor(self):
+        """Exit the battle screen painter and persist data."""
+        dung_idx = self.module_edit_active_dung
+        level_idx = self.module_edit_active_level
+        enc_idx = self._battle_screen_enc_idx
+        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
+        if level_idx < 0 or level_idx >= len(levels):
+            self._battle_screen_active = False
+            return
+        enc = levels[level_idx]["encounters"][enc_idx]
+
+        # Build battle_screen dict
+        style = self._BATTLE_STYLES[self._battle_screen_style_idx]
+        music = self._BATTLE_MUSIC[self._battle_screen_music_idx]
+        obstacles = []
+        for (c, r), otype in self._battle_screen_obstacles.items():
+            obstacles.append({"type": otype, "col": c, "row": r})
+        painted = {}
+        for (c, r), gfx in self._battle_screen_painted.items():
+            painted[f"{c},{r}"] = gfx
+
+        # Only store if non-default
+        if style != "dungeon" or music != "Default" or obstacles or painted:
+            enc["battle_screen"] = {
+                "style": style,
+                "music": music,
+                "obstacles": obstacles,
+                "painted": painted,
+            }
+        else:
+            enc.pop("battle_screen", None)
+
+        self._battle_screen_active = False
+        # Rebuild encounter sections to update subtitle
+        self._rebuild_encounter_monster_sections(enc_idx)
+
+    def _handle_battle_screen_input(self, event):
+        """Handle input in the battle screen painter."""
+        if event.type != pygame.KEYDOWN:
+            return
+
+        COLS, ROWS = 18, 21
+
+        if self._battle_mode == "settings":
+            self._handle_battle_settings_input(event)
+            return
+
+        # Movement — arrow keys
+        if event.key in (pygame.K_UP, pygame.K_w):
+            if self._battle_cursor_row > 1:
+                self._battle_cursor_row -= 1
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            if self._battle_cursor_row < ROWS - 2:
+                self._battle_cursor_row += 1
+        elif event.key in (pygame.K_LEFT, pygame.K_a):
+            if self._battle_cursor_col > 1:
+                self._battle_cursor_col -= 1
+        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+            if self._battle_cursor_col < COLS - 2:
+                self._battle_cursor_col += 1
+
+        # Mode switch — I cycles obstacle/tile, S goes to settings
+        elif event.key == pygame.K_i:
+            if self._battle_mode == "obstacle":
+                self._battle_mode = "tile"
+            else:
+                self._battle_mode = "obstacle"
+        elif event.key == pygame.K_o:
+            self._battle_mode = "settings"
+
+        # Paint — Enter
+        elif event.key == pygame.K_RETURN:
+            pos = (self._battle_cursor_col, self._battle_cursor_row)
+            if self._battle_mode == "obstacle":
+                brush = self._BATTLE_OBSTACLE_TYPES[self._battle_brush_idx]
+                if brush == "eraser":
+                    self._battle_screen_obstacles.pop(pos, None)
+                else:
+                    self._battle_screen_obstacles[pos] = brush
+            else:
+                brush = self._EXAMINE_BRUSHES[self._battle_tile_brush_idx]
+                if brush == "eraser":
+                    self._battle_screen_painted.pop(pos, None)
+                else:
+                    self._battle_screen_painted[pos] = brush
+
+        # Cycle brush — Tab / B
+        elif event.key in (pygame.K_TAB, pygame.K_b):
+            if self._battle_mode == "obstacle":
+                n = len(self._BATTLE_OBSTACLE_TYPES)
+                if event.mod & pygame.KMOD_SHIFT:
+                    self._battle_brush_idx = (
+                        self._battle_brush_idx - 1) % n
+                else:
+                    self._battle_brush_idx = (
+                        self._battle_brush_idx + 1) % n
+            else:
+                n = len(self._EXAMINE_BRUSHES)
+                if event.mod & pygame.KMOD_SHIFT:
+                    self._battle_tile_brush_idx = (
+                        self._battle_tile_brush_idx - 1) % n
+                else:
+                    self._battle_tile_brush_idx = (
+                        self._battle_tile_brush_idx + 1) % n
+
+        # Exit
+        elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+            self._leave_battle_screen_editor()
+
+    def _handle_battle_settings_input(self, event):
+        """Handle input on the battle screen settings sub-page."""
+        if event.key == pygame.K_UP:
+            self._battle_settings_cursor = max(
+                0, self._battle_settings_cursor - 1)
+        elif event.key == pygame.K_DOWN:
+            self._battle_settings_cursor = min(
+                1, self._battle_settings_cursor + 1)
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            delta = 1 if event.key == pygame.K_RIGHT else -1
+            if self._battle_settings_cursor == 0:
+                n = len(self._BATTLE_STYLES)
+                self._battle_screen_style_idx = (
+                    self._battle_screen_style_idx + delta) % n
+            else:
+                n = len(self._BATTLE_MUSIC)
+                self._battle_screen_music_idx = (
+                    self._battle_screen_music_idx + delta) % n
+        elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE,
+                           pygame.K_o):
+            self._battle_mode = "obstacle"
+
+    def _get_battle_screen_preview_data(self):
+        """Return a dict describing the current battle screen editor state."""
+        if not getattr(self, "_battle_screen_active", False):
+            return None
+        style = self._BATTLE_STYLES[self._battle_screen_style_idx]
+        music = self._BATTLE_MUSIC[self._battle_screen_music_idx]
+        if self._battle_mode == "obstacle":
+            brush = self._BATTLE_OBSTACLE_TYPES[self._battle_brush_idx]
+        elif self._battle_mode == "tile":
+            brush = self._EXAMINE_BRUSHES[self._battle_tile_brush_idx]
+        else:
+            brush = None
+        return {
+            "style": style,
+            "music": music,
+            "obstacles": self._battle_screen_obstacles,
+            "painted": self._battle_screen_painted,
+            "cursor_col": self._battle_cursor_col,
+            "cursor_row": self._battle_cursor_row,
+            "brush": brush,
+            "mode": self._battle_mode,
+            "settings_cursor": self._battle_settings_cursor,
+        }
 
     # ── Starting Loot editing ─────────────────────────────────────
 
@@ -3157,6 +3394,11 @@ class Game:
         # ── Examine preview editor mode ──
         if getattr(self, "module_edit_utile_preview", False):
             self._handle_examine_preview_input(event)
+            return
+
+        # ── Battle screen editor mode ──
+        if getattr(self, "_battle_screen_active", False):
+            self._handle_battle_screen_input(event)
             return
 
         # ── Level 0: section browser ──
@@ -4140,6 +4382,10 @@ class Game:
                     edit_utile_preview=(
                         self._get_utile_preview_data()
                         if getattr(self, "module_edit_utile_preview", False)
+                        else None),
+                    edit_battle_preview=(
+                        self._get_battle_screen_preview_data()
+                        if getattr(self, "_battle_screen_active", False)
                         else None))
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(

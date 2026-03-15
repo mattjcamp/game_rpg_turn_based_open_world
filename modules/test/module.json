@@ -3,7 +3,7 @@
     "id": "test",
     "name": "test",
     "author": "me",
-    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Elderreach to restore the protective ward.",
+    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Fernglen.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,9 +41,9 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "elderreach",
-        "name": "Elderreach",
-        "description": "A walled outpost on the frontier, always on guard against the wilds.",
+        "id": "fernglen",
+        "name": "Fernglen",
+        "description": "A sleepy village surrounded by ancient oaks and whispering meadows.",
         "town_config": {
           "size": "medium",
           "style": "medieval",
@@ -59,27 +59,27 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_altar"
+      "deliver_to": "town_armory"
     },
     "starting_quests": [
-      "restore"
+      "defend"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Forsaken Keep",
-        "key_name": "Coral Key",
+        "name": "Shattered Vaults",
+        "key_name": "Silver Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "Bones litter the threshold of Forsaken Keep. Whatever guards this place does not welcome visitors.",
+        "description": "A rusted iron gate bars the path into Shattered Vaults. It swings open with a tortured groan at your touch.",
         "quest_type": "retrieve",
-        "quest_objective": "Search Forsaken Keep for the hidden Coral Key",
-        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
+        "quest_objective": "Retrieve the Silver Key from Shattered Vaults",
+        "quest_hint": "A powerful artifact lies in the deepest chamber.",
         "kill_target": "",
         "kill_count": 0,
         "size": "medium",
         "torch_density": "medium",
-        "random_encounters": true,
+        "random_encounters": false,
         "exit_portal": true,
         "levels": [
           {
@@ -87,14 +87,36 @@
             "encounters": [
               {
                 "monsters": [
-                  "Orc",
-                  "Skeleton"
-                ]
+                  "Giant Rat",
+                  "Orc Shaman"
+                ],
+                "battle_screen": {
+                  "style": "dungeon",
+                  "music": "Default",
+                  "obstacles": [
+                    {
+                      "type": "rock",
+                      "col": 9,
+                      "row": 10
+                    },
+                    {
+                      "type": "rock",
+                      "col": 8,
+                      "row": 10
+                    },
+                    {
+                      "type": "rock",
+                      "col": 7,
+                      "row": 10
+                    }
+                  ],
+                  "painted": {}
+                }
               }
             ],
-            "random_encounters": false,
-            "torch_density": "high",
-            "size": "small"
+            "random_encounters": "inherit",
+            "torch_density": "inherit",
+            "size": "inherit"
           }
         ]
       }

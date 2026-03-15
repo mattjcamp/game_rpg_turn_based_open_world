@@ -728,9 +728,11 @@ class DungeonState(InventoryMixin, BaseState):
             enc = create_encounter("dungeon")
             monsters = enc["monsters"]
             enc_name = enc["name"]
+            battle_screen = None
         else:
             monsters = [create_monster(n) for n in tmpl["monster_names"]]
             enc_name = tmpl["name"]
+            battle_screen = tmpl.get("battle_screen")
         for m in monsters:
             m.col = monster.col
             m.row = monster.row
@@ -741,7 +743,8 @@ class DungeonState(InventoryMixin, BaseState):
             combat_state.start_combat(fighter, monsters,
                                       source_state="dungeon",
                                       encounter_name=enc_name,
-                                      map_monster_refs=[monster])
+                                      map_monster_refs=[monster],
+                                      battle_screen=battle_screen)
             self.game.change_state("combat")
 
     # ── Locked door interaction ─────────────────────────────────────

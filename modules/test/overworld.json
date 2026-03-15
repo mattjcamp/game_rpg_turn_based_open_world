@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "elderreach",
+      "id": "fernglen",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -17,7 +17,7 @@
       "clear_radius": 3
     },
     {
-      "id": "town_altar",
+      "id": "town_armory",
       "type": "machine",
       "col": 18,
       "row": 8,

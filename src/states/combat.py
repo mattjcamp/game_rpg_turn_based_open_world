@@ -421,7 +421,7 @@ class CombatState(BaseState):
 
     def start_combat(self, fighter, monsters, source_state="dungeon",
                      encounter_name=None, map_monster_refs=None,
-                     terrain_tile=None):
+                     terrain_tile=None, battle_screen=None):
         """Start combat with one or more monsters.
 
         Parameters
@@ -441,6 +441,10 @@ class CombatState(BaseState):
         terrain_tile : int or None
             Overworld tile type (TILE_FOREST, TILE_GRASS, etc.) for
             spawning terrain-appropriate obstacles in the arena.
+        battle_screen : dict or None
+            Custom battle screen data with keys: ``style``, ``music``,
+            ``obstacles`` (list of {type, col, row}), ``painted``
+            (dict of "col,row" -> sprite_path).
         """
         # Normalise to list
         if not isinstance(monsters, (list, tuple)):
@@ -449,7 +453,14 @@ class CombatState(BaseState):
         self.monsters = list(monsters)
         self.monster = self.monsters[0]  # legacy alias
         self.encounter_name = encounter_name or self.monsters[0].name
-        self.source_state = source_state
+        self.battle_screen = battle_screen
+        # Custom battle screen style can override source_state
+        if battle_screen and battle_screen.get("style") == "outdoor":
+            self.source_state = "overworld"
+        elif battle_screen and battle_screen.get("style") == "dungeon":
+            self.source_state = "dungeon"
+        else:
+            self.source_state = source_state
 
         # Store map refs for removal after combat (may differ from combat monsters)
         self.monster_refs = list(map_monster_refs) if map_monster_refs else list(monsters)
@@ -540,13 +551,29 @@ class CombatState(BaseState):
                     used.add((mc, mr))
                     break
 
-        # Spawn terrain obstacles
-        if source_state == "overworld" and terrain_tile is not None:
+        # Spawn terrain obstacles — custom battle screen overrides default
+        if battle_screen and battle_screen.get("obstacles"):
+            self.arena_obstacles = {}
+            for obs in battle_screen["obstacles"]:
+                pos = (obs.get("col", 0), obs.get("row", 0))
+                if pos not in used:
+                    self.arena_obstacles[pos] = obs.get("type", "rock")
+        elif self.source_state == "overworld" and terrain_tile is not None:
             self._spawn_arena_obstacles(terrain_tile, used)
-        elif source_state == "dungeon":
+        elif self.source_state == "dungeon":
             self._spawn_dungeon_obstacles(used)
         else:
             self.arena_obstacles = {}
+
+        # Store custom painted tiles for the renderer
+        self.battle_painted = {}
+        if battle_screen and battle_screen.get("painted"):
+            for pos_key, gfx in battle_screen["painted"].items():
+                try:
+                    c, r = pos_key.split(",")
+                    self.battle_painted[(int(c), int(r))] = gfx
+                except (ValueError, AttributeError):
+                    pass
 
         # Keep a reference to the first fighter for backward compat
         self.fighter = fighter
@@ -565,12 +592,25 @@ class CombatState(BaseState):
         self.combat_log.append(
             f"{len(self.fighters)} party members engage!"
         )
+
+        # Music override from custom battle screen
+        bs = getattr(self, "battle_screen", None)
+        if bs and bs.get("music") and bs["music"] != "Default":
+            self._prev_music_style = self.game.music.style
+            self.game.music.set_style(bs["music"])
+            self.game.music.play("combat")
+        else:
+            self._prev_music_style = None
+
         self.phase = PHASE_PLAYER
         self.active_idx = 0
         self._announce_turn()
 
     def exit(self):
-        pass
+        # Restore music style if it was overridden by battle screen
+        prev = getattr(self, "_prev_music_style", None)
+        if prev is not None:
+            self.game.music.set_style(prev)
 
     def _announce_turn(self):
         """Add a log entry for whose turn it is and reset move budget.
@@ -5151,6 +5191,7 @@ class CombatState(BaseState):
             ground_items=self.ground_items if self.phase == PHASE_LOOT else None,
             loot_message=self.loot_message,
             arena_obstacles=self.arena_obstacles,
+            battle_painted=getattr(self, "battle_painted", None),
         )
         # DEBUG: smite flash overlay
         if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):

@@ -4829,7 +4829,8 @@ class Renderer(CombatEffectRendererMixin):
                           monsters=None, monster_positions=None,
                           encounter_name=None,
                           ground_items=None, loot_message="",
-                          arena_obstacles=None):
+                          arena_obstacles=None,
+                          battle_painted=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -4856,6 +4857,15 @@ class Renderer(CombatEffectRendererMixin):
                         self._u3_draw_wall_tile(px, py, ts)
                     else:
                         self._u3_draw_floor_tile(px, py, ts, c, r)
+
+        # ── 1a-pre. custom painted tiles (battle_screen sprites) ──
+        if battle_painted:
+            for (pc, pr), gfx in battle_painted.items():
+                if gfx:
+                    sprite = self._get_unique_tile_sprite(gfx, ts)
+                    if sprite:
+                        self.screen.blit(sprite,
+                                         (mx + pc * ts, my + pr * ts))
 
         # ── 1a. arena obstacles (trees, rocks, boulders, cacti) ──
         if arena_obstacles:
@@ -5935,6 +5945,234 @@ class Renderer(CombatEffectRendererMixin):
             # Fallback: generic dot
             pygame.draw.circle(self.screen, (80, 80, 80), (cx, cy), 5)
 
+    # ── Battle screen editor (module editor) ─────────────────────
+    def _draw_battle_screen_editor(self, rx, ry, rw, rh, preview):
+        """Draw the interactive battle screen editor in the module panel.
+
+        Parameters
+        ----------
+        rx, ry, rw, rh : panel rectangle
+        preview : dict with style, music, obstacles, painted,
+                  cursor_col, cursor_row, brush, mode, settings_cursor
+        """
+        import time
+        fm = self.font_med
+        fs = self.font_small
+
+        # Dark overlay
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (80, 100, 160),
+                         (rx, ry, rw, rh), 1)
+
+        style = preview.get("style", "dungeon")
+        music = preview.get("music", "Default")
+        obstacles = preview.get("obstacles", {})
+        painted = preview.get("painted", {})
+        cursor_col = preview.get("cursor_col", 9)
+        cursor_row = preview.get("cursor_row", 10)
+        brush = preview.get("brush", "eraser")
+        mode = preview.get("mode", "obstacle")
+        settings_cursor = preview.get("settings_cursor", 0)
+        is_outdoor = (style == "outdoor")
+
+        # ── Header ──
+        dy = ry + 6
+        self._u3_text("BATTLE SCREEN", rx + 12, dy,
+                       (120, 160, 220), fm)
+        dy += 18
+
+        if mode == "settings":
+            # Draw settings sub-page
+            self._draw_battle_settings_page(
+                rx, dy, rw, rh - (dy - ry), style, music,
+                settings_cursor)
+            return
+
+        # ── Miniature arena grid ──
+        cols = self._ARENA_COLS  # 18
+        rows = self._ARENA_ROWS  # 21
+        margin_x = 8
+        ts = min(16, (rw - margin_x * 2) // cols)
+        grid_w = cols * ts
+        grid_h = rows * ts
+        gx = rx + (rw - grid_w) // 2
+        gy = dy + 2
+
+        # Draw the arena grid
+        for r in range(rows):
+            for c in range(cols):
+                px = gx + c * ts
+                py = gy + r * ts
+                wall = (c == 0 or c == cols - 1
+                        or r == 0 or r == rows - 1)
+                if is_outdoor:
+                    if wall:
+                        # Mini forest edge
+                        pygame.draw.rect(self.screen, (10, 50, 10),
+                                         pygame.Rect(px, py, ts, ts))
+                    else:
+                        # Mini grass floor
+                        pygame.draw.rect(self.screen, (15, 60, 15),
+                                         pygame.Rect(px, py, ts, ts))
+                else:
+                    if wall:
+                        # Mini brick wall
+                        pygame.draw.rect(self.screen, self._U3_BRICK2,
+                                         pygame.Rect(px, py, ts, ts))
+                        if ts >= 8:
+                            by = py + 1
+                            pygame.draw.rect(
+                                self.screen, self._U3_BRICK1,
+                                pygame.Rect(px + 1, by, ts - 2, ts // 2 - 1))
+                    else:
+                        # Mini dungeon floor
+                        pygame.draw.rect(self.screen, self._U3_BLACK,
+                                         pygame.Rect(px, py, ts, ts))
+                        seed = (c * 31 + r * 17)
+                        if seed % 7 < 2:
+                            dx = (seed * 7) % max(1, ts - 4) + 2
+                            ddy = (seed * 13) % max(1, ts - 4) + 2
+                            pygame.draw.rect(
+                                self.screen, self._U3_DKGRN,
+                                pygame.Rect(px + dx, py + ddy, 1, 1))
+
+        # Draw painted sprites on the grid
+        for (pc, pr), gfx in painted.items():
+            if gfx:
+                sprite = self._get_unique_tile_sprite(gfx, ts)
+                if sprite:
+                    self.screen.blit(sprite,
+                                     (gx + pc * ts, gy + pr * ts))
+
+        # Draw obstacles on the grid
+        for (oc, orow), obs_type in obstacles.items():
+            ox = gx + oc * ts
+            oy = gy + orow * ts
+            self._draw_battle_mini_obstacle(ox, oy, ts, obs_type)
+
+        # Draw cursor highlight
+        blink = int(time.time() * 4) % 2 == 0
+        if mode == "obstacle":
+            cur_color = (255, 150, 50) if blink else (180, 100, 30)
+        else:
+            cur_color = (100, 200, 255) if blink else (50, 130, 180)
+        cur_rect = pygame.Rect(gx + cursor_col * ts,
+                               gy + cursor_row * ts, ts, ts)
+        pygame.draw.rect(self.screen, cur_color, cur_rect, 2)
+
+        dy = gy + grid_h + 4
+
+        # ── Mode indicator ──
+        obs_color = (255, 150, 50) if mode == "obstacle" \
+            else (100, 100, 120)
+        tile_color = (100, 200, 255) if mode == "tile" \
+            else (100, 100, 120)
+        self._u3_text("Obstacles", rx + 10, dy, obs_color, fs)
+        self._u3_text("/", rx + 85, dy, (100, 100, 120), fs)
+        self._u3_text("Tiles", rx + 93, dy, tile_color, fs)
+        dy += 14
+
+        # ── Current brush ──
+        if brush is not None:
+            if mode == "obstacle":
+                label = "Brush:"
+                brush_name = brush.title()
+            else:
+                label = "Brush:"
+                brush_name = self._brush_friendly_name(brush)
+            arrow_color = (100, 180, 255)
+            self._u3_text(label, rx + 10, dy, (140, 140, 160), fs)
+            lw = fs.size(label.upper())[0]
+            nx = rx + 12 + lw + 4
+            self._u3_text("<", nx - 10, dy, arrow_color, fs)
+            self._u3_text(brush_name, nx, dy, (255, 255, 200), fs)
+            nw = fs.size(brush_name.upper())[0]
+            self._u3_text(">", nx + nw + 6, dy, arrow_color, fs)
+            dy += 14
+
+        # ── Style & music summary ──
+        self._u3_text(f"Style: {style.title()}", rx + 10, dy,
+                       (120, 120, 140), fs)
+        dy += 12
+        self._u3_text(f"Music: {music}", rx + 10, dy,
+                       (120, 120, 140), fs)
+        dy += 14
+
+        # ── Footer hints ──
+        hint_y = ry + rh - 36
+        action = "Place" if mode == "obstacle" else "Paint"
+        self._u3_text(f"[Arrows] Move  [ENTER] {action}",
+                       rx + 8, hint_y, (80, 80, 160), fs)
+        self._u3_text("[TAB] Cycle  [I] Mode  [O] Settings",
+                       rx + 8, hint_y + 13, (80, 80, 160), fs)
+
+    def _draw_battle_settings_page(self, rx, dy, rw, rh,
+                                    style, music, cursor):
+        """Draw the settings sub-page for the battle screen editor."""
+        fs = self.font_small
+        arrow = (100, 180, 255)
+        items = [
+            ("Arena Style", style.title()),
+            ("Music", music),
+        ]
+        for i, (label, value) in enumerate(items):
+            selected = (i == cursor)
+            color = (255, 255, 200) if selected else (140, 140, 160)
+            self._u3_text(label + ":", rx + 14, dy, color, fs)
+            lw = fs.size((label + ":").upper())[0]
+            vx = rx + 18 + lw + 8
+            if selected:
+                self._u3_text("<", vx - 12, dy, arrow, fs)
+            self._u3_text(value, vx, dy, (255, 255, 255) if selected
+                          else (180, 180, 200), fs)
+            vw = fs.size(value.upper())[0]
+            if selected:
+                self._u3_text(">", vx + vw + 6, dy, arrow, fs)
+            dy += 22
+
+        dy += 10
+        self._u3_text("[LT/RT] Change  [ESC/O] Back",
+                       rx + 14, dy, (80, 80, 160), fs)
+
+    def _draw_battle_mini_obstacle(self, px, py, ts, obs_type):
+        """Draw a tiny obstacle icon on the battle screen editor grid."""
+        cx = px + ts // 2
+        cy = py + ts // 2
+        r = max(2, ts // 4)
+
+        if obs_type == "tree":
+            pygame.draw.rect(self.screen, (90, 55, 25),
+                             pygame.Rect(cx - 1, cy + 1, 2, r))
+            pygame.draw.circle(self.screen, (20, 80, 20),
+                               (cx, cy - 1), r + 1)
+        elif obs_type == "rock":
+            pygame.draw.circle(self.screen, (110, 105, 95),
+                               (cx, cy), r + 1)
+        elif obs_type == "boulder":
+            pygame.draw.circle(self.screen, (90, 85, 75),
+                               (cx, cy), r + 2)
+            pygame.draw.circle(self.screen, (120, 115, 105),
+                               (cx - 1, cy - 1), r)
+        elif obs_type == "cactus":
+            pygame.draw.rect(self.screen, (30, 100, 30),
+                             pygame.Rect(cx - 1, cy - r, 2, r * 2))
+            pygame.draw.rect(self.screen, (30, 100, 30),
+                             pygame.Rect(cx - r, cy - 1, r, 2))
+        elif obs_type == "pillar":
+            pygame.draw.rect(self.screen, (120, 120, 140),
+                             pygame.Rect(cx - 1, cy - r, 3, r * 2 + 1))
+        elif obs_type == "rubble":
+            for i in range(3):
+                rx2 = cx - r + (i * r)
+                ry2 = cy - 1 + (i % 2)
+                pygame.draw.rect(self.screen, (80, 75, 65),
+                                 pygame.Rect(rx2, ry2, 2, 2))
+        else:
+            pygame.draw.circle(self.screen, (80, 80, 80),
+                               (cx, cy), r)
+
     def _u3_draw_orc_combat_sprite(self, monster, ax, ay, ts, col, row):
         """Draw monster using its unique tile sprite for overworld combat."""
         cx = ax + col * ts + ts // 2
@@ -6871,7 +7109,8 @@ class Renderer(CombatEffectRendererMixin):
                            edit_nav_label="",
                            edit_in_encounters=False,
                            edit_in_dungeon_sub=False,
-                           edit_utile_preview=None):
+                           edit_utile_preview=None,
+                           edit_battle_preview=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -6889,6 +7128,7 @@ class Renderer(CombatEffectRendererMixin):
         edit_nav_depth   : nesting depth in section navigation
         edit_in_encounters : True when editing encounters within a level
         edit_utile_preview : dict with preview data, or None
+        edit_battle_preview : dict with battle screen editor data, or None
         """
         import math
         self.screen.fill((0, 0, 0))
@@ -7075,6 +7315,11 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_utile_examine_preview(
                 right_x, panel_y, right_w, panel_h, edit_utile_preview)
 
+        # ── Battle screen editor preview ──
+        elif edit_battle_preview:
+            self._draw_battle_screen_editor(
+                right_x, panel_y, right_w, panel_h, edit_battle_preview)
+
         # ── Edit mode overlay ──
         elif edit_mode:
             if edit_is_new and edit_fields:
@@ -7134,6 +7379,8 @@ class Renderer(CombatEffectRendererMixin):
         hint_color = (68, 68, 200)
         if edit_utile_preview:
             hint = ""   # hints are rendered inside the preview panel
+        elif edit_battle_preview:
+            hint = ""   # hints are rendered inside the battle editor panel
         elif edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
@@ -7474,6 +7721,9 @@ class Renderer(CombatEffectRendererMixin):
             elif icon == "M":
                 badge_color = (140, 80, 80)
                 badge_text = "M"
+            elif icon == "B":
+                badge_color = (80, 120, 160)
+                badge_text = "B"
             elif icon == "U":
                 badge_color = (140, 100, 160)
                 badge_text = "U"

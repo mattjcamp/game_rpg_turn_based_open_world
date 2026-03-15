@@ -558,11 +558,16 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             monster = create_monster(lead_name)
             monster.col = mx
             monster.row = my
-            monster.encounter_template = {
+            tmpl = {
                 "name": f"Custom ({len(mon_names)})",
                 "monster_names": mon_names,
                 "monster_party_tile": lead_name,
             }
+            # Carry custom battle screen if defined
+            bs = enc_spec.get("battle_screen")
+            if bs:
+                tmpl["battle_screen"] = bs
+            monster.encounter_template = tmpl
             monsters.append(monster)
 
     if include_random_encounters:
