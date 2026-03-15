@@ -9,7 +9,7 @@
   ],
   "hp_per_level": 10,
   "mp_per_level": 5,
-  "range": 2,
+  "range": 4,
   "exp_per_level": 1000,
   "allowed_races": [
     "human",

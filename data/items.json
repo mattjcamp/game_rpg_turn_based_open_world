@@ -171,10 +171,10 @@
       "character_can_equip": true
     },
     "Gloves": {
-      "power": 8,
+      "power": 1,
       "ranged": false,
       "slots": ["right_hand", "left_hand"],
-      "description": "Enchanted gauntlets that strike with magic force.",
+      "description": "Sturdy leather gloves. A slight edge over bare fists.",
       "icon": "gloves",
       "item_type": "gloves",
       "party_can_equip": false,

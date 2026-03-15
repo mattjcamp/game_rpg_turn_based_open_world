@@ -169,7 +169,7 @@ Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal,
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 5        | 0        | 10    | None       |
+| 5        | 0        | 6     | None       |
 
 **Allowed Weapons:** Fists, Dagger, Club, Sling, Short Bow
 **Allowed Armor:** Cloth, Leather
@@ -180,9 +180,9 @@ Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal,
 - **Pick Locks** — Can open locked doors and chests without a key.
 - **Detect Traps** — Can detect and disarm hidden traps in dungeons.
 - **Backstab** *(Level 3+)* — When attacking with a Dagger in melee, the Thief rolls a DEX saving throw (d20 + DEX modifier vs DC 12). On success, the hit becomes a critical, doubling the damage dice. This stacks with natural 20 criticals — if the initial roll is already a natural 20, the backstab check is skipped. A distinctive purple flash and "BACKSTAB!" callout alert you when it triggers.
-- **Shadow Step** *(Level 7+)* — After attacking (melee or ranged), the Thief can use any remaining movement to reposition. The Thief still only gets one attack per turn, but instead of the turn ending immediately after the attack, they can move with whatever steps remain from their 10-tile range. During Shadow Step movement, bumping into monsters is blocked — no second attacks. Press spacebar to end the turn early.
+- **Shadow Step** *(Level 7+)* — After attacking (melee or ranged), the Thief can use any remaining movement to reposition. The Thief still only gets one attack per turn, but instead of the turn ending immediately after the attack, they can move with whatever steps remain from their 6-tile range. During Shadow Step movement, bumping into monsters is blocked — no second attacks. Press spacebar to end the turn early.
 
-The Thief has the longest combat range of any class (10 tiles), making them unmatched skirmishers who can strike from nearly anywhere on the battlefield. With a Short Bow they can pelt enemies from across the arena while staying safely out of harm's way. At Level 3, Thieves gain Backstab, turning the humble Dagger into a devastating weapon — a high-DEX Thief can crit on nearly half their dagger attacks. At Level 7, Shadow Step transforms them into true hit-and-run fighters who can strike and slip away before enemies can retaliate. Their real value outside combat is Pick Locks and Detect Traps, which open up areas and loot that other classes can't reach. Pair with Halfling for the Pickpocket bonus.
+The Thief has the longest combat range of any class (6 tiles), making them effective skirmishers who can outmaneuver most opponents. With a Short Bow they can pelt enemies from a safe distance while staying mobile. At Level 3, Thieves gain Backstab, turning the humble Dagger into a devastating weapon — a high-DEX Thief can crit on nearly half their dagger attacks. At Level 7, Shadow Step transforms them into true hit-and-run fighters who can strike and slip away before enemies can retaliate. Their real value outside combat is Pick Locks and Detect Traps, which open up areas and loot that other classes can't reach. Pair with Halfling for the Pickpocket bonus.
 
 ---
 
@@ -192,7 +192,7 @@ The Thief has the longest combat range of any class (10 tiles), making them unma
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 10       | 5        | 2     | Priest     |
+| 10       | 5        | 4     | Priest     |
 
 **Allowed Weapons:** All weapons
 **Allowed Armor:** Cloth, Leather, Chain, Plate
@@ -215,7 +215,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 10       | 3        | 3     | Priest     |
+| 10       | 3        | 4     | Priest     |
 
 **Allowed Weapons:** Fists, Dagger, Club, Sling, Short Bow, Long Bow, Sword
 **Allowed Armor:** Cloth, Leather, Chain
@@ -223,7 +223,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 **MP Source:** 50% of Wisdom
 
-Rangers are durable frontliners with bow proficiency and limited healing magic. With a 3-tile combat range and Long Bow access they can deal serious ranged damage, and their small MP pool lets them cast the occasional Minor Heal to keep the party going between fights. A strong choice for parties that want a self-sufficient frontliner who can both fight and heal.
+Rangers are durable frontliners with bow proficiency and limited healing magic. With a 4-tile combat range and Long Bow access they can deal serious ranged damage, and their small MP pool lets them cast the occasional Minor Heal to keep the party going between fights. A strong choice for parties that want a self-sufficient frontliner who can both fight and heal.
 
 ---
 
@@ -252,7 +252,7 @@ The Druid is the game's only hybrid caster, able to cast both Priest spells (Min
 
 | HP/Level | MP/Level | Range | Spell Type |
 |----------|----------|-------|------------|
-| 4        | 8        | 3     | Sorcerer   |
+| 4        | 8        | 4     | Sorcerer   |
 
 **Allowed Weapons:** Fists, Dagger
 **Allowed Armor:** Cloth only
@@ -264,7 +264,7 @@ The Druid is the game's only hybrid caster, able to cast both Priest spells (Min
 
 - **Brew Potions** — Can craft potions from gathered reagents, turning Moonpetal, Glowcap Mushrooms, and other ingredients into useful elixirs.
 
-Alchemists have modest combat ability but provide unique value through potion crafting. Their 3-tile range gives them slightly better positioning than Wizards, and access to Sorcerer spells means they can still contribute offensive magic.
+Alchemists have modest combat ability but provide unique value through potion crafting. Their 4-tile range matches the Fighter's mobility, and access to Sorcerer spells means they can still contribute offensive magic.
 
 ---
 
@@ -275,11 +275,11 @@ Alchemists have modest combat ability but provide unique value through potion cr
 | Fighter | 15 | 0 | 4 | None | Plate | — | — |
 | Wizard | 4 | 15 | 2 | Sorcerer | Cloth | 100% INT | Arcane Focus |
 | Cleric | 6 | 10 | 2 | Priest | Chain | 100% WIS | Turn Undead |
-| Thief | 5 | 0 | 10 | None | Leather | — | Pick Locks, Backstab, Shadow Step |
-| Paladin | 10 | 5 | 2 | Priest | Plate | 50% WIS | Holy Smite, Turn Undead |
-| Ranger | 10 | 3 | 3 | Priest | Chain | 50% WIS | — |
+| Thief | 5 | 0 | 6 | None | Leather | — | Pick Locks, Backstab, Shadow Step |
+| Paladin | 10 | 5 | 4 | Priest | Plate | 50% WIS | Holy Smite, Turn Undead |
+| Ranger | 10 | 3 | 4 | Priest | Chain | 50% WIS | — |
 | Druid | 5 | 12 | 2 | Both | Cloth | 50% INT/WIS | 2× MP regen |
-| Alchemist | 4 | 8 | 3 | Sorcerer | Cloth | 50% INT | Brew Potions |
+| Alchemist | 4 | 8 | 4 | Sorcerer | Cloth | 50% INT | Brew Potions |
 
 > **Tip:** A well-rounded party might include a Fighter or Paladin on the front line, a Cleric for healing and Turn Undead, a Wizard for devastating damage spells, and a Thief for utility and ranged harassment. Experiment to find your preferred combination.
 
@@ -533,6 +533,7 @@ Weapons determine your attack damage in combat. Each has a **power rating** that
 | Weapon | Power | Damage | Buy | Classes |
 |--------|-------|--------|-----|---------|
 | Fists | 0 | 1 | — | All |
+| Gloves | 1 | 1d4-1 | — | Fighter |
 | Dagger | 1 | 1d4-1 | 20g | All except some |
 | Club | 1 | 1d4-1 | 20g | Fighter, Cleric, Thief, Ranger, Druid |
 | Mace | 2 | 1d4 | 40g | Fighter, Cleric, Paladin, Druid |
@@ -541,7 +542,6 @@ Weapons determine your attack damage in combat. Each has a **power rating** that
 | Spear | 6 | 1d8 | — | Fighter, Paladin |
 | Broad Axe | 7 | 1d8 | — | Fighter |
 | Iron Sword | 8 | 1d8 | — | Fighter, Paladin |
-| Gloves | 8 | 1d8 | — | Fighter |
 | Halberd | 9 | 1d10 | — | Fighter |
 | Sun Sword | 10 | 1d10 | — | Fighter, Paladin |
 | Mystic Sword | 10 | 1d10 | — | Fighter, Paladin |
