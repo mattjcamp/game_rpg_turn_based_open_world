@@ -26,12 +26,13 @@ class NPC:
                  quest_dialogue=None, quest_choices=None, god_name=None,
                  quest_name=None, artifact_name=None,
                  hint_active=None, text_complete=None,
-                 innkeeper_quests=False):
+                 innkeeper_quests=False, shop_type="general"):
         self.col = col
         self.row = row
         self.name = name
         self.dialogue = dialogue  # list of strings, cycles through on each talk
         self.npc_type = npc_type  # villager, shopkeep, innkeeper, elder, priest
+        self.shop_type = shop_type  # general, weapons, armor, reagent, potion, book, map
         self._talk_index = 0
         # Quest support — only used for quest-giving NPCs
         self.quest_dialogue = quest_dialogue  # list of strings for quest offer
@@ -442,6 +443,7 @@ _OPTIONAL_BUILDING_NPCS = {
             ],
         ],
         "npc_type": "shopkeep",
+        "shop_type": "reagent",
     },
     "potion_shop": {
         "names": ["Elixia", "Master Dram", "Brewer Cask", "Vial"],
@@ -460,6 +462,7 @@ _OPTIONAL_BUILDING_NPCS = {
             ],
         ],
         "npc_type": "shopkeep",
+        "shop_type": "potion",
     },
     "weapons_shop": {
         "names": ["Ironhand", "Steelforge Gorm", "Blademaiden Yara",
@@ -479,6 +482,7 @@ _OPTIONAL_BUILDING_NPCS = {
             ],
         ],
         "npc_type": "shopkeep",
+        "shop_type": "weapons",
     },
     "armor_shop": {
         "names": ["Platewright", "Tanner Husk", "Shieldmaiden Bryn",
@@ -498,6 +502,7 @@ _OPTIONAL_BUILDING_NPCS = {
             ],
         ],
         "npc_type": "shopkeep",
+        "shop_type": "armor",
     },
     "book_shop": {
         "names": ["Scribe Lorewick", "Inkwell", "Sage Pagelore",
@@ -517,6 +522,7 @@ _OPTIONAL_BUILDING_NPCS = {
             ],
         ],
         "npc_type": "shopkeep",
+        "shop_type": "book",
     },
     "map_shop": {
         "names": ["Cartographer Finn", "Explorer Maris", "Mapmaker Gale",
@@ -536,6 +542,7 @@ _OPTIONAL_BUILDING_NPCS = {
             ],
         ],
         "npc_type": "shopkeep",
+        "shop_type": "map",
     },
     "town_hall": {
         "names": ["Mayor Aldwyn", "Reeve Selene", "Magistrate Horace",
@@ -681,7 +688,8 @@ def _place_optional_buildings(tmap, npcs, ox, oy, iw, ih,
         npc_col = bx + blayout[3][0]
         npc_row = by + blayout[3][1]
         npcs.append(NPC(npc_col, npc_row, npc_name, npc_dlg,
-                        npc_type=npc_type))
+                        npc_type=npc_type,
+                        shop_type=npc_pool.get("shop_type", "general")))
 
         # Record building sign
         if building_signs is not None:
@@ -917,7 +925,7 @@ def generate_town(name="Thornwall", seed=None, layout_index=None,
     shopkeep_col = ox + sx + sw // 2
     shopkeep_row = oy + sy + sh - 2
     npcs.append(NPC(shopkeep_col, shopkeep_row, shopkeep["name"],
-                    shop_dlg, npc_type="shopkeep"))
+                    shop_dlg, npc_type="shopkeep", shop_type="general"))
 
     # Innkeeper (inside the inn, behind the bar)
     # When innkeeper_quests is True, the innkeeper offers an endless
@@ -1257,7 +1265,7 @@ def generate_duskhollow():
         "Stock up before heading into the dark.",
         "Torches are half-price for adventurers.",
         "Be careful out there — the monsters grow fiercer to the north.",
-    ], npc_type="shopkeep"))
+    ], npc_type="shopkeep", shop_type="general"))
 
     # ── Innkeeper ──
     npcs.append(NPC(ox + 24, oy + 3, "Aldric", [

@@ -728,6 +728,7 @@ class TownState(InventoryMixin, BaseState):
             self.shop_sell_cursor = 0
             self.shop_message = ""
             self.shop_message_timer = 0
+            self.shop_type = getattr(npc, "shop_type", "general")
             return
 
         # Priest — open the temple service menu
@@ -1366,9 +1367,10 @@ class TownState(InventoryMixin, BaseState):
         """Handle input while the shop screen is open."""
         from src.party import (SHOP_INVENTORY, get_sell_price,
                                 group_items_by_category,
-                                group_inventory_by_category)
+                                group_inventory_by_category,
+                                get_shop_items)
 
-        buy_items = list(SHOP_INVENTORY.keys())
+        buy_items = get_shop_items(getattr(self, "shop_type", "general"))
         sell_items = self.game.party.shared_inventory
         num_buy = len(buy_items)
         num_sell = len(sell_items)
@@ -1699,7 +1701,8 @@ class TownState(InventoryMixin, BaseState):
             renderer.draw_shop_u3(
                 self.game.party, self.shop_mode, cursor,
                 self.shop_message,
-                quest_complete=quest_complete)
+                quest_complete=quest_complete,
+                shop_type=getattr(self, "shop_type", "general"))
             return
         if self.showing_party_inv:
             action_opts = self._get_party_inv_action_options() if self.party_inv_action_menu else None

@@ -81,7 +81,9 @@
           "size": "large",
           "style": "coastal",
           "buildings": [
-            "shrine"
+            "shrine",
+            "weapons_shop",
+            "book_shop"
           ]
         }
       }
@@ -146,7 +148,8 @@
             "torch_density": "medium"
           }
         ],
-        "size": "small"
+        "size": "small",
+        "random_encounters": true
       },
       {
         "id": "dungeon_key_2",
@@ -196,7 +199,8 @@
             "random_encounters": true
           }
         ],
-        "size": "medium"
+        "size": "medium",
+        "random_encounters": true
       },
       {
         "id": "dungeon_key_3",
@@ -277,7 +281,8 @@
             "torch_density": "medium"
           }
         ],
-        "size": "medium"
+        "size": "medium",
+        "random_encounters": true
       }
     ],
     "innkeeper_quests": true

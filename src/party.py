@@ -247,6 +247,42 @@ def group_items_by_category(item_names):
     return result
 
 
+# ── Shop-type filtering ────────────────────────────────────────
+# Maps shop_type → set of allowed category labels from _ITEM_CATEGORIES.
+SHOP_TYPE_CATEGORIES = {
+    "general":  {"SUPPLIES", "AMMUNITION", "POTIONS", "TOOLS"},
+    "weapons":  {"MELEE WEAPONS", "RANGED WEAPONS", "AMMUNITION"},
+    "armor":    {"ARMOR"},
+    "reagent":  {"REAGENTS"},
+    "potion":   {"POTIONS"},
+    "book":     {"SCROLLS & MAGIC"},
+    "map":      {"TOOLS"},
+}
+
+# Display names for each shop type.
+SHOP_TYPE_NAMES = {
+    "general":  "GENERAL STORE",
+    "weapons":  "WEAPONS SHOP",
+    "armor":    "ARMOR SHOP",
+    "reagent":  "REAGENT SHOP",
+    "potion":   "POTION SHOP",
+    "book":     "BOOK SHOP",
+    "map":      "MAP SHOP",
+}
+
+
+def get_shop_items(shop_type="general"):
+    """Return a list of item names from SHOP_INVENTORY appropriate for *shop_type*.
+
+    Falls back to the full inventory if *shop_type* is unknown.
+    """
+    allowed_cats = SHOP_TYPE_CATEGORIES.get(shop_type)
+    if allowed_cats is None:
+        return list(SHOP_INVENTORY.keys())
+    return [name for name in SHOP_INVENTORY
+            if _item_category(name)[0] in allowed_cats]
+
+
 def group_inventory_by_category(inventory, name_fn):
     """Sort an inventory list into category groups.
 

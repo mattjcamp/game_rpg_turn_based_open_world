@@ -8921,7 +8921,7 @@ class Renderer(CombatEffectRendererMixin):
     # ========================================================
 
     def draw_shop_u3(self, party, mode="buy", cursor_index=0, message="",
-                      quest_complete=False):
+                      quest_complete=False, shop_type="general"):
         """
         Full-screen shop for buying and selling items.
 
@@ -8929,16 +8929,18 @@ class Renderer(CombatEffectRendererMixin):
         *cursor_index*: position in the active list
         *message*: transient feedback text (e.g. "Bought Sword!")
         *quest_complete*: if True, show Shadow Crystal display case
+        *shop_type*: type of shop — controls which items appear and the title
         """
         from src.party import (SHOP_INVENTORY, WEAPONS, ARMORS, ITEM_INFO,
                                 get_sell_price, group_items_by_category,
-                                group_inventory_by_category)
+                                group_inventory_by_category,
+                                get_shop_items, SHOP_TYPE_NAMES)
 
         fm = self.font_med
         f = self.font
         self.screen.fill(self._U3_BLACK)
 
-        buy_items = list(SHOP_INVENTORY.keys())
+        buy_items = get_shop_items(shop_type)
         sell_items = party.shared_inventory
 
         # Pre-compute grouped buy list: [(item_name_or_None, cat_label_or_None), ...]
@@ -8948,7 +8950,8 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Title bar with BUY / SELL tabs ──
         self._u3_panel(0, 0, SCREEN_WIDTH, 30)
-        self._u3_text("SHOP", 10, 8, self._U3_ORANGE, f)
+        shop_title = SHOP_TYPE_NAMES.get(shop_type, "SHOP")
+        self._u3_text(shop_title, 10, 8, self._U3_ORANGE, f)
 
         # Tab indicators
         buy_col = self._U3_WHITE if mode == "buy" else self._U3_GRAY

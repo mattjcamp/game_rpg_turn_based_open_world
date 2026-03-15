@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "fernglen",
+      "id": "cedarcrest",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -17,7 +17,7 @@
       "clear_radius": 3
     },
     {
-      "id": "town_armory",
+      "id": "town_fountain",
       "type": "machine",
       "col": 18,
       "row": 8,

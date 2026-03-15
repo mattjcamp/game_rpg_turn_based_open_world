@@ -2,8 +2,8 @@
   "metadata": {
     "id": "test",
     "name": "test",
-    "author": "me",
-    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Fernglen.",
+    "author": "",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Cedarcrest.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,14 +41,22 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "fernglen",
-        "name": "Fernglen",
-        "description": "A sleepy village surrounded by ancient oaks and whispering meadows.",
+        "id": "cedarcrest",
+        "name": "Cedarcrest",
+        "description": "A fortified settlement perched on a rocky bluff overlooking the valley.",
         "town_config": {
-          "size": "medium",
-          "style": "medieval",
+          "size": "large",
+          "style": "mountain",
           "buildings": [
-            "shrine"
+            "shrine",
+            "reagent_shop",
+            "potion_shop",
+            "weapons_shop",
+            "armor_shop",
+            "book_shop",
+            "map_shop",
+            "town_hall",
+            "tavern"
           ]
         }
       }
@@ -59,66 +67,29 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_armory"
+      "deliver_to": "town_fountain"
     },
     "starting_quests": [
-      "defend"
+      "purify"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Shattered Vaults",
-        "key_name": "Silver Key",
+        "name": "Iron Halls",
+        "key_name": "Jade Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "A rusted iron gate bars the path into Shattered Vaults. It swings open with a tortured groan at your touch.",
+        "description": "The entrance to Iron Halls gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
         "quest_type": "retrieve",
-        "quest_objective": "Retrieve the Silver Key from Shattered Vaults",
-        "quest_hint": "A powerful artifact lies in the deepest chamber.",
+        "quest_objective": "Brave the depths of Iron Halls for the Jade Key",
+        "quest_hint": "Few who enter these halls return unchanged.",
         "kill_target": "",
         "kill_count": 0,
         "size": "medium",
         "torch_density": "medium",
-        "random_encounters": false,
+        "random_encounters": true,
         "exit_portal": true,
-        "levels": [
-          {
-            "name": "Floor 1",
-            "encounters": [
-              {
-                "monsters": [
-                  "Giant Rat",
-                  "Orc Shaman"
-                ],
-                "battle_screen": {
-                  "style": "dungeon",
-                  "music": "Default",
-                  "obstacles": [
-                    {
-                      "type": "rock",
-                      "col": 9,
-                      "row": 10
-                    },
-                    {
-                      "type": "rock",
-                      "col": 8,
-                      "row": 10
-                    },
-                    {
-                      "type": "rock",
-                      "col": 7,
-                      "row": 10
-                    }
-                  ],
-                  "painted": {}
-                }
-              }
-            ],
-            "random_encounters": "inherit",
-            "torch_density": "inherit",
-            "size": "inherit"
-          }
-        ]
+        "levels": []
       }
     ],
     "innkeeper_quests": false
