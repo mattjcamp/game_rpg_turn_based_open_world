@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "new_module",
-    "name": "New Module",
-    "author": "Unknown",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ashbrook.",
+    "id": "dorg",
+    "name": "Dorg",
+    "author": "you",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Amberfield.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,12 +41,12 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ashbrook",
-        "name": "Ashbrook",
-        "description": "A forest clearing settlement where druids and woodsmen live side by side.",
+        "id": "amberfield",
+        "name": "Amberfield",
+        "description": "A riverside town whose docks hum with the comings and goings of barges.",
         "town_config": {
           "size": "medium",
-          "style": "medieval",
+          "style": "forest",
           "buildings": [
             "shrine"
           ]
@@ -58,7 +58,7 @@
   "progression": {
     "win_condition": {
       "type": "collect_keys",
-      "total_keys": 2,
+      "total_keys": 1,
       "deliver_to": "town_fountain"
     },
     "starting_quests": [
@@ -67,14 +67,14 @@
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Flooded Labyrinth",
-        "key_name": "Ivory Key",
+        "name": "Lost Den",
+        "key_name": "Opal Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The entrance to Flooded Labyrinth gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "description": "Crumbling pillars mark the way into Lost Den. Faint scratching echoes from deep within.",
         "quest_type": "retrieve",
-        "quest_objective": "Search Flooded Labyrinth for the hidden Ivory Key",
-        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
+        "quest_objective": "Explore Lost Den and recover the lost Opal Key",
+        "quest_hint": "The artifact was hidden here long ago by a forgotten order.",
         "kill_target": "",
         "kill_count": 0,
         "size": "small",
@@ -102,31 +102,17 @@
                 "count": 1
               }
             ],
-            "random_encounters": "inherit",
-            "torch_density": "inherit",
-            "size": "inherit"
+            "random_encounters": "inherit"
           }
         ]
-      },
-      {
-        "id": "dungeon_key_2",
-        "name": "Burning Labyrinth",
-        "key_name": "Opal Key",
-        "dungeon_number": 2,
-        "landmark_id": "dungeon_2",
-        "description": "A rusted iron gate bars the path into Burning Labyrinth. It swings open with a tortured groan at your touch.",
-        "quest_type": "retrieve",
-        "quest_objective": "Venture into Burning Labyrinth and liberate the Opal Key",
-        "quest_hint": "The artifact pulses with ancient energy.",
-        "kill_target": "",
-        "kill_count": 0,
-        "size": "medium",
-        "torch_density": "medium",
-        "random_encounters": true,
-        "exit_portal": true,
-        "levels": []
       }
     ],
-    "innkeeper_quests": false
+    "innkeeper_quests": false,
+    "starting_loot": [
+      {
+        "item": "Lockpick",
+        "count": 2
+      }
+    ]
   }
 }

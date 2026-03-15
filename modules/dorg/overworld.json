@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "ashbrook",
+      "id": "amberfield",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -31,14 +31,6 @@
       "row": 12,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
-    },
-    {
-      "id": "dungeon_2",
-      "type": "dungeon",
-      "col": 8,
-      "row": 12,
-      "tile": "TILE_DUNGEON",
-      "clear_radius": 2
     }
   ],
   "paths": [
@@ -49,16 +41,6 @@
       ],
       "to": [
         22,
-        12
-      ]
-    },
-    {
-      "from": [
-        16,
-        8
-      ],
-      "to": [
-        8,
         12
       ]
     },

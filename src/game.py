@@ -1608,9 +1608,8 @@ class Game:
         # All fields are editable in create mode
         self.module_edit_fields = [
             ["DETAILS", "", "", "section", False],
-            ["Name", "name", "New Module", "text", True],
-            ["Author", "author", "Unknown", "text", True],
-            ["Description", "description", "", "text", True],
+            ["Name", "name", "", "text", True],
+            ["Author", "author", "", "text", True],
             ["SETTINGS", "", "", "section", False],
             ["World Size", "world_size", "Medium", "choice", True],
             ["Towns", "num_towns", "1", "int", True],
@@ -2301,7 +2300,7 @@ class Game:
         levels.append({
             "name": f"Floor {floor_num}",
             "encounters": [{"monster": "Giant Rat", "count": 1}],
-            "random_encounters": True,
+            "random_encounters": "inherit",
         })
         # Rebuild sub-sections to show the new level
         self._rebuild_dungeon_sub_sections(dung_idx)
@@ -3252,9 +3251,8 @@ class Game:
             # ── Create new module with all settings ──
             from src.module_loader import create_module
             path = create_module(
-                name=values.get("name", "New Module"),
-                author=values.get("author", "Unknown"),
-                description=values.get("description", ""),
+                name=values.get("name", "Untitled"),
+                author=values.get("author", ""),
                 world_size=values.get("world_size", "Medium"),
                 num_towns=values.get("num_towns", 1),
                 num_quests=values.get("num_quests", 1),
