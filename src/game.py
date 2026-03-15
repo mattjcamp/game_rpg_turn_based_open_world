@@ -100,6 +100,7 @@ class Game:
         self._config = load_config()
         self.smite_enabled = self._config.get("smite_enabled", False)
         self.start_with_equipment = self._config.get("start_with_equipment", True)
+        self.start_level = max(1, min(10, self._config.get("start_level", 1)))
 
         # --- Music & Sound Effects ---
         saved_style = self._config.get("soundtrack_style", "Classic")
@@ -228,6 +229,10 @@ class Game:
             {"label": "START WITH EQUIPMENT",
              "value": self._config.get("start_with_equipment", True),
              "type": "toggle", "action": self._toggle_start_equipment},
+            {"label": "START LEVEL",
+             "value": self.start_level,
+             "choices": list(range(1, 11)),
+             "type": "choice", "action": self._cycle_start_level},
         ]
 
         # --- Quest log screen ---
@@ -399,6 +404,19 @@ class Game:
                     for _ in range(count):
                         self.party.inv_add(item_name)
 
+        # ── Apply debug / testing settings ──
+        # Start level: use the higher of the global setting and the
+        # per-module debug override so either source can boost the party.
+        mod_start_level = 1
+        if self.module_manifest:
+            debug = self.module_manifest.get("debug", {})
+            mod_start_level = max(1, min(10, int(debug.get("start_level", 1))))
+            if debug.get("starter_kit", False):
+                self._apply_debug_starter_kit()
+        effective_level = max(self.start_level, mod_start_level)
+        if effective_level > 1:
+            self._apply_debug_start_level(effective_level)
+
         self.quest = None
         self.house_quest = None
         self.examined_tiles = {}  # {(col, row): {"obstacles": {}, "ground_items": {}}}
@@ -471,6 +489,57 @@ class Game:
         pygame.draw.circle(icon, (200, 170, 60), (cx, cy), 15, 1)
 
         return icon
+
+    def _apply_debug_start_level(self, target_level):
+        """Boost every party member to *target_level* by granting XP."""
+        for m in self.party.members:
+            template = m._load_class_template(m.char_class)
+            race_info = m.race_info
+            xp_per = race_info.get("exp_per_level",
+                                   template["exp_per_level"])
+            # check_level_up promotes while exp >= level * xp_per,
+            # so to reach target_level we need (target_level - 1) * xp_per.
+            needed = (target_level - 1) * xp_per
+            if needed > m.exp:
+                m.exp = needed
+                m.check_level_up()
+            # Fully heal after leveling
+            m.hp = m.max_hp
+            if hasattr(m, '_current_mp'):
+                m._current_mp = m.max_mp
+
+    def _apply_debug_starter_kit(self):
+        """Give the party a set of useful items for testing."""
+        kit = [
+            ("Lockpick", 5),
+            ("Camping Supplies", 3),
+            ("Torch", 5),
+            ("Healing Herb", 10),
+            ("Antidote", 5),
+            ("Healing Potion", 5),
+            ("Arrows", 20),
+            ("Bolts", 20),
+        ]
+        for item_name, count in kit:
+            for _ in range(count):
+                self.party.inv_add(item_name)
+        # Give each member decent gear
+        from src.party import WEAPONS, ARMORS
+        weapon_upgrades = ["Long Sword", "Mace", "Dagger"]
+        armor_upgrades = ["Chain", "Leather"]
+        for m in self.party.members:
+            # Equip best available weapon
+            for w in weapon_upgrades:
+                if w in WEAPONS:
+                    m.equipped["right_hand"] = w
+                    m._sync_legacy_fields()
+                    break
+            # Equip best available armor
+            for a in armor_upgrades:
+                if a in ARMORS:
+                    m.equipped["body"] = a
+                    m._sync_legacy_fields()
+                    break
 
     def _init_key_dungeons(self, kd_list):
         """Set up key dungeon quest entries from the module manifest.
@@ -1714,6 +1783,21 @@ class Game:
                  mod_settings["time_of_day"], "choice", False],
                 ["Innkeeper Quests", "innkeeper_quests",
                  "Yes" if innkeeper_quests else "No", "choice", True],
+            ],
+        })
+
+        # 2b) Debug / Testing settings
+        debug = manifest.get("debug", {})
+        debug_start_level = str(debug.get("start_level", 1))
+        debug_starter_kit = "Yes" if debug.get("starter_kit", False) else "No"
+        sections.append({
+            "label": "Debug / Testing",
+            "icon": ">",
+            "fields": [
+                ["Start Level", "debug_start_level",
+                 debug_start_level, "choice", True],
+                ["Starter Kit", "debug_starter_kit",
+                 debug_starter_kit, "choice", True],
             ],
         })
 
@@ -3560,6 +3644,10 @@ class Game:
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
             return ["Yes", "No"]
+        elif key == "debug_start_level":
+            return [str(i) for i in range(1, 11)]
+        elif key == "debug_starter_kit":
+            return ["Yes", "No"]
         elif key.endswith("_size") and key.startswith("town_"):
             from src.module_loader import TOWN_SIZE_NAMES
             return TOWN_SIZE_NAMES
@@ -3810,6 +3898,23 @@ class Game:
                 prog["innkeeper_quests"] = (
                     values["innkeeper_quests"] == "Yes")
 
+            # ── Debug / Testing settings ──
+            debug_changed = False
+            debug = data.setdefault("debug", {})
+            if "debug_start_level" in values:
+                try:
+                    debug["start_level"] = int(values["debug_start_level"])
+                except ValueError:
+                    debug["start_level"] = 1
+                debug_changed = True
+            if "debug_starter_kit" in values:
+                debug["starter_kit"] = (values["debug_starter_kit"] == "Yes")
+                debug_changed = True
+            # Remove debug section if all defaults
+            if debug_changed and debug.get("start_level", 1) == 1 \
+                    and not debug.get("starter_kit", False):
+                data.pop("debug", None)
+
             # ── Town fields (town_<i>_<field>) ──
             from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
                                            TOWN_STYLE_NAMES,
@@ -4046,6 +4151,18 @@ class Game:
         self.start_with_equipment = not self.start_with_equipment
         self.settings_options[3]["value"] = self.start_with_equipment
         self._config["start_with_equipment"] = self.start_with_equipment
+        save_config(self._config)
+
+    def _cycle_start_level(self, direction=1):
+        """Cycle the starting experience level (1-10) for new games."""
+        opt = self.settings_options[4]  # START LEVEL entry
+        choices = opt["choices"]
+        cur_idx = choices.index(opt["value"]) if opt["value"] in choices else 0
+        new_idx = (cur_idx + direction) % len(choices)
+        new_val = choices[new_idx]
+        opt["value"] = new_val
+        self.start_level = new_val
+        self._config["start_level"] = new_val
         save_config(self._config)
 
     def _open_save_screen(self):

@@ -1,7 +1,8 @@
 {
   "music_enabled": false,
   "smite_enabled": true,
-  "start_with_equipment": false,
-  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/test",
-  "soundtrack_style": "Dark & Moody"
+  "start_with_equipment": true,
+  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/arial",
+  "soundtrack_style": "Dark & Moody",
+  "start_level": 5
 }

@@ -516,8 +516,8 @@ class PartyMember:
 
             if mp_gain > 0:
                 self._bonus_mp += mp_gain
-                self._current_mp = min(
-                    getattr(self, "_current_mp", 0) + mp_gain, self.max_mp)
+                cur_mp = getattr(self, "_current_mp", 0) or 0
+                self._current_mp = min(cur_mp + mp_gain, self.max_mp)
 
             msg = f"{self.name} reached Level {self.level}! HP+{hp_gain}"
             if mp_gain > 0:
