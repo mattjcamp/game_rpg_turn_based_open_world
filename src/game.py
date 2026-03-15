@@ -2591,7 +2591,7 @@ class Game:
         floor_num = len(levels) + 1
         levels.append({
             "name": f"Floor {floor_num}",
-            "encounters": [{"monsters": ["Giant Rat"]}],
+            "encounters": [],
             "random_encounters": "inherit",
         })
         # Rebuild sub-sections to show the new level
@@ -2648,8 +2648,6 @@ class Game:
             return
         level = levels[level_idx]
         encounters = level.get("encounters", [])
-        if len(encounters) <= 1:
-            return  # Keep at least one encounter
         if 0 <= enc_idx < len(encounters):
             encounters.pop(enc_idx)
             level["encounters"] = encounters

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "arial",
-    "name": "Arial",
-    "author": "Me",
-    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Stormridge to break the spell.",
+    "id": "test",
+    "name": "test",
+    "author": "hyperbolic",
+    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Willowwall to restore the protective ward.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,13 +41,27 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "stormridge",
-        "name": "Stormridge",
+        "id": "willowwall",
+        "name": "Willowwall",
+        "description": "A sleepy village surrounded by ancient oaks and whispering meadows.",
+        "town_config": {
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
+        }
+      },
+      {
+        "id": "copperford",
+        "name": "Copperford",
         "description": "A forest clearing settlement where druids and woodsmen live side by side.",
         "town_config": {
-          "size": "large",
-          "style": "forest",
-          "buildings": []
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
         }
       }
     ],
@@ -57,27 +71,27 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_shrine"
+      "deliver_to": "town_altar"
     },
     "starting_quests": [
-      "awaken"
+      "restore"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Hidden Warren",
-        "key_name": "Coral Key",
+        "name": "Crumbling Halls",
+        "key_name": "Moonstone Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "Bones litter the threshold of Hidden Warren. Whatever guards this place does not welcome visitors.",
+        "description": "Bones litter the threshold of Crumbling Halls. Whatever guards this place does not welcome visitors.",
         "quest_type": "retrieve",
-        "quest_objective": "Retrieve the Coral Key from Hidden Warren",
+        "quest_objective": "Retrieve the Moonstone Key from Crumbling Halls",
         "quest_hint": "A powerful artifact lies in the deepest chamber.",
         "kill_target": "",
         "kill_count": 0,
-        "size": "small",
-        "torch_density": "high",
-        "random_encounters": false,
+        "size": "large",
+        "torch_density": "medium",
+        "random_encounters": true,
         "exit_portal": true,
         "levels": [
           {
@@ -118,61 +132,44 @@
             "encounters": [
               {
                 "monsters": [
-                  "Skeleton",
-                  "Skeleton Archer",
-                  "Skeleton Archer",
-                  "Dark Mage"
+                  "Dark Mage",
+                  "Dark Mage",
+                  "Dark Mage",
+                  "Dark Mage",
+                  "Orc Shaman"
                 ],
                 "battle_screen": {
                   "style": "dungeon",
                   "music": "Default",
                   "obstacles": [
                     {
-                      "type": "rubble",
-                      "col": 4,
-                      "row": 8
+                      "type": "cactus",
+                      "col": 15,
+                      "row": 2
                     },
                     {
-                      "type": "rubble",
-                      "col": 5,
-                      "row": 8
+                      "type": "rock",
+                      "col": 14,
+                      "row": 2
                     },
                     {
-                      "type": "boulder",
-                      "col": 6,
-                      "row": 8
+                      "type": "rock",
+                      "col": 13,
+                      "row": 2
                     },
                     {
-                      "type": "boulder",
-                      "col": 7,
-                      "row": 8
-                    },
-                    {
-                      "type": "boulder",
-                      "col": 8,
-                      "row": 10
-                    },
-                    {
-                      "type": "boulder",
-                      "col": 7,
-                      "row": 11
-                    },
-                    {
-                      "type": "boulder",
-                      "col": 6,
-                      "row": 12
-                    },
-                    {
-                      "type": "boulder",
-                      "col": 5,
-                      "row": 12
+                      "type": "rock",
+                      "col": 13,
+                      "row": 3
                     }
                   ],
                   "painted": {}
                 }
               }
             ],
-            "random_encounters": "inherit"
+            "random_encounters": "inherit",
+            "torch_density": "inherit",
+            "size": "inherit"
           }
         ]
       }
