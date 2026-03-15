@@ -1,0 +1,1 @@
+- decrease the thief movement (he is overpowered)

@@ -65,6 +65,9 @@ _TERRAIN_OBSTACLES = {
     TILE_PATH:     (1, 3,  [("rock", 2), ("tree", 1)]),
 }
 
+# Dungeon combat always uses this table (no terrain_tile needed)
+_DUNGEON_OBSTACLES = (2, 5, [("pillar", 3), ("rock", 2), ("rubble", 1)])
+
 PHASE_INIT        = "init"
 PHASE_PLAYER      = "player"         # menu selection (up/down + enter)
 PHASE_PLAYER_DIR  = "player_dir"     # choosing direction for action
@@ -365,6 +368,30 @@ class CombatState(BaseState):
             used_positions.add((col, row))
             placed += 1
 
+    def _spawn_dungeon_obstacles(self, used_positions):
+        """Place dungeon-appropriate obstacles (pillars, rocks, rubble)."""
+        self.arena_obstacles = {}
+
+        min_n, max_n, weighted_types = _DUNGEON_OBSTACLES
+        count = random.randint(min_n, max_n)
+        types = [t for t, _ in weighted_types]
+        weights = [w for _, w in weighted_types]
+
+        placed = 0
+        for _attempt in range(count * 10):
+            if placed >= count:
+                break
+            col = random.randint(2, ARENA_COLS - 3)
+            row = random.randint(7, 14)
+            if (col, row) in used_positions:
+                continue
+            if self._is_arena_wall(col, row):
+                continue
+            obs_type = random.choices(types, weights)[0]
+            self.arena_obstacles[(col, row)] = obs_type
+            used_positions.add((col, row))
+            placed += 1
+
     @property
     def active_fighter(self):
         """The party member whose turn it is."""
@@ -513,9 +540,11 @@ class CombatState(BaseState):
                     used.add((mc, mr))
                     break
 
-        # Spawn terrain obstacles for overworld combat
+        # Spawn terrain obstacles
         if source_state == "overworld" and terrain_tile is not None:
             self._spawn_arena_obstacles(terrain_tile, used)
+        elif source_state == "dungeon":
+            self._spawn_dungeon_obstacles(used)
         else:
             self.arena_obstacles = {}
 

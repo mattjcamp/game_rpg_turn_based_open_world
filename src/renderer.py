@@ -5447,6 +5447,43 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.line(self.screen, (50, 150, 50),
                              (cx, body_y + 2), (cx, body_y + body_h - 2), 1)
 
+        elif obs_type == "pillar":
+            # Stone pillar: rectangle with cap and base
+            pw = ts // 3
+            ph = ts - 4
+            pillar_x = cx - pw // 2
+            pillar_y = py + 2
+            # Base (wider)
+            base_w = pw + 4
+            pygame.draw.rect(self.screen, (100, 95, 90),
+                             pygame.Rect(cx - base_w // 2,
+                                         pillar_y + ph - 3, base_w, 3))
+            # Shaft
+            pygame.draw.rect(self.screen, (115, 110, 105),
+                             pygame.Rect(pillar_x, pillar_y + 3, pw, ph - 6))
+            # Cap (wider)
+            pygame.draw.rect(self.screen, (100, 95, 90),
+                             pygame.Rect(cx - base_w // 2, pillar_y, base_w, 3))
+            # Highlight edge
+            pygame.draw.line(self.screen, (140, 135, 130),
+                             (pillar_x + 1, pillar_y + 4),
+                             (pillar_x + 1, pillar_y + ph - 4), 1)
+
+        elif obs_type == "rubble":
+            # Scattered stone rubble: several small irregular shapes
+            r = ts // 5
+            # A few small rocks clustered together
+            offsets = [(-r, r // 2), (r // 2, -r // 3), (0, r),
+                       (r, r // 2), (-r // 3, -r)]
+            for dx, dy in offsets:
+                rx, ry = cx + dx, cy + dy
+                sz = random.choice([2, 3, 4]) if hasattr(self, '_rubble_seed') else 3
+                pygame.draw.rect(self.screen, (105, 100, 95),
+                                 pygame.Rect(rx - sz // 2, ry - sz // 2, sz, sz))
+            # Larger centre piece
+            pygame.draw.circle(self.screen, (110, 105, 100), (cx, cy), r - 1)
+            pygame.draw.circle(self.screen, (90, 85, 80), (cx, cy), r - 1, 1)
+
     # ── Examine area rendering ──────────────────────────────────
 
     _EXAMINE_COLS = 12
