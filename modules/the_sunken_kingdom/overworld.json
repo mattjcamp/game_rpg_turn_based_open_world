@@ -1,0 +1,89 @@
+{
+  "size": {
+    "width": 48,
+    "height": 36
+  },
+  "biome": "coastal",
+  "season": "Autumn",
+  "time_of_day": "Dusk",
+  "start_position": {
+    "col": 24,
+    "row": 30
+  },
+  "landmarks": [
+    {
+      "id": "tidewatch",
+      "type": "town",
+      "col": 24,
+      "row": 28,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "the_apparatus",
+      "type": "machine",
+      "col": 24,
+      "row": 18,
+      "tile": "TILE_MACHINE",
+      "clear_radius": 2
+    },
+    {
+      "id": "dungeon_coral_crypts",
+      "type": "dungeon",
+      "col": 38,
+      "row": 10,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    },
+    {
+      "id": "dungeon_drowned_temple",
+      "type": "dungeon",
+      "col": 10,
+      "row": 8,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    },
+    {
+      "id": "dungeon_abyssal_throne",
+      "type": "dungeon",
+      "col": 24,
+      "row": 4,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 3
+    },
+    {
+      "id": "dungeon_tidal_caves",
+      "type": "dungeon",
+      "col": 40,
+      "row": 26,
+      "tile": "TILE_DUNGEON",
+      "clear_radius": 2
+    }
+  ],
+  "paths": [
+    {
+      "from": [24, 30],
+      "to": [24, 28]
+    },
+    {
+      "from": [24, 28],
+      "to": [24, 18]
+    },
+    {
+      "from": [24, 18],
+      "to": [38, 10]
+    },
+    {
+      "from": [24, 18],
+      "to": [10, 8]
+    },
+    {
+      "from": [24, 18],
+      "to": [24, 4]
+    },
+    {
+      "from": [24, 28],
+      "to": [40, 26]
+    }
+  ]
+}

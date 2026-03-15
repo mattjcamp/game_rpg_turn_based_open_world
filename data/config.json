@@ -1,8 +1,8 @@
 {
-  "music_enabled": false,
-  "smite_enabled": true,
-  "start_with_equipment": true,
-  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/t",
+  "music_enabled": true,
+  "smite_enabled": false,
+  "start_with_equipment": false,
+  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/the_sunken_kingdom",
   "soundtrack_style": "Dark & Moody",
-  "start_level": 5
+  "start_level": 1
 }
