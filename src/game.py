@@ -509,12 +509,14 @@ class Game:
             kt = kd.get("kill_target", "") if quest_type == "kill" else None
             kc = int(kd.get("kill_count", 0)) if quest_type == "kill" else 0
             td = kd.get("torch_density", "medium")
+            dsz = kd.get("size", "medium")
             levels = generate_keys_dungeon(
                 dnum, name=name,
                 place_artifact=needs_artifact,
                 module_levels=module_levels,
                 kill_target=kt, kill_count=kc,
-                torch_density=td)
+                torch_density=td,
+                dungeon_size=dsz)
             self.key_dungeons[(col, row)] = {
                 "dungeon_number": dnum,
                 "name": name,
@@ -1765,11 +1767,15 @@ class Game:
         dungeon_children = []
         _TORCH_DENSITY_NAMES = {"high": "High", "medium": "Medium",
                                 "low": "Low"}
+        _DUNGEON_SIZE_NAMES = {"small": "Small", "medium": "Medium",
+                               "large": "Large"}
         for i, dung in enumerate(dungeons):
             dname = dung.get("name", f"Dungeon {i+1}")
             n_levels = len(dung.get("levels", []))
             td_raw = dung.get("torch_density", "medium")
             td_display = _TORCH_DENSITY_NAMES.get(td_raw, "Medium")
+            sz_raw = dung.get("size", "medium")
+            sz_display = _DUNGEON_SIZE_NAMES.get(sz_raw, "Medium")
             dungeon_children.append({
                 "label": dname,
                 "icon": "D",
@@ -1778,6 +1784,7 @@ class Game:
                     ["Name", f"dung_{i}_name", dname, "text", True],
                     ["Description", f"dung_{i}_desc",
                      dung.get("description", ""), "text", True],
+                    ["Size", f"dung_{i}_dsize", sz_display, "choice", True],
                     ["Torch Density", f"dung_{i}_tdensity",
                      td_display, "choice", True],
                 ],
@@ -3011,6 +3018,8 @@ class Game:
             return getattr(self, "_module_edit_town_names", []) or ["(none)"]
         elif key.endswith("_tdensity"):
             return ["High", "Medium", "Low"]
+        elif key.endswith("_dsize"):
+            return ["Small", "Medium", "Large"]
         elif key.endswith("_exitportal"):
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
@@ -3322,6 +3331,7 @@ class Game:
                 "name": "name",
                 "desc": "description",
                 "tdensity": "torch_density",
+                "dsize": "size",
             }
             for key, val in values.items():
                 if not key.startswith("dung_"):
@@ -3336,8 +3346,8 @@ class Game:
                 suffix = parts[2]
                 json_key = dung_field_map.get(suffix)
                 if json_key and 0 <= idx < len(dungeons):
-                    # Torch density: convert display name to key
-                    if suffix == "tdensity":
+                    # Torch density / size: convert display name to key
+                    if suffix in ("tdensity", "dsize"):
                         val = val.lower()
                     dungeons[idx][json_key] = val
 

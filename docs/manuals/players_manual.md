@@ -886,6 +886,16 @@ While traveling, the party may be ambushed by roaming monsters. Encounter diffic
 
 Dungeons are multi-floor underground areas filled with monsters, traps, treasure, and quest objectives. Each floor is a maze of rooms and corridors that must be explored carefully.
 
+### Dungeon Size
+
+Each dungeon has a **size** setting (configured by the module creator) that determines the floor area of its levels:
+
+- **Small** — Compact floors with fewer rooms. Quicker to explore but less loot to find.
+- **Medium** — Standard-sized floors with a moderate number of rooms and corridors.
+- **Large** — Sprawling floors with more rooms and wider layouts. More encounters and treasure, but longer to clear.
+
+Deeper floors within a dungeon are always slightly larger than earlier ones, regardless of size setting.
+
 ### Torch Density & Lighting
 
 Dungeons vary in how well-lit they are. The **torch density** setting (configured by the module creator) controls how many wall-mounted torches appear on each floor:

@@ -145,7 +145,8 @@
             "random_encounters": true,
             "torch_density": "medium"
           }
-        ]
+        ],
+        "size": "small"
       },
       {
         "id": "dungeon_key_2",
@@ -194,7 +195,8 @@
             ],
             "random_encounters": true
           }
-        ]
+        ],
+        "size": "medium"
       },
       {
         "id": "dungeon_key_3",
@@ -274,7 +276,8 @@
             "random_encounters": true,
             "torch_density": "medium"
           }
-        ]
+        ],
+        "size": "medium"
       }
     ],
     "innkeeper_quests": true

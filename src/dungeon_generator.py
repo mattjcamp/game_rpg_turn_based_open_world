@@ -711,18 +711,24 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
             if remaining <= 0:
                 break
 
+    base_w, base_h = _DUNGEON_SIZE_SCALES.get(dungeon_size, (28, 22))
+    cap_w, cap_h = _DUNGEON_SIZE_CAPS.get(dungeon_size, (40, 30))
+
     levels = []
     for floor in range(num_floors):
         is_last = (floor == num_floors - 1)
         enc_level = floor + 1
-        w = min(40, 28 + floor * 2)
-        h = min(30, 22 + floor * 2)
+        w = min(cap_w, base_w + floor * 2)
+        h = min(cap_h, base_h + floor * 2)
         custom_enc = floor_kill_encounters[floor] or None
+        # Scale room counts with dungeon size
+        room_offset = {"small": -1, "medium": 0, "large": 2}.get(
+            dungeon_size, 0)
         level = generate_dungeon(
             name=f"{name} - Level {floor + 1}",
             width=w, height=h,
-            min_rooms=max(4, 4 + floor),
-            max_rooms=max(6, 6 + floor),
+            min_rooms=max(3, 4 + floor + room_offset),
+            max_rooms=max(4, 6 + floor + room_offset),
             place_stairs_down=not is_last,
             place_artifact=(is_last and place_artifact),
             place_doors=False,
@@ -736,10 +742,23 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
     return levels
 
 
+_DUNGEON_SIZE_SCALES = {
+    "small":  (20, 16),   # base width, base height
+    "medium": (28, 22),
+    "large":  (36, 28),
+}
+_DUNGEON_SIZE_CAPS = {
+    "small":  (28, 22),   # max width, max height
+    "medium": (40, 30),
+    "large":  (52, 38),
+}
+
+
 def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
                           module_levels=None,
                           kill_target=None, kill_count=0,
-                          torch_density="medium"):
+                          torch_density="medium",
+                          dungeon_size="medium"):
     """Generate a progressive dungeon for a module.
 
     When *module_levels* is provided (from the module editor), the floor
@@ -760,6 +779,8 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
         ``"name"`` and ``"encounters"`` (list of ``{"monster", "count"}``).
         When provided, overrides the default floor count and encounter
         generation.
+    dungeon_size : str
+        "small", "medium", or "large". Controls the base floor area.
 
     Returns
     -------
