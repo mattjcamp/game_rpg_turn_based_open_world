@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "id": "new_module_2",
+    "name": "New Module",
+    "author": "Unknown",
+    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Galecrest to break the spell.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 32,
+    "map_height": 24,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "tile": null,
+      "base_tile": "grass"
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "tile": null,
+      "base_tile": "grass"
+    }
+  },
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "galecrest",
+        "name": "Galecrest",
+        "description": "A quiet hamlet nestled among rolling hills, known for its warm hearths.",
+        "town_config": {
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
+        }
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_shrine"
+    },
+    "starting_quests": [
+      "awaken"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Iron Mines",
+        "key_name": "Copper Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Thick vines choke the mouth of Iron Mines. Beyond them, torchlight flickers in the gloom.",
+        "quest_type": "retrieve",
+        "quest_objective": "Retrieve the Copper Key from Iron Mines",
+        "quest_hint": "A powerful artifact lies in the deepest chamber.",
+        "kill_target": "",
+        "kill_count": 0,
+        "size": "small",
+        "torch_density": "low",
+        "random_encounters": true,
+        "exit_portal": true,
+        "levels": [
+          {
+            "name": "Floor 1",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true
+          },
+          {
+            "name": "Floor 2",
+            "encounters": [
+              {
+                "monster": "Giant Rat",
+                "count": 1
+              }
+            ],
+            "random_encounters": true,
+            "torch_density": "inherit",
+            "size": "large"
+          }
+        ]
+      }
+    ],
+    "innkeeper_quests": false
+  }
+}

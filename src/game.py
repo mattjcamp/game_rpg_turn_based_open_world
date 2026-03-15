@@ -1776,6 +1776,8 @@ class Game:
             td_display = _TORCH_DENSITY_NAMES.get(td_raw, "Medium")
             sz_raw = dung.get("size", "medium")
             sz_display = _DUNGEON_SIZE_NAMES.get(sz_raw, "Medium")
+            re_display = "Yes" if dung.get(
+                "random_encounters", True) else "No"
             dungeon_children.append({
                 "label": dname,
                 "icon": "D",
@@ -1787,6 +1789,8 @@ class Game:
                     ["Size", f"dung_{i}_dsize", sz_display, "choice", True],
                     ["Torch Density", f"dung_{i}_tdensity",
                      td_display, "choice", True],
+                    ["Random Encounters", f"dung_{i}_randenc",
+                     re_display, "choice", True],
                 ],
                 "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
                              if n_levels > 0 else "no levels"),
@@ -2146,18 +2150,28 @@ class Game:
         fields.append(["Level Name", f"lvl_{level_idx}_name",
                         level.get("name", f"Floor {level_idx + 1}"),
                         "text", True])
-        # Include random encounters toggle
-        fields.append(["Random Encounters",
-                        f"lvl_{level_idx}_randenc",
-                        "Yes" if level.get("random_encounters", True)
-                        else "No",
-                        "choice", True])
-        # Torch density per level
-        _td_map = {"high": "High", "medium": "Medium", "low": "Low"}
-        td_raw = level.get("torch_density", "medium")
+
+        # Inheritable settings — "Inherit" means use the dungeon default
+        _td_map = {"high": "High", "medium": "Medium", "low": "Low",
+                    "inherit": "Inherit"}
+        _sz_map = {"small": "Small", "medium": "Medium", "large": "Large",
+                   "inherit": "Inherit"}
+        _re_map = {True: "Yes", False: "No", "inherit": "Inherit"}
+
+        td_raw = level.get("torch_density", "inherit")
         fields.append(["Torch Density",
-                        f"lvl_{level_idx}_tdensity",
-                        _td_map.get(td_raw, "Medium"),
+                        f"lvl_{level_idx}_ftdensity",
+                        _td_map.get(td_raw, "Inherit"),
+                        "choice", True])
+        sz_raw = level.get("size", "inherit")
+        fields.append(["Size",
+                        f"lvl_{level_idx}_fdsize",
+                        _sz_map.get(sz_raw, "Inherit"),
+                        "choice", True])
+        re_raw = level.get("random_encounters", "inherit")
+        fields.append(["Random Encounters",
+                        f"lvl_{level_idx}_frandenc",
+                        _re_map.get(re_raw, "Inherit"),
                         "choice", True])
 
         for ei, enc in enumerate(encounters):
@@ -2220,14 +2234,24 @@ class Game:
             return
         level = levels[level_idx]
 
-        # Read back level name, random encounters flag, and torch density
+        # Read back level name and inheritable settings
         for entry in self.module_edit_fields:
             if entry[1] == f"lvl_{level_idx}_name":
                 level["name"] = entry[2]
-            elif entry[1] == f"lvl_{level_idx}_randenc":
-                level["random_encounters"] = (entry[2] == "Yes")
-            elif entry[1] == f"lvl_{level_idx}_tdensity":
-                level["torch_density"] = entry[2].lower()
+            elif entry[1] == f"lvl_{level_idx}_ftdensity":
+                v = entry[2]
+                level["torch_density"] = (
+                    "inherit" if v == "Inherit" else v.lower())
+            elif entry[1] == f"lvl_{level_idx}_fdsize":
+                v = entry[2]
+                level["size"] = (
+                    "inherit" if v == "Inherit" else v.lower())
+            elif entry[1] == f"lvl_{level_idx}_frandenc":
+                v = entry[2]
+                if v == "Inherit":
+                    level["random_encounters"] = "inherit"
+                else:
+                    level["random_encounters"] = (v == "Yes")
 
         # Read back encounters
         encounters = []
@@ -3018,8 +3042,14 @@ class Game:
             return getattr(self, "_module_edit_town_names", []) or ["(none)"]
         elif key.endswith("_tdensity"):
             return ["High", "Medium", "Low"]
+        elif key.endswith("_ftdensity"):
+            return ["Inherit", "High", "Medium", "Low"]
         elif key.endswith("_dsize"):
             return ["Small", "Medium", "Large"]
+        elif key.endswith("_fdsize"):
+            return ["Inherit", "Small", "Medium", "Large"]
+        elif key.endswith("_frandenc"):
+            return ["Inherit", "Yes", "No"]
         elif key.endswith("_exitportal"):
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
@@ -3332,6 +3362,7 @@ class Game:
                 "desc": "description",
                 "tdensity": "torch_density",
                 "dsize": "size",
+                "randenc": "random_encounters",
             }
             for key, val in values.items():
                 if not key.startswith("dung_"):
@@ -3349,6 +3380,8 @@ class Game:
                     # Torch density / size: convert display name to key
                     if suffix in ("tdensity", "dsize"):
                         val = val.lower()
+                    elif suffix == "randenc":
+                        val = (val == "Yes")
                     dungeons[idx][json_key] = val
 
             # ── Quest fields (quest_<i>_<field>) ──

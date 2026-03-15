@@ -1,7 +1,7 @@
 {
-  "music_enabled": true,
+  "music_enabled": false,
   "smite_enabled": true,
   "start_with_equipment": false,
-  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/on_an_island",
+  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/new_module_2",
   "soundtrack_style": "Dark & Moody"
 }

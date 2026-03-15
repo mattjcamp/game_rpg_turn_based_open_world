@@ -191,100 +191,95 @@ def _connect_rooms(tmap, room_a, room_b):
 
 
 def _place_doors(tmap, rooms):
-    """Place doors where corridors meet room edges.
+    """Place doors flush against walls where corridors enter rooms.
 
-    Scans the perimeter of each room.  A perimeter tile gets a door if it
-    is a floor tile and at least one of its cardinal neighbours is also a
-    floor tile that lies *outside* every room (i.e. in a corridor).
+    Scans the one-tile-thick wall ring just *outside* each room.  A
+    wall-ring tile becomes a door if:
+
+    1. A corridor has carved it to floor.
+    2. It has a cardinal neighbour inside the room (connects to interior).
+    3. It has wall on both perpendicular sides (1-wide opening), giving
+       the door a flush-against-the-wall appearance matching town doors.
     """
-    # Build a set of all tiles that belong to a room interior
-    room_tiles = set()
-    for room in rooms:
-        for r in range(room.y, room.y2):
-            for c in range(room.x, room.x2):
-                room_tiles.add((c, r))
+    PASSABLE = {TILE_DFLOOR, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
+                TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PUDDLE, TILE_MOSS}
 
-    for room in rooms:
-        # Walk the perimeter (the outermost ring of the room)
-        perimeter = set()
-        for c in range(room.x, room.x2):
-            perimeter.add((c, room.y))
-            perimeter.add((c, room.y2 - 1))
-        for r in range(room.y, room.y2):
-            perimeter.add((room.x, r))
-            perimeter.add((room.x2 - 1, r))
-
-        for (pc, pr) in perimeter:
-            if tmap.get_tile(pc, pr) != TILE_DFLOOR:
-                continue
-            # Check cardinal neighbours outside the room
-            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
-                nc, nr = pc + dc, pr + dr
-                if (nc, nr) in room_tiles:
-                    continue
-                if tmap.get_tile(nc, nr) == TILE_DFLOOR:
-                    tmap.set_tile(pc, pr, TILE_DDOOR)
-                    break  # one door per perimeter tile
-
-
-def _place_locked_doors(tmap, rooms):
-    """Place locked doors on rooms that have exactly one tile-wide entrance.
-
-    A room entrance is a perimeter tile that is floor/door and has a cardinal
-    neighbour outside the room that is also floor/door (i.e. corridor).
-    If there is exactly one such entrance tile, replace it with a locked door.
-    Skip the first room (entrance room with stairs).
-    """
-    PASSABLE = {TILE_DFLOOR, TILE_DDOOR, TILE_STAIRS, TILE_CHEST,
-                TILE_TRAP, TILE_STAIRS_DOWN, TILE_ARTIFACT,
-                TILE_PUDDLE, TILE_MOSS}
-
-    # Build set of tiles belonging to each room
+    # Pre-compute room interior tile sets
+    all_room_tiles = set()
     room_tile_sets = []
     for room in rooms:
         tiles = set()
         for r in range(room.y, room.y2):
             for c in range(room.x, room.x2):
                 tiles.add((c, r))
+                all_room_tiles.add((c, r))
         room_tile_sets.append(tiles)
 
-    all_room_tiles = set()
-    for s in room_tile_sets:
-        all_room_tiles |= s
+    for ri, room in enumerate(rooms):
+        room_tiles = room_tile_sets[ri]
 
+        # Build the wall ring: tiles just outside the room bounds
+        wall_ring = []
+        for c in range(room.x, room.x2):
+            wall_ring.append((c, room.y - 1))   # north
+            wall_ring.append((c, room.y2))       # south
+        for r in range(room.y, room.y2):
+            wall_ring.append((room.x - 1, r))   # west
+            wall_ring.append((room.x2, r))       # east
+
+        for wc, wr in wall_ring:
+            tile = tmap.get_tile(wc, wr)
+            if tile not in PASSABLE:
+                continue  # still solid wall — no corridor here
+            if (wc, wr) in all_room_tiles:
+                continue  # inside another room, not a doorway
+
+            # Must connect to this room's interior
+            connects = False
+            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                if (wc + dc, wr + dr) in room_tiles:
+                    connects = True
+                    break
+            if not connects:
+                continue
+
+            # Must have wall on both perpendicular sides (1-wide opening)
+            h_walls = (tmap.get_tile(wc - 1, wr) == TILE_DWALL and
+                       tmap.get_tile(wc + 1, wr) == TILE_DWALL)
+            v_walls = (tmap.get_tile(wc, wr - 1) == TILE_DWALL and
+                       tmap.get_tile(wc, wr + 1) == TILE_DWALL)
+
+            if h_walls or v_walls:
+                tmap.set_tile(wc, wr, TILE_DDOOR)
+
+
+def _place_locked_doors(tmap, rooms):
+    """Replace the single door of single-entrance rooms with a locked door.
+
+    Must be called *after* ``_place_doors`` so that regular doors already
+    sit on the wall ring.  For each room (except the entrance room),
+    scan the wall ring for ``TILE_DDOOR`` tiles.  If there is exactly one,
+    upgrade it to ``TILE_LOCKED_DOOR``.
+    """
     for ri, room in enumerate(rooms):
         if ri == 0:
             continue  # don't lock the entrance room
 
-        room_tiles = room_tile_sets[ri]
-
-        # Find perimeter tiles
-        perimeter = set()
+        # Scan the wall ring for doors placed by _place_doors
+        wall_ring = []
         for c in range(room.x, room.x2):
-            perimeter.add((c, room.y))
-            perimeter.add((c, room.y2 - 1))
+            wall_ring.append((c, room.y - 1))
+            wall_ring.append((c, room.y2))
         for r in range(room.y, room.y2):
-            perimeter.add((room.x, r))
-            perimeter.add((room.x2 - 1, r))
+            wall_ring.append((room.x - 1, r))
+            wall_ring.append((room.x2, r))
 
-        # Find entrance tiles: perimeter floor/door tiles with an outside
-        # cardinal neighbour that is also passable
-        entrances = []
-        for (pc, pr) in perimeter:
-            tid = tmap.get_tile(pc, pr)
-            if tid not in PASSABLE and tid != TILE_DDOOR:
-                continue
-            for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
-                nc, nr = pc + dc, pr + dr
-                if (nc, nr) in room_tiles:
-                    continue  # neighbour is inside the room
-                if tmap.get_tile(nc, nr) in PASSABLE or tmap.get_tile(nc, nr) == TILE_DDOOR:
-                    entrances.append((pc, pr))
-                    break
+        doors = [(wc, wr) for wc, wr in wall_ring
+                 if tmap.get_tile(wc, wr) == TILE_DDOOR]
 
-        if len(entrances) == 1:
-            ec, er = entrances[0]
-            tmap.set_tile(ec, er, TILE_LOCKED_DOOR)
+        if len(doors) == 1:
+            dc, dr = doors[0]
+            tmap.set_tile(dc, dr, TILE_LOCKED_DOOR)
 
 
 def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
@@ -366,11 +361,22 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
             if abs(tc - ptc) + abs(tr - ptr) < min_spacing:
                 too_close = True
                 break
-        if not too_close:
-            tmap.set_tile(tc, tr, TILE_WALL_TORCH)
-            placed_torches.append((tc, tr))
-            if len(placed_torches) >= max_torches:
+        if too_close:
+            continue
+        # Don't place a torch adjacent to a door — it would break the
+        # visual "flush against wall" appearance of the door.
+        adjacent_door = False
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            nt = tmap.get_tile(tc + dx, tr + dy)
+            if nt in (TILE_DDOOR, TILE_LOCKED_DOOR):
+                adjacent_door = True
                 break
+        if adjacent_door:
+            continue
+        tmap.set_tile(tc, tr, TILE_WALL_TORCH)
+        placed_torches.append((tc, tr))
+        if len(placed_torches) >= max_torches:
+            break
 
     # --- Puddles: small water patches on floor tiles ---
     # Prefer tiles away from room centers, near corridors
@@ -591,7 +597,10 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         ac, ar = last_room.center
         tmap.set_tile(ac, ar, TILE_ARTIFACT)
 
-    # --- Place locked doors on rooms with single-tile entrances ---
+    # --- Place doors flush against walls where corridors enter rooms ---
+    _place_doors(tmap, rooms)
+
+    # --- Upgrade single-entrance rooms to locked doors ---
     _place_locked_doors(tmap, rooms)
 
     # --- Place cosmetic decorations (puddles, moss, wall torches) ---
@@ -664,7 +673,8 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
 def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
                                      place_artifact=True,
                                      kill_target=None, kill_count=0,
-                                     torch_density="medium"):
+                                     torch_density="medium",
+                                     dungeon_size="medium"):
     """Generate a random multi-level dungeon for an innkeeper quest.
 
     Parameters
@@ -814,34 +824,65 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             if remaining <= 0:
                 break
 
+    base_w, base_h = _DUNGEON_SIZE_SCALES.get(dungeon_size, (28, 22))
+    cap_w, cap_h = _DUNGEON_SIZE_CAPS.get(dungeon_size, (40, 30))
+    room_offset = {"small": -1, "medium": 0, "large": 2}.get(
+        dungeon_size, 0)
+
+    # Default for random_encounters at the dungeon level (True unless
+    # explicitly set to False in module data).
+    dung_random = True
+
     levels = []
 
     for floor in range(num_floors):
         is_last = (floor == num_floors - 1)
         enc_level = floor + 1
 
-        # Dungeons get slightly bigger with depth
-        w = min(40, 28 + floor * 2)
-        h = min(30, 22 + floor * 2)
-        min_r = min(8, 4 + floor)
-        max_r = min(12, 6 + floor)
+        # Per-floor defaults (may be overridden by module_levels)
+        floor_torch = torch_density
+        floor_size = dungeon_size
+        floor_random = dung_random
 
-        # Determine floor name and encounters from module specs
-        floor_torch = torch_density  # default to dungeon-level setting
         if module_levels and floor < len(module_levels):
             ml = module_levels[floor]
             floor_name = ml.get("name", f"Floor {floor + 1}")
             custom_enc = ml.get("encounters")
-            # Ensure encounters is a proper list of dicts
             if not custom_enc or not isinstance(custom_enc, list):
                 custom_enc = None
-            include_random = ml.get("random_encounters", False)
-            # Per-level torch density overrides dungeon default
-            floor_torch = ml.get("torch_density", torch_density)
+
+            # Resolve inheritable settings — "inherit" or missing
+            # falls back to the dungeon-level default.
+            ft = ml.get("torch_density", "inherit")
+            floor_torch = torch_density if ft == "inherit" else ft
+
+            fs = ml.get("size", "inherit")
+            floor_size = dungeon_size if fs == "inherit" else fs
+
+            fr = ml.get("random_encounters", "inherit")
+            if fr == "inherit":
+                floor_random = dung_random
+            else:
+                floor_random = bool(fr)
+
+            include_random = floor_random
         else:
             floor_name = f"Floor {floor + 1}"
             custom_enc = None
-            include_random = True  # procedural floors always random
+            include_random = True
+
+        # Compute dimensions from resolved floor size
+        f_base_w, f_base_h = _DUNGEON_SIZE_SCALES.get(
+            floor_size, (28, 22))
+        f_cap_w, f_cap_h = _DUNGEON_SIZE_CAPS.get(
+            floor_size, (40, 30))
+        f_room_offset = {"small": -1, "medium": 0, "large": 2}.get(
+            floor_size, 0)
+
+        w = min(f_cap_w, f_base_w + floor * 2)
+        h = min(f_cap_h, f_base_h + floor * 2)
+        min_r = max(3, 4 + floor + f_room_offset)
+        max_r = max(4, 6 + floor + f_room_offset)
 
         # Merge kill-quest guaranteed encounters with any custom ones
         kill_enc = floor_kill_encounters[floor]
