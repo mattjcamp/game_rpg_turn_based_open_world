@@ -262,10 +262,11 @@ class DungeonState(InventoryMixin, BaseState):
                         self.game.party.col, self.game.party.row
                     )
                     if tile_id == TILE_STAIRS:
-                        if self.quest_levels and self.current_level == 1:
-                            # Ascend back to level 0
+                        if self.quest_levels and self.current_level > 0:
+                            # Ascend one level up in a multi-level dungeon
                             self._ascend_level()
                         else:
+                            # Already on top floor (level 0) — exit to overworld
                             self._exit_dungeon()
                     else:
                         self.show_message(
