@@ -27,14 +27,47 @@
     "moongate": {
       "name": "Moongate",
       "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
-      "tile": null,
-      "base_tile": "grass"
+      "tile": "game/landmarks/moongate_active.png",
+      "base_tile": "grass",
+      "examine_layout": {
+        "2,2": "game/landmarks/moongate_active.png",
+        "1,3": "game/terrain/bridge.png",
+        "1,2": "game/terrain/bridge.png",
+        "1,1": "game/terrain/bridge.png",
+        "2,1": "game/terrain/bridge.png",
+        "3,1": "game/terrain/bridge.png",
+        "4,1": "game/terrain/bridge.png",
+        "2,3": "game/terrain/bridge.png",
+        "3,3": "game/terrain/bridge.png",
+        "4,3": "game/terrain/bridge.png"
+      },
+      "examine_items": {
+        "5,1": "Torch",
+        "9,2": "Holy Water"
+      }
     },
     "whispering_stones": {
       "name": "Whispering Stones",
       "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
-      "tile": "game/dungeon/portal_open.png",
-      "base_tile": "forest"
+      "tile": null,
+      "base_tile": "forest",
+      "examine_layout": {
+        "1,1": "game/terrain/bridge.png",
+        "2,1": "game/terrain/bridge.png",
+        "3,1": "game/terrain/bridge.png",
+        "4,1": "game/terrain/bridge.png",
+        "5,1": "game/terrain/bridge.png",
+        "6,1": "game/terrain/bridge.png",
+        "7,1": "game/terrain/bridge.png",
+        "8,1": "game/terrain/bridge.png",
+        "9,1": "game/terrain/bridge.png",
+        "10,1": "game/terrain/bridge.png"
+      },
+      "examine_items": {
+        "2,4": "Spring Water",
+        "3,4": "Spring Water",
+        "4,4": "Spring Water"
+      }
     }
   },
   "world": {
