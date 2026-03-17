@@ -54,6 +54,9 @@ class DungeonState(InventoryMixin, BaseState):
         self.door_interact_cursor = 0
         self.door_interact_options = []  # list of (label, action_key)
 
+        # ── Help overlay ──
+        self.showing_help = False
+
         # ── Door unlock animation ──
         self.door_unlock_anim = None  # {"col", "row", "timer", "duration"}
 
@@ -196,6 +199,12 @@ class DungeonState(InventoryMixin, BaseState):
         """Handle movement and interactions."""
         for event in events:
             if event.type == pygame.KEYDOWN:
+                # ── Help overlay input ──
+                if self.showing_help:
+                    if event.key in (pygame.K_h, pygame.K_ESCAPE):
+                        self.showing_help = False
+                    return
+
                 # ── Log overlay input ──
                 if self.showing_log:
                     if event.key == pygame.K_l or event.key == pygame.K_ESCAPE:
@@ -276,6 +285,9 @@ class DungeonState(InventoryMixin, BaseState):
                 if event.key == pygame.K_l:
                     self.showing_log = True
                     self.log_scroll = 0
+                    return
+                if event.key == pygame.K_h:
+                    self.showing_help = True
                     return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
@@ -1367,3 +1379,5 @@ class DungeonState(InventoryMixin, BaseState):
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
+        if self.showing_help:
+            renderer.draw_dungeon_help_overlay()

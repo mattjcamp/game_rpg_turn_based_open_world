@@ -256,6 +256,9 @@ class TownState(InventoryMixin, BaseState):
         self.pickpocket_targets = []   # list of adjacent NPCs
         self.pickpocket_cursor = 0     # index into pickpocket_targets
 
+        # ── Help overlay ──
+        self.showing_help = False
+
         # We'll save the overworld position so we can restore it on exit
         self.overworld_col = 0
         self.overworld_row = 0
@@ -376,6 +379,12 @@ class TownState(InventoryMixin, BaseState):
 
         for event in events:
             if event.type == pygame.KEYDOWN:
+                # ── Help overlay input ──
+                if self.showing_help:
+                    if event.key in (pygame.K_h, pygame.K_ESCAPE):
+                        self.showing_help = False
+                    return
+
                 # ── Log overlay input ──
                 if self.showing_log:
                     if event.key == pygame.K_l or event.key == pygame.K_ESCAPE:
@@ -452,6 +461,10 @@ class TownState(InventoryMixin, BaseState):
                     if not self.npc_dialogue_active:
                         self.showing_log = True
                         self.log_scroll = 0
+                    return
+                if event.key == pygame.K_h:
+                    if not self.npc_dialogue_active:
+                        self.showing_help = True
                     return
                 # Character sheet cursor navigation
                 if self.showing_char_detail is not None:
@@ -1833,3 +1846,5 @@ class TownState(InventoryMixin, BaseState):
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
+        if self.showing_help:
+            renderer.draw_town_help_overlay()

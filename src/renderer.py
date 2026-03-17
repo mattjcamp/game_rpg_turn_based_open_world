@@ -11972,6 +11972,26 @@ class Renderer(CombatEffectRendererMixin):
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
 
+        ry += 10
+        sect = sf.render("EXAMINE SCREEN", True, (200, 210, 255))
+        self.screen.blit(sect, (col2_x, ry))
+        ry += lh + 6
+        lines_examine = [
+            ("[E]", "Open / close examine view"),
+            ("[W/A/S/D]", "Move around the area"),
+            ("[L]", "Drop an item on the ground"),
+            ("Walk over", "Pick up ground items"),
+        ]
+        for key, desc in lines_examine:
+            if key.startswith("["):
+                ks = f.render(key, True, (255, 255, 255))
+            else:
+                ks = f.render(key, True, (240, 220, 150))
+            ds = f.render(desc, True, (210, 210, 230))
+            self.screen.blit(ks, (col2_x, ry))
+            self.screen.blit(ds, (col2_x + key_w, ry))
+            ry += lh
+
         # ── Tip ──
         tip_y = max(y, ry) + 14
         tip_text = ("TIP: Talk to the people you meet in town to learn"
@@ -12138,6 +12158,184 @@ class Renderer(CombatEffectRendererMixin):
                           py + ph - 30))
 
         self.screen.set_clip(prev_clip)
+
+    def _draw_help_overlay_frame(self, title):
+        """Set up the common help overlay background and return layout info.
+
+        Returns (px, py, pw, ph, col1_x, col2_x, start_y, tf, sf, f, lh,
+                 key_w, prev_clip).
+        """
+        if not hasattr(self, "_help_title_font"):
+            self._help_title_font = pygame.font.SysFont(
+                "liberationsans", 26, bold=True)
+        if not hasattr(self, "_help_font"):
+            self._help_font = pygame.font.SysFont(
+                "liberationsans", 18, bold=True)
+        if not hasattr(self, "_help_section_font"):
+            self._help_section_font = pygame.font.SysFont(
+                "liberationsans", 20, bold=True)
+
+        dim = pygame.Surface(
+            (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 210))
+        self.screen.blit(dim, (0, 0))
+
+        margin = 40
+        px, py = margin, margin
+        pw = SCREEN_WIDTH - margin * 2
+        ph = SCREEN_HEIGHT - margin * 2
+
+        pygame.draw.rect(self.screen, (8, 8, 20), (px, py, pw, ph))
+        pygame.draw.rect(
+            self.screen, self._U3_LTBLUE, (px, py, pw, ph), 2)
+
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(px, py, pw, ph))
+
+        tf = self._help_title_font
+        sf = self._help_section_font
+        f = self._help_font
+        lh = 24
+        key_w = 120
+
+        title_surf = tf.render(title, True, (255, 200, 100))
+        self.screen.blit(
+            title_surf,
+            (px + pw // 2 - title_surf.get_width() // 2, py + 12))
+
+        col1_x = px + 24
+        col2_x = px + pw // 2 + 14
+        start_y = py + 50
+
+        return (px, py, pw, ph, col1_x, col2_x, start_y,
+                tf, sf, f, lh, key_w, prev_clip)
+
+    def _draw_help_section(self, x, y, section_title, lines, sf, f,
+                           lh, key_w):
+        """Draw a titled section of key/description lines.
+
+        Returns the y position after the last line.
+        """
+        sect = sf.render(section_title, True, (200, 210, 255))
+        self.screen.blit(sect, (x, y))
+        y += lh + 6
+        for key, desc in lines:
+            if key.startswith("["):
+                ks = f.render(key, True, (255, 255, 255))
+            else:
+                ks = f.render(key, True, (240, 220, 150))
+            ds = f.render(desc, True, (210, 210, 230))
+            self.screen.blit(ks, (x, y))
+            self.screen.blit(ds, (x + key_w, y))
+            y += lh
+        return y
+
+    def _draw_help_footer(self, px, py, pw, ph, f, prev_clip):
+        """Draw the close hint and restore clipping."""
+        footer = f.render("[H / ESC] CLOSE", True, (150, 160, 255))
+        self.screen.blit(
+            footer,
+            (px + pw // 2 - footer.get_width() // 2, py + ph - 30))
+        self.screen.set_clip(prev_clip)
+
+    def draw_dungeon_help_overlay(self):
+        """Draw a full-screen overlay showing all dungeon controls."""
+        (px, py, pw, ph, col1_x, col2_x, y,
+         tf, sf, f, lh, key_w, prev_clip) = \
+            self._draw_help_overlay_frame("DUNGEON CONTROLS")
+
+        # ── Left column ──
+        y = self._draw_help_section(
+            col1_x, y, "MOVEMENT", [
+                ("[W/A/S/D]", "Move through the dungeon"),
+                ("[ARROWS]", "Move through the dungeon"),
+            ], sf, f, lh, key_w)
+
+        y += 10
+        y = self._draw_help_section(
+            col1_x, y, "MENUS & SCREENS", [
+                ("[P]", "Open party / inventory"),
+                ("[L]", "Open game log"),
+                ("[H]", "Toggle this help screen"),
+                ("[ESC]", "Exit dungeon (at stairs)"),
+            ], sf, f, lh, key_w)
+
+        # ── Right column ──
+        ry = py + 50
+        ry = self._draw_help_section(
+            col2_x, ry, "INTERACTIONS", [
+                ("Walk into", "Interact with objects"),
+                ("Chests", "Collect treasure"),
+                ("Traps", "May trigger when stepped on"),
+                ("Enemies", "Touch to start combat"),
+            ], sf, f, lh, key_w)
+
+        ry += 10
+        ry = self._draw_help_section(
+            col2_x, ry, "PARTY SCREEN", [
+                ("[1-4]", "View character details"),
+                ("[5]", "Open party stash"),
+                ("[P]", "Close party screen"),
+            ], sf, f, lh, key_w)
+
+        ry += 10
+        ry = self._draw_help_section(
+            col2_x, ry, "TIPS", [
+                ("Torch", "Equip a torch for light"),
+                ("Stairs", "Stand on stairs to exit"),
+            ], sf, f, lh, key_w)
+
+        self._draw_help_footer(px, py, pw, ph, f, prev_clip)
+
+    def draw_town_help_overlay(self):
+        """Draw a full-screen overlay showing all town controls."""
+        (px, py, pw, ph, col1_x, col2_x, y,
+         tf, sf, f, lh, key_w, prev_clip) = \
+            self._draw_help_overlay_frame("TOWN CONTROLS")
+
+        # ── Left column ──
+        y = self._draw_help_section(
+            col1_x, y, "MOVEMENT", [
+                ("[W/A/S/D]", "Move around town"),
+                ("[ARROWS]", "Move around town"),
+            ], sf, f, lh, key_w)
+
+        y += 10
+        y = self._draw_help_section(
+            col1_x, y, "MENUS & SCREENS", [
+                ("[P]", "Open party / inventory"),
+                ("[L]", "Open game log"),
+                ("[H]", "Toggle this help screen"),
+                ("[ESC]", "Leave town"),
+            ], sf, f, lh, key_w)
+
+        # ── Right column ──
+        ry = py + 50
+        ry = self._draw_help_section(
+            col2_x, ry, "INTERACTIONS", [
+                ("Walk into", "Talk to NPCs"),
+                ("Shops", "Buy and sell items"),
+                ("Temple", "Healing and resurrection"),
+                ("Exit gate", "Return to overworld"),
+            ], sf, f, lh, key_w)
+
+        ry += 10
+        ry = self._draw_help_section(
+            col2_x, ry, "PARTY SCREEN", [
+                ("[1-4]", "View character details"),
+                ("[5]", "Open party stash"),
+                ("[P]", "Close party screen"),
+            ], sf, f, lh, key_w)
+
+        ry += 10
+        ry = self._draw_help_section(
+            col2_x, ry, "DIALOGUE", [
+                ("[SPACE]", "Advance dialogue"),
+                ("[ENTER]", "Confirm choice"),
+                ("[UP/DOWN]", "Choose response"),
+            ], sf, f, lh, key_w)
+
+        self._draw_help_footer(px, py, pw, ph, f, prev_clip)
 
     def draw_log_overlay(self, log_entries, scroll_offset=0):
         """Draw a full-screen scrollable game log overlay.
