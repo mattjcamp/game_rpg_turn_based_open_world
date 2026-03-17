@@ -7184,29 +7184,49 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(f"{prefix}{cat['label']}",
                               left_x + 10, y, color, fm)
 
-            # Right panel: description
-            self._u3_text("Game Features", right_x + 16, panel_y + 12,
-                          self._U3_WHITE, f)
-            dy = panel_y + 44
-            self._u3_text(
-                "Edit the data files that define game",
-                right_x + 16, dy, (180, 180, 200), fm)
-            dy += 22
-            self._u3_text(
-                "mechanics: spells, weapons, items,",
-                right_x + 16, dy, (180, 180, 200), fm)
-            dy += 22
-            self._u3_text(
-                "shop types, and more.",
-                right_x + 16, dy, (180, 180, 200), fm)
-            dy += 40
-            self._u3_text(
-                "Changes are saved to the data/ folder",
-                right_x + 16, dy, (140, 140, 160), fs)
-            dy += 18
-            self._u3_text(
-                "and apply to all modules.",
-                right_x + 16, dy, (140, 140, 160), fs)
+            # Right panel: context-sensitive description
+            selected_cat = (categories[cat_cursor]["label"]
+                            if 0 <= cat_cursor < len(categories)
+                            else "")
+            if selected_cat == "Modules":
+                self._u3_text("Modules", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                desc_lines = [
+                    "Create, edit, and manage game",
+                    "modules. Each module defines its",
+                    "own world, dungeons, towns, quests,",
+                    "and encounters.",
+                ]
+                for line in desc_lines:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+            elif selected_cat == "Spells":
+                self._u3_text("Spells", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                desc_lines = [
+                    "Edit the spells available to all",
+                    "character classes. Define MP costs,",
+                    "damage dice, targeting, effects,",
+                    "and level requirements.",
+                ]
+                for line in desc_lines:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+                dy += 18
+                self._u3_text(
+                    "Changes are saved to data/spells.json",
+                    right_x + 16, dy, (140, 140, 160), fs)
+            else:
+                self._u3_text("Game Features", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                self._u3_text(
+                    "Select a category to edit.",
+                    right_x + 16, dy, (180, 180, 200), fm)
 
             # Footer
             self._u3_text(
@@ -7235,45 +7255,105 @@ class Renderer(CombatEffectRendererMixin):
                                    right_w, panel_y, panel_h,
                                    spell_list, spell_cursor,
                                    spell_scroll, fm, fs, f):
-        """Draw the spell list in the left panel and detail in right."""
+        """Draw the spell list in the left panel and detail in right.
+
+        Spells are assumed sorted by casting_type then min_level.
+        Section headers are inserted at group boundaries.
+        """
         self._u3_text("Spells", left_x + 12, panel_y + 8,
                        self._U3_ORANGE, fs)
-        row_h = 28
+        row_h = 36
+        header_h = 28
         ly = panel_y + 30
-        max_visible = (panel_h - 40) // row_h
 
-        for vi, si in enumerate(range(
-                spell_scroll,
-                min(spell_scroll + max_visible, len(spell_list)))):
-            spell = spell_list[si]
-            selected = (si == spell_cursor)
-            y = ly + vi * row_h
-            if selected:
-                bar = pygame.Surface((left_w - 4, row_h - 4),
-                                     pygame.SRCALPHA)
-                bar.fill((255, 200, 60, 30))
-                self.screen.blit(bar, (left_x + 2, y - 2))
-            prefix = "> " if selected else "  "
-            name_color = self._U3_WHITE if selected else (180, 180, 180)
-            name = spell.get("name", "???")
-            # Truncate name to fit
-            max_pw = left_w - 24
-            while len(name) > 2 and fm.size(f"{prefix}{name}")[0] > max_pw:
-                name = name[:-1]
-            self._u3_text(f"{prefix}{name}", left_x + 10, y,
-                          name_color, fm)
-            # Level/cost subtitle
-            lvl = spell.get("min_level", 1)
-            mp = spell.get("mp_cost", 0)
-            sub_color = (140, 180, 140) if selected else (120, 120, 140)
-            self._u3_text(f"L{lvl}  {mp} MP",
-                          left_x + 26, y + 14, sub_color, fs)
+        # Build display rows: list of (type, spell_index | None, label)
+        # "header" rows are not selectable; "spell" rows map to an index
+        display_rows = []
+        prev_ctype = None
+        for si, spell in enumerate(spell_list):
+            ctype = spell.get("casting_type", "sorcerer")
+            if ctype != prev_ctype:
+                label = ("Sorcerer Spells" if ctype == "sorcerer"
+                         else "Cleric Spells")
+                display_rows.append(("header", None, label))
+                prev_ctype = ctype
+            display_rows.append(("spell", si, None))
+
+        # Map spell_cursor to a display-row index for scrolling
+        cursor_drow = 0
+        for di, (rtype, si, _) in enumerate(display_rows):
+            if rtype == "spell" and si == spell_cursor:
+                cursor_drow = di
+                break
+
+        # Compute visible range (scroll around cursor_drow)
+        max_visible = (panel_h - 40) // row_h
+        dscroll = spell_scroll  # reuse scroll offset for display rows
+        # Adjust scroll so cursor row is visible
+        if cursor_drow < dscroll:
+            dscroll = cursor_drow
+        # Don't let a header sit alone; back up one if cursor is right after
+        if dscroll > 0 and display_rows[dscroll][0] == "spell":
+            if dscroll - 1 >= 0 and display_rows[dscroll - 1][0] == "header":
+                dscroll -= 1
+        if cursor_drow >= dscroll + max_visible:
+            dscroll = cursor_drow - max_visible + 1
+
+        # Draw visible rows
+        draw_y = ly
+        drawn = 0
+        for di in range(dscroll, len(display_rows)):
+            if drawn >= max_visible:
+                break
+            rtype, si, label = display_rows[di]
+            if rtype == "header":
+                # Section header
+                hy = draw_y + 2
+                pygame.draw.line(self.screen, (80, 70, 60),
+                                 (left_x + 10, hy + header_h - 2),
+                                 (left_x + left_w - 10, hy + header_h - 2),
+                                 1)
+                self._u3_text(label, left_x + 12, hy,
+                              self._U3_ORANGE, fs)
+                draw_y += header_h
+                drawn += 1
+            else:
+                spell = spell_list[si]
+                selected = (si == spell_cursor)
+                y = draw_y
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, y - 1))
+                prefix = "> " if selected else "  "
+                name_color = (self._U3_WHITE if selected
+                              else (180, 180, 180))
+                name = spell.get("name", "???")
+                max_pw = left_w - 24
+                while (len(name) > 2
+                       and fm.size(f"{prefix}{name}")[0] > max_pw):
+                    name = name[:-1]
+                self._u3_text(f"{prefix}{name}", left_x + 10, y + 2,
+                              name_color, fm)
+                # Level/cost subtitle — fixed positions so values
+                # don't bleed into each other
+                lvl = spell.get("min_level", 1)
+                mp = spell.get("mp_cost", 0)
+                sub_color = ((140, 180, 140) if selected
+                             else (120, 120, 140))
+                self._u3_text(f"L{lvl}", left_x + 26, y + 20,
+                              sub_color, fs)
+                self._u3_text(f"{mp} MP", left_x + 70, y + 20,
+                              sub_color, fs)
+                draw_y += row_h
+                drawn += 1
 
         # Scroll indicators
-        if spell_scroll > 0:
+        if dscroll > 0:
             self._u3_text("^", left_x + left_w // 2 - 4,
                           ly - 8, (180, 180, 200), fs)
-        if spell_scroll + max_visible < len(spell_list):
+        if dscroll + max_visible < len(display_rows):
             self._u3_text("v", left_x + left_w // 2 - 4,
                           ly + max_visible * row_h - 4,
                           (180, 180, 200), fs)

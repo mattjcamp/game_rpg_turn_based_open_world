@@ -124,7 +124,6 @@ class Game:
             {"label": "FORM PARTY", "action": self._title_form_party},
             {"label": "SAVE GAME", "action": self._title_save_game},
             {"label": "LOAD GAME", "action": self._title_load_game},
-            {"label": "MODULES", "action": self._title_modules},
             {"label": "EDIT GAME FEATURES", "action": self._title_features},
             {"label": "SETTINGS", "action": self._title_settings},
             {"label": "QUIT GAME", "action": self._title_quit},
@@ -210,8 +209,10 @@ class Game:
         self.showing_features = False
         self._feat_cursor = 0        # top-level category cursor
         self._feat_categories = [
+            {"label": "Modules", "icon": "M"},
             {"label": "Spells", "icon": "S"},
         ]
+        self._modules_from_features = False  # True when modules opened from features
         # Spell editor state
         self._feat_spell_list = []   # list of spell dicts loaded from JSON
         self._feat_spell_cursor = 0  # which spell is highlighted
@@ -1622,6 +1623,18 @@ class Game:
         self._feat_cursor = 0
         self._feat_spell_editing = False
 
+    def _feat_open_modules(self):
+        """Open the module browser from within the features editor."""
+        self._refresh_module_list()
+        self.showing_features = False
+        self.showing_modules = True
+        self._modules_from_features = True
+        self.module_message = None
+        self.module_msg_timer = 0.0
+        self.module_confirm_delete = False
+        self.module_edit_mode = False
+        self.module_edit_is_new = False
+
     def _feat_load_spells(self):
         """Load spells from data/spells.json into the editor."""
         import json
@@ -1630,9 +1643,17 @@ class Game:
         try:
             with open(path, "r") as f:
                 data = json.load(f)
-            self._feat_spell_list = data.get("spells", [])
+            spells = data.get("spells", [])
         except (OSError, ValueError):
-            self._feat_spell_list = []
+            spells = []
+        # Sort: sorcerer first, then priest/cleric, each by level
+        type_order = {"sorcerer": 0, "priest": 1}
+        spells.sort(key=lambda s: (
+            type_order.get(s.get("casting_type", "sorcerer"), 2),
+            s.get("min_level", 1),
+            s.get("name", ""),
+        ))
+        self._feat_spell_list = spells
         self._feat_spell_cursor = 0
         self._feat_spell_scroll = 0
 
@@ -1837,11 +1858,21 @@ class Game:
 
     # ── Module selection ──────────────────────────────────────
 
+    def _leave_modules(self):
+        """Close modules screen, returning to features or title."""
+        self.showing_modules = False
+        if self._modules_from_features:
+            self.showing_features = True
+            self._modules_from_features = False
+        else:
+            self.showing_title = True
+
     def _title_modules(self):
         """Open the module browser from the title screen."""
         self._refresh_module_list()
         self.showing_title = False
         self.showing_modules = True
+        self._modules_from_features = False
         self.module_message = None
         self.module_msg_timer = 0.0
         self.module_confirm_delete = False
@@ -1887,8 +1918,7 @@ class Game:
             if event.key == pygame.K_n:
                 self._do_create_module()
             elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
-                self.showing_modules = False
-                self.showing_title = True
+                self._leave_modules()
             return
 
         # ── Normal module browsing ──
@@ -1902,11 +1932,9 @@ class Game:
             selected = self.module_list[self.module_cursor]
             self._set_active_module(
                 selected["path"], selected["name"], selected["version"])
-            self.showing_modules = False
-            self.showing_title = True
+            self._leave_modules()
         elif event.key == pygame.K_ESCAPE:
-            self.showing_modules = False
-            self.showing_title = True
+            self._leave_modules()
         elif event.key == pygame.K_n:
             self._do_create_module()
         elif event.key == pygame.K_d:
@@ -4433,13 +4461,15 @@ class Game:
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE,
                            pygame.K_RIGHT):
             cat = self._feat_categories[self._feat_cursor]
-            if cat["label"] == "Spells":
+            if cat["label"] == "Modules":
+                self._feat_open_modules()
+            elif cat["label"] == "Spells":
                 self._feat_load_spells()
                 self._feat_level = 1
 
     def _feat_adjust_spell_scroll(self):
         """Keep spell cursor visible in the spell list."""
-        max_visible = 16
+        max_visible = 14
         if self._feat_spell_cursor < self._feat_spell_scroll:
             self._feat_spell_scroll = self._feat_spell_cursor
         elif (self._feat_spell_cursor >=
