@@ -154,8 +154,6 @@ class Game:
         self.module_edit_active_level = -1   # which level index (-1=props)
         self.module_edit_active_enc = -1     # which encounter index
         self._editing_level_settings = False # True when in level settings
-        self.module_edit_starting_loot = []  # [{item, count}]
-        self.module_edit_in_loot = False     # True when editing loot fields
         from src.module_loader import get_default_module_path, scan_modules
         self.active_module_path = None
         self.active_module_name = "No Module"
@@ -1786,21 +1784,6 @@ class Game:
             ],
         })
 
-        # 2b) Debug / Testing settings
-        debug = manifest.get("debug", {})
-        debug_start_level = str(debug.get("start_level", 1))
-        debug_starter_kit = "Yes" if debug.get("starter_kit", False) else "No"
-        sections.append({
-            "label": "Debug / Testing",
-            "icon": ">",
-            "fields": [
-                ["Start Level", "debug_start_level",
-                 debug_start_level, "choice", True],
-                ["Starter Kit", "debug_starter_kit",
-                 debug_starter_kit, "choice", True],
-            ],
-        })
-
         # 3) Towns folder
         from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
                                        TOWN_STYLE_NAMES, TOWN_STYLE_KEYS,
@@ -1928,20 +1911,7 @@ class Game:
                          if n_quests else "none"),
         })
 
-        # 6) Starting Loot section
-        starting_loot = manifest.get("progression", {}).get(
-            "starting_loot", [])
-        n_loot = len(starting_loot)
-        sections.append({
-            "label": "Starting Loot",
-            "icon": "S",
-            "is_loot": True,
-            "fields": [],  # fields built dynamically when drilled into
-            "subtitle": (f"{n_loot} item{'s' if n_loot != 1 else ''}"
-                         if n_loot > 0 else "no items"),
-        })
-
-        # 7) Unique Tiles folder — each tile is a child + [+] Add Tile
+        # 6) Unique Tiles folder — each tile is a child + [+] Add Tile
         unique_tiles_data = manifest.get("unique_tiles", {})
         self.module_edit_unique_tiles = [
             {"id": tid, **tdef}
@@ -1974,10 +1944,7 @@ class Game:
         self.module_edit_active_level = -1
         self.module_edit_active_enc = -1
         self._editing_level_settings = False
-        # Starting loot data for editing
-        self.module_edit_starting_loot = list(starting_loot)
-        self.module_edit_in_loot = False
-        # Unique tiles state (list already built above for section 7)
+        # Unique tiles state (list already built above for section 6)
         self.module_edit_in_unique_tiles = False
         self.module_edit_active_utile = -1
         self.module_edit_utile_preview = False
@@ -2144,11 +2111,6 @@ class Game:
         # ── Encounter sections drill into encounter fields ──
         if sec.get("icon") == "E" and sec.get("enc_idx") is not None:
             self._enter_encounter_fields(sec["enc_idx"])
-            return
-
-        # ── Starting Loot section drills into loot field editor ──
-        if sec.get("is_loot"):
-            self._enter_loot_fields()
             return
 
         # ── Monster sections drill into monster choice field ──
@@ -2459,11 +2421,6 @@ class Game:
             self._editing_level_settings = False
             self.module_edit_level = 0
             return
-
-        # If we were editing loot, save back to in-memory loot list
-        if self.module_edit_in_loot:
-            self._save_loot_fields()
-            self.module_edit_in_loot = False
 
         # If we were editing a unique tile, save back to in-memory list
         # and rebuild the children so tile labels update
@@ -2952,101 +2909,6 @@ class Game:
             "settings_cursor": self._battle_settings_cursor,
         }
 
-    # ── Starting Loot editing ─────────────────────────────────────
-
-    def _enter_loot_fields(self):
-        """Build field list for editing starting loot items."""
-        self.module_edit_in_loot = True
-        loot = self.module_edit_starting_loot
-        fields = []
-        for li, entry in enumerate(loot):
-            fields.append([f"-- Item {li + 1} --",
-                           f"loot_{li}_hdr", "", "section", False])
-            fields.append(["Item", f"loot_{li}_item",
-                           entry.get("item", "Healing Herb"),
-                           "choice", True])
-            fields.append(["Qty", f"loot_{li}_qty",
-                           str(entry.get("count", 1)),
-                           "int", True])
-        self.module_edit_fields = fields
-        self.module_edit_field = 0
-        self.module_edit_scroll = 0
-        self.module_edit_level = 1
-        self.module_edit_field = self._next_editable_field(0)
-        if self.module_edit_fields:
-            self.module_edit_buffer = \
-                self.module_edit_fields[self.module_edit_field][2]
-
-    def _save_loot_fields(self):
-        """Persist loot field edits back to the in-memory loot list."""
-        loot = []
-        li = 0
-        while True:
-            item_key = f"loot_{li}_item"
-            qty_key = f"loot_{li}_qty"
-            item_val = None
-            qty_val = None
-            for entry in self.module_edit_fields:
-                if entry[1] == item_key:
-                    item_val = entry[2]
-                elif entry[1] == qty_key:
-                    qty_val = entry[2]
-            if item_val is None:
-                break
-            loot.append({
-                "item": item_val,
-                "count": max(1, int(qty_val)) if qty_val else 1,
-            })
-            li += 1
-        self.module_edit_starting_loot = loot
-
-    def _add_loot_item(self):
-        """Add a new item to the starting loot list."""
-        # Save current field edits first
-        if self.module_edit_fields:
-            entry = self.module_edit_fields[self.module_edit_field]
-            entry[2] = self.module_edit_buffer
-        self._save_loot_fields()
-        self.module_edit_starting_loot.append(
-            {"item": "Healing Herb", "count": 1})
-        self._enter_loot_fields()
-        # Move cursor to the new item
-        if self.module_edit_fields:
-            self.module_edit_field = max(
-                0, len(self.module_edit_fields) - 2)
-            self.module_edit_field = self._next_editable_field(0)
-            self.module_edit_buffer = \
-                self.module_edit_fields[self.module_edit_field][2]
-            self._adjust_module_edit_scroll()
-
-    def _remove_loot_item(self):
-        """Remove the currently selected loot item."""
-        loot = self.module_edit_starting_loot
-        if len(loot) <= 0:
-            return  # Nothing to remove
-        # Save current edits
-        if self.module_edit_fields:
-            entry = self.module_edit_fields[self.module_edit_field]
-            entry[2] = self.module_edit_buffer
-        self._save_loot_fields()
-        loot = self.module_edit_starting_loot
-        if not loot:
-            return
-        # Figure out which loot item the cursor is on
-        # Fields: (hdr, item, qty) * N — groups of 3
-        cursor = self.module_edit_field
-        loot_idx = cursor // 3
-        loot_idx = min(loot_idx, len(loot) - 1)
-        loot.pop(loot_idx)
-        self.module_edit_starting_loot = loot
-        if loot:
-            self._enter_loot_fields()
-        else:
-            # No items left — rebuild empty field list
-            self.module_edit_fields = []
-            self.module_edit_field = 0
-            self.module_edit_buffer = ""
-
     # ── Unique Tiles editing ─────────────────────────────────────
 
     # Base tile choice list for the editor
@@ -3500,15 +3362,6 @@ class Game:
                 entry[2] = self.module_edit_buffer
             self._commit_module_edit()
             return
-        # Loot add/remove (only when editing starting loot)
-        if self.module_edit_in_loot:
-            if (event.key == pygame.K_a
-                    and event.mod & pygame.KMOD_CTRL):
-                self._add_loot_item()
-                return
-            if event.key == pygame.K_DELETE:
-                self._remove_loot_item()
-                return
         # (Unique tile add/remove is now at the section browser level)
 
         self._handle_field_editor_input(event)
@@ -3642,10 +3495,6 @@ class Game:
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
             return ["Yes", "No"]
-        elif key == "debug_start_level":
-            return [str(i) for i in range(1, 11)]
-        elif key == "debug_starter_kit":
-            return ["Yes", "No"]
         elif key.endswith("_size") and key.startswith("town_"):
             from src.module_loader import TOWN_SIZE_NAMES
             return TOWN_SIZE_NAMES
@@ -3656,9 +3505,6 @@ class Game:
             return ["Yes", "No"]
         elif key.endswith("_randenc"):
             return ["Yes", "No"]
-        elif key.endswith("_item") and key.startswith("loot_"):
-            from src.module_loader import LOOT_ITEMS
-            return LOOT_ITEMS
         # Unique tile choices
         elif key.endswith("_tilegfx") and key.startswith("utile_"):
             return self._UTILE_TILE_GRAPHICS
@@ -3671,8 +3517,7 @@ class Game:
     def _handle_field_editor_input(self, event):
         """Handle input at the field editor level (level 1)."""
         if not self.module_edit_fields:
-            # Empty field list (e.g. loot with no items) —
-            # only ESC to go back is meaningful here.
+            # Empty field list — only ESC to go back is meaningful.
             return
         field_entry = self.module_edit_fields[self.module_edit_field]
         field_type = field_entry[3] if len(field_entry) > 3 else "text"
@@ -3807,9 +3652,6 @@ class Game:
             # If editing level settings, save them back
             if getattr(self, "_editing_level_settings", False):
                 self._save_level_settings_fields()
-            # If editing loot, save back to in-memory loot list
-            if self.module_edit_in_loot:
-                self._save_loot_fields()
             # If editing a unique tile, save back to in-memory list
             if self.module_edit_in_unique_tiles:
                 self._save_single_utile_fields()
@@ -3895,23 +3737,6 @@ class Game:
                 prog = data.setdefault("progression", {})
                 prog["innkeeper_quests"] = (
                     values["innkeeper_quests"] == "Yes")
-
-            # ── Debug / Testing settings ──
-            debug_changed = False
-            debug = data.setdefault("debug", {})
-            if "debug_start_level" in values:
-                try:
-                    debug["start_level"] = int(values["debug_start_level"])
-                except ValueError:
-                    debug["start_level"] = 1
-                debug_changed = True
-            if "debug_starter_kit" in values:
-                debug["starter_kit"] = (values["debug_starter_kit"] == "Yes")
-                debug_changed = True
-            # Remove debug section if all defaults
-            if debug_changed and debug.get("start_level", 1) == 1 \
-                    and not debug.get("starter_kit", False):
-                data.pop("debug", None)
 
             # ── Town fields (town_<i>_<field>) ──
             from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
@@ -4049,13 +3874,6 @@ class Game:
                 if 0 <= dung_idx < len(dungeons):
                     dungeons[dung_idx]["levels"] = levels_data
 
-            # ── Starting loot ──
-            prog = data.setdefault("progression", {})
-            if self.module_edit_starting_loot:
-                prog["starting_loot"] = self.module_edit_starting_loot
-            else:
-                prog.pop("starting_loot", None)
-
             # ── Unique tiles ──
             ut_dict = {}
             for utile in self.module_edit_unique_tiles:
@@ -4092,7 +3910,6 @@ class Game:
             self.module_edit_nav_stack = []
             self.module_edit_active_dung = -1
             self.module_edit_active_level = -1
-            self.module_edit_in_loot = False
             self.module_edit_in_unique_tiles = False
             self.module_edit_active_utile = -1
             if ok:
@@ -4490,8 +4307,7 @@ class Game:
                     edit_nav_label=getattr(
                         self, "_module_edit_folder_label", ""),
                     edit_in_encounters=(
-                        self.module_edit_active_level >= 0
-                        or self.module_edit_in_loot),
+                        self.module_edit_active_level >= 0),
                     edit_in_dungeon_sub=(
                         self.module_edit_active_dung >= 0),
                     edit_utile_preview=(
