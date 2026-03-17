@@ -7125,6 +7125,341 @@ class Renderer(CombatEffectRendererMixin):
                           SCREEN_HEIGHT - 28,
                           cr_color, self.font_small)
 
+    # ── Game Features editor screen ──────────────────────────────
+
+    def draw_features_screen(self, categories, cat_cursor, level,
+                              spell_list, spell_cursor, spell_scroll,
+                              spell_editing, spell_fields, spell_field,
+                              spell_buffer, spell_field_scroll):
+        """Draw the Game Features editor screen."""
+        self.screen.fill((0, 0, 0))
+        fm = self.font_med
+        f = self.font
+        fs = self.font_small
+
+        # ── Header ──
+        self._u3_text("Edit Game Features", SCREEN_WIDTH // 2 - 80,
+                       20, self._U3_ORANGE, f)
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (80, 50), (SCREEN_WIDTH - 80, 50), 1)
+
+        # Layout: left panel (categories/list) + right panel (detail)
+        left_x = 40
+        left_w = 280
+        right_x = left_x + left_w + 20
+        right_w = SCREEN_WIDTH - right_x - 40
+        panel_y = 65
+        panel_h = SCREEN_HEIGHT - 130
+
+        # ── Left panel background ──
+        left_surf = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+        left_surf.fill((20, 15, 30, 180))
+        self.screen.blit(left_surf, (left_x, panel_y))
+        pygame.draw.rect(self.screen, (80, 60, 40),
+                         (left_x, panel_y, left_w, panel_h), 1)
+
+        # ── Right panel background ──
+        right_surf = pygame.Surface((right_w, panel_h), pygame.SRCALPHA)
+        right_surf.fill((20, 15, 30, 180))
+        self.screen.blit(right_surf, (right_x, panel_y))
+        pygame.draw.rect(self.screen, (80, 60, 40),
+                         (right_x, panel_y, right_w, panel_h), 1)
+
+        if level == 0:
+            # ── Category list ──
+            self._u3_text("Categories", left_x + 12, panel_y + 8,
+                          self._U3_ORANGE, fs)
+            row_h = 36
+            ly = panel_y + 30
+            for i, cat in enumerate(categories):
+                selected = (i == cat_cursor)
+                y = ly + i * row_h
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 4),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, y - 2))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{cat['label']}",
+                              left_x + 10, y, color, fm)
+
+            # Right panel: description
+            self._u3_text("Game Features", right_x + 16, panel_y + 12,
+                          self._U3_WHITE, f)
+            dy = panel_y + 44
+            self._u3_text(
+                "Edit the data files that define game",
+                right_x + 16, dy, (180, 180, 200), fm)
+            dy += 22
+            self._u3_text(
+                "mechanics: spells, weapons, items,",
+                right_x + 16, dy, (180, 180, 200), fm)
+            dy += 22
+            self._u3_text(
+                "shop types, and more.",
+                right_x + 16, dy, (180, 180, 200), fm)
+            dy += 40
+            self._u3_text(
+                "Changes are saved to the data/ folder",
+                right_x + 16, dy, (140, 140, 160), fs)
+            dy += 18
+            self._u3_text(
+                "and apply to all modules.",
+                right_x + 16, dy, (140, 140, 160), fs)
+
+            # Footer
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
+                SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
+                self._U3_HINT, fs)
+
+        elif level == 1:
+            # ── Spell list ──
+            self._draw_features_spell_list(
+                left_x, left_w, right_x, right_w, panel_y, panel_h,
+                spell_list, spell_cursor, spell_scroll, fm, fs, f)
+
+        elif level == 2:
+            # ── Spell list (left, dimmed) + field editor (right) ──
+            self._draw_features_spell_list(
+                left_x, left_w, right_x, right_w, panel_y, panel_h,
+                spell_list, spell_cursor, spell_scroll, fm, fs, f)
+            # Overlay right panel with field editor
+            self._draw_features_spell_editor(
+                right_x, panel_y, right_w, panel_h,
+                spell_fields, spell_field, spell_buffer,
+                spell_field_scroll, fm, fs, f)
+
+    def _draw_features_spell_list(self, left_x, left_w, right_x,
+                                   right_w, panel_y, panel_h,
+                                   spell_list, spell_cursor,
+                                   spell_scroll, fm, fs, f):
+        """Draw the spell list in the left panel and detail in right."""
+        self._u3_text("Spells", left_x + 12, panel_y + 8,
+                       self._U3_ORANGE, fs)
+        row_h = 28
+        ly = panel_y + 30
+        max_visible = (panel_h - 40) // row_h
+
+        for vi, si in enumerate(range(
+                spell_scroll,
+                min(spell_scroll + max_visible, len(spell_list)))):
+            spell = spell_list[si]
+            selected = (si == spell_cursor)
+            y = ly + vi * row_h
+            if selected:
+                bar = pygame.Surface((left_w - 4, row_h - 4),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (left_x + 2, y - 2))
+            prefix = "> " if selected else "  "
+            name_color = self._U3_WHITE if selected else (180, 180, 180)
+            name = spell.get("name", "???")
+            # Truncate name to fit
+            max_pw = left_w - 24
+            while len(name) > 2 and fm.size(f"{prefix}{name}")[0] > max_pw:
+                name = name[:-1]
+            self._u3_text(f"{prefix}{name}", left_x + 10, y,
+                          name_color, fm)
+            # Level/cost subtitle
+            lvl = spell.get("min_level", 1)
+            mp = spell.get("mp_cost", 0)
+            sub_color = (140, 180, 140) if selected else (120, 120, 140)
+            self._u3_text(f"L{lvl}  {mp} MP",
+                          left_x + 26, y + 14, sub_color, fs)
+
+        # Scroll indicators
+        if spell_scroll > 0:
+            self._u3_text("^", left_x + left_w // 2 - 4,
+                          ly - 8, (180, 180, 200), fs)
+        if spell_scroll + max_visible < len(spell_list):
+            self._u3_text("v", left_x + left_w // 2 - 4,
+                          ly + max_visible * row_h - 4,
+                          (180, 180, 200), fs)
+
+        # ── Right panel: selected spell detail ──
+        if 0 <= spell_cursor < len(spell_list):
+            spell = spell_list[spell_cursor]
+            dy = panel_y + 12
+            self._u3_text(spell.get("name", "???"),
+                          right_x + 16, dy, self._U3_WHITE, f)
+            dy += 28
+
+            ctype = spell.get("casting_type", "sorcerer").title()
+            self._u3_text(f"{ctype} spell",
+                          right_x + 16, dy, (160, 160, 180), fm)
+            dy += 20
+
+            classes = ", ".join(spell.get("allowable_classes", []))
+            self._u3_text(f"Classes: {classes}",
+                          right_x + 16, dy, (180, 180, 200), fm)
+            dy += 20
+
+            self._u3_text(
+                f"Level {spell.get('min_level', 1)}  |  "
+                f"{spell.get('mp_cost', 0)} MP  |  "
+                f"{spell.get('effect_type', '?')}",
+                right_x + 16, dy, (180, 180, 200), fm)
+            dy += 24
+
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (right_x + 16, dy),
+                             (right_x + right_w - 16, dy), 1)
+            dy += 12
+
+            # Description with word wrap
+            desc = spell.get("description", "")
+            max_pw = right_w - 36
+            if desc:
+                words = desc.split()
+                line = ""
+                for word in words:
+                    test = f"{line} {word}".strip()
+                    if fm.size(test)[0] > max_pw and line:
+                        self._u3_text(line, right_x + 16, dy,
+                                      (180, 180, 200), fm)
+                        dy += 22
+                        line = word
+                    else:
+                        line = test
+                if line:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+
+            # Targeting & range
+            dy += 8
+            targeting = spell.get("targeting", "?")
+            rng = spell.get("range", 99)
+            self._u3_text(f"Targeting: {targeting}",
+                          right_x + 16, dy, (140, 140, 160), fs)
+            dy += 16
+            self._u3_text(f"Range: {rng}",
+                          right_x + 16, dy, (140, 140, 160), fs)
+            dy += 16
+            usable = ", ".join(spell.get("usable_in", []))
+            self._u3_text(f"Usable in: {usable}",
+                          right_x + 16, dy, (140, 140, 160), fs)
+
+        # Footer
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  "
+            "[A] Add  [D] Delete  [Esc] Back",
+            SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+            self._U3_HINT, fs)
+
+    def _draw_features_spell_editor(self, rx, ry, rw, rh,
+                                     fields, active_idx, buffer,
+                                     scroll, fm, fs, f):
+        """Draw the spell field editor overlay on the right panel."""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        # Title
+        spell_name = ""
+        for entry in fields:
+            if entry[1] == "name":
+                spell_name = entry[2]
+                break
+        title = f"Edit: {spell_name}" if spell_name else "Edit Spell"
+        self._u3_text(title, rx + 16, ry + 10, self._U3_ORANGE, f)
+
+        # Scrollable field list
+        content_top = ry + 38
+        content_bottom = ry + rh - 8
+        content_h = content_bottom - content_top
+        clip_rect = pygame.Rect(rx, content_top, rw, content_h)
+        old_clip = self.screen.get_clip()
+        self.screen.set_clip(clip_rect)
+
+        dy = content_top - scroll * 38
+
+        for i, entry in enumerate(fields):
+            label, key, value = entry[0], entry[1], entry[2]
+            field_type = entry[3] if len(entry) > 3 else "text"
+            editable = entry[4] if len(entry) > 4 else True
+            selected = (i == active_idx)
+
+            # Section header
+            if field_type == "section":
+                dy += 4
+                if content_top - 20 < dy < content_bottom:
+                    pygame.draw.line(self.screen, (80, 70, 50),
+                                     (rx + 16, dy),
+                                     (rx + rw - 16, dy), 1)
+                dy += 6
+                if content_top - 20 < dy < content_bottom:
+                    self._u3_text(label, rx + 16, dy,
+                                  (180, 140, 60), fs)
+                dy += 20
+                continue
+
+            # Colors
+            if selected:
+                label_color = (255, 255, 100)
+                text_color = self._U3_WHITE
+                arrow_color = (255, 255, 100)
+            else:
+                label_color = (160, 160, 160)
+                text_color = (180, 180, 200)
+                arrow_color = (160, 160, 180)
+
+            visible = content_top - 30 < dy < content_bottom + 50
+            max_pw = rw - 36
+            display = buffer if selected else value
+
+            if visible:
+                self._u3_text(f"{label}:", rx + 16, dy,
+                              label_color, fm)
+            dy += 18
+
+            if visible:
+                if field_type == "choice":
+                    self._u3_text("<", rx + 20, dy, arrow_color, fm)
+                    self._u3_text(display or "(none)", rx + 34, dy,
+                                  text_color, fm)
+                    vw = fm.size(display or "(none)")[0]
+                    self._u3_text(">", rx + 38 + vw, dy,
+                                  arrow_color, fm)
+                elif field_type == "int":
+                    self._u3_text("<", rx + 20, dy, arrow_color, fm)
+                    self._u3_text(display, rx + 34, dy,
+                                  text_color, fm)
+                    vw = fm.size(display)[0]
+                    self._u3_text(">", rx + 38 + vw, dy,
+                                  arrow_color, fm)
+                else:
+                    # Text field - truncate to fit
+                    disp = display or "(empty)"
+                    while len(disp) > 2 and fm.size(disp)[0] > max_pw:
+                        disp = disp[:-1]
+                    if len(disp) < len(display or "(empty)"):
+                        disp += ".."
+                    self._u3_text(disp, rx + 20, dy, text_color, fm)
+                    # Show cursor for active text field
+                    if selected:
+                        cur_w = fm.size(display)[0]
+                        if cur_w < max_pw:
+                            cx = rx + 20 + cur_w + 1
+                            pygame.draw.line(self.screen,
+                                             (255, 255, 100),
+                                             (cx, dy),
+                                             (cx, dy + 14), 1)
+            dy += 20
+
+        self.screen.set_clip(old_clip)
+
+        # Footer hint inside panel
+        hint_y = ry + rh - 22
+        self._u3_text(
+            "[Up/Dn] Field  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 8, hint_y, self._U3_HINT, fs)
+
     def draw_module_screen(self, modules, cursor, active_path,
                            message=None, confirm_delete=False,
                            edit_mode=False, edit_is_new=False,

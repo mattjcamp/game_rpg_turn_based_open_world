@@ -125,6 +125,7 @@ class Game:
             {"label": "SAVE GAME", "action": self._title_save_game},
             {"label": "LOAD GAME", "action": self._title_load_game},
             {"label": "MODULES", "action": self._title_modules},
+            {"label": "EDIT GAME FEATURES", "action": self._title_features},
             {"label": "SETTINGS", "action": self._title_settings},
             {"label": "QUIT GAME", "action": self._title_quit},
         ]
@@ -204,6 +205,23 @@ class Game:
         self.showing_form_party = False
         self._fp_return_to_form_party = False
         self._fp_init()
+
+        # --- Game Features editor ---
+        self.showing_features = False
+        self._feat_cursor = 0        # top-level category cursor
+        self._feat_categories = [
+            {"label": "Spells", "icon": "S"},
+        ]
+        # Spell editor state
+        self._feat_spell_list = []   # list of spell dicts loaded from JSON
+        self._feat_spell_cursor = 0  # which spell is highlighted
+        self._feat_spell_scroll = 0
+        self._feat_spell_editing = False   # True when editing spell fields
+        self._feat_spell_field = 0         # active field index
+        self._feat_spell_fields = []       # [label, key, value, type, editable]
+        self._feat_spell_buffer = ""       # text being typed
+        self._feat_spell_scroll_f = 0      # field list scroll
+        self._feat_level = 0  # 0=categories, 1=spell list, 2=spell fields
 
         # --- Settings screen ---
         self.showing_settings = False
@@ -1593,6 +1611,229 @@ class Game:
     def _title_quit(self):
         """Quit the game."""
         pygame.event.post(pygame.event.Event(pygame.QUIT))
+
+    # ── Game Features editor ──────────────────────────────────
+
+    def _title_features(self):
+        """Open the Game Features editor from the title screen."""
+        self.showing_title = False
+        self.showing_features = True
+        self._feat_level = 0
+        self._feat_cursor = 0
+        self._feat_spell_editing = False
+
+    def _feat_load_spells(self):
+        """Load spells from data/spells.json into the editor."""
+        import json
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "spells.json")
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+            self._feat_spell_list = data.get("spells", [])
+        except (OSError, ValueError):
+            self._feat_spell_list = []
+        self._feat_spell_cursor = 0
+        self._feat_spell_scroll = 0
+
+    def _feat_save_spells(self):
+        """Write current spell list back to data/spells.json."""
+        import json
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "spells.json")
+        data = {"spells": self._feat_spell_list}
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+            return True
+        except OSError:
+            return False
+
+    def _feat_build_spell_fields(self, spell):
+        """Build the editable field list for a single spell."""
+        # Choice lists for spell fields
+        casting_types = ["sorcerer", "priest"]
+        effect_types = [
+            "damage", "heal", "ac_buff", "range_buff", "sleep",
+            "teleport", "charm", "invisibility", "summon_skeleton",
+            "lightning_bolt", "aoe_fireball", "cure_poison",
+            "magic_light", "undead_damage", "bless", "curse",
+            "major_heal", "repel_monsters", "mass_heal", "restore",
+            "knock",
+        ]
+        targeting_types = [
+            "directional_projectile", "select_enemy", "select_ally",
+            "select_ally_or_self", "select_tile", "self", "auto_monster",
+        ]
+        usable_in_opts = ["battle", "overworld", "town", "dungeon"]
+        all_classes = [
+            "Wizard", "Alchemist", "Cleric", "Druid", "Paladin", "Ranger",
+        ]
+
+        ev = spell.get("effect_value", {})
+        dice = ev.get("dice", "")
+        if not dice:
+            dc = ev.get("dice_count", "")
+            ds = ev.get("dice_sides", "")
+            if dc and ds:
+                dice = f"{dc}d{ds}"
+
+        fields = [
+            # -- Identity --
+            ["-- Identity --", "_hdr1", "", "section", False],
+            ["Name", "name", spell.get("name", ""), "text", True],
+            ["ID", "id", spell.get("id", ""), "text", True],
+            ["Description", "description",
+             spell.get("description", ""), "text", True],
+            # -- Class & Level --
+            ["-- Class & Level --", "_hdr2", "", "section", False],
+            ["Casting Type", "casting_type",
+             spell.get("casting_type", "sorcerer"), "choice", True],
+            ["Min Level", "min_level",
+             str(spell.get("min_level", 1)), "int", True],
+            ["Classes", "allowable_classes",
+             ", ".join(spell.get("allowable_classes", [])), "text", True],
+            # -- Cost & Effect --
+            ["-- Cost & Effect --", "_hdr3", "", "section", False],
+            ["MP Cost", "mp_cost",
+             str(spell.get("mp_cost", 3)), "int", True],
+            ["Effect Type", "effect_type",
+             spell.get("effect_type", "damage"), "choice", True],
+            ["Dice", "dice", dice, "text", True],
+            ["Duration", "duration",
+             str(spell.get("duration", "instant")), "text", True],
+            # -- Targeting --
+            ["-- Targeting --", "_hdr4", "", "section", False],
+            ["Targeting", "targeting",
+             spell.get("targeting", "select_enemy"), "choice", True],
+            ["Range", "range",
+             str(spell.get("range", 99)), "int", True],
+            ["Usable In", "usable_in",
+             ", ".join(spell.get("usable_in", ["battle"])), "text", True],
+            # -- Audio --
+            ["-- Audio --", "_hdr5", "", "section", False],
+            ["SFX", "sfx", spell.get("sfx", ""), "text", True],
+            ["Hit SFX", "hit_sfx",
+             spell.get("hit_sfx", "") or "", "text", True],
+        ]
+        self._feat_spell_fields = fields
+        self._feat_spell_field = 0
+        self._feat_spell_scroll_f = 0
+        self._feat_spell_buffer = ""
+        # Advance to first editable field
+        self._feat_spell_field = self._feat_next_editable(0)
+        if self._feat_spell_fields:
+            self._feat_spell_buffer = \
+                self._feat_spell_fields[self._feat_spell_field][2]
+
+    def _feat_next_editable(self, start):
+        """Find next editable field index from start."""
+        n = len(self._feat_spell_fields)
+        if n == 0:
+            return 0
+        idx = start % n
+        for _ in range(n):
+            entry = self._feat_spell_fields[idx]
+            if len(entry) > 4 and entry[4] and entry[3] != "section":
+                return idx
+            idx = (idx + 1) % n
+        return start % n
+
+    def _feat_save_spell_fields(self):
+        """Apply edited fields back to the spell dict in memory."""
+        if self._feat_spell_cursor >= len(self._feat_spell_list):
+            return
+        spell = self._feat_spell_list[self._feat_spell_cursor]
+        # Commit current buffer
+        if self._feat_spell_fields:
+            entry = self._feat_spell_fields[self._feat_spell_field]
+            entry[2] = self._feat_spell_buffer
+
+        for entry in self._feat_spell_fields:
+            key = entry[1]
+            val = entry[2]
+            if key.startswith("_"):
+                continue
+            if key == "allowable_classes":
+                spell[key] = [c.strip() for c in val.split(",") if c.strip()]
+            elif key == "usable_in":
+                spell[key] = [u.strip() for u in val.split(",") if u.strip()]
+            elif key in ("min_level", "mp_cost", "range"):
+                try:
+                    spell[key] = int(val)
+                except ValueError:
+                    pass
+            elif key == "duration":
+                if val.isdigit():
+                    spell[key] = int(val)
+                else:
+                    spell[key] = val
+            elif key == "dice":
+                ev = spell.setdefault("effect_value", {})
+                ev["dice"] = val
+                # Also try to set dice_count/dice_sides for compat
+                if "d" in val:
+                    parts = val.split("d")
+                    try:
+                        ev["dice_count"] = int(parts[0])
+                        ev["dice_sides"] = int(parts[1])
+                    except (ValueError, IndexError):
+                        pass
+            else:
+                spell[key] = val
+
+    def _feat_get_spell_choices(self, key):
+        """Return choice options for a spell choice field."""
+        if key == "casting_type":
+            return ["sorcerer", "priest"]
+        elif key == "effect_type":
+            return [
+                "damage", "heal", "ac_buff", "range_buff", "sleep",
+                "teleport", "charm", "invisibility", "summon_skeleton",
+                "lightning_bolt", "aoe_fireball", "cure_poison",
+                "magic_light", "undead_damage", "bless", "curse",
+                "major_heal", "repel_monsters", "mass_heal", "restore",
+                "knock",
+            ]
+        elif key == "targeting":
+            return [
+                "directional_projectile", "select_enemy", "select_ally",
+                "select_ally_or_self", "select_tile", "self", "auto_monster",
+            ]
+        return []
+
+    def _feat_add_spell(self):
+        """Add a new blank spell to the list."""
+        new_spell = {
+            "id": f"new_spell_{len(self._feat_spell_list) + 1}",
+            "name": "New Spell",
+            "description": "A new spell.",
+            "allowable_classes": ["Wizard"],
+            "casting_type": "sorcerer",
+            "min_level": 1,
+            "mp_cost": 5,
+            "duration": "instant",
+            "effect_type": "damage",
+            "effect_value": {"dice": "1d6"},
+            "range": 99,
+            "targeting": "select_enemy",
+            "usable_in": ["battle"],
+            "sfx": "",
+            "hit_sfx": "",
+        }
+        self._feat_spell_list.append(new_spell)
+        self._feat_spell_cursor = len(self._feat_spell_list) - 1
+
+    def _feat_remove_spell(self):
+        """Remove the currently selected spell."""
+        if not self._feat_spell_list:
+            return
+        idx = self._feat_spell_cursor
+        if 0 <= idx < len(self._feat_spell_list):
+            self._feat_spell_list.pop(idx)
+            if self._feat_spell_cursor >= len(self._feat_spell_list):
+                self._feat_spell_cursor = max(
+                    0, len(self._feat_spell_list) - 1)
 
     # ── Module selection ──────────────────────────────────────
 
@@ -4065,6 +4306,158 @@ class Game:
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             self.title_options[self.title_cursor]["action"]()
 
+    def _handle_features_input(self, event):
+        """Handle input for the Game Features editor."""
+        if event.type != pygame.KEYDOWN:
+            return
+
+        # ── Level 2: editing individual spell fields ──
+        if self._feat_level == 2:
+            if event.key == pygame.K_ESCAPE:
+                # Save field edits back to spell dict and return to list
+                self._feat_save_spell_fields()
+                self._feat_spell_editing = False
+                self._feat_level = 1
+                return
+            if (event.key == pygame.K_s
+                    and event.mod & pygame.KMOD_CTRL):
+                # Ctrl+S: save to disk
+                self._feat_save_spell_fields()
+                self._feat_save_spells()
+                self._feat_spell_editing = False
+                self._feat_level = 1
+                return
+            # Navigate fields
+            n = len(self._feat_spell_fields)
+            if n == 0:
+                return
+            entry = self._feat_spell_fields[self._feat_spell_field]
+            ftype = entry[3] if len(entry) > 3 else "text"
+
+            if event.key == pygame.K_UP:
+                entry[2] = self._feat_spell_buffer
+                idx = (self._feat_spell_field - 1) % n
+                idx = self._feat_next_editable(idx)
+                self._feat_spell_field = idx
+                self._feat_spell_buffer = \
+                    self._feat_spell_fields[idx][2]
+                self._feat_adjust_spell_field_scroll()
+            elif event.key == pygame.K_DOWN:
+                entry[2] = self._feat_spell_buffer
+                idx = (self._feat_spell_field + 1) % n
+                idx = self._feat_next_editable(idx)
+                self._feat_spell_field = idx
+                self._feat_spell_buffer = \
+                    self._feat_spell_fields[idx][2]
+                self._feat_adjust_spell_field_scroll()
+            elif ftype == "choice":
+                if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                    choices = self._feat_get_spell_choices(entry[1])
+                    if choices:
+                        try:
+                            ci = choices.index(self._feat_spell_buffer)
+                        except ValueError:
+                            ci = 0
+                        if event.key == pygame.K_RIGHT:
+                            ci = (ci + 1) % len(choices)
+                        else:
+                            ci = (ci - 1) % len(choices)
+                        self._feat_spell_buffer = choices[ci]
+            elif ftype == "int":
+                if event.key == pygame.K_BACKSPACE:
+                    self._feat_spell_buffer = \
+                        self._feat_spell_buffer[:-1]
+                elif event.key == pygame.K_LEFT:
+                    try:
+                        v = int(self._feat_spell_buffer) - 1
+                        self._feat_spell_buffer = str(max(0, v))
+                    except ValueError:
+                        pass
+                elif event.key == pygame.K_RIGHT:
+                    try:
+                        v = int(self._feat_spell_buffer) + 1
+                        self._feat_spell_buffer = str(v)
+                    except ValueError:
+                        pass
+                elif event.unicode and event.unicode.isdigit():
+                    self._feat_spell_buffer += event.unicode
+            elif ftype == "text":
+                if event.key == pygame.K_BACKSPACE:
+                    self._feat_spell_buffer = \
+                        self._feat_spell_buffer[:-1]
+                elif event.unicode and event.unicode.isprintable():
+                    self._feat_spell_buffer += event.unicode
+            return
+
+        # ── Level 1: spell list browser ──
+        if self._feat_level == 1:
+            n = len(self._feat_spell_list)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_level = 0
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_spell_cursor = (
+                    self._feat_spell_cursor - 1) % n
+                self._feat_adjust_spell_scroll()
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_spell_cursor = (
+                    self._feat_spell_cursor + 1) % n
+                self._feat_adjust_spell_scroll()
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    spell = self._feat_spell_list[
+                        self._feat_spell_cursor]
+                    self._feat_build_spell_fields(spell)
+                    self._feat_spell_editing = True
+                    self._feat_level = 2
+            elif event.key == pygame.K_a:
+                self._feat_add_spell()
+                self._feat_adjust_spell_scroll()
+            elif event.key in (pygame.K_d, pygame.K_DELETE):
+                self._feat_remove_spell()
+            elif (event.key == pygame.K_s
+                  and event.mod & pygame.KMOD_CTRL):
+                self._feat_save_spells()
+            return
+
+        # ── Level 0: category list ──
+        n = len(self._feat_categories)
+        if event.key == pygame.K_ESCAPE:
+            self.showing_features = False
+            self.showing_title = True
+            return
+        if event.key == pygame.K_UP:
+            self._feat_cursor = (self._feat_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._feat_cursor = (self._feat_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE,
+                           pygame.K_RIGHT):
+            cat = self._feat_categories[self._feat_cursor]
+            if cat["label"] == "Spells":
+                self._feat_load_spells()
+                self._feat_level = 1
+
+    def _feat_adjust_spell_scroll(self):
+        """Keep spell cursor visible in the spell list."""
+        max_visible = 16
+        if self._feat_spell_cursor < self._feat_spell_scroll:
+            self._feat_spell_scroll = self._feat_spell_cursor
+        elif (self._feat_spell_cursor >=
+              self._feat_spell_scroll + max_visible):
+            self._feat_spell_scroll = (
+                self._feat_spell_cursor - max_visible + 1)
+
+    def _feat_adjust_spell_field_scroll(self):
+        """Keep spell field cursor visible in the field editor."""
+        row_h = 38
+        panel_h = 500
+        max_visible = panel_h // row_h
+        idx = self._feat_spell_field
+        if idx < self._feat_spell_scroll_f:
+            self._feat_spell_scroll_f = idx
+        elif idx >= self._feat_spell_scroll_f + max_visible:
+            self._feat_spell_scroll_f = idx - max_visible + 1
+
     def _handle_settings_input(self, event):
         """Handle input while the settings screen is open."""
         if event.type != pygame.KEYDOWN:
@@ -4200,6 +4593,9 @@ class Game:
                     self._fp_msg_timer -= dt
                     if self._fp_msg_timer <= 0:
                         self._fp_message = None
+            elif self.showing_features:
+                for event in events:
+                    self._handle_features_input(event)
             elif self.showing_modules:
                 for event in events:
                     self._handle_module_input(event)
@@ -4272,6 +4668,7 @@ class Game:
                     and not self.showing_char_create
                     and not self.showing_form_party
                     and not self.showing_modules
+                    and not self.showing_features
                     and not self.showing_quest_log):
                 self.current_state.update(dt)
                 self.camera.update(self.party.col, self.party.row)
@@ -4287,6 +4684,20 @@ class Game:
                 self.renderer.draw_char_create_screen(self)
             elif self.showing_form_party:
                 self.renderer.draw_form_party_screen(self)
+            elif self.showing_features:
+                self.renderer.draw_features_screen(
+                    categories=self._feat_categories,
+                    cat_cursor=self._feat_cursor,
+                    level=self._feat_level,
+                    spell_list=self._feat_spell_list,
+                    spell_cursor=self._feat_spell_cursor,
+                    spell_scroll=self._feat_spell_scroll,
+                    spell_editing=self._feat_spell_editing,
+                    spell_fields=self._feat_spell_fields,
+                    spell_field=self._feat_spell_field,
+                    spell_buffer=self._feat_spell_buffer,
+                    spell_field_scroll=self._feat_spell_scroll_f,
+                )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(
                     self.module_list, self.module_cursor,
