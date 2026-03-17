@@ -668,10 +668,10 @@ class TownState(InventoryMixin, BaseState):
         self.game.party.gold += 1000
         town_name = getattr(self.game, "town_data", None)
         town_name = town_name.name if town_name else "the realm"
-        self.game.game_log.append("*** QUEST COMPLETE! ***")
+        self.game.game_log.append("*** Quest complete! ***")
         self.game.game_log.append("Peace returns to the land!")
         self.game.game_log.append(f"The people of {town_name} are saved!")
-        self.game.game_log.append("VICTORY! +500 XP, +1000 Gold")
+        self.game.game_log.append("Victory! +500 XP, +1000 Gold")
 
         # Launch the machine shutdown animation — darkness_active is
         # cleared when the animation finishes (in update()).

@@ -172,16 +172,16 @@ def get_sell_price(item_name):
 
 # Categories in display order.  Pinned essentials first.
 _ITEM_CATEGORIES = [
-    ("SUPPLIES",        {"camping_supplies", "torch"}),
-    ("AMMUNITION",      {"ammo"}),
-    ("POTIONS",         {"herb", "antidote", "potion", "poison_potion"}),
-    ("MELEE WEAPONS",   "__melee__"),
-    ("RANGED WEAPONS",  "__ranged__"),
-    ("ARMOR",           "__armor__"),
-    ("REAGENTS",        {"reagent"}),
-    ("SCROLLS & MAGIC", {"scroll", "holy_water", "throwable"}),
-    ("TOOLS",           {"rope", "lockpick", "bomb", "tool"}),
-    ("QUEST ITEMS",     {"quest_item"}),
+    ("Supplies",        {"camping_supplies", "torch"}),
+    ("Ammunition",      {"ammo"}),
+    ("Potions",         {"herb", "antidote", "potion", "poison_potion"}),
+    ("Melee Weapons",   "__melee__"),
+    ("Ranged Weapons",  "__ranged__"),
+    ("Armor",           "__armor__"),
+    ("Reagents",        {"reagent"}),
+    ("Scrolls & Magic", {"scroll", "holy_water", "throwable"}),
+    ("Tools",           {"rope", "lockpick", "bomb", "tool"}),
+    ("Quest Items",     {"quest_item"}),
 ]
 
 
@@ -198,14 +198,14 @@ def _item_category(item_name):
         for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
             if match == target:
                 return label, idx
-        return "OTHER", len(_ITEM_CATEGORIES)
+        return "Other", len(_ITEM_CATEGORIES)
 
     # Check armors
     if item_name in ARMORS:
         for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
             if match == "__armor__":
                 return label, idx
-        return "ARMOR", len(_ITEM_CATEGORIES)
+        return "Armor", len(_ITEM_CATEGORIES)
 
     # Match by item_type set
     for idx, (label, match) in enumerate(_ITEM_CATEGORIES):
@@ -218,7 +218,7 @@ def _item_category(item_name):
             if isinstance(match, set) and "quest_item" in match:
                 return label, idx
 
-    return "OTHER", len(_ITEM_CATEGORIES)
+    return "Other", len(_ITEM_CATEGORIES)
 
 
 def group_items_by_category(item_names):
@@ -250,24 +250,24 @@ def group_items_by_category(item_names):
 # ── Shop-type filtering ────────────────────────────────────────
 # Maps shop_type → set of allowed category labels from _ITEM_CATEGORIES.
 SHOP_TYPE_CATEGORIES = {
-    "general":  {"SUPPLIES", "AMMUNITION", "POTIONS", "TOOLS"},
-    "weapons":  {"MELEE WEAPONS", "RANGED WEAPONS", "AMMUNITION"},
-    "armor":    {"ARMOR"},
-    "reagent":  {"REAGENTS"},
-    "potion":   {"POTIONS"},
-    "book":     {"SCROLLS & MAGIC"},
-    "map":      {"TOOLS"},
+    "general":  {"Supplies", "Ammunition", "Potions", "Tools"},
+    "weapons":  {"Melee Weapons", "Ranged Weapons", "Ammunition"},
+    "armor":    {"Armor"},
+    "reagent":  {"Reagents"},
+    "potion":   {"Potions"},
+    "book":     {"Scrolls & Magic"},
+    "map":      {"Tools"},
 }
 
 # Display names for each shop type.
 SHOP_TYPE_NAMES = {
-    "general":  "GENERAL STORE",
-    "weapons":  "WEAPONS SHOP",
-    "armor":    "ARMOR SHOP",
-    "reagent":  "REAGENT SHOP",
-    "potion":   "POTION SHOP",
-    "book":     "BOOK SHOP",
-    "map":      "MAP SHOP",
+    "general":  "General Store",
+    "weapons":  "Weapons Shop",
+    "armor":    "Armor Shop",
+    "reagent":  "Reagent Shop",
+    "potion":   "Potion Shop",
+    "book":     "Book Shop",
+    "map":      "Map Shop",
 }
 
 
@@ -937,10 +937,10 @@ class PartyMember:
     # Equipment slot order and defaults
     _EQUIP_SLOTS = ["right_hand", "left_hand", "body", "head"]
     _SLOT_LABELS = {
-        "right_hand": "RIGHT HAND",
-        "left_hand": "LEFT HAND",
-        "body": "BODY",
-        "head": "HEAD",
+        "right_hand": "Right Hand",
+        "left_hand": "Left Hand",
+        "body": "Body",
+        "head": "Head",
     }
     _SLOT_DEFAULTS = {
         "right_hand": "Fists",
@@ -1086,9 +1086,9 @@ class Party:
     # Party-level equipment slot names and defaults
     PARTY_SLOTS = ["navigation", "camping", "special"]
     PARTY_SLOT_LABELS = {
-        "navigation": "NAVIGATION",
-        "camping": "CAMPING",
-        "special": "SPECIAL",
+        "navigation": "Navigation",
+        "camping": "Camping",
+        "special": "Special",
     }
     PARTY_SLOT_DEFAULTS = {"navigation": None,
                            "camping": None, "special": None}
@@ -1096,10 +1096,10 @@ class Party:
     # Party-level passive effect slots (4 slots)
     EFFECT_SLOTS = ["effect_1", "effect_2", "effect_3", "effect_4"]
     EFFECT_SLOT_LABELS = {
-        "effect_1": "EFFECT 1",
-        "effect_2": "EFFECT 2",
-        "effect_3": "EFFECT 3",
-        "effect_4": "EFFECT 4",
+        "effect_1": "Effect 1",
+        "effect_2": "Effect 2",
+        "effect_3": "Effect 3",
+        "effect_4": "Effect 4",
     }
 
     # ── Inventory item helpers ──────────────────────────────────

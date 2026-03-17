@@ -1337,7 +1337,7 @@ class DungeonState(InventoryMixin, BaseState):
 
         level_label = None
         if self.quest_levels:
-            level_label = f"LEVEL {self.current_level + 1}"
+            level_label = f"Level {self.current_level + 1}"
         # Determine if infravision or Galadriel's Light provides the light
         has_torch_light = self.torch_active or self._has_torch_equipped()
         party = self.game.party

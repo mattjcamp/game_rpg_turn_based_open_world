@@ -142,12 +142,12 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.party.gold += 1000
         town_name = getattr(self.game, "town_data", None)
         town_name = town_name.name if town_name else "the realm"
-        self.game.game_log.append("*** QUEST COMPLETE! ***")
+        self.game.game_log.append("*** Quest complete! ***")
         self.game.game_log.append("Peace returns to the land!")
         self.game.game_log.append(f"The people of {town_name} are saved!")
-        self.game.game_log.append("VICTORY! +500 XP, +1000 Gold")
+        self.game.game_log.append("Victory! +500 XP, +1000 Gold")
         self.show_message(
-            "QUEST COMPLETE! Peace returns! VICTORY!", 6000)
+            "Quest complete! Peace returns! Victory!", 6000)
 
     def _spawn_test_spellcaster(self):
         """Place a spell-casting Dark Mage 4 tiles east of the party start.

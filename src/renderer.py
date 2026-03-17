@@ -658,7 +658,7 @@ class Renderer(CombatEffectRendererMixin):
         # ── Row 1: town name + [H] HELP ──
         f = self.font  # 18px font for row 1
         row1_y = bar_y + 4
-        self._u3_text(town_data.name.upper(), 8, row1_y + 2,
+        self._u3_text(town_data.name, 8, row1_y + 2,
                       (255, 170, 85), font=f)
         self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y + 2,
                       (120, 120, 200), font=self.font_small)
@@ -789,7 +789,7 @@ class Renderer(CombatEffectRendererMixin):
         prompt_bg = pygame.Rect(0, prompt_y - 2, 960, 22)
         pygame.draw.rect(self.screen, (0, 0, 0), prompt_bg)
         self._u3_text(
-            f"PICKPOCKET: {hname} -> {name.upper()}   "
+            f"PICKPOCKET: {hname} -> {name}   "
             f"[ARROWS] SELECT  [ENTER] ATTEMPT  [ESC] CANCEL",
             8, prompt_y, (220, 180, 50))
 
@@ -855,7 +855,7 @@ class Renderer(CombatEffectRendererMixin):
         scale = 2  # render each glyph pixel as a 2×2 block
 
         for sign in signs:
-            text = sign["text"].upper()
+            text = sign["text"]
             s_row = sign["row"]
             s_col = sign["col"]
             s_width = sign["width"]
@@ -1475,7 +1475,7 @@ class Renderer(CombatEffectRendererMixin):
             name_color = (255, int(200 * pulse + 55), 0)
         else:
             name_color = (255, 255, 255)
-        name_surf = self.font_small.render(npc.name.upper(), True, name_color)
+        name_surf = self.font_small.render(npc.name, True, name_color)
         name_rect = name_surf.get_rect(center=(cx, cy - 20))
         bg = name_rect.inflate(4, 2)
         if npc.quest_highlight:
@@ -1568,7 +1568,7 @@ class Renderer(CombatEffectRendererMixin):
             name_color = (255, int(200 * pulse + 55), 0)
         else:
             name_color = (255, 255, 255)
-        name_surf = self.font_small.render(npc.name.upper(), True, name_color)
+        name_surf = self.font_small.render(npc.name, True, name_color)
         name_rect = name_surf.get_rect(center=(cx, cy + bob - 24))
         bg = name_rect.inflate(4, 2)
         if npc.quest_highlight:
@@ -2263,7 +2263,7 @@ class Renderer(CombatEffectRendererMixin):
                 pygame.draw.rect(self.screen, (255, 0, 0),
                                  pygame.Rect(cx + 2, cy - 9, 1, 1))
                 # Name tag (uppercase)
-                name_surf = self.font_small.render(monster.name.upper(), True, (255, 100, 100))
+                name_surf = self.font_small.render(monster.name, True, (255, 100, 100))
                 name_rect = name_surf.get_rect(center=(cx, cy - 16))
                 bg = name_rect.inflate(4, 2)
                 pygame.draw.rect(self.screen, (0, 0, 0), bg)
@@ -3142,7 +3142,7 @@ class Renderer(CombatEffectRendererMixin):
         row_h = f.get_linesize() + 4   # height of one info row (~22px)
 
         # ── Row 1: dungeon name + level  |  [H] HELP ──
-        dg_name = dungeon_data.name.upper()
+        dg_name = dungeon_data.name
         if level_label:
             dg_name += f"  [{level_label}]"
         self._u3_text(dg_name, 8, row1_y, (200, 60, 60), font=f)
@@ -3158,7 +3158,7 @@ class Renderer(CombatEffectRendererMixin):
         light_charges = party.get_equipped_charges("light")
         if torch_steps >= 0:
             torch_color = (255, 170, 85) if torch_steps > 3 else (200, 60, 60)
-            lbl = f"LIGHT:{light_name.upper() if light_name else 'TORCH'}:{torch_steps:d}"
+            lbl = f"LIGHT:{light_name if light_name else 'TORCH'}:{torch_steps:d}"
             effect_tags.append((lbl, torch_color))
         elif infravision:
             effect_tags.append(("INFRAVISION", (200, 40, 40)))
@@ -3167,7 +3167,7 @@ class Renderer(CombatEffectRendererMixin):
             gl_color = (120, 160, 255) if gl_steps > 50 else (200, 100, 100)
             effect_tags.append((f"STARLIGHT:{gl_steps:d}", gl_color))
         elif light_name:
-            lbl = f"LIGHT:{light_name.upper()}"
+            lbl = f"LIGHT:{light_name}"
             if light_charges is not None:
                 lbl += f":{light_charges:d}"
             effect_tags.append((lbl, (255, 170, 85)))
@@ -3182,7 +3182,7 @@ class Renderer(CombatEffectRendererMixin):
         tag_gap = 20
         for tag_text, tag_color in effect_tags:
             self._u3_text(tag_text, ex, row2_y, tag_color, font=self.font_small)
-            ex += self.font_small.size(tag_text.upper())[0] + tag_gap
+            ex += self.font_small.size(tag_text)[0] + tag_gap
 
         # ── Row 3+: message text (bigger, mixed-case, multi-line) ──
         if message:
@@ -3447,7 +3447,7 @@ class Renderer(CombatEffectRendererMixin):
             text_alpha = int(255 * (1.0 - tp * tp))
             text_y = cy - 20 - int(40 * tp)
             name = anim.get("name", "ARTIFACT")
-            text_surf = self.font_small.render(name.upper(), True,
+            text_surf = self.font_small.render(name, True,
                                                 (255, 220, 100))
             # Create alpha surface
             alpha_surf = pygame.Surface(text_surf.get_size(), pygame.SRCALPHA)
@@ -3518,7 +3518,7 @@ class Renderer(CombatEffectRendererMixin):
             else:
                 color = (180, 180, 200)
 
-            self._u3_text(label.upper(), panel_x + 26, oy, color,
+            self._u3_text(label, panel_x + 26, oy, color,
                           self.font_small)
             oy += line_h
 
@@ -4393,7 +4393,7 @@ class Renderer(CombatEffectRendererMixin):
             tx = x + 8
             ty = by + 6
 
-            cls_short = member.char_class[:3].upper()
+            cls_short = member.char_class[:3]
             alive_color = (255, 170, 85) if member.is_alive() else (200, 60, 60)
             self._u3_text(f"{i+1}", tx, ty, (68, 68, 255), self.font)
             self._u3_text(member.name, tx + 20, ty, alive_color, self.font)
@@ -4479,7 +4479,7 @@ class Renderer(CombatEffectRendererMixin):
     def _u3_text(self, text, x, y, color=None, font=None):
         f = font or self.font_small
         c = color or self._U3_WHITE
-        surf = f.render(text.upper(), True, c)
+        surf = f.render(text, True, c)
         self.screen.blit(surf, (x, y))
 
     @staticmethod
@@ -4492,7 +4492,7 @@ class Renderer(CombatEffectRendererMixin):
         """
         if not text:
             return ["(empty)"]
-        if font.size(text.upper())[0] <= max_width:
+        if font.size(text)[0] <= max_width:
             return [text]
 
         words = text.split()
@@ -4500,17 +4500,17 @@ class Renderer(CombatEffectRendererMixin):
         current = ""
         for word in words:
             test = f"{current} {word}".strip() if current else word
-            if font.size(test.upper())[0] <= max_width:
+            if font.size(test)[0] <= max_width:
                 current = test
             else:
                 if current:
                     lines.append(current)
                 # If the word itself is too wide, break it
-                if font.size(word.upper())[0] > max_width:
+                if font.size(word)[0] > max_width:
                     while word:
                         chunk = word
                         while (len(chunk) > 1
-                               and font.size(chunk.upper())[0]
+                               and font.size(chunk)[0]
                                > max_width):
                             chunk = chunk[:-1]
                         lines.append(chunk)
@@ -4530,7 +4530,7 @@ class Renderer(CombatEffectRendererMixin):
             # There's leftover text; mark truncation
             last = lines[-1]
             while (len(last) > 2
-                   and font.size((last + "..").upper())[0] > max_width):
+                   and font.size((last + ".."))[0] > max_width):
                 last = last[:-1]
             lines[-1] = last + ".."
         return lines if lines else ["(empty)"]
@@ -4545,7 +4545,7 @@ class Renderer(CombatEffectRendererMixin):
             return
         if max_width is None:
             max_width = SCREEN_WIDTH - 40  # 20px padding each side
-        text = message.upper()
+        text = message
         color = (255, 220, 140)
         border_color = (120, 120, 255)
         font = self.font
@@ -5290,7 +5290,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 7. floating combat message ──
         if combat_message:
-            surf = self.font.render(combat_message.upper(), True,
+            surf = self.font.render(combat_message, True,
                                     self._U3_ORANGE)
             rect = surf.get_rect(center=(mx + self._MAP_W // 2,
                                          my + self._MAP_H // 2))
@@ -5775,7 +5775,7 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text("/", rx + 55, dy, (180, 180, 200), fs)
         self._u3_text("Items", rx + 63, dy, item_label_color, fs)
         mode_hint = "[I] switch"
-        mhw = fs.size(mode_hint.upper())[0]
+        mhw = fs.size(mode_hint)[0]
         self._u3_text(mode_hint, rx + rw - mhw - 12, dy,
                        (80, 80, 160), fs)
         dy += 16
@@ -5790,12 +5790,12 @@ class Renderer(CombatEffectRendererMixin):
             label = "Item:"
             brush_name = brush  # item names are already friendly
         self._u3_text(label, rx + 12, dy, (160, 160, 180), fs)
-        label_w = fs.size(label.upper())[0]
+        label_w = fs.size(label)[0]
         name_x = rx + 14 + label_w + 4
         self._u3_text("<", name_x - 10, dy, arrow_color, fs)
         self._u3_text(brush_name, name_x, dy,
                        (255, 255, 200), fs)
-        name_w = fs.size(brush_name.upper())[0]
+        name_w = fs.size(brush_name)[0]
         self._u3_text(">", name_x + name_w + 6, dy, arrow_color, fs)
         dy += 18
 
@@ -6085,11 +6085,11 @@ class Renderer(CombatEffectRendererMixin):
                 brush_name = self._brush_friendly_name(brush)
             arrow_color = (100, 180, 255)
             self._u3_text(label, rx + 10, dy, (180, 180, 200), fs)
-            lw = fs.size(label.upper())[0]
+            lw = fs.size(label)[0]
             nx = rx + 12 + lw + 4
             self._u3_text("<", nx - 10, dy, arrow_color, fs)
             self._u3_text(brush_name, nx, dy, (255, 255, 200), fs)
-            nw = fs.size(brush_name.upper())[0]
+            nw = fs.size(brush_name)[0]
             self._u3_text(">", nx + nw + 6, dy, arrow_color, fs)
             dy += 14
 
@@ -6122,13 +6122,13 @@ class Renderer(CombatEffectRendererMixin):
             selected = (i == cursor)
             color = (255, 255, 200) if selected else (180, 180, 200)
             self._u3_text(label + ":", rx + 14, dy, color, fs)
-            lw = fs.size((label + ":").upper())[0]
+            lw = fs.size((label + ":"))[0]
             vx = rx + 18 + lw + 8
             if selected:
                 self._u3_text("<", vx - 12, dy, arrow, fs)
             self._u3_text(value, vx, dy, (255, 255, 255) if selected
                           else (180, 180, 200), fs)
-            vw = fs.size(value.upper())[0]
+            vw = fs.size(value)[0]
             if selected:
                 self._u3_text(">", vx + vw + 6, dy, arrow, fs)
             dy += 22
@@ -6760,7 +6760,7 @@ class Renderer(CombatEffectRendererMixin):
             if selected_spell:
                 from src.states.combat import SPELLS_DATA
                 sd = SPELLS_DATA.get(selected_spell, {})
-                spell_name = sd.get("name", "SHIELD").upper()
+                spell_name = sd.get("name", "SHIELD")
 
             self._u3_text(f"-- {spell_name} --", tx, ty, (100, 180, 255), f)
             self._u3_text("SELECT TARGET", tx, ty + 28, self._U3_WHITE, f)
@@ -6784,12 +6784,12 @@ class Renderer(CombatEffectRendererMixin):
         elif phase == PHASE_PLAYER:
             # Menu selection mode
             name = active_fighter.name if active_fighter else "???"
-            self._u3_text(f"-- {name.upper()}'S TURN --", tx, ty, self._U3_ORANGE, f)
+            self._u3_text(f"-- {name}'S TURN --", tx, ty, self._U3_ORANGE, f)
 
             if menu_actions:
                 self._u3_scrollable_list(
                     tx, ty + 28, h - 34, f,
-                    items=[(label.upper(), i == selected_action)
+                    items=[(label, i == selected_action)
                            for i, (_aid, label) in enumerate(menu_actions)],
                     cursor=selected_action)
 
@@ -6797,12 +6797,12 @@ class Renderer(CombatEffectRendererMixin):
         elif phase == PHASE_SPELL_SELECT:
             # Spell selection sub-menu
             name = active_fighter.name if active_fighter else "???"
-            self._u3_text(f"-- {name.upper()}'S SPELLS --", tx, ty, self._U3_ORANGE, f)
+            self._u3_text(f"-- {name}'S SPELLS --", tx, ty, self._U3_ORANGE, f)
 
             if spell_list:
                 self._u3_scrollable_list(
                     tx, ty + 28, h - 34, f,
-                    items=[(label.upper(), i == spell_cursor)
+                    items=[(label, i == spell_cursor)
                            for i, (_sid, label, _mp) in enumerate(spell_list)],
                     cursor=spell_cursor)
             else:
@@ -6817,7 +6817,7 @@ class Renderer(CombatEffectRendererMixin):
             if throw_list:
                 self._u3_scrollable_list(
                     tx, ty + 28, h - 34, f,
-                    items=[(f"{iname.upper()} x{cnt}", i == throw_cursor)
+                    items=[(f"{iname} x{cnt}", i == throw_cursor)
                            for i, (iname, cnt) in enumerate(throw_list)],
                     cursor=throw_cursor)
             else:
@@ -6832,7 +6832,7 @@ class Renderer(CombatEffectRendererMixin):
             if use_item_list:
                 self._u3_scrollable_list(
                     tx, ty + 28, h - 34, f,
-                    items=[(f"{iname.upper()} x{cnt}", i == use_item_cursor)
+                    items=[(f"{iname} x{cnt}", i == use_item_cursor)
                            for i, (iname, cnt, _eff, _pow) in enumerate(use_item_list)],
                     cursor=use_item_cursor)
             else:
@@ -6843,11 +6843,11 @@ class Renderer(CombatEffectRendererMixin):
             # Direction selection mode — show spell/throw name if applicable
             if directing_action == ACTION_RANGED and active_fighter:
                 rw = active_fighter.get_ranged_weapon()
-                action_label = f"SHOOT {rw.upper()}" if rw else "RANGE ATTACK"
+                action_label = f"SHOOT {rw}" if rw else "RANGE ATTACK"
             elif directing_action == ACTION_CAST and selected_spell:
                 action_label = _SPELL_DIR_LABELS.get(selected_spell, "CAST")
             elif directing_action == ACTION_THROW and selected_throw:
-                action_label = f"THROW {selected_throw.upper()}"
+                action_label = f"THROW {selected_throw}"
             else:
                 action_label = _DIR_LABELS.get(directing_action, "???")
             self._u3_text(f"-- {action_label} --", tx, ty, self._U3_ORANGE, f)
@@ -6864,13 +6864,13 @@ class Renderer(CombatEffectRendererMixin):
         elif phase == PHASE_LOOT:
             # Loot pickup phase — show looter name + menu
             name = active_fighter.name if active_fighter else "???"
-            self._u3_text(f"-- {name.upper()} --", tx, ty, (255, 220, 80), f)
+            self._u3_text(f"-- {name} --", tx, ty, (255, 220, 80), f)
             self._u3_text("COLLECT LOOT (WASD)", tx, ty + 22, (200, 200, 160), f)
 
             if menu_actions:
                 self._u3_scrollable_list(
                     tx, ty + 50, h - 56, f,
-                    items=[(label.upper(), i == selected_action)
+                    items=[(label, i == selected_action)
                            for i, (_aid, label) in enumerate(menu_actions)],
                     cursor=selected_action)
 
@@ -7069,7 +7069,7 @@ class Renderer(CombatEffectRendererMixin):
             if module_info:
                 mod_color = (int(200 * hint_fade), int(170 * hint_fade),
                              int(80 * hint_fade))
-                mw, _ = self.font_med.size(module_info.upper())
+                mw, _ = self.font_med.size(module_info)
                 self._u3_text(module_info,
                               panel_x + (panel_w - mw) // 2,
                               info_y,
@@ -7080,7 +7080,7 @@ class Renderer(CombatEffectRendererMixin):
             hint_color = (int(100 * hint_fade), int(100 * hint_fade),
                           int(255 * hint_fade))
             hint = "[UP/DOWN] Select  [ENTER] Choose"
-            hint_w, _ = self.font_med.size(hint.upper())
+            hint_w, _ = self.font_med.size(hint)
             self._u3_text(hint,
                           panel_x + (panel_w - hint_w) // 2,
                           info_y,
@@ -7215,7 +7215,7 @@ class Renderer(CombatEffectRendererMixin):
             disp_name = mod['name']
             mod_label = f"{prefix}{disp_name}{marker}"
             while (len(disp_name) > 2
-                   and fm.size(mod_label.upper())[0] > left_max_pw):
+                   and fm.size(mod_label)[0] > left_max_pw):
                 disp_name = disp_name[:len(disp_name) - 1]
                 mod_label = f"{prefix}{disp_name}..{marker}"
             self._u3_text(mod_label, left_x + 10, y, name_color, fm)
@@ -7243,7 +7243,7 @@ class Renderer(CombatEffectRendererMixin):
             right_max_pw = right_w - 36
             dname = mod["name"]
             while (len(dname) > 2
-                   and f.size(dname.upper())[0] > right_max_pw):
+                   and f.size(dname)[0] > right_max_pw):
                 dname = dname[:len(dname) - 1]
             if len(dname) < len(mod["name"]):
                 dname += ".."
@@ -7253,7 +7253,7 @@ class Renderer(CombatEffectRendererMixin):
             # Author — truncate to fit
             auth_text = f"by {mod['author']}"
             while (len(auth_text) > 4
-                   and fm.size(auth_text.upper())[0] > right_max_pw):
+                   and fm.size(auth_text)[0] > right_max_pw):
                 auth_text = auth_text[:len(auth_text) - 3] + ".."
             self._u3_text(auth_text, right_x + 16, dy,
                           (160, 160, 180), fm)
@@ -7288,7 +7288,7 @@ class Renderer(CombatEffectRendererMixin):
                 line = ""
                 for word in words:
                     test = f"{line} {word}".strip()
-                    tw, _ = fm.size(test.upper())
+                    tw, _ = fm.size(test)
                     if tw > max_pixel_w and line:
                         if dy < desc_bottom:
                             self._u3_text(line, right_x + 16, dy,
@@ -7306,7 +7306,7 @@ class Renderer(CombatEffectRendererMixin):
             id_y = max(dy + 16, panel_y + panel_h - 28)
             id_text = f"ID: {mod['id']}"
             while (len(id_text) > 5
-                   and fs.size(id_text.upper())[0] > right_max_pw):
+                   and fs.size(id_text)[0] > right_max_pw):
                 id_text = id_text[:len(id_text) - 3] + ".."
             self._u3_text(id_text, right_x + 16, id_y,
                           (140, 140, 160), fs)
@@ -7357,7 +7357,7 @@ class Renderer(CombatEffectRendererMixin):
                     overlay.fill((20, 15, 10, 220))
                     self.screen.blit(overlay, (right_x, panel_y))
                     if sec_label:
-                        self._u3_text(sec_label.upper(),
+                        self._u3_text(sec_label,
                                       right_x + 16, panel_y + 12,
                                       (200, 180, 120), fm)
                     self._u3_text("No items defined.",
@@ -7439,7 +7439,7 @@ class Renderer(CombatEffectRendererMixin):
             title = "EDIT MODULE"
         # Truncate title to fit panel
         while (len(title) > 3
-               and f.size(title.upper())[0] > rw - 36):
+               and f.size(title)[0] > rw - 36):
             title = title[:-1]
         if section_title and len(title) < len(section_title):
             title += ".."
@@ -7502,7 +7502,7 @@ class Renderer(CombatEffectRendererMixin):
             if visible:
                 # Truncate label if it exceeds panel width
                 while (len(lbl_text) > 4
-                       and fm.size(lbl_text.upper())[0] > max_pw):
+                       and fm.size(lbl_text)[0] > max_pw):
                     lbl_text = lbl_text[:len(lbl_text) - 4] + "..:"
                 self._u3_text(lbl_text, rx + 16, dy,
                               label_color, fm)
@@ -7535,14 +7535,14 @@ class Renderer(CombatEffectRendererMixin):
                         inner_pw = val_max_pw - 36
                         trunc = friendly
                         while (len(trunc) > 2
-                               and fm.size(trunc.upper())[0]
+                               and fm.size(trunc)[0]
                                > inner_pw):
                             trunc = trunc[:len(trunc) - 3] + ".."
                         self._u3_text("<", rx + 20, dy,
                                       arrow_color, fm)
                         self._u3_text(trunc, rx + 34, dy,
                                       text_color, fm)
-                        val_w = fm.size(trunc.upper())[0]
+                        val_w = fm.size(trunc)[0]
                         arrow_x = min(rx + 38 + val_w,
                                       rx + rw - 20)
                         self._u3_text(">", arrow_x, dy,
@@ -7573,14 +7573,14 @@ class Renderer(CombatEffectRendererMixin):
                         inner_pw = val_max_pw - 36
                         trunc = display
                         while (len(trunc) > 2
-                               and fm.size(trunc.upper())[0]
+                               and fm.size(trunc)[0]
                                > inner_pw):
                             trunc = trunc[:len(trunc) - 3] + ".."
                         self._u3_text("<", rx + 20, dy,
                                       arrow_color, fm)
                         self._u3_text(trunc, rx + 34, dy,
                                       text_color, fm)
-                        val_w = fm.size(trunc.upper())[0]
+                        val_w = fm.size(trunc)[0]
                         arrow_x = min(rx + 38 + val_w,
                                       rx + rw - 20)
                         self._u3_text(">", arrow_x, dy,
@@ -7588,7 +7588,7 @@ class Renderer(CombatEffectRendererMixin):
                     else:
                         trunc = display
                         while (len(trunc) > 2
-                               and fm.size(trunc.upper())[0]
+                               and fm.size(trunc)[0]
                                > val_max_pw):
                             trunc = trunc[:len(trunc) - 3] + ".."
                         self._u3_text(trunc, rx + 20, dy,
@@ -7606,7 +7606,7 @@ class Renderer(CombatEffectRendererMixin):
                         if (li == len(lines) - 1 and selected
                                 and editable and line_vis):
                             cursor_x = (rx + 20
-                                        + fm.size(line.upper())[0] + 2)
+                                        + fm.size(line)[0] + 2)
                             cursor_x = min(cursor_x, rx + rw - 16)
                             if pygame.time.get_ticks() % 800 < 400:
                                 pygame.draw.line(
@@ -7656,7 +7656,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Title with breadcrumb
         if nav_depth > 0 and nav_label:
-            self._u3_text(nav_label.upper(), rx + 16, ry + 12,
+            self._u3_text(nav_label, rx + 16, ry + 12,
                           self._U3_ORANGE, f)
         elif nav_depth > 0:
             self._u3_text("EDIT DUNGEON", rx + 16, ry + 12,
@@ -7740,7 +7740,7 @@ class Renderer(CombatEffectRendererMixin):
                              border_radius=3)
             pygame.draw.rect(self.screen, (40, 30, 20), badge_rect, 1,
                              border_radius=3)
-            bx = rx + 16 + 11 - fs.size(badge_text.upper())[0] // 2
+            bx = rx + 16 + 11 - fs.size(badge_text)[0] // 2
             self._u3_text(badge_text, bx, dy + 8,
                           self._U3_WHITE, fs)
 
@@ -7750,7 +7750,7 @@ class Renderer(CombatEffectRendererMixin):
             # Truncate to fit
             max_pw = rw - 80
             while (len(label) > 2
-                   and fm.size(label.upper())[0] > max_pw):
+                   and fm.size(label)[0] > max_pw):
                 label = label[:-1]
             if len(label) < len(sec["label"]):
                 label += ".."
@@ -7997,7 +7997,7 @@ class Renderer(CombatEffectRendererMixin):
                 val_color = (100, 200, 255) if selected else (140, 180, 220)
                 display = f"< {val_text} >"
                 # Measure actual pixel width and right-align with padding
-                text_w, _ = self.font.size(display.upper())
+                text_w, _ = self.font.size(display)
                 right_margin = 16
                 tx = panel_x + panel_w - right_margin - text_w
                 # Clamp to panel left edge so it never overflows
@@ -8092,7 +8092,7 @@ class Renderer(CombatEffectRendererMixin):
                 cur = ""
                 for w in words:
                     test = f"{cur} {w}" if cur else w
-                    tw2, _ = self.font_small.size(test.upper())
+                    tw2, _ = self.font_small.size(test)
                     if tw2 > max_step_w and cur:
                         wrapped.append(cur)
                         cur = w
@@ -8226,7 +8226,7 @@ class Renderer(CombatEffectRendererMixin):
 
                 # Party names — truncate if too wide
                 max_name_w = panel_w - 60
-                names_upper = names.upper()
+                names_upper = names
                 if self.font_med.size(names_upper)[0] > max_name_w:
                     while (len(names_upper) > 3
                            and self.font_med.size(names_upper + "..")[0]
@@ -8441,7 +8441,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Title bar ──
         self._u3_panel(0, 0, SCREEN_WIDTH, 30)
-        title = f"CHARACTER {index + 1}: {member.name.upper()}"
+        title = f"CHARACTER {index + 1}: {member.name}"
         self._u3_text(title, SCREEN_WIDTH // 2 - len(title) * 5, 8,
                        self._U3_ORANGE, f)
 
@@ -8482,7 +8482,7 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text("RACE:", tx, ty, self._U3_LTBLUE, fm)
         self._u3_text(f"{member.race}", tx + 58, ty, self._U3_WHITE, fm)
         gender_str = getattr(member, 'gender', 'Unknown')
-        self._u3_text(f"  {gender_str}", tx + 58 + fm.size(member.race.upper())[0], ty,
+        self._u3_text(f"  {gender_str}", tx + 58 + fm.size(member.race)[0], ty,
                       (180, 180, 200), fm)
         ty += 20
         self._u3_text(f"LEVEL: {member.level:d}", tx, ty, self._U3_WHITE, fm)
@@ -8581,7 +8581,7 @@ class Renderer(CombatEffectRendererMixin):
                 ty += 15
                 if fx_desc:
                     # Word-wrap description to fit within the panel
-                    words = fx_desc.upper().split()
+                    words = fx_desc.split()
                     line = ""
                     for word in words:
                         test = (line + " " + word).strip()
@@ -8781,7 +8781,7 @@ class Renderer(CombatEffectRendererMixin):
         # Breakdown line
         parts = [f"BASE 10"]
         if armor_bonus:
-            parts.append(f"{armor_name.upper()} {armor_bonus:+d}")
+            parts.append(f"{armor_name} {armor_bonus:+d}")
         if dex_mod:
             parts.append(f"DEX {dex_mod:+d}")
         if potion_ac:
@@ -8851,7 +8851,7 @@ class Renderer(CombatEffectRendererMixin):
             ry += 16
             self._u3_text(f"RANGE {dmg_min} - {dmg_max}", rx + 4, ry, dim, fs)
             ry += 14
-            parts = [f"{wp_name.upper()} {dice_count}D{dice_sides}"]
+            parts = [f"{wp_name} {dice_count}D{dice_sides}"]
             parts.append(f"{stat_label} {dmg_bonus:+d}")
             if potion_dmg:
                 parts.append(f"POTION {potion_dmg:+d}")
@@ -9300,7 +9300,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Floating shop message ──
         if message:
-            surf = fm.render(message.upper(), True, (255, 220, 140))
+            surf = fm.render(message, True, (255, 220, 140))
             rect = surf.get_rect(center=(SCREEN_WIDTH // 2,
                                          SCREEN_HEIGHT // 2))
             bg = rect.inflate(24, 12)
@@ -9750,7 +9750,7 @@ class Renderer(CombatEffectRendererMixin):
             name_x = rx + icon_size + 18
             _name_max_w = right_x + right_w - name_x - 8
             _name_disp = sel_item
-            while f.size(_name_disp.upper())[0] > _name_max_w and len(_name_disp) > 4:
+            while f.size(_name_disp)[0] > _name_max_w and len(_name_disp) > 4:
                 _name_disp = _name_disp[:-1]
             if _name_disp != sel_item:
                 _name_disp = _name_disp.rstrip() + ".."
@@ -9797,7 +9797,7 @@ class Renderer(CombatEffectRendererMixin):
                 line = ""
                 for word in words:
                     test = f"{line} {word}".strip()
-                    if fm.size(test.upper())[0] > _rp_max_w:
+                    if fm.size(test)[0] > _rp_max_w:
                         self._u3_text(line, rx, ry, (180, 180, 200), fm)
                         ry += 16
                         line = word
@@ -9905,7 +9905,7 @@ class Renderer(CombatEffectRendererMixin):
                 line = ""
                 for word in words:
                     test = f"{line} {word}".strip()
-                    if fm.size(test.upper())[0] > _rp_max_w:
+                    if fm.size(test)[0] > _rp_max_w:
                         self._u3_text(line, rx, ry, (180, 180, 200), fm)
                         ry += 16
                         line = word
@@ -9918,7 +9918,7 @@ class Renderer(CombatEffectRendererMixin):
             reqs = eff_dict.get("requirements", {})
             if reqs:
                 for rk, rv in reqs.items():
-                    self._u3_text(f"{rk.upper()}: {rv}", rx, ry, (160, 160, 180), fm)
+                    self._u3_text(f"{rk}: {rv}", rx, ry, (160, 160, 180), fm)
                     ry += 16
             ry += 8
             self._u3_text("ENTER to assign", rx, ry, self._U3_GREEN, fm)
@@ -11308,7 +11308,7 @@ class Renderer(CombatEffectRendererMixin):
         name_y = py + 14
         _exam_name = item_name
         _exam_name_max = px + pw - name_x - 10
-        while f.size(_exam_name.upper())[0] > _exam_name_max and len(_exam_name) > 4:
+        while f.size(_exam_name)[0] > _exam_name_max and len(_exam_name) > 4:
             _exam_name = _exam_name[:-1]
         if _exam_name != item_name:
             _exam_name = _exam_name.rstrip() + ".."
@@ -11361,7 +11361,7 @@ class Renderer(CombatEffectRendererMixin):
         current_line = ""
         for word in words:
             test = current_line + (" " if current_line else "") + word
-            if fm.size(test.upper())[0] <= _exam_max_w:
+            if fm.size(test)[0] <= _exam_max_w:
                 current_line = test
             else:
                 if current_line:
@@ -11457,8 +11457,8 @@ class Renderer(CombatEffectRendererMixin):
             ("[ARROWS]", "Move on the map"),
         ]
         for key, desc in lines_left:
-            ks = f.render(key.upper(), True, (255, 255, 255))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (255, 255, 255))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col1_x, y))
             self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
@@ -11475,8 +11475,8 @@ class Renderer(CombatEffectRendererMixin):
             ("[ESC]", "Quit game"),
         ]
         for key, desc in lines_menus:
-            ks = f.render(key.upper(), True, (255, 255, 255))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (255, 255, 255))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col1_x, y))
             self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
@@ -11491,8 +11491,8 @@ class Renderer(CombatEffectRendererMixin):
             ("Enemies", "Touch to start combat"),
         ]
         for key, desc in lines_interact:
-            ks = f.render(key.upper(), True, (240, 220, 150))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (240, 220, 150))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col2_x, ry))
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
@@ -11507,8 +11507,8 @@ class Renderer(CombatEffectRendererMixin):
             ("[ESC]", "Close screen"),
         ]
         for key, desc in lines_party:
-            ks = f.render(key.upper(), True, (255, 255, 255))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (255, 255, 255))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col2_x, ry))
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
@@ -11522,8 +11522,8 @@ class Renderer(CombatEffectRendererMixin):
             ("Time", "Current date and time of day"),
         ]
         for key, desc in lines_info:
-            ks = f.render(key.upper(), True, (240, 220, 150))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (240, 220, 150))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col2_x, ry))
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
@@ -11611,8 +11611,8 @@ class Renderer(CombatEffectRendererMixin):
             ("[ESC]", "Cancel current action"),
         ]
         for key, desc in lines_left:
-            ks = f.render(key.upper(), True, (255, 255, 255))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (255, 255, 255))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col1_x, y))
             self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
@@ -11631,8 +11631,8 @@ class Renderer(CombatEffectRendererMixin):
             ("Flee", "Attempt to escape combat"),
         ]
         for action, desc in lines_actions:
-            ks = f.render(action.upper(), True, (240, 220, 150))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(action, True, (240, 220, 150))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col1_x, y))
             self.screen.blit(ds, (col1_x + key_w, y))
             y += lh
@@ -11649,8 +11649,8 @@ class Renderer(CombatEffectRendererMixin):
             ("Turn Undead", "Damage all undead"),
         ]
         for spell, desc in lines_spells:
-            ks = f.render(spell.upper(), True, (240, 220, 150))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(spell, True, (240, 220, 150))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col2_x, ry))
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
@@ -11665,8 +11665,8 @@ class Renderer(CombatEffectRendererMixin):
             ("[ESC]", "Cancel and return"),
         ]
         for key, desc in lines_target:
-            ks = f.render(key.upper(), True, (255, 255, 255))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (255, 255, 255))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col2_x, ry))
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
@@ -11681,8 +11681,8 @@ class Renderer(CombatEffectRendererMixin):
             ("[E]", "Open equipment screen"),
         ]
         for key, desc in lines_other:
-            ks = f.render(key.upper(), True, (255, 255, 255))
-            ds = f.render(desc.upper(), True, (210, 210, 230))
+            ks = f.render(key, True, (255, 255, 255))
+            ds = f.render(desc, True, (210, 210, 230))
             self.screen.blit(ks, (col2_x, ry))
             self.screen.blit(ds, (col2_x + key_w, ry))
             ry += lh
@@ -12040,7 +12040,7 @@ class Renderer(CombatEffectRendererMixin):
                                else (200, 100, 100) if val < 0
                                else (120, 120, 120))
                         self._u3_text(
-                            f"{stat[:3].upper()}: {sign}{val}",
+                            f"{stat[:3]}: {sign}{val}",
                             info_x + (j % 2) * 100,
                             mod_y + 16 + (j // 2) * 16,
                             col, self.font_small)
@@ -12117,7 +12117,7 @@ class Renderer(CombatEffectRendererMixin):
                                   cy + 50, (160, 200, 160), self.font_small)
                     self._u3_text(f"MP/LVL:     {mp_lv}", info_x,
                                   cy + 66, (160, 160, 200), self.font_small)
-                    self._u3_text(f"SPELL TYPE: {spell.upper()}", info_x,
+                    self._u3_text(f"SPELL TYPE: {spell}", info_x,
                                   cy + 82, (180, 160, 100), self.font_small)
                     self._u3_text(f"RANGE:      {rng}", info_x,
                                   cy + 98, (160, 160, 160), self.font_small)
@@ -12197,7 +12197,7 @@ class Renderer(CombatEffectRendererMixin):
                 # Truncate long names
                 if len(name) > 10:
                     name = name[:9] + "."
-                nw, _ = self.font_small.size(name.upper())
+                nw, _ = self.font_small.size(name)
                 self._u3_text(name,
                               tx + (cell_w - 8 - nw) // 2,
                               ty + 58, name_col, self.font_small)
@@ -12229,7 +12229,7 @@ class Renderer(CombatEffectRendererMixin):
                 self._draw_cc_tile(sel_tile["file"], pcx, pcy, 80)
                 # Name below preview
                 pn = sel_tile["name"]
-                pnw, _ = self.font.size(pn.upper())
+                pnw, _ = self.font.size(pn)
                 self._u3_text(pn, pcx - pnw // 2,
                               preview_y + circle_r * 2 + 10,
                               (255, 255, 255), self.font)
@@ -12250,7 +12250,7 @@ class Renderer(CombatEffectRendererMixin):
             for i, stat_key in enumerate(game._cc_stat_names):
                 sy = cy + 48 + i * 40
                 val = game._cc_stats[stat_key]
-                label = stat_key[:3].upper()
+                label = stat_key[:3]
                 if i == game._cc_stat_cursor:
                     bar = pygame.Rect(cx, sy - 4, pw - 40, 34)
                     pygame.draw.rect(self.screen, (30, 30, 60), bar)
@@ -12337,7 +12337,7 @@ class Renderer(CombatEffectRendererMixin):
             for stat_key in game._cc_stat_names:
                 val = game._cc_stats[stat_key]
                 self._u3_text(
-                    f"{stat_key[:3].upper()}: {val:2d}",
+                    f"{stat_key[:3]}: {val:2d}",
                     cx, dy, (200, 200, 220))
                 dy += 18
             # Confirm/cancel buttons
@@ -12361,8 +12361,8 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text("CHARACTER CREATED!", cx, cy + 40,
                           (100, 200, 100))
             self._u3_text(
-                f"{game._cc_name} THE {game._cc_selected_race().upper()}"
-                f" {game._cc_selected_class().upper()}"
+                f"{game._cc_name} THE {game._cc_selected_race()}"
+                f" {game._cc_selected_class()}"
                 f" HAS JOINED THE ROSTER.",
                 cx, cy + 70, (180, 180, 200), self.font_small)
             self._u3_text(
@@ -12547,7 +12547,7 @@ class Renderer(CombatEffectRendererMixin):
                 dy = detail_y + 22
 
             # Character name centered
-            name_surf = self.font.render(m.name.upper(), True, (255, 255, 255))
+            name_surf = self.font.render(m.name, True, (255, 255, 255))
             self.screen.blit(name_surf,
                              (detail_x + (detail_w - name_surf.get_width()) // 2, dy))
             dy += 24
@@ -12592,7 +12592,7 @@ class Renderer(CombatEffectRendererMixin):
             # Spell type
             spell = m.spell_type
             if spell != "none":
-                self._u3_text(f"MAGIC:  {spell.upper()}", detail_x, dy,
+                self._u3_text(f"MAGIC:  {spell}", detail_x, dy,
                               (160, 140, 200), self.font_small)
                 dy += 16
             # Equipment
@@ -12603,7 +12603,7 @@ class Renderer(CombatEffectRendererMixin):
             for slot_key in ("right_hand", "left_hand", "body", "head"):
                 item = m.equipped.get(slot_key)
                 if item:
-                    slot_label = slot_key.replace("_", " ").upper()
+                    slot_label = slot_key.replace("_", " ")
                     self._u3_text(f"  {slot_label}: {item}",
                                   detail_x, dy,
                                   (160, 160, 180), self.font_small)
@@ -12617,7 +12617,7 @@ class Renderer(CombatEffectRendererMixin):
                               (120, 120, 160), self.font_small)
                 dy += 16
                 for e in effects:
-                    self._u3_text(f"  {e.replace('_', ' ').upper()}",
+                    self._u3_text(f"  {e.replace('_', ' ')}",
                                   detail_x, dy,
                                   (180, 160, 100), self.font_small)
                     dy += 14
@@ -12677,10 +12677,10 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Title bar ──
         self._u3_panel(0, 0, sw, 34)
-        title = f"TEMPLE OF {god_name.upper()}"
+        title = f"TEMPLE OF {god_name}"
         self._u3_text(title, 10, 9, (255, 220, 120), fm)
         # Priest name on right
-        self._u3_text(npc_name.upper(), sw - 10 - fm.size(npc_name.upper())[0],
+        self._u3_text(npc_name, sw - 10 - fm.size(npc_name)[0],
                       9, self._U3_LTBLUE, fm)
 
         # ── Main panel (services) ──
@@ -12738,7 +12738,7 @@ class Renderer(CombatEffectRendererMixin):
                          (20, sy + 10), (sw - 20, sy + 10), 1)
 
         # Flavor text
-        flavor = f"\"MAY {god_name.upper()} GRANT YOU STRENGTH.\""
+        flavor = f"\"MAY {god_name} GRANT YOU STRENGTH.\""
         self._u3_text(flavor, 30, sy + 20, (120, 110, 140), fs)
 
         # ── Party status panel ──
@@ -12759,7 +12759,7 @@ class Renderer(CombatEffectRendererMixin):
         for i, m in enumerate(party.members):
             alive = m.is_alive()
             nc = self._U3_WHITE if alive else self._U3_RED
-            self._u3_text(m.name.upper(), 20, my, nc, fm)
+            self._u3_text(m.name, 20, my, nc, fm)
 
             if alive:
                 # HP bar
@@ -12781,7 +12781,7 @@ class Renderer(CombatEffectRendererMixin):
         # ── Message area ──
         if message:
             msg_col = self._U3_ORANGE
-            msg_surf = fm.render(message.upper(), True, msg_col)
+            msg_surf = fm.render(message, True, msg_col)
             mx = sw // 2 - msg_surf.get_width() // 2
             # Pulsing message
             msg_alpha = int(200 + 55 * _math.sin(t * 4))

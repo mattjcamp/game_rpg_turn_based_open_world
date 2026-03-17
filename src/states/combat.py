@@ -1247,8 +1247,8 @@ class CombatState(BaseState):
             slot = slot_keys[idx]
             current = member.equipped.get(slot)
             if current:
-                options.append("UNEQUIP")
-                options.append("EXAMINE")
+                options.append("Unequip")
+                options.append("Examine")
         else:
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
@@ -1258,8 +1258,8 @@ class CombatState(BaseState):
                     valid_slots = member.get_valid_slots(item_name)
                     for s in valid_slots:
                         label = PartyMember._SLOT_LABELS[s]
-                        options.append(f"EQUIP \u2192 {label}")
-                options.append("EXAMINE")
+                        options.append(f"Equip \u2192 {label}")
+                options.append("Examine")
         return options
 
     def _handle_equip_input(self, event):
@@ -1287,10 +1287,10 @@ class CombatState(BaseState):
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 chosen = options[self.equip_action_cursor]
                 idx = self.equip_cursor
-                if chosen == "EXAMINE":
+                if chosen == "Examine":
                     self.equip_examining = self._equip_get_item_at_cursor(f)
                     return
-                elif chosen.startswith("EQUIP"):
+                elif chosen.startswith("Equip"):
                     inv_idx = idx - 4
                     if inv_idx < len(f.inventory):
                         from src.party import PartyMember
@@ -1298,7 +1298,7 @@ class CombatState(BaseState):
                         slot_label = chosen.split("\u2192 ", 1)[1].strip()
                         slot_key = _label_to_key.get(slot_label)
                         f.equip_item(f.inventory[inv_idx], slot_key)
-                elif chosen == "UNEQUIP":
+                elif chosen == "Unequip":
                     if idx < 4:
                         slot_keys = ["right_hand", "left_hand", "body", "head"]
                         if not f.unequip_slot(slot_keys[idx]):
@@ -3085,7 +3085,7 @@ class CombatState(BaseState):
 
         spell = SPELLS_DATA[self.selected_spell]
         mp_cost = spell["mp_cost"]
-        spell_name = spell.get("name", "Long Shanks").upper()
+        spell_name = spell.get("name", "Long Shanks")
 
         # Check casting ability
         if not f.can_cast_sorcerer():
@@ -3132,7 +3132,7 @@ class CombatState(BaseState):
         """
         spell = SPELLS_DATA.get(self.selected_spell, {})
         mp_cost = spell.get("mp_cost", 5)
-        spell_name = spell.get("name", "Spell").upper()
+        spell_name = spell.get("name", "Spell")
 
         # Check casting ability
         casting_type = spell.get("casting_type", "sorcerer")
@@ -3507,7 +3507,7 @@ class CombatState(BaseState):
         """
         spell = SPELLS_DATA.get(self.selected_spell, {})
         mp_cost = spell.get("mp_cost", 5)
-        spell_name = spell.get("name", "Charm Person").upper()
+        spell_name = spell.get("name", "Charm Person")
 
         # Check casting ability
         casting_type = spell.get("casting_type", "sorcerer")

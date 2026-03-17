@@ -197,23 +197,23 @@ class InventoryMixin:
             slot = slot_keys[idx]
             current = member.equipped.get(slot)
             if current:
-                options.append("UNEQUIP")
-                options.append("RETURN TO PARTY STASH")
-                options.append("EXAMINE")
+                options.append("Unequip")
+                options.append("Return to party stash")
+                options.append("Examine")
         else:
             inv_idx = idx - 4
             if inv_idx < len(member.inventory):
                 item_name = member.inventory[inv_idx]
                 info = ITEM_INFO.get(item_name, {})
                 if info.get("usable", False):
-                    options.append("USE")
+                    options.append("Use")
                 if member.can_use_item(item_name):
                     valid_slots = member.get_valid_slots(item_name)
                     for s in valid_slots:
                         label = PartyMember._SLOT_LABELS[s]
-                        options.append(f"EQUIP \u2192 {label}")
-                options.append("RETURN TO PARTY STASH")
-                options.append("EXAMINE")
+                        options.append(f"Equip \u2192 {label}")
+                options.append("Return to party stash")
+                options.append("Examine")
         return options
 
     def _handle_char_action_input(self, event):
@@ -238,15 +238,15 @@ class InventoryMixin:
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             chosen = options[self.char_action_cursor]
             idx = self.char_sheet_cursor
-            if chosen == "EXAMINE":
+            if chosen == "Examine":
                 self.examining_item = self._get_item_at_cursor(member)
                 return
-            elif chosen == "USE":
+            elif chosen == "Use":
                 inv_idx = idx - 4
                 if inv_idx < len(member.inventory):
                     item_name = member.inventory[inv_idx]
                     self._use_char_item(member, item_name, inv_idx)
-            elif chosen == "UNEQUIP":
+            elif chosen == "Unequip":
                 if idx < 4:
                     slot_keys = ["right_hand", "left_hand", "body", "head"]
                     if not member.unequip_slot(slot_keys[idx]):
@@ -254,7 +254,7 @@ class InventoryMixin:
                             f"Cannot remove basic "
                             f"{member.equipped.get(slot_keys[idx], 'gear')}!")
                         self.message_timer = 2000
-            elif chosen.startswith("EQUIP"):
+            elif chosen.startswith("Equip"):
                 inv_idx = idx - 4
                 if inv_idx < len(member.inventory):
                     from src.party import PartyMember
@@ -264,7 +264,7 @@ class InventoryMixin:
                     slot_label = chosen.split("\u2192 ", 1)[1].strip()
                     slot_key = _label_to_key.get(slot_label)
                     member.equip_item(member.inventory[inv_idx], slot_key)
-            elif chosen == "RETURN TO PARTY STASH":
+            elif chosen == "Return to party stash":
                 if idx < 4:
                     slot_keys = ["right_hand", "left_hand", "body", "head"]
                     member.return_equipped_to_party(
@@ -868,13 +868,13 @@ class InventoryMixin:
             inv_idx = grouped_index_to_original(inv, party.item_name, grouped_idx)
             if inv_idx >= 0 and inv_idx < len(inv):
                 item_name = party.item_name(inv[inv_idx])
-                if chosen == "USE":
+                if chosen == "Use":
                     self._use_party_item(item_name, inv_idx)
                     self.party_inv_action_menu = False
                     new_total = STASH_START + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
-                elif chosen == "EQUIP":
+                elif chosen == "Equip":
                     for slot_key in party.EFFECT_SLOTS:
                         if party.get_effect(slot_key) is None:
                             party.set_effect(slot_key, item_name)
@@ -884,19 +884,19 @@ class InventoryMixin:
                     new_total = STASH_START + len(party.shared_inventory)
                     if self.party_inv_cursor >= new_total:
                         self.party_inv_cursor = max(0, new_total - 1)
-                elif chosen == "EXAMINE":
+                elif chosen == "Examine":
                     self.examining_item = item_name
-                elif chosen == "APPLY TO WEAPON":
+                elif chosen == "Apply to weapon":
                     # Start poison application workflow
                     self.applying_poison_item = item_name
                     self.applying_poison_inv_idx = inv_idx
                     self.applying_poison_step = "member"
                     self.applying_poison_cursor = 0
                     self.party_inv_action_menu = False
-                elif chosen.startswith("GIVE TO "):
+                elif chosen.startswith("Give to "):
                     give_name = chosen[8:].strip()
                     for mi, member in enumerate(party.members):
-                        if member.name.upper() == give_name:
+                        if member.name == give_name:
                             party.give_item_to_member(inv_idx, mi)
                             break
                     self.party_inv_action_menu = False
@@ -928,20 +928,20 @@ class InventoryMixin:
             from src.party import ITEM_INFO
             info = ITEM_INFO.get(item_name, {})
             if info.get("usable", False):
-                options.append("USE")
+                options.append("Use")
             if info.get("party_can_equip", False):
                 already = party.has_effect(item_name)
                 has_free = any(
                     party.get_effect(s) is None for s in party.EFFECT_SLOTS
                 )
                 if not already and has_free:
-                    options.append("EQUIP")
+                    options.append("Equip")
             # Poison potions can be applied to weapons
             if info.get("item_type") == "poison_potion":
-                options.append("APPLY TO WEAPON")
+                options.append("Apply to weapon")
             for mi, member in enumerate(self.game.party.members):
-                options.append(f"GIVE TO {member.name.upper()}")
-            options.append("EXAMINE")
+                options.append(f"Give to {member.name}")
+            options.append("Examine")
             return options
 
     def _handle_apply_poison_input(self, event):
