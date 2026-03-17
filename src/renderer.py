@@ -5596,14 +5596,14 @@ class Renderer(CombatEffectRendererMixin):
                     desc_s = self.font_small.render(line, True,
                                                     (180, 180, 200))
                     self.screen.blit(desc_s, (panel_x, y))
-                    y += 18
+                    y += 22
                     line = word
                 else:
                     line = test
             if line:
                 desc_s = self.font_small.render(line, True, (180, 180, 200))
                 self.screen.blit(desc_s, (panel_x, y))
-                y += 18
+                y += 22
             y += 6
 
         # Party member (only if provided)
@@ -7283,6 +7283,7 @@ class Renderer(CombatEffectRendererMixin):
             desc = mod.get("description", "")
             max_pixel_w = right_w - 36  # 16px padding each side + margin
             desc_bottom = panel_y + panel_h - 40  # leave room for ID
+            desc_line_h = 22  # comfortable line spacing for descriptions
             if desc:
                 words = desc.split()
                 line = ""
@@ -7293,14 +7294,14 @@ class Renderer(CombatEffectRendererMixin):
                         if dy < desc_bottom:
                             self._u3_text(line, right_x + 16, dy,
                                           (180, 180, 200), fm)
-                        dy += 18
+                        dy += desc_line_h
                         line = word
                     else:
                         line = test
                 if line and dy < desc_bottom:
                     self._u3_text(line, right_x + 16, dy,
                                   (180, 180, 200), fm)
-                    dy += 18
+                    dy += desc_line_h
 
             # Module ID (for debugging / reference) — truncate to fit
             id_y = max(dy + 16, panel_y + panel_h - 28)
@@ -7614,7 +7615,7 @@ class Renderer(CombatEffectRendererMixin):
                                     (cursor_x, dy),
                                     (cursor_x, dy + 14), 1)
                         if li < len(lines) - 1:
-                            dy += 16   # line spacing within wrapped text
+                            dy += 22   # line spacing within wrapped text
             dy += 28
 
         # Restore clipping
@@ -9209,7 +9210,7 @@ class Renderer(CombatEffectRendererMixin):
                     test = f"{line} {word}".strip()
                     if fm.size(test)[0] > right_w - 24:
                         self._u3_text(line, rx, ry, self._U3_GRAY, fm)
-                        ry += 16
+                        ry += 22
                         line = word
                     else:
                         line = test
@@ -10089,13 +10090,13 @@ class Renderer(CombatEffectRendererMixin):
                         tw = fm.size(test)[0]
                         if tw > max_desc_w and line:
                             self._u3_text(line, dx, dy, (180, 180, 200), fm)
-                            dy += 16
+                            dy += 22
                             line = word
                         else:
                             line = test
                     if line:
                         self._u3_text(line, dx, dy, (180, 180, 200), fm)
-                        dy += 20
+                        dy += 22
 
                     # DC requirement
                     dc = sel_recipe.get("dc", 10)
@@ -11372,7 +11373,7 @@ class Renderer(CombatEffectRendererMixin):
 
         for line in lines:
             self._u3_text(line, px + 18, desc_y, (200, 200, 210), fm)
-            desc_y += 18
+            desc_y += 22
 
         # ── Rarity bar (based on power/evasion) ──
         bar_y = py + ph - 40
