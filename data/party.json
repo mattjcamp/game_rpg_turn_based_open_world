@@ -145,13 +145,33 @@
       },
       "inventory": [],
       "sprite": "src/assets/game/characters/ranger.png"
+    },
+    {
+      "name": "@mattjcamp",
+      "class": "Alchemist",
+      "race": "Halfling",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 15,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/game/npcs/vga_jester.png"
     }
   ],
   "active_party": [
     0,
-    1,
     2,
-    3
+    3,
+    7
   ],
   "party_effects": {
     "effect_1": null,

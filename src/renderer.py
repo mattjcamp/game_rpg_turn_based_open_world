@@ -6063,51 +6063,79 @@ class Renderer(CombatEffectRendererMixin):
                                gy + cursor_row * ts, ts, ts)
         pygame.draw.rect(self.screen, cur_color, cur_rect, 2)
 
-        dy = gy + grid_h + 4
+        dy = gy + grid_h + 6
 
         # ── Mode indicator ──
         obs_color = (255, 150, 50) if mode == "obstacle" \
             else (160, 160, 180)
         tile_color = (100, 200, 255) if mode == "tile" \
             else (160, 160, 180)
-        self._u3_text("Obstacles", rx + 10, dy, obs_color, fs)
-        self._u3_text("/", rx + 85, dy, (160, 160, 180), fs)
-        self._u3_text("Tiles", rx + 93, dy, tile_color, fs)
-        dy += 14
+        self._u3_text("Obstacles", rx + 10, dy, obs_color, fm)
+        obs_w = fm.size("Obstacles")[0]
+        self._u3_text("  /  ", rx + 10 + obs_w, dy, (160, 160, 180), fm)
+        slash_w = fm.size("  /  ")[0]
+        self._u3_text("Tiles", rx + 10 + obs_w + slash_w, dy,
+                       tile_color, fm)
+        dy += 22
 
-        # ── Current brush ──
+        # ── Current brush with graphic preview ──
         if brush is not None:
             if mode == "obstacle":
-                label = "Brush:"
                 brush_name = brush.title()
             else:
-                label = "Brush:"
                 brush_name = self._brush_friendly_name(brush)
             arrow_color = (100, 180, 255)
-            self._u3_text(label, rx + 10, dy, (180, 180, 200), fs)
-            lw = fs.size(label)[0]
-            nx = rx + 12 + lw + 4
-            self._u3_text("<", nx - 10, dy, arrow_color, fs)
-            self._u3_text(brush_name, nx, dy, (255, 255, 200), fs)
-            nw = fs.size(brush_name)[0]
-            self._u3_text(">", nx + nw + 6, dy, arrow_color, fs)
-            dy += 14
+            preview_size = 20
+            # Draw brush graphic preview
+            preview_x = rx + 12
+            preview_y = dy
+            if brush == "eraser":
+                # Draw an X for eraser
+                ex = preview_x + preview_size // 2
+                ey = preview_y + preview_size // 2
+                r2 = preview_size // 2 - 2
+                pygame.draw.line(self.screen, (200, 80, 80),
+                                 (ex - r2, ey - r2),
+                                 (ex + r2, ey + r2), 2)
+                pygame.draw.line(self.screen, (200, 80, 80),
+                                 (ex + r2, ey - r2),
+                                 (ex - r2, ey + r2), 2)
+            elif mode == "obstacle":
+                # Draw mini obstacle graphic
+                self._draw_battle_mini_obstacle(
+                    preview_x, preview_y, preview_size, brush)
+            else:
+                # Draw tile sprite preview
+                sprite = self._get_unique_tile_sprite(brush, preview_size)
+                if sprite:
+                    self.screen.blit(sprite, (preview_x, preview_y))
+            # Brush name with arrows
+            text_x = preview_x + preview_size + 8
+            text_y = preview_y + 2
+            self._u3_text("<", text_x, text_y, arrow_color, fm)
+            aw = fm.size("< ")[0]
+            self._u3_text(brush_name, text_x + aw, text_y,
+                          (255, 255, 200), fm)
+            nw = fm.size(brush_name)[0]
+            self._u3_text(">", text_x + aw + nw + 4, text_y,
+                          arrow_color, fm)
+            dy += max(preview_size + 4, 22)
 
         # ── Style & music summary ──
         self._u3_text(f"Style: {style.title()}", rx + 10, dy,
-                       (180, 180, 200), fs)
-        dy += 12
+                       (180, 180, 200), fm)
+        dy += 18
         self._u3_text(f"Music: {music}", rx + 10, dy,
-                       (180, 180, 200), fs)
-        dy += 14
+                       (180, 180, 200), fm)
+        dy += 18
 
         # ── Footer hints ──
-        hint_y = ry + rh - 36
+        hint_y = ry + rh - 40
         action = "Place" if mode == "obstacle" else "Paint"
-        self._u3_text(f"[Arrows] Move  [ENTER] {action}",
-                       rx + 8, hint_y, (80, 80, 160), fs)
-        self._u3_text("[TAB] Cycle  [I] Mode  [O] Settings",
-                       rx + 8, hint_y + 13, (80, 80, 160), fs)
+        self._u3_text(f"[Arrows] Move  [Enter] {action}",
+                       rx + 8, hint_y, self._U3_HINT, fs)
+        self._u3_text("[Tab] Cycle  [I] Mode  [O] Settings",
+                       rx + 8, hint_y + 16, self._U3_HINT, fs)
 
     def _draw_battle_settings_page(self, rx, dy, rw, rh,
                                     style, music, cursor):
@@ -6134,8 +6162,8 @@ class Renderer(CombatEffectRendererMixin):
             dy += 22
 
         dy += 10
-        self._u3_text("[LT/RT] Change  [ESC/O] Back",
-                       rx + 14, dy, (80, 80, 160), fs)
+        self._u3_text("[Left/Right] Change  [Esc/O] Back",
+                       rx + 14, dy, self._U3_HINT, fs)
 
     def _draw_battle_mini_obstacle(self, px, py, ts, obs_type):
         """Draw a tiny obstacle icon on the battle screen editor grid."""
