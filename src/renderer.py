@@ -33,9 +33,9 @@ class Renderer(CombatEffectRendererMixin):
 
     def __init__(self, screen):
         self.screen = screen
-        self.font = pygame.font.SysFont("monospace", 18)
-        self.font_med = pygame.font.SysFont("monospace", 16)
-        self.font_small = pygame.font.SysFont("monospace", 14)
+        self.font = pygame.font.SysFont("liberationsans", 18)
+        self.font_med = pygame.font.SysFont("liberationsans", 16)
+        self.font_small = pygame.font.SysFont("liberationsans", 14)
 
         # Load unified tile manifest — single source of truth for all sprites
         from src.tile_manifest import TileManifest
@@ -666,7 +666,7 @@ class Renderer(CombatEffectRendererMixin):
         # ── Row 2+: message text (bigger, mixed-case, multi-line) ──
         if message:
             if not hasattr(self, "_tn_readout_font"):
-                self._tn_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
+                self._tn_readout_font = pygame.font.SysFont("liberationsans", 20, bold=True)
             rf = self._tn_readout_font
             # NPC dialogue gets soft blue; other messages stay white
             if ": " in message and message[0].isupper():
@@ -2421,7 +2421,7 @@ class Renderer(CombatEffectRendererMixin):
         tile_name = tile_map.get_tile_name(party.col, party.row)
         # Lazily create a larger readout font (mixed-case, bright)
         if not hasattr(self, "_ow_readout_font"):
-            self._ow_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
+            self._ow_readout_font = pygame.font.SysFont("liberationsans", 20, bold=True)
         rf = self._ow_readout_font
         f = self.font  # original 18px font for row 1
         clock = party.clock
@@ -3135,7 +3135,7 @@ class Renderer(CombatEffectRendererMixin):
 
         f = self.font  # 18px for row 1 (original style)
         if not hasattr(self, "_dg_readout_font"):
-            self._dg_readout_font = pygame.font.SysFont("monospace", 20, bold=True)
+            self._dg_readout_font = pygame.font.SysFont("liberationsans", 20, bold=True)
         rf = self._dg_readout_font
 
         row1_y = bar_y + 4
@@ -3550,7 +3550,7 @@ class Renderer(CombatEffectRendererMixin):
         pad = 16
         content_w = panel_w - pad * 2
         line_h = 24
-        title_font = pygame.font.SysFont("monospace", 22, bold=True)
+        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
         body_font = self.font          # 18px
         hint_font = self.font_small    # 14px
 
@@ -3630,7 +3630,7 @@ class Renderer(CombatEffectRendererMixin):
         pad = 16
         content_w = panel_w - pad * 2
         line_h = 24
-        title_font = pygame.font.SysFont("monospace", 22, bold=True)
+        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
         body_font = self.font          # 18px
         hint_font = self.font_small    # 14px
 
@@ -11412,11 +11412,11 @@ class Renderer(CombatEffectRendererMixin):
         """Draw a full-screen overlay showing all overworld controls."""
         # Lazily create help-screen fonts
         if not hasattr(self, "_help_title_font"):
-            self._help_title_font = pygame.font.SysFont("monospace", 26, bold=True)
+            self._help_title_font = pygame.font.SysFont("liberationsans", 26, bold=True)
         if not hasattr(self, "_help_font"):
-            self._help_font = pygame.font.SysFont("monospace", 18, bold=True)
+            self._help_font = pygame.font.SysFont("liberationsans", 18, bold=True)
         if not hasattr(self, "_help_section_font"):
-            self._help_section_font = pygame.font.SysFont("monospace", 20, bold=True)
+            self._help_section_font = pygame.font.SysFont("liberationsans", 20, bold=True)
 
         dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 210))
@@ -11563,11 +11563,11 @@ class Renderer(CombatEffectRendererMixin):
         """Draw a full-screen overlay showing all combat controls."""
         # Reuse help fonts (created lazily by overworld help)
         if not hasattr(self, "_help_title_font"):
-            self._help_title_font = pygame.font.SysFont("monospace", 26, bold=True)
+            self._help_title_font = pygame.font.SysFont("liberationsans", 26, bold=True)
         if not hasattr(self, "_help_font"):
-            self._help_font = pygame.font.SysFont("monospace", 18, bold=True)
+            self._help_font = pygame.font.SysFont("liberationsans", 18, bold=True)
         if not hasattr(self, "_help_section_font"):
-            self._help_section_font = pygame.font.SysFont("monospace", 20, bold=True)
+            self._help_section_font = pygame.font.SysFont("liberationsans", 20, bold=True)
 
         dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 210))
@@ -11706,9 +11706,9 @@ class Renderer(CombatEffectRendererMixin):
         """
         # Lazily create the log fonts
         if not hasattr(self, "_log_font"):
-            self._log_font = pygame.font.SysFont("monospace", 16, bold=True)
+            self._log_font = pygame.font.SysFont("liberationsans", 16, bold=True)
         if not hasattr(self, "_log_title_font"):
-            self._log_title_font = pygame.font.SysFont("monospace", 22, bold=True)
+            self._log_title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
 
         log_font = self._log_font
         title_font = self._log_title_font
