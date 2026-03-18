@@ -991,33 +991,19 @@ class OverworldState(InventoryMixin, BaseState):
 
     # ── Chest loot ─────────────────────────────────────────────
 
-    _CHEST_LOOT = [
-        (None,           10),   # gold only
-        ("Torch",         6),
-        ("Healing Herb",  5),
-        ("Antidote",      3),
-        ("Dagger",        3),
-        ("Club",          3),
-        ("Mace",          2),
-        ("Leather",       2),
-        ("Sling",         2),
-        ("Axe",           1),
-        ("Sword",         1),
-        ("Chain",         1),
-        ("Short Bow",     1),
-    ]
-
     def _open_chest(self):
         """Roll random loot from a chest: gold, an item, or both."""
+        from src import data_registry as DR
         self.game.sfx.play("treasure")
         gold = random.randint(5, 30)
         self.game.party.gold += gold
 
-        total_weight = sum(w for _, w in self._CHEST_LOOT)
+        loot_table = DR.chest_loot()
+        total_weight = sum(w for _, w in loot_table)
         roll = random.randint(1, total_weight)
         cumulative = 0
         chosen_item = None
-        for item, weight in self._CHEST_LOOT:
+        for item, weight in loot_table:
             cumulative += weight
             if roll <= cumulative:
                 chosen_item = item

@@ -42,7 +42,8 @@
       "duration": 3,
       "effect_type": "ac_buff",
       "effect_value": {
-        "ac_bonus": 1
+        "ac_bonus": 1,
+        "dice": ""
       },
       "range": 5,
       "targeting": "select_ally",
@@ -50,7 +51,7 @@
         "battle"
       ],
       "sfx": "shield",
-      "hit_sfx": null
+      "hit_sfx": ""
     },
     {
       "id": "sleep",

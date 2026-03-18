@@ -6786,7 +6786,7 @@ class Renderer(CombatEffectRendererMixin):
             # Free-cursor target selection mode
             spell_name = "SHIELD"
             if selected_spell:
-                from src.states.combat import SPELLS_DATA
+                from src.party import SPELLS_DATA
                 sd = SPELLS_DATA.get(selected_spell, {})
                 spell_name = sd.get("name", "SHIELD")
 
@@ -7370,9 +7370,9 @@ class Renderer(CombatEffectRendererMixin):
                           right_x + 16, dy, self._U3_WHITE, f)
             dy += 28
 
+            from src import data_registry as DR
             raw_ctype = spell.get("casting_type", "sorcerer")
-            ctype_label = ("Cleric" if raw_ctype == "priest"
-                           else "Sorcerer")
+            ctype_label = DR.casting_type_label(raw_ctype)
             self._u3_text(f"{ctype_label} spell",
                           right_x + 16, dy, (160, 160, 180), fm)
             dy += 20

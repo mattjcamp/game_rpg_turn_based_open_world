@@ -1662,7 +1662,8 @@ class Game:
         except (OSError, ValueError):
             spells = []
         # Sort: sorcerer first, then priest/cleric, each by level
-        type_order = {"sorcerer": 0, "priest": 1}
+        from src import data_registry as DR
+        type_order = DR.casting_type_sort_order()
         spells.sort(key=lambda s: (
             type_order.get(s.get("casting_type", "sorcerer"), 2),
             s.get("min_level", 1),
@@ -1697,30 +1698,18 @@ class Game:
     @staticmethod
     def _feat_default_classes(casting_type):
         """Return the default allowable_classes for a casting type."""
-        if casting_type == "priest":
-            return ["Cleric", "Paladin", "Druid", "Ranger"]
-        return ["Wizard", "Alchemist"]
+        from src import data_registry as DR
+        return DR.classes_for_casting_type(casting_type)
 
     def _feat_build_spell_fields(self, spell):
         """Build the editable field list for a single spell."""
         # Choice lists for spell fields
-        casting_types = ["sorcerer", "priest"]
-        effect_types = [
-            "damage", "heal", "ac_buff", "range_buff", "sleep",
-            "teleport", "charm", "invisibility", "summon_skeleton",
-            "lightning_bolt", "aoe_fireball", "cure_poison",
-            "magic_light", "undead_damage", "bless", "curse",
-            "major_heal", "repel_monsters", "mass_heal", "restore",
-            "knock",
-        ]
-        targeting_types = [
-            "directional_projectile", "select_enemy", "select_ally",
-            "select_ally_or_self", "select_tile", "self", "auto_monster",
-        ]
-        usable_in_opts = ["battle", "overworld", "town", "dungeon"]
-        all_classes = [
-            "Wizard", "Alchemist", "Cleric", "Druid", "Paladin", "Ranger",
-        ]
+        from src import data_registry as DR
+        casting_types = DR.all_casting_types()
+        effect_types = DR.all_effect_types()
+        targeting_types = DR.all_targeting_types()
+        usable_in_opts = DR.all_usable_locations()
+        all_classes = DR.caster_class_names()
 
         ev = spell.get("effect_value", {})
         dice = ev.get("dice", "")
@@ -1800,7 +1789,8 @@ class Game:
         cur_spell = (self._feat_spell_list[self._feat_spell_cursor]
                      if 0 <= self._feat_spell_cursor
                      < len(self._feat_spell_list) else None)
-        type_order = {"sorcerer": 0, "priest": 1}
+        from src import data_registry as DR
+        type_order = DR.casting_type_sort_order()
         self._feat_spell_list.sort(key=lambda s: (
             type_order.get(s.get("casting_type", "sorcerer"), 2),
             s.get("min_level", 1),
@@ -1858,22 +1848,13 @@ class Game:
 
     def _feat_get_spell_choices(self, key):
         """Return choice options for a spell choice field."""
+        from src import data_registry as DR
         if key == "casting_type":
-            return ["sorcerer", "priest"]
+            return DR.all_casting_types()
         elif key == "effect_type":
-            return [
-                "damage", "heal", "ac_buff", "range_buff", "sleep",
-                "teleport", "charm", "invisibility", "summon_skeleton",
-                "lightning_bolt", "aoe_fireball", "cure_poison",
-                "magic_light", "undead_damage", "bless", "curse",
-                "major_heal", "repel_monsters", "mass_heal", "restore",
-                "knock",
-            ]
+            return DR.all_effect_types()
         elif key == "targeting":
-            return [
-                "directional_projectile", "select_enemy", "select_ally",
-                "select_ally_or_self", "select_tile", "self", "auto_monster",
-            ]
+            return DR.all_targeting_types()
         return []
 
     def _feat_add_spell(self):

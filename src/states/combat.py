@@ -134,22 +134,8 @@ ACTION_LEAVE_ENCOUNTER = 10  # loot phase: leave the encounter
 
 # Menu is built dynamically per character — see _build_menu_actions()
 
-# ── Loot table (weighted) — rolled per dead monster position ────────
-_CHEST_LOOT = [
-    (None,           10),   # gold only (no item)
-    ("Torch",         6),
-    ("Healing Herb",  5),
-    ("Antidote",      3),
-    ("Dagger",        3),
-    ("Club",          3),
-    ("Mace",          2),
-    ("Leather",       2),
-    ("Sling",         2),
-    ("Axe",           1),
-    ("Sword",         1),
-    ("Chain",         1),
-    ("Short Bow",     1),
-]
+# Loot table is now loaded from data/loot.json via data_registry
+from src import data_registry as _DR
 
 class CombatState(BaseState):
     """Handles combat encounters on a tactical arena (supports multiple monsters)."""
@@ -4936,10 +4922,10 @@ class CombatState(BaseState):
     @staticmethod
     def _roll_loot_item():
         """Roll a random item from the loot table. Returns item_name or None."""
-        total_weight = sum(w for _, w in _CHEST_LOOT)
+        total_weight = sum(w for _, w in _DR.chest_loot())
         roll = random.randint(1, total_weight)
         cumulative = 0
-        for item, weight in _CHEST_LOOT:
+        for item, weight in _DR.chest_loot():
             cumulative += weight
             if roll <= cumulative:
                 return item

@@ -166,6 +166,10 @@ def reload_module_data(module_data_dir=None):
     # Clear class template cache so they reload from the module directory
     PartyMember._class_templates.clear()
 
+    # Also refresh the centralized data registry caches
+    from src import data_registry as DR
+    DR.reload(module_data_dir)
+
 
 def get_sell_price(item_name):
     """Return the sell price for an item. Falls back to 5 gold if unlisted."""
