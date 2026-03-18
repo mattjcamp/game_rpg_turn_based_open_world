@@ -7128,9 +7128,23 @@ class Renderer(CombatEffectRendererMixin):
     # ── Game Features editor screen ──────────────────────────────
 
     def draw_features_screen(self, categories, cat_cursor, level,
-                              spell_list, spell_cursor, spell_scroll,
-                              spell_editing, spell_fields, spell_field,
-                              spell_buffer, spell_field_scroll):
+                              active_editor=None,
+                              spell_list=None, spell_cursor=0,
+                              spell_scroll=0, spell_editing=False,
+                              spell_fields=None, spell_field=0,
+                              spell_buffer="", spell_field_scroll=0,
+                              item_list=None, item_cursor=0,
+                              item_scroll=0, item_editing=False,
+                              item_fields=None, item_field=0,
+                              item_buffer="", item_field_scroll=0,
+                              mon_list=None, mon_cursor=0,
+                              mon_scroll=0, mon_editing=False,
+                              mon_fields=None, mon_field=0,
+                              mon_buffer="", mon_field_scroll=0,
+                              tile_list=None, tile_cursor=0,
+                              tile_scroll=0, tile_editing=False,
+                              tile_fields=None, tile_field=0,
+                              tile_buffer="", tile_field_scroll=0):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7220,6 +7234,51 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(
                     "Changes are saved to data/spells.json",
                     right_x + 16, dy, (140, 140, 160), fs)
+            elif selected_cat == "Items":
+                self._u3_text("Items", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Edit weapons, armor, and general",
+                    "items. Set stats, prices, effects,",
+                    "and equipment properties.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+                dy += 18
+                self._u3_text(
+                    "Changes are saved to data/items.json",
+                    right_x + 16, dy, (140, 140, 160), fs)
+            elif selected_cat == "Monsters":
+                self._u3_text("Monsters", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Edit monster stats, rewards, and",
+                    "combat properties. Define HP, AC,",
+                    "damage, XP, and creature flags.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+                dy += 18
+                self._u3_text(
+                    "Changes are saved to data/monsters.json",
+                    right_x + 16, dy, (140, 140, 160), fs)
+            elif selected_cat == "Tile Types":
+                self._u3_text("Tile Types", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Edit tile type properties: name,",
+                    "walkability, and display color.",
+                    "These define how each terrain",
+                    "type behaves in the game world.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
             else:
                 self._u3_text("Game Features", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
@@ -7234,22 +7293,49 @@ class Renderer(CombatEffectRendererMixin):
                 SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
                 self._U3_HINT, fs)
 
-        elif level == 1:
-            # ── Spell list ──
-            self._draw_features_spell_list(
-                left_x, left_w, right_x, right_w, panel_y, panel_h,
-                spell_list, spell_cursor, spell_scroll, fm, fs, f)
-
-        elif level == 2:
-            # ── Spell list (left, dimmed) + field editor (right) ──
-            self._draw_features_spell_list(
-                left_x, left_w, right_x, right_w, panel_y, panel_h,
-                spell_list, spell_cursor, spell_scroll, fm, fs, f)
-            # Overlay right panel with field editor
-            self._draw_features_spell_editor(
-                right_x, panel_y, right_w, panel_h,
-                spell_fields, spell_field, spell_buffer,
-                spell_field_scroll, fm, fs, f)
+        elif level in (1, 2):
+            # ── Draw the active editor's list + optional field overlay ──
+            ed = active_editor
+            if ed == "spells" or ed is None:
+                self._draw_features_spell_list(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    spell_list or [], spell_cursor, spell_scroll,
+                    fm, fs, f)
+                if level == 2:
+                    self._draw_features_spell_editor(
+                        right_x, panel_y, right_w, panel_h,
+                        spell_fields or [], spell_field, spell_buffer,
+                        spell_field_scroll, fm, fs, f)
+            elif ed == "items":
+                self._draw_features_generic_list(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    item_list or [], item_cursor, item_scroll,
+                    "Items", "_section", fm, fs, f)
+                if level == 2:
+                    self._draw_features_spell_editor(
+                        right_x, panel_y, right_w, panel_h,
+                        item_fields or [], item_field, item_buffer,
+                        item_field_scroll, fm, fs, f)
+            elif ed == "monsters":
+                self._draw_features_generic_list(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    mon_list or [], mon_cursor, mon_scroll,
+                    "Monsters", None, fm, fs, f)
+                if level == 2:
+                    self._draw_features_spell_editor(
+                        right_x, panel_y, right_w, panel_h,
+                        mon_fields or [], mon_field, mon_buffer,
+                        mon_field_scroll, fm, fs, f)
+            elif ed == "tiles":
+                self._draw_features_generic_list(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    tile_list or [], tile_cursor, tile_scroll,
+                    "Tile Types", None, fm, fs, f)
+                if level == 2:
+                    self._draw_features_spell_editor(
+                        right_x, panel_y, right_w, panel_h,
+                        tile_fields or [], tile_field, tile_buffer,
+                        tile_field_scroll, fm, fs, f)
 
     def _draw_features_spell_list(self, left_x, left_w, right_x,
                                    right_w, panel_y, panel_h,
@@ -7587,6 +7673,226 @@ class Renderer(CombatEffectRendererMixin):
         while len(hint) > 10 and fs.size(hint)[0] > hint_max:
             hint = hint[:-1]
         self._u3_text(hint, rx + 8, footer_y + 5, self._U3_HINT, fs)
+
+    def _draw_features_generic_list(self, left_x, left_w, right_x,
+                                     right_w, panel_y, panel_h,
+                                     data_list, cursor, scroll,
+                                     title, group_key, fm, fs, f):
+        """Draw a generic list in the left panel and detail in right.
+
+        Works for Items (group_key="_section"), Monsters (group_key=None),
+        and Tile Types (group_key=None).
+        """
+        # ── Left panel: list ──
+        self._u3_text(title, left_x + 12, panel_y + 8,
+                       self._U3_ORANGE, fs)
+        row_h = 36
+        ly = panel_y + 30
+        max_visible = (panel_h - 40) // row_h
+
+        # Build display rows (with optional section headers)
+        display_rows = []
+        prev_group = None
+        for si, item in enumerate(data_list):
+            if group_key:
+                grp = item.get(group_key, "")
+                if grp != prev_group:
+                    display_rows.append(("header", None, grp.title()))
+                    prev_group = grp
+            display_rows.append(("item", si, None))
+
+        # Find which display row the cursor is on
+        cursor_drow = 0
+        for di, (rtype, si, _) in enumerate(display_rows):
+            if rtype == "item" and si == cursor:
+                cursor_drow = di
+                break
+
+        # Adjust scroll
+        dscroll = scroll
+        if cursor_drow < dscroll:
+            dscroll = cursor_drow
+        if cursor_drow >= dscroll + max_visible:
+            dscroll = cursor_drow - max_visible + 1
+
+        header_h = 28
+        dy = ly
+        for di in range(dscroll, min(dscroll + max_visible,
+                                     len(display_rows))):
+            rtype, si, label = display_rows[di]
+            if rtype == "header":
+                pygame.draw.line(self.screen, (80, 70, 60),
+                                 (left_x + 10, dy + header_h - 2),
+                                 (left_x + left_w - 10,
+                                  dy + header_h - 2), 1)
+                self._u3_text(label or "", left_x + 12, dy,
+                               self._U3_ORANGE, fs)
+                dy += header_h
+            else:
+                item = data_list[si]
+                selected = (si == cursor)
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 4),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, dy - 1))
+                prefix = "> " if selected else "  "
+                name = item.get("_name", item.get("name", f"#{si}"))
+                nc = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{name}",
+                              left_x + 10, dy + 2, nc, fm)
+                # Subtitle
+                sub = ""
+                if "_section" in item:
+                    sub = item["_section"].title()
+                elif "hp" in item:
+                    sub = f"HP {item['hp']}  AC {item['ac']}"
+                elif "_tile_id" in item:
+                    walk = "Walk" if item.get("walkable") else "Block"
+                    sub = f"ID {item['_tile_id']}  {walk}"
+                if sub:
+                    sc = (140, 180, 140) if selected else (120, 120, 140)
+                    self._u3_text(sub, left_x + 26, dy + 20, sc, fs)
+                dy += row_h
+
+        # Scroll indicators
+        if dscroll > 0:
+            self._u3_text("^", left_x + left_w // 2 - 4, ly - 8,
+                           (180, 180, 200), fs)
+        if dscroll + max_visible < len(display_rows):
+            self._u3_text("v", left_x + left_w // 2 - 4,
+                           ly + max_visible * row_h - 4,
+                           (180, 180, 200), fs)
+
+        # ── Right panel: detail view ──
+        if 0 <= cursor < len(data_list):
+            item = data_list[cursor]
+            max_pw = right_w - 36
+            dy = panel_y + 12
+            name = item.get("_name", item.get("name", "?"))
+            self._u3_text(name, right_x + 16, dy,
+                           self._U3_WHITE, f)
+            dy += 28
+
+            # Description
+            desc = item.get("description", "")
+            if desc:
+                # Simple word wrap
+                words = desc.split()
+                line = ""
+                for w in words:
+                    test = f"{line} {w}".strip()
+                    if fm.size(test)[0] > max_pw:
+                        self._u3_text(line, right_x + 16, dy,
+                                       (180, 180, 200), fm)
+                        dy += 20
+                        line = w
+                    else:
+                        line = test
+                if line:
+                    self._u3_text(line, right_x + 16, dy,
+                                   (180, 180, 200), fm)
+                    dy += 20
+                dy += 8
+
+            # Show key stats
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (right_x + 12, dy),
+                             (right_x + right_w - 12, dy), 1)
+            dy += 12
+
+            # Item-specific stats
+            if "_section" in item:
+                section = item["_section"]
+                self._u3_text(f"Type: {section.title()}",
+                              right_x + 16, dy, (160, 160, 180), fm)
+                dy += 22
+                if section == "weapons":
+                    self._u3_text(
+                        f"Power: {item.get('power', 0)}",
+                        right_x + 16, dy, (180, 180, 200), fs)
+                    dy += 18
+                    flags = []
+                    if item.get("ranged"):
+                        flags.append("Ranged")
+                    if item.get("melee"):
+                        flags.append("Melee")
+                    if item.get("throwable"):
+                        flags.append("Throwable")
+                    if flags:
+                        self._u3_text(", ".join(flags),
+                                      right_x + 16, dy,
+                                      (140, 180, 140), fs)
+                        dy += 18
+                elif section == "armors":
+                    self._u3_text(
+                        f"Evasion: {item.get('evasion', 50)}",
+                        right_x + 16, dy, (180, 180, 200), fs)
+                    dy += 18
+                if item.get("buy"):
+                    self._u3_text(
+                        f"Buy: {item['buy']}g  Sell: {item.get('sell', 0)}g",
+                        right_x + 16, dy, (140, 140, 160), fs)
+                    dy += 18
+            elif "hp" in item:
+                # Monster
+                self._u3_text(
+                    f"HP: {item['hp']}  AC: {item['ac']}",
+                    right_x + 16, dy, (180, 180, 200), fs)
+                dy += 18
+                atk = item.get("attack_bonus", 0)
+                dd = item.get("damage_dice", 1)
+                ds = item.get("damage_sides", 4)
+                db = item.get("damage_bonus", 0)
+                self._u3_text(
+                    f"Attack: +{atk}  Dmg: {dd}d{ds}+{db}",
+                    right_x + 16, dy, (180, 180, 200), fs)
+                dy += 18
+                xp = item.get("xp_reward", 0)
+                gmin = item.get("gold_min", 0)
+                gmax = item.get("gold_max", 0)
+                self._u3_text(
+                    f"XP: {xp}  Gold: {gmin}-{gmax}",
+                    right_x + 16, dy, (140, 180, 140), fs)
+                dy += 18
+                flags = []
+                if item.get("undead"):
+                    flags.append("Undead")
+                if item.get("humanoid"):
+                    flags.append("Humanoid")
+                if item.get("terrain", "land") != "land":
+                    flags.append(f"Terrain: {item['terrain']}")
+                if flags:
+                    self._u3_text(", ".join(flags),
+                                  right_x + 16, dy,
+                                  (180, 140, 140), fs)
+                    dy += 18
+            elif "_tile_id" in item:
+                # Tile type
+                walk_str = ("Walkable" if item.get("walkable")
+                            else "Not Walkable")
+                self._u3_text(f"ID: {item['_tile_id']}  {walk_str}",
+                              right_x + 16, dy, (180, 180, 200), fs)
+                dy += 22
+                color = item.get("color", [128, 128, 128])
+                if isinstance(color, (list, tuple)) and len(color) == 3:
+                    # Draw color swatch
+                    swatch_y = dy
+                    swatch = pygame.Surface((40, 20))
+                    swatch.fill(tuple(color))
+                    self.screen.blit(swatch, (right_x + 16, swatch_y))
+                    pygame.draw.rect(self.screen, (80, 70, 50),
+                                     (right_x + 16, swatch_y, 40, 20), 1)
+                    self._u3_text(
+                        f"  ({color[0]}, {color[1]}, {color[2]})",
+                        right_x + 60, dy + 2, (140, 140, 160), fs)
+                    dy += 28
+
+        # Footer
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [Esc] Back",
+            SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+            self._U3_HINT, fs)
 
     def draw_module_screen(self, modules, cursor, active_path,
                            message=None, confirm_delete=False,

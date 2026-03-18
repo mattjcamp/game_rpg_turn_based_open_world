@@ -211,6 +211,9 @@ class Game:
         self._feat_categories = [
             {"label": "Modules", "icon": "M"},
             {"label": "Spells", "icon": "S"},
+            {"label": "Items", "icon": "I"},
+            {"label": "Monsters", "icon": "X"},
+            {"label": "Tile Types", "icon": "T"},
         ]
         self._modules_from_features = False  # True when modules opened from features
         # Spell editor state
@@ -222,7 +225,39 @@ class Game:
         self._feat_spell_fields = []       # [label, key, value, type, editable]
         self._feat_spell_buffer = ""       # text being typed
         self._feat_spell_scroll_f = 0      # field list scroll
-        self._feat_level = 0  # 0=categories, 1=spell list, 2=spell fields
+        self._feat_level = 0  # 0=categories, 1=list, 2=field editor
+        # Which editor is active: "spells", "items", "monsters", "tiles"
+        self._feat_active_editor = None
+
+        # Items editor state (mirrors spell editor pattern)
+        self._feat_item_list = []        # list of (name, section, data) tuples
+        self._feat_item_cursor = 0
+        self._feat_item_scroll = 0
+        self._feat_item_editing = False
+        self._feat_item_field = 0
+        self._feat_item_fields = []
+        self._feat_item_buffer = ""
+        self._feat_item_scroll_f = 0
+
+        # Monsters editor state
+        self._feat_mon_list = []         # list of (name, data) tuples
+        self._feat_mon_cursor = 0
+        self._feat_mon_scroll = 0
+        self._feat_mon_editing = False
+        self._feat_mon_field = 0
+        self._feat_mon_fields = []
+        self._feat_mon_buffer = ""
+        self._feat_mon_scroll_f = 0
+
+        # Tile Types editor state
+        self._feat_tile_list = []        # list of (tile_id, name, data) tuples
+        self._feat_tile_cursor = 0
+        self._feat_tile_scroll = 0
+        self._feat_tile_editing = False
+        self._feat_tile_field = 0
+        self._feat_tile_fields = []
+        self._feat_tile_buffer = ""
+        self._feat_tile_scroll_f = 0
 
         # --- Settings screen ---
         self.showing_settings = False
@@ -1889,6 +1924,524 @@ class Game:
             if self._feat_spell_cursor >= len(self._feat_spell_list):
                 self._feat_spell_cursor = max(
                     0, len(self._feat_spell_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Items editor ───────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def _feat_items_path(self):
+        """Path to items.json (module dir first, then default)."""
+        if self.active_module_path:
+            p = os.path.join(self.active_module_path, "items.json")
+            if os.path.isfile(p):
+                return p
+        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "items.json")
+
+    def _feat_load_items(self):
+        """Load items from items.json into a flat list for the editor."""
+        import json
+        path = self._feat_items_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        items = []
+        for section in ("weapons", "armors", "general"):
+            for name, entry in sorted(data.get(section, {}).items()):
+                items.append({"_name": name, "_section": section, **entry})
+        self._feat_item_list = items
+        self._feat_item_cursor = 0
+        self._feat_item_scroll = 0
+
+    def _feat_save_items(self):
+        """Write item list back to items.json and reload game data."""
+        import json
+        path = self._feat_items_path()
+        data = {"weapons": {}, "armors": {}, "general": {}}
+        for item in self._feat_item_list:
+            name = item["_name"]
+            section = item["_section"]
+            entry = {k: v for k, v in item.items()
+                     if not k.startswith("_")}
+            data[section][name] = entry
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            return False
+        try:
+            from src.party import reload_module_data as _reload
+            _reload(self.active_module_path)
+        except Exception:
+            pass
+        return True
+
+    def _feat_build_item_fields(self, item):
+        """Build editable field list for a single item."""
+        section = item.get("_section", "general")
+        fields = [
+            ["-- Identity --", "_hdr1", "", "section", False],
+            ["Name", "_name", item.get("_name", ""), "text", True],
+            ["Section", "_section", section, "choice", True],
+            ["Description", "description",
+             item.get("description", ""), "text", True],
+            ["Icon", "icon", item.get("icon", ""), "text", True],
+            ["Item Type", "item_type",
+             item.get("item_type", ""), "text", True],
+        ]
+        if section == "weapons":
+            fields += [
+                ["-- Weapon Stats --", "_hdr2", "", "section", False],
+                ["Power", "power",
+                 str(item.get("power", 0)), "int", True],
+                ["Ranged", "ranged",
+                 str(item.get("ranged", False)), "choice", True],
+                ["Melee", "melee",
+                 str(item.get("melee", False)), "choice", True],
+                ["Throwable", "throwable",
+                 str(item.get("throwable", False)), "choice", True],
+                ["Slots", "_slots",
+                 ", ".join(item.get("slots", [])), "text", True],
+            ]
+        elif section == "armors":
+            fields += [
+                ["-- Armor Stats --", "_hdr2", "", "section", False],
+                ["Evasion", "evasion",
+                 str(item.get("evasion", 50)), "int", True],
+                ["Slots", "_slots",
+                 ", ".join(item.get("slots", [])), "text", True],
+            ]
+        else:
+            fields += [
+                ["-- General --", "_hdr2", "", "section", False],
+                ["Usable", "usable",
+                 str(item.get("usable", False)), "choice", True],
+                ["Effect", "effect",
+                 item.get("effect", ""), "text", True],
+                ["Power", "power",
+                 str(item.get("power", 0)), "int", True],
+                ["Stackable", "stackable",
+                 str(item.get("stackable", False)), "choice", True],
+            ]
+        fields += [
+            ["-- Shop --", "_hdr3", "", "section", False],
+            ["Buy Price", "buy",
+             str(item.get("buy", 0)), "int", True],
+            ["Sell Price", "sell",
+             str(item.get("sell", 0)), "int", True],
+            ["-- Equip --", "_hdr4", "", "section", False],
+            ["Party Equip", "party_can_equip",
+             str(item.get("party_can_equip", False)), "choice", True],
+            ["Char Equip", "character_can_equip",
+             str(item.get("character_can_equip", False)), "choice", True],
+        ]
+        self._feat_item_fields = fields
+        self._feat_item_field = 0
+        self._feat_item_scroll_f = 0
+        self._feat_item_buffer = ""
+        self._feat_item_field = self._feat_next_editable_generic(
+            self._feat_item_fields, 0)
+        if self._feat_item_fields:
+            self._feat_item_buffer = \
+                self._feat_item_fields[self._feat_item_field][2]
+
+    def _feat_save_item_fields(self):
+        """Apply edited fields back to the item dict in memory."""
+        if self._feat_item_cursor >= len(self._feat_item_list):
+            return
+        item = self._feat_item_list[self._feat_item_cursor]
+        if self._feat_item_fields:
+            entry = self._feat_item_fields[self._feat_item_field]
+            entry[2] = self._feat_item_buffer
+        for entry in self._feat_item_fields:
+            key, val = entry[1], entry[2]
+            if key.startswith("_") and key not in ("_name", "_section",
+                                                    "_slots"):
+                continue
+            if key == "_slots":
+                item["slots"] = [s.strip() for s in val.split(",")
+                                 if s.strip()]
+            elif key in ("power", "evasion", "buy", "sell"):
+                try:
+                    item[key] = int(val)
+                except ValueError:
+                    pass
+            elif key in ("ranged", "melee", "throwable", "usable",
+                         "stackable", "party_can_equip",
+                         "character_can_equip"):
+                item[key] = val == "True"
+            else:
+                item[key] = val
+
+    def _feat_get_item_choices(self, key):
+        """Return choice options for an item field."""
+        if key == "_section":
+            return ["weapons", "armors", "general"]
+        if key in ("ranged", "melee", "throwable", "usable",
+                   "stackable", "party_can_equip",
+                   "character_can_equip"):
+            return ["True", "False"]
+        return []
+
+    def _feat_add_item(self):
+        """Add a new blank item."""
+        new_item = {
+            "_name": f"New Item {len(self._feat_item_list) + 1}",
+            "_section": "general",
+            "description": "A new item.",
+            "icon": "tool",
+            "item_type": "misc",
+            "buy": 10,
+            "sell": 5,
+            "party_can_equip": False,
+            "character_can_equip": False,
+        }
+        self._feat_item_list.append(new_item)
+        self._feat_item_cursor = len(self._feat_item_list) - 1
+
+    def _feat_remove_item(self):
+        """Remove the currently selected item."""
+        if not self._feat_item_list:
+            return
+        idx = self._feat_item_cursor
+        if 0 <= idx < len(self._feat_item_list):
+            self._feat_item_list.pop(idx)
+            if self._feat_item_cursor >= len(self._feat_item_list):
+                self._feat_item_cursor = max(
+                    0, len(self._feat_item_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Monsters editor ────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def _feat_monsters_path(self):
+        """Path to monsters.json (module dir first, then default)."""
+        if self.active_module_path:
+            p = os.path.join(self.active_module_path, "monsters.json")
+            if os.path.isfile(p):
+                return p
+        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "monsters.json")
+
+    def _feat_load_monsters(self):
+        """Load monsters from monsters.json into the editor."""
+        import json
+        path = self._feat_monsters_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        monsters = []
+        for name, entry in sorted(
+                data.get("monsters", {}).items()):
+            monsters.append({"_name": name, **entry})
+        self._feat_mon_list = monsters
+        self._feat_mon_cursor = 0
+        self._feat_mon_scroll = 0
+        # Stash spawn_tables so we can preserve them on save
+        self._feat_mon_spawn_tables = data.get("spawn_tables", {})
+
+    def _feat_save_monsters(self):
+        """Write monster list back to JSON and reload."""
+        import json
+        path = self._feat_monsters_path()
+        monsters = {}
+        for mon in self._feat_mon_list:
+            name = mon["_name"]
+            entry = {k: v for k, v in mon.items()
+                     if not k.startswith("_")}
+            monsters[name] = entry
+        data = {
+            "monsters": monsters,
+            "spawn_tables": getattr(self, "_feat_mon_spawn_tables", {}),
+        }
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            return False
+        try:
+            from src.monster import reload_module_data as _reload
+            _reload(self.active_module_path)
+        except Exception:
+            pass
+        return True
+
+    def _feat_build_mon_fields(self, mon):
+        """Build editable field list for a single monster."""
+        color = mon.get("color", [200, 50, 50])
+        color_str = f"{color[0]}, {color[1]}, {color[2]}" \
+            if isinstance(color, (list, tuple)) else str(color)
+        fields = [
+            ["-- Identity --", "_hdr1", "", "section", False],
+            ["Name", "_name", mon.get("_name", ""), "text", True],
+            ["Description", "description",
+             mon.get("description", ""), "text", True],
+            ["Tile", "tile", mon.get("tile", ""), "text", True],
+            ["Color (R,G,B)", "_color", color_str, "text", True],
+            ["-- Combat Stats --", "_hdr2", "", "section", False],
+            ["HP", "hp", str(mon.get("hp", 10)), "int", True],
+            ["AC", "ac", str(mon.get("ac", 10)), "int", True],
+            ["Attack Bonus", "attack_bonus",
+             str(mon.get("attack_bonus", 1)), "int", True],
+            ["Damage Dice", "damage_dice",
+             str(mon.get("damage_dice", 1)), "int", True],
+            ["Damage Sides", "damage_sides",
+             str(mon.get("damage_sides", 4)), "int", True],
+            ["Damage Bonus", "damage_bonus",
+             str(mon.get("damage_bonus", 0)), "int", True],
+            ["-- Rewards --", "_hdr3", "", "section", False],
+            ["XP Reward", "xp_reward",
+             str(mon.get("xp_reward", 25)), "int", True],
+            ["Gold Min", "gold_min",
+             str(mon.get("gold_min", 5)), "int", True],
+            ["Gold Max", "gold_max",
+             str(mon.get("gold_max", 15)), "int", True],
+            ["Spawn Weight", "spawn_weight",
+             str(mon.get("spawn_weight", 20)), "int", True],
+            ["-- Flags --", "_hdr4", "", "section", False],
+            ["Undead", "undead",
+             str(mon.get("undead", False)), "choice", True],
+            ["Humanoid", "humanoid",
+             str(mon.get("humanoid", False)), "choice", True],
+            ["Terrain", "terrain",
+             mon.get("terrain", "land"), "choice", True],
+        ]
+        self._feat_mon_fields = fields
+        self._feat_mon_field = 0
+        self._feat_mon_scroll_f = 0
+        self._feat_mon_buffer = ""
+        self._feat_mon_field = self._feat_next_editable_generic(
+            self._feat_mon_fields, 0)
+        if self._feat_mon_fields:
+            self._feat_mon_buffer = \
+                self._feat_mon_fields[self._feat_mon_field][2]
+
+    def _feat_save_mon_fields(self):
+        """Apply edited fields back to the monster dict."""
+        if self._feat_mon_cursor >= len(self._feat_mon_list):
+            return
+        mon = self._feat_mon_list[self._feat_mon_cursor]
+        if self._feat_mon_fields:
+            entry = self._feat_mon_fields[self._feat_mon_field]
+            entry[2] = self._feat_mon_buffer
+        for entry in self._feat_mon_fields:
+            key, val = entry[1], entry[2]
+            if key.startswith("_") and key not in ("_name", "_color"):
+                continue
+            if key == "_color":
+                try:
+                    parts = [int(p.strip()) for p in val.split(",")]
+                    if len(parts) == 3:
+                        mon["color"] = parts
+                except ValueError:
+                    pass
+            elif key in ("hp", "ac", "attack_bonus", "damage_dice",
+                         "damage_sides", "damage_bonus", "xp_reward",
+                         "gold_min", "gold_max", "spawn_weight"):
+                try:
+                    mon[key] = int(val)
+                except ValueError:
+                    pass
+            elif key in ("undead", "humanoid"):
+                mon[key] = val == "True"
+            else:
+                mon[key] = val
+
+    def _feat_get_mon_choices(self, key):
+        """Return choice options for a monster field."""
+        if key in ("undead", "humanoid"):
+            return ["True", "False"]
+        if key == "terrain":
+            return ["land", "sea"]
+        return []
+
+    def _feat_add_monster(self):
+        """Add a new blank monster."""
+        new_mon = {
+            "_name": f"New Monster {len(self._feat_mon_list) + 1}",
+            "description": "A new creature.",
+            "hp": 10,
+            "ac": 10,
+            "attack_bonus": 1,
+            "damage_dice": 1,
+            "damage_sides": 4,
+            "damage_bonus": 0,
+            "xp_reward": 20,
+            "gold_min": 3,
+            "gold_max": 10,
+            "color": [200, 50, 50],
+            "spawn_weight": 20,
+            "undead": False,
+            "humanoid": False,
+            "terrain": "land",
+            "tile": "",
+        }
+        self._feat_mon_list.append(new_mon)
+        self._feat_mon_cursor = len(self._feat_mon_list) - 1
+
+    def _feat_remove_monster(self):
+        """Remove the currently selected monster."""
+        if not self._feat_mon_list:
+            return
+        idx = self._feat_mon_cursor
+        if 0 <= idx < len(self._feat_mon_list):
+            self._feat_mon_list.pop(idx)
+            if self._feat_mon_cursor >= len(self._feat_mon_list):
+                self._feat_mon_cursor = max(
+                    0, len(self._feat_mon_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Tile Types editor ──────────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def _feat_load_tiles(self):
+        """Load tile types from settings.TILE_DEFS into the editor."""
+        from src.settings import TILE_DEFS
+        tiles = []
+        for tile_id in sorted(TILE_DEFS.keys()):
+            tdef = TILE_DEFS[tile_id]
+            tiles.append({
+                "_tile_id": tile_id,
+                "name": tdef.get("name", f"Tile {tile_id}"),
+                "walkable": tdef.get("walkable", True),
+                "color": list(tdef.get("color", (128, 128, 128))),
+            })
+        self._feat_tile_list = tiles
+        self._feat_tile_cursor = 0
+        self._feat_tile_scroll = 0
+
+    def _feat_save_tiles(self):
+        """Write tile definitions back to settings.TILE_DEFS
+        (in-memory; these are code-defined constants)."""
+        from src import settings
+        for tile in self._feat_tile_list:
+            tid = tile["_tile_id"]
+            if tid in settings.TILE_DEFS:
+                settings.TILE_DEFS[tid]["name"] = tile["name"]
+                settings.TILE_DEFS[tid]["walkable"] = tile["walkable"]
+                settings.TILE_DEFS[tid]["color"] = tuple(tile["color"])
+        return True
+
+    def _feat_build_tile_fields(self, tile):
+        """Build editable field list for a single tile type."""
+        color = tile.get("color", [128, 128, 128])
+        color_str = f"{color[0]}, {color[1]}, {color[2]}" \
+            if isinstance(color, (list, tuple)) else str(color)
+        fields = [
+            ["-- Tile Type --", "_hdr1", "", "section", False],
+            ["ID", "_tile_id",
+             str(tile.get("_tile_id", 0)), "int", False],
+            ["Name", "name", tile.get("name", ""), "text", True],
+            ["Walkable", "walkable",
+             str(tile.get("walkable", True)), "choice", True],
+            ["Color (R,G,B)", "_color", color_str, "text", True],
+        ]
+        self._feat_tile_fields = fields
+        self._feat_tile_field = 0
+        self._feat_tile_scroll_f = 0
+        self._feat_tile_buffer = ""
+        self._feat_tile_field = self._feat_next_editable_generic(
+            self._feat_tile_fields, 0)
+        if self._feat_tile_fields:
+            self._feat_tile_buffer = \
+                self._feat_tile_fields[self._feat_tile_field][2]
+
+    def _feat_save_tile_fields(self):
+        """Apply edited fields back to the tile dict."""
+        if self._feat_tile_cursor >= len(self._feat_tile_list):
+            return
+        tile = self._feat_tile_list[self._feat_tile_cursor]
+        if self._feat_tile_fields:
+            entry = self._feat_tile_fields[self._feat_tile_field]
+            entry[2] = self._feat_tile_buffer
+        for entry in self._feat_tile_fields:
+            key, val = entry[1], entry[2]
+            if key.startswith("_") and key != "_color":
+                continue
+            if key == "_color":
+                try:
+                    parts = [int(p.strip()) for p in val.split(",")]
+                    if len(parts) == 3:
+                        tile["color"] = parts
+                except ValueError:
+                    pass
+            elif key == "walkable":
+                tile[key] = val == "True"
+            elif key == "name":
+                tile[key] = val
+
+    def _feat_get_tile_choices(self, key):
+        """Return choice options for a tile field."""
+        if key == "walkable":
+            return ["True", "False"]
+        return []
+
+    def _feat_add_tile(self):
+        """Add a new tile type with the next available ID."""
+        used_ids = {t["_tile_id"] for t in self._feat_tile_list}
+        new_id = max(used_ids) + 1 if used_ids else 100
+        new_tile = {
+            "_tile_id": new_id,
+            "name": f"New Tile {new_id}",
+            "walkable": True,
+            "color": [128, 128, 128],
+        }
+        self._feat_tile_list.append(new_tile)
+        self._feat_tile_cursor = len(self._feat_tile_list) - 1
+
+    def _feat_remove_tile(self):
+        """Remove the currently selected tile type."""
+        if not self._feat_tile_list:
+            return
+        idx = self._feat_tile_cursor
+        if 0 <= idx < len(self._feat_tile_list):
+            self._feat_tile_list.pop(idx)
+            if self._feat_tile_cursor >= len(self._feat_tile_list):
+                self._feat_tile_cursor = max(
+                    0, len(self._feat_tile_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Generic editor helpers (shared across all editors) ─────
+    # ══════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _feat_next_editable_generic(fields, start):
+        """Find next editable field index from start in any field list."""
+        n = len(fields)
+        if n == 0:
+            return 0
+        idx = start % n
+        for _ in range(n):
+            entry = fields[idx]
+            if len(entry) > 4 and entry[4] and entry[3] != "section":
+                return idx
+            idx = (idx + 1) % n
+        return start % n
+
+    @staticmethod
+    def _feat_adjust_scroll_generic(cursor, scroll, max_visible=14):
+        """Generic scroll adjustment. Returns new scroll value."""
+        if cursor < scroll:
+            return cursor
+        if cursor >= scroll + max_visible:
+            return cursor - max_visible + 1
+        return scroll
+
+    @staticmethod
+    def _feat_adjust_field_scroll_generic(field_idx, scroll):
+        """Generic field scroll adjustment."""
+        row_h = 38
+        panel_h = 500
+        max_visible = panel_h // row_h
+        if field_idx < scroll:
+            return field_idx
+        if field_idx >= scroll + max_visible:
+            return field_idx - max_visible + 1
+        return scroll
 
     # ── Module selection ──────────────────────────────────────
 
@@ -4369,69 +4922,70 @@ class Game:
             self.title_options[self.title_cursor]["action"]()
 
     def _handle_features_input(self, event):
-        """Handle input for the Game Features editor."""
+        """Handle input for the Game Features editor.
+
+        Uses _feat_active_editor to dispatch to the correct data
+        structures while sharing the same level-1/level-2 navigation logic.
+        """
         if event.type != pygame.KEYDOWN:
             return
 
-        # ── Level 2: editing individual spell fields ──
-        if self._feat_level == 2:
-            if event.key == pygame.K_ESCAPE:
-                # Save field edits back to spell dict, persist to
-                # disk, resort, and return to list
-                self._feat_save_spell_fields()
-                self._feat_resort_spells()
-                self._feat_save_spells()
-                self._feat_spell_editing = False
-                self._feat_level = 1
-                return
-            if (event.key == pygame.K_s
+        # ── Resolve active editor data pointers ──
+        ed = self._feat_active_editor
+        # Build a context dict so the level-1 and level-2 code
+        # can work generically across all editor types
+        ctx = self._feat_editor_ctx()
+
+        # ── Level 2: editing individual fields ──
+        if self._feat_level == 2 and ctx:
+            if event.key == pygame.K_ESCAPE or (
+                    event.key == pygame.K_s
                     and event.mod & pygame.KMOD_CTRL):
-                # Ctrl+S: save to disk
-                self._feat_save_spell_fields()
-                self._feat_resort_spells()
-                self._feat_save_spells()
-                self._feat_spell_editing = False
+                ctx["save_fields"]()
+                if ed == "spells":
+                    self._feat_resort_spells()
+                ctx["save_disk"]()
+                ctx["set_editing"](False)
                 self._feat_level = 1
                 return
-            # Navigate fields
-            n = len(self._feat_spell_fields)
+            fields = ctx["fields"]()
+            n = len(fields)
             if n == 0:
                 return
-            entry = self._feat_spell_fields[self._feat_spell_field]
+            field_idx = ctx["field_idx"]()
+            entry = fields[field_idx]
             ftype = entry[3] if len(entry) > 3 else "text"
+            buf = ctx["buffer"]()
 
             if event.key == pygame.K_UP:
-                entry[2] = self._feat_spell_buffer
-                idx = (self._feat_spell_field - 1) % n
-                idx = self._feat_next_editable(idx)
-                self._feat_spell_field = idx
-                self._feat_spell_buffer = \
-                    self._feat_spell_fields[idx][2]
-                self._feat_adjust_spell_field_scroll()
+                entry[2] = buf
+                idx = (field_idx - 1) % n
+                idx = self._feat_next_editable_generic(fields, idx)
+                ctx["set_field_idx"](idx)
+                ctx["set_buffer"](fields[idx][2])
+                ctx["adjust_field_scroll"]()
             elif event.key == pygame.K_DOWN:
-                entry[2] = self._feat_spell_buffer
-                idx = (self._feat_spell_field + 1) % n
-                idx = self._feat_next_editable(idx)
-                self._feat_spell_field = idx
-                self._feat_spell_buffer = \
-                    self._feat_spell_fields[idx][2]
-                self._feat_adjust_spell_field_scroll()
+                entry[2] = buf
+                idx = (field_idx + 1) % n
+                idx = self._feat_next_editable_generic(fields, idx)
+                ctx["set_field_idx"](idx)
+                ctx["set_buffer"](fields[idx][2])
+                ctx["adjust_field_scroll"]()
             elif ftype == "choice":
                 if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                    choices = self._feat_get_spell_choices(entry[1])
+                    choices = ctx["get_choices"](entry[1])
                     if choices:
                         try:
-                            ci = choices.index(self._feat_spell_buffer)
+                            ci = choices.index(buf)
                         except ValueError:
                             ci = 0
                         if event.key == pygame.K_RIGHT:
                             ci = (ci + 1) % len(choices)
                         else:
                             ci = (ci - 1) % len(choices)
-                        self._feat_spell_buffer = choices[ci]
-                        # When casting_type changes, auto-update the
-                        # allowable_classes field to match
-                        if entry[1] == "casting_type":
+                        ctx["set_buffer"](choices[ci])
+                        # Spell-specific: casting_type → classes sync
+                        if ed == "spells" and entry[1] == "casting_type":
                             new_cls = ", ".join(
                                 self._feat_default_classes(choices[ci]))
                             for fe in self._feat_spell_fields:
@@ -4440,62 +4994,57 @@ class Game:
                                     break
             elif ftype == "int":
                 if event.key == pygame.K_BACKSPACE:
-                    self._feat_spell_buffer = \
-                        self._feat_spell_buffer[:-1]
+                    ctx["set_buffer"](buf[:-1])
                 elif event.key == pygame.K_LEFT:
                     try:
-                        v = int(self._feat_spell_buffer) - 1
-                        self._feat_spell_buffer = str(max(0, v))
+                        v = int(buf) - 1
+                        ctx["set_buffer"](str(max(0, v)))
                     except ValueError:
                         pass
                 elif event.key == pygame.K_RIGHT:
                     try:
-                        v = int(self._feat_spell_buffer) + 1
-                        self._feat_spell_buffer = str(v)
+                        v = int(buf) + 1
+                        ctx["set_buffer"](str(v))
                     except ValueError:
                         pass
                 elif event.unicode and event.unicode.isdigit():
-                    self._feat_spell_buffer += event.unicode
+                    ctx["set_buffer"](buf + event.unicode)
             elif ftype == "text":
                 if event.key == pygame.K_BACKSPACE:
-                    self._feat_spell_buffer = \
-                        self._feat_spell_buffer[:-1]
+                    ctx["set_buffer"](buf[:-1])
                 elif event.unicode and event.unicode.isprintable():
-                    self._feat_spell_buffer += event.unicode
+                    ctx["set_buffer"](buf + event.unicode)
             return
 
-        # ── Level 1: spell list browser ──
-        if self._feat_level == 1:
-            n = len(self._feat_spell_list)
+        # ── Level 1: list browser ──
+        if self._feat_level == 1 and ctx:
+            lst = ctx["list"]()
+            n = len(lst)
             if event.key == pygame.K_ESCAPE:
-                # Auto-save on exit so changes are immediately
-                # available in gameplay
-                self._feat_save_spells()
+                ctx["save_disk"]()
                 self._feat_level = 0
+                self._feat_active_editor = None
                 return
             if event.key == pygame.K_UP and n > 0:
-                self._feat_spell_cursor = (
-                    self._feat_spell_cursor - 1) % n
-                self._feat_adjust_spell_scroll()
+                ctx["set_cursor"]((ctx["cursor"]() - 1) % n)
+                ctx["adjust_scroll"]()
             elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_spell_cursor = (
-                    self._feat_spell_cursor + 1) % n
-                self._feat_adjust_spell_scroll()
+                ctx["set_cursor"]((ctx["cursor"]() + 1) % n)
+                ctx["adjust_scroll"]()
             elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
                 if n > 0:
-                    spell = self._feat_spell_list[
-                        self._feat_spell_cursor]
-                    self._feat_build_spell_fields(spell)
-                    self._feat_spell_editing = True
+                    item = lst[ctx["cursor"]()]
+                    ctx["build_fields"](item)
+                    ctx["set_editing"](True)
                     self._feat_level = 2
             elif event.key == pygame.K_a:
-                self._feat_add_spell()
-                self._feat_adjust_spell_scroll()
+                ctx["add"]()
+                ctx["adjust_scroll"]()
             elif event.key in (pygame.K_d, pygame.K_DELETE):
-                self._feat_remove_spell()
+                ctx["remove"]()
             elif (event.key == pygame.K_s
                   and event.mod & pygame.KMOD_CTRL):
-                self._feat_save_spells()
+                ctx["save_disk"]()
             return
 
         # ── Level 0: category list ──
@@ -4514,29 +5063,131 @@ class Game:
             if cat["label"] == "Modules":
                 self._feat_open_modules()
             elif cat["label"] == "Spells":
+                self._feat_active_editor = "spells"
                 self._feat_load_spells()
                 self._feat_level = 1
+            elif cat["label"] == "Items":
+                self._feat_active_editor = "items"
+                self._feat_load_items()
+                self._feat_level = 1
+            elif cat["label"] == "Monsters":
+                self._feat_active_editor = "monsters"
+                self._feat_load_monsters()
+                self._feat_level = 1
+            elif cat["label"] == "Tile Types":
+                self._feat_active_editor = "tiles"
+                self._feat_load_tiles()
+                self._feat_level = 1
 
-    def _feat_adjust_spell_scroll(self):
-        """Keep spell cursor visible in the spell list."""
-        max_visible = 14
-        if self._feat_spell_cursor < self._feat_spell_scroll:
-            self._feat_spell_scroll = self._feat_spell_cursor
-        elif (self._feat_spell_cursor >=
-              self._feat_spell_scroll + max_visible):
-            self._feat_spell_scroll = (
-                self._feat_spell_cursor - max_visible + 1)
-
-    def _feat_adjust_spell_field_scroll(self):
-        """Keep spell field cursor visible in the field editor."""
-        row_h = 38
-        panel_h = 500
-        max_visible = panel_h // row_h
-        idx = self._feat_spell_field
-        if idx < self._feat_spell_scroll_f:
-            self._feat_spell_scroll_f = idx
-        elif idx >= self._feat_spell_scroll_f + max_visible:
-            self._feat_spell_scroll_f = idx - max_visible + 1
+    def _feat_editor_ctx(self):
+        """Return a dict of lambdas/refs for the active editor,
+        allowing generic level-1 and level-2 logic."""
+        ed = self._feat_active_editor
+        if ed == "spells":
+            return {
+                "list": lambda: self._feat_spell_list,
+                "cursor": lambda: self._feat_spell_cursor,
+                "set_cursor": lambda v: setattr(self, "_feat_spell_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "_feat_spell_scroll",
+                    self._feat_adjust_scroll_generic(
+                        self._feat_spell_cursor, self._feat_spell_scroll)),
+                "fields": lambda: self._feat_spell_fields,
+                "field_idx": lambda: self._feat_spell_field,
+                "set_field_idx": lambda v: setattr(self, "_feat_spell_field", v),
+                "buffer": lambda: self._feat_spell_buffer,
+                "set_buffer": lambda v: setattr(self, "_feat_spell_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "_feat_spell_scroll_f",
+                    self._feat_adjust_field_scroll_generic(
+                        self._feat_spell_field, self._feat_spell_scroll_f)),
+                "build_fields": self._feat_build_spell_fields,
+                "save_fields": self._feat_save_spell_fields,
+                "save_disk": self._feat_save_spells,
+                "set_editing": lambda v: setattr(self, "_feat_spell_editing", v),
+                "add": self._feat_add_spell,
+                "remove": self._feat_remove_spell,
+                "get_choices": self._feat_get_spell_choices,
+            }
+        elif ed == "items":
+            return {
+                "list": lambda: self._feat_item_list,
+                "cursor": lambda: self._feat_item_cursor,
+                "set_cursor": lambda v: setattr(self, "_feat_item_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "_feat_item_scroll",
+                    self._feat_adjust_scroll_generic(
+                        self._feat_item_cursor, self._feat_item_scroll)),
+                "fields": lambda: self._feat_item_fields,
+                "field_idx": lambda: self._feat_item_field,
+                "set_field_idx": lambda v: setattr(self, "_feat_item_field", v),
+                "buffer": lambda: self._feat_item_buffer,
+                "set_buffer": lambda v: setattr(self, "_feat_item_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "_feat_item_scroll_f",
+                    self._feat_adjust_field_scroll_generic(
+                        self._feat_item_field, self._feat_item_scroll_f)),
+                "build_fields": self._feat_build_item_fields,
+                "save_fields": self._feat_save_item_fields,
+                "save_disk": self._feat_save_items,
+                "set_editing": lambda v: setattr(self, "_feat_item_editing", v),
+                "add": self._feat_add_item,
+                "remove": self._feat_remove_item,
+                "get_choices": self._feat_get_item_choices,
+            }
+        elif ed == "monsters":
+            return {
+                "list": lambda: self._feat_mon_list,
+                "cursor": lambda: self._feat_mon_cursor,
+                "set_cursor": lambda v: setattr(self, "_feat_mon_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "_feat_mon_scroll",
+                    self._feat_adjust_scroll_generic(
+                        self._feat_mon_cursor, self._feat_mon_scroll)),
+                "fields": lambda: self._feat_mon_fields,
+                "field_idx": lambda: self._feat_mon_field,
+                "set_field_idx": lambda v: setattr(self, "_feat_mon_field", v),
+                "buffer": lambda: self._feat_mon_buffer,
+                "set_buffer": lambda v: setattr(self, "_feat_mon_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "_feat_mon_scroll_f",
+                    self._feat_adjust_field_scroll_generic(
+                        self._feat_mon_field, self._feat_mon_scroll_f)),
+                "build_fields": self._feat_build_mon_fields,
+                "save_fields": self._feat_save_mon_fields,
+                "save_disk": self._feat_save_monsters,
+                "set_editing": lambda v: setattr(self, "_feat_mon_editing", v),
+                "add": self._feat_add_monster,
+                "remove": self._feat_remove_monster,
+                "get_choices": self._feat_get_mon_choices,
+            }
+        elif ed == "tiles":
+            return {
+                "list": lambda: self._feat_tile_list,
+                "cursor": lambda: self._feat_tile_cursor,
+                "set_cursor": lambda v: setattr(self, "_feat_tile_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "_feat_tile_scroll",
+                    self._feat_adjust_scroll_generic(
+                        self._feat_tile_cursor, self._feat_tile_scroll)),
+                "fields": lambda: self._feat_tile_fields,
+                "field_idx": lambda: self._feat_tile_field,
+                "set_field_idx": lambda v: setattr(self, "_feat_tile_field", v),
+                "buffer": lambda: self._feat_tile_buffer,
+                "set_buffer": lambda v: setattr(self, "_feat_tile_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "_feat_tile_scroll_f",
+                    self._feat_adjust_field_scroll_generic(
+                        self._feat_tile_field, self._feat_tile_scroll_f)),
+                "build_fields": self._feat_build_tile_fields,
+                "save_fields": self._feat_save_tile_fields,
+                "save_disk": self._feat_save_tiles,
+                "set_editing": lambda v: setattr(self, "_feat_tile_editing", v),
+                "add": self._feat_add_tile,
+                "remove": self._feat_remove_tile,
+                "get_choices": self._feat_get_tile_choices,
+            }
+        return None
 
     def _handle_settings_input(self, event):
         """Handle input while the settings screen is open."""
@@ -4769,6 +5420,7 @@ class Game:
                     categories=self._feat_categories,
                     cat_cursor=self._feat_cursor,
                     level=self._feat_level,
+                    active_editor=self._feat_active_editor,
                     spell_list=self._feat_spell_list,
                     spell_cursor=self._feat_spell_cursor,
                     spell_scroll=self._feat_spell_scroll,
@@ -4777,6 +5429,30 @@ class Game:
                     spell_field=self._feat_spell_field,
                     spell_buffer=self._feat_spell_buffer,
                     spell_field_scroll=self._feat_spell_scroll_f,
+                    item_list=self._feat_item_list,
+                    item_cursor=self._feat_item_cursor,
+                    item_scroll=self._feat_item_scroll,
+                    item_editing=self._feat_item_editing,
+                    item_fields=self._feat_item_fields,
+                    item_field=self._feat_item_field,
+                    item_buffer=self._feat_item_buffer,
+                    item_field_scroll=self._feat_item_scroll_f,
+                    mon_list=self._feat_mon_list,
+                    mon_cursor=self._feat_mon_cursor,
+                    mon_scroll=self._feat_mon_scroll,
+                    mon_editing=self._feat_mon_editing,
+                    mon_fields=self._feat_mon_fields,
+                    mon_field=self._feat_mon_field,
+                    mon_buffer=self._feat_mon_buffer,
+                    mon_field_scroll=self._feat_mon_scroll_f,
+                    tile_list=self._feat_tile_list,
+                    tile_cursor=self._feat_tile_cursor,
+                    tile_scroll=self._feat_tile_scroll,
+                    tile_editing=self._feat_tile_editing,
+                    tile_fields=self._feat_tile_fields,
+                    tile_field=self._feat_tile_field,
+                    tile_buffer=self._feat_tile_buffer,
+                    tile_field_scroll=self._feat_tile_scroll_f,
                 )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(
