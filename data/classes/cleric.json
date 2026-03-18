@@ -1,4 +1,5 @@
 {
+  "name": "Cleric",
   "_comment": "Cleric class template. Clerics favor blunt weapons and medium armor.",
   "allowed_weapons": [
     "fists",

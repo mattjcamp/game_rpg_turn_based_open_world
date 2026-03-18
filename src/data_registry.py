@@ -182,3 +182,45 @@ def default_race(data_dir=None):
     """Return the first race name (used as a default)."""
     names = all_race_names(data_dir)
     return names[0] if names else "Human"
+
+
+# ── Monster helpers (derived from data/monsters.json) ─────────────
+
+
+def all_monster_names(data_dir=None):
+    """Return sorted list of all monster names from monsters.json."""
+    try:
+        data = _load("monsters.json", data_dir)
+        return sorted(data.get("monsters", {}).keys())
+    except (OSError, ValueError):
+        return []
+
+
+def killable_monster_names(data_dir=None):
+    """Return monster names suitable for kill-quest targets.
+
+    Excludes sea-only creatures since dungeons are land-based.
+    """
+    try:
+        monsters = _load("monsters.json", data_dir).get("monsters", {})
+    except (OSError, ValueError):
+        return []
+    return sorted(
+        name for name, data in monsters.items()
+        if data.get("terrain", "land") != "sea"
+    )
+
+
+# ── Item helpers (derived from data/items.json) ──────────────────
+
+
+def all_item_names(data_dir=None):
+    """Return sorted list of all item names from items.json."""
+    try:
+        raw = _load("items.json", data_dir)
+    except (OSError, ValueError):
+        return []
+    names = set()
+    for section in ("weapons", "armors", "general"):
+        names.update(raw.get(section, {}).keys())
+    return sorted(names)

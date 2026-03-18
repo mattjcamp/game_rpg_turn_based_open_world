@@ -1,4 +1,5 @@
 {
+  "name": "Paladin",
   "_comment": "Paladin (Fighter + Cleric). Heavy fighter with priest healing. Can use all weapons and up to plate armor.",
   "allowed_weapons": "all",
   "allowed_armor": [

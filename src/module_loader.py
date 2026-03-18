@@ -87,32 +87,14 @@ _DUNGEON_NOUNS = [
 QUEST_TYPE_NAMES = ["Retrieve Artifact", "Kill Monsters", "Gnome Machine"]
 QUEST_TYPE_KEYS = ["retrieve", "kill", "gnome_machine"]  # internal keys
 
-# Monsters that can be targets for kill quests
-KILL_QUEST_MONSTERS = [
-    "Giant Rat", "Skeleton", "Orc", "Goblin", "Zombie",
-    "Wolf", "Dark Mage", "Troll", "Orc Shaman",
-]
+# Monster and item lists — derived from data files via data_registry
+# so that adding new entries to JSON automatically makes them available
+# in the module editor.
+from src import data_registry as _DR
 
-# All monsters available for encounter editing (includes Skeleton Archer)
-ENCOUNTER_MONSTERS = [
-    "Giant Rat", "Skeleton", "Skeleton Archer", "Orc", "Goblin",
-    "Zombie", "Wolf", "Dark Mage", "Troll", "Orc Shaman",
-]
-
-# Items available for starting loot selection in the module editor
-LOOT_ITEMS = [
-    "Healing Herb", "Healing Potion", "Antidote", "Torch",
-    "Lockpick", "Rock", "Stones", "Arrows", "Bolts",
-    "Camping Supplies", "Fire Oil", "Spring Water",
-    "Glowcap Mushroom", "Moonpetal", "Serpent Root", "Brimite Ore",
-    "Smoke Bomb", "Holy Water", "Mana Potion", "Rope",
-    "Elixir of Strength", "Elixir of Warding",
-    "Poison Vial", "Lingering Venom", "Paralytic Poison",
-    "Weakening Poison",
-    "Dagger", "Club", "Sword", "Axe", "Mace", "Spear",
-    "Short Bow", "Long Bow", "Sling", "Crossbow",
-    "Cloth", "Leather", "Chain", "Gloves",
-]
+KILL_QUEST_MONSTERS = _DR.killable_monster_names()
+ENCOUNTER_MONSTERS = _DR.all_monster_names()
+LOOT_ITEMS = _DR.all_item_names()
 
 _KEY_MATERIALS = [
     "Iron", "Bronze", "Silver", "Gold", "Crystal", "Ruby",

@@ -1,4 +1,5 @@
 {
+  "name": "Druid",
   "_comment": "Druid (Cleric + Wizard). Dual caster using both priest and sorcerer spells. MP based on stronger of INT/WIS. Recovers MP at 2x rate.",
   "allowed_weapons": [
     "fists",

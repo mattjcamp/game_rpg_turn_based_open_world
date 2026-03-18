@@ -1,4 +1,5 @@
 {
+  "name": "Ranger",
   "_comment": "A woodsman who can use light weapons and armor and knows healing magic. Herbalism training grants a higher chance of finding reagents when foraging.",
   "allowed_weapons": [
     "fists",

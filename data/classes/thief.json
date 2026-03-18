@@ -1,4 +1,5 @@
 {
+  "name": "Thief",
   "_comment": "Thief class template. Thieves favor light weapons and light armor.",
   "allowed_weapons": [
     "fists",
