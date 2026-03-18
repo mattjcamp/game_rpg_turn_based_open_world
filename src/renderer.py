@@ -7361,26 +7361,40 @@ class Renderer(CombatEffectRendererMixin):
         # ── Right panel: selected spell detail ──
         if 0 <= spell_cursor < len(spell_list):
             spell = spell_list[spell_cursor]
+            max_pw = right_w - 36
             dy = panel_y + 12
-            self._u3_text(spell.get("name", "???"),
+            sname = spell.get("name", "???")
+            while len(sname) > 2 and f.size(sname)[0] > max_pw:
+                sname = sname[:-1]
+            self._u3_text(sname,
                           right_x + 16, dy, self._U3_WHITE, f)
             dy += 28
 
-            ctype = spell.get("casting_type", "sorcerer").title()
-            self._u3_text(f"{ctype} spell",
+            raw_ctype = spell.get("casting_type", "sorcerer")
+            ctype_label = ("Cleric" if raw_ctype == "priest"
+                           else "Sorcerer")
+            self._u3_text(f"{ctype_label} spell",
                           right_x + 16, dy, (160, 160, 180), fm)
             dy += 20
 
             classes = ", ".join(spell.get("allowable_classes", []))
-            self._u3_text(f"Classes: {classes}",
+            cls_text = f"Classes: {classes}"
+            while (len(cls_text) > 10
+                   and fm.size(cls_text)[0] > max_pw):
+                cls_text = cls_text[:-1]
+            self._u3_text(cls_text,
                           right_x + 16, dy, (180, 180, 200), fm)
             dy += 20
 
-            self._u3_text(
+            stat_text = (
                 f"Level {spell.get('min_level', 1)}  |  "
                 f"{spell.get('mp_cost', 0)} MP  |  "
-                f"{spell.get('effect_type', '?')}",
-                right_x + 16, dy, (180, 180, 200), fm)
+                f"{spell.get('effect_type', '?')}")
+            while (len(stat_text) > 10
+                   and fm.size(stat_text)[0] > max_pw):
+                stat_text = stat_text[:-1]
+            self._u3_text(stat_text,
+                          right_x + 16, dy, (180, 180, 200), fm)
             dy += 24
 
             pygame.draw.line(self.screen, (60, 50, 40),
@@ -7390,7 +7404,6 @@ class Renderer(CombatEffectRendererMixin):
 
             # Description with word wrap
             desc = spell.get("description", "")
-            max_pw = right_w - 36
             if desc:
                 words = desc.split()
                 line = ""
@@ -7408,18 +7421,26 @@ class Renderer(CombatEffectRendererMixin):
                                   (180, 180, 200), fm)
                     dy += 22
 
-            # Targeting & range
+            # Targeting & range — truncate to fit right panel
             dy += 8
             targeting = spell.get("targeting", "?")
             rng = spell.get("range", 99)
-            self._u3_text(f"Targeting: {targeting}",
+            tgt_text = f"Targeting: {targeting}"
+            while (len(tgt_text) > 12
+                   and fs.size(tgt_text)[0] > max_pw):
+                tgt_text = tgt_text[:-1]
+            self._u3_text(tgt_text,
                           right_x + 16, dy, (140, 140, 160), fs)
             dy += 16
             self._u3_text(f"Range: {rng}",
                           right_x + 16, dy, (140, 140, 160), fs)
             dy += 16
             usable = ", ".join(spell.get("usable_in", []))
-            self._u3_text(f"Usable in: {usable}",
+            usable_text = f"Usable in: {usable}"
+            while (len(usable_text) > 12
+                   and fs.size(usable_text)[0] > max_pw):
+                usable_text = usable_text[:-1]
+            self._u3_text(usable_text,
                           right_x + 16, dy, (140, 140, 160), fs)
 
         # Footer
@@ -7449,9 +7470,9 @@ class Renderer(CombatEffectRendererMixin):
         title = f"Edit: {spell_name}" if spell_name else "Edit Spell"
         self._u3_text(title, rx + 16, ry + 10, self._U3_ORANGE, f)
 
-        # Scrollable field list
+        # Scrollable field list — leave room for footer hint
         content_top = ry + 38
-        content_bottom = ry + rh - 8
+        content_bottom = ry + rh - 30
         content_h = content_bottom - content_top
         clip_rect = pygame.Rect(rx, content_top, rw, content_h)
         old_clip = self.screen.get_clip()
@@ -7499,19 +7520,36 @@ class Renderer(CombatEffectRendererMixin):
             dy += 18
 
             if visible:
+                # Max pixel width for value text (inside arrows)
+                arrow_pad = 24  # space for < > arrows
+                val_max = max_pw - arrow_pad
                 if field_type == "choice":
                     self._u3_text("<", rx + 20, dy, arrow_color, fm)
-                    self._u3_text(display or "(none)", rx + 34, dy,
+                    disp = display or "(none)"
+                    while (len(disp) > 2
+                           and fm.size(disp)[0] > val_max):
+                        disp = disp[:-1]
+                    if len(disp) < len(display or "(none)"):
+                        disp += ".."
+                    self._u3_text(disp, rx + 34, dy,
                                   text_color, fm)
-                    vw = fm.size(display or "(none)")[0]
-                    self._u3_text(">", rx + 38 + vw, dy,
+                    vw = fm.size(disp)[0]
+                    arrow_x = min(rx + 38 + vw,
+                                  rx + rw - 20)
+                    self._u3_text(">", arrow_x, dy,
                                   arrow_color, fm)
                 elif field_type == "int":
                     self._u3_text("<", rx + 20, dy, arrow_color, fm)
-                    self._u3_text(display, rx + 34, dy,
+                    disp = display or "0"
+                    while (len(disp) > 1
+                           and fm.size(disp)[0] > val_max):
+                        disp = disp[:-1]
+                    self._u3_text(disp, rx + 34, dy,
                                   text_color, fm)
-                    vw = fm.size(display)[0]
-                    self._u3_text(">", rx + 38 + vw, dy,
+                    vw = fm.size(disp)[0]
+                    arrow_x = min(rx + 38 + vw,
+                                  rx + rw - 20)
+                    self._u3_text(">", arrow_x, dy,
                                   arrow_color, fm)
                 else:
                     # Text field - truncate to fit
@@ -7534,11 +7572,21 @@ class Renderer(CombatEffectRendererMixin):
 
         self.screen.set_clip(old_clip)
 
-        # Footer hint inside panel
-        hint_y = ry + rh - 22
-        self._u3_text(
-            "[Up/Dn] Field  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
-            rx + 8, hint_y, self._U3_HINT, fs)
+        # Footer hint inside panel — opaque background so scrolled
+        # content never shows through
+        footer_h = 26
+        footer_y = ry + rh - footer_h
+        footer_bg = pygame.Surface((rw - 2, footer_h), pygame.SRCALPHA)
+        footer_bg.fill((10, 8, 20, 255))
+        self.screen.blit(footer_bg, (rx + 1, footer_y))
+        pygame.draw.line(self.screen, (80, 70, 50),
+                         (rx + 8, footer_y),
+                         (rx + rw - 8, footer_y), 1)
+        hint = "[Up/Dn] Field  [Type] Edit  [Ctrl+S] Save  [Esc] Back"
+        hint_max = rw - 16
+        while len(hint) > 10 and fs.size(hint)[0] > hint_max:
+            hint = hint[:-1]
+        self._u3_text(hint, rx + 8, footer_y + 5, self._U3_HINT, fs)
 
     def draw_module_screen(self, modules, cursor, active_path,
                            message=None, confirm_delete=False,

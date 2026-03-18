@@ -151,9 +151,16 @@ def reload_module_data(module_data_dir=None):
     RACE_INFO = load_races(module_data_dir)
     VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 
-    # Reload effects and spells
-    EFFECTS_DATA = _load_effects_config().get("effects", [])
-    SPELLS_DATA = {s["id"]: s for s in _load_spells_config().get("spells", [])}
+    # Reload effects and spells — update dicts/lists *in place* so that
+    # modules which imported the old reference (e.g. combat.py's
+    # top-level ``from src.party import SPELLS_DATA``) see the changes.
+    EFFECTS_DATA[:] = _load_effects_config().get("effects", [])
+
+    fresh_spells = {s["id"]: s
+                    for s in _load_spells_config().get("spells", [])}
+    SPELLS_DATA.clear()
+    SPELLS_DATA.update(fresh_spells)
+
     POTIONS_DATA = _load_potions_config()
 
     # Clear class template cache so they reload from the module directory

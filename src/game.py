@@ -324,6 +324,11 @@ class Game:
         # ── Load module data (items, races, monsters, etc.) ──
         if self.active_module_path:
             self.module_manifest = load_module_data(self.active_module_path)
+        else:
+            # No active module — still refresh spell/item data from
+            # default data/ so editor changes take effect immediately.
+            from src.party import reload_module_data as _rp
+            _rp()
 
         # ── Regenerate the overworld map from module config ──
         overworld_cfg = None
@@ -1635,11 +1640,21 @@ class Game:
         self.module_edit_mode = False
         self.module_edit_is_new = False
 
-    def _feat_load_spells(self):
-        """Load spells from data/spells.json into the editor."""
-        import json
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+    def _feat_spells_path(self):
+        """Return the path to the spells.json file that the game
+        actually uses — module directory first, then default data/."""
+        if self.active_module_path:
+            mod_path = os.path.join(self.active_module_path,
+                                    "spells.json")
+            if os.path.isfile(mod_path):
+                return mod_path
+        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
                             "data", "spells.json")
+
+    def _feat_load_spells(self):
+        """Load spells from the active spells.json into the editor."""
+        import json
+        path = self._feat_spells_path()
         try:
             with open(path, "r") as f:
                 data = json.load(f)
@@ -1658,17 +1673,33 @@ class Game:
         self._feat_spell_scroll = 0
 
     def _feat_save_spells(self):
-        """Write current spell list back to data/spells.json."""
+        """Write current spell list back to the active spells.json
+        and refresh the in-memory spell registry so changes are
+        immediately available in gameplay."""
         import json
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                            "data", "spells.json")
+        path = self._feat_spells_path()
         data = {"spells": self._feat_spell_list}
         try:
             with open(path, "w") as f:
                 json.dump(data, f, indent=2)
-            return True
         except OSError:
             return False
+        # Refresh the runtime spell registry used by combat/casting.
+        # Pass the active module directory so _load_spells_config
+        # reads from the correct location.
+        try:
+            from src.party import reload_module_data as _reload
+            _reload(self.active_module_path)
+        except Exception:
+            pass
+        return True
+
+    @staticmethod
+    def _feat_default_classes(casting_type):
+        """Return the default allowable_classes for a casting type."""
+        if casting_type == "priest":
+            return ["Cleric", "Paladin", "Druid", "Ranger"]
+        return ["Wizard", "Alchemist"]
 
     def _feat_build_spell_fields(self, spell):
         """Build the editable field list for a single spell."""
@@ -1760,6 +1791,28 @@ class Game:
             idx = (idx + 1) % n
         return start % n
 
+    def _feat_resort_spells(self):
+        """Re-sort spell list and update cursor to follow the
+        previously-selected spell."""
+        if not self._feat_spell_list:
+            return
+        # Remember selected spell by identity
+        cur_spell = (self._feat_spell_list[self._feat_spell_cursor]
+                     if 0 <= self._feat_spell_cursor
+                     < len(self._feat_spell_list) else None)
+        type_order = {"sorcerer": 0, "priest": 1}
+        self._feat_spell_list.sort(key=lambda s: (
+            type_order.get(s.get("casting_type", "sorcerer"), 2),
+            s.get("min_level", 1),
+            s.get("name", ""),
+        ))
+        # Restore cursor
+        if cur_spell is not None:
+            for i, s in enumerate(self._feat_spell_list):
+                if s is cur_spell:
+                    self._feat_spell_cursor = i
+                    break
+
     def _feat_save_spell_fields(self):
         """Apply edited fields back to the spell dict in memory."""
         if self._feat_spell_cursor >= len(self._feat_spell_list):
@@ -1829,7 +1882,7 @@ class Game:
             "id": f"new_spell_{len(self._feat_spell_list) + 1}",
             "name": "New Spell",
             "description": "A new spell.",
-            "allowable_classes": ["Wizard"],
+            "allowable_classes": self._feat_default_classes("sorcerer"),
             "casting_type": "sorcerer",
             "min_level": 1,
             "mp_cost": 5,
@@ -4342,8 +4395,11 @@ class Game:
         # ── Level 2: editing individual spell fields ──
         if self._feat_level == 2:
             if event.key == pygame.K_ESCAPE:
-                # Save field edits back to spell dict and return to list
+                # Save field edits back to spell dict, persist to
+                # disk, resort, and return to list
                 self._feat_save_spell_fields()
+                self._feat_resort_spells()
+                self._feat_save_spells()
                 self._feat_spell_editing = False
                 self._feat_level = 1
                 return
@@ -4351,6 +4407,7 @@ class Game:
                     and event.mod & pygame.KMOD_CTRL):
                 # Ctrl+S: save to disk
                 self._feat_save_spell_fields()
+                self._feat_resort_spells()
                 self._feat_save_spells()
                 self._feat_spell_editing = False
                 self._feat_level = 1
@@ -4391,6 +4448,15 @@ class Game:
                         else:
                             ci = (ci - 1) % len(choices)
                         self._feat_spell_buffer = choices[ci]
+                        # When casting_type changes, auto-update the
+                        # allowable_classes field to match
+                        if entry[1] == "casting_type":
+                            new_cls = ", ".join(
+                                self._feat_default_classes(choices[ci]))
+                            for fe in self._feat_spell_fields:
+                                if fe[1] == "allowable_classes":
+                                    fe[2] = new_cls
+                                    break
             elif ftype == "int":
                 if event.key == pygame.K_BACKSPACE:
                     self._feat_spell_buffer = \
@@ -4421,6 +4487,9 @@ class Game:
         if self._feat_level == 1:
             n = len(self._feat_spell_list)
             if event.key == pygame.K_ESCAPE:
+                # Auto-save on exit so changes are immediately
+                # available in gameplay
+                self._feat_save_spells()
                 self._feat_level = 0
                 return
             if event.key == pygame.K_UP and n > 0:

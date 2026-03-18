@@ -16,7 +16,9 @@
       "effect_value": {
         "dice": "1d6",
         "stat_bonus": "intelligence",
-        "min_damage": 1
+        "min_damage": 1,
+        "dice_count": 1,
+        "dice_sides": 6
       },
       "range": 99,
       "targeting": "directional_projectile",
@@ -355,6 +357,34 @@
       "hit_sfx": null
     },
     {
+      "id": "new_spell_23",
+      "name": "New Spell",
+      "description": "A new spell.",
+      "allowable_classes": [
+        "Cleric",
+        "Paladin",
+        "Druid",
+        "Ranger"
+      ],
+      "casting_type": "priest",
+      "min_level": 1,
+      "mp_cost": 5,
+      "duration": "instant",
+      "effect_type": "teleport",
+      "effect_value": {
+        "dice": "1d6",
+        "dice_count": 1,
+        "dice_sides": 6
+      },
+      "range": 99,
+      "targeting": "select_tile",
+      "usable_in": [
+        "battle"
+      ],
+      "sfx": "",
+      "hit_sfx": ""
+    },
+    {
       "id": "cure_poison",
       "name": "Cure Poison",
       "description": "Draws the venom from an ally's body with a cleansing prayer, removing the poisoned condition.",
@@ -553,31 +583,6 @@
       ],
       "sfx": "heal",
       "hit_sfx": null
-    },
-    {
-      "id": "new_spell_23",
-      "name": "Butt Hurt",
-      "description": "A new spell.",
-      "allowable_classes": [
-        "Wizard"
-      ],
-      "casting_type": "sorcerer",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": "instant",
-      "effect_type": "damage",
-      "effect_value": {
-        "dice": "1d6",
-        "dice_count": 1,
-        "dice_sides": 6
-      },
-      "range": 99,
-      "targeting": "auto_monster",
-      "usable_in": [
-        "battle"
-      ],
-      "sfx": "",
-      "hit_sfx": ""
     }
   ]
 }

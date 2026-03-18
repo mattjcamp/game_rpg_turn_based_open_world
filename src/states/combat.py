@@ -103,10 +103,21 @@ PHASE_LOOT        = "loot"              # post-victory: free movement to pick up
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
 
-# ── Spell constants (loaded from data/spells.json) ────────────────
-FIREBALL_MP_COST  = SPELLS_DATA["fireball"]["mp_cost"]
+# ── Spell constants ────────────────────────────────────────────────
 FIREBALL_SPEED    = 320   # pixels per second (slower than arrow for drama)
-HEAL_MP_COST      = SPELLS_DATA["heal"]["mp_cost"]
+
+
+def _fireball_mp_cost():
+    """Look up fireball MP cost dynamically so spell edits take
+    effect without restarting the game."""
+    fb = SPELLS_DATA.get("fireball")
+    return fb["mp_cost"] if fb else 8
+
+
+def _heal_mp_cost():
+    """Look up heal MP cost dynamically."""
+    hl = SPELLS_DATA.get("heal")
+    return hl["mp_cost"] if hl else 4
 
 # ── Action indices ───────────────────────────────────────────────
 ACTION_MOVE   = 0      # kept for internal use (WASD movement)
@@ -2146,14 +2157,15 @@ class CombatState(BaseState):
             return
 
         # Check MP
-        if f.current_mp < FIREBALL_MP_COST:
-            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {FIREBALL_MP_COST})")
+        fb_cost = _fireball_mp_cost()
+        if f.current_mp < fb_cost:
+            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {fb_cost})")
             self.phase = PHASE_PLAYER
             self.directing_action = None
             return
 
         # Deduct MP
-        f.current_mp -= FIREBALL_MP_COST
+        f.current_mp -= fb_cost
 
         col, row = self.fighter_positions[f]
 
@@ -2203,7 +2215,7 @@ class CombatState(BaseState):
 
         self.phase = PHASE_FIREBALL
         self.combat_log.append(
-            f"{f.name} casts FIREBALL! (-{FIREBALL_MP_COST} MP)"
+            f"{f.name} casts FIREBALL! (-{fb_cost} MP)"
         )
 
     def _resolve_fireball(self):
@@ -2545,7 +2557,7 @@ class CombatState(BaseState):
         spell_id = self.selected_spell or "heal"
         spell = SPELLS_DATA.get(spell_id, SPELLS_DATA.get("heal", {}))
         spell_name = spell.get("name", "Heal")
-        mp_cost = spell.get("mp_cost", HEAL_MP_COST)
+        mp_cost = spell.get("mp_cost", _heal_mp_cost())
 
         # Check MP
         if f.current_mp < mp_cost:
