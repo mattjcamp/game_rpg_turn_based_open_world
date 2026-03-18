@@ -267,3 +267,65 @@ def all_overworld_tile_names():
     ow = data.get("overworld", {})
     return sorted(k for k, v in ow.items()
                   if isinstance(v, dict) and "path" in v)
+
+
+def all_tile_sprite_paths():
+    """Return sorted list of all tile sprite paths from the manifest.
+
+    Includes overworld, town, and dungeon categories — every sprite
+    that can be assigned to a tile type.  Each entry is
+    ``"category/name"`` (e.g. ``"overworld/grass"``).
+    """
+    try:
+        data = _load("tile_manifest.json")
+    except (OSError, ValueError):
+        return []
+    results = []
+    for cat in ("overworld", "town", "dungeon", "unique_tiles", "objects"):
+        section = data.get(cat, {})
+        if not isinstance(section, dict):
+            continue
+        for name, entry in sorted(section.items()):
+            if isinstance(entry, dict) and "path" in entry:
+                results.append(f"{cat}/{name}")
+    return results
+
+
+def all_spell_icon_options():
+    """Return sorted list of available spell icon identifiers.
+
+    Currently includes effect-type names as placeholders since
+    dedicated spell sprites don't exist yet.  As spell graphics
+    are added to the manifest, this list will grow.
+    """
+    try:
+        data = _load("tile_manifest.json")
+    except (OSError, ValueError):
+        data = {}
+
+    # Pull any existing "spells" or "effects" manifest entries
+    icons = set()
+    for cat in ("spells", "effects"):
+        section = data.get(cat, {})
+        if isinstance(section, dict):
+            for name, entry in section.items():
+                if isinstance(entry, dict) and "path" in entry:
+                    icons.add(name)
+
+    # Also include all unique_tiles and objects as possible spell icons
+    for cat in ("unique_tiles", "objects"):
+        section = data.get(cat, {})
+        if isinstance(section, dict):
+            for name, entry in section.items():
+                if isinstance(entry, dict) and "path" in entry:
+                    icons.add(f"{cat}/{name}")
+
+    # Include base effect-type names as placeholders
+    base = {
+        "damage", "heal", "ac_buff", "sleep", "teleport",
+        "charm", "invisibility", "lightning_bolt", "aoe_fireball",
+        "cure_poison", "magic_light", "undead_damage", "bless",
+        "curse", "summon_skeleton",
+    }
+    icons.update(base)
+    return sorted(icons)

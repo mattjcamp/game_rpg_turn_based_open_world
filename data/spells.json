@@ -26,7 +26,8 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": "unique_tiles/sunken_shipwreck"
     },
     {
       "id": "shield",

@@ -214,6 +214,7 @@ class Game:
             {"label": "Items", "icon": "I"},
             {"label": "Monsters", "icon": "X"},
             {"label": "Tile Types", "icon": "T"},
+            {"label": "Tile Gallery", "icon": "G"},
         ]
         self._modules_from_features = False  # True when modules opened from features
         # Spell editor state
@@ -258,6 +259,11 @@ class Game:
         self._feat_tile_fields = []
         self._feat_tile_buffer = ""
         self._feat_tile_scroll_f = 0
+
+        # Tile Gallery (read-only browser of all manifest sprites)
+        self._feat_gallery_list = []     # list of dicts: category, name, path
+        self._feat_gallery_cursor = 0
+        self._feat_gallery_scroll = 0
 
         # --- Settings screen ---
         self.showing_settings = False
@@ -1786,8 +1792,12 @@ class Game:
              str(spell.get("range", 99)), "int", True],
             ["Usable In", "usable_in",
              ", ".join(spell.get("usable_in", ["battle"])), "text", True],
+            # -- Visual --
+            ["-- Visual --", "_hdr5", "", "section", False],
+            ["Icon", "icon",
+             spell.get("icon", ""), "sprite", True],
             # -- Audio --
-            ["-- Audio --", "_hdr5", "", "section", False],
+            ["-- Audio --", "_hdr6", "", "section", False],
             ["SFX", "sfx", spell.get("sfx", ""), "text", True],
             ["Hit SFX", "hit_sfx",
              spell.get("hit_sfx", "") or "", "text", True],
@@ -1890,6 +1900,8 @@ class Game:
             return DR.all_effect_types()
         elif key == "targeting":
             return DR.all_targeting_types()
+        elif key == "icon":
+            return DR.all_spell_icon_options()
         return []
 
     def _feat_add_spell(self):
@@ -2337,11 +2349,17 @@ class Game:
         color = tile.get("color", [128, 128, 128])
         color_str = f"{color[0]}, {color[1]}, {color[2]}" \
             if isinstance(color, (list, tuple)) else str(color)
+        # Resolve current sprite from manifest via tile_id
+        sprite_key = tile.get("_sprite", "")
+        if not sprite_key:
+            sprite_key = self._feat_tile_sprite_key(
+                tile.get("_tile_id"))
         fields = [
             ["-- Tile Type --", "_hdr1", "", "section", False],
             ["ID", "_tile_id",
              str(tile.get("_tile_id", 0)), "int", False],
             ["Name", "name", tile.get("name", ""), "text", True],
+            ["Sprite", "_sprite", sprite_key, "sprite", True],
             ["Walkable", "walkable",
              str(tile.get("walkable", True)), "choice", True],
             ["Color (R,G,B)", "_color", color_str, "text", True],
@@ -2366,9 +2384,11 @@ class Game:
             entry[2] = self._feat_tile_buffer
         for entry in self._feat_tile_fields:
             key, val = entry[1], entry[2]
-            if key.startswith("_") and key != "_color":
+            if key.startswith("_") and key not in ("_color", "_sprite"):
                 continue
-            if key == "_color":
+            if key == "_sprite":
+                tile["_sprite"] = val
+            elif key == "_color":
                 try:
                     parts = [int(p.strip()) for p in val.split(",")]
                     if len(parts) == 3:
@@ -2380,8 +2400,36 @@ class Game:
             elif key == "name":
                 tile[key] = val
 
+    @staticmethod
+    def _feat_tile_sprite_key(tile_id):
+        """Resolve a tile_id to its manifest 'category/name' key."""
+        if tile_id is None:
+            return ""
+        import json, os
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            return ""
+        for cat in ("overworld", "town", "dungeon",
+                     "unique_tiles", "objects"):
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            for name, entry in section.items():
+                if (isinstance(entry, dict)
+                        and entry.get("tile_id") == tile_id):
+                    return f"{cat}/{name}"
+        return ""
+
     def _feat_get_tile_choices(self, key):
         """Return choice options for a tile field."""
+        if key == "_sprite":
+            from src import data_registry as DR
+            return DR.all_tile_sprite_paths()
         if key == "walkable":
             return ["True", "False"]
         return []
@@ -2409,6 +2457,39 @@ class Game:
             if self._feat_tile_cursor >= len(self._feat_tile_list):
                 self._feat_tile_cursor = max(
                     0, len(self._feat_tile_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Tile Gallery (read-only) ───────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def _feat_load_gallery(self):
+        """Load all manifest sprites into a flat list for browsing."""
+        import json
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "tile_manifest.json")
+        try:
+            with open(path, "r") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            manifest = {}
+        entries = []
+        for cat in ("overworld", "town", "dungeon", "characters",
+                     "npcs", "monsters", "objects", "unique_tiles"):
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            for name in sorted(section.keys()):
+                entry = section[name]
+                if isinstance(entry, dict) and "path" in entry:
+                    entries.append({
+                        "category": cat,
+                        "name": name,
+                        "path": entry["path"],
+                        "tile_id": entry.get("tile_id"),
+                    })
+        self._feat_gallery_list = entries
+        self._feat_gallery_cursor = 0
+        self._feat_gallery_scroll = 0
 
     # ══════════════════════════════════════════════════════════
     # ── Generic editor helpers (shared across all editors) ─────
@@ -5022,6 +5103,29 @@ class Game:
                     ctx["set_buffer"](buf + event.unicode)
             return
 
+        # ── Level 1: gallery (read-only) ──
+        if self._feat_level == 1 and ed == "gallery":
+            n = len(self._feat_gallery_list)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_level = 0
+                self._feat_active_editor = None
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_gallery_cursor = (
+                    self._feat_gallery_cursor - 1) % n
+                self._feat_gallery_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_gallery_cursor,
+                        self._feat_gallery_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_gallery_cursor = (
+                    self._feat_gallery_cursor + 1) % n
+                self._feat_gallery_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_gallery_cursor,
+                        self._feat_gallery_scroll)
+            return
+
         # ── Level 1: list browser ──
         if self._feat_level == 1 and ctx:
             lst = ctx["list"]()
@@ -5083,6 +5187,10 @@ class Game:
             elif cat["label"] == "Tile Types":
                 self._feat_active_editor = "tiles"
                 self._feat_load_tiles()
+                self._feat_level = 1
+            elif cat["label"] == "Tile Gallery":
+                self._feat_active_editor = "gallery"
+                self._feat_load_gallery()
                 self._feat_level = 1
 
     def _feat_editor_ctx(self):
@@ -5459,6 +5567,9 @@ class Game:
                     tile_field=self._feat_tile_field,
                     tile_buffer=self._feat_tile_buffer,
                     tile_field_scroll=self._feat_tile_scroll_f,
+                    gallery_list=self._feat_gallery_list,
+                    gallery_cursor=self._feat_gallery_cursor,
+                    gallery_scroll=self._feat_gallery_scroll,
                 )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(
