@@ -224,3 +224,46 @@ def all_item_names(data_dir=None):
     for section in ("weapons", "armors", "general"):
         names.update(raw.get(section, {}).keys())
     return sorted(names)
+
+
+# ── Sprite / icon helpers (for editors) ──────────────────────────
+
+
+def all_item_icons(data_dir=None):
+    """Return sorted list of all icon type strings used by items."""
+    try:
+        raw = _load("items.json", data_dir)
+    except (OSError, ValueError):
+        return []
+    icons = set()
+    for section in ("weapons", "armors", "general"):
+        for entry in raw.get(section, {}).values():
+            ic = entry.get("icon", "")
+            if ic:
+                icons.add(ic)
+    return sorted(icons)
+
+
+def all_monster_tiles(data_dir=None):
+    """Return sorted list of all monster tile paths from monsters.json."""
+    try:
+        data = _load("monsters.json", data_dir)
+    except (OSError, ValueError):
+        return []
+    tiles = set()
+    for entry in data.get("monsters", {}).values():
+        t = entry.get("tile", "")
+        if t:
+            tiles.add(t)
+    return sorted(tiles)
+
+
+def all_overworld_tile_names():
+    """Return sorted list of overworld tile names from the manifest."""
+    try:
+        data = _load("tile_manifest.json")
+    except (OSError, ValueError):
+        return []
+    ow = data.get("overworld", {})
+    return sorted(k for k, v in ow.items()
+                  if isinstance(v, dict) and "path" in v)

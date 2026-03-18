@@ -53,7 +53,8 @@
           "ac_penalty": 2,
           "attack_penalty": 2
         }
-      ]
+      ],
+      "terrain": "land"
     },
     "Giant Rat": {
       "description": "A large rat. Weak but fast.",
@@ -109,7 +110,8 @@
         ],
         "projectile_symbol": ".",
         "label": "thrown rock"
-      }
+      },
+      "terrain": "land"
     },
     "Orc": {
       "description": "A brutal orc. Tough fight.",

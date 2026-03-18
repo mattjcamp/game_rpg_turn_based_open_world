@@ -7547,13 +7547,13 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (140, 120, 60),
                          (rx, ry, rw, rh), 1)
 
-        # Title
-        spell_name = ""
+        # Title — check both "name" and "_name" keys for generality
+        entry_name = ""
         for entry in fields:
-            if entry[1] == "name":
-                spell_name = entry[2]
+            if entry[1] in ("name", "_name"):
+                entry_name = entry[2]
                 break
-        title = f"Edit: {spell_name}" if spell_name else "Edit Spell"
+        title = f"Edit: {entry_name}" if entry_name else "Edit Entry"
         self._u3_text(title, rx + 16, ry + 10, self._U3_ORANGE, f)
 
         # Scrollable field list — leave room for footer hint
@@ -7609,7 +7609,64 @@ class Renderer(CombatEffectRendererMixin):
                 # Max pixel width for value text (inside arrows)
                 arrow_pad = 24  # space for < > arrows
                 val_max = max_pw - arrow_pad
-                if field_type == "choice":
+                if field_type == "sprite":
+                    # Sprite field: arrows + value text + sprite preview
+                    sprite_sz = 32
+                    spr_val_max = val_max - sprite_sz - 8
+                    self._u3_text("<", rx + 20, dy, arrow_color, fm)
+                    disp = display or "(none)"
+                    # Show just the filename portion for readability
+                    short = disp.rsplit("/", 1)[-1]
+                    if short.endswith(".png"):
+                        short = short[:-4]
+                    while (len(short) > 2
+                           and fm.size(short)[0] > spr_val_max):
+                        short = short[:-1]
+                    if len(short) < len(
+                            (disp.rsplit("/", 1)[-1]).replace(".png", "")):
+                        short += ".."
+                    self._u3_text(short, rx + 34, dy,
+                                  text_color, fm)
+                    vw = fm.size(short)[0]
+                    arrow_x = min(rx + 38 + vw,
+                                  rx + rw - sprite_sz - 20)
+                    self._u3_text(">", arrow_x, dy,
+                                  arrow_color, fm)
+                    # Draw sprite preview to the right
+                    spr_x = rx + rw - sprite_sz - 12
+                    spr_y = dy - 8
+                    sprite = self._feat_resolve_sprite_field(
+                        key, display, sprite_sz)
+                    if sprite:
+                        bg = pygame.Surface(
+                            (sprite_sz + 4, sprite_sz + 4),
+                            pygame.SRCALPHA)
+                        bg.fill((0, 0, 0, 180))
+                        self.screen.blit(bg, (spr_x - 2, spr_y - 2))
+                        self.screen.blit(sprite, (spr_x, spr_y))
+                        pygame.draw.rect(self.screen, (80, 70, 50),
+                                         (spr_x - 2, spr_y - 2,
+                                          sprite_sz + 4,
+                                          sprite_sz + 4), 1)
+                    else:
+                        # For item icons, draw procedural icon
+                        if key == "icon" and display:
+                            bg = pygame.Surface(
+                                (sprite_sz + 4, sprite_sz + 4),
+                                pygame.SRCALPHA)
+                            bg.fill((0, 0, 0, 180))
+                            self.screen.blit(
+                                bg, (spr_x - 2, spr_y - 2))
+                            self._draw_item_icon(
+                                spr_x + sprite_sz // 2,
+                                spr_y + sprite_sz // 2,
+                                display, sprite_sz)
+                            pygame.draw.rect(
+                                self.screen, (80, 70, 50),
+                                (spr_x - 2, spr_y - 2,
+                                 sprite_sz + 4,
+                                 sprite_sz + 4), 1)
+                elif field_type == "choice":
                     self._u3_text("<", rx + 20, dy, arrow_color, fm)
                     disp = display or "(none)"
                     while (len(disp) > 2
@@ -7674,6 +7731,79 @@ class Renderer(CombatEffectRendererMixin):
             hint = hint[:-1]
         self._u3_text(hint, rx + 8, footer_y + 5, self._U3_HINT, fs)
 
+    def _feat_resolve_sprite_field(self, field_key, value, size=32):
+        """Resolve a sprite for a 'sprite'-type field in the editor.
+
+        - field_key='tile' + value='game/monsters/orc.png' → monster sprite
+        - field_key='icon' + value='sword' → None (procedural, handled by caller)
+        - field_key with tile_id semantics → tile sprite
+        """
+        if not value:
+            return None
+        if field_key == "tile":
+            # Monster tile path → look up in _monster_tiles
+            sprite = self._monster_tiles.get(value)
+            if sprite:
+                w, h = sprite.get_size()
+                if w != size or h != size:
+                    return pygame.transform.scale(sprite, (size, size))
+                return sprite
+            # Try manifest by extracted name
+            name = value.rsplit("/", 1)[-1].replace(".png", "")
+            s = self._manifest.get_sprite_by_name("monsters", name, size)
+            if s:
+                return s
+        elif field_key == "icon":
+            # Item icons are procedural — return None so caller
+            # draws via _draw_item_icon
+            return None
+        return None
+
+    def _feat_get_sprite(self, item, size=32):
+        """Get a sprite surface for an editor list item, scaled to *size*.
+
+        Handles monsters (from _monster_tiles), tile types (from
+        _tile_sprites), and items (returns None — items use procedural
+        icons via _draw_item_icon instead).
+        """
+        # Monster — look up by "tile" field
+        tile_file = item.get("tile", "")
+        if tile_file and "hp" in item:
+            sprite = self._monster_tiles.get(tile_file)
+            if sprite:
+                w, h = sprite.get_size()
+                if w != size or h != size:
+                    return pygame.transform.scale(sprite, (size, size))
+                return sprite
+            # Try manifest lookup by monster name
+            mname = item.get("_name", "").lower().replace(" ", "_")
+            if mname:
+                s = self._manifest.get_sprite_by_name(
+                    "monsters", mname, size)
+                if s:
+                    return s
+            return None
+
+        # Tile type — look up by tile_id
+        tile_id = item.get("_tile_id")
+        if tile_id is not None:
+            sprite = self._get_tile_sprite(tile_id)
+            if sprite:
+                w, h = sprite.get_size()
+                if w != size or h != size:
+                    return pygame.transform.scale(sprite, (size, size))
+                return sprite
+            # Fallback: color swatch
+            color = item.get("color", [128, 128, 128])
+            if isinstance(color, (list, tuple)) and len(color) == 3:
+                surf = pygame.Surface((size, size))
+                surf.fill(tuple(color))
+                return surf
+            return None
+
+        # Items — no sprite (caller should use _draw_item_icon)
+        return None
+
     def _draw_features_generic_list(self, left_x, left_w, right_x,
                                      right_w, panel_y, panel_h,
                                      data_list, cursor, scroll,
@@ -7736,13 +7866,33 @@ class Renderer(CombatEffectRendererMixin):
                                          pygame.SRCALPHA)
                     bar.fill((255, 200, 60, 30))
                     self.screen.blit(bar, (left_x + 2, dy - 1))
+
+                # Draw inline sprite (24px) for the list row
+                icon_x = left_x + 8
+                icon_size = 24
+                sprite = self._feat_get_sprite(item, icon_size)
+                text_x = left_x + 10
+                if sprite:
+                    self.screen.blit(sprite, (icon_x, dy + 4))
+                    text_x = icon_x + icon_size + 6
+                else:
+                    # For items, draw procedural icon inline
+                    icon_type = item.get("icon", "")
+                    if icon_type and "_section" in item:
+                        self._draw_item_icon(
+                            icon_x + icon_size // 2,
+                            dy + 4 + icon_size // 2,
+                            icon_type, icon_size)
+                        text_x = icon_x + icon_size + 6
+
                 prefix = "> " if selected else "  "
                 name = item.get("_name", item.get("name", f"#{si}"))
                 nc = self._U3_WHITE if selected else (180, 180, 180)
                 self._u3_text(f"{prefix}{name}",
-                              left_x + 10, dy + 2, nc, fm)
+                              text_x, dy + 2, nc, fm)
                 # Subtitle
                 sub = ""
+                sub_x = text_x + 16
                 if "_section" in item:
                     sub = item["_section"].title()
                 elif "hp" in item:
@@ -7752,7 +7902,7 @@ class Renderer(CombatEffectRendererMixin):
                     sub = f"ID {item['_tile_id']}  {walk}"
                 if sub:
                     sc = (140, 180, 140) if selected else (120, 120, 140)
-                    self._u3_text(sub, left_x + 26, dy + 20, sc, fs)
+                    self._u3_text(sub, sub_x, dy + 20, sc, fs)
                 dy += row_h
 
         # Scroll indicators
@@ -7769,8 +7919,56 @@ class Renderer(CombatEffectRendererMixin):
             item = data_list[cursor]
             max_pw = right_w - 36
             dy = panel_y + 12
+
+            # Large sprite preview (64px) in top-right corner
+            preview_size = 64
+            preview_sprite = self._feat_get_sprite(item, preview_size)
+            preview_drawn = False
+            if preview_sprite:
+                px = right_x + right_w - preview_size - 16
+                py = panel_y + 10
+                # Dark background behind sprite
+                bg = pygame.Surface(
+                    (preview_size + 8, preview_size + 8),
+                    pygame.SRCALPHA)
+                bg.fill((0, 0, 0, 160))
+                self.screen.blit(bg, (px - 4, py - 4))
+                self.screen.blit(preview_sprite, (px, py))
+                pygame.draw.rect(self.screen, (80, 70, 50),
+                                 (px - 4, py - 4,
+                                  preview_size + 8,
+                                  preview_size + 8), 1)
+                preview_drawn = True
+            elif "_section" in item and item.get("icon"):
+                # Procedural item icon preview
+                px = right_x + right_w - preview_size - 16
+                py = panel_y + 10
+                bg = pygame.Surface(
+                    (preview_size + 8, preview_size + 8),
+                    pygame.SRCALPHA)
+                bg.fill((0, 0, 0, 160))
+                self.screen.blit(bg, (px - 4, py - 4))
+                self._draw_item_icon(
+                    px + preview_size // 2,
+                    py + preview_size // 2,
+                    item["icon"], preview_size)
+                pygame.draw.rect(self.screen, (80, 70, 50),
+                                 (px - 4, py - 4,
+                                  preview_size + 8,
+                                  preview_size + 8), 1)
+                preview_drawn = True
+
             name = item.get("_name", item.get("name", "?"))
-            self._u3_text(name, right_x + 16, dy,
+            # Limit name width if sprite preview is shown
+            name_max = max_pw - (preview_size + 24 if preview_drawn
+                                 else 0)
+            disp_name = name
+            while (len(disp_name) > 2
+                   and f.size(disp_name)[0] > name_max):
+                disp_name = disp_name[:-1]
+            if len(disp_name) < len(name):
+                disp_name += ".."
+            self._u3_text(disp_name, right_x + 16, dy,
                            self._U3_WHITE, f)
             dy += 28
 

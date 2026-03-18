@@ -25,10 +25,14 @@
         "left_hand"
       ],
       "description": "A massive double-headed axe. Devastating blows.",
-      "icon": "axe",
+      "icon": "tool",
       "item_type": "axe",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "melee": false,
+      "throwable": false,
+      "buy": 0,
+      "sell": 0
     },
     "Club": {
       "power": 1,
@@ -534,7 +538,8 @@
       "buy": 40,
       "sell": 20,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "stackable": false
     },
     "Holy Water": {
       "description": "Blessed water from a sacred spring. Burns the undead.",

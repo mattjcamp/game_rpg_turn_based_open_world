@@ -1987,7 +1987,7 @@ class Game:
             ["Section", "_section", section, "choice", True],
             ["Description", "description",
              item.get("description", ""), "text", True],
-            ["Icon", "icon", item.get("icon", ""), "text", True],
+            ["Icon", "icon", item.get("icon", ""), "sprite", True],
             ["Item Type", "item_type",
              item.get("item_type", ""), "text", True],
         ]
@@ -2079,6 +2079,9 @@ class Game:
         """Return choice options for an item field."""
         if key == "_section":
             return ["weapons", "armors", "general"]
+        if key == "icon":
+            from src import data_registry as DR
+            return DR.all_item_icons()
         if key in ("ranged", "melee", "throwable", "usable",
                    "stackable", "party_can_equip",
                    "character_can_equip"):
@@ -2180,7 +2183,7 @@ class Game:
             ["Name", "_name", mon.get("_name", ""), "text", True],
             ["Description", "description",
              mon.get("description", ""), "text", True],
-            ["Tile", "tile", mon.get("tile", ""), "text", True],
+            ["Tile", "tile", mon.get("tile", ""), "sprite", True],
             ["Color (R,G,B)", "_color", color_str, "text", True],
             ["-- Combat Stats --", "_hdr2", "", "section", False],
             ["HP", "hp", str(mon.get("hp", 10)), "int", True],
@@ -2253,6 +2256,9 @@ class Game:
 
     def _feat_get_mon_choices(self, key):
         """Return choice options for a monster field."""
+        if key == "tile":
+            from src import data_registry as DR
+            return DR.all_monster_tiles()
         if key in ("undead", "humanoid"):
             return ["True", "False"]
         if key == "terrain":
@@ -4971,7 +4977,7 @@ class Game:
                 ctx["set_field_idx"](idx)
                 ctx["set_buffer"](fields[idx][2])
                 ctx["adjust_field_scroll"]()
-            elif ftype == "choice":
+            elif ftype in ("choice", "sprite"):
                 if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                     choices = ctx["get_choices"](entry[1])
                     if choices:
