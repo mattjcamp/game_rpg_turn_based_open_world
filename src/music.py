@@ -1000,6 +1000,345 @@ def _compose_epic_combat():
 
 
 # ═══════════════════════════════════════════════════════════════
+#  CINEMATIC SOUNDTRACK
+# ═══════════════════════════════════════════════════════════════
+#
+# Uses the same proven waveform generators as every other style
+# but with slower tempos, longer attack/release envelopes,
+# layered triangle-wave voices, and plenty of rests to create
+# a spacious, atmospheric, film-score feel.
+
+
+def _sine_wave(freq, duration, sample_rate=SAMPLE_RATE):
+    """Pure sine wave — warmer than square/triangle for pads."""
+    if freq <= 0:
+        return np.zeros(int(sample_rate * duration), dtype=np.float32)
+    t = np.linspace(0, duration, int(sample_rate * duration),
+                    endpoint=False)
+    return np.sin(2.0 * np.pi * freq * t).astype(np.float32)
+
+
+def _render_pad(notes, note_dur, volume=0.10):
+    """Render a warm pad by layering two slightly-detuned triangle
+    waves with a slow sine underneath.  Uses only existing primitives
+    so it's fully safe."""
+    parts = []
+    for note_str in notes:
+        freq = _n(note_str)
+        n_samp = int(SAMPLE_RATE * note_dur)
+        if freq <= 0:
+            parts.append(np.zeros(n_samp, dtype=np.float32))
+            continue
+        # Two triangle voices, ~4 cents apart for warmth
+        v1 = _triangle_wave(freq, note_dur)
+        v2 = _triangle_wave(freq * 1.003, note_dur)
+        # Sine an octave below for depth
+        v3 = _sine_wave(freq * 0.5, note_dur)
+        raw = (v1 * 0.40 + v2 * 0.35 + v3 * 0.25)
+        raw = _envelope(raw, attack=0.12, release=0.25)
+        parts.append(raw * volume)
+    return np.concatenate(parts)
+
+
+def _render_strings(notes, note_dur, volume=0.14):
+    """Render a string-like voice — three slightly detuned triangle
+    waves with longer envelopes for a legato feel."""
+    parts = []
+    for note_str in notes:
+        freq = _n(note_str)
+        n_samp = int(SAMPLE_RATE * note_dur)
+        if freq <= 0:
+            parts.append(np.zeros(n_samp, dtype=np.float32))
+            continue
+        v1 = _triangle_wave(freq, note_dur)
+        v2 = _triangle_wave(freq * 1.002, note_dur)
+        v3 = _triangle_wave(freq * 0.998, note_dur)
+        raw = (v1 + v2 + v3) / 3.0
+        raw = _envelope(raw, attack=0.06, release=0.20)
+        parts.append(raw * volume)
+    return np.concatenate(parts)
+
+
+def _render_choir(notes, note_dur, volume=0.06):
+    """Very soft choir-like voice — two sine waves a fifth apart with
+    slow attack for an ethereal quality."""
+    parts = []
+    for note_str in notes:
+        freq = _n(note_str)
+        n_samp = int(SAMPLE_RATE * note_dur)
+        if freq <= 0:
+            parts.append(np.zeros(n_samp, dtype=np.float32))
+            continue
+        v1 = _sine_wave(freq, note_dur)
+        v2 = _sine_wave(freq * 1.5, note_dur)  # perfect fifth
+        raw = v1 * 0.6 + v2 * 0.4
+        raw = _envelope(raw, attack=0.15, release=0.30)
+        parts.append(raw * volume)
+    return np.concatenate(parts)
+
+
+def _render_deep_bass(notes, note_dur, volume=0.16):
+    """Sub-bass using a sine wave for a clean, deep low end."""
+    parts = []
+    for note_str in notes:
+        freq = _n(note_str)
+        n_samp = int(SAMPLE_RATE * note_dur)
+        if freq <= 0:
+            parts.append(np.zeros(n_samp, dtype=np.float32))
+            continue
+        raw = _sine_wave(freq, note_dur)
+        raw = _envelope(raw, attack=0.02, release=0.10)
+        parts.append(raw * volume)
+    return np.concatenate(parts)
+
+
+# ── Cinematic compositions ─────────────────────────────────────
+
+def _compose_cine_title():
+    """Cinematic title — majestic, slow-building, with layered
+    strings, brass-like melody, choir swells, and deep bass."""
+    bpm = 54
+    nd = 60.0 / bpm
+
+    # Warm pad chords (slow harmonic progression)
+    pad = _render_pad(
+        ['C3', 'C3', 'E3', 'E3', 'G3', 'G3', 'E3', 'E3',
+         'A2', 'A2', 'C3', 'C3', 'E3', 'E3', 'C3', 'C3',
+         'F3', 'F3', 'A3', 'A3', 'C4', 'C4', 'A3', 'A3',
+         'G2', 'G2', 'B2', 'B2', 'D3', 'D3', 'B2', 'B2'],
+        nd, volume=0.10)
+
+    # Brass-like melody — enters after 8 rests
+    melody = _render_melody(
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'C4', 'R', 'E4', 'G4', 'C5', 'R', 'R', 'R',
+         'B4', 'R', 'A4', 'G4', 'E4', 'R', 'R', 'R',
+         'A4', 'R', 'G4', 'E4', 'D4', 'R', 'C4', 'R'],
+        nd, _square_wave, duty=0.25, volume=0.16,
+        attack=0.05, release=0.30)
+
+    # Ethereal choir hum (sparse)
+    choir = _render_choir(
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'C4', 'R', 'R', 'R', 'E4', 'R', 'R', 'R',
+         'D4', 'R', 'R', 'R', 'C4', 'R', 'R', 'R'],
+        nd, volume=0.06)
+
+    # Deep sub bass
+    bass = _render_deep_bass(
+        ['C2', 'R', 'C2', 'R', 'R', 'R', 'R', 'R',
+         'A1', 'R', 'A1', 'R', 'R', 'R', 'R', 'R',
+         'F2', 'R', 'F2', 'R', 'R', 'R', 'R', 'R',
+         'G1', 'R', 'G1', 'R', 'C2', 'R', 'R', 'R'],
+        nd, volume=0.14)
+
+    return _mix_tracks(pad, melody, choir, bass)
+
+
+def _compose_cine_overworld():
+    """Cinematic overworld — hopeful, wide-open strings with a soaring
+    lead and warm bass.  Evokes journeying across a vast landscape."""
+    bpm = 62
+    nd = 60.0 / bpm
+
+    # Soaring string melody
+    melody = _render_strings(
+        ['E4', 'R', 'G4', 'A4', 'B4', 'R', 'A4', 'G4',
+         'E4', 'R', 'D4', 'E4', 'G4', 'R', 'R', 'R',
+         'A4', 'R', 'B4', 'C5', 'B4', 'R', 'A4', 'G4',
+         'E4', 'R', 'D4', 'R', 'E4', 'R', 'R', 'R',
+         'C5', 'R', 'B4', 'A4', 'G4', 'R', 'E4', 'D4',
+         'E4', 'R', 'G4', 'A4', 'B4', 'R', 'R', 'R',
+         'A4', 'R', 'G4', 'E4', 'D4', 'R', 'E4', 'R',
+         'E4', 'R', 'R', 'R', 'R', 'R', 'R', 'R'],
+        nd, volume=0.14)
+
+    # Warm sustained pad
+    pad = _render_pad(
+        ['E3', 'E3', 'E3', 'E3', 'E3', 'E3', 'E3', 'E3',
+         'A2', 'A2', 'A2', 'A2', 'A2', 'A2', 'A2', 'A2',
+         'D3', 'D3', 'D3', 'D3', 'D3', 'D3', 'D3', 'D3',
+         'G2', 'G2', 'G2', 'G2', 'G2', 'G2', 'G2', 'G2',
+         'C3', 'C3', 'C3', 'C3', 'C3', 'C3', 'C3', 'C3',
+         'A2', 'A2', 'A2', 'A2', 'A2', 'A2', 'A2', 'A2',
+         'D3', 'D3', 'D3', 'D3', 'G2', 'G2', 'G2', 'G2',
+         'E3', 'E3', 'E3', 'E3', 'E3', 'E3', 'E3', 'E3'],
+        nd, volume=0.08)
+
+    # Gentle counter (sparse, high)
+    counter = _render_melody(
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'B4', 'R', 'A4', 'G4',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'G4', 'R', 'E4', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'],
+        nd, _triangle_wave, volume=0.07, attack=0.06, release=0.30)
+
+    bass = _render_deep_bass(
+        ['E2', 'R', 'E2', 'R', 'A1', 'R', 'A1', 'R',
+         'D2', 'R', 'D2', 'R', 'G1', 'R', 'G1', 'R',
+         'C2', 'R', 'C2', 'R', 'A1', 'R', 'A1', 'R',
+         'D2', 'R', 'G1', 'R', 'E2', 'R', 'E2', 'R'] * 2,
+        nd, volume=0.12)
+
+    return _mix_tracks(melody, pad, counter, bass)
+
+
+def _compose_cine_town():
+    """Cinematic town — peaceful, intimate, music-box quality with
+    warm strings and a gentle hum.  Safe and welcoming."""
+    bpm = 68
+    nd = 60.0 / bpm
+
+    # Delicate melody — like a lullaby
+    melody = _render_strings(
+        ['G4', 'A4', 'B4', 'R', 'D5', 'C5', 'B4', 'A4',
+         'G4', 'R', 'E4', 'R', 'D4', 'E4', 'G4', 'R',
+         'A4', 'B4', 'C5', 'R', 'B4', 'A4', 'G4', 'R',
+         'E4', 'D4', 'E4', 'G4', 'A4', 'R', 'R', 'R',
+         'B4', 'C5', 'D5', 'R', 'C5', 'B4', 'A4', 'G4',
+         'E4', 'R', 'D4', 'R', 'E4', 'R', 'G4', 'R',
+         'A4', 'R', 'G4', 'E4', 'D4', 'R', 'E4', 'R',
+         'G4', 'R', 'R', 'R', 'R', 'R', 'R', 'R'],
+        nd, volume=0.12)
+
+    # Soft pad harmony
+    pad = _render_pad(
+        ['G3', 'G3', 'G3', 'G3', 'G3', 'G3', 'G3', 'G3',
+         'C3', 'C3', 'C3', 'C3', 'C3', 'C3', 'C3', 'C3',
+         'D3', 'D3', 'D3', 'D3', 'D3', 'D3', 'D3', 'D3',
+         'G3', 'G3', 'G3', 'G3', 'G3', 'G3', 'G3', 'G3',
+         'E3', 'E3', 'E3', 'E3', 'E3', 'E3', 'E3', 'E3',
+         'C3', 'C3', 'C3', 'C3', 'C3', 'C3', 'C3', 'C3',
+         'D3', 'D3', 'D3', 'D3', 'D3', 'D3', 'D3', 'D3',
+         'G3', 'G3', 'G3', 'G3', 'G3', 'G3', 'G3', 'G3'],
+        nd, volume=0.07)
+
+    # Very faint choir hum on roots
+    choir = _render_choir(
+        ['G3', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'C3', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'D3', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'G3', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, volume=0.04)
+
+    bass = _render_deep_bass(
+        ['G1', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'C2', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'D2', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'G1', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] * 2,
+        nd, volume=0.10)
+
+    return _mix_tracks(melody, pad, choir, bass)
+
+
+def _compose_cine_dungeon():
+    """Cinematic dungeon — dark, sparse, and tense.  Lots of silence
+    punctuated by eerie tones and a rumbling sub-bass drone."""
+    bpm = 44
+    nd = 60.0 / bpm
+
+    # Eerie sparse melody — mostly silence
+    melody = _render_melody(
+        ['R', 'R', 'R', 'R', 'R', 'R', 'E4', 'R',
+         'R', 'R', 'R', 'F4', 'R', 'R', 'E4', 'R',
+         'R', 'R', 'C4', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'D4', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'G3', 'R', 'R',
+         'R', 'R', 'A3', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'B3', 'R', 'R', 'C4', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'],
+        nd / 2, _triangle_wave, volume=0.12,
+        attack=0.10, release=0.35)
+
+    # Dark low pad — sustained dissonance
+    pad = _render_pad(
+        ['C2', 'C2', 'C2', 'C2', 'C2', 'C2', 'C2', 'C2',
+         'C2', 'C2', 'C2', 'C2', 'C2', 'C2', 'C2', 'C2',
+         'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
+         'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2'],
+        nd, volume=0.08)
+
+    # Very faint high dissonant tone (tritone shimmer)
+    eerie = _render_choir(
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'F#5', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'B4'],
+        nd, volume=0.04)
+
+    # Deep rumbling bass drone
+    bass = _render_deep_bass(
+        ['C1', 'C1', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'C1', 'R', 'R', 'R', 'R', 'R', 'R', 'R'],
+        nd, volume=0.14)
+
+    # Sparse percussion — just occasional deep thuds
+    drums = _render_drums(
+        ['K', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'K',
+         'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'],
+        nd, volume=0.04)
+
+    return _mix_tracks(melody, pad, eerie, bass, drums)
+
+
+def _compose_cine_combat():
+    """Cinematic combat — driving and heroic.  Pulsing bass,
+    bold melody, urgent strings, and pounding drums."""
+    bpm = 96
+    nd = 60.0 / bpm
+
+    # Bold lead melody
+    melody = _render_melody(
+        ['C4', 'C4', 'E4', 'G4', 'C5', 'R', 'G4', 'R',
+         'A4', 'A4', 'G4', 'E4', 'C4', 'R', 'D4', 'R',
+         'E4', 'E4', 'G4', 'C5', 'D5', 'R', 'C5', 'R',
+         'G4', 'E4', 'C4', 'D4', 'E4', 'R', 'R', 'R',
+         'F4', 'F4', 'A4', 'C5', 'D5', 'R', 'C5', 'A4',
+         'G4', 'G4', 'E4', 'G4', 'A4', 'R', 'G4', 'R',
+         'C5', 'B4', 'A4', 'G4', 'E4', 'R', 'D4', 'E4',
+         'C4', 'R', 'R', 'R', 'C4', 'R', 'R', 'R'],
+        nd, _square_wave, duty=0.25, volume=0.18,
+        attack=0.02, release=0.10)
+
+    # Urgent pulsing strings
+    strings = _render_strings(
+        ['C3', 'G3', 'C3', 'G3', 'C3', 'G3', 'C3', 'G3',
+         'A2', 'E3', 'A2', 'E3', 'A2', 'E3', 'A2', 'E3',
+         'F3', 'C4', 'F3', 'C4', 'F3', 'C4', 'F3', 'C4',
+         'G2', 'D3', 'G2', 'D3', 'G2', 'D3', 'G2', 'D3',
+         'F3', 'A3', 'F3', 'A3', 'F3', 'A3', 'F3', 'A3',
+         'G2', 'D3', 'G2', 'D3', 'G2', 'D3', 'G2', 'D3',
+         'A2', 'E3', 'A2', 'E3', 'A2', 'E3', 'A2', 'E3',
+         'C3', 'G3', 'C3', 'G3', 'C3', 'G3', 'C3', 'G3'],
+        nd, volume=0.09)
+
+    # Driving bass
+    bass = _render_deep_bass(
+        ['C2', 'R', 'C2', 'R', 'A1', 'R', 'A1', 'R',
+         'F2', 'R', 'F2', 'R', 'G1', 'R', 'G1', 'R',
+         'F2', 'R', 'F2', 'R', 'G1', 'R', 'G1', 'R',
+         'A1', 'R', 'A1', 'R', 'C2', 'R', 'C2', 'R'] * 2,
+        nd, volume=0.14)
+
+    # Driving drums
+    drums = _render_drums(
+        (['K', 'R', 'H', 'R', 'S', 'R', 'H', 'K',
+          'R', 'H', 'R', 'K', 'S', 'R', 'H', 'R'] * 2) * 2,
+        nd, volume=0.06)
+
+    return _mix_tracks(melody, strings, bass, drums)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  SOUNDTRACK STYLE REGISTRY
 # ═══════════════════════════════════════════════════════════════
 
@@ -1010,6 +1349,7 @@ SOUNDTRACK_STYLES = [
     "Quiet",
     "Twin Peaks",
     "Epic Fantasy",
+    "Cinematic",
 ]
 
 # Composer functions keyed by style → area → list of variations
@@ -1051,6 +1391,13 @@ _STYLE_COMPOSERS = {
         "town":      [_compose_epic_town],
         "dungeon":   [_compose_epic_dungeon],
         "combat":    [_compose_epic_combat],
+    },
+    "Cinematic": {
+        "title":     [_compose_cine_title],
+        "overworld": [_compose_cine_overworld],
+        "town":      [_compose_cine_town],
+        "dungeon":   [_compose_cine_dungeon],
+        "combat":    [_compose_cine_combat],
     },
 }
 

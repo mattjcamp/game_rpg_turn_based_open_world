@@ -103,6 +103,8 @@ class ExamineState(BaseState):
         self.drop_items = []              # list of item names available to drop
         self.drop_message = ""
         self.drop_msg_timer = 0
+        # Help overlay
+        self.showing_help = False
 
     # ── Lifecycle ─────────────────────────────────────────────────
 
@@ -227,11 +229,19 @@ class ExamineState(BaseState):
         for event in events:
             if event.type != pygame.KEYDOWN:
                 continue
+            # ── Help overlay input ──
+            if self.showing_help:
+                if event.key in (pygame.K_h, pygame.K_ESCAPE):
+                    self.showing_help = False
+                return
             if self.drop_mode:
                 self._handle_drop_input(event)
                 return
             if event.key in (pygame.K_ESCAPE, pygame.K_e):
                 self.game.change_state("overworld")
+                return
+            if event.key == pygame.K_h:
+                self.showing_help = True
                 return
             if event.key in (pygame.K_UP, pygame.K_w):
                 self._try_move(0, -1)
@@ -292,6 +302,8 @@ class ExamineState(BaseState):
             tile_graphic=self.tile_graphic,
             examine_layout=self.examine_layout,
         )
+        if self.showing_help:
+            renderer.draw_examine_help_overlay()
 
     # ── Movement ──────────────────────────────────────────────────
 

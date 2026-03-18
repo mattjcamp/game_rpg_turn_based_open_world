@@ -12306,7 +12306,6 @@ class Renderer(CombatEffectRendererMixin):
                 ("[P]", "Open party / inventory"),
                 ("[L]", "Open game log"),
                 ("[H]", "Toggle this help screen"),
-                ("[ESC]", "Leave town"),
             ], sf, f, lh, key_w)
 
         # ── Right column ──
@@ -12334,6 +12333,68 @@ class Renderer(CombatEffectRendererMixin):
                 ("[ENTER]", "Confirm choice"),
                 ("[UP/DOWN]", "Choose response"),
             ], sf, f, lh, key_w)
+
+        self._draw_help_footer(px, py, pw, ph, f, prev_clip)
+
+    def draw_examine_help_overlay(self):
+        """Draw a full-screen overlay showing all examine-area controls."""
+        (px, py, pw, ph, col1_x, col2_x, y,
+         tf, sf, f, lh, key_w, prev_clip) = \
+            self._draw_help_overlay_frame("EXAMINE AREA CONTROLS")
+
+        # ── Left column ──
+        y = self._draw_help_section(
+            col1_x, y, "MOVEMENT", [
+                ("[W/A/S/D]", "Move around the area"),
+                ("[ARROWS]", "Move around the area"),
+            ], sf, f, lh, key_w)
+
+        y += 10
+        y = self._draw_help_section(
+            col1_x, y, "ACTIONS", [
+                ("[L]", "Drop an item on the ground"),
+                ("[E / ESC]", "Return to overworld"),
+                ("[H]", "Toggle this help screen"),
+            ], sf, f, lh, key_w)
+
+        # ── Right column ──
+        ry = py + 50
+        ry = self._draw_help_section(
+            col2_x, ry, "INTERACTIONS", [
+                ("Walk over", "Pick up ground items"),
+                ("Obstacles", "Cannot walk through"),
+            ], sf, f, lh, key_w)
+
+        ry += 10
+        ry = self._draw_help_section(
+            col2_x, ry, "DROP MODE", [
+                ("[UP/DOWN]", "Select item to drop"),
+                ("[ENTER]", "Confirm drop"),
+                ("[ESC]", "Cancel"),
+            ], sf, f, lh, key_w)
+
+        ry += 10
+        # Tip
+        tip_text = ("TIP: Explore areas to find herbs, reagents, "
+                    "and other useful items on the ground.")
+        tip_max_w = pw - 48
+        tip_words = tip_text.split(" ")
+        tip_lines = []
+        cur = ""
+        for w in tip_words:
+            test = (cur + " " + w).strip() if cur else w
+            if f.size(test)[0] <= tip_max_w:
+                cur = test
+            else:
+                if cur:
+                    tip_lines.append(cur)
+                cur = w
+        if cur:
+            tip_lines.append(cur)
+        tip_y = max(y, ry) + 14
+        for i, tl in enumerate(tip_lines):
+            ts2 = f.render(tl, True, (180, 200, 140))
+            self.screen.blit(ts2, (px + 24, tip_y + i * lh))
 
         self._draw_help_footer(px, py, pw, ph, f, prev_clip)
 

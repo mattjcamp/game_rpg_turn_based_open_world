@@ -1,4 +1,4 @@
-- audit help text. Make sure it's clear. Make sure it reflects current state. Make sure it appears on all screens.
+- keep working on the world editor
 - work on towns, tighten up their appearance. Think of better ways to organize layouts. Add editing for town types that can be used in modules. Create a better shop experience. Create unique items for shops.
 - think of adding more mindful content
 - consider a new soundtrack using Caves of Qud as inspiration
