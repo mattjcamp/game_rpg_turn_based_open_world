@@ -213,24 +213,28 @@ class Renderer(CombatEffectRendererMixin):
                 big = pygame.transform.scale(sprite, (w * 3, h * 3))
                 self._class_sprites_big[cls_name] = big
 
-        # Create a white-tinted fighter sprite for the party map marker.
-        # The source sprite has a solid black (0,0,0) background — make
-        # those pixels transparent and turn the actual figure pixels white.
+        # Party map marker — load from manifest if available,
+        # otherwise derive from fighter sprite with white tinting.
         self._party_map_sprite = None
-        fighter_src = self._class_sprites.get("fighter")
-        if fighter_src:
-            w, h = fighter_src.get_size()
-            white_sprite = pygame.Surface((w, h), pygame.SRCALPHA)
-            for px in range(w):
-                for py in range(h):
-                    r, g, b, a = fighter_src.get_at((px, py))
-                    if a == 0 or (r == 0 and g == 0 and b == 0):
-                        # Background — keep transparent
-                        pass
-                    else:
-                        # Figure pixel — make white
-                        white_sprite.set_at((px, py), (255, 255, 255, 255))
-            self._party_map_sprite = white_sprite
+        marker_spr = self._manifest.get_sprite_by_name(
+            "overworld", "party_marker", 32)
+        if marker_spr:
+            self._party_map_sprite = marker_spr
+        else:
+            fighter_src = self._class_sprites.get("fighter")
+            if fighter_src:
+                w, h = fighter_src.get_size()
+                white_sprite = pygame.Surface((w, h), pygame.SRCALPHA)
+                _BG_THRESHOLD = 60
+                for px in range(w):
+                    for py in range(h):
+                        r, g, b, a = fighter_src.get_at((px, py))
+                        if a == 0 or (r + g + b) < _BG_THRESHOLD:
+                            pass
+                        else:
+                            white_sprite.set_at(
+                                (px, py), (255, 255, 255, 255))
+                self._party_map_sprite = white_sprite
 
     def _get_class_sprite(self, char_class, big=False):
         """Return the sprite surface for a character class, or None."""

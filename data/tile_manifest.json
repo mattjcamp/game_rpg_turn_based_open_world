@@ -71,6 +71,12 @@
       "usable_in": [
         "overworld"
       ]
+    },
+    "party_marker": {
+      "path": "src/assets/game/terrain/party_marker.png",
+      "usable_in": [
+        "overworld"
+      ]
     }
   },
   "town": {
