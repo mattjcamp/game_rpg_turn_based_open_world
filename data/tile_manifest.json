@@ -889,5 +889,133 @@
         "unassigned"
       ]
     }
+  },
+  "item_icons": {
+    "ammo": {
+      "path": "src/assets/game/items/icons_32/ammo.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "armor_heavy": {
+      "path": "src/assets/game/items/icons_32/armor_heavy.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "armor_light": {
+      "path": "src/assets/game/items/icons_32/armor_light.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "artifact": {
+      "path": "src/assets/game/items/icons_32/artifact.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "bomb": {
+      "path": "src/assets/game/items/icons_32/bomb.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "bow": {
+      "path": "src/assets/game/items/icons_32/bow.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "campfire": {
+      "path": "src/assets/game/items/icons_32/campfire.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "dagger": {
+      "path": "src/assets/game/items/icons_32/dagger.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "gloves": {
+      "path": "src/assets/game/items/icons_32/gloves.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "halberd": {
+      "path": "src/assets/game/items/icons_32/halberd.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "herb": {
+      "path": "src/assets/game/items/icons_32/herb.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "holy": {
+      "path": "src/assets/game/items/icons_32/holy.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "mace": {
+      "path": "src/assets/game/items/icons_32/mace.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "potion": {
+      "path": "src/assets/game/items/icons_32/potion.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "rock": {
+      "path": "src/assets/game/items/icons_32/rock.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "rope": {
+      "path": "src/assets/game/items/icons_32/rope.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "scroll": {
+      "path": "src/assets/game/items/icons_32/scroll.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "spear": {
+      "path": "src/assets/game/items/icons_32/spear.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "sword": {
+      "path": "src/assets/game/items/icons_32/sword.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "tool": {
+      "path": "src/assets/game/items/icons_32/tool.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    },
+    "torch": {
+      "path": "src/assets/game/items/icons_32/torch.png",
+      "usable_in": [
+        "item_icons"
+      ]
+    }
   }
 }

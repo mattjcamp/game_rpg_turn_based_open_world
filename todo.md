@@ -1,5 +1,6 @@
 
 Polish Content Systems
+- Clean up UI and make consistent throughout game
 - add editing screens for content templates (spells, items, classes, monsters, shops)
 - modules should inherit but be able to override some things like town appearance, shops, etc
 - Towns: work on towns, tighten up their appearance. Think of better ways to organize layouts. Add editing for town types that can be used in modules. Create a better shop experience. Create unique items for shops.

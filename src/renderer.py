@@ -7844,8 +7844,8 @@ class Renderer(CombatEffectRendererMixin):
             "dungeon": (90, 60, 100), "characters": (50, 90, 140),
             "npcs": (60, 120, 120), "monsters": (140, 50, 50),
             "objects": (100, 100, 60), "unique_tiles": (120, 80, 120),
-            "items": (160, 130, 40), "spells": (80, 60, 160),
-            "unassigned": (100, 100, 100),
+            "items": (160, 130, 40), "item_icons": (180, 150, 60),
+            "spells": (80, 60, 160), "unassigned": (100, 100, 100),
         }
         row_h = 34
         ly = panel_y + 30
@@ -12776,6 +12776,16 @@ class Renderer(CombatEffectRendererMixin):
                                  (cx - size // 2, cy - size // 2))
                 return
 
+        # ── Pixel art icon from item_icons category ──
+        if icon_type:
+            sprite = self._manifest.get_sprite_by_name(
+                "item_icons", icon_type, size)
+            if sprite:
+                self.screen.blit(sprite,
+                                 (cx - size // 2, cy - size // 2))
+                return
+
+        # ── Procedural fallback ──
         s = size
         hs = s // 2
         x0 = cx - hs

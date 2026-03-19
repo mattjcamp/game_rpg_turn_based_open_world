@@ -300,7 +300,7 @@ class Game:
         self._feat_gallery_all_cats = [
             "overworld", "town", "dungeon", "characters",
             "npcs", "monsters", "objects", "unique_tiles",
-            "items", "spells", "unassigned",
+            "item_icons", "items", "spells", "unassigned",
         ]
         # Pixel editor state (Level 4)
         self._feat_pxedit_pixels = None      # 2D list of (r,g,b,a) tuples
@@ -2658,7 +2658,7 @@ class Game:
 
         all_cats = ("overworld", "town", "dungeon", "characters",
                     "npcs", "monsters", "objects", "unique_tiles",
-                    "unassigned")
+                    "item_icons", "unassigned")
         entries = []
         for cat in all_cats:
             section = manifest.get(cat, {})
@@ -2682,13 +2682,19 @@ class Game:
                     "usable_in": sorted(usable),
                     "rendering": rendering,
                 })
-        # Add procedural item icons as gallery entries under "items"
+        # Item icons from the manifest are already included via the
+        # "item_icons" category in the manifest scan above. Also add
+        # any procedural icons that don't yet have a sprite file.
         from src import data_registry as DR
+        icon_names_in_manifest = {
+            e["name"] for e in entries if e["category"] == "item_icons"
+        }
         for icon_name in DR.all_item_icons():
-            # Skip manifest references (category/name) — those are
-            # already in the gallery from the manifest scan above
             if "/" in icon_name:
                 continue
+            if icon_name in icon_names_in_manifest:
+                continue
+            # No sprite file yet — add as procedural fallback
             entries.append({
                 "category": "items",
                 "name": icon_name,
@@ -2696,7 +2702,7 @@ class Game:
                 "tile_id": None,
                 "usable_in": ["items"],
                 "rendering": "procedural",
-                "_icon": icon_name,  # flag for preview renderer
+                "_icon": icon_name,
             })
 
         self._feat_gallery_list = entries
