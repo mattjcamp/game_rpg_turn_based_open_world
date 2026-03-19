@@ -298,9 +298,9 @@ class Game:
         self._feat_gallery_spr_scroll = 0
         self._feat_gallery_tag_cursor = 0    # which tag row in editor
         self._feat_gallery_all_cats = [
-            "overworld", "town", "dungeon", "characters",
-            "npcs", "monsters", "objects", "unique_tiles",
-            "item_icons", "items", "spells", "unassigned",
+            "overworld", "town", "dungeon", "people",
+            "monsters", "objects", "unique_tiles",
+            "items", "spells", "unassigned",
         ]
         # Pixel editor state (Level 4)
         self._feat_pxedit_pixels = None      # 2D list of (r,g,b,a) tuples
@@ -2656,9 +2656,9 @@ class Game:
         except (OSError, ValueError):
             manifest = {}
 
-        all_cats = ("overworld", "town", "dungeon", "characters",
-                    "npcs", "monsters", "objects", "unique_tiles",
-                    "item_icons", "unassigned")
+        all_cats = ("overworld", "town", "dungeon", "people",
+                    "monsters", "objects", "unique_tiles",
+                    "items", "unassigned")
         entries = []
         for cat in all_cats:
             section = manifest.get(cat, {})
@@ -2683,11 +2683,11 @@ class Game:
                     "rendering": rendering,
                 })
         # Item icons from the manifest are already included via the
-        # "item_icons" category in the manifest scan above. Also add
+        # "items" category in the manifest scan above. Also add
         # any procedural icons that don't yet have a sprite file.
         from src import data_registry as DR
         icon_names_in_manifest = {
-            e["name"] for e in entries if e["category"] == "item_icons"
+            e["name"] for e in entries if e["category"] == "items"
         }
         for icon_name in DR.all_item_icons():
             if "/" in icon_name:

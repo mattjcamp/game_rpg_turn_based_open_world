@@ -155,12 +155,12 @@ class Renderer(CombatEffectRendererMixin):
         # ── Load NPC sprites from manifest ──
         npc_roles = ["shopkeep", "innkeeper", "elder"]
         for role in npc_roles:
-            sprite = m.get_sprite_by_name("npcs", role, dst_ts)
+            sprite = m.get_sprite_by_name("people", role, dst_ts)
             if sprite:
                 self._npc_sprites[role] = sprite
 
         for i in range(6):
-            sprite = m.get_sprite_by_name("npcs", f"villager_{i}", dst_ts)
+            sprite = m.get_sprite_by_name("people", f"villager_{i}", dst_ts)
             if sprite:
                 self._villager_sprites.append(sprite)
 
@@ -198,15 +198,15 @@ class Renderer(CombatEffectRendererMixin):
         """Load character class sprites from the tile manifest.
 
         All class-to-sprite mappings are defined in data/tile_manifest.json
-        under the 'characters' section.  This replaces the previous
+        under the 'people' section.  This replaces the previous
         Amiga-primary / U4-fallback chain with a single manifest lookup.
         """
         self._class_sprites = {}       # class name -> original-size surface
         self._class_sprites_big = {}   # class name -> scaled up for party screen
 
         m = self._manifest
-        for cls_name in m.names_in("characters"):
-            sprite = m.get_sprite_by_name("characters", cls_name, 32)
+        for cls_name in m.names_in("people"):
+            sprite = m.get_sprite_by_name("people", cls_name, 32)
             if sprite:
                 self._class_sprites[cls_name] = sprite
                 w, h = sprite.get_size()
@@ -7841,10 +7841,10 @@ class Renderer(CombatEffectRendererMixin):
         """
         tag_colors = {
             "overworld": (50, 120, 50), "town": (140, 110, 50),
-            "dungeon": (90, 60, 100), "characters": (50, 90, 140),
-            "npcs": (60, 120, 120), "monsters": (140, 50, 50),
+            "dungeon": (90, 60, 100), "people": (50, 90, 140),
+            "monsters": (140, 50, 50),
             "objects": (100, 100, 60), "unique_tiles": (120, 80, 120),
-            "items": (160, 130, 40), "item_icons": (180, 150, 60),
+            "items": (160, 130, 40),
             "spells": (80, 60, 160), "unassigned": (100, 100, 100),
         }
         row_h = 34
@@ -12776,10 +12776,10 @@ class Renderer(CombatEffectRendererMixin):
                                  (cx - size // 2, cy - size // 2))
                 return
 
-        # ── Pixel art icon from item_icons category ──
+        # ── Pixel art icon from items category ──
         if icon_type:
             sprite = self._manifest.get_sprite_by_name(
-                "item_icons", icon_type, size)
+                "items", icon_type, size)
             if sprite:
                 self.screen.blit(sprite,
                                  (cx - size // 2, cy - size // 2))

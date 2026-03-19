@@ -230,127 +230,125 @@
       ]
     }
   },
-  "characters": {
+  "people": {
     "fighter": {
       "path": "src/assets/game/characters/fighter.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "cleric": {
       "path": "src/assets/game/characters/cleric.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "wizard": {
       "path": "src/assets/game/characters/wizard.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "thief": {
       "path": "src/assets/game/characters/thief.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "barbarian": {
       "path": "src/assets/game/characters/barbarian.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "alchemist": {
       "path": "src/assets/game/characters/alchemist.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "illusionist": {
       "path": "src/assets/game/characters/illusionist.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "druid": {
       "path": "src/assets/game/characters/druid.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "paladin": {
       "path": "src/assets/game/characters/paladin.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "ranger": {
       "path": "src/assets/game/characters/ranger.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
     },
     "lark": {
       "path": "src/assets/game/characters/lark.png",
       "usable_in": [
-        "characters"
+        "people"
       ]
-    }
-  },
-  "npcs": {
+    },
     "shopkeep": {
       "path": "src/assets/game/npcs/shopkeep.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "innkeeper": {
       "path": "src/assets/game/npcs/innkeeper.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "elder": {
       "path": "src/assets/game/npcs/elder.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "villager_0": {
       "path": "src/assets/game/npcs/villager_citizen.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "villager_1": {
       "path": "src/assets/game/npcs/villager_shepherd.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "villager_2": {
       "path": "src/assets/game/npcs/villager_bard.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "villager_3": {
       "path": "src/assets/game/npcs/villager_guard.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "villager_4": {
       "path": "src/assets/game/npcs/villager_beggar.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     },
     "villager_5": {
       "path": "src/assets/game/npcs/villager_child.png",
       "usable_in": [
-        "npcs"
+        "people"
       ]
     }
   },
@@ -890,131 +888,131 @@
       ]
     }
   },
-  "item_icons": {
+  "items": {
     "ammo": {
       "path": "src/assets/game/items/icons_32/ammo.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "armor_heavy": {
       "path": "src/assets/game/items/icons_32/armor_heavy.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "armor_light": {
       "path": "src/assets/game/items/icons_32/armor_light.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "artifact": {
       "path": "src/assets/game/items/icons_32/artifact.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "bomb": {
       "path": "src/assets/game/items/icons_32/bomb.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "bow": {
       "path": "src/assets/game/items/icons_32/bow.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "campfire": {
       "path": "src/assets/game/items/icons_32/campfire.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "dagger": {
       "path": "src/assets/game/items/icons_32/dagger.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "gloves": {
       "path": "src/assets/game/items/icons_32/gloves.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "halberd": {
       "path": "src/assets/game/items/icons_32/halberd.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "herb": {
       "path": "src/assets/game/items/icons_32/herb.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "holy": {
       "path": "src/assets/game/items/icons_32/holy.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "mace": {
       "path": "src/assets/game/items/icons_32/mace.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "potion": {
       "path": "src/assets/game/items/icons_32/potion.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "rock": {
       "path": "src/assets/game/items/icons_32/rock.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "rope": {
       "path": "src/assets/game/items/icons_32/rope.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "scroll": {
       "path": "src/assets/game/items/icons_32/scroll.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "spear": {
       "path": "src/assets/game/items/icons_32/spear.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "sword": {
       "path": "src/assets/game/items/icons_32/sword.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "tool": {
       "path": "src/assets/game/items/icons_32/tool.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     },
     "torch": {
       "path": "src/assets/game/items/icons_32/torch.png",
       "usable_in": [
-        "item_icons"
+        "items"
       ]
     }
   }
