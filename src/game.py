@@ -273,7 +273,7 @@ class Game:
         self._feat_gallery_all_cats = [
             "overworld", "town", "dungeon", "characters",
             "npcs", "monsters", "objects", "unique_tiles",
-            "items", "spells",
+            "items", "spells", "unassigned",
         ]
 
         # --- Settings screen ---
@@ -2548,7 +2548,8 @@ class Game:
             manifest = {}
 
         all_cats = ("overworld", "town", "dungeon", "characters",
-                    "npcs", "monsters", "objects", "unique_tiles")
+                    "npcs", "monsters", "objects", "unique_tiles",
+                    "unassigned")
         entries = []
         for cat in all_cats:
             section = manifest.get(cat, {})

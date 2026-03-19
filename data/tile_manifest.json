@@ -467,5 +467,214 @@
         "objects"
       ]
     }
+  },
+  "unassigned": {
+    "balron_demon_f1": {
+      "path": "src/assets/unassigned/balron_demon_f1.png"
+    },
+    "balron_demon_f2": {
+      "path": "src/assets/unassigned/balron_demon_f2.png"
+    },
+    "barbarian_f1": {
+      "path": "src/assets/unassigned/barbarian_f1.png"
+    },
+    "barbarian_f2": {
+      "path": "src/assets/unassigned/barbarian_f2.png"
+    },
+    "brick_wall": {
+      "path": "src/assets/unassigned/brick_wall.png"
+    },
+    "brush_scrubland": {
+      "path": "src/assets/unassigned/brush_scrubland.png"
+    },
+    "cleric_f1": {
+      "path": "src/assets/unassigned/cleric_f1.png"
+    },
+    "cleric_f2": {
+      "path": "src/assets/unassigned/cleric_f2.png"
+    },
+    "cursor_sparkle": {
+      "path": "src/assets/unassigned/cursor_sparkle.png"
+    },
+    "daemon_f1": {
+      "path": "src/assets/unassigned/daemon_f1.png"
+    },
+    "daemon_f2": {
+      "path": "src/assets/unassigned/daemon_f2.png"
+    },
+    "dragon_f1": {
+      "path": "src/assets/unassigned/dragon_f1.png"
+    },
+    "dragon_f2": {
+      "path": "src/assets/unassigned/dragon_f2.png"
+    },
+    "fighter_f1": {
+      "path": "src/assets/unassigned/fighter_f1.png"
+    },
+    "fighter_f2": {
+      "path": "src/assets/unassigned/fighter_f2.png"
+    },
+    "forest": {
+      "path": "src/assets/unassigned/forest.png"
+    },
+    "grass_plains": {
+      "path": "src/assets/unassigned/grass_plains.png"
+    },
+    "horse": {
+      "path": "src/assets/unassigned/horse.png"
+    },
+    "illusionist_f1": {
+      "path": "src/assets/unassigned/illusionist_f1.png"
+    },
+    "illusionist_f2": {
+      "path": "src/assets/unassigned/illusionist_f2.png"
+    },
+    "island_jungle": {
+      "path": "src/assets/unassigned/island_jungle.png"
+    },
+    "lark_f1": {
+      "path": "src/assets/unassigned/lark_f1.png"
+    },
+    "lark_f2": {
+      "path": "src/assets/unassigned/lark_f2.png"
+    },
+    "man_thing_f1": {
+      "path": "src/assets/unassigned/man_thing_f1.png"
+    },
+    "man_thing_f2": {
+      "path": "src/assets/unassigned/man_thing_f2.png"
+    },
+    "mountains": {
+      "path": "src/assets/unassigned/mountains.png"
+    },
+    "night_sky_stars": {
+      "path": "src/assets/unassigned/night_sky_stars.png"
+    },
+    "orc_f2": {
+      "path": "src/assets/unassigned/orc_f2.png"
+    },
+    "paladin_f1": {
+      "path": "src/assets/unassigned/paladin_f1.png"
+    },
+    "paladin_f2": {
+      "path": "src/assets/unassigned/paladin_f2.png"
+    },
+    "pirate_brigand_f2": {
+      "path": "src/assets/unassigned/pirate_brigand_f2.png"
+    },
+    "ship_frigate": {
+      "path": "src/assets/unassigned/ship_frigate.png"
+    },
+    "shrine_church": {
+      "path": "src/assets/unassigned/shrine_church.png"
+    },
+    "skeleton_f2": {
+      "path": "src/assets/unassigned/skeleton_f2.png"
+    },
+    "thief_f1": {
+      "path": "src/assets/unassigned/thief_f1.png"
+    },
+    "thief_f2": {
+      "path": "src/assets/unassigned/thief_f2.png"
+    },
+    "town_village": {
+      "path": "src/assets/unassigned/town_village.png"
+    },
+    "void_empty": {
+      "path": "src/assets/unassigned/void_empty.png"
+    },
+    "water_deep_ocean": {
+      "path": "src/assets/unassigned/water_deep_ocean.png"
+    },
+    "whirlpool": {
+      "path": "src/assets/unassigned/whirlpool.png"
+    },
+    "whirlpool_f2": {
+      "path": "src/assets/unassigned/whirlpool_f2.png"
+    },
+    "wizard_f1": {
+      "path": "src/assets/unassigned/wizard_f1.png"
+    },
+    "wizard_f2": {
+      "path": "src/assets/unassigned/wizard_f2.png"
+    },
+    "npcs_brigand": {
+      "path": "src/assets/game/npcs/brigand.png"
+    },
+    "npcs_townsfolk": {
+      "path": "src/assets/game/npcs/townsfolk.png"
+    },
+    "npcs_u4_avatar": {
+      "path": "src/assets/game/npcs/u4_avatar.png"
+    },
+    "npcs_u4_beggar": {
+      "path": "src/assets/game/npcs/u4_beggar.png"
+    },
+    "npcs_u4_child": {
+      "path": "src/assets/game/npcs/u4_child.png"
+    },
+    "npcs_u4_citizen": {
+      "path": "src/assets/game/npcs/u4_citizen.png"
+    },
+    "npcs_u4_guard": {
+      "path": "src/assets/game/npcs/u4_guard.png"
+    },
+    "npcs_u4_guard_npc": {
+      "path": "src/assets/game/npcs/u4_guard_npc.png"
+    },
+    "npcs_u4_healer": {
+      "path": "src/assets/game/npcs/u4_healer.png"
+    },
+    "npcs_u4_jester": {
+      "path": "src/assets/game/npcs/u4_jester.png"
+    },
+    "npcs_u4_knight": {
+      "path": "src/assets/game/npcs/u4_knight.png"
+    },
+    "npcs_u4_monk": {
+      "path": "src/assets/game/npcs/u4_monk.png"
+    },
+    "npcs_u4_shepherd": {
+      "path": "src/assets/game/npcs/u4_shepherd.png"
+    },
+    "npcs_u4_tinker": {
+      "path": "src/assets/game/npcs/u4_tinker.png"
+    },
+    "npcs_u4_villager_female": {
+      "path": "src/assets/game/npcs/u4_villager_female.png"
+    },
+    "npcs_u4_villager_male": {
+      "path": "src/assets/game/npcs/u4_villager_male.png"
+    },
+    "npcs_vga_avatar": {
+      "path": "src/assets/game/npcs/vga_avatar.png"
+    },
+    "npcs_vga_druid": {
+      "path": "src/assets/game/npcs/vga_druid.png"
+    },
+    "npcs_vga_evil_mage": {
+      "path": "src/assets/game/npcs/vga_evil_mage.png"
+    },
+    "npcs_vga_fighter": {
+      "path": "src/assets/game/npcs/vga_fighter.png"
+    },
+    "npcs_vga_jester": {
+      "path": "src/assets/game/npcs/vga_jester.png"
+    },
+    "npcs_vga_mage": {
+      "path": "src/assets/game/npcs/vga_mage.png"
+    },
+    "npcs_vga_paladin": {
+      "path": "src/assets/game/npcs/vga_paladin.png"
+    },
+    "npcs_vga_ranger": {
+      "path": "src/assets/game/npcs/vga_ranger.png"
+    },
+    "npcs_vga_rogue": {
+      "path": "src/assets/game/npcs/vga_rogue.png"
+    },
+    "characters_ranger_alt": {
+      "path": "src/assets/game/characters/ranger_alt.png"
+    }
   }
 }

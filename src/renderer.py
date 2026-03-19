@@ -7783,6 +7783,7 @@ class Renderer(CombatEffectRendererMixin):
             "npcs": (60, 120, 120), "monsters": (140, 50, 50),
             "objects": (100, 100, 60), "unique_tiles": (120, 80, 120),
             "items": (160, 130, 40), "spells": (80, 60, 160),
+            "unassigned": (100, 100, 100),
         }
         row_h = 34
         ly = panel_y + 30
