@@ -116,8 +116,22 @@
       ]
     },
     "altar": {
-      "path": "src/assets/game/terrain/altar.png",
+      "path": "src/assets/game/dungeon/altar.png",
       "tile_id": 35,
+      "usable_in": [
+        "town"
+      ]
+    },
+    "machine": {
+      "path": "src/assets/game/dungeon/machine.png",
+      "tile_id": 30,
+      "usable_in": [
+        "town"
+      ]
+    },
+    "keyslot": {
+      "path": "src/assets/game/dungeon/keyslot.png",
+      "tile_id": 31,
       "usable_in": [
         "town"
       ]
@@ -125,21 +139,21 @@
   },
   "dungeon": {
     "dfloor": {
-      "path": "src/assets/game/dungeon/brick_floor.png",
+      "path": "src/assets/game/dungeon/stone_floor.png",
       "tile_id": 20,
       "usable_in": [
         "dungeon"
       ]
     },
     "dwall": {
-      "path": "src/assets/game/dungeon/brick_wall.png",
+      "path": "src/assets/game/dungeon/stone_wall.png",
       "tile_id": 21,
       "usable_in": [
         "dungeon"
       ]
     },
     "stairs": {
-      "path": "src/assets/game/dungeon/brick_floor.png",
+      "path": "src/assets/game/dungeon/stairs_up.png",
       "tile_id": 22,
       "usable_in": [
         "dungeon"
@@ -153,21 +167,21 @@
       ]
     },
     "trap": {
-      "path": "src/assets/game/dungeon/brick_floor.png",
+      "path": "src/assets/game/dungeon/trap.png",
       "tile_id": 24,
       "usable_in": [
         "dungeon"
       ]
     },
     "stairs_down": {
-      "path": "src/assets/game/dungeon/brick_floor.png",
+      "path": "src/assets/game/dungeon/stairs_down.png",
       "tile_id": 25,
       "usable_in": [
         "dungeon"
       ]
     },
     "ddoor": {
-      "path": "src/assets/game/dungeon/locked_door.png",
+      "path": "src/assets/game/dungeon/dungeon_door.png",
       "tile_id": 26,
       "usable_in": [
         "dungeon"
@@ -190,20 +204,6 @@
     "locked_door": {
       "path": "src/assets/game/dungeon/locked_door.png",
       "tile_id": 29,
-      "usable_in": [
-        "dungeon"
-      ]
-    },
-    "machine": {
-      "path": "src/assets/game/dungeon/brick_floor.png",
-      "tile_id": 30,
-      "usable_in": [
-        "dungeon"
-      ]
-    },
-    "keyslot": {
-      "path": "src/assets/game/dungeon/brick_floor.png",
-      "tile_id": 31,
       "usable_in": [
         "dungeon"
       ]

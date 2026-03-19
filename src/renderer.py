@@ -124,6 +124,7 @@ class Renderer(CombatEffectRendererMixin):
                 sprite = m.get_sprite_by_name("dungeon", name, dst_ts)
                 if sprite:
                     self._dungeon_tiles[entry["tile_id"]] = sprite
+                    self._tile_sprites[entry["tile_id"]] = sprite
 
         # ── Load special object tiles from manifest ──
         self._chest_tile = m.get_sprite_by_name("objects", "chest", dst_ts)
@@ -8505,14 +8506,11 @@ class Renderer(CombatEffectRendererMixin):
                     return s
             return None
 
-        # Tile type — look up by tile_id
+        # Tile type — look up by tile_id via manifest
         tile_id = item.get("_tile_id")
         if tile_id is not None:
-            sprite = self._get_tile_sprite(tile_id)
+            sprite = self._manifest.get_sprite(tile_id, size)
             if sprite:
-                w, h = sprite.get_size()
-                if w != size or h != size:
-                    return pygame.transform.scale(sprite, (size, size))
                 return sprite
             # Fallback: color swatch
             color = item.get("color", [128, 128, 128])

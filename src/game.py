@@ -273,10 +273,11 @@ class Game:
             9: "overworld",
             10: "town", 11: "town", 12: "town", 13: "town",
             14: "town", 35: "town",
+            30: "town", 31: "town",
             20: "dungeon", 21: "dungeon", 22: "dungeon",
             23: "dungeon", 24: "dungeon", 25: "dungeon",
             26: "dungeon", 27: "dungeon", 28: "dungeon",
-            29: "dungeon", 30: "dungeon", 31: "dungeon",
+            29: "dungeon",
             32: "dungeon", 33: "dungeon", 34: "dungeon",
         }
         self._TILE_FOLDER_ORDER = [
@@ -2636,8 +2637,8 @@ class Game:
         ("dungeon", "stairs"): "procedural",
         ("dungeon", "stairs_down"): "procedural",
         ("dungeon", "trap"): "procedural",
-        ("dungeon", "machine"): "procedural",
-        ("dungeon", "keyslot"): "procedural",
+        ("town", "machine"): "procedural",
+        ("town", "keyslot"): "procedural",
     }
 
     def _feat_load_gallery(self):
@@ -2674,6 +2675,9 @@ class Game:
                     usable = [cat]
                 rendering = self._GALLERY_RENDER_MODE.get(
                     (cat, name), "sprite")
+                # Hide purely procedural tiles (no meaningful sprite)
+                if rendering == "procedural":
+                    continue
                 entries.append({
                     "category": cat,
                     "name": name,
@@ -2682,28 +2686,8 @@ class Game:
                     "usable_in": sorted(usable),
                     "rendering": rendering,
                 })
-        # Item icons from the manifest are already included via the
-        # "items" category in the manifest scan above. Also add
-        # any procedural icons that don't yet have a sprite file.
-        from src import data_registry as DR
-        icon_names_in_manifest = {
-            e["name"] for e in entries if e["category"] == "items"
-        }
-        for icon_name in DR.all_item_icons():
-            if "/" in icon_name:
-                continue
-            if icon_name in icon_names_in_manifest:
-                continue
-            # No sprite file yet — add as procedural fallback
-            entries.append({
-                "category": "items",
-                "name": icon_name,
-                "path": "(procedural)",
-                "tile_id": None,
-                "usable_in": ["items"],
-                "rendering": "procedural",
-                "_icon": icon_name,
-            })
+        # Procedural-only item icons (no sprite file) are hidden from
+        # the gallery along with other procedural-only entries.
 
         self._feat_gallery_list = entries
         self._feat_gallery_cat_cursor = 0
