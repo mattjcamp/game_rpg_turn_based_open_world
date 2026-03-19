@@ -1,22 +1,5 @@
 {
   "weapons": {
-    "Axe": {
-      "power": 4,
-      "ranged": false,
-      "slots": [
-        "right_hand",
-        "left_hand"
-      ],
-      "description": "A single-headed battle axe. Reliable and brutal.",
-      "icon": "tool",
-      "item_type": "axe",
-      "buy": 80,
-      "sell": 40,
-      "party_can_equip": false,
-      "character_can_equip": true,
-      "melee": false,
-      "throwable": false
-    },
     "Broad Axe": {
       "power": 7,
       "ranged": false,
@@ -429,7 +412,7 @@
     },
     "Camping Supplies": {
       "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
-      "icon": "tool",
+      "icon": "campfire",
       "item_type": "camping_supplies",
       "usable": true,
       "effect": "rest",

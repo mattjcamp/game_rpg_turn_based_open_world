@@ -7153,7 +7153,13 @@ class Renderer(CombatEffectRendererMixin):
                               gallery_spr_cursor=0,
                               gallery_spr_scroll=0,
                               gallery_tag_cursor=0,
-                              gallery_all_cats=None):
+                              gallery_all_cats=None,
+                              pxedit_pixels=None,
+                              pxedit_cx=0, pxedit_cy=0,
+                              pxedit_w=32, pxedit_h=32,
+                              pxedit_color_idx=0,
+                              pxedit_palette=None,
+                              pxedit_focus="canvas"):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7360,17 +7366,26 @@ class Renderer(CombatEffectRendererMixin):
                         tile_fields or [], tile_field, tile_buffer,
                         tile_field_scroll, fm, fs, f)
             elif ed == "gallery":
-                self._draw_features_gallery(
-                    left_x, left_w, right_x, right_w,
-                    panel_y, panel_h, level,
-                    gallery_list or [],
-                    gallery_cat_list or [],
-                    gallery_cat_cursor, gallery_cat_scroll,
-                    gallery_sprites or [],
-                    gallery_spr_cursor, gallery_spr_scroll,
-                    gallery_tag_cursor,
-                    gallery_all_cats or [],
-                    fm, fs, f)
+                if level == 4 and pxedit_pixels is not None:
+                    self._draw_pixel_editor(
+                        pxedit_pixels, pxedit_cx, pxedit_cy,
+                        pxedit_w, pxedit_h,
+                        pxedit_color_idx,
+                        pxedit_palette or [],
+                        pxedit_focus,
+                        fm, fs, f)
+                else:
+                    self._draw_features_gallery(
+                        left_x, left_w, right_x, right_w,
+                        panel_y, panel_h, level,
+                        gallery_list or [],
+                        gallery_cat_list or [],
+                        gallery_cat_cursor, gallery_cat_scroll,
+                        gallery_sprites or [],
+                        gallery_spr_cursor, gallery_spr_scroll,
+                        gallery_tag_cursor,
+                        gallery_all_cats or [],
+                        fm, fs, f)
 
     def _draw_features_spell_list(self, left_x, left_w, right_x,
                                    right_w, panel_y, panel_h,
@@ -7967,6 +7982,32 @@ class Renderer(CombatEffectRendererMixin):
                               right_x + 16, dy,
                               (140, 140, 160), fs)
                 dy += 18
+            # Show pixel dimensions for file-based sprites
+            if path and path != "(procedural)":
+                m_entry = self._manifest.get_entry_by_name(
+                    entry["category"], entry["name"])
+                if m_entry and "path" in m_entry:
+                    import os as _os
+                    _abs = _os.path.join(
+                        _os.path.dirname(_os.path.dirname(
+                            _os.path.abspath(__file__))),
+                        m_entry["path"])
+                    if _os.path.isfile(_abs):
+                        try:
+                            _raw = pygame.image.load(_abs)
+                            pw, ph = _raw.get_size()
+                            from src.settings import TILE_SIZE
+                            dim_str = f"Original: {pw} x {ph} px"
+                            if pw != TILE_SIZE or ph != TILE_SIZE:
+                                dim_str += (f"  (renders at "
+                                            f"{TILE_SIZE}x"
+                                            f"{TILE_SIZE})")
+                            self._u3_text(
+                                dim_str, right_x + 16, dy,
+                                (140, 140, 160), fs)
+                            dy += 18
+                        except Exception:
+                            pass
             tile_id = entry.get("tile_id")
             if tile_id is not None:
                 self._u3_text(f"Tile ID: {tile_id}",
@@ -8070,11 +8111,207 @@ class Renderer(CombatEffectRendererMixin):
         if level == 3:
             hint = "[Up/Dn] Select  [Enter] Toggle  [Esc] Done"
         else:
-            hint = ("[Up/Dn] Browse  [Enter] Edit Tags  "
-                    "[Esc] Back")
+            hint = ("[Up/Dn] Browse  [Enter] Tags  "
+                    "[E] Edit Pixels  [Esc] Back")
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 45, self._U3_HINT, fs)
+
+    def _draw_pixel_editor(self, pixels, cx, cy, pw, ph,
+                            color_idx, palette, focus, fm, fs, f):
+        """Draw the full-screen pixel editor for a sprite."""
+        self.screen.fill((0, 0, 0))
+        canvas_focused = (focus == "canvas")
+        palette_focused = (focus == "palette")
+
+        # ── Header ──
+        self._u3_text("Pixel Editor", SCREEN_WIDTH // 2 - 50,
+                       10, self._U3_ORANGE, f)
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (40, 38), (SCREEN_WIDTH - 40, 38), 1)
+
+        # ── Layout ──
+        # Canvas on the left, palette on the right
+        canvas_area_x = 40
+        canvas_area_y = 50
+        # Scale pixels to fill available space
+        max_canvas_w = SCREEN_WIDTH - 260  # leave room for palette
+        max_canvas_h = SCREEN_HEIGHT - 120  # leave room for header+footer
+        pixel_sz = min(max_canvas_w // pw, max_canvas_h // ph)
+        pixel_sz = max(4, min(pixel_sz, 20))  # clamp 4-20px per pixel
+        canvas_w = pw * pixel_sz
+        canvas_h = ph * pixel_sz
+        # Center canvas vertically
+        canvas_x = canvas_area_x
+        canvas_y = canvas_area_y + (max_canvas_h - canvas_h) // 2
+
+        # ── Draw canvas background (checkerboard for transparency) ──
+        for py_ in range(ph):
+            for px_ in range(pw):
+                sx = canvas_x + px_ * pixel_sz
+                sy = canvas_y + py_ * pixel_sz
+                # Checkerboard background
+                if (px_ + py_) % 2 == 0:
+                    bg = (40, 40, 40)
+                else:
+                    bg = (55, 55, 55)
+                pygame.draw.rect(self.screen, bg,
+                                 (sx, sy, pixel_sz, pixel_sz))
+                # Draw pixel
+                r, g, b, a = pixels[py_][px_]
+                if a > 0:
+                    psurf = pygame.Surface(
+                        (pixel_sz, pixel_sz), pygame.SRCALPHA)
+                    psurf.fill((r, g, b, a))
+                    self.screen.blit(psurf, (sx, sy))
+
+        # ── Canvas border ──
+        pygame.draw.rect(self.screen, (80, 70, 50),
+                         (canvas_x - 1, canvas_y - 1,
+                          canvas_w + 2, canvas_h + 2), 1)
+
+        # ── Canvas border glow when focused ──
+        if canvas_focused:
+            pygame.draw.rect(self.screen, (255, 200, 60),
+                             (canvas_x - 2, canvas_y - 2,
+                              canvas_w + 4, canvas_h + 4), 2)
+
+        # ── Cursor highlight ──
+        cur_sx = canvas_x + cx * pixel_sz
+        cur_sy = canvas_y + cy * pixel_sz
+        cur_color = (255, 255, 100) if canvas_focused else (120, 120, 80)
+        pygame.draw.rect(self.screen, cur_color,
+                         (cur_sx, cur_sy, pixel_sz, pixel_sz), 2)
+
+        # ── Coordinates display ──
+        self._u3_text(f"({cx}, {cy})",
+                      canvas_x, canvas_y + canvas_h + 6,
+                      (140, 140, 160), fs)
+
+        # ── Preview (actual size) ──
+        prev_x = canvas_x + canvas_w // 2 - pw // 2
+        prev_y = canvas_y + canvas_h + 24
+        prev_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        for py_ in range(ph):
+            for px_ in range(pw):
+                prev_surf.set_at((px_, py_), pixels[py_][px_])
+        self.screen.blit(prev_surf, (prev_x, prev_y))
+        pygame.draw.rect(self.screen, (80, 70, 50),
+                         (prev_x - 1, prev_y - 1,
+                          pw + 2, ph + 2), 1)
+        self._u3_text("1:1", prev_x + pw + 8, prev_y + ph // 2 - 6,
+                      (140, 140, 160), fs)
+
+        # ── Palette panel (right side) ──
+        pal_x = canvas_x + canvas_w + 30
+        pal_y = canvas_area_y + 10
+        pal_label = "Palette"
+        if palette_focused:
+            pal_label = "> Palette (active)"
+        self._u3_text(pal_label, pal_x, pal_y,
+                       self._U3_ORANGE if palette_focused
+                       else (140, 120, 80), fs)
+        pal_y += 22
+
+        swatch_sz = 24
+        cols = 4
+        pal_grid_w = cols * (swatch_sz + 4)
+
+        # Palette border glow when focused
+        n_rows = (len(palette) + cols - 1) // cols
+        pal_grid_h = n_rows * (swatch_sz + 4)
+        if palette_focused:
+            pygame.draw.rect(self.screen, (255, 200, 60),
+                             (pal_x - 4, pal_y - 4,
+                              pal_grid_w + 8,
+                              pal_grid_h + 8), 2)
+
+        for pi, pc in enumerate(palette):
+            col = pi % cols
+            row = pi // cols
+            sx = pal_x + col * (swatch_sz + 4)
+            sy = pal_y + row * (swatch_sz + 4)
+
+            # Draw checkerboard for transparent
+            if pc[3] == 0:
+                for cx2 in range(2):
+                    for cy2 in range(2):
+                        cbg = (40, 40, 40) if (cx2 + cy2) % 2 == 0 \
+                            else (80, 80, 80)
+                        pygame.draw.rect(self.screen, cbg,
+                                         (sx + cx2 * swatch_sz // 2,
+                                          sy + cy2 * swatch_sz // 2,
+                                          swatch_sz // 2,
+                                          swatch_sz // 2))
+            else:
+                pygame.draw.rect(self.screen, pc[:3],
+                                 (sx, sy, swatch_sz, swatch_sz))
+
+            # Selection indicator — bright when palette focused
+            if pi == color_idx:
+                sel_c = ((255, 255, 100) if palette_focused
+                         else (200, 180, 60))
+                pygame.draw.rect(self.screen, sel_c,
+                                 (sx - 2, sy - 2,
+                                  swatch_sz + 4,
+                                  swatch_sz + 4), 2)
+            else:
+                pygame.draw.rect(self.screen, (60, 60, 60),
+                                 (sx, sy, swatch_sz, swatch_sz), 1)
+
+        # ── Selected color info ──
+        sel_color = palette[color_idx] if color_idx < len(palette) \
+            else (0, 0, 0, 255)
+        info_y = pal_y + ((len(palette) + cols - 1) // cols) \
+            * (swatch_sz + 4) + 10
+        # Large preview of selected color
+        sel_sz = 32
+        sel_x = pal_x
+        if sel_color[3] == 0:
+            self._u3_text("Transparent", sel_x, info_y,
+                          (180, 180, 200), fm)
+        else:
+            pygame.draw.rect(self.screen, sel_color[:3],
+                             (sel_x, info_y, sel_sz, sel_sz))
+            pygame.draw.rect(self.screen, (80, 70, 50),
+                             (sel_x, info_y, sel_sz, sel_sz), 1)
+            self._u3_text(
+                f"R:{sel_color[0]} G:{sel_color[1]} B:{sel_color[2]}",
+                sel_x + sel_sz + 8, info_y + 4,
+                (140, 140, 160), fs)
+            if sel_color[3] < 255:
+                self._u3_text(f"A:{sel_color[3]}",
+                              sel_x + sel_sz + 8, info_y + 18,
+                              (140, 140, 160), fs)
+
+        # ── Current pixel color ──
+        cur_color = pixels[cy][cx]
+        cur_y = info_y + 44
+        self._u3_text("Pixel:", pal_x, cur_y, (180, 180, 200), fs)
+        cur_y += 18
+        if cur_color[3] == 0:
+            self._u3_text("Transparent", pal_x, cur_y,
+                          (120, 120, 140), fs)
+        else:
+            pygame.draw.rect(self.screen, cur_color[:3],
+                             (pal_x, cur_y, 20, 20))
+            pygame.draw.rect(self.screen, (80, 70, 50),
+                             (pal_x, cur_y, 20, 20), 1)
+            self._u3_text(
+                f"({cur_color[0]},{cur_color[1]},{cur_color[2]})",
+                pal_x + 26, cur_y + 2,
+                (120, 120, 140), fs)
+
+        # ── Footer hints (context-sensitive) ──
+        if palette_focused:
+            hint = ("[Arrows] Select Color  [Enter] Confirm  "
+                    "[Tab] Canvas  [Esc] Canvas")
+        else:
+            hint = ("[Arrows] Move  [Space] Paint  [Tab] Palette  "
+                    "[Q/E] Color  [P] Pick  [Esc] Save")
+        hw = fs.size(hint)[0]
+        self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
+                      SCREEN_HEIGHT - 30, self._U3_HINT, fs)
 
     def _render_tile_preview(self, category, name, tile_id, size=96):
         """Render a tile preview surface showing how it looks in-game.
@@ -12571,6 +12808,34 @@ class Renderer(CombatEffectRendererMixin):
                                [(cx, cy - 22), (cx - 5, cy - 10), (cx + 5, cy - 10)])
             # Flame core
             pygame.draw.ellipse(self.screen, YELLOW, (cx - 4, cy - 10, 8, 10))
+
+        elif icon_type == "campfire":
+            # Logs — two crossed brown logs at the base
+            pygame.draw.line(self.screen, DARK_BROWN,
+                             (cx - 14, cy + 10), (cx + 14, cy + 10), 4)
+            pygame.draw.line(self.screen, BROWN,
+                             (cx - 12, cy + 14), (cx + 12, cy + 6), 4)
+            pygame.draw.line(self.screen, DARK_BROWN,
+                             (cx - 12, cy + 6), (cx + 12, cy + 14), 4)
+            # Embers — small orange dots at the base
+            for ex, ey in [(-6, 8), (2, 9), (7, 7), (-3, 11)]:
+                pygame.draw.circle(self.screen, RED,
+                                   (cx + ex, cy + ey), 2)
+            # Outer flame — large orange teardrop
+            pygame.draw.polygon(self.screen, ORANGE, [
+                (cx, cy - 20),
+                (cx - 12, cy + 6), (cx + 12, cy + 6)])
+            pygame.draw.ellipse(self.screen, ORANGE,
+                                (cx - 12, cy - 4, 24, 14))
+            # Inner flame — yellow core
+            pygame.draw.polygon(self.screen, YELLOW, [
+                (cx, cy - 14),
+                (cx - 7, cy + 2), (cx + 7, cy + 2)])
+            pygame.draw.ellipse(self.screen, YELLOW,
+                                (cx - 6, cy - 4, 12, 10))
+            # Bright hotspot
+            pygame.draw.ellipse(self.screen, WHITE,
+                                (cx - 3, cy - 4, 6, 8))
 
         elif icon_type == "rope":
             # Coiled rope

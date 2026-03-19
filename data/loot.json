@@ -1,17 +1,56 @@
 {
   "chest_loot": [
-    {"item": null,          "weight": 10},
-    {"item": "Torch",       "weight": 6},
-    {"item": "Healing Herb", "weight": 5},
-    {"item": "Antidote",    "weight": 3},
-    {"item": "Dagger",      "weight": 3},
-    {"item": "Club",        "weight": 3},
-    {"item": "Mace",        "weight": 2},
-    {"item": "Leather",     "weight": 2},
-    {"item": "Sling",       "weight": 2},
-    {"item": "Axe",         "weight": 1},
-    {"item": "Sword",       "weight": 1},
-    {"item": "Chain",       "weight": 1},
-    {"item": "Short Bow",   "weight": 1}
+    {
+      "item": null,
+      "weight": 10
+    },
+    {
+      "item": "Torch",
+      "weight": 6
+    },
+    {
+      "item": "Healing Herb",
+      "weight": 5
+    },
+    {
+      "item": "Antidote",
+      "weight": 3
+    },
+    {
+      "item": "Dagger",
+      "weight": 3
+    },
+    {
+      "item": "Club",
+      "weight": 3
+    },
+    {
+      "item": "Mace",
+      "weight": 2
+    },
+    {
+      "item": "Leather",
+      "weight": 2
+    },
+    {
+      "item": "Sling",
+      "weight": 2
+    },
+    {
+      "item": "Broad Axe",
+      "weight": 1
+    },
+    {
+      "item": "Sword",
+      "weight": 1
+    },
+    {
+      "item": "Chain",
+      "weight": 1
+    },
+    {
+      "item": "Short Bow",
+      "weight": 1
+    }
   ]
 }

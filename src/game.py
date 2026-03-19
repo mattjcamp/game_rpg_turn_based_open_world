@@ -275,6 +275,41 @@ class Game:
             "npcs", "monsters", "objects", "unique_tiles",
             "items", "spells", "unassigned",
         ]
+        # Pixel editor state (Level 4)
+        self._feat_pxedit_pixels = None      # 2D list of (r,g,b,a) tuples
+        self._feat_pxedit_cx = 0             # cursor x on canvas
+        self._feat_pxedit_cy = 0             # cursor y on canvas
+        self._feat_pxedit_color_idx = 0      # selected palette index
+        self._feat_pxedit_focus = "canvas"   # "canvas" or "palette"
+        self._feat_pxedit_w = 32             # canvas width
+        self._feat_pxedit_h = 32             # canvas height
+        self._feat_pxedit_path = ""          # file path for saving
+        self._feat_pxedit_palette = [
+            (0, 0, 0, 255),        # Black
+            (255, 255, 255, 255),  # White
+            (200, 50, 50, 255),    # Red
+            (50, 160, 50, 255),    # Green
+            (50, 80, 200, 255),    # Blue
+            (255, 200, 60, 255),   # Gold
+            (255, 140, 40, 255),   # Orange
+            (160, 80, 200, 255),   # Purple
+            (100, 200, 200, 255),  # Cyan
+            (180, 130, 60, 255),   # Brown
+            (140, 100, 40, 255),   # Dark Brown
+            (180, 190, 200, 255),  # Steel
+            (120, 130, 140, 255),  # Dark Steel
+            (60, 55, 65, 255),     # Dark Gray
+            (130, 130, 130, 255),  # Gray
+            (200, 200, 200, 255),  # Light Gray
+            (34, 139, 34, 255),    # Forest Green
+            (30, 90, 180, 255),    # Ocean Blue
+            (210, 190, 130, 255),  # Sand
+            (80, 0, 0, 255),       # Dark Red
+            (0, 80, 0, 255),       # Dark Green
+            (255, 220, 180, 255),  # Skin
+            (220, 180, 140, 255),  # Parchment
+            (0, 0, 0, 0),          # Transparent
+        ]
 
         # --- Settings screen ---
         self.showing_settings = False
@@ -2650,6 +2685,62 @@ class Game:
                 json.dump(manifest, f, indent=2)
         except OSError:
             return False
+        return True
+
+    def _feat_pxedit_open(self):
+        """Open the pixel editor for the currently selected sprite."""
+        gi = self._feat_gallery_cur_gi()
+        if gi is None:
+            return False
+        entry = self._feat_gallery_list[gi]
+        path = entry.get("path", "")
+        if not path or path == "(procedural)":
+            return False
+        import os
+        abs_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), path)
+        if not os.path.isfile(abs_path):
+            return False
+        # Load image into pixel array
+        import pygame
+        try:
+            img = pygame.image.load(abs_path).convert_alpha()
+        except Exception:
+            return False
+        w, h = img.get_size()
+        pixels = []
+        for y in range(h):
+            row = []
+            for x in range(w):
+                row.append(tuple(img.get_at((x, y))))
+            pixels.append(row)
+        self._feat_pxedit_pixels = pixels
+        self._feat_pxedit_w = w
+        self._feat_pxedit_h = h
+        self._feat_pxedit_cx = w // 2
+        self._feat_pxedit_cy = h // 2
+        self._feat_pxedit_color_idx = 0
+        self._feat_pxedit_path = abs_path
+        return True
+
+    def _feat_pxedit_save(self):
+        """Save the edited pixels back to the sprite file."""
+        import pygame
+        pixels = self._feat_pxedit_pixels
+        if not pixels:
+            return False
+        w = self._feat_pxedit_w
+        h = self._feat_pxedit_h
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        for y in range(h):
+            for x in range(w):
+                surf.set_at((x, y), pixels[y][x])
+        try:
+            pygame.image.save(surf, self._feat_pxedit_path)
+        except Exception:
+            return False
+        # Clear manifest sprite cache so the new image is loaded
+        self.renderer._manifest._sprite_cache.clear()
         return True
 
     def _feat_gallery_cur_gi(self):
@@ -5288,6 +5379,94 @@ class Game:
                     ctx["set_buffer"](buf + event.unicode)
             return
 
+        # ── Level 4: pixel editor ──
+        if self._feat_level == 4 and ed == "gallery":
+            px = self._feat_pxedit_pixels
+            if px is None:
+                self._feat_level = 2
+                return
+            w = self._feat_pxedit_w
+            h = self._feat_pxedit_h
+            n_pal = len(self._feat_pxedit_palette)
+            pal_cols = 4  # palette grid columns
+
+            if event.key == pygame.K_ESCAPE:
+                if self._feat_pxedit_focus == "palette":
+                    # Escape from palette returns to canvas
+                    self._feat_pxedit_focus = "canvas"
+                else:
+                    self._feat_pxedit_save()
+                    self._feat_pxedit_pixels = None
+                    self.renderer._manifest._sprite_cache.clear()
+                    self._feat_level = 2
+                return
+
+            # Tab toggles focus between canvas and palette
+            if event.key == pygame.K_TAB:
+                if self._feat_pxedit_focus == "canvas":
+                    self._feat_pxedit_focus = "palette"
+                else:
+                    self._feat_pxedit_focus = "canvas"
+                return
+
+            if self._feat_pxedit_focus == "palette":
+                # ── Palette navigation (grid: 4 columns) ──
+                ci = self._feat_pxedit_color_idx
+                if event.key == pygame.K_LEFT:
+                    self._feat_pxedit_color_idx = (ci - 1) % n_pal
+                elif event.key == pygame.K_RIGHT:
+                    self._feat_pxedit_color_idx = (ci + 1) % n_pal
+                elif event.key == pygame.K_UP:
+                    self._feat_pxedit_color_idx = (
+                        ci - pal_cols) % n_pal
+                elif event.key == pygame.K_DOWN:
+                    self._feat_pxedit_color_idx = (
+                        ci + pal_cols) % n_pal
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    # Confirm selection, return to canvas
+                    self._feat_pxedit_focus = "canvas"
+                return
+
+            # ── Canvas mode ──
+            if event.key == pygame.K_UP:
+                self._feat_pxedit_cy = (
+                    self._feat_pxedit_cy - 1) % h
+            elif event.key == pygame.K_DOWN:
+                self._feat_pxedit_cy = (
+                    self._feat_pxedit_cy + 1) % h
+            elif event.key == pygame.K_LEFT:
+                self._feat_pxedit_cx = (
+                    self._feat_pxedit_cx - 1) % w
+            elif event.key == pygame.K_RIGHT:
+                self._feat_pxedit_cx = (
+                    self._feat_pxedit_cx + 1) % w
+            # Paint with current color
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                color = self._feat_pxedit_palette[
+                    self._feat_pxedit_color_idx]
+                px[self._feat_pxedit_cy][self._feat_pxedit_cx] = color
+            # Quick palette cycle: Q = prev, E = next
+            elif event.key == pygame.K_q:
+                self._feat_pxedit_color_idx = (
+                    self._feat_pxedit_color_idx - 1) % n_pal
+            elif event.key == pygame.K_e:
+                self._feat_pxedit_color_idx = (
+                    self._feat_pxedit_color_idx + 1) % n_pal
+            # Pick color from canvas (P = eyedropper)
+            elif event.key == pygame.K_p:
+                picked = tuple(
+                    px[self._feat_pxedit_cy][self._feat_pxedit_cx])
+                best_i = 0
+                best_d = float("inf")
+                for pi, pc in enumerate(self._feat_pxedit_palette):
+                    d = sum((a - b) ** 2
+                            for a, b in zip(picked[:3], pc[:3]))
+                    if d < best_d:
+                        best_d = d
+                        best_i = pi
+                self._feat_pxedit_color_idx = best_i
+            return
+
         # ── Level 3: gallery tag editing ──
         if self._feat_level == 3 and ed == "gallery":
             n_tags = len(self._feat_gallery_all_cats)
@@ -5335,6 +5514,9 @@ class Game:
                 if n > 0:
                     self._feat_gallery_tag_cursor = 0
                     self._feat_level = 3
+            elif event.key == pygame.K_e:
+                if n > 0 and self._feat_pxedit_open():
+                    self._feat_level = 4
             return
 
         # ── Level 1: gallery category folders ──
@@ -5815,6 +5997,14 @@ class Game:
                     gallery_spr_scroll=self._feat_gallery_spr_scroll,
                     gallery_tag_cursor=self._feat_gallery_tag_cursor,
                     gallery_all_cats=self._feat_gallery_all_cats,
+                    pxedit_pixels=self._feat_pxedit_pixels,
+                    pxedit_cx=self._feat_pxedit_cx,
+                    pxedit_cy=self._feat_pxedit_cy,
+                    pxedit_w=self._feat_pxedit_w,
+                    pxedit_h=self._feat_pxedit_h,
+                    pxedit_color_idx=self._feat_pxedit_color_idx,
+                    pxedit_palette=self._feat_pxedit_palette,
+                    pxedit_focus=self._feat_pxedit_focus,
                 )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(
