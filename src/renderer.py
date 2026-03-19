@@ -136,7 +136,7 @@ class Renderer(CombatEffectRendererMixin):
         for mon_name, data in MONSTERS.items():
             tile_file = data.get("tile")
             if tile_file and tile_file not in self._monster_tiles:
-                # Try manifest first, fall back to direct load
+                # Look up via manifest by matching the filename
                 sprite = None
                 for mname in m.names_in("monsters"):
                     entry = m.get_entry_by_name("monsters", mname)
@@ -144,12 +144,6 @@ class Renderer(CombatEffectRendererMixin):
                         sprite = m.get_sprite_by_name(
                             "monsters", mname, dst_ts)
                         break
-                if sprite is None:
-                    # Direct load fallback for monsters not yet in manifest
-                    tile_path = os.path.join(assets_dir, tile_file)
-                    if os.path.exists(tile_path):
-                        raw = pygame.image.load(tile_path).convert_alpha()
-                        sprite = pygame.transform.scale(raw, (dst_ts, dst_ts))
                 if sprite:
                     self._monster_tiles[tile_file] = sprite
 
@@ -166,13 +160,8 @@ class Renderer(CombatEffectRendererMixin):
                 self._villager_sprites.append(sprite)
 
         # ── Load skeleton fallback for monster sprite misses ──
-        skel_path = os.path.join(assets_dir, "game", "monsters", "skeleton.png")
-        if os.path.exists(skel_path):
-            raw = pygame.image.load(skel_path).convert_alpha()
-            self._skeleton_fallback = pygame.transform.scale(
-                raw, (dst_ts, dst_ts))
-        else:
-            self._skeleton_fallback = None
+        self._skeleton_fallback = m.get_sprite_by_name(
+            "monsters", "skeleton", dst_ts)
 
     def reload_sprites(self):
         """Clear all sprite caches and reload from disk.
@@ -12692,8 +12681,9 @@ class Renderer(CombatEffectRendererMixin):
     def _load_cc_tile(self, file_path):
         """Load a character tile image by project-relative path.
 
-        Returns a pygame Surface or None. Results are cached in
-        ``self._cc_tile_cache``.
+        Returns a pygame Surface or None.  Tries the tile manifest first
+        (matching by path), falling back to direct load for custom sprites.
+        Results are cached in ``self._cc_tile_cache``.
         """
         if not hasattr(self, '_cc_tile_cache'):
             self._cc_tile_cache = {}
@@ -12702,6 +12692,17 @@ class Renderer(CombatEffectRendererMixin):
         if not file_path:
             self._cc_tile_cache[file_path] = None
             return None
+        # Try manifest lookup first (matches on path suffix)
+        m = self._manifest
+        for cat in ("people", "monsters"):
+            for name in m.names_in(cat):
+                entry = m.get_entry_by_name(cat, name)
+                if entry and entry["path"] == file_path:
+                    sprite = m.get_sprite_by_name(cat, name, 32)
+                    if sprite:
+                        self._cc_tile_cache[file_path] = sprite
+                        return sprite
+        # Fallback: direct load for custom/non-manifest sprites
         import os
         project_root = os.path.dirname(os.path.dirname(__file__))
         abs_path = os.path.join(project_root, file_path)
@@ -12710,13 +12711,6 @@ class Renderer(CombatEffectRendererMixin):
             return None
         try:
             raw = pygame.image.load(abs_path).convert_alpha()
-            # Make black pixels transparent (common for U4 tiles)
-            w, h = raw.get_size()
-            for px in range(w):
-                for py in range(h):
-                    r, g, b, a = raw.get_at((px, py))
-                    if r == 0 and g == 0 and b == 0 and a > 0:
-                        raw.set_at((px, py), (0, 0, 0, 0))
             self._cc_tile_cache[file_path] = raw
         except Exception:
             self._cc_tile_cache[file_path] = None

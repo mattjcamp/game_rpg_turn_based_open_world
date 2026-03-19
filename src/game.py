@@ -1306,33 +1306,26 @@ class Game:
                     self._cc_classes.append(name)
 
     def _cc_load_tiles(self):
-        """Load available character tiles from character_tiles.json."""
+        """Load available character tiles from the 'people' category
+        in the tile manifest (data/tile_manifest.json)."""
         import os, json
+        from src.tile_manifest import TileManifest
         project_root = os.path.dirname(os.path.dirname(__file__))
-        # Try module directory first, then data/
-        tiles_path = None
-        if hasattr(self, 'active_module_path') and self.active_module_path:
-            mod_path = os.path.join(self.active_module_path,
-                                    "character_tiles.json")
-            if os.path.isfile(mod_path):
-                tiles_path = mod_path
-        if tiles_path is None:
-            tiles_path = os.path.join(project_root, "data",
-                                      "character_tiles.json")
+        manifest = TileManifest()
+        manifest.load()
         self._cc_tiles = []  # list of {"name": ..., "file": ...}
-        if os.path.isfile(tiles_path):
-            try:
-                with open(tiles_path, "r") as f:
-                    data = json.load(f)
-                for entry in data.get("tiles", []):
-                    abs_path = os.path.join(project_root, entry["file"])
-                    if os.path.isfile(abs_path):
-                        self._cc_tiles.append({
-                            "name": entry["name"],
-                            "file": entry["file"],
-                        })
-            except (json.JSONDecodeError, OSError, KeyError):
-                pass
+        for name in manifest.names_in("people"):
+            entry = manifest.get_entry_by_name("people", name)
+            if entry and "path" in entry:
+                abs_path = os.path.join(project_root, entry["path"])
+                if os.path.isfile(abs_path):
+                    # Use a display-friendly name: replace underscores,
+                    # title-case, strip numbering suffixes
+                    display = name.replace("_", " ").title()
+                    self._cc_tiles.append({
+                        "name": display,
+                        "file": entry["path"],
+                    })
         # If no tiles loaded, provide a minimal fallback
         if not self._cc_tiles:
             self._cc_tiles.append({"name": "Default", "file": ""})

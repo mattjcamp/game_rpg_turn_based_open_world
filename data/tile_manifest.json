@@ -350,6 +350,144 @@
       "usable_in": [
         "people"
       ]
+    },
+    "ranger_alt": {
+      "path": "src/assets/game/characters/ranger_alt.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "brigand": {
+      "path": "src/assets/game/npcs/brigand.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "townsfolk": {
+      "path": "src/assets/game/npcs/townsfolk.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_avatar": {
+      "path": "src/assets/game/npcs/u4_avatar.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_child": {
+      "path": "src/assets/game/npcs/u4_child.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_citizen": {
+      "path": "src/assets/game/npcs/u4_citizen.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_guard": {
+      "path": "src/assets/game/npcs/u4_guard.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_guard_alt": {
+      "path": "src/assets/game/npcs/u4_guard_npc.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_jester": {
+      "path": "src/assets/game/npcs/u4_jester.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_monk": {
+      "path": "src/assets/game/npcs/u4_monk.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_shepherd": {
+      "path": "src/assets/game/npcs/u4_shepherd.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_tinker": {
+      "path": "src/assets/game/npcs/u4_tinker.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_villager_female": {
+      "path": "src/assets/game/npcs/u4_villager_female.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "u4_villager_male": {
+      "path": "src/assets/game/npcs/u4_villager_male.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_avatar": {
+      "path": "src/assets/game/npcs/vga_avatar.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_druid": {
+      "path": "src/assets/game/npcs/vga_druid.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_evil_mage": {
+      "path": "src/assets/game/npcs/vga_evil_mage.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_fighter": {
+      "path": "src/assets/game/npcs/vga_fighter.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_jester": {
+      "path": "src/assets/game/npcs/vga_jester.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_mage": {
+      "path": "src/assets/game/npcs/vga_mage.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_paladin": {
+      "path": "src/assets/game/npcs/vga_paladin.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_ranger": {
+      "path": "src/assets/game/npcs/vga_ranger.png",
+      "usable_in": [
+        "people"
+      ]
+    },
+    "vga_rogue": {
+      "path": "src/assets/game/npcs/vga_rogue.png",
+      "usable_in": [
+        "people"
+      ]
     }
   },
   "monsters": {

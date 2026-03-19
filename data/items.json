@@ -30,7 +30,9 @@
       "buy": 20,
       "sell": 10,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "melee": false,
+      "throwable": false
     },
     "Crossbow": {
       "power": 9,
