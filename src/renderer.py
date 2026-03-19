@@ -173,6 +173,22 @@ class Renderer(CombatEffectRendererMixin):
         else:
             self._skeleton_fallback = None
 
+    def reload_sprites(self):
+        """Clear all sprite caches and reload from disk.
+
+        Called after the pixel editor saves changes so the updated
+        graphics appear immediately in the gallery and in-game.
+        """
+        # Clear manifest cache so PNGs are re-read from disk
+        self._manifest._sprite_cache.clear()
+        self._manifest._loaded = False
+        self._manifest.load()
+        # Rebuild all renderer sprite caches
+        self._load_tile_sheet()
+        self._load_class_sprites()
+        # Clear the unique-tile on-demand cache
+        self._unique_tile_sprites.clear()
+
     def _get_tile_sprite(self, tile_id):
         """Return the sprite surface for an overworld/town tile, or None."""
         mapped_id = self._overworld_tile_map.get(tile_id, tile_id)

@@ -2739,8 +2739,6 @@ class Game:
             pygame.image.save(surf, self._feat_pxedit_path)
         except Exception:
             return False
-        # Clear manifest sprite cache so the new image is loaded
-        self.renderer._manifest._sprite_cache.clear()
         return True
 
     def _feat_gallery_cur_gi(self):
@@ -5397,7 +5395,9 @@ class Game:
                 else:
                     self._feat_pxedit_save()
                     self._feat_pxedit_pixels = None
-                    self.renderer._manifest._sprite_cache.clear()
+                    # Reload ALL sprite caches so changes show
+                    # in the gallery and in-game immediately
+                    self.renderer.reload_sprites()
                     self._feat_level = 2
                 return
 
