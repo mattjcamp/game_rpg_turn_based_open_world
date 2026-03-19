@@ -260,10 +260,21 @@ class Game:
         self._feat_tile_buffer = ""
         self._feat_tile_scroll_f = 0
 
-        # Tile Gallery (read-only browser of all manifest sprites)
-        self._feat_gallery_list = []     # list of dicts: category, name, path
-        self._feat_gallery_cursor = 0
-        self._feat_gallery_scroll = 0
+        # Tile Gallery — 3-level folder hierarchy
+        # Level 1: category folders, Level 2: sprites, Level 3: tag editor
+        self._feat_gallery_list = []         # unique sprite entries (for saving)
+        self._feat_gallery_cat_list = []     # categories with counts
+        self._feat_gallery_cat_cursor = 0    # which category folder
+        self._feat_gallery_cat_scroll = 0
+        self._feat_gallery_sprites = []      # sprites for current category
+        self._feat_gallery_spr_cursor = 0    # which sprite in category
+        self._feat_gallery_spr_scroll = 0
+        self._feat_gallery_tag_cursor = 0    # which tag row in editor
+        self._feat_gallery_all_cats = [
+            "overworld", "town", "dungeon", "characters",
+            "npcs", "monsters", "objects", "unique_tiles",
+            "items", "spells",
+        ]
 
         # --- Settings screen ---
         self.showing_settings = False
@@ -1901,7 +1912,8 @@ class Game:
         elif key == "targeting":
             return DR.all_targeting_types()
         elif key == "icon":
-            return DR.all_spell_icon_options()
+            # All sprites tagged with the "spells" category
+            return DR.sprites_for_category("spells")
         return []
 
     def _feat_add_spell(self):
@@ -2093,7 +2105,11 @@ class Game:
             return ["weapons", "armors", "general"]
         if key == "icon":
             from src import data_registry as DR
-            return DR.all_item_icons()
+            # Procedural icons always available, plus any manifest
+            # sprites the user has tagged with the "items" category
+            procedural = DR.all_item_icons()
+            tagged = DR.sprites_for_category("items")
+            return procedural + tagged
         if key in ("ranged", "melee", "throwable", "usable",
                    "stackable", "party_can_equip",
                    "character_can_equip"):
@@ -2270,7 +2286,8 @@ class Game:
         """Return choice options for a monster field."""
         if key == "tile":
             from src import data_registry as DR
-            return DR.all_monster_tiles()
+            # All sprites tagged with the "monsters" category
+            return DR.sprites_for_category("monsters")
         if key in ("undead", "humanoid"):
             return ["True", "False"]
         if key == "terrain":
@@ -2429,7 +2446,15 @@ class Game:
         """Return choice options for a tile field."""
         if key == "_sprite":
             from src import data_registry as DR
-            return DR.all_tile_sprite_paths()
+            # Combine sprites from all terrain-related categories
+            seen = set()
+            result = []
+            for cat in ("overworld", "town", "dungeon"):
+                for s in DR.sprites_for_category(cat):
+                    if s not in seen:
+                        seen.add(s)
+                        result.append(s)
+            return sorted(result)
         if key == "walkable":
             return ["True", "False"]
         return []
@@ -2462,34 +2487,160 @@ class Game:
     # ── Tile Gallery (read-only) ───────────────────────────────
     # ══════════════════════════════════════════════════════════
 
+    # Mapping from a sprite's source category to the set of categories
+    # it can be assigned to.  Terrain sprites work across overworld,
+    # town, and dungeon; character/NPC sprites are interchangeable; etc.
+    _GALLERY_USABLE_MAP = {
+        "overworld":    ["overworld", "town", "dungeon"],
+        "town":         ["overworld", "town", "dungeon"],
+        "dungeon":      ["overworld", "town", "dungeon"],
+        "characters":   ["characters", "npcs", "monsters"],
+        "npcs":         ["characters", "npcs", "monsters"],
+        "monsters":     ["characters", "npcs", "monsters"],
+        "objects":      ["overworld", "town", "dungeon", "objects"],
+        "unique_tiles": ["overworld", "town", "dungeon",
+                         "unique_tiles", "objects"],
+    }
+
     def _feat_load_gallery(self):
-        """Load all manifest sprites into a flat list for browsing."""
+        """Load all manifest sprites into a flat list for browsing.
+
+        Each entry includes a ``usable_in`` list — the categories this
+        sprite can be assigned to.  Computed from the source category
+        plus any additional categories the same asset file appears in.
+        """
         import json
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                            "data", "tile_manifest.json")
+        from collections import defaultdict
+
+        mpath = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                             "data", "tile_manifest.json")
         try:
-            with open(path, "r") as f:
+            with open(mpath, "r") as f:
                 manifest = json.load(f)
         except (OSError, ValueError):
             manifest = {}
+
+        # Build reverse map: asset path → set of categories it appears in
+        path_cats = defaultdict(set)
+        all_cats = ("overworld", "town", "dungeon", "characters",
+                    "npcs", "monsters", "objects", "unique_tiles")
+        for cat in all_cats:
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            for entry in section.values():
+                if isinstance(entry, dict) and "path" in entry:
+                    path_cats[entry["path"]].add(cat)
+
         entries = []
-        for cat in ("overworld", "town", "dungeon", "characters",
-                     "npcs", "monsters", "objects", "unique_tiles"):
+        for cat in all_cats:
             section = manifest.get(cat, {})
             if not isinstance(section, dict):
                 continue
             for name in sorted(section.keys()):
                 entry = section[name]
-                if isinstance(entry, dict) and "path" in entry:
-                    entries.append({
-                        "category": cat,
-                        "name": name,
-                        "path": entry["path"],
-                        "tile_id": entry.get("tile_id"),
-                    })
+                if not (isinstance(entry, dict) and "path" in entry):
+                    continue
+                # Use persisted usable_in if it exists in the manifest,
+                # otherwise compute from the default map + cross-refs
+                if "usable_in" in entry:
+                    usable = set(entry["usable_in"])
+                else:
+                    usable = set(self._GALLERY_USABLE_MAP.get(
+                        cat, [cat]))
+                    usable |= path_cats.get(entry["path"], set())
+                entries.append({
+                    "category": cat,
+                    "name": name,
+                    "path": entry["path"],
+                    "tile_id": entry.get("tile_id"),
+                    "usable_in": sorted(usable),
+                })
         self._feat_gallery_list = entries
-        self._feat_gallery_cursor = 0
-        self._feat_gallery_scroll = 0
+        self._feat_gallery_cat_cursor = 0
+        self._feat_gallery_cat_scroll = 0
+        self._feat_rebuild_gallery_cats()
+
+    def _feat_rebuild_gallery_cats(self):
+        """Rebuild the category folder list with sprite counts."""
+        cats = []
+        for cat in self._feat_gallery_all_cats:
+            count = sum(1 for e in self._feat_gallery_list
+                        if cat in e.get("usable_in", []))
+            cats.append({"name": cat, "label": cat.replace("_", " ").title(),
+                         "count": count})
+        self._feat_gallery_cat_list = cats
+
+    def _feat_gallery_enter_cat(self):
+        """Enter the selected category folder — build sprite list."""
+        if self._feat_gallery_cat_cursor >= len(self._feat_gallery_cat_list):
+            return
+        cat = self._feat_gallery_cat_list[
+            self._feat_gallery_cat_cursor]["name"]
+        sprites = []
+        for gi, entry in enumerate(self._feat_gallery_list):
+            if cat in entry.get("usable_in", []):
+                sprites.append(gi)
+        self._feat_gallery_sprites = sprites
+        self._feat_gallery_spr_cursor = 0
+        self._feat_gallery_spr_scroll = 0
+
+    def _feat_save_gallery(self):
+        """Persist usable_in changes back to tile_manifest.json.
+
+        For each gallery entry, if the user added or removed a category
+        from usable_in, we store the custom list in a ``_usable_in``
+        key inside the manifest entry so it survives reloads.
+        """
+        import json
+        mpath = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                             "data", "tile_manifest.json")
+        try:
+            with open(mpath, "r") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            return False
+
+        for entry in self._feat_gallery_list:
+            cat = entry["category"]
+            name = entry["name"]
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            mentry = section.get(name)
+            if isinstance(mentry, dict):
+                mentry["usable_in"] = entry.get("usable_in", [])
+
+        try:
+            with open(mpath, "w") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError:
+            return False
+        return True
+
+    def _feat_gallery_cur_gi(self):
+        """Return gallery_list index for the currently selected sprite."""
+        sprites = self._feat_gallery_sprites
+        c = self._feat_gallery_spr_cursor
+        if 0 <= c < len(sprites):
+            return sprites[c]
+        return None
+
+    def _feat_gallery_toggle_tag(self):
+        """Toggle the currently highlighted category tag on/off."""
+        gi = self._feat_gallery_cur_gi()
+        if gi is None:
+            return
+        entry = self._feat_gallery_list[gi]
+        usable = entry.get("usable_in", [])
+        tag = self._feat_gallery_all_cats[self._feat_gallery_tag_cursor]
+        if tag in usable:
+            if tag != entry["category"]:
+                usable.remove(tag)
+        else:
+            usable.append(tag)
+            usable.sort()
+        entry["usable_in"] = usable
 
     # ══════════════════════════════════════════════════════════
     # ── Generic editor helpers (shared across all editors) ─────
@@ -5103,27 +5254,81 @@ class Game:
                     ctx["set_buffer"](buf + event.unicode)
             return
 
-        # ── Level 1: gallery (read-only) ──
-        if self._feat_level == 1 and ed == "gallery":
-            n = len(self._feat_gallery_list)
+        # ── Level 3: gallery tag editing ──
+        if self._feat_level == 3 and ed == "gallery":
+            n_tags = len(self._feat_gallery_all_cats)
             if event.key == pygame.K_ESCAPE:
+                self._feat_save_gallery()
+                self._feat_level = 2
+                # Rebuild category sprite list since tags may changed
+                self._feat_rebuild_gallery_cats()
+                self._feat_gallery_enter_cat()
+                return
+            if event.key == pygame.K_UP:
+                self._feat_gallery_tag_cursor = (
+                    self._feat_gallery_tag_cursor - 1) % n_tags
+            elif event.key == pygame.K_DOWN:
+                self._feat_gallery_tag_cursor = (
+                    self._feat_gallery_tag_cursor + 1) % n_tags
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE,
+                               pygame.K_LEFT, pygame.K_RIGHT):
+                self._feat_gallery_toggle_tag()
+            return
+
+        # ── Level 2: gallery sprite list ──
+        if self._feat_level == 2 and ed == "gallery":
+            n = len(self._feat_gallery_sprites)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_gallery()
+                self._feat_rebuild_gallery_cats()
+                self._feat_level = 1
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_gallery_spr_cursor = (
+                    self._feat_gallery_spr_cursor - 1) % n
+                self._feat_gallery_spr_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_gallery_spr_cursor,
+                        self._feat_gallery_spr_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_gallery_spr_cursor = (
+                    self._feat_gallery_spr_cursor + 1) % n
+                self._feat_gallery_spr_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_gallery_spr_cursor,
+                        self._feat_gallery_spr_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self._feat_gallery_tag_cursor = 0
+                    self._feat_level = 3
+            return
+
+        # ── Level 1: gallery category folders ──
+        if self._feat_level == 1 and ed == "gallery":
+            n = len(self._feat_gallery_cat_list)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_gallery()
                 self._feat_level = 0
                 self._feat_active_editor = None
                 return
             if event.key == pygame.K_UP and n > 0:
-                self._feat_gallery_cursor = (
-                    self._feat_gallery_cursor - 1) % n
-                self._feat_gallery_scroll = \
+                self._feat_gallery_cat_cursor = (
+                    self._feat_gallery_cat_cursor - 1) % n
+                self._feat_gallery_cat_scroll = \
                     self._feat_adjust_scroll_generic(
-                        self._feat_gallery_cursor,
-                        self._feat_gallery_scroll)
+                        self._feat_gallery_cat_cursor,
+                        self._feat_gallery_cat_scroll)
             elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_gallery_cursor = (
-                    self._feat_gallery_cursor + 1) % n
-                self._feat_gallery_scroll = \
+                self._feat_gallery_cat_cursor = (
+                    self._feat_gallery_cat_cursor + 1) % n
+                self._feat_gallery_cat_scroll = \
                     self._feat_adjust_scroll_generic(
-                        self._feat_gallery_cursor,
-                        self._feat_gallery_scroll)
+                        self._feat_gallery_cat_cursor,
+                        self._feat_gallery_cat_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self._feat_gallery_enter_cat()
+                    self._feat_level = 2
             return
 
         # ── Level 1: list browser ──
@@ -5568,8 +5773,14 @@ class Game:
                     tile_buffer=self._feat_tile_buffer,
                     tile_field_scroll=self._feat_tile_scroll_f,
                     gallery_list=self._feat_gallery_list,
-                    gallery_cursor=self._feat_gallery_cursor,
-                    gallery_scroll=self._feat_gallery_scroll,
+                    gallery_cat_list=self._feat_gallery_cat_list,
+                    gallery_cat_cursor=self._feat_gallery_cat_cursor,
+                    gallery_cat_scroll=self._feat_gallery_cat_scroll,
+                    gallery_sprites=self._feat_gallery_sprites,
+                    gallery_spr_cursor=self._feat_gallery_spr_cursor,
+                    gallery_spr_scroll=self._feat_gallery_spr_scroll,
+                    gallery_tag_cursor=self._feat_gallery_tag_cursor,
+                    gallery_all_cats=self._feat_gallery_all_cats,
                 )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(

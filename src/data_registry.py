@@ -269,6 +269,35 @@ def all_overworld_tile_names():
                   if isinstance(v, dict) and "path" in v)
 
 
+def sprites_for_category(category):
+    """Return sorted list of ``category/name`` keys for every manifest
+    sprite whose ``usable_in`` list includes *category*.
+
+    This is the main entry point used by the editors' sprite pickers:
+    each editor passes the category relevant to its context (e.g.
+    ``"monsters"``, ``"spells"``, ``"items"``) and receives back only
+    the sprites the user has tagged as usable in that context.
+    """
+    try:
+        data = _load("tile_manifest.json")
+    except (OSError, ValueError):
+        return []
+    results = []
+    for cat in sorted(data.keys()):
+        if cat.startswith("_"):
+            continue
+        section = data.get(cat, {})
+        if not isinstance(section, dict):
+            continue
+        for name, entry in sorted(section.items()):
+            if not (isinstance(entry, dict) and "path" in entry):
+                continue
+            usable = entry.get("usable_in", [])
+            if category in usable:
+                results.append(f"{cat}/{name}")
+    return results
+
+
 def all_tile_sprite_paths():
     """Return sorted list of all tile sprite paths from the manifest.
 

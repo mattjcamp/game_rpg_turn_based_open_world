@@ -8,7 +8,7 @@
         "left_hand"
       ],
       "description": "A single-headed battle axe. Reliable and brutal.",
-      "icon": "axe",
+      "icon": "tool",
       "item_type": "axe",
       "buy": 80,
       "sell": 40,
@@ -105,10 +105,14 @@
         "left_hand"
       ],
       "description": "Sturdy leather gloves. A slight edge over bare fists.",
-      "icon": "gloves",
+      "icon": "tool",
       "item_type": "gloves",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "melee": false,
+      "throwable": false,
+      "buy": 0,
+      "sell": 0
     },
     "Halberd": {
       "power": 9,
@@ -425,7 +429,7 @@
     },
     "Camping Supplies": {
       "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
-      "icon": "tool",
+      "icon": "town/altar",
       "item_type": "camping_supplies",
       "usable": true,
       "effect": "rest",
@@ -434,7 +438,8 @@
       "buy": 25,
       "sell": 12,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "stackable": false
     },
     "Crystal Key": {
       "description": "A translucent key carved from a single crystal, humming with magical energy. One of the 8 Keys of Shadow.",

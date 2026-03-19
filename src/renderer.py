@@ -7145,8 +7145,15 @@ class Renderer(CombatEffectRendererMixin):
                               tile_scroll=0, tile_editing=False,
                               tile_fields=None, tile_field=0,
                               tile_buffer="", tile_field_scroll=0,
-                              gallery_list=None, gallery_cursor=0,
-                              gallery_scroll=0):
+                              gallery_list=None,
+                              gallery_cat_list=None,
+                              gallery_cat_cursor=0,
+                              gallery_cat_scroll=0,
+                              gallery_sprites=None,
+                              gallery_spr_cursor=0,
+                              gallery_spr_scroll=0,
+                              gallery_tag_cursor=0,
+                              gallery_all_cats=None):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7355,9 +7362,15 @@ class Renderer(CombatEffectRendererMixin):
             elif ed == "gallery":
                 self._draw_features_gallery(
                     left_x, left_w, right_x, right_w,
-                    panel_y, panel_h,
-                    gallery_list or [], gallery_cursor,
-                    gallery_scroll, fm, fs, f)
+                    panel_y, panel_h, level,
+                    gallery_list or [],
+                    gallery_cat_list or [],
+                    gallery_cat_cursor, gallery_cat_scroll,
+                    gallery_sprites or [],
+                    gallery_spr_cursor, gallery_spr_scroll,
+                    gallery_tag_cursor,
+                    gallery_all_cats or [],
+                    fm, fs, f)
 
     def _draw_features_spell_list(self, left_x, left_w, right_x,
                                    right_w, panel_y, panel_h,
@@ -7754,114 +7767,158 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(hint, rx + 8, footer_y + 5, self._U3_HINT, fs)
 
     def _draw_features_gallery(self, left_x, left_w, right_x,
-                                right_w, panel_y, panel_h,
-                                gallery, cursor, scroll,
+                                right_w, panel_y, panel_h, level,
+                                gallery, cat_list,
+                                cat_cursor, cat_scroll,
+                                sprites, spr_cursor, spr_scroll,
+                                tag_cursor, all_cats,
                                 fm, fs, f):
-        """Draw the tile gallery: all manifest sprites with their keys."""
-        # ── Left panel: list grouped by category ──
-        self._u3_text("Tile Gallery", left_x + 12, panel_y + 8,
-                       self._U3_ORANGE, fs)
-        row_h = 36
+        """Draw the 3-level tile gallery.
+
+        Level 1: category folders  Level 2: sprite list  Level 3: tag editor
+        """
+        tag_colors = {
+            "overworld": (50, 120, 50), "town": (140, 110, 50),
+            "dungeon": (90, 60, 100), "characters": (50, 90, 140),
+            "npcs": (60, 120, 120), "monsters": (140, 50, 50),
+            "objects": (100, 100, 60), "unique_tiles": (120, 80, 120),
+            "items": (160, 130, 40), "spells": (80, 60, 160),
+        }
+        row_h = 34
         ly = panel_y + 30
         max_visible = (panel_h - 40) // row_h
 
-        # Build display rows with category headers
-        display_rows = []
-        prev_cat = None
-        for gi, entry in enumerate(gallery):
-            cat = entry.get("category", "")
-            if cat != prev_cat:
-                display_rows.append(("header", None, cat.title()))
-                prev_cat = cat
-            display_rows.append(("entry", gi, None))
+        # ── Level 1: category folders ──
+        if level == 1:
+            self._u3_text("Tile Gallery", left_x + 12,
+                          panel_y + 8, self._U3_ORANGE, fs)
+            dscroll = cat_scroll
+            if cat_cursor < dscroll:
+                dscroll = cat_cursor
+            if cat_cursor >= dscroll + max_visible:
+                dscroll = cat_cursor - max_visible + 1
 
-        # Find cursor display row
-        cursor_drow = 0
-        for di, (rtype, gi, _) in enumerate(display_rows):
-            if rtype == "entry" and gi == cursor:
-                cursor_drow = di
-                break
-
-        # Adjust scroll
-        dscroll = scroll
-        if cursor_drow < dscroll:
-            dscroll = cursor_drow
-        if cursor_drow >= dscroll + max_visible:
-            dscroll = cursor_drow - max_visible + 1
-
-        header_h = 28
-        dy = ly
-        for di in range(dscroll, min(dscroll + max_visible,
-                                     len(display_rows))):
-            rtype, gi, label = display_rows[di]
-            if rtype == "header":
-                pygame.draw.line(self.screen, (80, 70, 60),
-                                 (left_x + 10, dy + header_h - 2),
-                                 (left_x + left_w - 10,
-                                  dy + header_h - 2), 1)
-                self._u3_text(label or "", left_x + 12, dy,
-                               self._U3_ORANGE, fs)
-                dy += header_h
-            else:
-                entry = gallery[gi]
-                selected = (gi == cursor)
+            dy = ly
+            for ci in range(dscroll, min(dscroll + max_visible,
+                                         len(cat_list))):
+                cat = cat_list[ci]
+                selected = (ci == cat_cursor)
                 if selected:
-                    bar = pygame.Surface((left_w - 4, row_h - 4),
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
                                          pygame.SRCALPHA)
                     bar.fill((255, 200, 60, 30))
                     self.screen.blit(bar, (left_x + 2, dy - 1))
-
-                # Inline sprite (24px)
-                icon_size = 24
-                sprite = self._manifest.get_sprite_by_name(
-                    entry["category"], entry["name"], icon_size)
-                text_x = left_x + 10
-                if sprite:
-                    self.screen.blit(sprite,
-                                     (left_x + 8, dy + 4))
-                    text_x = left_x + 8 + icon_size + 6
-
                 prefix = "> " if selected else "  "
-                name = entry["name"]
                 nc = self._U3_WHITE if selected else (180, 180, 180)
-                max_tw = left_w - (text_x - left_x) - 12
-                disp = f"{prefix}{name}"
-                while len(disp) > 4 and fm.size(disp)[0] > max_tw:
-                    disp = disp[:-1]
-                self._u3_text(disp, text_x, dy + 2, nc, fm)
-
-                # Subtitle: category
+                label = cat["label"]
+                self._u3_text(f"{prefix}{label}",
+                              left_x + 10, dy + 4, nc, fm)
+                # Sprite count on the right
+                cnt = str(cat["count"])
+                cw = fs.size(cnt)[0]
                 sc = (140, 180, 140) if selected else (120, 120, 140)
-                self._u3_text(entry["category"],
-                              text_x + 16, dy + 20, sc, fs)
+                self._u3_text(cnt, left_x + left_w - cw - 12,
+                              dy + 6, sc, fs)
                 dy += row_h
+
+            # Right panel: description of selected category
+            if 0 <= cat_cursor < len(cat_list):
+                cat = cat_list[cat_cursor]
+                dy = panel_y + 12
+                self._u3_text(cat["label"], right_x + 16, dy,
+                              self._U3_WHITE, f)
+                dy += 28
+                bg_c = tag_colors.get(cat["name"], (80, 80, 80))
+                pill_w = fs.size(cat["name"])[0] + 12
+                pill = pygame.Surface((pill_w, 18), pygame.SRCALPHA)
+                pill.fill((*bg_c, 200))
+                self.screen.blit(pill, (right_x + 16, dy))
+                pygame.draw.rect(self.screen,
+                                 (min(bg_c[0]+40, 255),
+                                  min(bg_c[1]+40, 255),
+                                  min(bg_c[2]+40, 255)),
+                                 (right_x + 16, dy, pill_w, 18), 1)
+                self._u3_text(cat["name"], right_x + 22, dy + 1,
+                              self._U3_WHITE, fs)
+                dy += 30
+                self._u3_text(f"{cat['count']} graphic tiles",
+                              right_x + 16, dy, (180, 180, 200), fm)
+
+            hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
+            hw = fs.size(hint)[0]
+            self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
+                          SCREEN_HEIGHT - 45, self._U3_HINT, fs)
+            return
+
+        # ── Level 2 & 3: sprite list + optional tag editor ──
+        # Left panel: sprite list for selected category
+        cat_name = ""
+        if 0 <= cat_cursor < len(cat_list):
+            cat_name = cat_list[cat_cursor]["label"]
+        self._u3_text(cat_name, left_x + 12, panel_y + 8,
+                       self._U3_ORANGE, fs)
+
+        dscroll = spr_scroll
+        if spr_cursor < dscroll:
+            dscroll = spr_cursor
+        if spr_cursor >= dscroll + max_visible:
+            dscroll = spr_cursor - max_visible + 1
+
+        dy = ly
+        for si in range(dscroll, min(dscroll + max_visible,
+                                     len(sprites))):
+            gi = sprites[si]
+            entry = gallery[gi]
+            selected = (si == spr_cursor)
+            if selected:
+                bar = pygame.Surface((left_w - 4, row_h - 2),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (left_x + 2, dy - 1))
+
+            icon_size = 24
+            sprite = self._manifest.get_sprite_by_name(
+                entry["category"], entry["name"], icon_size)
+            text_x = left_x + 10
+            if sprite:
+                self.screen.blit(sprite, (left_x + 8, dy + 3))
+                text_x = left_x + 8 + icon_size + 6
+
+            prefix = "> " if selected else "  "
+            nc = self._U3_WHITE if selected else (180, 180, 180)
+            name = entry["name"]
+            max_tw = left_w - (text_x - left_x) - 12
+            disp_name = f"{prefix}{name}"
+            while len(disp_name) > 4 and fm.size(disp_name)[0] > max_tw:
+                disp_name = disp_name[:-1]
+            self._u3_text(disp_name, text_x, dy + 5, nc, fm)
+            dy += row_h
 
         # Scroll indicators
         if dscroll > 0:
             self._u3_text("^", left_x + left_w // 2 - 4,
                            ly - 8, (180, 180, 200), fs)
-        if dscroll + max_visible < len(display_rows):
+        if dscroll + max_visible < len(sprites):
             self._u3_text("v", left_x + left_w // 2 - 4,
                            ly + max_visible * row_h - 4,
                            (180, 180, 200), fs)
 
-        # ── Right panel: large preview of selected sprite ──
-        if 0 <= cursor < len(gallery):
-            entry = gallery[cursor]
+        # ── Right panel: sprite detail ──
+        gi = sprites[spr_cursor] if 0 <= spr_cursor < len(sprites) \
+            else None
+        if gi is not None and 0 <= gi < len(gallery):
+            entry = gallery[gi]
             dy = panel_y + 12
 
-            # Title: category/name
             key = f"{entry['category']}/{entry['name']}"
             self._u3_text(key, right_x + 16, dy,
                            self._U3_WHITE, f)
             dy += 28
 
-            # Large sprite preview (96px)
             preview_sz = 96
-            sprite = self._manifest.get_sprite_by_name(
+            spr = self._manifest.get_sprite_by_name(
                 entry["category"], entry["name"], preview_sz)
-            if sprite:
-                # Centered in right panel
+            if spr:
                 sx = right_x + (right_w - preview_sz) // 2
                 sy = dy + 4
                 bg = pygame.Surface(
@@ -7869,7 +7926,7 @@ class Renderer(CombatEffectRendererMixin):
                     pygame.SRCALPHA)
                 bg.fill((0, 0, 0, 180))
                 self.screen.blit(bg, (sx - 4, sy - 4))
-                self.screen.blit(sprite, (sx, sy))
+                self.screen.blit(spr, (sx, sy))
                 pygame.draw.rect(self.screen, (80, 70, 50),
                                  (sx - 4, sy - 4,
                                   preview_sz + 8,
@@ -7878,84 +7935,151 @@ class Renderer(CombatEffectRendererMixin):
             else:
                 dy += 8
 
-            # Info lines
             pygame.draw.line(self.screen, (60, 50, 40),
                              (right_x + 12, dy),
                              (right_x + right_w - 12, dy), 1)
             dy += 12
 
-            self._u3_text(f"Category: {entry['category']}",
+            self._u3_text(f"Source: {entry['category']}",
                           right_x + 16, dy, (180, 180, 200), fm)
             dy += 22
-
-            self._u3_text(f"Name: {entry['name']}",
-                          right_x + 16, dy, (180, 180, 200), fm)
-            dy += 22
-
-            # Show asset file path
             path = entry.get("path", "")
             if path:
-                # Show just the filename portion for readability
-                short = path.rsplit("/", 1)[-1] if "/" in path else path
+                short = path.rsplit("/", 1)[-1] if "/" in path \
+                    else path
                 self._u3_text(f"File: {short}",
-                              right_x + 16, dy, (140, 140, 160), fs)
+                              right_x + 16, dy,
+                              (140, 140, 160), fs)
                 dy += 18
-
             tile_id = entry.get("tile_id")
             if tile_id is not None:
                 self._u3_text(f"Tile ID: {tile_id}",
-                              right_x + 16, dy, (140, 140, 160), fs)
+                              right_x + 16, dy,
+                              (140, 140, 160), fs)
                 dy += 18
 
+            # ── Usable-in tags / tag editor ──
+            usable = entry.get("usable_in", [])
+            dy += 6
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (right_x + 12, dy),
+                             (right_x + right_w - 12, dy), 1)
+            dy += 10
+
+            if level == 3:
+                # Interactive tag editor
+                self._u3_text("Edit categories:",
+                              right_x + 16, dy,
+                              self._U3_ORANGE, fm)
+                dy += 24
+                src_cat = entry.get("category", "")
+                for ci, cat in enumerate(all_cats):
+                    is_on = cat in usable
+                    is_sel = (ci == tag_cursor)
+                    is_src = (cat == src_cat)
+                    rw = right_w - 32
+                    if is_sel:
+                        sb = pygame.Surface((rw, 22),
+                                            pygame.SRCALPHA)
+                        sb.fill((255, 200, 60, 30))
+                        self.screen.blit(sb,
+                                         (right_x + 14, dy - 2))
+                    chk = "[x]" if is_on else "[ ]"
+                    cc = (self._U3_WHITE if is_sel
+                          else (180, 180, 200))
+                    self._u3_text(chk, right_x + 18, dy, cc, fm)
+                    bg_c = tag_colors.get(cat, (80, 80, 80))
+                    tw = fs.size(cat)[0]
+                    pw = tw + 12
+                    px = right_x + 56
+                    pill = pygame.Surface((pw, 18),
+                                          pygame.SRCALPHA)
+                    pill.fill((*bg_c, 200 if is_on else 80))
+                    self.screen.blit(pill, (px, dy))
+                    bc = (min(bg_c[0]+40, 255),
+                          min(bg_c[1]+40, 255),
+                          min(bg_c[2]+40, 255))
+                    pygame.draw.rect(self.screen, bc,
+                                     (px, dy, pw, 18), 1)
+                    tc = (self._U3_WHITE if is_on
+                          else (120, 120, 120))
+                    self._u3_text(cat, px + 6, dy + 1, tc, fs)
+                    if is_src:
+                        self._u3_text("(source)",
+                                      px + pw + 8, dy + 1,
+                                      (140, 140, 160), fs)
+                    dy += 26
+            else:
+                # Read-only pill tags
+                self._u3_text("Usable in:", right_x + 16, dy,
+                              (180, 180, 200), fm)
+                dy += 22
+                tag_x = right_x + 16
+                for tag in usable:
+                    tw = fs.size(tag)[0]
+                    pw = tw + 12
+                    if tag_x + pw > right_x + right_w - 16:
+                        tag_x = right_x + 16
+                        dy += 22
+                    bg_c = tag_colors.get(tag, (80, 80, 80))
+                    pill = pygame.Surface((pw, 18),
+                                          pygame.SRCALPHA)
+                    pill.fill((*bg_c, 200))
+                    self.screen.blit(pill, (tag_x, dy))
+                    bc = (min(bg_c[0]+40, 255),
+                          min(bg_c[1]+40, 255),
+                          min(bg_c[2]+40, 255))
+                    pygame.draw.rect(self.screen, bc,
+                                     (tag_x, dy, pw, 18), 1)
+                    self._u3_text(tag, tag_x + 6, dy + 1,
+                                  self._U3_WHITE, fs)
+                    tag_x += pw + 6
+
         # Footer
-        self._u3_text(
-            "[Up/Dn] Browse  [Esc] Back",
-            SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 45,
-            self._U3_HINT, fs)
+        if level == 3:
+            hint = "[Up/Dn] Select  [Enter] Toggle  [Esc] Done"
+        else:
+            hint = ("[Up/Dn] Browse  [Enter] Edit Tags  "
+                    "[Esc] Back")
+        hw = fs.size(hint)[0]
+        self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
+                      SCREEN_HEIGHT - 45, self._U3_HINT, fs)
 
     def _feat_resolve_sprite_field(self, field_key, value, size=32):
         """Resolve a sprite for a 'sprite'-type field in the editor.
 
-        - field_key='tile' + value='game/monsters/orc.png' → monster sprite
-        - field_key='icon' + value='sword' (items) → None (procedural)
-        - field_key='icon' + value='unique_tiles/moongate' (spells) →
-          manifest sprite if category/name, else None for procedural
-        - field_key='_sprite' + value='overworld/grass' → tile manifest sprite
+        Values may be in ``category/name`` format (e.g.
+        ``"monsters/orc"``) or legacy file paths (e.g.
+        ``"game/monsters/orc.png"``).  Both are handled.
         """
         if not value:
             return None
 
+        # ── Generic: try category/name manifest lookup first ──
+        # This covers all editors since sprites_for_category() returns
+        # "category/name" keys.
+        if "/" in value:
+            cat, name = value.split("/", 1)
+            # Strip .png suffix from legacy paths
+            name = name.replace(".png", "")
+            s = self._manifest.get_sprite_by_name(cat, name, size)
+            if s:
+                return s
+
+        # ── Field-specific fallbacks ──
         if field_key == "tile":
-            # Monster tile path → look up in _monster_tiles
+            # Legacy monster tile path (game/monsters/orc.png)
             sprite = self._monster_tiles.get(value)
             if sprite:
                 w, h = sprite.get_size()
                 if w != size or h != size:
-                    return pygame.transform.scale(sprite, (size, size))
+                    return pygame.transform.scale(
+                        sprite, (size, size))
                 return sprite
-            # Try manifest by extracted name
-            name = value.rsplit("/", 1)[-1].replace(".png", "")
-            s = self._manifest.get_sprite_by_name("monsters", name, size)
-            if s:
-                return s
-
-        elif field_key == "_sprite":
-            # Tile type sprite — value is "category/name"
-            if "/" in value:
-                cat, name = value.split("/", 1)
-                s = self._manifest.get_sprite_by_name(cat, name, size)
-                if s:
-                    return s
 
         elif field_key == "icon":
-            # Spell or item icon — try manifest "category/name" first
-            if "/" in value:
-                cat, name = value.split("/", 1)
-                s = self._manifest.get_sprite_by_name(cat, name, size)
-                if s:
-                    return s
-            # For plain item icon names (sword, herb, etc.)
-            # return None so caller draws procedural icon
+            # Plain item icon names (sword, herb, etc.) are procedural
+            # — return None so caller uses _draw_item_icon
             return None
 
         return None
@@ -7970,6 +8094,14 @@ class Renderer(CombatEffectRendererMixin):
         # Monster — look up by "tile" field
         tile_file = item.get("tile", "")
         if tile_file and "hp" in item:
+            # Try category/name format first (e.g. "monsters/orc")
+            if "/" in tile_file:
+                cat, name = tile_file.split("/", 1)
+                name = name.replace(".png", "")
+                s = self._manifest.get_sprite_by_name(cat, name, size)
+                if s:
+                    return s
+            # Try legacy path lookup in _monster_tiles cache
             sprite = self._monster_tiles.get(tile_file)
             if sprite:
                 w, h = sprite.get_size()
@@ -8002,7 +8134,15 @@ class Renderer(CombatEffectRendererMixin):
                 return surf
             return None
 
-        # Items — no sprite (caller should use _draw_item_icon)
+        # Items — check if icon is a manifest "category/name" reference
+        icon = item.get("icon", "")
+        if icon and "/" in icon:
+            cat, name = icon.split("/", 1)
+            s = self._manifest.get_sprite_by_name(cat, name, size)
+            if s:
+                return s
+
+        # Plain icon names (sword, herb, etc.) → caller uses _draw_item_icon
         return None
 
     def _draw_features_generic_list(self, left_x, left_w, right_x,
@@ -12141,7 +12281,22 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_item_icon(self, cx, cy, icon_type, size=64, tint=None):
         """Draw a pixel-art icon for an item type, centered at (cx, cy).
-        Optional *tint* overrides the primary colour for potion/herb icons."""
+        Optional *tint* overrides the primary colour for potion/herb icons.
+
+        If *icon_type* is a manifest ``category/name`` reference
+        (e.g. ``"town/altar"``), the manifest sprite is drawn instead
+        of a procedural icon.
+        """
+        # ── Manifest sprite shortcut ──
+        if icon_type and "/" in icon_type:
+            cat, name = icon_type.split("/", 1)
+            sprite = self._manifest.get_sprite_by_name(
+                cat, name, size)
+            if sprite:
+                self.screen.blit(sprite,
+                                 (cx - size // 2, cy - size // 2))
+                return
+
         s = size
         hs = s // 2
         x0 = cx - hs
