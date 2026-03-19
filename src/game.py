@@ -5378,7 +5378,8 @@ class Game:
         ctx = self._feat_editor_ctx()
 
         # ── Level 2: editing individual fields ──
-        if self._feat_level == 2 and ctx:
+        # (tiles and gallery use level 2 for browsing, not field editing)
+        if self._feat_level == 2 and ctx and ed not in ("tiles", "gallery"):
             if event.key == pygame.K_ESCAPE or (
                     event.key == pygame.K_s
                     and event.mod & pygame.KMOD_CTRL):
@@ -5765,7 +5766,8 @@ class Game:
             return
 
         # ── Level 1: list browser ──
-        if self._feat_level == 1 and ctx:
+        # (tiles and gallery have their own level-1 handlers above)
+        if self._feat_level == 1 and ctx and ed not in ("tiles", "gallery"):
             lst = ctx["list"]()
             n = len(lst)
             if event.key == pygame.K_ESCAPE:
