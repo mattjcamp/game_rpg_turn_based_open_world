@@ -8090,7 +8090,18 @@ class Renderer(CombatEffectRendererMixin):
         self.screen = surf
 
         try:
-            if category == "dungeon" and tile_id is not None:
+            if category == "items":
+                # Procedural item icon — render via _draw_item_icon
+                self.screen = old_screen
+                icon_surf = pygame.Surface((size, size), pygame.SRCALPHA)
+                icon_surf.fill((20, 15, 30, 255))
+                old2 = self.screen
+                self.screen = icon_surf
+                self._draw_item_icon(
+                    size // 2, size // 2, name, size - 8)
+                self.screen = old2
+                return icon_surf
+            elif category == "dungeon" and tile_id is not None:
                 palette = self._get_dungeon_palette(0)
                 self._u3_draw_dungeon_tile(
                     tile_id, 0, 0, ts, 5, 5, palette=palette)

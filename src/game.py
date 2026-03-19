@@ -2572,6 +2572,23 @@ class Game:
                     "usable_in": sorted(usable),
                     "rendering": rendering,
                 })
+        # Add procedural item icons as gallery entries under "items"
+        from src import data_registry as DR
+        for icon_name in DR.all_item_icons():
+            # Skip manifest references (category/name) — those are
+            # already in the gallery from the manifest scan above
+            if "/" in icon_name:
+                continue
+            entries.append({
+                "category": "items",
+                "name": icon_name,
+                "path": "(procedural)",
+                "tile_id": None,
+                "usable_in": ["items"],
+                "rendering": "procedural",
+                "_icon": icon_name,  # flag for preview renderer
+            })
+
         self._feat_gallery_list = entries
         self._feat_gallery_cat_cursor = 0
         self._feat_gallery_cat_scroll = 0

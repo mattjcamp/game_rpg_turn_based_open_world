@@ -429,7 +429,7 @@
     },
     "Camping Supplies": {
       "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
-      "icon": "town/altar",
+      "icon": "tool",
       "item_type": "camping_supplies",
       "usable": true,
       "effect": "rest",
