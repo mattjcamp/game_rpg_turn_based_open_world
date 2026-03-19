@@ -6,90 +6,70 @@
       "path": "src/assets/game/terrain/grass.png",
       "tile_id": 0,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "water": {
       "path": "src/assets/game/terrain/water.png",
       "tile_id": 1,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "forest": {
       "path": "src/assets/game/terrain/forest.png",
       "tile_id": 2,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "mountain": {
       "path": "src/assets/game/terrain/mountain.png",
       "tile_id": 3,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "town": {
       "path": "src/assets/game/terrain/town.png",
       "tile_id": 4,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "dungeon": {
       "path": "src/assets/game/terrain/dungeon.png",
       "tile_id": 5,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "path": {
       "path": "src/assets/game/terrain/path.png",
       "tile_id": 6,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "sand": {
       "path": "src/assets/game/terrain/sand.png",
       "tile_id": 7,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "bridge": {
       "path": "src/assets/game/terrain/bridge.png",
       "tile_id": 8,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     },
     "dungeon_cleared": {
       "path": "src/assets/game/terrain/dungeon.png",
       "tile_id": 9,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "overworld"
       ]
     }
   },
@@ -98,8 +78,6 @@
       "path": "src/assets/game/terrain/grass.png",
       "tile_id": 10,
       "usable_in": [
-        "dungeon",
-        "overworld",
         "town"
       ]
     },
@@ -107,8 +85,6 @@
       "path": "src/assets/game/terrain/wall.png",
       "tile_id": 11,
       "usable_in": [
-        "dungeon",
-        "overworld",
         "town"
       ]
     },
@@ -116,8 +92,6 @@
       "path": "src/assets/game/terrain/counter.png",
       "tile_id": 12,
       "usable_in": [
-        "dungeon",
-        "overworld",
         "town"
       ]
     },
@@ -125,8 +99,6 @@
       "path": "src/assets/game/terrain/door.png",
       "tile_id": 13,
       "usable_in": [
-        "dungeon",
-        "overworld",
         "town"
       ]
     },
@@ -134,8 +106,6 @@
       "path": "src/assets/game/terrain/town.png",
       "tile_id": 14,
       "usable_in": [
-        "dungeon",
-        "overworld",
         "town"
       ]
     },
@@ -143,9 +113,6 @@
       "path": "src/assets/game/terrain/altar.png",
       "tile_id": 35,
       "usable_in": [
-        "dungeon",
-        "items",
-        "overworld",
         "town"
       ]
     }
@@ -155,135 +122,105 @@
       "path": "src/assets/game/dungeon/brick_floor.png",
       "tile_id": 20,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "dwall": {
       "path": "src/assets/game/dungeon/brick_wall.png",
       "tile_id": 21,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "stairs": {
       "path": "src/assets/game/dungeon/brick_floor.png",
       "tile_id": 22,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "chest": {
       "path": "src/assets/game/dungeon/chest_tile.png",
       "tile_id": 23,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "trap": {
       "path": "src/assets/game/dungeon/brick_floor.png",
       "tile_id": 24,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "stairs_down": {
       "path": "src/assets/game/dungeon/brick_floor.png",
       "tile_id": 25,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "ddoor": {
       "path": "src/assets/game/dungeon/locked_door.png",
       "tile_id": 26,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "artifact": {
       "path": "src/assets/game/dungeon/sparkle.png",
       "tile_id": 27,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "portal": {
       "path": "src/assets/game/dungeon/portal_open.png",
       "tile_id": 28,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "locked_door": {
       "path": "src/assets/game/dungeon/locked_door.png",
       "tile_id": 29,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "machine": {
       "path": "src/assets/game/dungeon/brick_floor.png",
       "tile_id": 30,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "keyslot": {
       "path": "src/assets/game/dungeon/brick_floor.png",
       "tile_id": 31,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "puddle": {
       "path": "src/assets/game/dungeon/shallow_water.png",
       "tile_id": 32,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "moss": {
       "path": "src/assets/game/dungeon/swamp.png",
       "tile_id": 33,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     },
     "wall_torch": {
       "path": "src/assets/game/dungeon/torch_post.png",
       "tile_id": 34,
       "usable_in": [
-        "dungeon",
-        "overworld",
-        "town"
+        "dungeon"
       ]
     }
   },
@@ -291,89 +228,67 @@
     "fighter": {
       "path": "src/assets/game/characters/fighter.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "cleric": {
       "path": "src/assets/game/characters/cleric.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "wizard": {
       "path": "src/assets/game/characters/wizard.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "thief": {
       "path": "src/assets/game/characters/thief.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "barbarian": {
       "path": "src/assets/game/characters/barbarian.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "alchemist": {
       "path": "src/assets/game/characters/alchemist.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "illusionist": {
       "path": "src/assets/game/characters/illusionist.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "druid": {
       "path": "src/assets/game/characters/druid.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "paladin": {
       "path": "src/assets/game/characters/paladin.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "ranger": {
       "path": "src/assets/game/characters/ranger.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     },
     "lark": {
       "path": "src/assets/game/characters/lark.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "characters"
       ]
     }
   },
@@ -381,72 +296,54 @@
     "shopkeep": {
       "path": "src/assets/game/npcs/shopkeep.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "innkeeper": {
       "path": "src/assets/game/npcs/innkeeper.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "elder": {
       "path": "src/assets/game/npcs/elder.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "villager_0": {
       "path": "src/assets/game/npcs/villager_citizen.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "villager_1": {
       "path": "src/assets/game/npcs/villager_shepherd.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "villager_2": {
       "path": "src/assets/game/npcs/villager_bard.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "villager_3": {
       "path": "src/assets/game/npcs/villager_guard.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "villager_4": {
       "path": "src/assets/game/npcs/villager_beggar.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     },
     "villager_5": {
       "path": "src/assets/game/npcs/villager_child.png",
       "usable_in": [
-        "characters",
-        "monsters",
         "npcs"
       ]
     }
@@ -455,65 +352,49 @@
     "giant_rat": {
       "path": "src/assets/game/monsters/giant_rat.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "skeleton": {
       "path": "src/assets/game/monsters/skeleton.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "orc": {
       "path": "src/assets/game/monsters/orc.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "goblin": {
       "path": "src/assets/game/monsters/goblin.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "zombie": {
       "path": "src/assets/game/monsters/zombie.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "wolf": {
       "path": "src/assets/game/monsters/wolf.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "dark_mage": {
       "path": "src/assets/game/monsters/dark_mage.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     },
     "troll": {
       "path": "src/assets/game/monsters/troll.png",
       "usable_in": [
-        "characters",
-        "monsters",
-        "npcs"
+        "monsters"
       ]
     }
   },
@@ -521,90 +402,54 @@
     "moongate": {
       "path": "src/assets/game/landmarks/moongate_active.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "moongate_dormant": {
       "path": "src/assets/game/landmarks/moongate_dormant.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "ruined_tower": {
       "path": "src/assets/game/landmarks/ruined_tower.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "sunken_shipwreck": {
       "path": "src/assets/game/landmarks/sunken_shipwreck.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "lava_vent": {
       "path": "src/assets/game/landmarks/lava_vent.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "smuggler_tunnel": {
       "path": "src/assets/game/landmarks/smuggler_tunnel.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "seal_of_binding": {
       "path": "src/assets/game/landmarks/moongate_active.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "poison_swamp": {
       "path": "src/assets/game/landmarks/poison_swamp.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     },
     "treasure_hoard": {
       "path": "src/assets/game/landmarks/treasure_hoard.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town",
         "unique_tiles"
       ]
     }
@@ -613,19 +458,13 @@
     "chest": {
       "path": "src/assets/game/items/chest.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town"
+        "objects"
       ]
     },
     "town_gate": {
       "path": "src/assets/game/items/town_gate.png",
       "usable_in": [
-        "dungeon",
-        "objects",
-        "overworld",
-        "town"
+        "objects"
       ]
     }
   }

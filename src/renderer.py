@@ -7316,7 +7316,7 @@ class Renderer(CombatEffectRendererMixin):
                 SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
                 self._U3_HINT, fs)
 
-        elif level in (1, 2):
+        elif level >= 1:
             # ── Draw the active editor's list + optional field overlay ──
             ed = active_editor
             if ed == "spells" or ed is None:
@@ -7877,8 +7877,9 @@ class Renderer(CombatEffectRendererMixin):
                 self.screen.blit(bar, (left_x + 2, dy - 1))
 
             icon_size = 24
-            sprite = self._manifest.get_sprite_by_name(
-                entry["category"], entry["name"], icon_size)
+            sprite = self._render_tile_preview(
+                entry["category"], entry["name"],
+                entry.get("tile_id"), icon_size)
             text_x = left_x + 10
             if sprite:
                 self.screen.blit(sprite, (left_x + 8, dy + 3))
@@ -7887,11 +7888,24 @@ class Renderer(CombatEffectRendererMixin):
             prefix = "> " if selected else "  "
             nc = self._U3_WHITE if selected else (180, 180, 180)
             name = entry["name"]
+            rendering = entry.get("rendering", "sprite")
+            # Reserve space for procedural marker
+            marker = ""
+            if rendering == "procedural":
+                marker = " [P]"
+            elif rendering == "sprite+procedural":
+                marker = " [S+P]"
             max_tw = left_w - (text_x - left_x) - 12
             disp_name = f"{prefix}{name}"
-            while len(disp_name) > 4 and fm.size(disp_name)[0] > max_tw:
+            while (len(disp_name) > 4
+                   and fm.size(disp_name + marker)[0] > max_tw):
                 disp_name = disp_name[:-1]
             self._u3_text(disp_name, text_x, dy + 5, nc, fm)
+            if marker:
+                mx = text_x + fm.size(disp_name)[0] + 2
+                mc = ((180, 120, 60) if rendering == "procedural"
+                      else (140, 160, 120))
+                self._u3_text(marker, mx, dy + 5, mc, fs)
             dy += row_h
 
         # Scroll indicators
@@ -7916,8 +7930,9 @@ class Renderer(CombatEffectRendererMixin):
             dy += 28
 
             preview_sz = 96
-            spr = self._manifest.get_sprite_by_name(
-                entry["category"], entry["name"], preview_sz)
+            spr = self._render_tile_preview(
+                entry["category"], entry["name"],
+                entry.get("tile_id"), preview_sz)
             if spr:
                 sx = right_x + (right_w - preview_sz) // 2
                 sy = dy + 4
@@ -7957,6 +7972,21 @@ class Renderer(CombatEffectRendererMixin):
                               right_x + 16, dy,
                               (140, 140, 160), fs)
                 dy += 18
+
+            # Rendering mode indicator
+            rendering = entry.get("rendering", "sprite")
+            if rendering == "procedural":
+                r_label = "Procedural (graphic not shown in-game)"
+                r_color = (180, 120, 60)
+            elif rendering == "sprite+procedural":
+                r_label = "Sprite base + procedural overlay"
+                r_color = (140, 160, 120)
+            else:
+                r_label = "Sprite"
+                r_color = (120, 180, 120)
+            self._u3_text(r_label, right_x + 16, dy,
+                          r_color, fs)
+            dy += 18
 
             # ── Usable-in tags / tag editor ──
             usable = entry.get("usable_in", [])
@@ -8044,6 +8074,48 @@ class Renderer(CombatEffectRendererMixin):
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 45, self._U3_HINT, fs)
+
+    def _render_tile_preview(self, category, name, tile_id, size=96):
+        """Render a tile preview surface showing how it looks in-game.
+
+        Uses the actual game rendering methods by temporarily
+        redirecting ``self.screen`` to a small offscreen surface.
+        Returns a pygame Surface of *size* x *size*, or None.
+        """
+        ts = 32  # internal tile size for rendering
+        surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        surf.fill((0, 0, 0, 255))
+
+        old_screen = self.screen
+        self.screen = surf
+
+        try:
+            if category == "dungeon" and tile_id is not None:
+                palette = self._get_dungeon_palette(0)
+                self._u3_draw_dungeon_tile(
+                    tile_id, 0, 0, ts, 5, 5, palette=palette)
+            elif category == "overworld" and tile_id is not None:
+                self._u3_draw_overworld_tile(
+                    tile_id, 0, 0, ts, 5, 5)
+            elif category == "town" and tile_id is not None:
+                self._u3_draw_town_tile(
+                    tile_id, 0, 0, ts, 5, 5)
+            else:
+                # Non-tile categories (monsters, characters, etc.)
+                # use the raw manifest sprite
+                self.screen = old_screen
+                return self._manifest.get_sprite_by_name(
+                    category, name, size)
+        except Exception:
+            self.screen = old_screen
+            return None
+
+        self.screen = old_screen
+
+        # Scale up to requested size
+        if size != ts:
+            surf = pygame.transform.scale(surf, (size, size))
+        return surf
 
     def _feat_resolve_sprite_field(self, field_key, value, size=32):
         """Resolve a sprite for a 'sprite'-type field in the editor.

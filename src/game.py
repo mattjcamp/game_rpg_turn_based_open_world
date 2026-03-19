@@ -2487,30 +2487,57 @@ class Game:
     # ── Tile Gallery (read-only) ───────────────────────────────
     # ══════════════════════════════════════════════════════════
 
-    # Mapping from a sprite's source category to the set of categories
-    # it can be assigned to.  Terrain sprites work across overworld,
-    # town, and dungeon; character/NPC sprites are interchangeable; etc.
-    _GALLERY_USABLE_MAP = {
-        "overworld":    ["overworld", "town", "dungeon"],
-        "town":         ["overworld", "town", "dungeon"],
-        "dungeon":      ["overworld", "town", "dungeon"],
-        "characters":   ["characters", "npcs", "monsters"],
-        "npcs":         ["characters", "npcs", "monsters"],
-        "monsters":     ["characters", "npcs", "monsters"],
-        "objects":      ["overworld", "town", "dungeon", "objects"],
-        "unique_tiles": ["overworld", "town", "dungeon",
-                         "unique_tiles", "objects"],
+    # Default: each sprite belongs only to its own manifest category.
+    # Players can add more categories via the tag editor in the gallery.
+
+    # Rendering mode for each manifest sprite.
+    # "sprite" = rendered directly from this graphic
+    # "sprite+procedural" = sprite used as base, procedural overlay on top
+    # "procedural" = graphic loaded but tile is mostly procedural
+    _GALLERY_RENDER_MODE = {
+        # Overworld: all sprites used directly
+        ("overworld", "grass"): "sprite",
+        ("overworld", "water"): "sprite",
+        ("overworld", "forest"): "sprite",
+        ("overworld", "mountain"): "sprite",
+        ("overworld", "town"): "sprite",
+        ("overworld", "dungeon"): "sprite",
+        ("overworld", "dungeon_cleared"): "sprite+procedural",
+        ("overworld", "path"): "sprite",
+        ("overworld", "sand"): "sprite",
+        ("overworld", "bridge"): "sprite",
+        # Town: sprites used in medieval style, procedural otherwise
+        ("town", "floor"): "sprite+procedural",
+        ("town", "wall"): "sprite+procedural",
+        ("town", "counter"): "sprite+procedural",
+        ("town", "door"): "sprite+procedural",
+        ("town", "exit"): "sprite",
+        ("town", "altar"): "procedural",
+        # Dungeon: base sprites with procedural environmental overlay
+        ("dungeon", "dfloor"): "sprite+procedural",
+        ("dungeon", "dwall"): "sprite+procedural",
+        ("dungeon", "chest"): "sprite",
+        ("dungeon", "artifact"): "sprite+procedural",
+        ("dungeon", "portal"): "sprite+procedural",
+        ("dungeon", "wall_torch"): "sprite+procedural",
+        ("dungeon", "moss"): "sprite+procedural",
+        ("dungeon", "puddle"): "sprite+procedural",
+        ("dungeon", "ddoor"): "sprite+procedural",
+        ("dungeon", "locked_door"): "sprite+procedural",
+        ("dungeon", "stairs"): "procedural",
+        ("dungeon", "stairs_down"): "procedural",
+        ("dungeon", "trap"): "procedural",
+        ("dungeon", "machine"): "procedural",
+        ("dungeon", "keyslot"): "procedural",
     }
 
     def _feat_load_gallery(self):
         """Load all manifest sprites into a flat list for browsing.
 
-        Each entry includes a ``usable_in`` list — the categories this
-        sprite can be assigned to.  Computed from the source category
-        plus any additional categories the same asset file appears in.
+        Each entry includes a ``usable_in`` list and a ``rendering``
+        note indicating how the game uses it.
         """
         import json
-        from collections import defaultdict
 
         mpath = os.path.join(os.path.dirname(os.path.dirname(__file__)),
                              "data", "tile_manifest.json")
@@ -2520,18 +2547,8 @@ class Game:
         except (OSError, ValueError):
             manifest = {}
 
-        # Build reverse map: asset path → set of categories it appears in
-        path_cats = defaultdict(set)
         all_cats = ("overworld", "town", "dungeon", "characters",
                     "npcs", "monsters", "objects", "unique_tiles")
-        for cat in all_cats:
-            section = manifest.get(cat, {})
-            if not isinstance(section, dict):
-                continue
-            for entry in section.values():
-                if isinstance(entry, dict) and "path" in entry:
-                    path_cats[entry["path"]].add(cat)
-
         entries = []
         for cat in all_cats:
             section = manifest.get(cat, {})
@@ -2541,20 +2558,19 @@ class Game:
                 entry = section[name]
                 if not (isinstance(entry, dict) and "path" in entry):
                     continue
-                # Use persisted usable_in if it exists in the manifest,
-                # otherwise compute from the default map + cross-refs
                 if "usable_in" in entry:
-                    usable = set(entry["usable_in"])
+                    usable = list(entry["usable_in"])
                 else:
-                    usable = set(self._GALLERY_USABLE_MAP.get(
-                        cat, [cat]))
-                    usable |= path_cats.get(entry["path"], set())
+                    usable = [cat]
+                rendering = self._GALLERY_RENDER_MODE.get(
+                    (cat, name), "sprite")
                 entries.append({
                     "category": cat,
                     "name": name,
                     "path": entry["path"],
                     "tile_id": entry.get("tile_id"),
                     "usable_in": sorted(usable),
+                    "rendering": rendering,
                 })
         self._feat_gallery_list = entries
         self._feat_gallery_cat_cursor = 0
