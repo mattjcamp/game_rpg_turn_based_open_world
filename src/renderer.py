@@ -7157,7 +7157,12 @@ class Renderer(CombatEffectRendererMixin):
                               mon_scroll=0, mon_editing=False,
                               mon_fields=None, mon_field=0,
                               mon_buffer="", mon_field_scroll=0,
-                              tile_list=None, tile_cursor=0,
+                              tile_list=None,
+                              tile_folders=None,
+                              tile_folder_cursor=0,
+                              tile_folder_scroll=0,
+                              tile_folder_tiles=None,
+                              tile_cursor=0,
                               tile_scroll=0, tile_editing=False,
                               tile_fields=None, tile_field=0,
                               tile_buffer="", tile_field_scroll=0,
@@ -7372,15 +7377,37 @@ class Renderer(CombatEffectRendererMixin):
                         mon_fields or [], mon_field, mon_buffer,
                         mon_field_scroll, fm, fs, f)
             elif ed == "tiles":
-                self._draw_features_generic_list(
-                    left_x, left_w, right_x, right_w, panel_y, panel_h,
-                    tile_list or [], tile_cursor, tile_scroll,
-                    "Tile Types", None, fm, fs, f)
-                if level == 2:
-                    self._draw_features_spell_editor(
-                        right_x, panel_y, right_w, panel_h,
-                        tile_fields or [], tile_field, tile_buffer,
-                        tile_field_scroll, fm, fs, f)
+                if level == 1:
+                    # Folder list
+                    self._draw_tile_folder_list(
+                        left_x, left_w, right_x, right_w,
+                        panel_y, panel_h,
+                        tile_folders or [],
+                        tile_folder_cursor, tile_folder_scroll,
+                        fm, fs, f)
+                elif level in (2, 3):
+                    # Tile list inside folder
+                    folder_name = ""
+                    if tile_folders and 0 <= tile_folder_cursor < len(
+                            tile_folders):
+                        folder_name = tile_folders[
+                            tile_folder_cursor]["label"]
+                    # Build the visible tile sublist
+                    folder_tiles = tile_folder_tiles or []
+                    all_tiles = tile_list or []
+                    sub_list = [all_tiles[i] for i in folder_tiles
+                                if 0 <= i < len(all_tiles)]
+                    self._draw_features_generic_list(
+                        left_x, left_w, right_x, right_w,
+                        panel_y, panel_h,
+                        sub_list, tile_cursor, tile_scroll,
+                        folder_name, None, fm, fs, f)
+                    if level == 3:
+                        self._draw_features_spell_editor(
+                            right_x, panel_y, right_w, panel_h,
+                            tile_fields or [], tile_field,
+                            tile_buffer, tile_field_scroll,
+                            fm, fs, f)
             elif ed == "gallery":
                 if level == 4 and pxedit_pixels is not None:
                     self._draw_pixel_editor(
@@ -8204,20 +8231,6 @@ class Renderer(CombatEffectRendererMixin):
                       canvas_x, canvas_y + canvas_h + 6,
                       (140, 140, 160), fs)
 
-        # ── Preview (actual size) ──
-        prev_x = canvas_x + canvas_w // 2 - pw // 2
-        prev_y = canvas_y + canvas_h + 24
-        prev_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        for py_ in range(ph):
-            for px_ in range(pw):
-                prev_surf.set_at((px_, py_), pixels[py_][px_])
-        self.screen.blit(prev_surf, (prev_x, prev_y))
-        pygame.draw.rect(self.screen, (80, 70, 50),
-                         (prev_x - 1, prev_y - 1,
-                          pw + 2, ph + 2), 1)
-        self._u3_text("1:1", prev_x + pw + 8, prev_y + ph // 2 - 6,
-                      (140, 140, 160), fs)
-
         # ── Palette panel (right side) ──
         pal_x = canvas_x + canvas_w + 30
         pal_y = canvas_area_y + 10
@@ -8318,6 +8331,31 @@ class Renderer(CombatEffectRendererMixin):
                 pal_x + 26, cur_y + 2,
                 (120, 120, 140), fs)
 
+        # ── Preview (actual size + 2x) below palette ──
+        prev_y2 = cur_y + 28
+        self._u3_text("Preview:", pal_x, prev_y2, (180, 180, 200), fs)
+        prev_y2 += 18
+        prev_surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        for py_ in range(ph):
+            for px_ in range(pw):
+                prev_surf.set_at((px_, py_), pixels[py_][px_])
+        # 1:1 preview
+        self.screen.blit(prev_surf, (pal_x, prev_y2))
+        pygame.draw.rect(self.screen, (80, 70, 50),
+                         (pal_x - 1, prev_y2 - 1,
+                          pw + 2, ph + 2), 1)
+        # 2x preview beside it
+        prev_2x = pygame.transform.scale(prev_surf, (pw * 2, ph * 2))
+        p2x = pal_x + pw + 12
+        self.screen.blit(prev_2x, (p2x, prev_y2))
+        pygame.draw.rect(self.screen, (80, 70, 50),
+                         (p2x - 1, prev_y2 - 1,
+                          pw * 2 + 2, ph * 2 + 2), 1)
+        self._u3_text("1:1", pal_x, prev_y2 + ph + 4,
+                      (100, 100, 120), fs)
+        self._u3_text("2x", p2x, prev_y2 + ph * 2 + 4,
+                      (100, 100, 120), fs)
+
         # ── Footer hints (context-sensitive) ──
         if palette_focused:
             hint = ("[Arrows] Select Color  [Enter] Confirm  "
@@ -8355,19 +8393,28 @@ class Renderer(CombatEffectRendererMixin):
                     size // 2, size // 2, name, size - 8)
                 self.screen = old2
                 return icon_surf
+            elif category in ("overworld", "town") and \
+                    tile_id is not None:
+                # Use the live sprite from the renderer cache —
+                # this is exactly what the game draws on screen,
+                # so edits are always in sync.
+                sprite = self._tile_sprites.get(tile_id)
+                if sprite:
+                    self.screen = old_screen
+                    if size != ts:
+                        return pygame.transform.scale(
+                            sprite.copy(), (size, size))
+                    return sprite.copy()
+                # Fallback to procedural
+                self._u3_draw_overworld_tile(
+                    tile_id, 0, 0, ts, 5, 5)
             elif category == "dungeon" and tile_id is not None:
                 palette = self._get_dungeon_palette(0)
                 self._u3_draw_dungeon_tile(
                     tile_id, 0, 0, ts, 5, 5, palette=palette)
-            elif category == "overworld" and tile_id is not None:
-                self._u3_draw_overworld_tile(
-                    tile_id, 0, 0, ts, 5, 5)
-            elif category == "town" and tile_id is not None:
-                self._u3_draw_town_tile(
-                    tile_id, 0, 0, ts, 5, 5)
             else:
                 # Non-tile categories (monsters, characters, etc.)
-                # use the raw manifest sprite
+                # use the raw manifest sprite directly from disk
                 self.screen = old_screen
                 return self._manifest.get_sprite_by_name(
                     category, name, size)
@@ -8481,6 +8528,97 @@ class Renderer(CombatEffectRendererMixin):
 
         # Plain icon names (sword, herb, etc.) → caller uses _draw_item_icon
         return None
+
+    def _draw_tile_folder_list(self, left_x, left_w, right_x,
+                                right_w, panel_y, panel_h,
+                                folders, cursor, scroll,
+                                fm, fs, f):
+        """Draw the tile type folder list (Overworld, Town, etc.)."""
+        self._u3_text("Tile Types", left_x + 12, panel_y + 8,
+                       self._U3_ORANGE, fs)
+        row_h = 34
+        ly = panel_y + 30
+        max_visible = (panel_h - 40) // row_h
+
+        dscroll = scroll
+        if cursor < dscroll:
+            dscroll = cursor
+        if cursor >= dscroll + max_visible:
+            dscroll = cursor - max_visible + 1
+
+        dy = ly
+        for fi in range(dscroll, min(dscroll + max_visible,
+                                     len(folders))):
+            fld = folders[fi]
+            selected = (fi == cursor)
+            if selected:
+                bar = pygame.Surface((left_w - 4, row_h - 2),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (left_x + 2, dy - 1))
+            prefix = "> " if selected else "  "
+            nc = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(f"{prefix}{fld['label']}",
+                          left_x + 10, dy + 4, nc, fm)
+            cnt = str(fld["count"])
+            cw = fs.size(cnt)[0]
+            sc = (140, 180, 140) if selected else (120, 120, 140)
+            self._u3_text(cnt, left_x + left_w - cw - 12,
+                          dy + 6, sc, fs)
+            dy += row_h
+
+        # Right panel: folder description
+        if 0 <= cursor < len(folders):
+            fld = folders[cursor]
+            dy = panel_y + 12
+            self._u3_text(fld["label"], right_x + 16, dy,
+                          self._U3_WHITE, f)
+            dy += 28
+            descs = {
+                "overworld": [
+                    "Terrain tiles used on the world",
+                    "map: grass, water, forests,",
+                    "mountains, paths, and landmarks.",
+                ],
+                "town": [
+                    "Interior tiles for town buildings:",
+                    "floors, walls, doors, counters,",
+                    "and special objects like altars.",
+                ],
+                "dungeon": [
+                    "Tiles for dungeon exploration:",
+                    "stone floors, walls, stairs,",
+                    "chests, traps, doors, and",
+                    "environmental decorations.",
+                ],
+                "battle": [
+                    "Battle arena tiles are rendered",
+                    "entirely with procedural code.",
+                    "There are no editable tile types",
+                    "for the battle screen.",
+                ],
+                "examine": [
+                    "The examine screen reuses",
+                    "overworld tiles: Grass, Forest,",
+                    "Sand, and Path. Edit them in",
+                    "the Overworld folder.",
+                ],
+            }
+            for line in descs.get(fld["name"], []):
+                self._u3_text(line, right_x + 16, dy,
+                              (180, 180, 200), fm)
+                dy += 22
+            if fld["count"] > 0:
+                dy += 10
+                self._u3_text(f"{fld['count']} tile types",
+                              right_x + 16, dy,
+                              (140, 140, 160), fs)
+
+        # Footer
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
+            SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
+            self._U3_HINT, fs)
 
     def _draw_features_generic_list(self, left_x, left_w, right_x,
                                      right_w, panel_y, panel_h,

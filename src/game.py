@@ -250,8 +250,12 @@ class Game:
         self._feat_mon_buffer = ""
         self._feat_mon_scroll_f = 0
 
-        # Tile Types editor state
-        self._feat_tile_list = []        # list of (tile_id, name, data) tuples
+        # Tile Types editor state — sub-folder hierarchy
+        self._feat_tile_list = []        # all tiles (flat)
+        self._feat_tile_folders = []     # folder dicts: name, label, count
+        self._feat_tile_folder_cursor = 0
+        self._feat_tile_folder_scroll = 0
+        self._feat_tile_folder_tiles = []  # tiles in current folder
         self._feat_tile_cursor = 0
         self._feat_tile_scroll = 0
         self._feat_tile_editing = False
@@ -259,6 +263,29 @@ class Game:
         self._feat_tile_fields = []
         self._feat_tile_buffer = ""
         self._feat_tile_scroll_f = 0
+        self._feat_tile_in_folder = False  # True when browsing inside a folder
+
+        # Classification of tile IDs into context folders
+        self._TILE_CONTEXT = {
+            0: "overworld", 1: "overworld", 2: "overworld",
+            3: "overworld", 4: "overworld", 5: "overworld",
+            6: "overworld", 7: "overworld", 8: "overworld",
+            9: "overworld",
+            10: "town", 11: "town", 12: "town", 13: "town",
+            14: "town", 35: "town",
+            20: "dungeon", 21: "dungeon", 22: "dungeon",
+            23: "dungeon", 24: "dungeon", 25: "dungeon",
+            26: "dungeon", 27: "dungeon", 28: "dungeon",
+            29: "dungeon", 30: "dungeon", 31: "dungeon",
+            32: "dungeon", 33: "dungeon", 34: "dungeon",
+        }
+        self._TILE_FOLDER_ORDER = [
+            {"name": "overworld", "label": "Overworld"},
+            {"name": "town", "label": "Town"},
+            {"name": "dungeon", "label": "Dungeon"},
+            {"name": "battle", "label": "Battle Screen"},
+            {"name": "examine", "label": "Examine Screen"},
+        ]
 
         # Tile Gallery — 3-level folder hierarchy
         # Level 1: category folders, Level 2: sprites, Level 3: tag editor
@@ -2374,15 +2401,62 @@ class Game:
         tiles = []
         for tile_id in sorted(TILE_DEFS.keys()):
             tdef = TILE_DEFS[tile_id]
+            context = self._TILE_CONTEXT.get(tile_id, "overworld")
             tiles.append({
                 "_tile_id": tile_id,
                 "name": tdef.get("name", f"Tile {tile_id}"),
                 "walkable": tdef.get("walkable", True),
                 "color": list(tdef.get("color", (128, 128, 128))),
+                "_context": context,
             })
         self._feat_tile_list = tiles
+        self._feat_tile_in_folder = False
+        self._feat_tile_folder_cursor = 0
+        self._feat_tile_folder_scroll = 0
+        self._feat_rebuild_tile_folders()
+
+    def _feat_rebuild_tile_folders(self):
+        """Build folder list with tile counts per context."""
+        # Examine screen reuses overworld tiles (Grass, Forest, Sand, Path)
+        examine_ids = {0, 2, 7, 6}  # GRASS, FOREST, SAND, PATH
+        folders = []
+        for fdef in self._TILE_FOLDER_ORDER:
+            fname = fdef["name"]
+            if fname == "examine":
+                count = sum(1 for t in self._feat_tile_list
+                            if t["_tile_id"] in examine_ids)
+            elif fname == "battle":
+                count = 0  # battle uses procedural tiles
+            else:
+                count = sum(1 for t in self._feat_tile_list
+                            if t.get("_context") == fname)
+            folders.append({
+                "name": fname,
+                "label": fdef["label"],
+                "count": count,
+            })
+        self._feat_tile_folders = folders
+
+    def _feat_tile_enter_folder(self):
+        """Enter the selected tile folder — build tile list."""
+        if self._feat_tile_folder_cursor >= len(self._feat_tile_folders):
+            return
+        fname = self._feat_tile_folders[
+            self._feat_tile_folder_cursor]["name"]
+        examine_ids = {0, 2, 7, 6}
+        if fname == "examine":
+            self._feat_tile_folder_tiles = [
+                i for i, t in enumerate(self._feat_tile_list)
+                if t["_tile_id"] in examine_ids]
+        elif fname == "battle":
+            self._feat_tile_folder_tiles = []
+        else:
+            self._feat_tile_folder_tiles = [
+                i for i, t in enumerate(self._feat_tile_list)
+                if t.get("_context") == fname]
         self._feat_tile_cursor = 0
         self._feat_tile_scroll = 0
+        self._feat_tile_in_folder = True
 
     def _feat_save_tiles(self):
         """Write tile definitions back to settings.TILE_DEFS
@@ -5547,6 +5621,143 @@ class Game:
                     self._feat_level = 2
             return
 
+        # ── Level 3: tile field editor (inside folder) ──
+        if self._feat_level == 3 and ed == "tiles":
+            # Reuse generic level-2 field editing logic via ctx
+            if ctx:
+                if event.key == pygame.K_ESCAPE or (
+                        event.key == pygame.K_s
+                        and event.mod & pygame.KMOD_CTRL):
+                    ctx["save_fields"]()
+                    ctx["save_disk"]()
+                    ctx["set_editing"](False)
+                    self._feat_level = 2
+                    return
+                fields = ctx["fields"]()
+                n = len(fields)
+                if n == 0:
+                    return
+                field_idx = ctx["field_idx"]()
+                entry = fields[field_idx]
+                ftype = entry[3] if len(entry) > 3 else "text"
+                buf = ctx["buffer"]()
+                if event.key == pygame.K_UP:
+                    entry[2] = buf
+                    idx = (field_idx - 1) % n
+                    idx = self._feat_next_editable_generic(fields, idx)
+                    ctx["set_field_idx"](idx)
+                    ctx["set_buffer"](fields[idx][2])
+                    ctx["adjust_field_scroll"]()
+                elif event.key == pygame.K_DOWN:
+                    entry[2] = buf
+                    idx = (field_idx + 1) % n
+                    idx = self._feat_next_editable_generic(fields, idx)
+                    ctx["set_field_idx"](idx)
+                    ctx["set_buffer"](fields[idx][2])
+                    ctx["adjust_field_scroll"]()
+                elif ftype in ("choice", "sprite"):
+                    if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                        choices = ctx["get_choices"](entry[1])
+                        if choices:
+                            try:
+                                ci = choices.index(buf)
+                            except ValueError:
+                                ci = 0
+                            if event.key == pygame.K_RIGHT:
+                                ci = (ci + 1) % len(choices)
+                            else:
+                                ci = (ci - 1) % len(choices)
+                            ctx["set_buffer"](choices[ci])
+                elif ftype == "int":
+                    if event.key == pygame.K_BACKSPACE:
+                        ctx["set_buffer"](buf[:-1])
+                    elif event.key == pygame.K_LEFT:
+                        try:
+                            ctx["set_buffer"](str(max(0, int(buf) - 1)))
+                        except ValueError:
+                            pass
+                    elif event.key == pygame.K_RIGHT:
+                        try:
+                            ctx["set_buffer"](str(int(buf) + 1))
+                        except ValueError:
+                            pass
+                    elif event.unicode and event.unicode.isdigit():
+                        ctx["set_buffer"](buf + event.unicode)
+                elif ftype == "text":
+                    if event.key == pygame.K_BACKSPACE:
+                        ctx["set_buffer"](buf[:-1])
+                    elif event.unicode and event.unicode.isprintable():
+                        ctx["set_buffer"](buf + event.unicode)
+            return
+
+        # ── Level 2: tile list inside folder ──
+        if self._feat_level == 2 and ed == "tiles":
+            tiles_in = self._feat_tile_folder_tiles
+            n = len(tiles_in)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_tiles()
+                self._feat_tile_in_folder = False
+                self._feat_level = 1
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_tile_cursor = (
+                    self._feat_tile_cursor - 1) % n
+                self._feat_tile_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_tile_cursor,
+                        self._feat_tile_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_tile_cursor = (
+                    self._feat_tile_cursor + 1) % n
+                self._feat_tile_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_tile_cursor,
+                        self._feat_tile_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    ti = tiles_in[self._feat_tile_cursor]
+                    tile = self._feat_tile_list[ti]
+                    self._feat_build_tile_fields(tile)
+                    self._feat_tile_editing = True
+                    self._feat_level = 3
+            elif event.key == pygame.K_a:
+                self._feat_add_tile()
+                self._feat_rebuild_tile_folders()
+                self._feat_tile_enter_folder()
+            elif event.key in (pygame.K_d, pygame.K_DELETE):
+                self._feat_remove_tile()
+                self._feat_rebuild_tile_folders()
+                self._feat_tile_enter_folder()
+            return
+
+        # ── Level 1: tile folder list ──
+        if self._feat_level == 1 and ed == "tiles":
+            n = len(self._feat_tile_folders)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_tiles()
+                self._feat_level = 0
+                self._feat_active_editor = None
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_tile_folder_cursor = (
+                    self._feat_tile_folder_cursor - 1) % n
+                self._feat_tile_folder_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_tile_folder_cursor,
+                        self._feat_tile_folder_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_tile_folder_cursor = (
+                    self._feat_tile_folder_cursor + 1) % n
+                self._feat_tile_folder_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_tile_folder_cursor,
+                        self._feat_tile_folder_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self._feat_tile_enter_folder()
+                    self._feat_level = 2
+            return
+
         # ── Level 1: list browser ──
         if self._feat_level == 1 and ctx:
             lst = ctx["list"]()
@@ -5981,6 +6192,10 @@ class Game:
                     mon_buffer=self._feat_mon_buffer,
                     mon_field_scroll=self._feat_mon_scroll_f,
                     tile_list=self._feat_tile_list,
+                    tile_folders=self._feat_tile_folders,
+                    tile_folder_cursor=self._feat_tile_folder_cursor,
+                    tile_folder_scroll=self._feat_tile_folder_scroll,
+                    tile_folder_tiles=self._feat_tile_folder_tiles,
                     tile_cursor=self._feat_tile_cursor,
                     tile_scroll=self._feat_tile_scroll,
                     tile_editing=self._feat_tile_editing,

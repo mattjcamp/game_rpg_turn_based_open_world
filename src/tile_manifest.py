@@ -39,6 +39,10 @@ class TileManifest:
         with open(self._manifest_path) as f:
             self._raw = json.load(f)
 
+        # Clear previous lookups so reloads start fresh
+        self._by_tile_id.clear()
+        self._by_name.clear()
+
         for category, entries in self._raw.items():
             if category.startswith("_"):
                 continue
