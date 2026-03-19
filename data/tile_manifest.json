@@ -66,7 +66,7 @@
       ]
     },
     "dungeon_cleared": {
-      "path": "src/assets/game/terrain/dungeon.png",
+      "path": "src/assets/game/terrain/dungeon_cleared.png",
       "tile_id": 9,
       "usable_in": [
         "overworld"
@@ -81,35 +81,35 @@
   },
   "town": {
     "floor": {
-      "path": "src/assets/game/terrain/grass.png",
+      "path": "src/assets/game/terrain/town_floor.png",
       "tile_id": 10,
       "usable_in": [
         "town"
       ]
     },
     "wall": {
-      "path": "src/assets/game/terrain/wall.png",
+      "path": "src/assets/game/terrain/town_wall.png",
       "tile_id": 11,
       "usable_in": [
         "town"
       ]
     },
     "counter": {
-      "path": "src/assets/game/terrain/counter.png",
+      "path": "src/assets/game/terrain/town_counter.png",
       "tile_id": 12,
       "usable_in": [
         "town"
       ]
     },
     "door": {
-      "path": "src/assets/game/terrain/door.png",
+      "path": "src/assets/game/terrain/town_door.png",
       "tile_id": 13,
       "usable_in": [
         "town"
       ]
     },
     "exit": {
-      "path": "src/assets/game/terrain/town.png",
+      "path": "src/assets/game/terrain/town_exit.png",
       "tile_id": 14,
       "usable_in": [
         "town"
@@ -188,42 +188,42 @@
       ]
     },
     "artifact": {
-      "path": "src/assets/game/dungeon/sparkle.png",
+      "path": "src/assets/game/dungeon/artifact.png",
       "tile_id": 27,
       "usable_in": [
         "dungeon"
       ]
     },
     "portal": {
-      "path": "src/assets/game/dungeon/portal_open.png",
+      "path": "src/assets/game/dungeon/portal.png",
       "tile_id": 28,
       "usable_in": [
         "dungeon"
       ]
     },
     "locked_door": {
-      "path": "src/assets/game/dungeon/locked_door.png",
+      "path": "src/assets/game/dungeon/locked_door_new.png",
       "tile_id": 29,
       "usable_in": [
         "dungeon"
       ]
     },
     "puddle": {
-      "path": "src/assets/game/dungeon/shallow_water.png",
+      "path": "src/assets/game/dungeon/puddle.png",
       "tile_id": 32,
       "usable_in": [
         "dungeon"
       ]
     },
     "moss": {
-      "path": "src/assets/game/dungeon/swamp.png",
+      "path": "src/assets/game/dungeon/moss.png",
       "tile_id": 33,
       "usable_in": [
         "dungeon"
       ]
     },
     "wall_torch": {
-      "path": "src/assets/game/dungeon/torch_post.png",
+      "path": "src/assets/game/dungeon/wall_torch.png",
       "tile_id": 34,
       "usable_in": [
         "dungeon"
