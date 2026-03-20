@@ -314,8 +314,21 @@ class Game:
         self._feat_pxedit_h = 32             # canvas height
         self._feat_pxedit_path = ""          # file path for saving
 
-        # Town Layouts editor state
-        self._feat_townlayout_list = []      # list of layout dicts: name, width, height, tiles
+        # Town editor state — three sub-editors share same grid painter
+        self._feat_town_subfolders = [
+            {"name": "layouts", "label": "Town Layouts",
+             "icon": "L", "desc": "Full town map layouts"},
+            {"name": "features", "label": "Town Features",
+             "icon": "F", "desc": "Reusable features (fountains, buildings)"},
+            {"name": "interiors", "label": "Town Interior Spaces",
+             "icon": "I", "desc": "Building interiors"},
+        ]
+        self._feat_town_subfolder_cursor = 0
+        self._feat_town_active_sub = None     # "layouts" / "features" / "interiors"
+        # Per-sub-editor lists stored by key
+        self._feat_town_lists = {
+            "layouts": [], "features": [], "interiors": [],
+        }
         self._feat_townlayout_cursor = 0
         self._feat_townlayout_scroll = 0
         self._feat_townlayout_editing = False  # True when in grid painter
@@ -2756,67 +2769,94 @@ class Game:
             return False
         return True
 
+    # ── Default sizes for each sub-editor type ──
+    _TOWN_SUB_DEFAULTS = {
+        "layouts":   {"name_prefix": "Town Layout",   "width": 18, "height": 19},
+        "features":  {"name_prefix": "Town Feature",  "width": 8,  "height": 8},
+        "interiors": {"name_prefix": "Interior",      "width": 14, "height": 15},
+    }
+    # Manifest keys for persistence
+    _TOWN_SUB_MANIFEST_KEY = {
+        "layouts":   "_town_layouts",
+        "features":  "_town_features",
+        "interiors": "_town_interiors",
+    }
+
     def _feat_load_townlayouts(self):
-        """Load town layouts from the active module or create empty list."""
-        layouts = []
-        if self.module_manifest:
-            raw = self.module_manifest.get("_town_layouts", [])
-            for tl in raw:
-                layouts.append({
-                    "name": tl.get("name", "Unnamed"),
-                    "width": tl.get("width", 18),
-                    "height": tl.get("height", 19),
-                    "tiles": dict(tl.get("tiles", {})),
-                })
-        if not layouts:
-            # Start with one default layout
-            layouts.append({
-                "name": "Default Town",
-                "width": 18,
-                "height": 19,
-                "tiles": {},
-            })
-        self._feat_townlayout_list = layouts
+        """Load all town sub-editor lists from the active module."""
+        for sub_key in ("layouts", "features", "interiors"):
+            items = []
+            mkey = self._TOWN_SUB_MANIFEST_KEY[sub_key]
+            defaults = self._TOWN_SUB_DEFAULTS[sub_key]
+            if self.module_manifest:
+                raw = self.module_manifest.get(mkey, [])
+                for tl in raw:
+                    items.append({
+                        "name": tl.get("name", "Unnamed"),
+                        "width": tl.get("width", defaults["width"]),
+                        "height": tl.get("height", defaults["height"]),
+                        "tiles": dict(tl.get("tiles", {})),
+                    })
+            self._feat_town_lists[sub_key] = items
+        self._feat_town_subfolder_cursor = 0
+        self._feat_town_active_sub = None
         self._feat_townlayout_cursor = 0
         self._feat_townlayout_scroll = 0
         self._feat_townlayout_editing = False
 
+    @property
+    def _feat_townlayout_list(self):
+        """Return the active sub-editor's item list."""
+        sub = self._feat_town_active_sub or "layouts"
+        return self._feat_town_lists.get(sub, [])
+
+    @_feat_townlayout_list.setter
+    def _feat_townlayout_list(self, value):
+        sub = self._feat_town_active_sub or "layouts"
+        self._feat_town_lists[sub] = value
+
     def _feat_save_townlayouts(self):
-        """Persist town layouts back to the module manifest."""
+        """Persist all town sub-editor lists back to the module manifest."""
         if not self.module_manifest:
             return
-        raw = []
-        for tl in self._feat_townlayout_list:
-            raw.append({
-                "name": tl["name"],
-                "width": tl["width"],
-                "height": tl["height"],
-                "tiles": dict(tl.get("tiles", {})),
-            })
-        self.module_manifest["_town_layouts"] = raw
+        for sub_key in ("layouts", "features", "interiors"):
+            mkey = self._TOWN_SUB_MANIFEST_KEY[sub_key]
+            raw = []
+            for tl in self._feat_town_lists.get(sub_key, []):
+                raw.append({
+                    "name": tl["name"],
+                    "width": tl["width"],
+                    "height": tl["height"],
+                    "tiles": dict(tl.get("tiles", {})),
+                })
+            self.module_manifest[mkey] = raw
 
     def _feat_add_townlayout(self):
-        """Add a new empty town layout."""
-        idx = len(self._feat_townlayout_list)
-        self._feat_townlayout_list.append({
-            "name": f"Town Layout {idx + 1}",
-            "width": 18,
-            "height": 19,
+        """Add a new empty item to the active sub-editor."""
+        sub = self._feat_town_active_sub or "layouts"
+        defaults = self._TOWN_SUB_DEFAULTS[sub]
+        items = self._feat_town_lists[sub]
+        idx = len(items)
+        items.append({
+            "name": f"{defaults['name_prefix']} {idx + 1}",
+            "width": defaults["width"],
+            "height": defaults["height"],
             "tiles": {},
         })
         self._feat_townlayout_cursor = idx
 
     def _feat_remove_townlayout(self):
-        """Remove the currently selected town layout."""
-        if not self._feat_townlayout_list:
+        """Remove the currently selected item from the active sub-editor."""
+        items = self._feat_townlayout_list
+        if not items:
             return
         idx = self._feat_townlayout_cursor
-        self._feat_townlayout_list.pop(idx)
-        if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
-            self._feat_townlayout_cursor = max(0, len(self._feat_townlayout_list) - 1)
+        items.pop(idx)
+        if self._feat_townlayout_cursor >= len(items):
+            self._feat_townlayout_cursor = max(0, len(items) - 1)
 
     def _feat_enter_townlayout_painter(self):
-        """Enter the grid painter for the selected town layout."""
+        """Enter the grid painter for the selected item."""
         if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
             return
         self._feat_townlayout_editing = True
@@ -2879,12 +2919,30 @@ class Game:
             self._feat_handle_townlayout_painter_input(event)
             return
 
-        # List mode (level 1)
+        # ── Sub-folder selection (when no sub-editor is active) ──
+        if self._feat_town_active_sub is None:
+            n = len(self._feat_town_subfolders)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_level = 0
+                self._feat_active_editor = None
+            elif event.key == pygame.K_UP and n > 0:
+                self._feat_town_subfolder_cursor = (
+                    self._feat_town_subfolder_cursor - 1) % n
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_town_subfolder_cursor = (
+                    self._feat_town_subfolder_cursor + 1) % n
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
+                sub = self._feat_town_subfolders[self._feat_town_subfolder_cursor]
+                self._feat_town_active_sub = sub["name"]
+                self._feat_townlayout_cursor = 0
+                self._feat_townlayout_scroll = 0
+            return
+
+        # List mode (level 1) — inside a sub-editor
         n = len(self._feat_townlayout_list)
         if event.key == pygame.K_ESCAPE:
             self._feat_save_townlayouts()
-            self._feat_level = 0
-            self._feat_active_editor = None
+            self._feat_town_active_sub = None
         elif event.key == pygame.K_UP and n > 0:
             self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
             self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
@@ -6455,6 +6513,9 @@ class Game:
                     townlayout_cy=self._feat_townlayout_cy,
                     townlayout_brush_idx=self._feat_townlayout_brush_idx,
                     townlayout_brushes=self._feat_get_townlayout_brushes() if self._feat_active_editor == "townlayouts" else [],
+                    town_subfolders=self._feat_town_subfolders,
+                    town_subfolder_cursor=self._feat_town_subfolder_cursor,
+                    town_active_sub=self._feat_town_active_sub,
                 )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(

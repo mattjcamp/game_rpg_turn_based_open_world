@@ -7183,7 +7183,10 @@ class Renderer(CombatEffectRendererMixin):
                               townlayout_cx=0,
                               townlayout_cy=0,
                               townlayout_brush_idx=0,
-                              townlayout_brushes=None):
+                              townlayout_brushes=None,
+                              town_subfolders=None,
+                              town_subfolder_cursor=0,
+                              town_active_sub=None):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7432,9 +7435,60 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_tag_cursor,
                         gallery_all_cats or [],
                         fm, fs, f)
-            elif ed == "townlayouts" and not townlayout_editing:
-                # ── Town Layouts list ──
-                self._u3_text("Town Layouts", left_x + 12, panel_y + 8,
+            elif ed == "townlayouts" and not townlayout_editing and town_active_sub is None:
+                # ── Town sub-folder selection ──
+                self._u3_text("Town Editor", left_x + 12, panel_y + 8,
+                               self._U3_ORANGE, fs)
+                folders = town_subfolders or []
+                row_h = 56
+                ly = panel_y + 34
+                for i, fld in enumerate(folders):
+                    dy = ly + i * row_h
+                    selected = (i == town_subfolder_cursor)
+                    if selected:
+                        bar = pygame.Surface((left_w - 4, row_h - 4),
+                                             pygame.SRCALPHA)
+                        bar.fill((255, 200, 60, 30))
+                        self.screen.blit(bar, (left_x + 2, dy))
+                    prefix = "> " if selected else "  "
+                    icon = fld.get("icon", "?")
+                    label = fld.get("label", "?")
+                    nc = self._U3_WHITE if selected else (180, 180, 180)
+                    self._u3_text(f"{prefix}[{icon}] {label}",
+                                  left_x + 14, dy + 6, nc, fm)
+                    desc = fld.get("desc", "")
+                    dc = (140, 180, 140) if selected else (120, 120, 140)
+                    self._u3_text(f"    {desc}",
+                                  left_x + 14, dy + 28, dc, fs)
+
+                # Right panel: brief description
+                self._u3_text("Select a sub-editor",
+                              right_x + 30, panel_y + 40,
+                              (140, 140, 160), fm)
+                self._u3_text("Choose a category to create and edit",
+                              right_x + 30, panel_y + 68,
+                              (120, 120, 140), fs)
+                self._u3_text("town maps, reusable features, or",
+                              right_x + 30, panel_y + 86,
+                              (120, 120, 140), fs)
+                self._u3_text("building interiors.",
+                              right_x + 30, panel_y + 104,
+                              (120, 120, 140), fs)
+
+                self._u3_text(
+                    "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
+                    SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT - 45,
+                    self._U3_HINT, fs)
+
+            elif ed == "townlayouts" and not townlayout_editing and town_active_sub is not None:
+                # ── Town item list (inside a sub-editor) ──
+                # Determine label from active sub
+                sub_label = "Town Layouts"
+                for fld in (town_subfolders or []):
+                    if fld.get("name") == town_active_sub:
+                        sub_label = fld.get("label", sub_label)
+                        break
+                self._u3_text(sub_label, left_x + 12, panel_y + 8,
                                self._U3_ORANGE, fs)
                 row_h = 40
                 ly = panel_y + 30
