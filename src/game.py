@@ -215,6 +215,7 @@ class Game:
             {"label": "Monsters", "icon": "X"},
             {"label": "Tile Types", "icon": "T"},
             {"label": "Tile Gallery", "icon": "G"},
+            {"label": "Town Layouts", "icon": "L"},
         ]
         self._modules_from_features = False  # True when modules opened from features
         # Spell editor state
@@ -312,6 +313,17 @@ class Game:
         self._feat_pxedit_w = 32             # canvas width
         self._feat_pxedit_h = 32             # canvas height
         self._feat_pxedit_path = ""          # file path for saving
+
+        # Town Layouts editor state
+        self._feat_townlayout_list = []      # list of layout dicts: name, width, height, tiles
+        self._feat_townlayout_cursor = 0
+        self._feat_townlayout_scroll = 0
+        self._feat_townlayout_editing = False  # True when in grid painter
+        self._feat_townlayout_cx = 0          # cursor col in grid
+        self._feat_townlayout_cy = 0          # cursor row in grid
+        self._feat_townlayout_brush_idx = 0   # index into brush palette
+        self._feat_townlayout_brushes = None  # built lazily from manifest
+
         self._feat_pxedit_palette = [
             (0, 0, 0, 255),        # Black
             (255, 255, 255, 255),  # White
@@ -2743,6 +2755,195 @@ class Game:
         except OSError:
             return False
         return True
+
+    def _feat_load_townlayouts(self):
+        """Load town layouts from the active module or create empty list."""
+        layouts = []
+        if self.module_manifest:
+            raw = self.module_manifest.get("_town_layouts", [])
+            for tl in raw:
+                layouts.append({
+                    "name": tl.get("name", "Unnamed"),
+                    "width": tl.get("width", 18),
+                    "height": tl.get("height", 19),
+                    "tiles": dict(tl.get("tiles", {})),
+                })
+        if not layouts:
+            # Start with one default layout
+            layouts.append({
+                "name": "Default Town",
+                "width": 18,
+                "height": 19,
+                "tiles": {},
+            })
+        self._feat_townlayout_list = layouts
+        self._feat_townlayout_cursor = 0
+        self._feat_townlayout_scroll = 0
+        self._feat_townlayout_editing = False
+
+    def _feat_save_townlayouts(self):
+        """Persist town layouts back to the module manifest."""
+        if not self.module_manifest:
+            return
+        raw = []
+        for tl in self._feat_townlayout_list:
+            raw.append({
+                "name": tl["name"],
+                "width": tl["width"],
+                "height": tl["height"],
+                "tiles": dict(tl.get("tiles", {})),
+            })
+        self.module_manifest["_town_layouts"] = raw
+
+    def _feat_add_townlayout(self):
+        """Add a new empty town layout."""
+        idx = len(self._feat_townlayout_list)
+        self._feat_townlayout_list.append({
+            "name": f"Town Layout {idx + 1}",
+            "width": 18,
+            "height": 19,
+            "tiles": {},
+        })
+        self._feat_townlayout_cursor = idx
+
+    def _feat_remove_townlayout(self):
+        """Remove the currently selected town layout."""
+        if not self._feat_townlayout_list:
+            return
+        idx = self._feat_townlayout_cursor
+        self._feat_townlayout_list.pop(idx)
+        if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
+            self._feat_townlayout_cursor = max(0, len(self._feat_townlayout_list) - 1)
+
+    def _feat_enter_townlayout_painter(self):
+        """Enter the grid painter for the selected town layout."""
+        if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
+            return
+        self._feat_townlayout_editing = True
+        self._feat_townlayout_cx = 1
+        self._feat_townlayout_cy = 1
+        self._feat_townlayout_brush_idx = 0
+
+    def _feat_get_townlayout_brushes(self):
+        """Build brush list from the Town category in the tile manifest."""
+        if self._feat_townlayout_brushes is not None:
+            return self._feat_townlayout_brushes
+        import json
+        brushes = [
+            {"name": "Eraser", "tile_id": None, "path": None},
+        ]
+        # Pull all sprites tagged for 'town' usage from the manifest
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+            # Scan every category for sprites with 'town' in usable_in
+            seen_paths = set()
+            for cat in sorted(manifest.keys()):
+                if cat.startswith("_"):
+                    continue
+                section = manifest.get(cat, {})
+                if not isinstance(section, dict):
+                    continue
+                for name, entry in sorted(section.items()):
+                    if not (isinstance(entry, dict) and "path" in entry):
+                        continue
+                    usable = entry.get("usable_in", [cat])
+                    if "town" not in usable:
+                        continue
+                    p = entry["path"]
+                    if p in seen_paths:
+                        continue
+                    seen_paths.add(p)
+                    if p.startswith("src/assets/"):
+                        p = p[len("src/assets/"):]
+                    brushes.append({
+                        "name": name.replace("_", " ").title(),
+                        "tile_id": entry.get("tile_id"),
+                        "path": p,
+                    })
+        except (OSError, ValueError):
+            pass
+        self._feat_townlayout_brushes = brushes
+        return brushes
+
+    def _feat_handle_townlayout_input(self, event):
+        """Handle input for the town layouts editor."""
+        if event.type != pygame.KEYDOWN:
+            return
+
+        if self._feat_townlayout_editing:
+            # Grid painter mode
+            self._feat_handle_townlayout_painter_input(event)
+            return
+
+        # List mode (level 1)
+        n = len(self._feat_townlayout_list)
+        if event.key == pygame.K_ESCAPE:
+            self._feat_save_townlayouts()
+            self._feat_level = 0
+            self._feat_active_editor = None
+        elif event.key == pygame.K_UP and n > 0:
+            self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
+            self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
+                self._feat_townlayout_cursor, self._feat_townlayout_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._feat_townlayout_cursor = (self._feat_townlayout_cursor + 1) % n
+            self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
+                self._feat_townlayout_cursor, self._feat_townlayout_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
+            self._feat_enter_townlayout_painter()
+            self._feat_level = 2
+        elif event.key == pygame.K_a:
+            self._feat_add_townlayout()
+        elif event.key == pygame.K_d and n > 0:
+            self._feat_remove_townlayout()
+
+    def _feat_handle_townlayout_painter_input(self, event):
+        """Handle input in the town layout grid painter."""
+        if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
+            return
+        layout = self._feat_townlayout_list[self._feat_townlayout_cursor]
+        w = layout["width"]
+        h = layout["height"]
+
+        if event.key == pygame.K_ESCAPE:
+            self._feat_townlayout_editing = False
+            self._feat_level = 1
+        elif event.key == pygame.K_UP:
+            self._feat_townlayout_cy = max(0, self._feat_townlayout_cy - 1)
+        elif event.key == pygame.K_DOWN:
+            self._feat_townlayout_cy = min(h - 1, self._feat_townlayout_cy + 1)
+        elif event.key == pygame.K_LEFT:
+            self._feat_townlayout_cx = max(0, self._feat_townlayout_cx - 1)
+        elif event.key == pygame.K_RIGHT:
+            self._feat_townlayout_cx = min(w - 1, self._feat_townlayout_cx + 1)
+        elif event.key == pygame.K_RETURN:
+            # Paint current brush at cursor
+            brushes = self._feat_get_townlayout_brushes()
+            brush = brushes[self._feat_townlayout_brush_idx]
+            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
+            if brush["name"] == "Eraser":
+                layout["tiles"].pop(pos_key, None)
+            else:
+                layout["tiles"][pos_key] = {
+                    "tile_id": brush["tile_id"],
+                    "path": brush.get("path"),
+                    "name": brush["name"],
+                }
+        elif event.key in (pygame.K_TAB, pygame.K_b):
+            # Cycle brush
+            brushes = self._feat_get_townlayout_brushes()
+            n = len(brushes)
+            if event.mod & pygame.KMOD_SHIFT:
+                self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx - 1) % n
+            else:
+                self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx + 1) % n
+        elif event.key == pygame.K_s:
+            # Save
+            self._feat_save_townlayouts()
 
     def _feat_pxedit_open(self):
         """Open the pixel editor for the currently selected sprite."""
@@ -5380,6 +5581,11 @@ class Game:
         if event.type != pygame.KEYDOWN:
             return
 
+        # Town Layouts has its own input handler (bypasses generic ctx system)
+        if self._feat_active_editor == "townlayouts":
+            self._feat_handle_townlayout_input(event)
+            return
+
         # ── Resolve active editor data pointers ──
         ed = self._feat_active_editor
         # Build a context dict so the level-1 and level-2 code
@@ -5841,6 +6047,10 @@ class Game:
                 self._feat_active_editor = "gallery"
                 self._feat_load_gallery()
                 self._feat_level = 1
+            elif cat["label"] == "Town Layouts":
+                self._feat_active_editor = "townlayouts"
+                self._feat_load_townlayouts()
+                self._feat_level = 1
 
     def _feat_editor_ctx(self):
         """Return a dict of lambdas/refs for the active editor,
@@ -6237,6 +6447,14 @@ class Game:
                     pxedit_color_idx=self._feat_pxedit_color_idx,
                     pxedit_palette=self._feat_pxedit_palette,
                     pxedit_focus=self._feat_pxedit_focus,
+                    townlayout_list=self._feat_townlayout_list,
+                    townlayout_cursor=self._feat_townlayout_cursor,
+                    townlayout_scroll=self._feat_townlayout_scroll,
+                    townlayout_editing=self._feat_townlayout_editing,
+                    townlayout_cx=self._feat_townlayout_cx,
+                    townlayout_cy=self._feat_townlayout_cy,
+                    townlayout_brush_idx=self._feat_townlayout_brush_idx,
+                    townlayout_brushes=self._feat_get_townlayout_brushes() if self._feat_active_editor == "townlayouts" else [],
                 )
             elif self.showing_modules:
                 self.renderer.draw_module_screen(

@@ -7175,7 +7175,15 @@ class Renderer(CombatEffectRendererMixin):
                               pxedit_w=32, pxedit_h=32,
                               pxedit_color_idx=0,
                               pxedit_palette=None,
-                              pxedit_focus="canvas"):
+                              pxedit_focus="canvas",
+                              townlayout_list=None,
+                              townlayout_cursor=0,
+                              townlayout_scroll=0,
+                              townlayout_editing=False,
+                              townlayout_cx=0,
+                              townlayout_cy=0,
+                              townlayout_brush_idx=0,
+                              townlayout_brushes=None):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7424,6 +7432,138 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_tag_cursor,
                         gallery_all_cats or [],
                         fm, fs, f)
+            elif ed == "townlayouts" and not townlayout_editing:
+                # ── Town Layouts list ──
+                self._u3_text("Town Layouts", left_x + 12, panel_y + 8,
+                               self._U3_ORANGE, fs)
+                row_h = 40
+                ly = panel_y + 30
+                max_visible = (panel_h - 40) // row_h
+                tl_list = townlayout_list or []
+                tl_scroll = townlayout_scroll
+                for i in range(tl_scroll, min(tl_scroll + max_visible, len(tl_list))):
+                    draw_i = i - tl_scroll
+                    dy = ly + draw_i * row_h
+                    selected = (i == townlayout_cursor)
+                    if selected:
+                        bar = pygame.Surface((left_w - 4, row_h - 2),
+                                             pygame.SRCALPHA)
+                        bar.fill((255, 200, 60, 30))
+                        self.screen.blit(bar, (left_x + 2, dy))
+                    prefix = "> " if selected else "  "
+                    name = tl_list[i].get("name", "Unnamed")
+                    nc = self._U3_WHITE if selected else (180, 180, 180)
+                    self._u3_text(f"{prefix}{name}", left_x + 14, dy + 4, nc, fm)
+                    w = tl_list[i].get("width", 18)
+                    h = tl_list[i].get("height", 19)
+                    sc = (140, 180, 140) if selected else (120, 120, 140)
+                    self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
+
+                # Right panel: preview of selected layout
+                if 0 <= townlayout_cursor < len(tl_list):
+                    layout = tl_list[townlayout_cursor]
+                    self._draw_townlayout_preview(
+                        right_x + 12, panel_y + 12,
+                        right_w - 24, panel_h - 24,
+                        layout, -1, -1, -1, None)
+
+                self._u3_text(
+                    "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [Esc] Back",
+                    SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+                    self._U3_HINT, fs)
+
+            elif ed == "townlayouts" and townlayout_editing:
+                # ── Town Layout grid painter ──
+                tl_list = townlayout_list or []
+                if 0 <= townlayout_cursor < len(tl_list):
+                    layout = tl_list[townlayout_cursor]
+                    brushes = townlayout_brushes or []
+                    brush_name = (brushes[townlayout_brush_idx]["name"]
+                                  if brushes and townlayout_brush_idx < len(brushes)
+                                  else "?")
+
+                    # ── Left panel: brush palette ──
+                    self._u3_text(f"Editing: {layout.get('name', '?')}",
+                                  left_x + 12, panel_y + 8,
+                                  self._U3_ORANGE, fm)
+                    self._u3_text("BRUSH PALETTE", left_x + 12,
+                                  panel_y + 30, (120, 120, 160), fs)
+                    brush_row_h = 32
+                    brush_y0 = panel_y + 48
+                    max_brush_vis = (panel_h - 100) // brush_row_h
+                    # Scroll so selected brush is visible
+                    b_scroll = max(0, townlayout_brush_idx - max_brush_vis + 1)
+                    for bi in range(b_scroll,
+                                    min(b_scroll + max_brush_vis,
+                                        len(brushes))):
+                        by = brush_y0 + (bi - b_scroll) * brush_row_h
+                        b = brushes[bi]
+                        is_sel = (bi == townlayout_brush_idx)
+                        if is_sel:
+                            bar = pygame.Surface(
+                                (left_w - 8, brush_row_h - 2),
+                                pygame.SRCALPHA)
+                            bar.fill((255, 200, 60, 40))
+                            self.screen.blit(bar, (left_x + 4, by))
+                            pygame.draw.rect(
+                                self.screen, (200, 160, 60),
+                                (left_x + 4, by,
+                                 left_w - 8, brush_row_h - 2), 1)
+                        # Sprite preview (24px)
+                        icon_x = left_x + 12
+                        text_x = icon_x + 4
+                        b_path = b.get("path")
+                        if b_path:
+                            spr = self._get_unique_tile_sprite(
+                                b_path, 22)
+                            if spr:
+                                self.screen.blit(
+                                    spr, (icon_x, by + 4))
+                                text_x = icon_x + 28
+                        elif b.get("tile_id") is not None:
+                            # Colored square for base tiles
+                            TCOL = {10: (120, 100, 80),
+                                    11: (70, 55, 40),
+                                    12: (110, 80, 50),
+                                    13: (100, 70, 35),
+                                    14: (50, 150, 50)}
+                            tc = TCOL.get(b["tile_id"], (80, 80, 80))
+                            pygame.draw.rect(
+                                self.screen, tc,
+                                pygame.Rect(icon_x, by + 4, 22, 22))
+                            pygame.draw.rect(
+                                self.screen, (60, 50, 40),
+                                pygame.Rect(icon_x, by + 4, 22, 22), 1)
+                            text_x = icon_x + 28
+                        nc = ((255, 255, 100) if is_sel
+                              else (180, 180, 200))
+                        self._u3_text(b["name"], text_x, by + 6,
+                                      nc, fs)
+
+                    # Hint at bottom of left panel
+                    self._u3_text("[Tab] Next Brush",
+                                  left_x + 12,
+                                  panel_y + panel_h - 40,
+                                  (140, 140, 160), fs)
+                    self._u3_text("[Shift+Tab] Prev",
+                                  left_x + 12,
+                                  panel_y + panel_h - 24,
+                                  (140, 140, 160), fs)
+
+                    # ── Right panel: grid ──
+                    self._draw_townlayout_preview(
+                        right_x + 8, panel_y + 8,
+                        right_w - 16, panel_h - 16,
+                        layout, townlayout_cx, townlayout_cy,
+                        townlayout_brush_idx, brushes)
+
+                    # Footer
+                    self._u3_text(
+                        "[Arrows] Move  [Enter] Paint  "
+                        "[Tab] Brush  [Esc] Back",
+                        SCREEN_WIDTH // 2 - 200,
+                        SCREEN_HEIGHT - 45,
+                        self._U3_HINT, fs)
 
     def _draw_features_spell_list(self, left_x, left_w, right_x,
                                    right_w, panel_y, panel_h,
@@ -8361,6 +8501,81 @@ class Renderer(CombatEffectRendererMixin):
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 30, self._U3_HINT, fs)
+
+    def _draw_townlayout_preview(self, rx, ry, rw, rh,
+                                  layout, cx, cy, brush_idx, brushes):
+        """Draw a town layout grid preview/editor.
+
+        Parameters
+        ----------
+        rx, ry, rw, rh : bounding rectangle
+        layout : dict with width, height, tiles
+        cx, cy : cursor position (-1 = no cursor)
+        brush_idx : current brush index (-1 = no brush indicator)
+        brushes : list of brush dicts
+        """
+        tw = layout.get("width", 18)
+        th = layout.get("height", 19)
+        # Calculate tile size to fit
+        ts = min(rw // tw, rh // th, 24)
+        grid_w = tw * ts
+        grid_h = th * ts
+        gx = rx + (rw - grid_w) // 2
+        gy = ry
+
+        # Town tile colors
+        TILE_COLORS = {
+            10: (120, 100, 80),   # Floor
+            11: (70, 55, 40),     # Wall
+            12: (110, 80, 50),    # Counter
+            13: (100, 70, 35),    # Door
+            14: (50, 150, 50),    # Exit
+        }
+
+        tiles = layout.get("tiles", {})
+
+        for r in range(th):
+            for c in range(tw):
+                px = gx + c * ts
+                py = gy + r * ts
+                pos_key = f"{c},{r}"
+                is_edge = (c == 0 or c == tw - 1 or r == 0 or r == th - 1)
+
+                if pos_key in tiles:
+                    td = tiles[pos_key]
+                    tid = td.get("tile_id")
+                    # Try to load a sprite if path is set
+                    path = td.get("path")
+                    drawn = False
+                    if path:
+                        sprite = self._get_unique_tile_sprite(path, ts)
+                        if sprite:
+                            self.screen.blit(sprite, (px, py))
+                            drawn = True
+                    if not drawn:
+                        col = TILE_COLORS.get(tid, (80, 80, 80))
+                        pygame.draw.rect(self.screen, col,
+                                         pygame.Rect(px, py, ts, ts))
+                elif is_edge:
+                    # Default: wall on edges
+                    pygame.draw.rect(self.screen, (70, 55, 40),
+                                     pygame.Rect(px, py, ts, ts))
+                else:
+                    # Default: floor
+                    pygame.draw.rect(self.screen, (120, 100, 80),
+                                     pygame.Rect(px, py, ts, ts))
+
+                # Grid lines
+                pygame.draw.rect(self.screen, (40, 35, 30),
+                                 pygame.Rect(px, py, ts, ts), 1)
+
+        # Draw cursor
+        if cx >= 0 and cy >= 0:
+            elapsed = pygame.time.get_ticks() / 1000.0
+            pulse = int(80 + 40 * math.sin(elapsed * 4))
+            cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts, ts, ts)
+            pygame.draw.rect(self.screen, (255, 200, pulse),
+                             cursor_rect, 2)
 
     def _render_tile_preview(self, category, name, tile_id, size=96):
         """Render a tile preview surface showing how it looks in-game.
