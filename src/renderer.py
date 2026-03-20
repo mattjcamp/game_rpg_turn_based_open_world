@@ -36,6 +36,7 @@ class Renderer(CombatEffectRendererMixin):
         self.font = pygame.font.SysFont("liberationsans", 18)
         self.font_med = pygame.font.SysFont("liberationsans", 16)
         self.font_small = pygame.font.SysFont("liberationsans", 14)
+        self.font_mono = pygame.font.SysFont("liberationmono", 14)
 
         # Load unified tile manifest — single source of truth for all sprites
         from src.tile_manifest import TileManifest
@@ -7023,7 +7024,7 @@ class Renderer(CombatEffectRendererMixin):
             r = min(255, int(r * (1.0 + pulse)))
             g = min(255, int(g * (1.0 + pulse)))
             b = min(255, int(b * (1.0 + pulse)))
-            self._u3_text(line, 180, art_y + i * 16, (r, g, b), self.font_small)
+            self._u3_text(line, 180, art_y + i * 16, (r, g, b), self.font_mono)
 
         # ── Subtitle ──
         sub_fade = min(1.0, max(0.0, (elapsed - 1.5) / 1.0))
@@ -7043,10 +7044,10 @@ class Renderer(CombatEffectRendererMixin):
         if sep_fade > 0:
             sep_color = (int(80 * sep_fade), int(60 * sep_fade), int(40 * sep_fade))
             sep_text = "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~"
-            sw = len(sep_text) * 5
+            sw, _ = self.font_mono.size(sep_text)
             self._u3_text(sep_text,
                           SCREEN_WIDTH // 2 - sw // 2, sep_y,
-                          sep_color, self.font_small)
+                          sep_color, self.font_mono)
 
         # ── Menu options ──
         menu_y = sep_y + 35
@@ -8623,7 +8624,7 @@ class Renderer(CombatEffectRendererMixin):
         # ── Left panel: list ──
         self._u3_text(title, left_x + 12, panel_y + 8,
                        self._U3_ORANGE, fs)
-        row_h = 36
+        row_h = 40
         ly = panel_y + 30
         max_visible = (panel_h - 40) // row_h
 
@@ -8652,51 +8653,52 @@ class Renderer(CombatEffectRendererMixin):
         if cursor_drow >= dscroll + max_visible:
             dscroll = cursor_drow - max_visible + 1
 
-        header_h = 28
+        header_h = 32
         dy = ly
         for di in range(dscroll, min(dscroll + max_visible,
                                      len(display_rows))):
             rtype, si, label = display_rows[di]
             if rtype == "header":
+                # Separator line at top of header with padding
+                sep_y = dy + 4
                 pygame.draw.line(self.screen, (80, 70, 60),
-                                 (left_x + 10, dy + header_h - 2),
-                                 (left_x + left_w - 10,
-                                  dy + header_h - 2), 1)
-                self._u3_text(label or "", left_x + 12, dy,
+                                 (left_x + 10, sep_y),
+                                 (left_x + left_w - 10, sep_y), 1)
+                self._u3_text(label or "", left_x + 12, dy + 10,
                                self._U3_ORANGE, fs)
                 dy += header_h
             else:
                 item = data_list[si]
                 selected = (si == cursor)
                 if selected:
-                    bar = pygame.Surface((left_w - 4, row_h - 4),
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
                                          pygame.SRCALPHA)
                     bar.fill((255, 200, 60, 30))
-                    self.screen.blit(bar, (left_x + 2, dy - 1))
+                    self.screen.blit(bar, (left_x + 2, dy))
 
                 # Draw inline sprite (24px) for the list row
-                icon_x = left_x + 8
+                icon_x = left_x + 12
                 icon_size = 24
                 sprite = self._feat_get_sprite(item, icon_size)
-                text_x = left_x + 10
+                text_x = left_x + 14
                 if sprite:
-                    self.screen.blit(sprite, (icon_x, dy + 4))
-                    text_x = icon_x + icon_size + 6
+                    self.screen.blit(sprite, (icon_x, dy + 6))
+                    text_x = icon_x + icon_size + 8
                 else:
                     # For items, draw procedural icon inline
                     icon_type = item.get("icon", "")
                     if icon_type and "_section" in item:
                         self._draw_item_icon(
                             icon_x + icon_size // 2,
-                            dy + 4 + icon_size // 2,
+                            dy + 6 + icon_size // 2,
                             icon_type, icon_size)
-                        text_x = icon_x + icon_size + 6
+                        text_x = icon_x + icon_size + 8
 
                 prefix = "> " if selected else "  "
                 name = item.get("_name", item.get("name", f"#{si}"))
                 nc = self._U3_WHITE if selected else (180, 180, 180)
                 self._u3_text(f"{prefix}{name}",
-                              text_x, dy + 2, nc, fm)
+                              text_x, dy + 4, nc, fm)
                 # Subtitle
                 sub = ""
                 sub_x = text_x + 16
@@ -8709,7 +8711,7 @@ class Renderer(CombatEffectRendererMixin):
                     sub = f"ID {item['_tile_id']}  {walk}"
                 if sub:
                     sc = (140, 180, 140) if selected else (120, 120, 140)
-                    self._u3_text(sub, sub_x, dy + 20, sc, fs)
+                    self._u3_text(sub, sub_x, dy + 22, sc, fs)
                 dy += row_h
 
         # Scroll indicators
@@ -8727,13 +8729,13 @@ class Renderer(CombatEffectRendererMixin):
             max_pw = right_w - 36
             dy = panel_y + 12
 
-            # Large sprite preview (64px) in top-right corner
-            preview_size = 64
+            # Large sprite preview (56px) in top-right corner
+            preview_size = 56
             preview_sprite = self._feat_get_sprite(item, preview_size)
             preview_drawn = False
             if preview_sprite:
-                px = right_x + right_w - preview_size - 16
-                py = panel_y + 10
+                px = right_x + right_w - preview_size - 20
+                py = panel_y + 16
                 # Dark background behind sprite
                 bg = pygame.Surface(
                     (preview_size + 8, preview_size + 8),
@@ -8748,8 +8750,8 @@ class Renderer(CombatEffectRendererMixin):
                 preview_drawn = True
             elif "_section" in item and item.get("icon"):
                 # Procedural item icon preview
-                px = right_x + right_w - preview_size - 16
-                py = panel_y + 10
+                px = right_x + right_w - preview_size - 20
+                py = panel_y + 16
                 bg = pygame.Surface(
                     (preview_size + 8, preview_size + 8),
                     pygame.SRCALPHA)
@@ -8799,6 +8801,13 @@ class Renderer(CombatEffectRendererMixin):
                                    (180, 180, 200), fm)
                     dy += 20
                 dy += 8
+
+            # Ensure dy is below the sprite preview box before drawing
+            # the stats separator line
+            if preview_drawn:
+                preview_bottom = panel_y + 16 + preview_size + 8
+                if dy < preview_bottom:
+                    dy = preview_bottom
 
             # Show key stats
             pygame.draw.line(self.screen, (60, 50, 40),
@@ -8876,21 +8885,21 @@ class Renderer(CombatEffectRendererMixin):
                 # Tile type
                 walk_str = ("Walkable" if item.get("walkable")
                             else "Not Walkable")
-                self._u3_text(f"ID: {item['_tile_id']}  {walk_str}",
+                self._u3_text(walk_str,
                               right_x + 16, dy, (180, 180, 200), fs)
                 dy += 22
                 color = item.get("color", [128, 128, 128])
                 if isinstance(color, (list, tuple)) and len(color) == 3:
-                    # Draw color swatch
-                    swatch_y = dy
-                    swatch = pygame.Surface((40, 20))
+                    # Draw labeled color swatch (minimap color)
+                    self._u3_text("Map Color:",
+                                  right_x + 16, dy + 2,
+                                  (140, 140, 160), fs)
+                    swatch_x = right_x + 96
+                    swatch = pygame.Surface((40, 18))
                     swatch.fill(tuple(color))
-                    self.screen.blit(swatch, (right_x + 16, swatch_y))
+                    self.screen.blit(swatch, (swatch_x, dy + 1))
                     pygame.draw.rect(self.screen, (80, 70, 50),
-                                     (right_x + 16, swatch_y, 40, 20), 1)
-                    self._u3_text(
-                        f"  ({color[0]}, {color[1]}, {color[2]})",
-                        right_x + 60, dy + 2, (140, 140, 160), fs)
+                                     (swatch_x, dy + 1, 40, 18), 1)
                     dy += 28
 
         # Footer
@@ -14096,51 +14105,55 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── NAME ENTRY ──
         if step == "name":
-            self._u3_text("ENTER THY NAME:", cx, cy, (140, 140, 180))
+            f_main = self.font        # 18px
+            f_hint = self.font_med    # 16px
+            self._u3_text("ENTER THY NAME:", cx, cy, (140, 140, 180), f_main)
             # Name field with blinking cursor
             name_display = game._cc_name
             blink = int(elapsed * 2) % 2 == 0
             if blink:
                 name_display += "_"
-            name_surf = self.font.render(name_display, True, (255, 255, 255))
+            name_surf = f_main.render(name_display, True, (255, 255, 255))
             # Draw name in a bordered box
-            name_box = pygame.Rect(cx, cy + 30, pw - 40, 28)
+            name_box = pygame.Rect(cx, cy + 34, pw - 40, 32)
             pygame.draw.rect(self.screen, (20, 20, 40), name_box)
             pygame.draw.rect(self.screen, (100, 100, 160), name_box, 1)
-            self.screen.blit(name_surf, (cx + 8, cy + 34))
-            self._u3_text("(MAX 12 CHARACTERS)", cx, cy + 70,
-                          (140, 140, 160), self.font_small)
+            self.screen.blit(name_surf, (cx + 8, cy + 38))
+            self._u3_text("(MAX 12 CHARACTERS)", cx, cy + 78,
+                          (140, 140, 160), f_hint)
             self._u3_text("[ENTER] NEXT   [ESC] BACK", cx, cy + ph - 60,
-                          (180, 180, 200), self.font_small)
+                          (180, 180, 200), f_hint)
 
         # ── RACE SELECTION ──
         elif step == "race":
-            self._u3_text("CHOOSE THY RACE:", cx, cy, (140, 140, 180))
+            f_main = self.font
+            f_hint = self.font_med
+            self._u3_text("CHOOSE THY RACE:", cx, cy, (140, 140, 180), f_main)
             for i, race in enumerate(VALID_RACES):
-                ry = cy + 30 + i * 36
+                ry = cy + 34 + i * 40
                 if i == game._cc_race_cursor:
-                    # Selection bar
-                    bar = pygame.Rect(cx, ry - 2, pw - 40, 30)
+                    bar = pygame.Rect(cx, ry - 4, pw // 2 - 20, 34)
                     pygame.draw.rect(self.screen, (30, 30, 60), bar)
                     pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
-                    arrow_x = cx + 4
                     bob = int(math.sin(elapsed * 4) * 3)
-                    self._u3_text(">", arrow_x + bob, ry,
-                                  (255, 200, 60))
-                    self._u3_text(race, cx + 20, ry, (255, 255, 100))
+                    self._u3_text(">", cx + 4 + bob, ry,
+                                  (255, 200, 60), f_main)
+                    self._u3_text(race, cx + 24, ry, (255, 255, 100), f_main)
                     # Show race info on the right
                     info = RACE_INFO.get(race, {})
                     desc = info.get("description", "")
                     effects = info.get("effects", [])
                     mods = info.get("stat_modifiers", {})
                     info_x = cx + pw // 2
-                    self._u3_text("DESCRIPTION:", info_x, cy + 30,
-                                  (120, 120, 160), self.font_small)
+                    iy = cy + 34
+                    self._u3_text("DESCRIPTION:", info_x, iy,
+                                  (120, 120, 160), f_hint)
+                    iy += 22
                     # Word-wrap description
                     words = desc.split()
                     lines, line = [], ""
                     for w in words:
-                        if len(line) + len(w) + 1 > 36:
+                        if len(line) + len(w) + 1 > 32:
                             lines.append(line)
                             line = w
                         else:
@@ -14148,131 +14161,156 @@ class Renderer(CombatEffectRendererMixin):
                     if line:
                         lines.append(line)
                     for li, l in enumerate(lines[:4]):
-                        self._u3_text(l, info_x, cy + 46 + li * 14,
-                                      (160, 160, 180), self.font_small)
+                        self._u3_text(l, info_x, iy + li * 18,
+                                      (160, 160, 180), f_hint)
+                    iy += len(lines[:4]) * 18 + 14
                     # Stat mods
-                    mod_y = cy + 110
-                    self._u3_text("STAT MODIFIERS:", info_x, mod_y,
-                                  (120, 120, 160), self.font_small)
+                    self._u3_text("STAT MODIFIERS:", info_x, iy,
+                                  (120, 120, 160), f_hint)
+                    iy += 22
                     for j, (stat, val) in enumerate(mods.items()):
                         sign = "+" if val >= 0 else ""
                         col = ((100, 200, 100) if val > 0
                                else (200, 100, 100) if val < 0
                                else (120, 120, 120))
                         self._u3_text(
-                            f"{stat[:3]}: {sign}{val}",
-                            info_x + (j % 2) * 100,
-                            mod_y + 16 + (j // 2) * 16,
-                            col, self.font_small)
+                            f"{stat[:3].title()}: {sign}{val}",
+                            info_x + (j % 2) * 110,
+                            iy + (j // 2) * 20,
+                            col, f_hint)
+                    iy += ((len(mods) + 1) // 2) * 20 + 10
                     # Effects
                     if effects:
-                        eff_y = mod_y + 56
-                        self._u3_text("INNATE EFFECTS:", info_x, eff_y,
-                                      (120, 120, 160), self.font_small)
+                        self._u3_text("INNATE EFFECTS:", info_x, iy,
+                                      (120, 120, 160), f_hint)
+                        iy += 22
                         for ei, e in enumerate(effects):
                             self._u3_text(
-                                e.replace("_", " "),
-                                info_x, eff_y + 16 + ei * 14,
-                                (180, 160, 100), self.font_small)
+                                e.replace("_", " ").title(),
+                                info_x, iy + ei * 20,
+                                (180, 160, 100), f_hint)
                 else:
-                    self._u3_text(race, cx + 20, ry, (180, 180, 200))
+                    self._u3_text(race, cx + 24, ry, (180, 180, 200), f_main)
             self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
-                          cx, cy + ph - 60, (68, 68, 200), self.font_small)
+                          cx, cy + ph - 60, (68, 68, 200), f_hint)
 
         # ── GENDER SELECTION ──
         elif step == "gender":
             from src.party import PartyMember
-            self._u3_text("CHOOSE THY GENDER:", cx, cy, (140, 140, 180))
+            f_main = self.font
+            f_hint = self.font_med
+            self._u3_text("CHOOSE THY GENDER:", cx, cy, (140, 140, 180), f_main)
             for i, gender in enumerate(PartyMember.VALID_GENDERS):
-                gy = cy + 30 + i * 36
+                gy = cy + 34 + i * 40
                 if i == game._cc_gender_cursor:
-                    bar = pygame.Rect(cx, gy - 2, pw // 2, 30)
+                    bar = pygame.Rect(cx, gy - 4, pw // 2 - 20, 34)
                     pygame.draw.rect(self.screen, (30, 30, 60), bar)
                     pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
                     bob = int(math.sin(elapsed * 4) * 3)
-                    self._u3_text(">", cx + 4 + bob, gy, (255, 200, 60))
-                    self._u3_text(gender, cx + 20, gy, (255, 255, 100))
+                    self._u3_text(">", cx + 4 + bob, gy, (255, 200, 60), f_main)
+                    self._u3_text(gender, cx + 24, gy, (255, 255, 100), f_main)
                 else:
-                    self._u3_text(gender, cx + 20, gy, (180, 180, 200))
+                    self._u3_text(gender, cx + 24, gy, (180, 180, 200), f_main)
             # Show summary so far
             sum_x = cx + pw // 2
-            self._u3_text("SUMMARY:", sum_x, cy + 30,
-                          (120, 120, 160), self.font_small)
-            self._u3_text(f"NAME:  {game._cc_name}", sum_x, cy + 50,
-                          (180, 180, 200), self.font_small)
-            self._u3_text(f"RACE:  {game._cc_selected_race()}", sum_x,
-                          cy + 66, (180, 180, 200), self.font_small)
+            sum_val_x = sum_x + 80
+            self._u3_text("SUMMARY:", sum_x, cy + 34,
+                          (120, 120, 160), f_hint)
+            sy = cy + 58
+            for lbl, val in [("NAME:", game._cc_name),
+                             ("RACE:", game._cc_selected_race())]:
+                self._u3_text(lbl, sum_x, sy, (140, 140, 160), f_hint)
+                self._u3_text(val, sum_val_x, sy, (200, 200, 220), f_hint)
+                sy += 24
             self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
-                          cx, cy + ph - 60, (180, 180, 200), self.font_small)
+                          cx, cy + ph - 60, (180, 180, 200), f_hint)
 
         # ── CLASS SELECTION ──
         elif step == "class":
             from src.party import PartyMember as _PM
+            f_main = self.font        # 18px
+            f_hint = self.font_med    # 16px
             valid = game._cc_valid_classes_for_race()
-            self._u3_text("CHOOSE THY CLASS:", cx, cy, (140, 140, 180))
+            self._u3_text("CHOOSE THY CLASS:", cx, cy, (140, 140, 180), f_main)
             # List classes (scrollable if needed)
-            visible = min(len(valid), 11)
+            visible = min(len(valid), 9)
             scroll = max(0, game._cc_class_cursor - visible + 1)
             for i in range(scroll, min(scroll + visible, len(valid))):
                 draw_i = i - scroll
-                cly = cy + 30 + draw_i * 28
+                cly = cy + 34 + draw_i * 34
                 cls_name = valid[i]
                 if i == game._cc_class_cursor:
-                    bar = pygame.Rect(cx, cly - 2, pw // 2 - 20, 24)
+                    bar = pygame.Rect(cx, cly - 4, pw // 2 - 20, 30)
                     pygame.draw.rect(self.screen, (30, 30, 60), bar)
                     pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
                     bob = int(math.sin(elapsed * 4) * 3)
-                    self._u3_text(">", cx + 4 + bob, cly, (255, 200, 60))
-                    self._u3_text(cls_name, cx + 20, cly, (255, 255, 100))
+                    self._u3_text(">", cx + 4 + bob, cly, (255, 200, 60), f_main)
+                    self._u3_text(cls_name, cx + 20, cly, (255, 255, 100), f_main)
                     # Show class info on the right
                     tmpl = _PM._load_class_template(cls_name)
                     info_x = cx + pw // 2
-                    self._u3_text("CLASS INFO:", info_x, cy + 30,
-                                  (120, 120, 160), self.font_small)
+                    val_x = info_x + 110   # column for values
+                    iy = cy + 30
+                    fs = f_hint
+
+                    self._u3_text("CLASS INFO:", info_x, iy,
+                                  (120, 120, 160), fs)
+                    iy += 26
+
                     spell = tmpl.get("spell_type", "none")
                     hp_lv = tmpl.get("hp_per_level", 0)
                     mp_lv = tmpl.get("mp_per_level", 0)
                     rng = tmpl.get("range", 1)
-                    self._u3_text(f"HP/LVL:     {hp_lv}", info_x,
-                                  cy + 50, (160, 200, 160), self.font_small)
-                    self._u3_text(f"MP/LVL:     {mp_lv}", info_x,
-                                  cy + 66, (160, 160, 200), self.font_small)
-                    self._u3_text(f"SPELL TYPE: {spell}", info_x,
-                                  cy + 82, (180, 160, 100), self.font_small)
-                    self._u3_text(f"RANGE:      {rng}", info_x,
-                                  cy + 98, (160, 160, 160), self.font_small)
+
+                    stats = [
+                        ("HP/LVL:", str(hp_lv), (160, 200, 160)),
+                        ("MP/LVL:", str(mp_lv), (160, 160, 200)),
+                        ("SPELL TYPE:", spell, (180, 160, 100)),
+                        ("RANGE:", str(rng), (160, 160, 160)),
+                    ]
+                    for lbl, val, col in stats:
+                        self._u3_text(lbl, info_x, iy,
+                                      (140, 140, 160), fs)
+                        self._u3_text(val, val_x, iy, col, fs)
+                        iy += 22
+
                     # Weapon/armor access
+                    iy += 12
                     wpn = tmpl.get("allowed_weapons")
                     arm = tmpl.get("allowed_armor")
                     wpn_str = "ALL" if wpn is None else ", ".join(
                         sorted(wpn))
                     arm_str = "ALL" if arm is None else ", ".join(
                         sorted(arm))
-                    self._u3_text("WEAPONS:", info_x, cy + 122,
-                                  (120, 120, 160), self.font_small)
-                    # Word-wrap
-                    for wi, chunk in enumerate(
-                            [wpn_str[j:j+30]
-                             for j in range(0, len(wpn_str), 30)]):
-                        self._u3_text(chunk, info_x, cy + 136 + wi * 14,
-                                      (160, 160, 180), self.font_small)
-                    arm_y = cy + 136 + (len(wpn_str) // 30 + 1) * 14 + 4
-                    self._u3_text("ARMOR:", info_x, arm_y,
-                                  (120, 120, 160), self.font_small)
-                    for ai, chunk in enumerate(
-                            [arm_str[j:j+30]
-                             for j in range(0, len(arm_str), 30)]):
-                        self._u3_text(chunk, info_x,
-                                      arm_y + 14 + ai * 14,
-                                      (160, 160, 180), self.font_small)
+
+                    self._u3_text("WEAPONS:", info_x, iy,
+                                  (120, 120, 160), fs)
+                    iy += 20
+                    for chunk in [wpn_str[j:j+30]
+                                  for j in range(0, len(wpn_str), 30)]:
+                        self._u3_text(chunk, info_x,  iy,
+                                      (160, 160, 180), fs)
+                        iy += 18
+
+                    iy += 12
+                    self._u3_text("ARMOR:", info_x, iy,
+                                  (120, 120, 160), fs)
+                    iy += 20
+                    for chunk in [arm_str[j:j+30]
+                                  for j in range(0, len(arm_str), 30)]:
+                        self._u3_text(chunk, info_x, iy,
+                                      (160, 160, 180), fs)
+                        iy += 18
                 else:
-                    self._u3_text(cls_name, cx + 20, cly, (180, 180, 200))
+                    self._u3_text(cls_name, cx + 20, cly, (180, 180, 200), f_main)
             self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
-                          cx, cy + ph - 60, (180, 180, 200), self.font_small)
+                          cx, cy + ph - 60, (180, 180, 200), f_hint)
 
         # ── TILE SELECTION ──
         elif step == "tile":
-            self._u3_text("CHOOSE THY APPEARANCE:", cx, cy, (140, 140, 180))
+            f_main = self.font        # 18px
+            f_hint = self.font_med    # 16px
+            self._u3_text("CHOOSE THY APPEARANCE:", cx, cy, (140, 140, 180), f_main)
             tiles = game._cc_tiles
             tile_cursor = game._cc_tile_cursor
             # Grid layout: 6 tiles per row, 80px cells
@@ -14280,7 +14318,7 @@ class Renderer(CombatEffectRendererMixin):
             cell_w = 80
             cell_h = 90
             grid_x = cx + 10
-            grid_y = cy + 28
+            grid_y = cy + 30
             # Calculate visible rows
             max_rows = (ph - 120) // cell_h
             total_rows = (len(tiles) + cols - 1) // cols
@@ -14317,27 +14355,27 @@ class Renderer(CombatEffectRendererMixin):
                 # Truncate long names
                 if len(name) > 10:
                     name = name[:9] + "."
-                nw, _ = self.font_small.size(name)
+                nw, _ = f_hint.size(name)
                 self._u3_text(name,
                               tx + (cell_w - 8 - nw) // 2,
-                              ty + 58, name_col, self.font_small)
+                              ty + 58, name_col, f_hint)
 
             # Scroll indicators
             if scroll_row > 0:
                 self._u3_text("^ MORE ^",
                               grid_x + (cols * cell_w) // 2 - 30,
-                              grid_y - 10, (180, 180, 200), self.font_small)
+                              grid_y - 10, (180, 180, 200), f_hint)
             if scroll_row + max_rows < total_rows:
                 self._u3_text("v MORE v",
                               grid_x + (cols * cell_w) // 2 - 30,
                               grid_y + max_rows * cell_h - 4,
-                              (180, 180, 200), self.font_small)
+                              (180, 180, 200), f_hint)
 
             # Preview of selected tile on the right
             if 0 <= tile_cursor < len(tiles):
                 sel_tile = tiles[tile_cursor]
                 preview_x = cx + pw - 160
-                preview_y = cy + 28
+                preview_y = cy + 30
                 # Large preview with circle bg
                 circle_r = 52
                 pcx = preview_x + circle_r
@@ -14349,87 +14387,115 @@ class Renderer(CombatEffectRendererMixin):
                 self._draw_cc_tile(sel_tile["file"], pcx, pcy, 80)
                 # Name below preview
                 pn = sel_tile["name"]
-                pnw, _ = self.font.size(pn)
+                pnw, _ = f_main.size(pn)
                 self._u3_text(pn, pcx - pnw // 2,
                               preview_y + circle_r * 2 + 10,
-                              (255, 255, 255), self.font)
+                              (255, 255, 255), f_main)
 
             self._u3_text(
                 "[ARROWS] BROWSE   [ENTER] NEXT   [ESC] BACK",
-                cx, cy + ph - 60, (180, 180, 200), self.font_small)
+                cx, cy + ph - 60, (180, 180, 200), f_hint)
 
         # ── STAT ALLOCATION ──
         elif step == "stats":
             remaining = game._cc_points_remaining
+            f_main = self.font        # 18px
+            f_hint = self.font_med    # 16px
+
             self._u3_text("DISTRIBUTE THY ATTRIBUTES:", cx, cy,
-                          (140, 140, 180))
+                          (140, 140, 180), f_main)
             pts_col = ((100, 200, 100) if remaining > 0
                        else (200, 200, 60))
             self._u3_text(f"POINTS REMAINING: {remaining}", cx,
-                          cy + 18, pts_col, self.font_small)
+                          cy + 24, pts_col, f_hint)
+
+            # Left column: stat bars (half panel width)
+            stat_col_w = pw // 2 - 20
+            bar_max_w = 180
+            bar_x = cx + 120
+            row_h = 50
+
             for i, stat_key in enumerate(game._cc_stat_names):
-                sy = cy + 48 + i * 40
+                sy = cy + 52 + i * row_h
                 val = game._cc_stats[stat_key]
-                label = stat_key[:3]
+                label = stat_key[:3].title()
                 if i == game._cc_stat_cursor:
-                    bar = pygame.Rect(cx, sy - 4, pw - 40, 34)
-                    pygame.draw.rect(self.screen, (30, 30, 60), bar)
-                    pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
+                    sel_bar = pygame.Rect(
+                        cx, sy - 6, stat_col_w, row_h - 4)
+                    pygame.draw.rect(self.screen, (30, 30, 60),
+                                     sel_bar)
+                    pygame.draw.rect(self.screen, (100, 100, 200),
+                                     sel_bar, 1)
                     bob = int(math.sin(elapsed * 4) * 3)
                     self._u3_text(">", cx + 4 + bob, sy,
-                                  (255, 200, 60))
-                    self._u3_text(f"{label}:", cx + 20, sy,
-                                  (255, 255, 100))
+                                  (255, 200, 60), f_main)
+                    self._u3_text(f"{label}:", cx + 22, sy,
+                                  (255, 255, 100), f_main)
                 else:
-                    self._u3_text(f"{label}:", cx + 20, sy,
-                                  (180, 180, 200))
-                # Value with bar
-                self._u3_text(f"{val:2d}", cx + 70, sy, (255, 255, 255))
+                    self._u3_text(f"{label}:", cx + 22, sy,
+                                  (180, 180, 200), f_main)
+
+                # Value
+                self._u3_text(f"{val:2d}", cx + 74, sy,
+                              (255, 255, 255), f_main)
                 # Visual bar
-                bar_x = cx + 110
-                bar_w = int((val - 5) / 20 * 200)
-                bar_bg = pygame.Rect(bar_x, sy + 2, 200, 12)
-                bar_fill = pygame.Rect(bar_x, sy + 2, bar_w, 12)
+                bar_w = int((val - 5) / 20 * bar_max_w)
+                bar_bg = pygame.Rect(bar_x, sy + 3, bar_max_w, 12)
+                bar_fill = pygame.Rect(bar_x, sy + 3, bar_w, 12)
                 pygame.draw.rect(self.screen, (20, 20, 40), bar_bg)
                 bar_color = ((80, 160, 80) if val >= 15
                              else (160, 160, 80) if val >= 10
                              else (160, 80, 80))
                 if bar_w > 0:
                     pygame.draw.rect(self.screen, bar_color, bar_fill)
-                pygame.draw.rect(self.screen, (60, 60, 100), bar_bg, 1)
-                # Min/max labels
-                self._u3_text("5", bar_x - 2, sy + 16,
-                              (140, 140, 160), self.font_small)
-                self._u3_text("25", bar_x + 194, sy + 16,
-                              (140, 140, 160), self.font_small)
-            # Summary on the right
-            sum_x = cx + pw // 2 + 40
-            self._u3_text("SUMMARY:", sum_x, cy + 48,
-                          (120, 120, 160), self.font_small)
-            self._u3_text(f"NAME:   {game._cc_name}", sum_x, cy + 68,
-                          (180, 180, 200), self.font_small)
-            self._u3_text(f"RACE:   {game._cc_selected_race()}", sum_x,
-                          cy + 84, (180, 180, 200), self.font_small)
-            self._u3_text(f"GENDER: {game._cc_selected_gender()}", sum_x,
-                          cy + 100, (180, 180, 200), self.font_small)
-            self._u3_text(f"CLASS:  {game._cc_selected_class()}", sum_x,
-                          cy + 116, (180, 180, 200), self.font_small)
+                pygame.draw.rect(self.screen, (60, 60, 100),
+                                 bar_bg, 1)
+                # Min/max labels below bar
+                self._u3_text("5", bar_x, sy + 18,
+                              (100, 100, 120), f_hint)
+                self._u3_text("25", bar_x + bar_max_w - 14,
+                              sy + 18, (100, 100, 120), f_hint)
+
+            # Right column: summary
+            sum_x = cx + pw // 2 + 20
+            sum_val_x = sum_x + 80
+            sy = cy + 52
+
+            self._u3_text("SUMMARY:", sum_x, sy,
+                          (120, 120, 160), f_hint)
+            sy += 28
+
+            summary = [
+                ("NAME:", game._cc_name),
+                ("RACE:", game._cc_selected_race()),
+                ("GENDER:", game._cc_selected_gender()),
+                ("CLASS:", game._cc_selected_class()),
+            ]
+            for lbl, val in summary:
+                self._u3_text(lbl, sum_x, sy,
+                              (140, 140, 160), f_hint)
+                self._u3_text(val, sum_val_x, sy,
+                              (200, 200, 220), f_hint)
+                sy += 24
+
             # Hints
             hint = "[LEFT/RIGHT] ADJUST   [UP/DOWN] SELECT STAT"
             self._u3_text(hint, cx, cy + ph - 76,
-                          (180, 180, 200), self.font_small)
+                          (180, 180, 200), f_hint)
             if remaining == 0:
                 self._u3_text("[ENTER] NEXT   [ESC] BACK", cx,
-                              cy + ph - 60, (180, 180, 200), self.font_small)
+                              cy + ph - 60, (180, 180, 200), f_hint)
             else:
                 self._u3_text(
                     "SPEND ALL POINTS TO CONTINUE   [ESC] BACK",
-                    cx, cy + ph - 60, (140, 100, 60), self.font_small)
+                    cx, cy + ph - 60, (140, 100, 60), f_hint)
 
         # ── CONFIRM ──
         elif step == "confirm":
+            f_main = self.font        # 18px
+            f_hint = self.font_med    # 16px
             self._u3_text("CONFIRM THY CHARACTER:", cx, cy,
-                          (140, 140, 180))
+                          (140, 140, 180), f_main)
 
             # Selected tile preview on the right
             tile_file = game._cc_selected_tile()
@@ -14443,53 +14509,59 @@ class Renderer(CombatEffectRendererMixin):
                                    (preview_cx, preview_cy), circle_r, 1)
                 self._draw_cc_tile(tile_file, preview_cx, preview_cy, 72)
 
-            # Full summary
-            dy = cy + 30
-            self._u3_text(f"NAME:   {game._cc_name}", cx, dy,
-                          (255, 255, 255))
-            self._u3_text(f"RACE:   {game._cc_selected_race()}",
-                          cx, dy + 20, (255, 255, 255))
-            self._u3_text(f"GENDER: {game._cc_selected_gender()}",
-                          cx, dy + 40, (255, 255, 255))
-            self._u3_text(f"CLASS:  {game._cc_selected_class()}",
-                          cx, dy + 60, (255, 255, 255))
-            dy += 90
+            # Full summary — two-column layout
+            val_x = cx + 80
+            dy = cy + 34
+            for lbl, val in [("NAME:", game._cc_name),
+                             ("RACE:", game._cc_selected_race()),
+                             ("GENDER:", game._cc_selected_gender()),
+                             ("CLASS:", game._cc_selected_class())]:
+                self._u3_text(lbl, cx, dy, (140, 140, 160), f_main)
+                self._u3_text(val, val_x, dy, (255, 255, 255), f_main)
+                dy += 24
+            dy += 10
+            stat_val_x = cx + 50
             for stat_key in game._cc_stat_names:
                 val = game._cc_stats[stat_key]
                 self._u3_text(
-                    f"{stat_key[:3]}: {val:2d}",
-                    cx, dy, (200, 200, 220))
-                dy += 18
+                    f"{stat_key[:3].title()}:", cx, dy,
+                    (140, 140, 160), f_main)
+                self._u3_text(
+                    f"{val:2d}", stat_val_x, dy,
+                    (200, 200, 220), f_main)
+                dy += 22
             # Confirm/cancel buttons
-            btn_y = dy + 30
+            btn_y = dy + 24
             for i, label in enumerate(["CREATE", "CANCEL"]):
-                by = btn_y + i * 36
+                by = btn_y + i * 38
                 if i == game._cc_confirm_cursor:
-                    bar = pygame.Rect(cx, by - 2, 200, 30)
+                    bar = pygame.Rect(cx, by - 4, 200, 32)
                     pygame.draw.rect(self.screen, (30, 30, 60), bar)
                     pygame.draw.rect(self.screen, (100, 100, 200), bar, 1)
                     bob = int(math.sin(elapsed * 4) * 3)
-                    self._u3_text(">", cx + 4 + bob, by, (255, 200, 60))
-                    self._u3_text(label, cx + 20, by, (255, 255, 100))
+                    self._u3_text(">", cx + 4 + bob, by, (255, 200, 60), f_main)
+                    self._u3_text(label, cx + 20, by, (255, 255, 100), f_main)
                 else:
-                    self._u3_text(label, cx + 20, by, (180, 180, 200))
+                    self._u3_text(label, cx + 20, by, (180, 180, 200), f_main)
             self._u3_text("[UP/DOWN] SELECT   [ENTER] CHOOSE   [ESC] BACK",
-                          cx, cy + ph - 60, (180, 180, 200), self.font_small)
+                          cx, cy + ph - 60, (180, 180, 200), f_hint)
 
         # ── DONE ──
         elif step == "done":
+            f_main = self.font        # 18px
+            f_hint = self.font_med    # 16px
             self._u3_text("CHARACTER CREATED!", cx, cy + 40,
-                          (100, 200, 100))
+                          (100, 200, 100), f_main)
             self._u3_text(
                 f"{game._cc_name} THE {game._cc_selected_race()}"
                 f" {game._cc_selected_class()}"
                 f" HAS JOINED THE ROSTER.",
-                cx, cy + 70, (180, 180, 200), self.font_small)
+                cx, cy + 70, (180, 180, 200), f_hint)
             self._u3_text(
                 f"ROSTER: {len(game.party.roster)}/{game.party.MAX_ROSTER}",
-                cx, cy + 100, (180, 180, 200), self.font_small)
+                cx, cy + 100, (180, 180, 200), f_hint)
             self._u3_text("[ANY KEY] RETURN TO TITLE",
-                          cx, cy + ph - 60, (180, 180, 200), self.font_small)
+                          cx, cy + ph - 60, (180, 180, 200), f_hint)
 
         # ── Feedback message overlay ──
         if game._cc_message and game._cc_msg_timer > 0:
