@@ -4108,7 +4108,7 @@ class Game:
                 else:
                     self._battle_screen_obstacles[pos] = brush
             else:
-                brush = self._EXAMINE_BRUSHES[self._battle_tile_brush_idx]
+                brush = self._get_examine_brushes()[self._battle_tile_brush_idx]
                 if brush == "eraser":
                     self._battle_screen_painted.pop(pos, None)
                 else:
@@ -4125,7 +4125,7 @@ class Game:
                     self._battle_brush_idx = (
                         self._battle_brush_idx + 1) % n
             else:
-                n = len(self._EXAMINE_BRUSHES)
+                n = len(self._get_examine_brushes())
                 if event.mod & pygame.KMOD_SHIFT:
                     self._battle_tile_brush_idx = (
                         self._battle_tile_brush_idx - 1) % n
@@ -4168,7 +4168,7 @@ class Game:
         if self._battle_mode == "obstacle":
             brush = self._BATTLE_OBSTACLE_TYPES[self._battle_brush_idx]
         elif self._battle_mode == "tile":
-            brush = self._EXAMINE_BRUSHES[self._battle_tile_brush_idx]
+            brush = self._get_examine_brushes()[self._battle_tile_brush_idx]
         else:
             brush = None
         return {
@@ -4191,26 +4191,43 @@ class Game:
         "dungeon_floor", "floor",
     ]
 
-    # Tile graphic choices — "none" means invisible (text-only discovery).
-    # Paths are relative to the assets directory.
-    _UTILE_TILE_GRAPHICS = [
-        "none",
-        "game/landmarks/moongate_active.png",
-        "game/landmarks/moongate_dormant.png",
-        "game/landmarks/ruined_tower.png",
-        "game/landmarks/treasure_hoard.png",
-        "game/landmarks/lava_vent.png",
-        "game/landmarks/poison_swamp.png",
-        "game/landmarks/smuggler_tunnel.png",
-        "game/landmarks/sunken_shipwreck.png",
-        "game/terrain/altar.png",
-        "game/terrain/bridge.png",
-        "game/terrain/door.png",
-        "game/dungeon/portal_open.png",
-        "game/dungeon/chest_tile.png",
-        "game/dungeon/sparkle.png",
-        "game/dungeon/torch_post.png",
-    ]
+    # Tile graphic choices — built dynamically from the manifest.
+    # "none" means invisible (text-only discovery).
+    _UTILE_TILE_GRAPHICS = None  # built lazily
+
+    @classmethod
+    def _get_utile_tile_graphics(cls):
+        """Build tile graphic choices from the manifest."""
+        if cls._UTILE_TILE_GRAPHICS is not None:
+            return cls._UTILE_TILE_GRAPHICS
+        import json, os
+        choices = ["none"]
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            manifest = {}
+        seen = set()
+        for cat in ("overworld", "town", "dungeon",
+                     "unique_tiles", "objects"):
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            for name, entry in sorted(section.items()):
+                if not (isinstance(entry, dict) and "path" in entry):
+                    continue
+                p = entry["path"]
+                # Convert to assets-relative path
+                if p.startswith("src/assets/"):
+                    p = p[len("src/assets/"):]
+                if p not in seen:
+                    seen.add(p)
+                    choices.append(p)
+        cls._UTILE_TILE_GRAPHICS = choices
+        return choices
 
     def _in_unique_tiles_folder(self):
         """Return True if the section browser is inside the Unique Tiles folder."""
@@ -4365,26 +4382,41 @@ class Game:
             }
         return cls._BASE_TILE_TO_TYPE
 
-    # Brush palette for the examine editor.  "eraser" clears a cell.
-    # The rest are asset paths rendered as sprites on the grid.
-    _EXAMINE_BRUSHES = [
-        "eraser",
-        "game/landmarks/moongate_active.png",
-        "game/landmarks/moongate_dormant.png",
-        "game/landmarks/ruined_tower.png",
-        "game/landmarks/treasure_hoard.png",
-        "game/landmarks/lava_vent.png",
-        "game/landmarks/poison_swamp.png",
-        "game/landmarks/smuggler_tunnel.png",
-        "game/landmarks/sunken_shipwreck.png",
-        "game/terrain/altar.png",
-        "game/terrain/bridge.png",
-        "game/terrain/door.png",
-        "game/dungeon/portal_open.png",
-        "game/dungeon/chest_tile.png",
-        "game/dungeon/sparkle.png",
-        "game/dungeon/torch_post.png",
-    ]
+    # Brush palette for the examine editor — built dynamically.
+    _EXAMINE_BRUSHES = None  # built lazily
+
+    @classmethod
+    def _get_examine_brushes(cls):
+        """Build examine brush list from the manifest."""
+        if cls._EXAMINE_BRUSHES is not None:
+            return cls._EXAMINE_BRUSHES
+        import json, os
+        brushes = ["eraser"]
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            manifest = {}
+        seen = set()
+        for cat in ("overworld", "town", "dungeon",
+                     "unique_tiles", "objects"):
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            for name, entry in sorted(section.items()):
+                if not (isinstance(entry, dict) and "path" in entry):
+                    continue
+                p = entry["path"]
+                if p.startswith("src/assets/"):
+                    p = p[len("src/assets/"):]
+                if p not in seen:
+                    seen.add(p)
+                    brushes.append(p)
+        cls._EXAMINE_BRUSHES = brushes
+        return brushes
 
     # Item palette for the examine editor.  "eraser" clears an item.
     _EXAMINE_ITEMS = [
@@ -4491,7 +4523,7 @@ class Game:
         elif event.key == pygame.K_RETURN:
             pos = (self._examine_cursor_col, self._examine_cursor_row)
             if self._examine_mode == "tile":
-                brush = self._EXAMINE_BRUSHES[self._examine_brush_idx]
+                brush = self._get_examine_brushes()[self._examine_brush_idx]
                 if brush == "eraser":
                     self._examine_painted.pop(pos, None)
                 else:
@@ -4506,7 +4538,7 @@ class Game:
         # Cycle brush/item — Tab / B forward, Shift+Tab backward
         elif event.key in (pygame.K_TAB, pygame.K_b):
             if self._examine_mode == "tile":
-                n = len(self._EXAMINE_BRUSHES)
+                n = len(self._get_examine_brushes())
                 if event.mod & pygame.KMOD_SHIFT:
                     self._examine_brush_idx = (
                         self._examine_brush_idx - 1) % n
@@ -4536,7 +4568,7 @@ class Game:
         from src.settings import TILE_GRASS
         mode = getattr(self, "_examine_mode", "tile")
         if mode == "tile":
-            current_brush = self._EXAMINE_BRUSHES[
+            current_brush = self._get_examine_brushes()[
                 getattr(self, "_examine_brush_idx", 0)]
         else:
             current_brush = self._EXAMINE_ITEMS[
@@ -4781,7 +4813,7 @@ class Game:
             return ["Yes", "No"]
         # Unique tile choices
         elif key.endswith("_tilegfx") and key.startswith("utile_"):
-            return self._UTILE_TILE_GRAPHICS
+            return self._get_utile_tile_graphics()
         elif key.endswith("_basetile") and key.startswith("utile_"):
             return self._UTILE_BASE_TILES
         # No match

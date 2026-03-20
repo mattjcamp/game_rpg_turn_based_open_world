@@ -17,7 +17,8 @@
       ]
     },
     "forest": {
-      "path": "src/assets/unassigned/forest.png",
+      "path": "src/assets/game/terrain/forest.png",
+      "tile_id": 2,
       "usable_in": [
         "overworld"
       ]
@@ -145,6 +146,12 @@
     },
     "void_empty": {
       "path": "src/assets/unassigned/void_empty.png",
+      "usable_in": [
+        "overworld"
+      ]
+    },
+    "forest_alt": {
+      "path": "src/assets/unassigned/forest.png",
       "usable_in": [
         "overworld"
       ]
