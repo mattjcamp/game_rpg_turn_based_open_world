@@ -75,7 +75,8 @@
         80
       ],
       "spawn_weight": 40,
-      "tile": "game/monsters/giant_rat.png"
+      "tile": "monsters/giant_rat",
+      "terrain": "land"
     },
     "Goblin": {
       "description": "A small, sneaky goblin. Attacks in groups.",
