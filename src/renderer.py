@@ -672,7 +672,7 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(town_data.name, 8, row1_y + 2,
                       (255, 170, 85), font=f)
         self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y + 2,
-                      (120, 120, 200), font=self.font_small)
+                      (68, 68, 255), font=self.font_small)
 
         # ── Row 2+: message text (bigger, mixed-case, multi-line) ──
         if message:
@@ -1607,7 +1607,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Controls hint
         hint = "Arrow keys: Move  |  Bump NPC: Talk  |  ESC: Leave town"
-        hint_surface = self.font_small.render(hint, True, (180, 180, 200))
+        hint_surface = self.font_small.render(hint, True, self._U3_HINT)
         self.screen.blit(hint_surface, (10, hud_y + 28))
 
         # Party summary (compact)
@@ -1679,7 +1679,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Controls hint
         hint = "Arrow keys: Move  |  ESC on stairs: Leave dungeon"
-        hint_surface = self.font_small.render(hint, True, (180, 180, 200))
+        hint_surface = self.font_small.render(hint, True, self._U3_HINT)
         self.screen.blit(hint_surface, (10, hud_y + 28))
 
         # Party summary with gold
@@ -1751,7 +1751,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Hint to dismiss
         hint = "[SPACE / ENTER] continue   [ESC] close"
-        hint_surface = self.font_small.render(hint, True, (180, 180, 200))
+        hint_surface = self.font_small.render(hint, True, self._U3_HINT)
         self.screen.blit(hint_surface, (box_x + text_pad, cur_y + 4))
 
     def draw_machine_shutdown_effect(self, effect, town_name="the realm"):
@@ -2450,7 +2450,7 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(f"TERRAIN:{tile_name}", 380, row1_y + 2,
                       (200, 200, 255), font=f)
         self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y + 2,
-                      (120, 120, 200), font=self.font_small)
+                      (68, 68, 255), font=self.font_small)
 
         # ── Row 2+: unique tile text (bigger, mixed-case, multi-line) ──
         if unique_text:
@@ -3158,7 +3158,7 @@ class Renderer(CombatEffectRendererMixin):
             dg_name += f"  [{level_label}]"
         self._u3_text(dg_name, 8, row1_y, (200, 60, 60), font=f)
         self._u3_text("[H] HELP", SCREEN_WIDTH - 110, row1_y,
-                      (120, 120, 200), font=self.font_small)
+                      (68, 68, 255), font=self.font_small)
 
         # ── Row 2: active effects (light, detect traps, etc.) ──
         row2_y = row1_y + row_h
@@ -3535,7 +3535,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Hint text
         self._u3_text("[ENTER] SELECT  [ESC] LEAVE",
-                       panel_x + 10, oy + 2, (180, 180, 200), self.font_small)
+                       panel_x + 10, oy + 2, self._U3_HINT, self.font_small)
 
         # Draw a pulsing indicator on the locked door tile
         sc = col - off_c
@@ -3626,7 +3626,7 @@ class Renderer(CombatEffectRendererMixin):
         y += 12
 
         # ── Hint ──
-        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, (180, 180, 200))
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
 
     def draw_dungeon_action_screen(self, info, cursor):
@@ -3748,7 +3748,7 @@ class Renderer(CombatEffectRendererMixin):
         y += 12
 
         # ── Hint ──
-        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, (180, 180, 200))
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
 
     def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr, palette=None):
@@ -4457,15 +4457,15 @@ class Renderer(CombatEffectRendererMixin):
 
     # ── Retro colour palette (C64 / Apple II inspired) ──
     _U3_BLACK  = (0, 0, 0)
-    _U3_BLUE   = (90, 90, 255)
-    _U3_LTBLUE = (180, 180, 255)   # brighter blue for readable text
+    _U3_BLUE   = (68, 68, 255)    # style-guide canonical border/hint blue
+    _U3_LTBLUE = (180, 180, 255)  # brighter blue for readable text
     _U3_WHITE  = (255, 255, 255)
     _U3_ORANGE = (255, 185, 100)
     _U3_GREEN  = (0, 200, 0)
     _U3_DKGRN  = (0, 130, 0)
     _U3_RED    = (220, 70, 70)
     _U3_GRAY   = (170, 170, 170)
-    _U3_HINT   = (180, 180, 200)   # readable hint/help text on black
+    _U3_HINT   = (68, 68, 255)    # control-hint text (matches border blue)
     _U3_BRICK1 = (102, 51, 85)
     _U3_BRICK2 = (68, 34, 68)
 
@@ -4510,7 +4510,7 @@ class Renderer(CombatEffectRendererMixin):
                       (200, 200, 220), self.font_med)
         self._u3_text("[ENTER] SAVE & EXIT   [ESC] DISCARD & EXIT",
                       box_x + 20, box_y + 80,
-                      (180, 180, 200), self.font_small)
+                      self._U3_HINT, self.font_small)
 
     @staticmethod
     def _wrap_text_px(text, font, max_width, max_lines=4):
@@ -5858,9 +5858,9 @@ class Renderer(CombatEffectRendererMixin):
         hint_y = ry + rh - 36
         action = "Paint" if mode == "tile" else "Place"
         self._u3_text(f"[Arrows] Move  [ENTER] {action}",
-                       rx + 10, hint_y, (180, 180, 200), fs)
+                       rx + 10, hint_y, self._U3_HINT, fs)
         self._u3_text("[TAB/B] Cycle  [I] Mode  [ESC] Done",
-                       rx + 10, hint_y + 14, (180, 180, 200), fs)
+                       rx + 10, hint_y + 14, self._U3_HINT, fs)
 
     def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):
         """Draw an interior floor tile themed by overworld tile type."""
@@ -7701,8 +7701,8 @@ class Renderer(CombatEffectRendererMixin):
 
                     # Footer
                     self._u3_text(
-                        "[Arrows] Move  [Enter] Paint  "
-                        "[Tab] Brush  [S] Save  [Esc] Save & Back",
+                        "[Arrows/WASD] Move  [Enter] Paint  "
+                        "[Tab] Brush  [Ctrl+S] Save  [Esc] Save & Back",
                         SCREEN_WIDTH // 2 - 230,
                         SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
@@ -10475,10 +10475,10 @@ class Renderer(CombatEffectRendererMixin):
         if max_scroll > 0:
             if scroll > 0:
                 self._u3_text("^ UP ^", panel_x + panel_w // 2 - 24,
-                              panel_y + 2, (180, 180, 200), self.font_small)
+                              panel_y + 2, self._U3_HINT, self.font_small)
             if scroll < max_scroll:
                 self._u3_text("v DOWN v", panel_x + panel_w // 2 - 30,
-                              panel_y + panel_h - 32, (180, 180, 200),
+                              panel_y + panel_h - 32, self._U3_HINT,
                               self.font_small)
 
         # Controls hint
@@ -10605,7 +10605,7 @@ class Renderer(CombatEffectRendererMixin):
         # Controls hint
         hint_y = panel_y + panel_h - 30
         if mode == "save":
-            hint = "[UP/DN] SELECT  [ENTER] SAVE  [ESC] BACK"
+            hint = "[UP/DN] SELECT  [ENTER] SAVE  [CTRL+S] QUICK SAVE  [ESC] BACK"
         else:
             hint = "[UP/DN] SELECT  [ENTER] LOAD  [CTRL+D] DELETE  [ESC] BACK"
         self._u3_text(hint, panel_x + 16, hint_y, (68, 68, 255),
@@ -10616,7 +10616,8 @@ class Renderer(CombatEffectRendererMixin):
     def draw_quick_save_hud(self, message):
         """Draw a brief Quick Save notification in the top-right corner."""
         pad_x, pad_y = 12, 6
-        text_surf = self.font.render(message, True, (100, 255, 100))
+        color = self._U3_GREEN
+        text_surf = self.font.render(message, True, color)
         tw, th = text_surf.get_size()
         box_w = tw + pad_x * 2
         box_h = th + pad_y * 2
@@ -10625,7 +10626,7 @@ class Renderer(CombatEffectRendererMixin):
         bg = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
         bg.fill((0, 0, 0, 180))
         self.screen.blit(bg, (x, y))
-        pygame.draw.rect(self.screen, (100, 255, 100),
+        pygame.draw.rect(self.screen, color,
                          (x, y, box_w, box_h), 1)
         self.screen.blit(text_surf, (x + pad_x, y + pad_y))
 
@@ -14679,7 +14680,7 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text("(MAX 12 CHARACTERS)", cx, cy + 78,
                           (140, 140, 160), f_hint)
             self._u3_text("[ENTER] NEXT   [ESC] BACK", cx, cy + ph - 60,
-                          (180, 180, 200), f_hint)
+                          self._U3_HINT, f_hint)
 
         # ── RACE SELECTION ──
         elif step == "race":
@@ -14780,7 +14781,7 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(val, sum_val_x, sy, (200, 200, 220), f_hint)
                 sy += 24
             self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
-                          cx, cy + ph - 60, (180, 180, 200), f_hint)
+                          cx, cy + ph - 60, self._U3_HINT, f_hint)
 
         # ── CLASS SELECTION ──
         elif step == "class":
@@ -14861,7 +14862,7 @@ class Renderer(CombatEffectRendererMixin):
                 else:
                     self._u3_text(cls_name, cx + 20, cly, (180, 180, 200), f_main)
             self._u3_text("[UP/DOWN] SELECT   [ENTER] NEXT   [ESC] BACK",
-                          cx, cy + ph - 60, (180, 180, 200), f_hint)
+                          cx, cy + ph - 60, self._U3_HINT, f_hint)
 
         # ── TILE SELECTION ──
         elif step == "tile":
@@ -14921,12 +14922,12 @@ class Renderer(CombatEffectRendererMixin):
             if scroll_row > 0:
                 self._u3_text("^ MORE ^",
                               grid_x + (cols * cell_w) // 2 - 30,
-                              grid_y - 10, (180, 180, 200), f_hint)
+                              grid_y - 10, self._U3_HINT, f_hint)
             if scroll_row + max_rows < total_rows:
                 self._u3_text("v MORE v",
                               grid_x + (cols * cell_w) // 2 - 30,
                               grid_y + max_rows * cell_h - 4,
-                              (180, 180, 200), f_hint)
+                              self._U3_HINT, f_hint)
 
             # Preview of selected tile on the right
             if 0 <= tile_cursor < len(tiles):
@@ -14951,7 +14952,7 @@ class Renderer(CombatEffectRendererMixin):
 
             self._u3_text(
                 "[ARROWS] BROWSE   [ENTER] NEXT   [ESC] BACK",
-                cx, cy + ph - 60, (180, 180, 200), f_hint)
+                cx, cy + ph - 60, self._U3_HINT, f_hint)
 
         # ── STAT ALLOCATION ──
         elif step == "stats":
@@ -15038,10 +15039,10 @@ class Renderer(CombatEffectRendererMixin):
             # Hints
             hint = "[LEFT/RIGHT] ADJUST   [UP/DOWN] SELECT STAT"
             self._u3_text(hint, cx, cy + ph - 76,
-                          (180, 180, 200), f_hint)
+                          self._U3_HINT, f_hint)
             if remaining == 0:
                 self._u3_text("[ENTER] NEXT   [ESC] BACK", cx,
-                              cy + ph - 60, (180, 180, 200), f_hint)
+                              cy + ph - 60, self._U3_HINT, f_hint)
             else:
                 self._u3_text(
                     "SPEND ALL POINTS TO CONTINUE   [ESC] BACK",
@@ -15101,7 +15102,7 @@ class Renderer(CombatEffectRendererMixin):
                 else:
                     self._u3_text(label, cx + 20, by, (180, 180, 200), f_main)
             self._u3_text("[UP/DOWN] SELECT   [ENTER] CHOOSE   [ESC] BACK",
-                          cx, cy + ph - 60, (180, 180, 200), f_hint)
+                          cx, cy + ph - 60, self._U3_HINT, f_hint)
 
         # ── DONE ──
         elif step == "done":
@@ -15113,12 +15114,12 @@ class Renderer(CombatEffectRendererMixin):
                 f"{game._cc_name} THE {game._cc_selected_race()}"
                 f" {game._cc_selected_class()}"
                 f" HAS JOINED THE ROSTER.",
-                cx, cy + 70, (180, 180, 200), f_hint)
+                cx, cy + 70, self._U3_HINT, f_hint)
             self._u3_text(
                 f"ROSTER: {len(game.party.roster)}/{game.party.MAX_ROSTER}",
-                cx, cy + 100, (180, 180, 200), f_hint)
+                cx, cy + 100, self._U3_HINT, f_hint)
             self._u3_text("[ANY KEY] RETURN TO TITLE",
-                          cx, cy + ph - 60, (180, 180, 200), f_hint)
+                          cx, cy + ph - 60, self._U3_HINT, f_hint)
 
         # ── Feedback message overlay ──
         if game._cc_message and game._cc_msg_timer > 0:
@@ -15259,12 +15260,12 @@ class Renderer(CombatEffectRendererMixin):
         # Scroll indicators
         if scroll > 0:
             self._u3_text("^ MORE ^", roster_x + roster_w // 2 - 30,
-                          roster_y - 4, (180, 180, 200), self.font_small)
+                          roster_y - 4, self._U3_HINT, self.font_small)
         if scroll + visible < len(roster):
             self._u3_text("v MORE v",
                           roster_x + roster_w // 2 - 30,
                           roster_y + visible * row_h - 4,
-                          (180, 180, 200), self.font_small)
+                          self._U3_HINT, self.font_small)
 
         # ── Detail panel (right side) ──
         detail_x = px + pw // 2 + 4
@@ -15396,7 +15397,7 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(
             "[UP/DN] BROWSE  [SPACE] TOGGLE  "
             "[ENTER] CONFIRM  [CTRL+N] CREATE  [CTRL+D] DELETE  [ESC] BACK",
-            px + 4, hint_y, (180, 180, 200), self.font_small)
+            px + 4, hint_y, self._U3_HINT, self.font_small)
 
         # ── Feedback message ──
         if game._fp_message and game._fp_msg_timer > 0:
@@ -15543,7 +15544,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Controls hint ──
         self._u3_text("[UP/DOWN] SELECT  [ENTER] CONFIRM  [ESC] LEAVE",
-                      10, sh - 22, (180, 180, 200), fs)
+                      10, sh - 22, self._U3_HINT, fs)
 
     # ════════════════════════════════════════════════════════════════
     #  TEMPLE HEAL EFFECT (celestial animation overlay)

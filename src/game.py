@@ -3071,13 +3071,17 @@ class Game:
             else:
                 self._feat_townlayout_editing = False
                 self._feat_level = 1
-        elif event.key == pygame.K_UP:
+        elif self._is_save_shortcut(event):
+            # Save (Ctrl+S / Cmd+S) — must be checked before WASD movement
+            self._feat_save_townlayouts()
+            self._feat_dirty = False
+        elif event.key in (pygame.K_UP, pygame.K_w):
             self._feat_townlayout_cy = max(0, self._feat_townlayout_cy - 1)
-        elif event.key == pygame.K_DOWN:
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
             self._feat_townlayout_cy = min(h - 1, self._feat_townlayout_cy + 1)
-        elif event.key == pygame.K_LEFT:
+        elif event.key in (pygame.K_LEFT, pygame.K_a):
             self._feat_townlayout_cx = max(0, self._feat_townlayout_cx - 1)
-        elif event.key == pygame.K_RIGHT:
+        elif event.key in (pygame.K_RIGHT, pygame.K_d):
             self._feat_townlayout_cx = min(w - 1, self._feat_townlayout_cx + 1)
         elif event.key == pygame.K_RETURN:
             # Paint current brush at cursor
@@ -3129,10 +3133,6 @@ class Game:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx - 1) % n
             else:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx + 1) % n
-        elif event.key == pygame.K_s or self._is_save_shortcut(event):
-            # Save
-            self._feat_save_townlayouts()
-            self._feat_dirty = False
 
     def _feat_pxedit_open(self):
         """Open the pixel editor for the currently selected sprite."""
