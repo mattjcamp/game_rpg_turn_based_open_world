@@ -4,6 +4,7 @@ Main Game class - the heart of the application.
 Manages the game loop, state machine, and top-level resources.
 """
 
+import json
 import os
 import random
 import pygame
@@ -2775,28 +2776,32 @@ class Game:
         "features":  {"name_prefix": "Town Feature",  "width": 8,  "height": 8},
         "interiors": {"name_prefix": "Interior",      "width": 14, "height": 15},
     }
-    # Manifest keys for persistence
-    _TOWN_SUB_MANIFEST_KEY = {
-        "layouts":   "_town_layouts",
-        "features":  "_town_features",
-        "interiors": "_town_interiors",
-    }
+    def _feat_town_templates_path(self):
+        """Return path to the standalone town_templates.json file."""
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "town_templates.json")
 
     def _feat_load_townlayouts(self):
-        """Load all town sub-editor lists from the active module."""
+        """Load all town sub-editor lists from town_templates.json."""
+        data = {}
+        path = self._feat_town_templates_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            pass
         for sub_key in ("layouts", "features", "interiors"):
             items = []
-            mkey = self._TOWN_SUB_MANIFEST_KEY[sub_key]
             defaults = self._TOWN_SUB_DEFAULTS[sub_key]
-            if self.module_manifest:
-                raw = self.module_manifest.get(mkey, [])
-                for tl in raw:
-                    items.append({
-                        "name": tl.get("name", "Unnamed"),
-                        "width": tl.get("width", defaults["width"]),
-                        "height": tl.get("height", defaults["height"]),
-                        "tiles": dict(tl.get("tiles", {})),
-                    })
+            raw = data.get(sub_key, [])
+            for tl in raw:
+                items.append({
+                    "name": tl.get("name", "Unnamed"),
+                    "width": tl.get("width", defaults["width"]),
+                    "height": tl.get("height", defaults["height"]),
+                    "tiles": dict(tl.get("tiles", {})),
+                })
             self._feat_town_lists[sub_key] = items
         self._feat_town_subfolder_cursor = 0
         self._feat_town_active_sub = None
@@ -2816,11 +2821,9 @@ class Game:
         self._feat_town_lists[sub] = value
 
     def _feat_save_townlayouts(self):
-        """Persist all town sub-editor lists back to the module manifest."""
-        if not self.module_manifest:
-            return
+        """Persist all town sub-editor lists to town_templates.json."""
+        data = {}
         for sub_key in ("layouts", "features", "interiors"):
-            mkey = self._TOWN_SUB_MANIFEST_KEY[sub_key]
             raw = []
             for tl in self._feat_town_lists.get(sub_key, []):
                 raw.append({
@@ -2829,7 +2832,13 @@ class Game:
                     "height": tl["height"],
                     "tiles": dict(tl.get("tiles", {})),
                 })
-            self.module_manifest[mkey] = raw
+            data[sub_key] = raw
+        path = self._feat_town_templates_path()
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            pass
 
     def _feat_add_townlayout(self):
         """Add a new empty item to the active sub-editor."""
@@ -2968,6 +2977,7 @@ class Game:
         h = layout["height"]
 
         if event.key == pygame.K_ESCAPE:
+            self._feat_save_townlayouts()
             self._feat_townlayout_editing = False
             self._feat_level = 1
         elif event.key == pygame.K_UP:

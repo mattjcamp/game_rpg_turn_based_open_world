@@ -85,5 +85,154 @@
       }
     ],
     "innkeeper_quests": false
-  }
+  },
+  "_overworld_cfg": {
+    "size": {
+      "width": 32,
+      "height": 24
+    },
+    "start_position": {
+      "col": 16,
+      "row": 10
+    },
+    "landmarks": [
+      {
+        "id": "silvermarch",
+        "type": "town",
+        "col": 16,
+        "row": 8,
+        "tile": "TILE_TOWN",
+        "clear_radius": 3
+      },
+      {
+        "id": "town_vault",
+        "type": "machine",
+        "col": 18,
+        "row": 8,
+        "tile": "TILE_MACHINE",
+        "clear_radius": 1
+      },
+      {
+        "id": "dungeon_1",
+        "type": "dungeon",
+        "col": 22,
+        "row": 12,
+        "tile": "TILE_DUNGEON",
+        "clear_radius": 2
+      }
+    ],
+    "paths": [
+      {
+        "from": [
+          16,
+          8
+        ],
+        "to": [
+          22,
+          12
+        ]
+      },
+      {
+        "from": [
+          16,
+          10
+        ],
+        "to": [
+          16,
+          8
+        ]
+      }
+    ]
+  },
+  "_town_layouts": [],
+  "_town_features": [
+    {
+      "name": "Town Feature 1",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "2,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "3,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "5,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "5,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "5,4": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "2,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "2,4": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "2,5": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "3,5": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "5,5": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        }
+      }
+    }
+  ],
+  "_town_interiors": []
 }

@@ -1,0 +1,18 @@
+{
+  "layouts": [],
+  "features": [
+    {
+      "name": "Town Feature 1",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "1,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        }
+      }
+    }
+  ],
+  "interiors": []
+}

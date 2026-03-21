@@ -7522,8 +7522,8 @@ class Renderer(CombatEffectRendererMixin):
                         layout, -1, -1, -1, None)
 
                 self._u3_text(
-                    "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [Esc] Back",
-                    SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+                    "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [Esc] Save & Back",
+                    SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
                     self._U3_HINT, fs)
 
             elif ed == "townlayouts" and townlayout_editing:
@@ -7614,8 +7614,8 @@ class Renderer(CombatEffectRendererMixin):
                     # Footer
                     self._u3_text(
                         "[Arrows] Move  [Enter] Paint  "
-                        "[Tab] Brush  [Esc] Back",
-                        SCREEN_WIDTH // 2 - 200,
+                        "[Tab] Brush  [S] Save  [Esc] Save & Back",
+                        SCREEN_WIDTH // 2 - 230,
                         SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
 
