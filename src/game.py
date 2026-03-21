@@ -24,8 +24,9 @@ from src.states.examine import ExamineState
 from src.town_generator import generate_town, generate_duskhollow
 from src.music import MusicManager, SoundEffects, SOUNDTRACK_STYLES
 from src.save_load import (save_game, load_game, get_save_info,
-                           delete_save,
-                           NUM_SAVE_SLOTS, load_config, save_config)
+                           delete_save, quick_save,
+                           NUM_SAVE_SLOTS, QUICK_SAVE_SLOT,
+                           load_config, save_config)
 from src.module_loader import load_module_data
 
 
@@ -307,7 +308,8 @@ class Game:
         ]
         self._feat_gallery_naming = False     # True when typing a new name
         self._feat_gallery_name_buf = ""      # text buffer for renaming
-        # Pixel editor state (Level 4)
+        self._feat_gallery_detail_cursor = 0  # 0=Name, 1=Categories, 2=Edit Pixels
+        # Pixel editor state (Level 5)
         self._feat_pxedit_pixels = None      # 2D list of (r,g,b,a) tuples
         self._feat_pxedit_cx = 0             # cursor x on canvas
         self._feat_pxedit_cy = 0             # cursor y on canvas
@@ -392,6 +394,9 @@ class Game:
         self.save_load_message = None    # feedback message ("Saved!", "Loaded!", etc.)
         self.save_load_msg_timer = 0.0   # seconds remaining for message display
         self.save_load_confirm_delete = False  # True while confirming a delete
+        # Quick Save HUD flash
+        self.quick_save_message = None
+        self.quick_save_msg_timer = 0.0
         self.settings_options = [
             {"label": "MUSIC",
              "value": self._config.get("music_enabled", True),
@@ -1679,7 +1684,7 @@ class Game:
             self._fp_toggle(self._fp_cursor)
         elif event.key == pygame.K_RETURN:
             self._fp_confirm()
-        elif event.key == pygame.K_d:
+        elif self._is_delete_shortcut(event):
             # Prompt delete confirmation
             if 0 <= self._fp_cursor < roster_len:
                 self._fp_confirm_delete = True
@@ -2995,17 +3000,8 @@ class Game:
         # List mode (level 1) — inside a sub-editor
         n = len(self._feat_townlayout_list)
         if event.key == pygame.K_ESCAPE:
-            if self._feat_dirty:
-                def _save_and_exit():
-                    self._feat_save_townlayouts()
-                    self._feat_town_active_sub = None
-                    self._feat_dirty = False
-                def _discard_and_exit():
-                    self._feat_town_active_sub = None
-                    self._feat_dirty = False
-                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-            else:
-                self._feat_town_active_sub = None
+            self._feat_save_townlayouts()
+            self._feat_town_active_sub = None
         elif event.key == pygame.K_UP and n > 0:
             self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
             self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
@@ -3020,7 +3016,7 @@ class Game:
             self._feat_level = 2
         elif self._is_new_shortcut(event):
             self._feat_add_townlayout()
-        elif event.key == pygame.K_d and n > 0:
+        elif self._is_delete_shortcut(event) and n > 0:
             self._feat_remove_townlayout()
         elif event.key == pygame.K_n and n > 0:
             # Enter naming mode for the selected item
@@ -3591,7 +3587,7 @@ class Game:
             self._leave_modules()
         elif self._is_new_shortcut(event):
             self._do_create_module()
-        elif event.key == pygame.K_d:
+        elif self._is_delete_shortcut(event):
             selected = self.module_list[self.module_cursor]
             if selected["path"] == self.active_module_path:
                 self.module_message = "Cannot delete the active module!"
@@ -5377,22 +5373,11 @@ class Game:
             if self.module_edit_nav_stack:
                 self._leave_dungeon_sub()
             else:
-                if self._feat_dirty:
-                    def _save_and_exit():
-                        self.module_edit_mode = False
-                        self.module_edit_is_new = False
-                        self.module_message = None
-                        self._feat_dirty = False
-                    def _discard_and_exit():
-                        self.module_edit_mode = False
-                        self.module_edit_is_new = False
-                        self.module_message = None
-                        self._feat_dirty = False
-                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-                else:
-                    self.module_edit_mode = False
-                    self.module_edit_is_new = False
-                    self.module_message = None
+                self._commit_module_edit()
+                self.module_edit_mode = False
+                self.module_edit_is_new = False
+                self.module_message = None
+                self._feat_dirty = False
         elif event.key == pygame.K_LEFT:
             # Left also goes back from sub-browser
             if self.module_edit_nav_stack:
@@ -5435,8 +5420,8 @@ class Game:
             elif (self.module_edit_nav_stack
                     and self.module_edit_active_dung >= 0):
                 self._add_dungeon_level()
-        elif event.key in (pygame.K_d, pygame.K_DELETE):
-            # 'D' or Delete to remove: context-dependent
+        elif self._is_delete_shortcut(event):
+            # Ctrl+D to remove: context-dependent
             if self._in_unique_tiles_folder():
                 self._remove_unique_tile()
             elif getattr(self, "module_edit_active_enc", -1) >= 0:
@@ -6017,6 +6002,21 @@ class Game:
         self.save_load_message = None
         self.save_load_confirm_delete = False
 
+    def _do_quick_save(self):
+        """Quick Save via Ctrl-S / Cmd-S shortcut.
+
+        Saves to the dedicated Quick Save slot and shows a brief HUD
+        message.  Blocked during combat and examine states.
+        """
+        ok = quick_save(self)
+        if ok:
+            self.quick_save_message = "Quick Save!"
+            self.quick_save_msg_timer = 1.5
+        else:
+            # In combat or examine — show a brief "can't save" hint
+            self.quick_save_message = "Cannot save here!"
+            self.quick_save_msg_timer = 1.5
+
     def _do_save(self, slot):
         """Save game to the given slot and show feedback."""
         ok = save_game(slot, self)
@@ -6041,8 +6041,9 @@ class Game:
     def _do_delete_save(self, slot):
         """Delete a save from the given slot and show feedback."""
         ok = delete_save(slot)
+        label = "Quick Save" if slot == QUICK_SAVE_SLOT else f"Slot {slot}"
         if ok:
-            self.save_load_message = f"Slot {slot} deleted."
+            self.save_load_message = f"{label} deleted."
         else:
             self.save_load_message = "Nothing to delete!"
         self.save_load_msg_timer = 2.0
@@ -6086,6 +6087,20 @@ class Game:
     def _is_new_shortcut(event):
         """Return True if the event is Ctrl+N or Cmd+N (universal new)."""
         if event.key != pygame.K_n:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
+    @staticmethod
+    def _is_delete_shortcut(event):
+        """Return True if the event is Ctrl+D or Cmd+D (universal delete)."""
+        if event.key != pygame.K_d:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
+    @staticmethod
+    def _is_copy_shortcut(event):
+        """Return True if the event is Ctrl+C or Cmd+C (universal copy/duplicate)."""
+        if event.key != pygame.K_c:
             return False
         return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
 
@@ -6264,10 +6279,10 @@ class Game:
             return
 
         # ── Level 4: pixel editor ──
-        if self._feat_level == 4 and ed == "gallery":
+        if self._feat_level == 5 and ed == "gallery":
             px = self._feat_pxedit_pixels
             if px is None:
-                self._feat_level = 2
+                self._feat_level = 3
                 return
             w = self._feat_pxedit_w
             h = self._feat_pxedit_h
@@ -6323,18 +6338,18 @@ class Game:
                             self._feat_pxedit_save()
                             self._feat_pxedit_pixels = None
                             self.renderer.reload_sprites()
-                            self._feat_level = 2
+                            self._feat_level = 3
                             self._feat_dirty = False
                         def _discard_and_exit():
                             self._feat_pxedit_pixels = None
                             self.renderer.reload_sprites()
-                            self._feat_level = 2
+                            self._feat_level = 3
                             self._feat_dirty = False
                         self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
                     else:
                         self._feat_pxedit_pixels = None
                         self.renderer.reload_sprites()
-                        self._feat_level = 2
+                        self._feat_level = 3
                 return
 
             # Tab toggles focus between canvas and palette
@@ -6425,8 +6440,8 @@ class Game:
                     self._feat_dirty = True
             return
 
-        # ── Level 3: gallery tag editing ──
-        if self._feat_level == 3 and ed == "gallery":
+        # ── Level 4: gallery tag editing ──
+        if self._feat_level == 4 and ed == "gallery":
             n_tags = len(self._feat_gallery_all_cats)
             if self._is_save_shortcut(event):
                 # Save without leaving the tag editor
@@ -6437,20 +6452,17 @@ class Game:
                 if self._feat_dirty:
                     def _save_and_exit():
                         self._feat_save_gallery()
-                        self._feat_level = 2
+                        self._feat_level = 3
                         self._feat_rebuild_gallery_cats()
-                        self._feat_gallery_enter_cat()
                         self._feat_dirty = False
                     def _discard_and_exit():
-                        self._feat_level = 2
+                        self._feat_level = 3
                         self._feat_rebuild_gallery_cats()
-                        self._feat_gallery_enter_cat()
                         self._feat_dirty = False
                     self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
                 else:
-                    self._feat_level = 2
+                    self._feat_level = 3
                     self._feat_rebuild_gallery_cats()
-                    self._feat_gallery_enter_cat()
                 return
             if event.key == pygame.K_UP:
                 self._feat_gallery_tag_cursor = (
@@ -6464,26 +6476,49 @@ class Game:
                 self._feat_dirty = True
             return
 
-        # ── Level 2: gallery sprite list ──
-        if self._feat_level == 2 and ed == "gallery":
+        # ── Level 3: gallery tile detail / edit screen ──
+        if self._feat_level == 3 and ed == "gallery":
             # ── Naming mode: capture text input ──
             if self._feat_gallery_naming:
                 self._feat_handle_gallery_naming_input(event)
                 return
+            n_fields = 3  # Name, Categories, Edit Pixels
+            if event.key == pygame.K_ESCAPE:
+                self._feat_level = 2
+                return
+            if event.key == pygame.K_UP:
+                self._feat_gallery_detail_cursor = (
+                    self._feat_gallery_detail_cursor - 1) % n_fields
+            elif event.key == pygame.K_DOWN:
+                self._feat_gallery_detail_cursor = (
+                    self._feat_gallery_detail_cursor + 1) % n_fields
+            elif event.key == pygame.K_RETURN:
+                cur = self._feat_gallery_detail_cursor
+                if cur == 0:
+                    # Name → enter naming mode
+                    gi = self._feat_gallery_cur_gi()
+                    if gi is not None:
+                        self._feat_gallery_naming = True
+                        self._feat_gallery_name_buf = \
+                            self._feat_gallery_list[gi]["name"]
+                elif cur == 1:
+                    # Categories → open tag editor (Level 4)
+                    self._feat_gallery_tag_cursor = 0
+                    self._feat_dirty = False
+                    self._feat_level = 4
+                elif cur == 2:
+                    # Edit Pixels → open pixel editor (Level 5)
+                    if self._feat_pxedit_open():
+                        self._feat_level = 5
+            return
+
+        # ── Level 2: gallery sprite list ──
+        if self._feat_level == 2 and ed == "gallery":
             n = len(self._feat_gallery_sprites)
             if event.key == pygame.K_ESCAPE:
-                if self._feat_dirty:
-                    def _save_and_exit():
-                        self._feat_save_gallery()
-                        self._feat_rebuild_gallery_cats()
-                        self._feat_level = 1
-                        self._feat_dirty = False
-                    def _discard_and_exit():
-                        self._feat_level = 1
-                        self._feat_dirty = False
-                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-                else:
-                    self._feat_level = 1
+                self._feat_save_gallery()
+                self._feat_rebuild_gallery_cats()
+                self._feat_level = 1
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_gallery_spr_cursor = (
@@ -6500,47 +6535,24 @@ class Game:
                         self._feat_gallery_spr_cursor,
                         self._feat_gallery_spr_scroll)
             elif event.key == pygame.K_RETURN:
-                # Enter → open pixel editor directly
-                if n > 0 and self._feat_pxedit_open():
-                    self._feat_level = 4
-            elif event.key == pygame.K_RIGHT:
-                # Right Arrow → open tag editor
+                # Enter → open tile detail / edit screen
                 if n > 0:
-                    self._feat_gallery_tag_cursor = 0
-                    self._feat_dirty = False
+                    self._feat_gallery_detail_cursor = 0
                     self._feat_level = 3
-            elif event.key == pygame.K_d and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META)):
+            elif self._is_copy_shortcut(event):
                 if n > 0:
                     self._feat_gallery_duplicate()
-                    self._feat_dirty = True
-            elif event.key == pygame.K_n and n > 0:
-                gi = self._feat_gallery_cur_gi()
-                if gi is not None:
-                    self._feat_gallery_naming = True
-                    self._feat_gallery_name_buf = self._feat_gallery_list[gi]["name"]
-            elif event.key in (pygame.K_DELETE, pygame.K_x) and n > 0:
+            elif self._is_delete_shortcut(event) and n > 0:
                 self._feat_gallery_delete()
-                self._feat_dirty = True
             return
 
         # ── Level 1: gallery category folders ──
         if self._feat_level == 1 and ed == "gallery":
             n = len(self._feat_gallery_cat_list)
             if event.key == pygame.K_ESCAPE:
-                if self._feat_dirty:
-                    def _save_and_exit():
-                        self._feat_save_gallery()
-                        self._feat_level = 0
-                        self._feat_active_editor = None
-                        self._feat_dirty = False
-                    def _discard_and_exit():
-                        self._feat_level = 0
-                        self._feat_active_editor = None
-                        self._feat_dirty = False
-                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-                else:
-                    self._feat_level = 0
-                    self._feat_active_editor = None
+                self._feat_save_gallery()
+                self._feat_level = 0
+                self._feat_active_editor = None
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_gallery_cat_cursor = (
@@ -6661,20 +6673,9 @@ class Game:
             tiles_in = self._feat_tile_folder_tiles
             n = len(tiles_in)
             if event.key == pygame.K_ESCAPE:
-                if self._feat_dirty:
-                    def _save_and_exit():
-                        self._feat_save_tiles()
-                        self._feat_tile_in_folder = False
-                        self._feat_level = 1
-                        self._feat_dirty = False
-                    def _discard_and_exit():
-                        self._feat_tile_in_folder = False
-                        self._feat_level = 1
-                        self._feat_dirty = False
-                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-                else:
-                    self._feat_tile_in_folder = False
-                    self._feat_level = 1
+                self._feat_save_tiles()
+                self._feat_tile_in_folder = False
+                self._feat_level = 1
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_tile_cursor = (
@@ -6702,7 +6703,7 @@ class Game:
                 self._feat_add_tile()
                 self._feat_rebuild_tile_folders()
                 self._feat_tile_enter_folder()
-            elif event.key in (pygame.K_d, pygame.K_DELETE):
+            elif self._is_delete_shortcut(event):
                 self._feat_remove_tile()
                 self._feat_rebuild_tile_folders()
                 self._feat_tile_enter_folder()
@@ -6762,7 +6763,7 @@ class Game:
             elif self._is_new_shortcut(event):
                 ctx["add"]()
                 ctx["adjust_scroll"]()
-            elif event.key in (pygame.K_d, pygame.K_DELETE):
+            elif self._is_delete_shortcut(event):
                 ctx["remove"]()
             elif self._is_save_shortcut(event):
                 ctx["save_disk"]()
@@ -6965,7 +6966,7 @@ class Game:
         # ── Delete confirmation sub-state ──
         if self.save_load_confirm_delete:
             if event.key == pygame.K_y:
-                slot = self.save_load_cursor + 1
+                slot = QUICK_SAVE_SLOT if self.save_load_cursor == 0 else self.save_load_cursor
                 self._do_delete_save(slot)
             elif event.key in (pygame.K_n, pygame.K_ESCAPE):
                 self.save_load_confirm_delete = False
@@ -6993,18 +6994,33 @@ class Game:
                 self.settings_mode = "main"
             self.save_load_message = None
             return
+        total_slots = 1 + NUM_SAVE_SLOTS  # Quick Save + regular slots
         if event.key == pygame.K_UP:
             self.save_load_cursor = (
-                (self.save_load_cursor - 1) % NUM_SAVE_SLOTS)
+                (self.save_load_cursor - 1) % total_slots)
         elif event.key == pygame.K_DOWN:
             self.save_load_cursor = (
-                (self.save_load_cursor + 1) % NUM_SAVE_SLOTS)
+                (self.save_load_cursor + 1) % total_slots)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            slot = self.save_load_cursor + 1  # 1-based
+            # Cursor 0 = Quick Save (slot 0), cursor 1-3 = regular slots 1-3
+            slot = QUICK_SAVE_SLOT if self.save_load_cursor == 0 else self.save_load_cursor
+            slot_label = "Quick Save" if slot == QUICK_SAVE_SLOT else f"Slot {slot}"
             if self.settings_mode == "save":
-                self._do_save(slot)
+                ok = save_game(slot, self)
+                if ok:
+                    self.save_load_message = f"Game saved to {slot_label}!"
+                else:
+                    self.save_load_message = "Save failed!"
+                self.save_load_msg_timer = 2.0
             else:
-                self._do_load(slot)
+                ok = load_game(slot, self)
+                if ok:
+                    self._game_started = True
+                    self.save_load_message = f"Loaded {slot_label}!"
+                    self.save_load_msg_timer = 2.0
+                else:
+                    self.save_load_message = "No save in that slot!"
+                    self.save_load_msg_timer = 2.0
                 # If load succeeded from title or game over, close everything
                 if self.save_load_message and "Loaded" in self.save_load_message:
                     if getattr(self, '_title_load_mode', False):
@@ -7013,13 +7029,14 @@ class Game:
                     elif getattr(self, '_game_over_load_mode', False):
                         self._game_over_load_mode = False
                         self.showing_settings = False
-        elif event.key == pygame.K_d and self.settings_mode == "load":
+        elif self._is_delete_shortcut(event) and self.settings_mode == "load":
             # Only allow delete from the load screen
-            slot = self.save_load_cursor + 1
+            slot = QUICK_SAVE_SLOT if self.save_load_cursor == 0 else self.save_load_cursor
+            slot_label = "Quick Save" if slot == QUICK_SAVE_SLOT else f"Slot {slot}"
             info = get_save_info(slot)
             if info is not None:
                 self.save_load_confirm_delete = True
-                self.save_load_message = f"Delete Slot {slot}?  Y = Yes  N = No"
+                self.save_load_message = f"Delete {slot_label}?  Y = Yes  N = No"
 
     def run(self):
         """Main game loop."""
@@ -7101,6 +7118,11 @@ class Game:
                         self.title_cursor = 0
                         self.music.play("title")
                         break
+                    # Ctrl-S / Cmd-S: Quick Save
+                    if (event.key == pygame.K_s
+                            and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))):
+                        self._do_quick_save()
+                        break
                     # 1-4 opens/switches character sheet if the state supports it
                     num = {pygame.K_1: 0, pygame.K_2: 1,
                            pygame.K_3: 2, pygame.K_4: 3}.get(event.key)
@@ -7123,6 +7145,11 @@ class Game:
 
             # --- Update ---
             self.music.update(dt)
+            # Tick quick save HUD timer
+            if self.quick_save_msg_timer > 0:
+                self.quick_save_msg_timer -= dt
+                if self.quick_save_msg_timer <= 0:
+                    self.quick_save_message = None
             if (not self.showing_settings and not self.showing_title
                     and not self.showing_game_over
                     and not self.showing_char_create
@@ -7197,6 +7224,7 @@ class Game:
                     gallery_all_cats=self._feat_gallery_all_cats,
                     gallery_naming=self._feat_gallery_naming,
                     gallery_name_buf=self._feat_gallery_name_buf,
+                    gallery_detail_cursor=self._feat_gallery_detail_cursor,
                     pxedit_pixels=self._feat_pxedit_pixels,
                     pxedit_cx=self._feat_pxedit_cx,
                     pxedit_cy=self._feat_pxedit_cy,
@@ -7268,9 +7296,10 @@ class Game:
                     quest_data, self.quest_log_scroll)
             elif self.showing_settings:
                 if self.settings_mode in ("save", "load"):
-                    # Build slot info list for the renderer
-                    slot_infos = [get_save_info(i + 1)
-                                  for i in range(NUM_SAVE_SLOTS)]
+                    # Build slot info list: Quick Save first, then regular slots
+                    slot_infos = [get_save_info(QUICK_SAVE_SLOT)]
+                    slot_infos += [get_save_info(i + 1)
+                                   for i in range(NUM_SAVE_SLOTS)]
                     self.renderer.draw_save_load_screen(
                         mode=self.settings_mode,
                         slot_infos=slot_infos,
@@ -7282,6 +7311,11 @@ class Game:
                         self.settings_options, self.settings_cursor)
             else:
                 self.current_state.draw(self.renderer)
+
+            # ── Quick Save HUD overlay ──
+            if self.quick_save_message:
+                self.renderer.draw_quick_save_hud(self.quick_save_message)
+
             pygame.display.flip()
 
         pygame.quit()

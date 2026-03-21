@@ -17,8 +17,11 @@ from src.settings import TILE_DUNGEON_CLEARED
 _SAVE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "saves")
 
-# Number of save slots
+# Number of regular save slots (1-based: 1, 2, 3)
 NUM_SAVE_SLOTS = 3
+
+# Quick Save uses slot 0 and a dedicated filename
+QUICK_SAVE_SLOT = 0
 
 
 _CONFIG_PATH = os.path.join(
@@ -59,7 +62,12 @@ def _ensure_save_dir():
 
 
 def _save_path(slot):
-    """Return the file path for a given save slot (1-based)."""
+    """Return the file path for a given save slot.
+
+    Slot 0 is the Quick Save slot; slots 1+ are regular saves.
+    """
+    if slot == QUICK_SAVE_SLOT:
+        return os.path.join(_SAVE_DIR, "quick_save.json")
     return os.path.join(_SAVE_DIR, f"save_{slot}.json")
 
 
@@ -301,6 +309,41 @@ def _deserialize_party(data):
     return party
 
 
+# ── State context serialization ───────────────────────────────────
+
+def _serialize_state_context(game, state_name):
+    """Capture additional context needed to restore the player's position.
+
+    For dungeon/town states this includes the overworld coordinates of
+    the dungeon or town so the correct map can be re-entered on load.
+    """
+    ctx = {"state": state_name}
+
+    if state_name == "dungeon":
+        ds = game.states.get("dungeon")
+        if ds:
+            ctx["overworld_col"] = ds.overworld_col
+            ctx["overworld_row"] = ds.overworld_row
+            ctx["current_level"] = ds.current_level
+            ctx["is_quest_dungeon"] = ds.quest_levels is not None
+            # Save the party position *inside* the dungeon
+            ctx["party_col"] = game.party.col
+            ctx["party_row"] = game.party.row
+            ctx["torch_active"] = ds.torch_active
+            ctx["torch_steps"] = ds.torch_steps
+
+    elif state_name == "town":
+        ts = game.states.get("town")
+        if ts:
+            ctx["overworld_col"] = ts.overworld_col
+            ctx["overworld_row"] = ts.overworld_row
+            # Save the party position *inside* the town
+            ctx["party_col"] = game.party.col
+            ctx["party_row"] = game.party.row
+
+    return ctx
+
+
 # ── Public API ────────────────────────────────────────────────────
 
 def save_game(slot, game):
@@ -337,7 +380,7 @@ def save_game(slot, game):
                         cleared_dungeons.append([c, r])
 
         save_data = {
-            "version": 2,
+            "version": 3,
             "timestamp": time.time(),
             "state": state_name,
             "party": _serialize_party(game.party),
@@ -367,6 +410,8 @@ def save_game(slot, game):
             # ── Map seed for reproducible overworld ──
             "map_seed": getattr(game.tile_map, "seed", None)
                         if hasattr(game, "tile_map") and game.tile_map else None,
+            # ── State context for restoring position in dungeon/town ──
+            "state_context": _serialize_state_context(game, state_name),
         }
 
         path = _save_path(slot)
@@ -493,9 +538,18 @@ def load_game(slot, game):
                     # Regenerate all towns from the manifest
                     game._init_module_towns()
 
-        # ── Switch to overworld ─────────────────────────────────
-        game.change_state("overworld")
-        game.camera.update(game.party.col, game.party.row)
+        # ── Restore the player to the correct state ────────────
+        state_ctx = save_data.get("state_context", {})
+        target_state = state_ctx.get("state", "overworld")
+
+        if target_state == "dungeon":
+            _restore_dungeon_state(game, state_ctx)
+        elif target_state == "town":
+            _restore_town_state(game, state_ctx)
+        else:
+            # Default: overworld
+            game.change_state("overworld")
+            game.camera.update(game.party.col, game.party.row)
 
         return True
     except Exception:
@@ -632,6 +686,98 @@ def _restore_quest(game, save_data, quest_attr):
     setattr(game, quest_attr, quest)
 
 
+def _restore_dungeon_state(game, ctx):
+    """Re-enter a dungeon from saved state context.
+
+    Locates the correct dungeon levels (key dungeon, quest, house quest,
+    or cached random dungeon) using the saved overworld coordinates,
+    sets up the DungeonState, and restores the party's position inside
+    the dungeon.
+    """
+    ow_col = ctx.get("overworld_col", 0)
+    ow_row = ctx.get("overworld_row", 0)
+    level_idx = ctx.get("current_level", 0)
+    dungeon_state = game.states["dungeon"]
+
+    # Try key dungeon first
+    kd = game.key_dungeons.get((ow_col, ow_row))
+    if kd and kd.get("levels"):
+        dungeon_state.enter_quest_dungeon(kd["levels"], ow_col, ow_row)
+    else:
+        # Check standard quest
+        quest = getattr(game, "quest", None)
+        hq = getattr(game, "house_quest", None)
+        if (quest and quest.get("dungeon_col") == ow_col
+                and quest.get("dungeon_row") == ow_row
+                and quest.get("levels")):
+            dungeon_state.enter_quest_dungeon(quest["levels"], ow_col, ow_row)
+        elif (hq and hq.get("dungeon_col") == ow_col
+              and hq.get("dungeon_row") == ow_row
+              and hq.get("levels")):
+            dungeon_state.enter_quest_dungeon(hq["levels"], ow_col, ow_row)
+        else:
+            # Random / cached dungeon
+            cached = game.dungeon_cache.get((ow_col, ow_row))
+            if cached:
+                dungeon_state.enter_dungeon(cached[0], ow_col, ow_row)
+            else:
+                # Fallback: cannot find dungeon data, go to overworld
+                game.change_state("overworld")
+                game.camera.update(game.party.col, game.party.row)
+                return
+
+    # Advance to the correct level if multi-level
+    if dungeon_state.quest_levels and level_idx < len(dungeon_state.quest_levels):
+        dungeon_state.current_level = level_idx
+        dungeon_state.dungeon_data = dungeon_state.quest_levels[level_idx]
+
+    game.change_state("dungeon")
+
+    # Restore party position inside the dungeon (override the entry point)
+    if "party_col" in ctx and "party_row" in ctx:
+        game.party.col = ctx["party_col"]
+        game.party.row = ctx["party_row"]
+
+    # Restore torch state
+    dungeon_state.torch_active = ctx.get("torch_active", False)
+    dungeon_state.torch_steps = ctx.get("torch_steps", 0)
+
+    # Update camera for dungeon dimensions
+    if dungeon_state.dungeon_data:
+        game.camera.map_width = dungeon_state.dungeon_data.tile_map.width
+        game.camera.map_height = dungeon_state.dungeon_data.tile_map.height
+    game.camera.update(game.party.col, game.party.row)
+
+
+def _restore_town_state(game, ctx):
+    """Re-enter a town from saved state context.
+
+    Looks up the correct TownData using the saved overworld coordinates,
+    sets up the TownState, and restores the party's position inside
+    the town.
+    """
+    ow_col = ctx.get("overworld_col", 0)
+    ow_row = ctx.get("overworld_row", 0)
+    town_state = game.states["town"]
+
+    # Look up the town data for these coordinates
+    town_data = game.get_town_at(ow_col, ow_row)
+    game.town_data = town_data
+    town_state.enter_town(town_data, ow_col, ow_row)
+    game.change_state("town")
+
+    # Restore party position inside the town (override the entry point)
+    if "party_col" in ctx and "party_row" in ctx:
+        game.party.col = ctx["party_col"]
+        game.party.row = ctx["party_row"]
+
+    # Update camera for town dimensions
+    if town_state.town_data:
+        game.camera.map_width = town_state.town_data.tile_map.width
+        game.camera.map_height = town_state.town_data.tile_map.height
+    game.camera.update(game.party.col, game.party.row)
+
+
 def get_save_info(slot):
     """Return summary info about a save slot, or None if empty.
 
@@ -665,6 +811,26 @@ def get_save_info(slot):
         }
     except Exception:
         return None
+
+
+def quick_save(game):
+    """Save the current game state to the Quick Save slot.
+
+    Returns True if saved successfully, False on error.
+    Does nothing (returns False) if the game is in combat or examine state.
+    """
+    # Determine current state name
+    state_name = "overworld"
+    for name, state_obj in game.states.items():
+        if state_obj is game.current_state:
+            state_name = name
+            break
+
+    # Block saving during combat or examine
+    if state_name in ("combat", "examine"):
+        return False
+
+    return save_game(QUICK_SAVE_SLOT, game)
 
 
 def delete_save(slot):

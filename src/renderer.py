@@ -7191,6 +7191,7 @@ class Renderer(CombatEffectRendererMixin):
                               gallery_all_cats=None,
                               gallery_naming=False,
                               gallery_name_buf="",
+                              gallery_detail_cursor=0,
                               pxedit_pixels=None,
                               pxedit_cx=0, pxedit_cy=0,
                               pxedit_w=32, pxedit_h=32,
@@ -7442,7 +7443,7 @@ class Renderer(CombatEffectRendererMixin):
                             tile_buffer, tile_field_scroll,
                             fm, fs, f)
             elif ed == "gallery":
-                if level == 4 and pxedit_pixels is not None:
+                if level == 5 and pxedit_pixels is not None:
                     self._draw_pixel_editor(
                         pxedit_pixels, pxedit_cx, pxedit_cy,
                         pxedit_w, pxedit_h,
@@ -7467,7 +7468,8 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_all_cats or [],
                         fm, fs, f,
                         gallery_naming=gallery_naming,
-                        gallery_name_buf=gallery_name_buf)
+                        gallery_name_buf=gallery_name_buf,
+                        gallery_detail_cursor=gallery_detail_cursor)
             elif ed == "townlayouts" and not townlayout_editing and town_active_sub is None:
                 # ── Town sub-folder selection ──
                 self._u3_text("Town Editor", left_x + 12, panel_y + 8,
@@ -7582,7 +7584,7 @@ class Renderer(CombatEffectRendererMixin):
                                   self._U3_HINT, fs)
                 else:
                     self._u3_text(
-                        "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [D] Delete  [N] Rename  [Esc] Back",
+                        "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Delete  [N] Rename  [Esc] Back",
                         SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
 
@@ -7900,7 +7902,7 @@ class Renderer(CombatEffectRendererMixin):
         # Footer
         self._u3_text(
             "[Up/Dn] Browse  [Enter] Edit  "
-            "[Ctrl+N] Add  [D] Delete  [Esc] Back",
+            "[Ctrl+N] Add  [Ctrl+D] Delete  [Esc] Back",
             SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
             self._U3_HINT, fs)
 
@@ -8107,10 +8109,12 @@ class Renderer(CombatEffectRendererMixin):
                                 tag_cursor, all_cats,
                                 fm, fs, f,
                                 gallery_naming=False,
-                                gallery_name_buf=""):
-        """Draw the 3-level tile gallery.
+                                gallery_name_buf="",
+                                gallery_detail_cursor=0):
+        """Draw the tile gallery with detail editing screen.
 
-        Level 1: category folders  Level 2: sprite list  Level 3: tag editor
+        Level 1: category folders  Level 2: sprite list
+        Level 3: tile detail/edit  Level 4: tag editor
         """
         tag_colors = {
             "overworld": (50, 120, 50), "town": (140, 110, 50),
@@ -8186,7 +8190,7 @@ class Renderer(CombatEffectRendererMixin):
                           SCREEN_HEIGHT - 45, self._U3_HINT, fs)
             return
 
-        # ── Level 2 & 3: sprite list + optional tag editor ──
+        # ── Level 2, 3 & 4: sprite list + detail / tag editor ──
         # Left panel: sprite list for selected category
         cat_name = ""
         if 0 <= cat_cursor < len(cat_list):
@@ -8350,7 +8354,7 @@ class Renderer(CombatEffectRendererMixin):
                           r_color, fs)
             dy += 18
 
-            # ── Usable-in tags / tag editor ──
+            # ── Usable-in tags / tag editor / detail fields ──
             usable = entry.get("usable_in", [])
             dy += 6
             pygame.draw.line(self.screen, (60, 50, 40),
@@ -8358,7 +8362,7 @@ class Renderer(CombatEffectRendererMixin):
                              (right_x + right_w - 12, dy), 1)
             dy += 10
 
-            if level == 3:
+            if level == 4:
                 # Interactive tag editor
                 self._u3_text("Edit categories:",
                               right_x + 16, dy,
@@ -8401,6 +8405,40 @@ class Renderer(CombatEffectRendererMixin):
                                       px + pw + 8, dy + 1,
                                       (140, 140, 160), fs)
                     dy += 26
+            elif level == 3:
+                # ── Detail / edit fields ──
+                detail_fields = [
+                    ("Name", entry["name"]),
+                    ("Categories", ", ".join(usable) if usable
+                     else "(none)"),
+                    ("Edit Pixels", ""),
+                ]
+                for fi, (label, value) in enumerate(detail_fields):
+                    is_sel = (fi == gallery_detail_cursor)
+                    rw = right_w - 32
+                    row_h = 30
+                    if is_sel:
+                        sb = pygame.Surface((rw, row_h),
+                                            pygame.SRCALPHA)
+                        sb.fill((255, 200, 60, 30))
+                        self.screen.blit(sb,
+                                         (right_x + 14, dy - 4))
+                    prefix = "> " if is_sel else "  "
+                    lc = self._U3_ORANGE if is_sel else (180, 180, 200)
+                    if value:
+                        self._u3_text(f"{prefix}{label}:",
+                                      right_x + 16, dy, lc, fm)
+                        # Value on same line after label
+                        lw = fm.size(f"{prefix}{label}: ")[0]
+                        vc = self._U3_WHITE if is_sel \
+                            else (160, 160, 180)
+                        self._u3_text(value,
+                                      right_x + 16 + lw, dy,
+                                      vc, fm)
+                    else:
+                        self._u3_text(f"{prefix}{label}",
+                                      right_x + 16, dy, lc, fm)
+                    dy += row_h
             else:
                 # Read-only pill tags
                 self._u3_text("Usable in:", right_x + 16, dy,
@@ -8428,14 +8466,15 @@ class Renderer(CombatEffectRendererMixin):
                     tag_x += pw + 6
 
         # ── Naming overlay ──
-        if gallery_naming and level == 2:
-            nm_x = left_x + 10
+        if gallery_naming and level == 3:
+            nm_x = right_x + 10
             nm_y = panel_y + panel_h // 2 - 30
-            nm_w = left_w - 20
+            nm_w = right_w - 20
             nm_h = 50
-            overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+            overlay = pygame.Surface((right_w, panel_h),
+                                     pygame.SRCALPHA)
             overlay.fill((20, 18, 30, 200))
-            self.screen.blit(overlay, (left_x, panel_y))
+            self.screen.blit(overlay, (right_x, panel_y))
             self._u3_text("Rename tile:", nm_x + 4, nm_y - 18,
                           self._U3_ORANGE, fs)
             pygame.draw.rect(self.screen, (60, 55, 80),
@@ -8454,12 +8493,14 @@ class Renderer(CombatEffectRendererMixin):
             return  # skip normal footer when naming
 
         # Footer
-        if level == 3:
+        if level == 4:
             hint = "[Up/Dn] Select  [Enter] Toggle  [Esc] Done"
+        elif level == 3:
+            hint = ("[Up/Dn] Select  [Enter] Edit  [Esc] Back")
         else:
-            hint = ("[Up/Dn] Browse  [Enter] Edit  "
-                    "[Right] Tags  [Ctrl+D] Duplicate  "
-                    "[N] Rename  [X] Delete  [Esc] Back")
+            hint = ("[Up/Dn] Browse  [Enter] Open  "
+                    "[Ctrl+C] Duplicate  "
+                    "[Ctrl+D] Delete  [Esc] Back")
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 45, self._U3_HINT, fs)
@@ -9402,7 +9443,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Footer
         self._u3_text(
-            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [D] Delete  [Esc] Back",
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Delete  [Esc] Back",
             SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
             self._U3_HINT, fs)
 
@@ -9699,12 +9740,12 @@ class Renderer(CombatEffectRendererMixin):
                 and edit_in_encounters:
             # Inside level sub-sections (encounters list)
             hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[Ctrl+N] Add  [D] Remove  [ESC] Back")
+                    "[Ctrl+N] Add  [Ctrl+D] Remove  [ESC] Back")
         elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
                 and edit_in_dungeon_sub:
             # Inside dungeon sub-sections (levels)
             hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[Ctrl+N] Add Level  [D] Remove  [ESC] Back")
+                    "[Ctrl+N] Add Level  [Ctrl+D] Remove  [ESC] Back")
         elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
             # Inside a folder or other sub-section
             hint = ("[UP/DN] Browse  [ENTER] Open  "
@@ -9720,7 +9761,7 @@ class Renderer(CombatEffectRendererMixin):
                     "[CTRL+S] Save  [ESC] Back")
         else:
             hint = ("[UP/DN] Browse  [S] Select  "
-                    "[Ctrl+N] New  [E] Edit  [D] Delete  [ESC] Back")
+                    "[Ctrl+N] New  [E] Edit  [Ctrl+D] Delete  [ESC] Back")
         self._u3_text(hint, SCREEN_WIDTH // 2 - len(hint) * 4,
                       hint_y, hint_color, fs)
 
@@ -10501,11 +10542,13 @@ class Renderer(CombatEffectRendererMixin):
                              (panel_x + 10, y, panel_w - 20, slot_h), 1)
 
             prefix = "> " if selected else "  "
-            slot_num = i + 1
+            # First entry (i==0) is the Quick Save slot
+            is_quick = (i == 0)
+            slot_label = "QUICK SAVE" if is_quick else f"SLOT {i}"
 
             if info is None:
                 # Empty slot
-                self._u3_text(f"{prefix}SLOT {slot_num}  -  EMPTY",
+                self._u3_text(f"{prefix}{slot_label}  -  EMPTY",
                               panel_x + 20, y + 10,
                               (120, 120, 120), self.font)
                 if mode == "save":
@@ -10527,7 +10570,7 @@ class Renderer(CombatEffectRendererMixin):
                     dt_str = "Unknown date"
 
                 label_color = (255, 255, 0) if selected else (200, 200, 200)
-                self._u3_text(f"{prefix}SLOT {slot_num}",
+                self._u3_text(f"{prefix}{slot_label}",
                               panel_x + 20, y + 6, label_color, self.font)
 
                 # Date on the right
@@ -10564,11 +10607,27 @@ class Renderer(CombatEffectRendererMixin):
         if mode == "save":
             hint = "[UP/DN] SELECT  [ENTER] SAVE  [ESC] BACK"
         else:
-            hint = "[UP/DN] SELECT  [ENTER] LOAD  [D] DELETE  [ESC] BACK"
+            hint = "[UP/DN] SELECT  [ENTER] LOAD  [CTRL+D] DELETE  [ESC] BACK"
         self._u3_text(hint, panel_x + 16, hint_y, (68, 68, 255),
                       self.font_small)
 
         self.screen.set_clip(prev_clip)
+
+    def draw_quick_save_hud(self, message):
+        """Draw a brief Quick Save notification in the top-right corner."""
+        pad_x, pad_y = 12, 6
+        text_surf = self.font.render(message, True, (100, 255, 100))
+        tw, th = text_surf.get_size()
+        box_w = tw + pad_x * 2
+        box_h = th + pad_y * 2
+        x = SCREEN_WIDTH - box_w - 10
+        y = 10
+        bg = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 180))
+        self.screen.blit(bg, (x, y))
+        pygame.draw.rect(self.screen, (100, 255, 100),
+                         (x, y, box_w, box_h), 1)
+        self.screen.blit(text_surf, (x + pad_x, y + pad_y))
 
     def draw_party_screen_u3(self, party):
         """
@@ -15336,7 +15395,7 @@ class Renderer(CombatEffectRendererMixin):
         hint_y = py + ph + 6
         self._u3_text(
             "[UP/DN] BROWSE  [SPACE] TOGGLE  "
-            "[ENTER] CONFIRM  [CTRL+N] CREATE  [D] DELETE  [ESC] BACK",
+            "[ENTER] CONFIRM  [CTRL+N] CREATE  [CTRL+D] DELETE  [ESC] BACK",
             px + 4, hint_y, (180, 180, 200), self.font_small)
 
         # ── Feedback message ──

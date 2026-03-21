@@ -339,6 +339,11 @@
           "tile_id": 13,
           "path": "game/terrain/town_door.png",
           "name": "Door"
+        },
+        "1,4": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
         }
       }
     }

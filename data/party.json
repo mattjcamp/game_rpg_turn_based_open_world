@@ -85,33 +85,12 @@
       },
       "inventory": [],
       "sprite": "src/assets/game/characters/cleric.png"
-    },
-    {
-      "name": "d",
-      "class": "Alchemist",
-      "race": "Human",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Club",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/npcs/villager_guard.png"
     }
   ],
   "active_party": [
     0,
     1,
-    3,
-    4
+    3
   ],
   "party_effects": {
     "effect_1": null,
