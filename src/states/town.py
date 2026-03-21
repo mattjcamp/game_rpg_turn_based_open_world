@@ -556,7 +556,9 @@ class TownState(InventoryMixin, BaseState):
             dcol = 1
         elif keys_pressed[pygame.K_UP] or keys_pressed[pygame.K_w]:
             drow = -1
-        elif keys_pressed[pygame.K_DOWN] or keys_pressed[pygame.K_s]:
+        elif keys_pressed[pygame.K_DOWN] or (
+                keys_pressed[pygame.K_s]
+                and not (pygame.key.get_mods() & (pygame.KMOD_CTRL | pygame.KMOD_META))):
             drow = 1
 
         if dcol != 0 or drow != 0:

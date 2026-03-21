@@ -85,6 +85,26 @@
       },
       "inventory": [],
       "sprite": "src/assets/game/characters/cleric.png"
+    },
+    {
+      "name": "matt",
+      "class": "Alchemist",
+      "race": "Dwarf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 10,
+      "intelligence": 15,
+      "wisdom": 15,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/game/characters/wizard.png"
     }
   ],
   "active_party": [

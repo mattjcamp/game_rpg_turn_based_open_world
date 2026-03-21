@@ -229,6 +229,15 @@ class Game:
         self._feat_spell_fields = []       # [label, key, value, type, editable]
         self._feat_spell_buffer = ""       # text being typed
         self._feat_spell_scroll_f = 0      # field list scroll
+        # Spell folder navigation (3-tier: casting_type → level → spells)
+        self._feat_spell_nav = 0           # 0=casting types, 1=levels, 2=spells
+        self._feat_spell_ctype_cursor = 0  # cursor within casting type list
+        self._feat_spell_level_cursor = 0  # cursor within level list
+        self._feat_spell_level_scroll = 0
+        self._feat_spell_sel_ctype = None  # selected casting type string
+        self._feat_spell_sel_level = None  # selected level number
+        self._feat_spell_filtered = []     # indices into _feat_spell_list
+        self._feat_spell_filter_pos = 0    # cursor position within filtered
         self._feat_level = 0  # 0=categories, 1=list, 2=field editor
         # Which editor is active: "spells", "items", "monsters", "tiles"
         self._feat_active_editor = None
@@ -1742,10 +1751,14 @@ class Game:
         self._title_settings_mode = True
 
     def _find_most_recent_save(self):
-        """Return the slot number of the most recent save, or None."""
+        """Return the slot number of the most recent save, or None.
+
+        Checks all regular slots AND the Quick Save slot (0).
+        """
         best_slot = None
         best_ts = -1
-        for slot in range(1, NUM_SAVE_SLOTS + 1):
+        # Include Quick Save slot (0) alongside regular slots
+        for slot in [QUICK_SAVE_SLOT] + list(range(1, NUM_SAVE_SLOTS + 1)):
             info = get_save_info(slot)
             if info and info.get("timestamp", 0) > best_ts:
                 best_ts = info["timestamp"]
@@ -1829,6 +1842,50 @@ class Game:
         ))
         self._feat_spell_list = spells
         self._feat_spell_cursor = 0
+        self._feat_spell_scroll = 0
+        # Reset folder navigation to top level
+        self._feat_spell_nav = 0
+        self._feat_spell_ctype_cursor = 0
+        self._feat_spell_level_cursor = 0
+        self._feat_spell_level_scroll = 0
+        self._feat_spell_sel_ctype = None
+        self._feat_spell_sel_level = None
+        self._feat_spell_filtered = []
+
+    def _feat_spell_casting_types(self):
+        """Return sorted list of distinct casting types in the spell list."""
+        from src import data_registry as DR
+        order = DR.casting_type_sort_order()
+        seen = {}
+        for s in self._feat_spell_list:
+            ct = s.get("casting_type", "sorcerer")
+            if ct not in seen:
+                seen[ct] = order.get(ct, 99)
+        return sorted(seen.keys(), key=lambda c: seen[c])
+
+    def _feat_spell_levels_for_ctype(self, ctype):
+        """Return sorted list of (level, count) for a casting type."""
+        from collections import Counter
+        counts = Counter()
+        for s in self._feat_spell_list:
+            if s.get("casting_type", "sorcerer") == ctype:
+                counts[s.get("min_level", 1)] += 1
+        return sorted(counts.items())
+
+    def _feat_spell_filter(self, ctype, level):
+        """Build filtered index list for a casting type + level.
+
+        Resets cursor and scroll to 0.  Callers may adjust cursor
+        afterwards if they need to restore a position.
+        """
+        self._feat_spell_filtered = [
+            i for i, s in enumerate(self._feat_spell_list)
+            if s.get("casting_type", "sorcerer") == ctype
+            and s.get("min_level", 1) == level
+        ]
+        self._feat_spell_cursor = min(
+            self._feat_spell_filter_pos,
+            max(0, len(self._feat_spell_filtered) - 1))
         self._feat_spell_scroll = 0
 
     def _feat_save_spells(self):
@@ -3583,6 +3640,8 @@ class Game:
             self._set_active_module(
                 selected["path"], selected["name"], selected["version"])
             self._leave_modules()
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._enter_module_edit()
         elif event.key == pygame.K_ESCAPE:
             self._leave_modules()
         elif self._is_new_shortcut(event):
@@ -3596,8 +3655,6 @@ class Game:
                 self.module_confirm_delete = True
                 name = selected["name"]
                 self.module_message = f'Delete "{name}"?  Y = Yes  N = No'
-        elif event.key == pygame.K_e:
-            self._enter_module_edit()
 
     def _do_create_module(self):
         """Open the edit overlay in 'create new module' mode."""
@@ -6188,16 +6245,33 @@ class Game:
                         ctx["save_fields"]()
                         if ed == "spells":
                             self._feat_resort_spells()
+                            self._feat_save_spells()
+                            self._feat_spell_filter(
+                                self._feat_spell_sel_ctype,
+                                self._feat_spell_sel_level)
                         ctx["save_disk"]()
                         ctx["set_editing"](False)
                         self._feat_level = 1
                         self._feat_dirty = False
                     def _discard_and_exit():
+                        if ed == "spells":
+                            # Reload to discard; re-filter
+                            saved_ct = self._feat_spell_sel_ctype
+                            saved_lv = self._feat_spell_sel_level
+                            self._feat_load_spells()
+                            self._feat_spell_sel_ctype = saved_ct
+                            self._feat_spell_sel_level = saved_lv
+                            self._feat_spell_nav = 2
+                            self._feat_spell_filter(saved_ct, saved_lv)
                         ctx["set_editing"](False)
                         self._feat_level = 1
                         self._feat_dirty = False
                     self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
                 else:
+                    if ed == "spells":
+                        self._feat_spell_filter(
+                            self._feat_spell_sel_ctype,
+                            self._feat_spell_sel_level)
                     ctx["set_editing"](False)
                     self._feat_level = 1
                 return
@@ -6739,7 +6813,141 @@ class Game:
 
         # ── Level 1: list browser ──
         # (tiles and gallery have their own level-1 handlers above)
-        if self._feat_level == 1 and ctx and ed not in ("tiles", "gallery"):
+        # ── Spell 3-tier folder navigation ──
+        if self._feat_level == 1 and ed == "spells":
+            nav = self._feat_spell_nav
+            if nav == 0:
+                # Tier 0: casting type folders
+                ctypes = self._feat_spell_casting_types()
+                n = len(ctypes)
+                if event.key == pygame.K_ESCAPE:
+                    self._feat_save_spells()
+                    self._feat_level = 0
+                    self._feat_active_editor = None
+                elif event.key == pygame.K_UP and n > 0:
+                    self._feat_spell_ctype_cursor = (
+                        self._feat_spell_ctype_cursor - 1) % n
+                elif event.key == pygame.K_DOWN and n > 0:
+                    self._feat_spell_ctype_cursor = (
+                        self._feat_spell_ctype_cursor + 1) % n
+                elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+                    self._feat_spell_sel_ctype = ctypes[
+                        self._feat_spell_ctype_cursor]
+                    self._feat_spell_level_cursor = 0
+                    self._feat_spell_level_scroll = 0
+                    self._feat_spell_nav = 1
+                elif self._is_save_shortcut(event):
+                    self._feat_save_spells()
+            elif nav == 1:
+                # Tier 1: level folders for selected casting type
+                levels = self._feat_spell_levels_for_ctype(
+                    self._feat_spell_sel_ctype)
+                n = len(levels)
+                if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+                    self._feat_spell_nav = 0
+                elif event.key == pygame.K_UP and n > 0:
+                    self._feat_spell_level_cursor = (
+                        self._feat_spell_level_cursor - 1) % n
+                    self._feat_spell_level_scroll = (
+                        self._feat_adjust_scroll_generic(
+                            self._feat_spell_level_cursor,
+                            self._feat_spell_level_scroll))
+                elif event.key == pygame.K_DOWN and n > 0:
+                    self._feat_spell_level_cursor = (
+                        self._feat_spell_level_cursor + 1) % n
+                    self._feat_spell_level_scroll = (
+                        self._feat_adjust_scroll_generic(
+                            self._feat_spell_level_cursor,
+                            self._feat_spell_level_scroll))
+                elif event.key in (pygame.K_RETURN,
+                                   pygame.K_RIGHT) and n > 0:
+                    lvl, _count = levels[self._feat_spell_level_cursor]
+                    self._feat_spell_sel_level = lvl
+                    self._feat_spell_filter(
+                        self._feat_spell_sel_ctype, lvl)
+                    self._feat_spell_nav = 2
+                elif self._is_new_shortcut(event):
+                    # Add spell with current casting type + first
+                    # available level
+                    self._feat_add_spell()
+                    new_s = self._feat_spell_list[-1]
+                    new_s["casting_type"] = self._feat_spell_sel_ctype
+                    new_s["allowable_classes"] = (
+                        self._feat_default_classes(
+                            self._feat_spell_sel_ctype))
+                    self._feat_resort_spells()
+                    self._feat_save_spells()
+                elif self._is_save_shortcut(event):
+                    self._feat_save_spells()
+            elif nav == 2:
+                # Tier 2: spells at selected casting type + level
+                filt = self._feat_spell_filtered
+                n = len(filt)
+                if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+                    self._feat_spell_nav = 1
+                elif event.key == pygame.K_UP and n > 0:
+                    self._feat_spell_cursor = (
+                        self._feat_spell_cursor - 1) % n
+                    self._feat_spell_scroll = (
+                        self._feat_adjust_scroll_generic(
+                            self._feat_spell_cursor,
+                            self._feat_spell_scroll))
+                elif event.key == pygame.K_DOWN and n > 0:
+                    self._feat_spell_cursor = (
+                        self._feat_spell_cursor + 1) % n
+                    self._feat_spell_scroll = (
+                        self._feat_adjust_scroll_generic(
+                            self._feat_spell_cursor,
+                            self._feat_spell_scroll))
+                elif event.key in (pygame.K_RETURN,
+                                   pygame.K_RIGHT) and n > 0:
+                    real_idx = filt[self._feat_spell_cursor]
+                    # Save filter position; point cursor at real
+                    # index for the field editor
+                    self._feat_spell_filter_pos = (
+                        self._feat_spell_cursor)
+                    self._feat_spell_cursor = real_idx
+                    spell = self._feat_spell_list[real_idx]
+                    self._feat_build_spell_fields(spell)
+                    self._feat_spell_editing = True
+                    self._feat_dirty = False
+                    self._feat_level = 2
+                elif self._is_new_shortcut(event):
+                    self._feat_add_spell()
+                    new_s = self._feat_spell_list[-1]
+                    new_s["casting_type"] = self._feat_spell_sel_ctype
+                    new_s["min_level"] = self._feat_spell_sel_level
+                    new_s["allowable_classes"] = (
+                        self._feat_default_classes(
+                            self._feat_spell_sel_ctype))
+                    self._feat_resort_spells()
+                    self._feat_save_spells()
+                    self._feat_spell_filter(
+                        self._feat_spell_sel_ctype,
+                        self._feat_spell_sel_level)
+                    self._feat_spell_cursor = max(
+                        0, len(self._feat_spell_filtered) - 1)
+                elif self._is_delete_shortcut(event) and n > 0:
+                    real_idx = filt[self._feat_spell_cursor]
+                    self._feat_spell_list.pop(real_idx)
+                    self._feat_save_spells()
+                    self._feat_spell_filter(
+                        self._feat_spell_sel_ctype,
+                        self._feat_spell_sel_level)
+                    if self._feat_spell_cursor >= len(
+                            self._feat_spell_filtered):
+                        self._feat_spell_cursor = max(
+                            0, len(self._feat_spell_filtered) - 1)
+                    # If level is now empty, go back to level list
+                    if not self._feat_spell_filtered:
+                        self._feat_spell_nav = 1
+                elif self._is_save_shortcut(event):
+                    self._feat_save_spells()
+            return
+
+        # ── Level 1: generic list (items, monsters) ──
+        if self._feat_level == 1 and ctx and ed not in (
+                "tiles", "gallery", "spells"):
             lst = ctx["list"]()
             n = len(lst)
             if event.key == pygame.K_ESCAPE:
@@ -7185,6 +7393,13 @@ class Game:
                     spell_field=self._feat_spell_field,
                     spell_buffer=self._feat_spell_buffer,
                     spell_field_scroll=self._feat_spell_scroll_f,
+                    spell_nav=self._feat_spell_nav,
+                    spell_ctype_cursor=self._feat_spell_ctype_cursor,
+                    spell_level_cursor=self._feat_spell_level_cursor,
+                    spell_level_scroll=self._feat_spell_level_scroll,
+                    spell_sel_ctype=self._feat_spell_sel_ctype,
+                    spell_sel_level=self._feat_spell_sel_level,
+                    spell_filtered=self._feat_spell_filtered,
                     item_list=self._feat_item_list,
                     item_cursor=self._feat_item_cursor,
                     item_scroll=self._feat_item_scroll,

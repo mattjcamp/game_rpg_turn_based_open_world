@@ -1028,13 +1028,6 @@
       "usable_in": [
         "unique_tiles"
       ]
-    },
-    "seal_of_binding_copy1": {
-      "path": "src/assets/game/landmarks/seal_of_binding_copy1.png",
-      "usable_in": [
-        "town",
-        "unique_tiles"
-      ]
     }
   },
   "objects": {

@@ -5,12 +5,27 @@
       "width": 18,
       "height": 19,
       "tiles": {
-        "2,1": {
+        "1,0": {
           "tile_id": null,
           "path": "unassigned/brick_wall_brown.png",
           "name": "Brick Wall Brown"
         },
-        "4,1": {
+        "2,0": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall_brown.png",
+          "name": "Brick Wall Brown"
+        },
+        "3,0": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall_brown.png",
+          "name": "Brick Wall Brown"
+        },
+        "4,0": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall_brown.png",
+          "name": "Brick Wall Brown"
+        },
+        "5,0": {
           "tile_id": null,
           "path": "unassigned/brick_wall_brown.png",
           "name": "Brick Wall Brown"
@@ -25,137 +40,87 @@
           "path": "unassigned/brick_wall_brown.png",
           "name": "Brick Wall Brown"
         },
-        "5,3": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "1,3": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
         "1,2": {
           "tile_id": null,
           "path": "unassigned/brick_wall_brown.png",
           "name": "Brick Wall Brown"
         },
-        "2,2": {
+        "1,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall_brown.png",
+          "name": "Brick Wall Brown"
+        },
+        "2,1": {
           "tile_id": 35,
           "path": "game/dungeon/altar.png",
           "name": "Altar"
         },
-        "3,2": {
+        "3,1": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "4,1": {
           "tile_id": 35,
           "path": "game/dungeon/altar.png",
           "name": "Altar"
         },
         "4,2": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "4,3": {
           "tile_id": null,
           "path": "unassigned/brick_wall_brown.png",
           "name": "Brick Wall Brown"
         },
-        "2,3": {
+        "2,2": {
           "tile_id": null,
           "path": "unassigned/brick_wall_brown.png",
           "name": "Brick Wall Brown"
         },
-        "3,3": {
+        "3,2": {
           "tile_id": 13,
           "path": "game/terrain/town_door.png",
           "name": "Door"
         },
-        "10,6": {
+        "2,4": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
+        },
+        "3,4": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
+        },
+        "3,5": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "11,6": {
+        "4,5": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "12,6": {
+        "5,5": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "12,7": {
+        "5,6": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "12,8": {
+        "5,7": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "12,9": {
+        "5,8": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "12,10": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "10,10": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "10,9": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "10,8": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "10,7": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "11,7": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "11,10": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
-        },
-        "1,6": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "2,6": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "3,6": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "3,7": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "3,8": {
+        "5,9": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
@@ -165,175 +130,30 @@
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "3,10": {
+        "3,8": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "1,10": {
+        "3,7": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "1,9": {
+        "3,6": {
           "tile_id": null,
           "path": "unassigned/brick_wall_red.png",
           "name": "Brick Wall Red"
         },
-        "1,8": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "1,7": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "2,7": {
+        "4,6": {
           "tile_id": 35,
           "path": "game/dungeon/altar.png",
           "name": "Altar"
         },
-        "2,10": {
+        "4,9": {
           "tile_id": 13,
           "path": "game/terrain/town_door.png",
           "name": "Door"
-        },
-        "2,8": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "2,9": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "5,9": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "6,9": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "7,9": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "5,10": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "6,10": {
-          "tile_id": 10,
-          "path": "game/terrain/town_floor.png",
-          "name": "Floor"
-        },
-        "3,12": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "4,12": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "5,12": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "6,12": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "7,12": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "7,13": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "7,14": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "3,14": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "3,13": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "4,13": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "5,13": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "6,13": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "6,14": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "4,14": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "5,14": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
-        },
-        "4,16": {
-          "tile_id": 12,
-          "path": "game/terrain/town_counter.png",
-          "name": "Counter"
-        },
-        "5,16": {
-          "tile_id": 12,
-          "path": "game/terrain/town_counter.png",
-          "name": "Counter"
-        },
-        "6,5": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "5,5": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
-        },
-        "1,4": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
         }
       }
     }

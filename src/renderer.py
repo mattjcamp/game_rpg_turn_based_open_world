@@ -4465,7 +4465,7 @@ class Renderer(CombatEffectRendererMixin):
     _U3_DKGRN  = (0, 130, 0)
     _U3_RED    = (220, 70, 70)
     _U3_GRAY   = (170, 170, 170)
-    _U3_HINT   = (68, 68, 255)    # control-hint text (matches border blue)
+    _U3_HINT   = (200, 200, 210)   # control-hint text (bright light gray)
     _U3_BRICK1 = (102, 51, 85)
     _U3_BRICK2 = (68, 34, 68)
 
@@ -7163,6 +7163,10 @@ class Renderer(CombatEffectRendererMixin):
                               spell_scroll=0, spell_editing=False,
                               spell_fields=None, spell_field=0,
                               spell_buffer="", spell_field_scroll=0,
+                              spell_nav=0, spell_ctype_cursor=0,
+                              spell_level_cursor=0, spell_level_scroll=0,
+                              spell_sel_ctype=None, spell_sel_level=None,
+                              spell_filtered=None,
                               item_list=None, item_cursor=0,
                               item_scroll=0, item_editing=False,
                               item_fields=None, item_field=0,
@@ -7381,9 +7385,13 @@ class Renderer(CombatEffectRendererMixin):
             # ── Draw the active editor's list + optional field overlay ──
             ed = active_editor
             if ed == "spells" or ed is None:
-                self._draw_features_spell_list(
+                self._draw_features_spell_nav(
                     left_x, left_w, right_x, right_w, panel_y, panel_h,
                     spell_list or [], spell_cursor, spell_scroll,
+                    spell_nav, spell_ctype_cursor,
+                    spell_level_cursor, spell_level_scroll,
+                    spell_sel_ctype, spell_sel_level,
+                    spell_filtered or [],
                     fm, fs, f)
                 if level == 2:
                     self._draw_features_spell_editor(
@@ -7707,76 +7715,200 @@ class Renderer(CombatEffectRendererMixin):
                         SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
 
-    def _draw_features_spell_list(self, left_x, left_w, right_x,
-                                   right_w, panel_y, panel_h,
-                                   spell_list, spell_cursor,
-                                   spell_scroll, fm, fs, f):
-        """Draw the spell list in the left panel and detail in right.
+    def _draw_features_spell_nav(self, left_x, left_w, right_x,
+                                  right_w, panel_y, panel_h,
+                                  spell_list, spell_cursor,
+                                  spell_scroll, spell_nav,
+                                  ctype_cursor, level_cursor,
+                                  level_scroll, sel_ctype,
+                                  sel_level, filtered,
+                                  fm, fs, f):
+        """Draw the 3-tier spell folder navigation.
 
-        Spells are assumed sorted by casting_type then min_level.
-        Section headers are inserted at group boundaries.
+        nav 0 = casting-type folders
+        nav 1 = level folders within a casting type
+        nav 2 = spells at a specific casting type + level
         """
-        self._u3_text("Spells", left_x + 12, panel_y + 8,
-                       self._U3_ORANGE, fs)
+        from src import data_registry as DR
         row_h = 36
-        header_h = 28
-        ly = panel_y + 30
 
-        # Build display rows: list of (type, spell_index | None, label)
-        # "header" rows are not selectable; "spell" rows map to an index
-        display_rows = []
-        prev_ctype = None
-        for si, spell in enumerate(spell_list):
-            ctype = spell.get("casting_type", "sorcerer")
-            if ctype != prev_ctype:
-                label = ("Sorcerer Spells" if ctype == "sorcerer"
-                         else "Cleric Spells")
-                display_rows.append(("header", None, label))
-                prev_ctype = ctype
-            display_rows.append(("spell", si, None))
+        if spell_nav == 0:
+            # ── Tier 0: Casting type folders ──
+            self._u3_text("Spells", left_x + 12, panel_y + 8,
+                          self._U3_ORANGE, fs)
+            ly = panel_y + 34
 
-        # Map spell_cursor to a display-row index for scrolling
-        cursor_drow = 0
-        for di, (rtype, si, _) in enumerate(display_rows):
-            if rtype == "spell" and si == spell_cursor:
-                cursor_drow = di
-                break
+            type_order = DR.casting_type_sort_order()
+            seen = {}
+            for s in spell_list:
+                ct = s.get("casting_type", "sorcerer")
+                if ct not in seen:
+                    seen[ct] = type_order.get(ct, 99)
+            ctypes = sorted(seen.keys(), key=lambda c: seen[c])
 
-        # Compute visible range (scroll around cursor_drow)
-        max_visible = (panel_h - 40) // row_h
-        dscroll = spell_scroll  # reuse scroll offset for display rows
-        # Adjust scroll so cursor row is visible
-        if cursor_drow < dscroll:
-            dscroll = cursor_drow
-        # Don't let a header sit alone; back up one if cursor is right after
-        if dscroll > 0 and display_rows[dscroll][0] == "spell":
-            if dscroll - 1 >= 0 and display_rows[dscroll - 1][0] == "header":
-                dscroll -= 1
-        if cursor_drow >= dscroll + max_visible:
-            dscroll = cursor_drow - max_visible + 1
+            for i, ct in enumerate(ctypes):
+                selected = (i == ctype_cursor)
+                y = ly + i * row_h
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, y - 1))
+                prefix = "> " if selected else "  "
+                label = DR.casting_type_label(ct)
+                count = sum(1 for s in spell_list
+                            if s.get("casting_type", "sorcerer") == ct)
+                name_color = (self._U3_WHITE if selected
+                              else (180, 180, 180))
+                self._u3_text(f"{prefix}{label} Spells",
+                              left_x + 10, y + 4, name_color, fm)
+                self._u3_text(f"{count} spell{'s' if count != 1 else ''}",
+                              left_x + 26, y + 22,
+                              (140, 140, 160), fs)
 
-        # Draw visible rows
-        draw_y = ly
-        drawn = 0
-        for di in range(dscroll, len(display_rows)):
-            if drawn >= max_visible:
-                break
-            rtype, si, label = display_rows[di]
-            if rtype == "header":
-                # Section header
-                hy = draw_y + 2
-                pygame.draw.line(self.screen, (80, 70, 60),
-                                 (left_x + 10, hy + header_h - 2),
-                                 (left_x + left_w - 10, hy + header_h - 2),
-                                 1)
-                self._u3_text(label, left_x + 12, hy,
-                              self._U3_ORANGE, fs)
-                draw_y += header_h
+            # Right panel: summary of selected casting type
+            if ctypes:
+                ct = ctypes[ctype_cursor]
+                ct_label = DR.casting_type_label(ct)
+                max_pw = right_w - 36
+                dy = panel_y + 12
+                self._u3_text(f"{ct_label} Spells",
+                              right_x + 16, dy, self._U3_WHITE, f)
+                dy += 30
+                # Count by level
+                from collections import Counter
+                level_counts = Counter()
+                for s in spell_list:
+                    if s.get("casting_type", "sorcerer") == ct:
+                        level_counts[s.get("min_level", 1)] += 1
+                for lvl in sorted(level_counts.keys()):
+                    cnt = level_counts[lvl]
+                    self._u3_text(
+                        f"Level {lvl}: {cnt} spell{'s' if cnt != 1 else ''}",
+                        right_x + 16, dy, (180, 180, 200), fm)
+                    dy += 22
+
+            # Footer
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
+                SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
+                self._U3_HINT, fs)
+
+        elif spell_nav == 1:
+            # ── Tier 1: Level folders for selected casting type ──
+            ct_label = DR.casting_type_label(sel_ctype or "sorcerer")
+            self._u3_text(f"{ct_label} Spells", left_x + 12,
+                          panel_y + 8, self._U3_ORANGE, fs)
+            ly = panel_y + 34
+
+            from collections import Counter
+            level_counts = Counter()
+            for s in spell_list:
+                if s.get("casting_type", "sorcerer") == sel_ctype:
+                    level_counts[s.get("min_level", 1)] += 1
+            levels = sorted(level_counts.items())
+
+            max_visible = (panel_h - 50) // row_h
+            scroll = level_scroll
+            if level_cursor < scroll:
+                scroll = level_cursor
+            if level_cursor >= scroll + max_visible:
+                scroll = level_cursor - max_visible + 1
+
+            drawn = 0
+            for i in range(scroll, len(levels)):
+                if drawn >= max_visible:
+                    break
+                lvl, cnt = levels[i]
+                selected = (i == level_cursor)
+                y = ly + drawn * row_h
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, y - 1))
+                prefix = "> " if selected else "  "
+                name_color = (self._U3_WHITE if selected
+                              else (180, 180, 180))
+                self._u3_text(
+                    f"{prefix}Level {lvl}",
+                    left_x + 10, y + 4, name_color, fm)
+                self._u3_text(
+                    f"{cnt} spell{'s' if cnt != 1 else ''}",
+                    left_x + 26, y + 22, (140, 140, 160), fs)
                 drawn += 1
-            else:
-                spell = spell_list[si]
-                selected = (si == spell_cursor)
-                y = draw_y
+
+            # Scroll indicators
+            if scroll > 0:
+                self._u3_text("^", left_x + left_w // 2 - 4,
+                              ly - 8, (180, 180, 200), fs)
+            if scroll + max_visible < len(levels):
+                self._u3_text("v", left_x + left_w // 2 - 4,
+                              ly + max_visible * row_h - 4,
+                              (180, 180, 200), fs)
+
+            # Right panel: list spells at the selected level
+            if levels:
+                lvl, cnt = levels[level_cursor]
+                max_pw = right_w - 36
+                dy = panel_y + 12
+                self._u3_text(
+                    f"{ct_label} - Level {lvl}",
+                    right_x + 16, dy, self._U3_WHITE, f)
+                dy += 28
+                pygame.draw.line(
+                    self.screen, (60, 50, 40),
+                    (right_x + 16, dy), (right_x + right_w - 16, dy), 1)
+                dy += 10
+                for s in spell_list:
+                    if (s.get("casting_type", "sorcerer") == sel_ctype
+                            and s.get("min_level", 1) == lvl):
+                        sn = s.get("name", "???")
+                        mp = s.get("mp_cost", 0)
+                        while (len(sn) > 2
+                               and fm.size(f"{sn} ({mp} MP)")[0] > max_pw):
+                            sn = sn[:-1]
+                        self._u3_text(f"{sn}  ({mp} MP)",
+                                      right_x + 16, dy,
+                                      (180, 180, 200), fm)
+                        dy += 20
+                        if dy > panel_y + panel_h - 20:
+                            self._u3_text("...", right_x + 16, dy,
+                                          (140, 140, 160), fs)
+                            break
+
+            # Footer
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  "
+                "[Ctrl+N] Add  [Esc] Back",
+                SCREEN_WIDTH // 2 - 170, SCREEN_HEIGHT - 45,
+                self._U3_HINT, fs)
+
+        elif spell_nav == 2:
+            # ── Tier 2: Spells at selected casting type + level ──
+            ct_label = DR.casting_type_label(sel_ctype or "sorcerer")
+            self._u3_text(
+                f"{ct_label} - Level {sel_level}",
+                left_x + 12, panel_y + 8, self._U3_ORANGE, fs)
+            ly = panel_y + 34
+
+            max_visible = (panel_h - 50) // row_h
+            scroll = spell_scroll
+            if spell_cursor < scroll:
+                scroll = spell_cursor
+            if spell_cursor >= scroll + max_visible:
+                scroll = spell_cursor - max_visible + 1
+
+            drawn = 0
+            for fi in range(scroll, len(filtered)):
+                if drawn >= max_visible:
+                    break
+                real_idx = filtered[fi]
+                if real_idx >= len(spell_list):
+                    continue
+                spell = spell_list[real_idx]
+                selected = (fi == spell_cursor)
+                y = ly + drawn * row_h
                 if selected:
                     bar = pygame.Surface((left_w - 4, row_h - 2),
                                          pygame.SRCALPHA)
@@ -7790,121 +7922,115 @@ class Renderer(CombatEffectRendererMixin):
                 while (len(name) > 2
                        and fm.size(f"{prefix}{name}")[0] > max_pw):
                     name = name[:-1]
-                self._u3_text(f"{prefix}{name}", left_x + 10, y + 2,
-                              name_color, fm)
-                # Level/cost subtitle — fixed positions so values
-                # don't bleed into each other
-                lvl = spell.get("min_level", 1)
+                self._u3_text(f"{prefix}{name}",
+                              left_x + 10, y + 4, name_color, fm)
                 mp = spell.get("mp_cost", 0)
                 sub_color = ((140, 180, 140) if selected
                              else (120, 120, 140))
-                self._u3_text(f"L{lvl}", left_x + 26, y + 20,
+                self._u3_text(f"{mp} MP", left_x + 26, y + 22,
                               sub_color, fs)
-                self._u3_text(f"{mp} MP", left_x + 70, y + 20,
-                              sub_color, fs)
-                draw_y += row_h
                 drawn += 1
 
-        # Scroll indicators
-        if dscroll > 0:
-            self._u3_text("^", left_x + left_w // 2 - 4,
-                          ly - 8, (180, 180, 200), fs)
-        if dscroll + max_visible < len(display_rows):
-            self._u3_text("v", left_x + left_w // 2 - 4,
-                          ly + max_visible * row_h - 4,
-                          (180, 180, 200), fs)
+            # Scroll indicators
+            if scroll > 0:
+                self._u3_text("^", left_x + left_w // 2 - 4,
+                              ly - 8, (180, 180, 200), fs)
+            if scroll + max_visible < len(filtered):
+                self._u3_text("v", left_x + left_w // 2 - 4,
+                              ly + max_visible * row_h - 4,
+                              (180, 180, 200), fs)
 
-        # ── Right panel: selected spell detail ──
-        if 0 <= spell_cursor < len(spell_list):
-            spell = spell_list[spell_cursor]
-            max_pw = right_w - 36
-            dy = panel_y + 12
-            sname = spell.get("name", "???")
-            while len(sname) > 2 and f.size(sname)[0] > max_pw:
-                sname = sname[:-1]
-            self._u3_text(sname,
-                          right_x + 16, dy, self._U3_WHITE, f)
-            dy += 28
+            # ── Right panel: selected spell detail ──
+            if (0 <= spell_cursor < len(filtered)
+                    and filtered[spell_cursor] < len(spell_list)):
+                spell = spell_list[filtered[spell_cursor]]
+                max_pw = right_w - 36
+                dy = panel_y + 12
+                sname = spell.get("name", "???")
+                while len(sname) > 2 and f.size(sname)[0] > max_pw:
+                    sname = sname[:-1]
+                self._u3_text(sname,
+                              right_x + 16, dy, self._U3_WHITE, f)
+                dy += 28
 
-            from src import data_registry as DR
-            raw_ctype = spell.get("casting_type", "sorcerer")
-            ctype_label = DR.casting_type_label(raw_ctype)
-            self._u3_text(f"{ctype_label} spell",
-                          right_x + 16, dy, (160, 160, 180), fm)
-            dy += 20
+                raw_ctype = spell.get("casting_type", "sorcerer")
+                ctype_label = DR.casting_type_label(raw_ctype)
+                self._u3_text(f"{ctype_label} spell",
+                              right_x + 16, dy, (160, 160, 180), fm)
+                dy += 20
 
-            classes = ", ".join(spell.get("allowable_classes", []))
-            cls_text = f"Classes: {classes}"
-            while (len(cls_text) > 10
-                   and fm.size(cls_text)[0] > max_pw):
-                cls_text = cls_text[:-1]
-            self._u3_text(cls_text,
-                          right_x + 16, dy, (180, 180, 200), fm)
-            dy += 20
+                classes = ", ".join(spell.get("allowable_classes", []))
+                cls_text = f"Classes: {classes}"
+                while (len(cls_text) > 10
+                       and fm.size(cls_text)[0] > max_pw):
+                    cls_text = cls_text[:-1]
+                self._u3_text(cls_text,
+                              right_x + 16, dy, (180, 180, 200), fm)
+                dy += 20
 
-            stat_text = (
-                f"Level {spell.get('min_level', 1)}  |  "
-                f"{spell.get('mp_cost', 0)} MP  |  "
-                f"{spell.get('effect_type', '?')}")
-            while (len(stat_text) > 10
-                   and fm.size(stat_text)[0] > max_pw):
-                stat_text = stat_text[:-1]
-            self._u3_text(stat_text,
-                          right_x + 16, dy, (180, 180, 200), fm)
-            dy += 24
+                stat_text = (
+                    f"Level {spell.get('min_level', 1)}  |  "
+                    f"{spell.get('mp_cost', 0)} MP  |  "
+                    f"{spell.get('effect_type', '?')}")
+                while (len(stat_text) > 10
+                       and fm.size(stat_text)[0] > max_pw):
+                    stat_text = stat_text[:-1]
+                self._u3_text(stat_text,
+                              right_x + 16, dy, (180, 180, 200), fm)
+                dy += 24
 
-            pygame.draw.line(self.screen, (60, 50, 40),
-                             (right_x + 16, dy),
-                             (right_x + right_w - 16, dy), 1)
-            dy += 12
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (right_x + 16, dy),
+                                 (right_x + right_w - 16, dy), 1)
+                dy += 12
 
-            # Description with word wrap
-            desc = spell.get("description", "")
-            if desc:
-                words = desc.split()
-                line = ""
-                for word in words:
-                    test = f"{line} {word}".strip()
-                    if fm.size(test)[0] > max_pw and line:
+                # Description with word wrap
+                desc = spell.get("description", "")
+                if desc:
+                    words = desc.split()
+                    line = ""
+                    for word in words:
+                        test = f"{line} {word}".strip()
+                        if fm.size(test)[0] > max_pw and line:
+                            self._u3_text(line, right_x + 16, dy,
+                                          (180, 180, 200), fm)
+                            dy += 22
+                            line = word
+                        else:
+                            line = test
+                    if line:
                         self._u3_text(line, right_x + 16, dy,
                                       (180, 180, 200), fm)
                         dy += 22
-                        line = word
-                    else:
-                        line = test
-                if line:
-                    self._u3_text(line, right_x + 16, dy,
-                                  (180, 180, 200), fm)
-                    dy += 22
 
-            # Targeting & range — truncate to fit right panel
-            dy += 8
-            targeting = spell.get("targeting", "?")
-            rng = spell.get("range", 99)
-            tgt_text = f"Targeting: {targeting}"
-            while (len(tgt_text) > 12
-                   and fs.size(tgt_text)[0] > max_pw):
-                tgt_text = tgt_text[:-1]
-            self._u3_text(tgt_text,
-                          right_x + 16, dy, (140, 140, 160), fs)
-            dy += 16
-            self._u3_text(f"Range: {rng}",
-                          right_x + 16, dy, (140, 140, 160), fs)
-            dy += 16
-            usable = ", ".join(spell.get("usable_in", []))
-            usable_text = f"Usable in: {usable}"
-            while (len(usable_text) > 12
-                   and fs.size(usable_text)[0] > max_pw):
-                usable_text = usable_text[:-1]
-            self._u3_text(usable_text,
-                          right_x + 16, dy, (140, 140, 160), fs)
+                # Targeting & range
+                dy += 8
+                targeting = spell.get("targeting", "?")
+                rng = spell.get("range", 99)
+                tgt_text = f"Targeting: {targeting}"
+                while (len(tgt_text) > 12
+                       and fs.size(tgt_text)[0] > max_pw):
+                    tgt_text = tgt_text[:-1]
+                self._u3_text(tgt_text,
+                              right_x + 16, dy, (140, 140, 160), fs)
+                dy += 16
+                self._u3_text(f"Range: {rng}",
+                              right_x + 16, dy, (140, 140, 160), fs)
+                dy += 16
+                usable = ", ".join(spell.get("usable_in", []))
+                usable_text = f"Usable in: {usable}"
+                while (len(usable_text) > 12
+                       and fs.size(usable_text)[0] > max_pw):
+                    usable_text = usable_text[:-1]
+                self._u3_text(usable_text,
+                              right_x + 16, dy, (140, 140, 160), fs)
 
-        # Footer
-        self._u3_text(
-            "[Up/Dn] Browse  [Enter] Edit  "
-            "[Ctrl+N] Add  [Ctrl+D] Delete  [Esc] Back",
-            SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
-            self._U3_HINT, fs)
+            # Footer
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Edit  "
+                "[Ctrl+N] Add  [Ctrl+D] Delete  [Esc] Back",
+                SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+                self._U3_HINT, fs)
 
     def _draw_features_spell_editor(self, rx, ry, rw, rh,
                                      fields, active_idx, buffer,
@@ -9761,7 +9887,7 @@ class Renderer(CombatEffectRendererMixin):
                     "[CTRL+S] Save  [ESC] Back")
         else:
             hint = ("[UP/DN] Browse  [S] Select  "
-                    "[Ctrl+N] New  [E] Edit  [Ctrl+D] Delete  [ESC] Back")
+                    "[ENTER] Edit  [Ctrl+N] New  [Ctrl+D] Delete  [ESC] Back")
         self._u3_text(hint, SCREEN_WIDTH // 2 - len(hint) * 4,
                       hint_y, hint_color, fs)
 
@@ -10368,7 +10494,7 @@ class Renderer(CombatEffectRendererMixin):
         # Controls hint
         hint_y = panel_y + panel_h - 30
         self._u3_text("[UP/DN] SELECT  [ENTER/L/R] CHANGE  [M/ESC] CLOSE",
-                      panel_x + 16, hint_y, (68, 68, 255), self.font_small)
+                      panel_x + 16, hint_y, self._U3_HINT, self.font_small)
 
         self.screen.set_clip(prev_clip)
 
@@ -10484,7 +10610,7 @@ class Renderer(CombatEffectRendererMixin):
         # Controls hint
         hint_y = panel_y + panel_h - 18
         self._u3_text("[UP/DN] SCROLL  [Q/ESC] CLOSE",
-                      panel_x + 16, hint_y, (68, 68, 255), self.font_small)
+                      panel_x + 16, hint_y, self._U3_HINT, self.font_small)
 
     def draw_save_load_screen(self, mode, slot_infos, cursor, message=None,
                               confirm_delete=False):
@@ -10608,7 +10734,7 @@ class Renderer(CombatEffectRendererMixin):
             hint = "[UP/DN] SELECT  [ENTER] SAVE  [CTRL+S] QUICK SAVE  [ESC] BACK"
         else:
             hint = "[UP/DN] SELECT  [ENTER] LOAD  [CTRL+D] DELETE  [ESC] BACK"
-        self._u3_text(hint, panel_x + 16, hint_y, (68, 68, 255),
+        self._u3_text(hint, panel_x + 16, hint_y, self._U3_HINT,
                       self.font_small)
 
         self.screen.set_clip(prev_clip)
