@@ -7170,12 +7170,18 @@ class Renderer(CombatEffectRendererMixin):
                               gallery_spr_scroll=0,
                               gallery_tag_cursor=0,
                               gallery_all_cats=None,
+                              gallery_naming=False,
+                              gallery_name_buf="",
                               pxedit_pixels=None,
                               pxedit_cx=0, pxedit_cy=0,
                               pxedit_w=32, pxedit_h=32,
                               pxedit_color_idx=0,
                               pxedit_palette=None,
                               pxedit_focus="canvas",
+                              pxedit_replacing=False,
+                              pxedit_replace_src_color=(0, 0, 0, 255),
+                              pxedit_replace_dst=0,
+                              pxedit_replace_sel="src",
                               townlayout_list=None,
                               townlayout_cursor=0,
                               townlayout_scroll=0,
@@ -7424,7 +7430,11 @@ class Renderer(CombatEffectRendererMixin):
                         pxedit_color_idx,
                         pxedit_palette or [],
                         pxedit_focus,
-                        fm, fs, f)
+                        fm, fs, f,
+                        replacing=pxedit_replacing,
+                        replace_src_color=pxedit_replace_src_color,
+                        replace_dst=pxedit_replace_dst,
+                        replace_sel=pxedit_replace_sel)
                 else:
                     self._draw_features_gallery(
                         left_x, left_w, right_x, right_w,
@@ -7436,7 +7446,9 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_spr_cursor, gallery_spr_scroll,
                         gallery_tag_cursor,
                         gallery_all_cats or [],
-                        fm, fs, f)
+                        fm, fs, f,
+                        gallery_naming=gallery_naming,
+                        gallery_name_buf=gallery_name_buf)
             elif ed == "townlayouts" and not townlayout_editing and town_active_sub is None:
                 # ── Town sub-folder selection ──
                 self._u3_text("Town Editor", left_x + 12, panel_y + 8,
@@ -8074,7 +8086,9 @@ class Renderer(CombatEffectRendererMixin):
                                 cat_cursor, cat_scroll,
                                 sprites, spr_cursor, spr_scroll,
                                 tag_cursor, all_cats,
-                                fm, fs, f):
+                                fm, fs, f,
+                                gallery_naming=False,
+                                gallery_name_buf=""):
         """Draw the 3-level tile gallery.
 
         Level 1: category folders  Level 2: sprite list  Level 3: tag editor
@@ -8394,18 +8408,48 @@ class Renderer(CombatEffectRendererMixin):
                                   self._U3_WHITE, fs)
                     tag_x += pw + 6
 
+        # ── Naming overlay ──
+        if gallery_naming and level == 2:
+            nm_x = left_x + 10
+            nm_y = panel_y + panel_h // 2 - 30
+            nm_w = left_w - 20
+            nm_h = 50
+            overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+            overlay.fill((20, 18, 30, 200))
+            self.screen.blit(overlay, (left_x, panel_y))
+            self._u3_text("Rename tile:", nm_x + 4, nm_y - 18,
+                          self._U3_ORANGE, fs)
+            pygame.draw.rect(self.screen, (60, 55, 80),
+                             pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+            pygame.draw.rect(self.screen, (200, 180, 80),
+                             pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+            display_text = gallery_name_buf
+            elapsed = pygame.time.get_ticks() / 1000.0
+            if int(elapsed * 2) % 2 == 0:
+                display_text += "|"
+            self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                          self._U3_WHITE, fm)
+            self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                          nm_x + 4, nm_y + nm_h + 6,
+                          self._U3_HINT, fs)
+            return  # skip normal footer when naming
+
         # Footer
         if level == 3:
             hint = "[Up/Dn] Select  [Enter] Toggle  [Esc] Done"
         else:
             hint = ("[Up/Dn] Browse  [Enter] Tags  "
-                    "[E] Edit Pixels  [Esc] Back")
+                    "[E] Edit Pixels  [Ctrl+D] Duplicate  "
+                    "[N] Rename  [X] Delete  [Esc] Back")
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 45, self._U3_HINT, fs)
 
     def _draw_pixel_editor(self, pixels, cx, cy, pw, ph,
-                            color_idx, palette, focus, fm, fs, f):
+                            color_idx, palette, focus, fm, fs, f,
+                            replacing=False,
+                            replace_src_color=(0, 0, 0, 255),
+                            replace_dst=0, replace_sel="dst"):
         """Draw the full-screen pixel editor for a sprite."""
         self.screen.fill((0, 0, 0))
         canvas_focused = (focus == "canvas")
@@ -8600,13 +8644,113 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text("2x", p2x, prev_y2 + ph * 2 + 4,
                       (100, 100, 120), fs)
 
+        # ── Color Replace Mode overlay ──
+        if replacing and palette:
+            # Semi-transparent overlay over the canvas area
+            overlay = pygame.Surface(
+                (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 160))
+            self.screen.blit(overlay, (0, 0))
+
+            # Panel
+            rpw, rph = 360, 200
+            rpx = (SCREEN_WIDTH - rpw) // 2
+            rpy = (SCREEN_HEIGHT - rph) // 2
+            pygame.draw.rect(self.screen, (30, 28, 40),
+                             pygame.Rect(rpx, rpy, rpw, rph))
+            pygame.draw.rect(self.screen, (200, 180, 80),
+                             pygame.Rect(rpx, rpy, rpw, rph), 2)
+
+            self._u3_text("Replace Color", rpx + rpw // 2 - 55,
+                          rpy + 10, self._U3_ORANGE, f)
+
+            swatch = 36
+            dst_sel = (replace_sel == "dst")
+
+            # Source color ("From") — exact color from canvas pixel
+            src_c = replace_src_color
+            self._u3_text("From:", rpx + 30, rpy + 55, (180, 180, 200), fm)
+            src_sx = rpx + 100
+            src_sy = rpy + 48
+            if len(src_c) >= 4 and src_c[3] == 0:
+                for qr in range(2):
+                    for qc in range(2):
+                        qcol = (40, 40, 40) if (qr + qc) % 2 == 0 \
+                            else (80, 80, 80)
+                        pygame.draw.rect(self.screen, qcol,
+                                         (src_sx + qc * swatch // 2,
+                                          src_sy + qr * swatch // 2,
+                                          swatch // 2, swatch // 2))
+            else:
+                pygame.draw.rect(self.screen, src_c[:3],
+                                 (src_sx, src_sy, swatch, swatch))
+            pygame.draw.rect(self.screen, (80, 70, 50),
+                             (src_sx - 2, src_sy - 2,
+                              swatch + 4, swatch + 4), 2)
+            # Color name / RGB
+            if len(src_c) >= 4 and src_c[3] == 0:
+                self._u3_text("Transparent",
+                              src_sx + swatch + 10, src_sy + 8,
+                              (140, 140, 160), fs)
+            else:
+                self._u3_text(
+                    f"R:{src_c[0]} G:{src_c[1]} B:{src_c[2]}",
+                    src_sx + swatch + 10, src_sy + 8,
+                    (140, 140, 160), fs)
+
+            # Arrow between
+            arrow_y = rpy + 95
+            self._u3_text(">>>", rpx + rpw // 2 - 15,
+                          arrow_y, (180, 160, 80), fm)
+
+            # Destination color ("To")
+            self._u3_text("To:", rpx + 30, rpy + 125,
+                          (255, 255, 100), fm)
+            dst_c = palette[replace_dst] if replace_dst < len(palette) \
+                else (0, 0, 0, 255)
+            dst_sx = rpx + 100
+            dst_sy = rpy + 118
+            if dst_c[3] == 0:
+                for qr in range(2):
+                    for qc in range(2):
+                        qcol = (40, 40, 40) if (qr + qc) % 2 == 0 \
+                            else (80, 80, 80)
+                        pygame.draw.rect(self.screen, qcol,
+                                         (dst_sx + qc * swatch // 2,
+                                          dst_sy + qr * swatch // 2,
+                                          swatch // 2, swatch // 2))
+            else:
+                pygame.draw.rect(self.screen, dst_c[:3],
+                                 (dst_sx, dst_sy, swatch, swatch))
+            pygame.draw.rect(self.screen, (255, 255, 100),
+                             (dst_sx - 2, dst_sy - 2,
+                              swatch + 4, swatch + 4), 2)
+            if dst_c[3] == 0:
+                self._u3_text("Transparent",
+                              dst_sx + swatch + 10, dst_sy + 8,
+                              (140, 140, 160), fs)
+            else:
+                self._u3_text(
+                    f"R:{dst_c[0]} G:{dst_c[1]} B:{dst_c[2]}",
+                    dst_sx + swatch + 10, dst_sy + 8,
+                    (140, 140, 160), fs)
+
+            # Footer for replace mode
+            self._u3_text(
+                "[Arrows] Choose replacement color  "
+                "[Enter] Apply  [Esc] Cancel",
+                rpx + 10, rpy + rph - 28,
+                self._U3_HINT, fs)
+            return  # skip normal footer
+
         # ── Footer hints (context-sensitive) ──
         if palette_focused:
             hint = ("[Arrows] Select Color  [Enter] Confirm  "
                     "[Tab] Canvas  [Esc] Canvas")
         else:
             hint = ("[Arrows] Move  [Space] Paint  [Tab] Palette  "
-                    "[Q/E] Color  [P] Pick  [Esc] Save")
+                    "[Q/E] Color  [P] Pick  [R] Replace  "
+                    "[Ctrl+Z] Undo  [Esc] Save")
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 30, self._U3_HINT, fs)

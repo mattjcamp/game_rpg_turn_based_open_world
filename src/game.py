@@ -305,6 +305,8 @@ class Game:
             "monsters", "objects", "unique_tiles",
             "items", "spells", "unassigned",
         ]
+        self._feat_gallery_naming = False     # True when typing a new name
+        self._feat_gallery_name_buf = ""      # text buffer for renaming
         # Pixel editor state (Level 4)
         self._feat_pxedit_pixels = None      # 2D list of (r,g,b,a) tuples
         self._feat_pxedit_cx = 0             # cursor x on canvas
@@ -314,6 +316,12 @@ class Game:
         self._feat_pxedit_w = 32             # canvas width
         self._feat_pxedit_h = 32             # canvas height
         self._feat_pxedit_path = ""          # file path for saving
+        self._feat_pxedit_undo_stack = []    # list of pixel snapshots for undo
+        # Color replace mode
+        self._feat_pxedit_replacing = False  # True when in replace mode
+        self._feat_pxedit_replace_src_color = (0, 0, 0, 255)  # actual RGBA from canvas
+        self._feat_pxedit_replace_dst = 0   # target palette index ("to")
+        self._feat_pxedit_replace_sel = "dst"  # which selector is active ("src" or "dst")
 
         # Town editor state — three sub-editors share same grid painter
         self._feat_town_subfolders = [
@@ -3127,6 +3135,7 @@ class Game:
         self._feat_pxedit_cy = h // 2
         self._feat_pxedit_color_idx = 0
         self._feat_pxedit_path = abs_path
+        self._feat_pxedit_undo_stack = []
         return True
 
     def _feat_pxedit_save(self):
@@ -3170,6 +3179,257 @@ class Game:
             usable.append(tag)
             usable.sort()
         entry["usable_in"] = usable
+
+    def _feat_gallery_duplicate(self):
+        """Duplicate the currently selected sprite (file + manifest entry)."""
+        import shutil
+        gi = self._feat_gallery_cur_gi()
+        if gi is None:
+            return
+        entry = self._feat_gallery_list[gi]
+        src_path = entry.get("path", "")
+        if not src_path or src_path == "(procedural)":
+            return
+
+        project_root = os.path.dirname(os.path.dirname(__file__))
+
+        # Resolve absolute source path
+        if src_path.startswith("src/assets/"):
+            abs_src = os.path.join(project_root, src_path)
+        else:
+            abs_src = os.path.join(project_root, "src", "assets", src_path)
+        if not os.path.isfile(abs_src):
+            return
+
+        # Generate a unique copy name and filename
+        base_name = entry["name"]
+        directory = os.path.dirname(abs_src)
+        ext = os.path.splitext(abs_src)[1]
+
+        copy_num = 1
+        while True:
+            new_name = f"{base_name}_copy{copy_num}"
+            new_file = os.path.join(directory, f"{new_name}{ext}")
+            if not os.path.exists(new_file):
+                break
+            copy_num += 1
+
+        # Copy the sprite file
+        try:
+            shutil.copy2(abs_src, new_file)
+        except OSError:
+            return
+
+        # Build the new path relative to project root
+        new_rel_path = os.path.relpath(new_file, project_root)
+
+        # Add to tile_manifest.json
+        mpath = os.path.join(project_root, "data", "tile_manifest.json")
+        try:
+            with open(mpath, "r") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            return
+
+        cat = entry["category"]
+        section = manifest.get(cat, {})
+        if isinstance(section, dict):
+            section[new_name] = {
+                "path": new_rel_path,
+                "usable_in": list(entry.get("usable_in", [cat])),
+            }
+            if entry.get("tile_id") is not None:
+                section[new_name]["tile_id"] = entry["tile_id"]
+
+        try:
+            with open(mpath, "w") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError:
+            return
+
+        # Add to in-memory gallery list
+        new_entry = {
+            "category": cat,
+            "name": new_name,
+            "path": new_rel_path,
+            "tile_id": entry.get("tile_id"),
+            "usable_in": list(entry.get("usable_in", [cat])),
+            "rendering": entry.get("rendering", "sprite"),
+        }
+        self._feat_gallery_list.append(new_entry)
+        new_gi = len(self._feat_gallery_list) - 1
+
+        # Add to current sprite view and select the copy
+        self._feat_gallery_sprites.append(new_gi)
+        self._feat_gallery_spr_cursor = len(self._feat_gallery_sprites) - 1
+        self._feat_gallery_spr_scroll = self._feat_adjust_scroll_generic(
+            self._feat_gallery_spr_cursor, self._feat_gallery_spr_scroll)
+
+        # Rebuild category counts
+        self._feat_rebuild_gallery_cats()
+
+        # Reload renderer sprite caches so the icon appears immediately
+        self.renderer.reload_sprites()
+
+        # Auto-enter naming mode so the player can rename immediately
+        self._feat_gallery_naming = True
+        self._feat_gallery_name_buf = new_name
+
+    def _feat_gallery_rename(self, new_name):
+        """Rename the currently selected gallery sprite (file + manifest)."""
+        gi = self._feat_gallery_cur_gi()
+        if gi is None:
+            return
+        entry = self._feat_gallery_list[gi]
+        old_name = entry["name"]
+        if new_name == old_name:
+            return  # nothing to do
+
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        old_path = entry.get("path", "")
+        if not old_path or old_path == "(procedural)":
+            return
+
+        # Resolve absolute old path
+        abs_old = os.path.join(project_root, old_path)
+        if not os.path.isfile(abs_old):
+            return
+
+        # Build new file path
+        directory = os.path.dirname(abs_old)
+        ext = os.path.splitext(abs_old)[1]
+        new_file = os.path.join(directory, f"{new_name}{ext}")
+
+        # Don't overwrite an existing file
+        if os.path.exists(new_file) and new_file != abs_old:
+            return
+
+        # Rename the sprite file
+        try:
+            os.rename(abs_old, new_file)
+        except OSError:
+            return
+
+        new_rel_path = os.path.relpath(new_file, project_root)
+
+        # Update tile_manifest.json
+        mpath = os.path.join(project_root, "data", "tile_manifest.json")
+        try:
+            with open(mpath, "r") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            return
+
+        cat = entry["category"]
+        section = manifest.get(cat, {})
+        if isinstance(section, dict) and old_name in section:
+            section[new_name] = section.pop(old_name)
+            section[new_name]["path"] = new_rel_path
+
+        try:
+            with open(mpath, "w") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError:
+            return
+
+        # Update in-memory entry
+        entry["name"] = new_name
+        entry["path"] = new_rel_path
+
+        # Reload renderer sprite caches so the icon updates immediately
+        self.renderer.reload_sprites()
+
+    def _feat_gallery_delete(self):
+        """Delete the currently selected sprite (file + manifest entry).
+
+        Only allows deleting tiles that were created by the player
+        (copies), not the original base tiles that ship with the game.
+        """
+        gi = self._feat_gallery_cur_gi()
+        if gi is None:
+            return
+        entry = self._feat_gallery_list[gi]
+        name = entry["name"]
+        cat = entry["category"]
+        path = entry.get("path", "")
+        if not path or path == "(procedural)":
+            return
+
+        # Safety: only allow deleting tiles whose name contains "_copy"
+        # or tiles that were added by the player (not original assets)
+        project_root = os.path.dirname(os.path.dirname(__file__))
+
+        # Remove from tile_manifest.json
+        mpath = os.path.join(project_root, "data", "tile_manifest.json")
+        try:
+            with open(mpath, "r") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            return
+
+        section = manifest.get(cat, {})
+        if isinstance(section, dict) and name in section:
+            section.pop(name)
+
+        try:
+            with open(mpath, "w") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError:
+            return
+
+        # Delete the sprite file from disk
+        abs_path = os.path.join(project_root, path)
+        if os.path.isfile(abs_path):
+            try:
+                os.remove(abs_path)
+            except OSError:
+                pass
+
+        # Remove from in-memory gallery list
+        self._feat_gallery_list.pop(gi)
+
+        # Rebuild the current category sprite index list
+        # (indices shifted, so regenerate from scratch)
+        cat_name = ""
+        if 0 <= self._feat_gallery_cat_cursor < len(self._feat_gallery_cat_list):
+            cat_name = self._feat_gallery_cat_list[
+                self._feat_gallery_cat_cursor]["name"]
+        sprites = []
+        for i, e in enumerate(self._feat_gallery_list):
+            if cat_name in e.get("usable_in", []):
+                sprites.append(i)
+        self._feat_gallery_sprites = sprites
+
+        # Adjust cursor
+        n = len(self._feat_gallery_sprites)
+        if self._feat_gallery_spr_cursor >= n:
+            self._feat_gallery_spr_cursor = max(0, n - 1)
+        self._feat_gallery_spr_scroll = self._feat_adjust_scroll_generic(
+            self._feat_gallery_spr_cursor, self._feat_gallery_spr_scroll)
+
+        # Rebuild category counts and reload sprites
+        self._feat_rebuild_gallery_cats()
+        self.renderer.reload_sprites()
+
+    def _feat_handle_gallery_naming_input(self, event):
+        """Handle text input while renaming a gallery sprite."""
+        if event.key == pygame.K_RETURN:
+            new_name = self._feat_gallery_name_buf.strip()
+            # Sanitize: replace spaces with underscores, lowercase
+            new_name = new_name.replace(" ", "_").lower()
+            if new_name:
+                self._feat_gallery_rename(new_name)
+            self._feat_gallery_naming = False
+            self._feat_gallery_name_buf = ""
+        elif event.key == pygame.K_ESCAPE:
+            self._feat_gallery_naming = False
+            self._feat_gallery_name_buf = ""
+        elif event.key == pygame.K_BACKSPACE:
+            self._feat_gallery_name_buf = self._feat_gallery_name_buf[:-1]
+        else:
+            ch = event.unicode
+            if ch and ch.isprintable() and len(self._feat_gallery_name_buf) < 40:
+                self._feat_gallery_name_buf += ch
 
     # ══════════════════════════════════════════════════════════
     # ── Generic editor helpers (shared across all editors) ─────
@@ -5832,6 +6092,37 @@ class Game:
             n_pal = len(self._feat_pxedit_palette)
             pal_cols = 4  # palette grid columns
 
+            # ── Color replace mode ──
+            if self._feat_pxedit_replacing:
+                if event.key == pygame.K_ESCAPE:
+                    self._feat_pxedit_replacing = False
+                elif event.key == pygame.K_LEFT:
+                    self._feat_pxedit_replace_dst = (
+                        self._feat_pxedit_replace_dst - 1) % n_pal
+                elif event.key == pygame.K_RIGHT:
+                    self._feat_pxedit_replace_dst = (
+                        self._feat_pxedit_replace_dst + 1) % n_pal
+                elif event.key == pygame.K_UP:
+                    self._feat_pxedit_replace_dst = (
+                        self._feat_pxedit_replace_dst - pal_cols) % n_pal
+                elif event.key == pygame.K_DOWN:
+                    self._feat_pxedit_replace_dst = (
+                        self._feat_pxedit_replace_dst + pal_cols) % n_pal
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    # Snapshot for undo before batch replace
+                    self._feat_pxedit_undo_stack.append(
+                        [list(row) for row in px])
+                    # Execute: match the exact pixel color from canvas
+                    src_c = self._feat_pxedit_replace_src_color
+                    dst_c = self._feat_pxedit_palette[
+                        self._feat_pxedit_replace_dst]
+                    for row in px:
+                        for xi in range(len(row)):
+                            if tuple(row[xi]) == tuple(src_c):
+                                row[xi] = dst_c
+                    self._feat_pxedit_replacing = False
+                return
+
             if event.key == pygame.K_ESCAPE:
                 if self._feat_pxedit_focus == "palette":
                     # Escape from palette returns to canvas
@@ -5886,6 +6177,9 @@ class Game:
                     self._feat_pxedit_cx + 1) % w
             # Paint with current color
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                # Snapshot for undo
+                self._feat_pxedit_undo_stack.append(
+                    [list(row) for row in px])
                 color = self._feat_pxedit_palette[
                     self._feat_pxedit_color_idx]
                 px[self._feat_pxedit_cy][self._feat_pxedit_cx] = color
@@ -5909,6 +6203,22 @@ class Game:
                         best_d = d
                         best_i = pi
                 self._feat_pxedit_color_idx = best_i
+            # Enter color replace mode (R) — source = exact color under cursor
+            elif event.key == pygame.K_r:
+                picked = tuple(
+                    px[self._feat_pxedit_cy][self._feat_pxedit_cx])
+                self._feat_pxedit_replacing = True
+                self._feat_pxedit_replace_src_color = picked
+                self._feat_pxedit_replace_dst = self._feat_pxedit_color_idx
+                self._feat_pxedit_replace_sel = "dst"
+            # Undo (Ctrl+Z or U)
+            elif (event.key == pygame.K_z and (event.mod & pygame.KMOD_CTRL)) \
+                    or event.key == pygame.K_u:
+                if self._feat_pxedit_undo_stack:
+                    restored = self._feat_pxedit_undo_stack.pop()
+                    # Copy restored data back into the live pixel array
+                    for yi in range(len(restored)):
+                        px[yi][:] = restored[yi]
             return
 
         # ── Level 3: gallery tag editing ──
@@ -5934,6 +6244,10 @@ class Game:
 
         # ── Level 2: gallery sprite list ──
         if self._feat_level == 2 and ed == "gallery":
+            # ── Naming mode: capture text input ──
+            if self._feat_gallery_naming:
+                self._feat_handle_gallery_naming_input(event)
+                return
             n = len(self._feat_gallery_sprites)
             if event.key == pygame.K_ESCAPE:
                 self._feat_save_gallery()
@@ -5961,6 +6275,16 @@ class Game:
             elif event.key == pygame.K_e:
                 if n > 0 and self._feat_pxedit_open():
                     self._feat_level = 4
+            elif event.key == pygame.K_d and (event.mod & pygame.KMOD_CTRL):
+                if n > 0:
+                    self._feat_gallery_duplicate()
+            elif event.key == pygame.K_n and n > 0:
+                gi = self._feat_gallery_cur_gi()
+                if gi is not None:
+                    self._feat_gallery_naming = True
+                    self._feat_gallery_name_buf = self._feat_gallery_list[gi]["name"]
+            elif event.key in (pygame.K_DELETE, pygame.K_x) and n > 0:
+                self._feat_gallery_delete()
             return
 
         # ── Level 1: gallery category folders ──
@@ -6587,6 +6911,8 @@ class Game:
                     gallery_spr_scroll=self._feat_gallery_spr_scroll,
                     gallery_tag_cursor=self._feat_gallery_tag_cursor,
                     gallery_all_cats=self._feat_gallery_all_cats,
+                    gallery_naming=self._feat_gallery_naming,
+                    gallery_name_buf=self._feat_gallery_name_buf,
                     pxedit_pixels=self._feat_pxedit_pixels,
                     pxedit_cx=self._feat_pxedit_cx,
                     pxedit_cy=self._feat_pxedit_cy,
@@ -6595,6 +6921,10 @@ class Game:
                     pxedit_color_idx=self._feat_pxedit_color_idx,
                     pxedit_palette=self._feat_pxedit_palette,
                     pxedit_focus=self._feat_pxedit_focus,
+                    pxedit_replacing=self._feat_pxedit_replacing,
+                    pxedit_replace_src_color=self._feat_pxedit_replace_src_color,
+                    pxedit_replace_dst=self._feat_pxedit_replace_dst,
+                    pxedit_replace_sel=self._feat_pxedit_replace_sel,
                     townlayout_list=self._feat_townlayout_list,
                     townlayout_cursor=self._feat_townlayout_cursor,
                     townlayout_scroll=self._feat_townlayout_scroll,

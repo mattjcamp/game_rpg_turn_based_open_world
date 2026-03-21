@@ -214,8 +214,14 @@
         "town"
       ]
     },
-    "brick_wall": {
-      "path": "src/assets/unassigned/brick_wall.png",
+    "brick_wall_brown": {
+      "path": "src/assets/unassigned/brick_wall_brown.png",
+      "usable_in": [
+        "town"
+      ]
+    },
+    "brick_wall_red": {
+      "path": "src/assets/unassigned/brick_wall_red.png",
       "usable_in": [
         "town"
       ]
@@ -994,6 +1000,7 @@
     "seal_of_binding": {
       "path": "src/assets/game/landmarks/moongate_active.png",
       "usable_in": [
+        "town",
         "unique_tiles"
       ]
     },
