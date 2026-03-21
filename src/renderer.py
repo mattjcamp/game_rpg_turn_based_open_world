@@ -7582,7 +7582,7 @@ class Renderer(CombatEffectRendererMixin):
                                   self._U3_HINT, fs)
                 else:
                     self._u3_text(
-                        "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [N] Rename  [Esc] Save & Back",
+                        "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [D] Delete  [N] Rename  [Esc] Back",
                         SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
 
@@ -7900,7 +7900,7 @@ class Renderer(CombatEffectRendererMixin):
         # Footer
         self._u3_text(
             "[Up/Dn] Browse  [Enter] Edit  "
-            "[A] Add  [D] Delete  [Esc] Back",
+            "[Ctrl+N] Add  [D] Delete  [Esc] Back",
             SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
             self._U3_HINT, fs)
 
@@ -9402,7 +9402,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # Footer
         self._u3_text(
-            "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [Esc] Back",
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [D] Delete  [Esc] Back",
             SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
             self._U3_HINT, fs)
 
@@ -9456,7 +9456,7 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text("No modules found in modules/ directory.",
                           SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2,
                           (180, 100, 100), fm)
-            self._u3_text("[N] New Module   [ESC] Back",
+            self._u3_text("[Ctrl+N] New Module   [ESC] Back",
                           SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 50,
                           self._U3_HINT, fs)
             return
@@ -9699,12 +9699,12 @@ class Renderer(CombatEffectRendererMixin):
                 and edit_in_encounters:
             # Inside level sub-sections (encounters list)
             hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[A] Add  [D] Remove  [ESC] Back")
+                    "[Ctrl+N] Add  [D] Remove  [ESC] Back")
         elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
                 and edit_in_dungeon_sub:
             # Inside dungeon sub-sections (levels)
             hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[A] Add Level  [D] Remove  [ESC] Back")
+                    "[Ctrl+N] Add Level  [D] Remove  [ESC] Back")
         elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
             # Inside a folder or other sub-section
             hint = ("[UP/DN] Browse  [ENTER] Open  "
@@ -9720,7 +9720,7 @@ class Renderer(CombatEffectRendererMixin):
                     "[CTRL+S] Save  [ESC] Back")
         else:
             hint = ("[UP/DN] Browse  [S] Select  "
-                    "[N] New  [E] Edit  [D] Delete  [ESC] Back")
+                    "[Ctrl+N] New  [E] Edit  [D] Delete  [ESC] Back")
         self._u3_text(hint, SCREEN_WIDTH // 2 - len(hint) * 4,
                       hint_y, hint_color, fs)
 
@@ -15111,9 +15111,9 @@ class Renderer(CombatEffectRendererMixin):
         if not roster:
             self._u3_text("NO CHARACTERS IN ROSTER!", px + 20, py + 40,
                           (200, 100, 100))
-            self._u3_text("PRESS [C] TO CREATE A CHARACTER.",
+            self._u3_text("PRESS [CTRL+N] TO CREATE A CHARACTER.",
                           px + 20, py + 66, (180, 180, 200))
-            self._u3_text("[C] CREATE CHARACTER   [ESC] RETURN TO TITLE",
+            self._u3_text("[CTRL+N] CREATE CHARACTER   [ESC] RETURN TO TITLE",
                           px + 20, py + ph - 40, (180, 180, 200),
                           self.font_small)
             return
@@ -15336,7 +15336,7 @@ class Renderer(CombatEffectRendererMixin):
         hint_y = py + ph + 6
         self._u3_text(
             "[UP/DN] BROWSE  [SPACE] TOGGLE  "
-            "[ENTER] CONFIRM  [C] CREATE  [D] DELETE  [ESC] BACK",
+            "[ENTER] CONFIRM  [CTRL+N] CREATE  [D] DELETE  [ESC] BACK",
             px + 4, hint_y, (180, 180, 200), self.font_small)
 
         # ── Feedback message ──

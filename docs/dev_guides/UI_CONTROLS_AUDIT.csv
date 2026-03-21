@@ -37,7 +37,7 @@ Form Party,,Navigate down,Down Arrow,,x
 Form Party,,Toggle character active,Space,,x
 Form Party,,Confirm party / start game,Enter,,x
 Form Party,,Delete character,D,,x
-Form Party,,Create new character,C,,x
+Form Party,,Create new character,Ctrl+N / Cmd+N,,x
 Form Party,,Go back,Escape,,x
 Form Party,Delete Confirmation Sub-dialog,Confirm deletion,Y,,x
 Form Party,Delete Confirmation Sub-dialog,Cancel,N / Escape,,x
@@ -105,7 +105,7 @@ Edit Game Features — Main Menu,,Go back,Escape,,x
 Spells Editor,Level 1 — Spell List,Navigate up,Up Arrow,,x
 Spells Editor,Level 1 — Spell List,Navigate down,Down Arrow,,x
 Spells Editor,Level 1 — Spell List,Open spell,Enter / Right Arrow,,x
-Spells Editor,Level 1 — Spell List,Add new spell,A,,x
+Spells Editor,Level 1 — Spell List,Add new spell,Ctrl+N / Cmd+N,,x
 Spells Editor,Level 1 — Spell List,Delete spell,D / Delete,,x
 Spells Editor,Level 1 — Spell List,Go back,Escape,,x
 Spells Editor,Level 2 — Spell Field Editor,Previous field,Up Arrow,,x
@@ -119,13 +119,13 @@ Spells Editor,Level 2 — Spell Field Editor,Exit (unsaved dialog if dirty),Esca
 Items Editor,Level 1 — Item List,Navigate up,Up Arrow,,x
 Items Editor,Level 1 — Item List,Navigate down,Down Arrow,,x
 Items Editor,Level 1 — Item List,Open item,Enter / Right Arrow,,x
-Items Editor,Level 1 — Item List,Add new item,A,,x
+Items Editor,Level 1 — Item List,Add new item,Ctrl+N / Cmd+N,,x
 Items Editor,Level 1 — Item List,Delete item,D / Delete,,x
 Items Editor,Level 1 — Item List,Go back,Escape,,x
 Monsters Editor,Level 1 — Monster List,Navigate up,Up Arrow,,x
 Monsters Editor,Level 1 — Monster List,Navigate down,Down Arrow,,x
 Monsters Editor,Level 1 — Monster List,Open monster,Enter / Right Arrow,,x
-Monsters Editor,Level 1 — Monster List,Add new monster,A,,x
+Monsters Editor,Level 1 — Monster List,Add new monster,Ctrl+N / Cmd+N,,x
 Monsters Editor,Level 1 — Monster List,Delete monster,D / Delete,,x
 Monsters Editor,Level 1 — Monster List,Go back,Escape,,x
 Tile Types Editor,Level 1 — Folder List,Navigate up,Up Arrow,,x
@@ -135,7 +135,7 @@ Tile Types Editor,Level 1 — Folder List,Go back,Escape,,x
 Tile Types Editor,Level 2 — Tile List,Navigate up,Up Arrow,,x
 Tile Types Editor,Level 2 — Tile List,Navigate down,Down Arrow,,x
 Tile Types Editor,Level 2 — Tile List,Open tile,Enter / Right Arrow,,x
-Tile Types Editor,Level 2 — Tile List,Add tile,A,,x
+Tile Types Editor,Level 2 — Tile List,Add tile,Ctrl+N / Cmd+N,,x
 Tile Types Editor,Level 2 — Tile List,Delete tile,D / Delete,,x
 Tile Types Editor,Level 2 — Tile List,Exit (unsaved dialog if dirty),Escape,,x
 Tile Gallery,Level 1 — Category Folders,Navigate up,Up Arrow,,x
@@ -144,7 +144,7 @@ Tile Gallery,Level 1 — Category Folders,Enter category,Enter / Right Arrow,,x
 Tile Gallery,Level 1 — Category Folders,Exit (unsaved dialog if dirty),Escape,,x
 Tile Gallery,Level 2 — Sprite List,Navigate up,Up Arrow,,x
 Tile Gallery,Level 2 — Sprite List,Navigate down,Down Arrow,,x
-Tile Gallery,Level 2 — Sprite List,Open pixel editor,Enter / E,,x
+Tile Gallery,Level 2 — Sprite List,Open pixel editor,Enter,,x
 Tile Gallery,Level 2 — Sprite List,Open tag editor,Right Arrow,,x
 Tile Gallery,Level 2 — Sprite List,Duplicate sprite,Ctrl+D,,x
 Tile Gallery,Level 2 — Sprite List,Rename sprite,N,,x
@@ -182,7 +182,7 @@ Town Layouts Editor,Level 0 — Sub-Editor Selection,Go back,Escape,,x
 Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Navigate up,Up Arrow,,x
 Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Navigate down,Down Arrow,,x
 Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Open layout,Enter / Space,,x
-Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Add new,A,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Add new,Ctrl+N / Cmd+N,,x
 Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Delete,D,,x
 Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Rename,N,,x
 Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Exit (unsaved dialog if dirty),Escape,,x
@@ -199,7 +199,7 @@ Town Layouts Editor,Level 2 — Grid Painter,Exit (unsaved dialog if dirty),Esca
 Modules Editor,Module Selection,Navigate up,Up Arrow,,x
 Modules Editor,Module Selection,Navigate down,Down Arrow,,x
 Modules Editor,Module Selection,Select / activate,S,,x
-Modules Editor,Module Selection,Create new,N,,x
+Modules Editor,Module Selection,Create new,Ctrl+N / Cmd+N,,x
 Modules Editor,Module Selection,Edit,E,,x
 Modules Editor,Module Selection,Delete,D,,x
 Modules Editor,Module Selection,Go back,Escape,,x
@@ -207,7 +207,7 @@ Modules Editor,Delete Confirmation,Confirm,Y,,x
 Modules Editor,Delete Confirmation,Cancel,N / Escape,,x
 Modules Editor,Module Edit — Section Browser (Level 0),Navigate,Up / Down Arrow,,x
 Modules Editor,Module Edit — Section Browser (Level 0),Enter section,Enter / Right Arrow,,x
-Modules Editor,Module Edit — Section Browser (Level 0),Add item,A,,x
+Modules Editor,Module Edit — Section Browser (Level 0),Add item,Ctrl+N / Cmd+N,,x
 Modules Editor,Module Edit — Section Browser (Level 0),Delete item,D / Delete,,x
 Modules Editor,Module Edit — Section Browser (Level 0),Save,Ctrl+S,Ctrl+S / Cmd+S,x
 Modules Editor,Module Edit — Section Browser (Level 0),Go back,Escape / Left Arrow,,x

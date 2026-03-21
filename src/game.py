@@ -1650,8 +1650,8 @@ class Game:
 
         roster_len = len(self.party.roster)
         if roster_len == 0:
-            # No characters — C to create, or ESC/Enter/Space to return
-            if event.key == pygame.K_c:
+            # No characters — Ctrl+N to create, or ESC/Enter/Space to return
+            if self._is_new_shortcut(event):
                 self._fp_create_char()
             elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self.showing_form_party = False
@@ -1683,7 +1683,7 @@ class Game:
             # Prompt delete confirmation
             if 0 <= self._fp_cursor < roster_len:
                 self._fp_confirm_delete = True
-        elif event.key == pygame.K_c:
+        elif self._is_new_shortcut(event):
             self._fp_create_char()
 
     def _fp_create_char(self):
@@ -3018,7 +3018,7 @@ class Game:
             self._feat_enter_townlayout_painter()
             self._feat_dirty = False
             self._feat_level = 2
-        elif event.key == pygame.K_a:
+        elif self._is_new_shortcut(event):
             self._feat_add_townlayout()
         elif event.key == pygame.K_d and n > 0:
             self._feat_remove_townlayout()
@@ -3567,9 +3567,9 @@ class Game:
                 self.module_message = None
             return
 
-        # ── No modules: N to create, ESC to go back ──
+        # ── No modules: Ctrl+N to create, ESC to go back ──
         if not self.module_list:
-            if event.key == pygame.K_n:
+            if self._is_new_shortcut(event):
                 self._do_create_module()
             elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self._leave_modules()
@@ -3589,7 +3589,7 @@ class Game:
             self._leave_modules()
         elif event.key == pygame.K_ESCAPE:
             self._leave_modules()
-        elif event.key == pygame.K_n:
+        elif self._is_new_shortcut(event):
             self._do_create_module()
         elif event.key == pygame.K_d:
             selected = self.module_list[self.module_cursor]
@@ -5422,8 +5422,8 @@ class Game:
                 pass  # handled by 'd' key
             else:
                 self._enter_section_fields()
-        elif event.key == pygame.K_a:
-            # 'A' to add: context-dependent
+        elif self._is_new_shortcut(event):
+            # Ctrl+N to add: context-dependent
             if self._in_unique_tiles_folder():
                 self._add_unique_tile()
             elif getattr(self, "module_edit_active_enc", -1) >= 0:
@@ -6082,6 +6082,13 @@ class Game:
             return False
         return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
 
+    @staticmethod
+    def _is_new_shortcut(event):
+        """Return True if the event is Ctrl+N or Cmd+N (universal new)."""
+        if event.key != pygame.K_n:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
     def _show_unsaved_dialog(self, save_cb, discard_cb):
         """Show the 'unsaved changes' confirmation dialog.
 
@@ -6492,8 +6499,8 @@ class Game:
                     self._feat_adjust_scroll_generic(
                         self._feat_gallery_spr_cursor,
                         self._feat_gallery_spr_scroll)
-            elif event.key in (pygame.K_RETURN, pygame.K_e):
-                # Enter or E → open pixel editor directly
+            elif event.key == pygame.K_RETURN:
+                # Enter → open pixel editor directly
                 if n > 0 and self._feat_pxedit_open():
                     self._feat_level = 4
             elif event.key == pygame.K_RIGHT:
@@ -6691,7 +6698,7 @@ class Game:
                     self._feat_tile_editing = True
                     self._feat_dirty = False
                     self._feat_level = 3
-            elif event.key == pygame.K_a:
+            elif self._is_new_shortcut(event):
                 self._feat_add_tile()
                 self._feat_rebuild_tile_folders()
                 self._feat_tile_enter_folder()
@@ -6752,7 +6759,7 @@ class Game:
                     ctx["set_editing"](True)
                     self._feat_dirty = False
                     self._feat_level = 2
-            elif event.key == pygame.K_a:
+            elif self._is_new_shortcut(event):
                 ctx["add"]()
                 ctx["adjust_scroll"]()
             elif event.key in (pygame.K_d, pygame.K_DELETE):

@@ -329,6 +329,16 @@
           "tile_id": 12,
           "path": "game/terrain/town_counter.png",
           "name": "Counter"
+        },
+        "6,5": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "5,5": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door"
         }
       }
     }

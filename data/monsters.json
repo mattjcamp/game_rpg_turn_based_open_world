@@ -57,7 +57,7 @@
       "terrain": "land"
     },
     "Giant Rat": {
-      "description": "A large rat. Weak but fast.",
+      "description": "A large rat. Weak but fast.Gross.Meh",
       "undead": false,
       "humanoid": false,
       "hp": 8,
