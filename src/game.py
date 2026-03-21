@@ -323,6 +323,15 @@ class Game:
         self._feat_pxedit_replace_dst = 0   # target palette index ("to")
         self._feat_pxedit_replace_sel = "dst"  # which selector is active ("src" or "dst")
 
+        # Unsaved-changes confirmation dialog
+        # When a player presses ESC on an editor with unsaved changes,
+        # this flag activates and the pending callback stores what to
+        # do on "save" vs "discard".
+        self._unsaved_dialog_active = False
+        self._unsaved_dialog_save_cb = None    # callable: save then exit
+        self._unsaved_dialog_discard_cb = None # callable: exit without saving
+        self._feat_dirty = False               # True when editor has unsaved changes
+
         # Town editor state — three sub-editors share same grid painter
         self._feat_town_subfolders = [
             {"name": "layouts", "label": "Town Layouts",
@@ -2949,6 +2958,11 @@ class Game:
         if event.type != pygame.KEYDOWN:
             return
 
+        # Intercept input when unsaved-changes dialog is showing
+        if self._unsaved_dialog_active:
+            self._handle_unsaved_dialog_input(event)
+            return
+
         # ── Naming mode: capture text input ──
         if self._feat_townlayout_naming:
             self._feat_handle_townlayout_naming_input(event)
@@ -2981,8 +2995,17 @@ class Game:
         # List mode (level 1) — inside a sub-editor
         n = len(self._feat_townlayout_list)
         if event.key == pygame.K_ESCAPE:
-            self._feat_save_townlayouts()
-            self._feat_town_active_sub = None
+            if self._feat_dirty:
+                def _save_and_exit():
+                    self._feat_save_townlayouts()
+                    self._feat_town_active_sub = None
+                    self._feat_dirty = False
+                def _discard_and_exit():
+                    self._feat_town_active_sub = None
+                    self._feat_dirty = False
+                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                self._feat_town_active_sub = None
         elif event.key == pygame.K_UP and n > 0:
             self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
             self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
@@ -2993,6 +3016,7 @@ class Game:
                 self._feat_townlayout_cursor, self._feat_townlayout_scroll)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
             self._feat_enter_townlayout_painter()
+            self._feat_dirty = False
             self._feat_level = 2
         elif event.key == pygame.K_a:
             self._feat_add_townlayout()
@@ -3037,9 +3061,20 @@ class Game:
         h = layout["height"]
 
         if event.key == pygame.K_ESCAPE:
-            self._feat_save_townlayouts()
-            self._feat_townlayout_editing = False
-            self._feat_level = 1
+            if self._feat_dirty:
+                def _save_and_exit():
+                    self._feat_save_townlayouts()
+                    self._feat_townlayout_editing = False
+                    self._feat_level = 1
+                    self._feat_dirty = False
+                def _discard_and_exit():
+                    self._feat_townlayout_editing = False
+                    self._feat_level = 1
+                    self._feat_dirty = False
+                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                self._feat_townlayout_editing = False
+                self._feat_level = 1
         elif event.key == pygame.K_UP:
             self._feat_townlayout_cy = max(0, self._feat_townlayout_cy - 1)
         elif event.key == pygame.K_DOWN:
@@ -3053,6 +3088,7 @@ class Game:
             brushes = self._feat_get_townlayout_brushes()
             brush = brushes[self._feat_townlayout_brush_idx]
             pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
+            self._feat_dirty = True
             if brush["name"] == "Eraser":
                 layout["tiles"].pop(pos_key, None)
             elif "feature" in brush:
@@ -3097,9 +3133,10 @@ class Game:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx - 1) % n
             else:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx + 1) % n
-        elif event.key == pygame.K_s:
+        elif event.key == pygame.K_s or self._is_save_shortcut(event):
             # Save
             self._feat_save_townlayouts()
+            self._feat_dirty = False
 
     def _feat_pxedit_open(self):
         """Open the pixel editor for the currently selected sprite."""
@@ -3136,6 +3173,7 @@ class Game:
         self._feat_pxedit_color_idx = 0
         self._feat_pxedit_path = abs_path
         self._feat_pxedit_undo_stack = []
+        self._feat_dirty = False
         return True
 
     def _feat_pxedit_save(self):
@@ -4023,6 +4061,7 @@ class Game:
         self.module_edit_field = 0
         self.module_edit_scroll = 0
         self.module_edit_level = 1
+        self._feat_dirty = False
         # Find first editable field
         self.module_edit_field = self._next_editable_field(0)
         if self.module_edit_fields:
@@ -4638,6 +4677,7 @@ class Game:
         self._battle_mode = "obstacle"  # "obstacle", "tile", "settings"
         self._battle_tile_brush_idx = 0  # index into examine brushes
         self._battle_settings_cursor = 0  # 0=style, 1=music
+        self._feat_dirty = False
 
     def _leave_battle_screen_editor(self):
         """Exit the battle screen painter and persist data."""
@@ -4680,6 +4720,11 @@ class Game:
         if event.type != pygame.KEYDOWN:
             return
 
+        # Intercept input when unsaved-changes dialog is showing
+        if self._unsaved_dialog_active:
+            self._handle_unsaved_dialog_input(event)
+            return
+
         COLS, ROWS = 18, 21
 
         if self._battle_mode == "settings":
@@ -4712,6 +4757,7 @@ class Game:
         # Paint — Enter
         elif event.key == pygame.K_RETURN:
             pos = (self._battle_cursor_col, self._battle_cursor_row)
+            self._feat_dirty = True
             if self._battle_mode == "obstacle":
                 brush = self._BATTLE_OBSTACLE_TYPES[self._battle_brush_idx]
                 if brush == "eraser":
@@ -4746,7 +4792,16 @@ class Game:
 
         # Exit
         elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-            self._leave_battle_screen_editor()
+            if self._feat_dirty:
+                def _save_and_exit():
+                    self._leave_battle_screen_editor()
+                    self._feat_dirty = False
+                def _discard_and_exit():
+                    self._battle_screen_active = False
+                    self._feat_dirty = False
+                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                self._leave_battle_screen_editor()
 
     def _handle_battle_settings_input(self, event):
         """Handle input on the battle screen settings sub-page."""
@@ -5088,6 +5143,7 @@ class Game:
                 self._examine_items[(int(c), int(r))] = item_name
             except (ValueError, AttributeError):
                 pass
+        self._feat_dirty = False
 
     def _leave_utile_examine_preview(self):
         """Exit examine-screen preview and persist painted layout + items."""
@@ -5107,6 +5163,11 @@ class Game:
 
     def _handle_examine_preview_input(self, event):
         """Handle input in the examine preview editor."""
+        # Intercept input when unsaved-changes dialog is showing
+        if self._unsaved_dialog_active:
+            self._handle_unsaved_dialog_input(event)
+            return
+
         from src.states.examine import EXAMINE_COLS, EXAMINE_ROWS
 
         # Movement — arrow keys move cursor within interior (1..cols-2)
@@ -5133,6 +5194,7 @@ class Game:
         # Paint / place — Enter
         elif event.key == pygame.K_RETURN:
             pos = (self._examine_cursor_col, self._examine_cursor_row)
+            self._feat_dirty = True
             if self._examine_mode == "tile":
                 brush = self._get_examine_brushes()[self._examine_brush_idx]
                 if brush == "eraser":
@@ -5167,7 +5229,16 @@ class Game:
 
         # Escape / Backspace exits preview
         elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-            self._leave_utile_examine_preview()
+            if self._feat_dirty:
+                def _save_and_exit():
+                    self._leave_utile_examine_preview()
+                    self._feat_dirty = False
+                def _discard_and_exit():
+                    self.module_edit_utile_preview = False
+                    self._feat_dirty = False
+                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                self._leave_utile_examine_preview()
 
     def _get_utile_preview_data(self):
         """Return a dict with the preview data for the active tile."""
@@ -5247,6 +5318,11 @@ class Game:
 
     def _handle_module_edit_input(self, event):
         """Handle input while editing module (hierarchical navigation)."""
+        # Intercept input when unsaved-changes dialog is showing
+        if self._unsaved_dialog_active:
+            self._handle_unsaved_dialog_input(event)
+            return
+
         # ── Create-new mode uses flat field list (no hierarchy) ──
         if self.module_edit_is_new:
             self._handle_module_edit_input_flat(event)
@@ -5269,15 +5345,25 @@ class Game:
 
         # ── Level 1: field editor within a section ──
         if event.key == pygame.K_ESCAPE:
-            self._leave_section_fields()
+            if self._feat_dirty:
+                def _save_and_exit():
+                    self._leave_section_fields()
+                    self._feat_dirty = False
+                def _discard_and_exit():
+                    # Exit without saving — need to reload the editor state
+                    self.module_edit_level = 0
+                    self._feat_dirty = False
+                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                self._leave_section_fields()
             return
-        if (event.key == pygame.K_s
-                and event.mod & pygame.KMOD_CTRL):
+        if self._is_save_shortcut(event):
             # Save from within field editor
             if self.module_edit_fields:
                 entry = self.module_edit_fields[self.module_edit_field]
                 entry[2] = self.module_edit_buffer
             self._commit_module_edit()
+            self._feat_dirty = False
             return
         # (Unique tile add/remove is now at the section browser level)
 
@@ -5291,9 +5377,22 @@ class Game:
             if self.module_edit_nav_stack:
                 self._leave_dungeon_sub()
             else:
-                self.module_edit_mode = False
-                self.module_edit_is_new = False
-                self.module_message = None
+                if self._feat_dirty:
+                    def _save_and_exit():
+                        self.module_edit_mode = False
+                        self.module_edit_is_new = False
+                        self.module_message = None
+                        self._feat_dirty = False
+                    def _discard_and_exit():
+                        self.module_edit_mode = False
+                        self.module_edit_is_new = False
+                        self.module_message = None
+                        self._feat_dirty = False
+                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    self.module_edit_mode = False
+                    self.module_edit_is_new = False
+                    self.module_message = None
         elif event.key == pygame.K_LEFT:
             # Left also goes back from sub-browser
             if self.module_edit_nav_stack:
@@ -5361,8 +5460,7 @@ class Game:
                 if sec.get("icon") == "L" and sec.get(
                         "level_idx") is not None:
                     self._remove_dungeon_level(sec["level_idx"])
-        elif (event.key == pygame.K_s
-              and event.mod & pygame.KMOD_CTRL):
+        elif self._is_save_shortcut(event):
             self._commit_module_edit()
 
     def _adjust_section_scroll(self):
@@ -5442,12 +5540,14 @@ class Game:
 
         if event.key == pygame.K_UP:
             field_entry[2] = self.module_edit_buffer
+            self._feat_dirty = True
             self.module_edit_field = self._next_editable_field(-1)
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
             self._adjust_module_edit_scroll()
         elif event.key == pygame.K_DOWN:
             field_entry[2] = self.module_edit_buffer
+            self._feat_dirty = True
             self.module_edit_field = self._next_editable_field(+1)
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
@@ -5475,26 +5575,33 @@ class Game:
                 else:
                     idx = (idx - 1) % len(choices)
                 self.module_edit_buffer = choices[idx]
+                self._feat_dirty = True
                 # When quest type changes, rebuild the field list
                 if field_entry[1].endswith("_qtype"):
                     self._on_quest_type_changed(field_entry[1])
         elif field_type == "int":
             if event.key == pygame.K_BACKSPACE:
                 self.module_edit_buffer = self.module_edit_buffer[:-1]
+                self._feat_dirty = True
             elif event.key == pygame.K_LEFT:
                 val = max(0, int(self.module_edit_buffer or "0") - 1)
                 self.module_edit_buffer = str(val)
+                self._feat_dirty = True
             elif event.key == pygame.K_RIGHT:
                 val = int(self.module_edit_buffer or "0") + 1
                 self.module_edit_buffer = str(val)
+                self._feat_dirty = True
             elif event.unicode and event.unicode.isdigit():
                 self.module_edit_buffer += event.unicode
+                self._feat_dirty = True
         else:
             # text field
             if event.key == pygame.K_BACKSPACE:
                 self.module_edit_buffer = self.module_edit_buffer[:-1]
+                self._feat_dirty = True
             elif event.unicode and event.unicode.isprintable():
                 self.module_edit_buffer += event.unicode
+                self._feat_dirty = True
 
     def _handle_module_edit_input_flat(self, event):
         """Handle input for the flat create-new-module form."""
@@ -5520,8 +5627,7 @@ class Game:
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
             self._adjust_module_edit_scroll()
-        elif (event.key == pygame.K_s
-              and event.mod & pygame.KMOD_CTRL):
+        elif self._is_save_shortcut(event):
             field_entry[2] = self.module_edit_buffer
             self._commit_module_edit()
         elif not editable:
@@ -5969,6 +6075,45 @@ class Game:
 
     # ── Input handlers ──────────────────────────────────────────
 
+    @staticmethod
+    def _is_save_shortcut(event):
+        """Return True if the event is Ctrl+S or Cmd+S (universal save)."""
+        if event.key != pygame.K_s:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
+    def _show_unsaved_dialog(self, save_cb, discard_cb):
+        """Show the 'unsaved changes' confirmation dialog.
+
+        save_cb    — called when the player presses [S] (save & exit)
+        discard_cb — called when the player presses [D] (discard & exit)
+        Pressing [Escape] cancels and returns to the editor.
+        """
+        self._unsaved_dialog_active = True
+        self._unsaved_dialog_save_cb = save_cb
+        self._unsaved_dialog_discard_cb = discard_cb
+
+    def _handle_unsaved_dialog_input(self, event):
+        """Handle Y/N/Escape input on the unsaved-changes overlay."""
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key == pygame.K_s:
+            # Save changes then exit
+            cb = self._unsaved_dialog_save_cb
+            self._unsaved_dialog_active = False
+            if cb:
+                cb()
+        elif event.key == pygame.K_d:
+            # Discard changes and exit
+            cb = self._unsaved_dialog_discard_cb
+            self._unsaved_dialog_active = False
+            self._feat_dirty = False
+            if cb:
+                cb()
+        elif event.key == pygame.K_ESCAPE:
+            # Cancel — return to editor, keep editing
+            self._unsaved_dialog_active = False
+
     def _handle_title_input(self, event):
         """Handle input on the title screen."""
         if event.type != pygame.KEYDOWN:
@@ -5991,6 +6136,11 @@ class Game:
         if event.type != pygame.KEYDOWN:
             return
 
+        # Intercept input when unsaved-changes dialog is showing
+        if self._unsaved_dialog_active:
+            self._handle_unsaved_dialog_input(event)
+            return
+
         # Town Layouts has its own input handler (bypasses generic ctx system)
         if self._feat_active_editor == "townlayouts":
             self._feat_handle_townlayout_input(event)
@@ -6005,15 +6155,32 @@ class Game:
         # ── Level 2: editing individual fields ──
         # (tiles and gallery use level 2 for browsing, not field editing)
         if self._feat_level == 2 and ctx and ed not in ("tiles", "gallery"):
-            if event.key == pygame.K_ESCAPE or (
-                    event.key == pygame.K_s
-                    and event.mod & pygame.KMOD_CTRL):
+            if self._is_save_shortcut(event):
+                # Save without leaving the editor
                 ctx["save_fields"]()
                 if ed == "spells":
                     self._feat_resort_spells()
                 ctx["save_disk"]()
-                ctx["set_editing"](False)
-                self._feat_level = 1
+                self._feat_dirty = False
+                return
+            if event.key == pygame.K_ESCAPE:
+                if self._feat_dirty:
+                    def _save_and_exit():
+                        ctx["save_fields"]()
+                        if ed == "spells":
+                            self._feat_resort_spells()
+                        ctx["save_disk"]()
+                        ctx["set_editing"](False)
+                        self._feat_level = 1
+                        self._feat_dirty = False
+                    def _discard_and_exit():
+                        ctx["set_editing"](False)
+                        self._feat_level = 1
+                        self._feat_dirty = False
+                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    ctx["set_editing"](False)
+                    self._feat_level = 1
                 return
             fields = ctx["fields"]()
             n = len(fields)
@@ -6026,6 +6193,7 @@ class Game:
 
             if event.key == pygame.K_UP:
                 entry[2] = buf
+                self._feat_dirty = True
                 idx = (field_idx - 1) % n
                 idx = self._feat_next_editable_generic(fields, idx)
                 ctx["set_field_idx"](idx)
@@ -6033,6 +6201,7 @@ class Game:
                 ctx["adjust_field_scroll"]()
             elif event.key == pygame.K_DOWN:
                 entry[2] = buf
+                self._feat_dirty = True
                 idx = (field_idx + 1) % n
                 idx = self._feat_next_editable_generic(fields, idx)
                 ctx["set_field_idx"](idx)
@@ -6051,6 +6220,7 @@ class Game:
                         else:
                             ci = (ci - 1) % len(choices)
                         ctx["set_buffer"](choices[ci])
+                        self._feat_dirty = True
                         # Spell-specific: casting_type → classes sync
                         if ed == "spells" and entry[1] == "casting_type":
                             new_cls = ", ".join(
@@ -6062,25 +6232,31 @@ class Game:
             elif ftype == "int":
                 if event.key == pygame.K_BACKSPACE:
                     ctx["set_buffer"](buf[:-1])
+                    self._feat_dirty = True
                 elif event.key == pygame.K_LEFT:
                     try:
                         v = int(buf) - 1
                         ctx["set_buffer"](str(max(0, v)))
+                        self._feat_dirty = True
                     except ValueError:
                         pass
                 elif event.key == pygame.K_RIGHT:
                     try:
                         v = int(buf) + 1
                         ctx["set_buffer"](str(v))
+                        self._feat_dirty = True
                     except ValueError:
                         pass
                 elif event.unicode and event.unicode.isdigit():
                     ctx["set_buffer"](buf + event.unicode)
+                    self._feat_dirty = True
             elif ftype == "text":
                 if event.key == pygame.K_BACKSPACE:
                     ctx["set_buffer"](buf[:-1])
+                    self._feat_dirty = True
                 elif event.unicode and event.unicode.isprintable():
                     ctx["set_buffer"](buf + event.unicode)
+                    self._feat_dirty = True
             return
 
         # ── Level 4: pixel editor ──
@@ -6122,7 +6298,15 @@ class Game:
                         for xi in range(len(row)):
                             if tuple(row[xi]) == tuple(src_c):
                                 row[xi] = dst_c
+                    self._feat_dirty = True
                     self._feat_pxedit_replacing = False
+                return
+
+            if self._is_save_shortcut(event):
+                # Save without leaving the pixel editor
+                self._feat_pxedit_save()
+                self.renderer.reload_sprites()
+                self._feat_dirty = False
                 return
 
             if event.key == pygame.K_ESCAPE:
@@ -6130,12 +6314,23 @@ class Game:
                     # Escape from palette returns to canvas
                     self._feat_pxedit_focus = "canvas"
                 else:
-                    self._feat_pxedit_save()
-                    self._feat_pxedit_pixels = None
-                    # Reload ALL sprite caches so changes show
-                    # in the gallery and in-game immediately
-                    self.renderer.reload_sprites()
-                    self._feat_level = 2
+                    if self._feat_dirty:
+                        def _save_and_exit():
+                            self._feat_pxedit_save()
+                            self._feat_pxedit_pixels = None
+                            self.renderer.reload_sprites()
+                            self._feat_level = 2
+                            self._feat_dirty = False
+                        def _discard_and_exit():
+                            self._feat_pxedit_pixels = None
+                            self.renderer.reload_sprites()
+                            self._feat_level = 2
+                            self._feat_dirty = False
+                        self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                    else:
+                        self._feat_pxedit_pixels = None
+                        self.renderer.reload_sprites()
+                        self._feat_level = 2
                 return
 
             # Tab toggles focus between canvas and palette
@@ -6185,6 +6380,7 @@ class Game:
                 color = self._feat_pxedit_palette[
                     self._feat_pxedit_color_idx]
                 px[self._feat_pxedit_cy][self._feat_pxedit_cx] = color
+                self._feat_dirty = True
             # Quick palette cycle: Q = prev, E = next
             elif event.key == pygame.K_q:
                 self._feat_pxedit_color_idx = (
@@ -6214,24 +6410,43 @@ class Game:
                 self._feat_pxedit_replace_dst = self._feat_pxedit_color_idx
                 self._feat_pxedit_replace_sel = "dst"
             # Undo (Ctrl+Z or U)
-            elif (event.key == pygame.K_z and (event.mod & pygame.KMOD_CTRL)) \
+            elif (event.key == pygame.K_z
+                  and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))) \
                     or event.key == pygame.K_u:
                 if self._feat_pxedit_undo_stack:
                     restored = self._feat_pxedit_undo_stack.pop()
                     # Copy restored data back into the live pixel array
                     for yi in range(len(restored)):
                         px[yi][:] = restored[yi]
+                    self._feat_dirty = True
             return
 
         # ── Level 3: gallery tag editing ──
         if self._feat_level == 3 and ed == "gallery":
             n_tags = len(self._feat_gallery_all_cats)
-            if event.key == pygame.K_ESCAPE:
+            if self._is_save_shortcut(event):
+                # Save without leaving the tag editor
                 self._feat_save_gallery()
-                self._feat_level = 2
-                # Rebuild category sprite list since tags may changed
-                self._feat_rebuild_gallery_cats()
-                self._feat_gallery_enter_cat()
+                self._feat_dirty = False
+                return
+            if event.key == pygame.K_ESCAPE:
+                if self._feat_dirty:
+                    def _save_and_exit():
+                        self._feat_save_gallery()
+                        self._feat_level = 2
+                        self._feat_rebuild_gallery_cats()
+                        self._feat_gallery_enter_cat()
+                        self._feat_dirty = False
+                    def _discard_and_exit():
+                        self._feat_level = 2
+                        self._feat_rebuild_gallery_cats()
+                        self._feat_gallery_enter_cat()
+                        self._feat_dirty = False
+                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    self._feat_level = 2
+                    self._feat_rebuild_gallery_cats()
+                    self._feat_gallery_enter_cat()
                 return
             if event.key == pygame.K_UP:
                 self._feat_gallery_tag_cursor = (
@@ -6242,6 +6457,7 @@ class Game:
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE,
                                pygame.K_LEFT, pygame.K_RIGHT):
                 self._feat_gallery_toggle_tag()
+                self._feat_dirty = True
             return
 
         # ── Level 2: gallery sprite list ──
@@ -6252,9 +6468,18 @@ class Game:
                 return
             n = len(self._feat_gallery_sprites)
             if event.key == pygame.K_ESCAPE:
-                self._feat_save_gallery()
-                self._feat_rebuild_gallery_cats()
-                self._feat_level = 1
+                if self._feat_dirty:
+                    def _save_and_exit():
+                        self._feat_save_gallery()
+                        self._feat_rebuild_gallery_cats()
+                        self._feat_level = 1
+                        self._feat_dirty = False
+                    def _discard_and_exit():
+                        self._feat_level = 1
+                        self._feat_dirty = False
+                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    self._feat_level = 1
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_gallery_spr_cursor = (
@@ -6273,13 +6498,15 @@ class Game:
             elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
                 if n > 0:
                     self._feat_gallery_tag_cursor = 0
+                    self._feat_dirty = False
                     self._feat_level = 3
             elif event.key == pygame.K_e:
                 if n > 0 and self._feat_pxedit_open():
                     self._feat_level = 4
-            elif event.key == pygame.K_d and (event.mod & pygame.KMOD_CTRL):
+            elif event.key == pygame.K_d and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META)):
                 if n > 0:
                     self._feat_gallery_duplicate()
+                    self._feat_dirty = True
             elif event.key == pygame.K_n and n > 0:
                 gi = self._feat_gallery_cur_gi()
                 if gi is not None:
@@ -6287,15 +6514,27 @@ class Game:
                     self._feat_gallery_name_buf = self._feat_gallery_list[gi]["name"]
             elif event.key in (pygame.K_DELETE, pygame.K_x) and n > 0:
                 self._feat_gallery_delete()
+                self._feat_dirty = True
             return
 
         # ── Level 1: gallery category folders ──
         if self._feat_level == 1 and ed == "gallery":
             n = len(self._feat_gallery_cat_list)
             if event.key == pygame.K_ESCAPE:
-                self._feat_save_gallery()
-                self._feat_level = 0
-                self._feat_active_editor = None
+                if self._feat_dirty:
+                    def _save_and_exit():
+                        self._feat_save_gallery()
+                        self._feat_level = 0
+                        self._feat_active_editor = None
+                        self._feat_dirty = False
+                    def _discard_and_exit():
+                        self._feat_level = 0
+                        self._feat_active_editor = None
+                        self._feat_dirty = False
+                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    self._feat_level = 0
+                    self._feat_active_editor = None
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_gallery_cat_cursor = (
@@ -6314,6 +6553,7 @@ class Game:
             elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
                 if n > 0:
                     self._feat_gallery_enter_cat()
+                    self._feat_dirty = False
                     self._feat_level = 2
             return
 
@@ -6321,13 +6561,28 @@ class Game:
         if self._feat_level == 3 and ed == "tiles":
             # Reuse generic level-2 field editing logic via ctx
             if ctx:
-                if event.key == pygame.K_ESCAPE or (
-                        event.key == pygame.K_s
-                        and event.mod & pygame.KMOD_CTRL):
+                if self._is_save_shortcut(event):
+                    # Save without leaving the editor
                     ctx["save_fields"]()
                     ctx["save_disk"]()
-                    ctx["set_editing"](False)
-                    self._feat_level = 2
+                    self._feat_dirty = False
+                    return
+                if event.key == pygame.K_ESCAPE:
+                    if self._feat_dirty:
+                        def _save_and_exit():
+                            ctx["save_fields"]()
+                            ctx["save_disk"]()
+                            ctx["set_editing"](False)
+                            self._feat_level = 2
+                            self._feat_dirty = False
+                        def _discard_and_exit():
+                            ctx["set_editing"](False)
+                            self._feat_level = 2
+                            self._feat_dirty = False
+                        self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                    else:
+                        ctx["set_editing"](False)
+                        self._feat_level = 2
                     return
                 fields = ctx["fields"]()
                 n = len(fields)
@@ -6339,6 +6594,7 @@ class Game:
                 buf = ctx["buffer"]()
                 if event.key == pygame.K_UP:
                     entry[2] = buf
+                    self._feat_dirty = True
                     idx = (field_idx - 1) % n
                     idx = self._feat_next_editable_generic(fields, idx)
                     ctx["set_field_idx"](idx)
@@ -6346,6 +6602,7 @@ class Game:
                     ctx["adjust_field_scroll"]()
                 elif event.key == pygame.K_DOWN:
                     entry[2] = buf
+                    self._feat_dirty = True
                     idx = (field_idx + 1) % n
                     idx = self._feat_next_editable_generic(fields, idx)
                     ctx["set_field_idx"](idx)
@@ -6364,26 +6621,33 @@ class Game:
                             else:
                                 ci = (ci - 1) % len(choices)
                             ctx["set_buffer"](choices[ci])
+                            self._feat_dirty = True
                 elif ftype == "int":
                     if event.key == pygame.K_BACKSPACE:
                         ctx["set_buffer"](buf[:-1])
+                        self._feat_dirty = True
                     elif event.key == pygame.K_LEFT:
                         try:
                             ctx["set_buffer"](str(max(0, int(buf) - 1)))
+                            self._feat_dirty = True
                         except ValueError:
                             pass
                     elif event.key == pygame.K_RIGHT:
                         try:
                             ctx["set_buffer"](str(int(buf) + 1))
+                            self._feat_dirty = True
                         except ValueError:
                             pass
                     elif event.unicode and event.unicode.isdigit():
                         ctx["set_buffer"](buf + event.unicode)
+                        self._feat_dirty = True
                 elif ftype == "text":
                     if event.key == pygame.K_BACKSPACE:
                         ctx["set_buffer"](buf[:-1])
+                        self._feat_dirty = True
                     elif event.unicode and event.unicode.isprintable():
                         ctx["set_buffer"](buf + event.unicode)
+                        self._feat_dirty = True
             return
 
         # ── Level 2: tile list inside folder ──
@@ -6391,9 +6655,20 @@ class Game:
             tiles_in = self._feat_tile_folder_tiles
             n = len(tiles_in)
             if event.key == pygame.K_ESCAPE:
-                self._feat_save_tiles()
-                self._feat_tile_in_folder = False
-                self._feat_level = 1
+                if self._feat_dirty:
+                    def _save_and_exit():
+                        self._feat_save_tiles()
+                        self._feat_tile_in_folder = False
+                        self._feat_level = 1
+                        self._feat_dirty = False
+                    def _discard_and_exit():
+                        self._feat_tile_in_folder = False
+                        self._feat_level = 1
+                        self._feat_dirty = False
+                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    self._feat_tile_in_folder = False
+                    self._feat_level = 1
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_tile_cursor = (
@@ -6415,6 +6690,7 @@ class Game:
                     tile = self._feat_tile_list[ti]
                     self._feat_build_tile_fields(tile)
                     self._feat_tile_editing = True
+                    self._feat_dirty = False
                     self._feat_level = 3
             elif event.key == pygame.K_a:
                 self._feat_add_tile()
@@ -6475,14 +6751,14 @@ class Game:
                     item = lst[ctx["cursor"]()]
                     ctx["build_fields"](item)
                     ctx["set_editing"](True)
+                    self._feat_dirty = False
                     self._feat_level = 2
             elif event.key == pygame.K_a:
                 ctx["add"]()
                 ctx["adjust_scroll"]()
             elif event.key in (pygame.K_d, pygame.K_DELETE):
                 ctx["remove"]()
-            elif (event.key == pygame.K_s
-                  and event.mod & pygame.KMOD_CTRL):
+            elif self._is_save_shortcut(event):
                 ctx["save_disk"]()
             return
 
@@ -6941,6 +7217,8 @@ class Game:
                     town_subfolder_cursor=self._feat_town_subfolder_cursor,
                     town_active_sub=self._feat_town_active_sub,
                 )
+                if self._unsaved_dialog_active:
+                    self.renderer.draw_unsaved_dialog()
             elif self.showing_modules:
                 self.renderer.draw_module_screen(
                     self.module_list, self.module_cursor,
@@ -6972,6 +7250,8 @@ class Game:
                         self._get_battle_screen_preview_data()
                         if getattr(self, "_battle_screen_active", False)
                         else None))
+                if self._unsaved_dialog_active:
+                    self.renderer.draw_unsaved_dialog()
             elif self.showing_game_over:
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,

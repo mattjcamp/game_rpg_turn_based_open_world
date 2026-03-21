@@ -4493,6 +4493,25 @@ class Renderer(CombatEffectRendererMixin):
         surf = f.render(text, True, c)
         self.screen.blit(surf, (x, y))
 
+    def draw_unsaved_dialog(self):
+        """Draw the 'Unsaved Changes' confirmation overlay."""
+        sw, sh = self.screen.get_size()
+        overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        self.screen.blit(overlay, (0, 0))
+        box_w, box_h = 400, 120
+        box_x = (sw - box_w) // 2
+        box_y = (sh - box_h) // 2
+        pygame.draw.rect(self.screen, (30, 25, 45), (box_x, box_y, box_w, box_h))
+        pygame.draw.rect(self.screen, (200, 160, 80), (box_x, box_y, box_w, box_h), 2)
+        self._u3_text("UNSAVED CHANGES", box_x + box_w // 2 - 70, box_y + 16,
+                      (255, 200, 100), self.font)
+        self._u3_text("You have unsaved changes.", box_x + 20, box_y + 50,
+                      (200, 200, 220), self.font_med)
+        self._u3_text("[S] SAVE & EXIT   [D] DISCARD   [ESC] CANCEL",
+                      box_x + 20, box_y + 80,
+                      (180, 180, 200), self.font_small)
+
     @staticmethod
     def _wrap_text_px(text, font, max_width, max_lines=4):
         """Word-wrap *text* into lines that fit within *max_width* pixels.

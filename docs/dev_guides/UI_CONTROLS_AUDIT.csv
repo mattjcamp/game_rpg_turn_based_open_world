@@ -1,0 +1,227 @@
+Screen,Sub-Section,Function,Key Binding,New Key Binding,Shared Function
+Title / Main Menu,,Navigate up,Up Arrow,,x
+Title / Main Menu,,Navigate down,Down Arrow,,x
+Title / Main Menu,,Select option,Enter / Space,,x
+Character Creation,Step 1 — Name Entry,Type character,Any printable key,,x
+Character Creation,Step 1 — Name Entry,Delete character,Backspace,,x
+Character Creation,Step 1 — Name Entry,Confirm name,Enter,,x
+Character Creation,Step 1 — Name Entry,Go back,Escape,,x
+Character Creation,Step 2 — Race Selection,Navigate up,Up Arrow,,x
+Character Creation,Step 2 — Race Selection,Navigate down,Down Arrow,,x
+Character Creation,Step 2 — Race Selection,Confirm selection,Enter / Space,,x
+Character Creation,Step 2 — Race Selection,Go back,Escape,,x
+Character Creation,Step 3 — Gender Selection,Toggle selection,Up / Down Arrow,,x
+Character Creation,Step 3 — Gender Selection,Confirm selection,Enter / Space,,x
+Character Creation,Step 3 — Gender Selection,Go back,Escape,,x
+Character Creation,Step 4 — Class Selection,Navigate up,Up Arrow,,x
+Character Creation,Step 4 — Class Selection,Navigate down,Down Arrow,,x
+Character Creation,Step 4 — Class Selection,Confirm selection,Enter / Space,,x
+Character Creation,Step 4 — Class Selection,Go back,Escape,,x
+Character Creation,Step 5 — Tile/Sprite Selection,Move left,Left Arrow,,x
+Character Creation,Step 5 — Tile/Sprite Selection,Move right,Right Arrow,,x
+Character Creation,Step 5 — Tile/Sprite Selection,Move up (jump 6),Up Arrow,,x
+Character Creation,Step 5 — Tile/Sprite Selection,Move down (jump 6),Down Arrow,,x
+Character Creation,Step 5 — Tile/Sprite Selection,Confirm selection,Enter / Space,,x
+Character Creation,Step 5 — Tile/Sprite Selection,Go back,Escape,,x
+Character Creation,Step 6 — Stat Allocation,Previous stat,Up Arrow,,x
+Character Creation,Step 6 — Stat Allocation,Next stat,Down Arrow,,x
+Character Creation,Step 6 — Stat Allocation,Decrease stat,Left Arrow,,x
+Character Creation,Step 6 — Stat Allocation,Increase stat,Right Arrow,,x
+Character Creation,Step 6 — Stat Allocation,Confirm,Enter / Space,,x
+Character Creation,Step 6 — Stat Allocation,Go back,Escape,,x
+Character Creation,Step 7 — Confirmation,Toggle CREATE / CANCEL,Up / Down Arrow,,x
+Character Creation,Step 7 — Confirmation,Execute selection,Enter / Space,,x
+Character Creation,Step 7 — Confirmation,Go back,Escape,,x
+Form Party,,Navigate up,Up Arrow,,x
+Form Party,,Navigate down,Down Arrow,,x
+Form Party,,Toggle character active,Space,,x
+Form Party,,Confirm party / start game,Enter,,x
+Form Party,,Delete character,D,,x
+Form Party,,Create new character,C,,x
+Form Party,,Go back,Escape,,x
+Form Party,Delete Confirmation Sub-dialog,Confirm deletion,Y,,x
+Form Party,Delete Confirmation Sub-dialog,Cancel,N / Escape,,x
+Overworld,Global Shortcuts (available in all game-world screens),Character 1 sheet,1,,x
+Overworld,Global Shortcuts (available in all game-world screens),Character 2 sheet,2,,x
+Overworld,Global Shortcuts (available in all game-world screens),Character 3 sheet,3,,x
+Overworld,Global Shortcuts (available in all game-world screens),Character 4 sheet,4,,x
+Overworld,Global Shortcuts (available in all game-world screens),Quest log,Q,,x
+Overworld,Global Shortcuts (available in all game-world screens),Main menu,M,,x
+Overworld,Movement & Interaction,Move,Arrow Keys / WASD,,x
+Overworld,Movement & Interaction,Examine tile,E,,x
+Overworld,Movement & Interaction,Interact / confirm,Enter,,x
+Overworld,Movement & Interaction,Cancel / close,Escape,,x
+Town,,Move,Arrow Keys,,x
+Town,,Talk to NPC,Move into NPC,,x
+Town,,Interact with object,Enter,,x
+Town,,Open inventory,I,,x
+Town,,Leave town,Escape,,x
+Dungeon,,Move,Arrow Keys,,x
+Dungeon,,Fight monster,Move into monster,,x
+Dungeon,,Use stairs / exit,Escape (at stairs),,x
+Dungeon,,Open inventory,I,,x
+Combat,,Navigate menu,Up / Down or W / S,,x
+Combat,,Navigate targets,Left / Right or A / D,,x
+Combat,,Confirm action,Enter,,x
+Combat,,Open inventory,I,,x
+Combat,,Character status,O,,x
+Combat,,Toggle action tabs,Tab / B,,x
+Combat,,Open equipment,E,,x
+Combat,,Cancel / go back,Escape / Backspace,,x
+Inventory / Equipment,,Navigate items,Up / Down Arrow,,x
+Inventory / Equipment,,Switch character,Left / Right Arrow,,x
+Inventory / Equipment,,View / examine item,Enter,,x
+Inventory / Equipment,,Drop / remove item,L,,x
+Inventory / Equipment,,Toggle tabs,Tab,,x
+Inventory / Equipment,,Close inventory,P / Escape,,x
+Shopping / Merchant,,Navigate items,Up / Down Arrow,,x
+Shopping / Merchant,,Select / confirm,Enter,,x
+Shopping / Merchant,,Toggle buy / sell,Tab / B,,x
+Shopping / Merchant,,Leave shop,Escape,,x
+NPC Dialog,,Advance dialog,Space / Enter,,x
+NPC Dialog,,Select option,Up / Down then Enter,,x
+NPC Dialog,,Exit dialog,Escape,,x
+Quest Log,,Scroll up,Up Arrow,,x
+Quest Log,,Scroll down,Down Arrow,,x
+Quest Log,,Close,Q / Escape,,x
+Game Over,,Navigate,Up / Down Arrow,,x
+Game Over,,Select,Enter / Space,,x
+Settings,,Navigate up,Up Arrow,,x
+Settings,,Navigate down,Down Arrow,,x
+Settings,,Toggle option,Enter / Space,,x
+Settings,,Cycle left,Left Arrow,,x
+Settings,,Cycle right,Right Arrow,,x
+Settings,,Close,M / Escape,,x
+Save / Load,,Navigate slots,Up / Down Arrow,,x
+Save / Load,,Save / Load,Enter / Space,Ctrl+S / Cmd+S,x
+Save / Load,,Delete slot (load only),D,,x
+Save / Load,,Go back,Escape,,x
+Save / Load,Delete Confirmation,Confirm,Y,,x
+Save / Load,Delete Confirmation,Cancel,N / Escape,,x
+Edit Game Features — Main Menu,,Navigate up,Up Arrow,,x
+Edit Game Features — Main Menu,,Navigate down,Down Arrow,,x
+Edit Game Features — Main Menu,,Open category,Enter / Space,,x
+Edit Game Features — Main Menu,,Go back,Escape,,x
+Spells Editor,Level 1 — Spell List,Navigate up,Up Arrow,,x
+Spells Editor,Level 1 — Spell List,Navigate down,Down Arrow,,x
+Spells Editor,Level 1 — Spell List,Open spell,Enter / Right Arrow,,x
+Spells Editor,Level 1 — Spell List,Add new spell,A,,x
+Spells Editor,Level 1 — Spell List,Delete spell,D / Delete,,x
+Spells Editor,Level 1 — Spell List,Go back,Escape,,x
+Spells Editor,Level 2 — Spell Field Editor,Previous field,Up Arrow,,x
+Spells Editor,Level 2 — Spell Field Editor,Next field,Down Arrow,,x
+Spells Editor,Level 2 — Spell Field Editor,Cycle choice left,Left Arrow,,x
+Spells Editor,Level 2 — Spell Field Editor,Cycle choice right,Right Arrow,,x
+Spells Editor,Level 2 — Spell Field Editor,Type text,Printable characters,,x
+Spells Editor,Level 2 — Spell Field Editor,Delete character,Backspace,,x
+Spells Editor,Level 2 — Spell Field Editor,Save,Ctrl+S,Ctrl+S / Cmd+S,x
+Spells Editor,Level 2 — Spell Field Editor,Exit (unsaved dialog if dirty),Escape,,x
+Items Editor,Level 1 — Item List,Navigate up,Up Arrow,,x
+Items Editor,Level 1 — Item List,Navigate down,Down Arrow,,x
+Items Editor,Level 1 — Item List,Open item,Enter / Right Arrow,,x
+Items Editor,Level 1 — Item List,Add new item,A,,x
+Items Editor,Level 1 — Item List,Delete item,D / Delete,,x
+Items Editor,Level 1 — Item List,Go back,Escape,,x
+Monsters Editor,Level 1 — Monster List,Navigate up,Up Arrow,,x
+Monsters Editor,Level 1 — Monster List,Navigate down,Down Arrow,,x
+Monsters Editor,Level 1 — Monster List,Open monster,Enter / Right Arrow,,x
+Monsters Editor,Level 1 — Monster List,Add new monster,A,,x
+Monsters Editor,Level 1 — Monster List,Delete monster,D / Delete,,x
+Monsters Editor,Level 1 — Monster List,Go back,Escape,,x
+Tile Types Editor,Level 1 — Folder List,Navigate up,Up Arrow,,x
+Tile Types Editor,Level 1 — Folder List,Navigate down,Down Arrow,,x
+Tile Types Editor,Level 1 — Folder List,Enter folder,Enter / Right Arrow,,x
+Tile Types Editor,Level 1 — Folder List,Go back,Escape,,x
+Tile Types Editor,Level 2 — Tile List,Navigate up,Up Arrow,,x
+Tile Types Editor,Level 2 — Tile List,Navigate down,Down Arrow,,x
+Tile Types Editor,Level 2 — Tile List,Open tile,Enter / Right Arrow,,x
+Tile Types Editor,Level 2 — Tile List,Add tile,A,,x
+Tile Types Editor,Level 2 — Tile List,Delete tile,D / Delete,,x
+Tile Types Editor,Level 2 — Tile List,Exit (unsaved dialog if dirty),Escape,,x
+Tile Gallery,Level 1 — Category Folders,Navigate up,Up Arrow,,x
+Tile Gallery,Level 1 — Category Folders,Navigate down,Down Arrow,,x
+Tile Gallery,Level 1 — Category Folders,Enter category,Enter / Right Arrow,,x
+Tile Gallery,Level 1 — Category Folders,Exit (unsaved dialog if dirty),Escape,,x
+Tile Gallery,Level 2 — Sprite List,Navigate up,Up Arrow,,x
+Tile Gallery,Level 2 — Sprite List,Navigate down,Down Arrow,,x
+Tile Gallery,Level 2 — Sprite List,Open tag editor,Enter / Right Arrow,,x
+Tile Gallery,Level 2 — Sprite List,Open pixel editor,E,,x
+Tile Gallery,Level 2 — Sprite List,Duplicate sprite,Ctrl+D,,x
+Tile Gallery,Level 2 — Sprite List,Rename sprite,N,,x
+Tile Gallery,Level 2 — Sprite List,Delete sprite,X / Delete,,x
+Tile Gallery,Level 2 — Sprite List,Exit (unsaved dialog if dirty),Escape,,x
+Tile Gallery,Naming Mode (rename / duplicate),Type character,Printable characters,,x
+Tile Gallery,Naming Mode (rename / duplicate),Delete character,Backspace,,x
+Tile Gallery,Naming Mode (rename / duplicate),Confirm name,Enter,,x
+Tile Gallery,Naming Mode (rename / duplicate),Cancel,Escape,,x
+Tile Gallery,Level 3 — Tag Editor,Previous tag,Up Arrow,,x
+Tile Gallery,Level 3 — Tag Editor,Next tag,Down Arrow,,x
+Tile Gallery,Level 3 — Tag Editor,Toggle tag,Enter / Space / Left / Right,,x
+Tile Gallery,Level 3 — Tag Editor,Save,Ctrl+S / Cmd+S,Ctrl+S / Cmd+S,x
+Tile Gallery,Level 3 — Tag Editor,Exit (unsaved dialog if dirty),Escape,,x
+Pixel Editor,Canvas Mode,Move cursor,Arrow Keys,,x
+Pixel Editor,Canvas Mode,Paint pixel,Enter / Space,,x
+Pixel Editor,Canvas Mode,Previous color,Q,,
+Pixel Editor,Canvas Mode,Next color,E,,
+Pixel Editor,Canvas Mode,Eyedropper (pick),P,,
+Pixel Editor,Canvas Mode,Color replace mode,R,,
+Pixel Editor,Canvas Mode,Undo,U / Ctrl+Z,,x
+Pixel Editor,Canvas Mode,Switch to palette,Tab,,x
+Pixel Editor,Canvas Mode,Save,Ctrl+S / Cmd+S,Ctrl+S / Cmd+S,x
+Pixel Editor,Canvas Mode,Exit (unsaved dialog if dirty),Escape,,x
+Pixel Editor,Palette Mode,Move selection,Arrow Keys,,x
+Pixel Editor,Palette Mode,Confirm color,Enter / Space,,x
+Pixel Editor,Palette Mode,Switch to canvas,Tab,,x
+Pixel Editor,Color Replace Mode,Navigate dest color,Arrow Keys,,x
+Pixel Editor,Color Replace Mode,Execute replacement,Enter / Space,,x
+Pixel Editor,Color Replace Mode,Cancel,Escape,,x
+Town Layouts Editor,Level 0 — Sub-Editor Selection,Navigate up,Up Arrow,,x
+Town Layouts Editor,Level 0 — Sub-Editor Selection,Navigate down,Down Arrow,,x
+Town Layouts Editor,Level 0 — Sub-Editor Selection,Enter sub-editor,Enter / Space,,x
+Town Layouts Editor,Level 0 — Sub-Editor Selection,Go back,Escape,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Navigate up,Up Arrow,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Navigate down,Down Arrow,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Open layout,Enter / Space,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Add new,A,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Delete,D,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Rename,N,,x
+Town Layouts Editor,Level 1 — Layout / Feature / Interior List,Exit (unsaved dialog if dirty),Escape,,x
+Town Layouts Editor,Naming Mode,Type character,Printable characters (max 40),,x
+Town Layouts Editor,Naming Mode,Delete character,Backspace,,x
+Town Layouts Editor,Naming Mode,Confirm name,Enter,,x
+Town Layouts Editor,Naming Mode,Cancel,Escape,,x
+Town Layouts Editor,Level 2 — Grid Painter,Move cursor,Arrow Keys,,x
+Town Layouts Editor,Level 2 — Grid Painter,Paint tile,Enter,,x
+Town Layouts Editor,Level 2 — Grid Painter,Next brush,Tab / B,,x
+Town Layouts Editor,Level 2 — Grid Painter,Previous brush,Shift+Tab / Shift+B,,x
+Town Layouts Editor,Level 2 — Grid Painter,Save layout,S,Ctrl+S / Cmd+S,x
+Town Layouts Editor,Level 2 — Grid Painter,Exit (unsaved dialog if dirty),Escape,,x
+Modules Editor,Module Selection,Navigate up,Up Arrow,,x
+Modules Editor,Module Selection,Navigate down,Down Arrow,,x
+Modules Editor,Module Selection,Select / activate,S,,x
+Modules Editor,Module Selection,Create new,N,,x
+Modules Editor,Module Selection,Edit,E,,x
+Modules Editor,Module Selection,Delete,D,,x
+Modules Editor,Module Selection,Go back,Escape,,x
+Modules Editor,Delete Confirmation,Confirm,Y,,x
+Modules Editor,Delete Confirmation,Cancel,N / Escape,,x
+Modules Editor,Module Edit — Section Browser (Level 0),Navigate,Up / Down Arrow,,x
+Modules Editor,Module Edit — Section Browser (Level 0),Enter section,Enter / Right Arrow,,x
+Modules Editor,Module Edit — Section Browser (Level 0),Add item,A,,x
+Modules Editor,Module Edit — Section Browser (Level 0),Delete item,D / Delete,,x
+Modules Editor,Module Edit — Section Browser (Level 0),Save,Ctrl+S,Ctrl+S / Cmd+S,x
+Modules Editor,Module Edit — Section Browser (Level 0),Go back,Escape / Left Arrow,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Move cursor,Arrow Keys / WASD,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Paint at cursor,Enter,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Next brush,Tab / B,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Previous brush,Shift+Tab / Shift+B,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Toggle obstacle/tile mode,I,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Open settings,O,,x
+Battle Screen / Examine Screen Editor,Grid Painter,Exit (unsaved dialog if dirty),Escape / Backspace,,x
+Battle Screen / Examine Screen Editor,Settings Sub-Menu,Navigate,Up / Down Arrow,,x
+Battle Screen / Examine Screen Editor,Settings Sub-Menu,Cycle left,Left Arrow,,x
+Battle Screen / Examine Screen Editor,Settings Sub-Menu,Cycle right,Right Arrow,,x
+Battle Screen / Examine Screen Editor,Settings Sub-Menu,Close settings,Escape / Backspace / O,,x
+Unsaved Changes Dialog,,Save changes and exit,S,,x
+Unsaved Changes Dialog,,Discard changes and exit,D,,x
+Unsaved Changes Dialog,,Cancel (return to editor),Escape,,x
