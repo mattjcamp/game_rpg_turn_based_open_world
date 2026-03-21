@@ -1,8 +1,136 @@
 {
-  "layouts": [],
+  "layouts": [
+    {
+      "name": "Town Layout 1",
+      "width": 18,
+      "height": 19,
+      "tiles": {
+        "1,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "2,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "3,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "1,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "1,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "2,2": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "3,2": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "3,3": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "2,3": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "5,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "6,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "7,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "8,1": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "8,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "5,2": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "5,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "8,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "6,2": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "7,2": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "7,3": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "6,3": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        }
+      }
+    }
+  ],
   "features": [
     {
-      "name": "Town Feature 1",
+      "name": "Fountain",
       "width": 8,
       "height": 8,
       "tiles": {
@@ -10,6 +138,61 @@
           "tile_id": null,
           "path": "unassigned/brick_wall.png",
           "name": "Brick Wall"
+        },
+        "2,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "3,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,3": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,4": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "1,4": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "1,5": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "4,5": {
+          "tile_id": null,
+          "path": "unassigned/brick_wall.png",
+          "name": "Brick Wall"
+        },
+        "2,4": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "3,4": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "3,5": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
+        },
+        "2,5": {
+          "tile_id": 35,
+          "path": "game/dungeon/altar.png",
+          "name": "Altar"
         }
       }
     }

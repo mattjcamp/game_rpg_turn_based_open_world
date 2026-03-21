@@ -337,6 +337,8 @@ class Game:
         self._feat_townlayout_cy = 0          # cursor row in grid
         self._feat_townlayout_brush_idx = 0   # index into brush palette
         self._feat_townlayout_brushes = None  # built lazily from manifest
+        self._feat_townlayout_naming = False   # True when typing a name
+        self._feat_townlayout_name_buf = ""    # text buffer for naming
 
         self._feat_pxedit_palette = [
             (0, 0, 0, 255),        # Black
@@ -2872,12 +2874,13 @@ class Game:
         self._feat_townlayout_cx = 1
         self._feat_townlayout_cy = 1
         self._feat_townlayout_brush_idx = 0
+        # Invalidate brush cache so features list is rebuilt fresh
+        self._feat_townlayout_brushes = None
 
     def _feat_get_townlayout_brushes(self):
         """Build brush list from the Town category in the tile manifest."""
         if self._feat_townlayout_brushes is not None:
             return self._feat_townlayout_brushes
-        import json
         brushes = [
             {"name": "Eraser", "tile_id": None, "path": None},
         ]
@@ -2915,12 +2918,32 @@ class Game:
                     })
         except (OSError, ValueError):
             pass
+
+        # ── Append town features as composite brushes (only for layouts) ──
+        sub = self._feat_town_active_sub or "layouts"
+        if sub == "layouts":
+            features = self._feat_town_lists.get("features", [])
+            for fi, feat in enumerate(features):
+                if not feat.get("tiles"):
+                    continue  # skip empty features
+                brushes.append({
+                    "name": f"\u2726 {feat['name']}",
+                    "tile_id": None,
+                    "path": None,
+                    "feature": feat,
+                })
+
         self._feat_townlayout_brushes = brushes
         return brushes
 
     def _feat_handle_townlayout_input(self, event):
         """Handle input for the town layouts editor."""
         if event.type != pygame.KEYDOWN:
+            return
+
+        # ── Naming mode: capture text input ──
+        if self._feat_townlayout_naming:
+            self._feat_handle_townlayout_naming_input(event)
             return
 
         if self._feat_townlayout_editing:
@@ -2967,6 +2990,35 @@ class Game:
             self._feat_add_townlayout()
         elif event.key == pygame.K_d and n > 0:
             self._feat_remove_townlayout()
+        elif event.key == pygame.K_n and n > 0:
+            # Enter naming mode for the selected item
+            item = self._feat_townlayout_list[self._feat_townlayout_cursor]
+            self._feat_townlayout_naming = True
+            self._feat_townlayout_name_buf = item.get("name", "")
+
+    def _feat_handle_townlayout_naming_input(self, event):
+        """Handle text input while renaming a town layout/feature/interior."""
+        if event.key == pygame.K_RETURN:
+            # Confirm the name
+            items = self._feat_townlayout_list
+            if 0 <= self._feat_townlayout_cursor < len(items):
+                new_name = self._feat_townlayout_name_buf.strip()
+                if new_name:
+                    items[self._feat_townlayout_cursor]["name"] = new_name
+                self._feat_save_townlayouts()
+            self._feat_townlayout_naming = False
+            self._feat_townlayout_name_buf = ""
+        elif event.key == pygame.K_ESCAPE:
+            # Cancel naming
+            self._feat_townlayout_naming = False
+            self._feat_townlayout_name_buf = ""
+        elif event.key == pygame.K_BACKSPACE:
+            self._feat_townlayout_name_buf = self._feat_townlayout_name_buf[:-1]
+        else:
+            # Append typed character (if printable)
+            ch = event.unicode
+            if ch and ch.isprintable() and len(self._feat_townlayout_name_buf) < 40:
+                self._feat_townlayout_name_buf += ch
 
     def _feat_handle_townlayout_painter_input(self, event):
         """Handle input in the town layout grid painter."""
@@ -2995,6 +3047,34 @@ class Game:
             pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
             if brush["name"] == "Eraser":
                 layout["tiles"].pop(pos_key, None)
+            elif "feature" in brush:
+                # Composite feature brush — cursor marks top-left tile
+                feat = brush["feature"]
+                ftiles = feat.get("tiles", {})
+                # Find the bounding box of actual tiles in the feature
+                min_fc = min_fr = 9999
+                for fkey in ftiles:
+                    pts = fkey.split(",")
+                    fc_, fr_ = int(pts[0]), int(pts[1])
+                    if fc_ < min_fc:
+                        min_fc = fc_
+                    if fr_ < min_fr:
+                        min_fr = fr_
+                if not ftiles:
+                    min_fc = min_fr = 0
+                ox = self._feat_townlayout_cx - min_fc
+                oy = self._feat_townlayout_cy - min_fr
+                for fkey, fval in ftiles.items():
+                    parts = fkey.split(",")
+                    fc, fr = int(parts[0]), int(parts[1])
+                    tx = ox + fc
+                    ty = oy + fr
+                    if 0 <= tx < w and 0 <= ty < h:
+                        layout["tiles"][f"{tx},{ty}"] = {
+                            "tile_id": fval.get("tile_id"),
+                            "path": fval.get("path"),
+                            "name": fval.get("name", ""),
+                        }
             else:
                 layout["tiles"][pos_key] = {
                     "tile_id": brush["tile_id"],
@@ -6523,6 +6603,8 @@ class Game:
                     townlayout_cy=self._feat_townlayout_cy,
                     townlayout_brush_idx=self._feat_townlayout_brush_idx,
                     townlayout_brushes=self._feat_get_townlayout_brushes() if self._feat_active_editor == "townlayouts" else [],
+                    townlayout_naming=self._feat_townlayout_naming,
+                    townlayout_name_buf=self._feat_townlayout_name_buf,
                     town_subfolders=self._feat_town_subfolders,
                     town_subfolder_cursor=self._feat_town_subfolder_cursor,
                     town_active_sub=self._feat_town_active_sub,

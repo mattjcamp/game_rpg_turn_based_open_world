@@ -7184,6 +7184,8 @@ class Renderer(CombatEffectRendererMixin):
                               townlayout_cy=0,
                               townlayout_brush_idx=0,
                               townlayout_brushes=None,
+                              townlayout_naming=False,
+                              townlayout_name_buf="",
                               town_subfolders=None,
                               town_subfolder_cursor=0,
                               town_active_sub=None):
@@ -7521,10 +7523,37 @@ class Renderer(CombatEffectRendererMixin):
                         right_w - 24, panel_h - 24,
                         layout, -1, -1, -1, None)
 
-                self._u3_text(
-                    "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [Esc] Save & Back",
-                    SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
-                    self._U3_HINT, fs)
+                # ── Naming overlay ──
+                if townlayout_naming:
+                    # Draw a text input box over the selected item
+                    nm_x = left_x + 10
+                    nm_y = panel_y + panel_h // 2 - 30
+                    nm_w = left_w - 20
+                    nm_h = 50
+                    overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+                    overlay.fill((20, 18, 30, 200))
+                    self.screen.blit(overlay, (left_x, panel_y))
+                    self._u3_text("Rename:", nm_x + 4, nm_y - 18,
+                                  self._U3_ORANGE, fs)
+                    pygame.draw.rect(self.screen, (60, 55, 80),
+                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+                    pygame.draw.rect(self.screen, (200, 180, 80),
+                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+                    display_text = townlayout_name_buf
+                    # Blinking cursor
+                    elapsed = pygame.time.get_ticks() / 1000.0
+                    if int(elapsed * 2) % 2 == 0:
+                        display_text += "|"
+                    self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                                  self._U3_WHITE, fm)
+                    self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                                  nm_x + 4, nm_y + nm_h + 6,
+                                  self._U3_HINT, fs)
+                else:
+                    self._u3_text(
+                        "[Up/Dn] Browse  [Enter] Edit  [A] Add  [D] Delete  [N] Rename  [Esc] Save & Back",
+                        SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
+                        self._U3_HINT, fs)
 
             elif ed == "townlayouts" and townlayout_editing:
                 # ── Town Layout grid painter ──
@@ -7574,6 +7603,32 @@ class Renderer(CombatEffectRendererMixin):
                                 self.screen.blit(
                                     spr, (icon_x, by + 4))
                                 text_x = icon_x + 28
+                        elif b.get("feature") is not None:
+                            # Composite feature — draw mini grid icon
+                            feat = b["feature"]
+                            fw = feat.get("width", 8)
+                            fh = feat.get("height", 8)
+                            ft = feat.get("tiles", {})
+                            mini_ts = max(1, min(22 // max(fw, fh), 4))
+                            mw = fw * mini_ts
+                            mh = fh * mini_ts
+                            mx = icon_x + (22 - mw) // 2
+                            my = by + 4 + (22 - mh) // 2
+                            pygame.draw.rect(
+                                self.screen, (35, 35, 45),
+                                pygame.Rect(mx - 1, my - 1, mw + 2, mh + 2))
+                            for fk in ft:
+                                pts = fk.split(",")
+                                fc, fr = int(pts[0]), int(pts[1])
+                                pygame.draw.rect(
+                                    self.screen, (100, 200, 160),
+                                    pygame.Rect(mx + fc * mini_ts,
+                                                my + fr * mini_ts,
+                                                mini_ts, mini_ts))
+                            pygame.draw.rect(
+                                self.screen, (80, 180, 140),
+                                pygame.Rect(mx - 1, my - 1, mw + 2, mh + 2), 1)
+                            text_x = icon_x + 28
                         elif b.get("tile_id") is not None:
                             # Colored square for base tiles
                             TCOL = {10: (120, 100, 80),
@@ -8610,14 +8665,19 @@ class Renderer(CombatEffectRendererMixin):
                         col = TILE_COLORS.get(tid, (80, 80, 80))
                         pygame.draw.rect(self.screen, col,
                                          pygame.Rect(px, py, ts, ts))
-                elif is_edge:
-                    # Default: wall on edges
-                    pygame.draw.rect(self.screen, (70, 55, 40),
-                                     pygame.Rect(px, py, ts, ts))
                 else:
-                    # Default: floor
-                    pygame.draw.rect(self.screen, (120, 100, 80),
-                                     pygame.Rect(px, py, ts, ts))
+                    # Transparent checkerboard pattern
+                    half = max(ts // 2, 1)
+                    for qr in range(2):
+                        for qc in range(2):
+                            qx = px + qc * half
+                            qy = py + qr * half
+                            if (qr + qc) % 2 == 0:
+                                qcol = (45, 45, 45)
+                            else:
+                                qcol = (30, 30, 30)
+                            pygame.draw.rect(self.screen, qcol,
+                                             pygame.Rect(qx, qy, half, half))
 
                 # Grid lines
                 pygame.draw.rect(self.screen, (40, 35, 30),
