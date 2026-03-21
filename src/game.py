@@ -6094,25 +6094,22 @@ class Game:
         self._unsaved_dialog_discard_cb = discard_cb
 
     def _handle_unsaved_dialog_input(self, event):
-        """Handle Y/N/Escape input on the unsaved-changes overlay."""
+        """Handle Enter/Escape input on the unsaved-changes overlay."""
         if event.type != pygame.KEYDOWN:
             return
-        if event.key == pygame.K_s:
+        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
             # Save changes then exit
             cb = self._unsaved_dialog_save_cb
             self._unsaved_dialog_active = False
             if cb:
                 cb()
-        elif event.key == pygame.K_d:
+        elif event.key == pygame.K_ESCAPE:
             # Discard changes and exit
             cb = self._unsaved_dialog_discard_cb
             self._unsaved_dialog_active = False
             self._feat_dirty = False
             if cb:
                 cb()
-        elif event.key == pygame.K_ESCAPE:
-            # Cancel — return to editor, keep editing
-            self._unsaved_dialog_active = False
 
     def _handle_title_input(self, event):
         """Handle input on the title screen."""
@@ -6495,14 +6492,16 @@ class Game:
                     self._feat_adjust_scroll_generic(
                         self._feat_gallery_spr_cursor,
                         self._feat_gallery_spr_scroll)
-            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            elif event.key in (pygame.K_RETURN, pygame.K_e):
+                # Enter or E → open pixel editor directly
+                if n > 0 and self._feat_pxedit_open():
+                    self._feat_level = 4
+            elif event.key == pygame.K_RIGHT:
+                # Right Arrow → open tag editor
                 if n > 0:
                     self._feat_gallery_tag_cursor = 0
                     self._feat_dirty = False
                     self._feat_level = 3
-            elif event.key == pygame.K_e:
-                if n > 0 and self._feat_pxedit_open():
-                    self._feat_level = 4
             elif event.key == pygame.K_d and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META)):
                 if n > 0:
                     self._feat_gallery_duplicate()

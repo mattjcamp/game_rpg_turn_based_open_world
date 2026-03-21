@@ -144,8 +144,8 @@ Tile Gallery,Level 1 — Category Folders,Enter category,Enter / Right Arrow,,x
 Tile Gallery,Level 1 — Category Folders,Exit (unsaved dialog if dirty),Escape,,x
 Tile Gallery,Level 2 — Sprite List,Navigate up,Up Arrow,,x
 Tile Gallery,Level 2 — Sprite List,Navigate down,Down Arrow,,x
-Tile Gallery,Level 2 — Sprite List,Open tag editor,Enter / Right Arrow,,x
-Tile Gallery,Level 2 — Sprite List,Open pixel editor,E,,x
+Tile Gallery,Level 2 — Sprite List,Open pixel editor,Enter / E,,x
+Tile Gallery,Level 2 — Sprite List,Open tag editor,Right Arrow,,x
 Tile Gallery,Level 2 — Sprite List,Duplicate sprite,Ctrl+D,,x
 Tile Gallery,Level 2 — Sprite List,Rename sprite,N,,x
 Tile Gallery,Level 2 — Sprite List,Delete sprite,X / Delete,,x
@@ -222,6 +222,5 @@ Battle Screen / Examine Screen Editor,Settings Sub-Menu,Navigate,Up / Down Arrow
 Battle Screen / Examine Screen Editor,Settings Sub-Menu,Cycle left,Left Arrow,,x
 Battle Screen / Examine Screen Editor,Settings Sub-Menu,Cycle right,Right Arrow,,x
 Battle Screen / Examine Screen Editor,Settings Sub-Menu,Close settings,Escape / Backspace / O,,x
-Unsaved Changes Dialog,,Save changes and exit,S,,x
-Unsaved Changes Dialog,,Discard changes and exit,D,,x
-Unsaved Changes Dialog,,Cancel (return to editor),Escape,,x
+Unsaved Changes Dialog,,Save changes and exit,Enter,,x
+Unsaved Changes Dialog,,Discard changes and exit,Escape,,x

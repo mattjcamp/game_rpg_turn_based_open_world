@@ -4508,7 +4508,7 @@ class Renderer(CombatEffectRendererMixin):
                       (255, 200, 100), self.font)
         self._u3_text("You have unsaved changes.", box_x + 20, box_y + 50,
                       (200, 200, 220), self.font_med)
-        self._u3_text("[S] SAVE & EXIT   [D] DISCARD   [ESC] CANCEL",
+        self._u3_text("[ENTER] SAVE & EXIT   [ESC] DISCARD & EXIT",
                       box_x + 20, box_y + 80,
                       (180, 180, 200), self.font_small)
 
@@ -8457,8 +8457,8 @@ class Renderer(CombatEffectRendererMixin):
         if level == 3:
             hint = "[Up/Dn] Select  [Enter] Toggle  [Esc] Done"
         else:
-            hint = ("[Up/Dn] Browse  [Enter] Tags  "
-                    "[E] Edit Pixels  [Ctrl+D] Duplicate  "
+            hint = ("[Up/Dn] Browse  [Enter] Edit  "
+                    "[Right] Tags  [Ctrl+D] Duplicate  "
                     "[N] Rename  [X] Delete  [Esc] Back")
         hw = fs.size(hint)[0]
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
