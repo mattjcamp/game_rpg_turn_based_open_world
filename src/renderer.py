@@ -4861,7 +4861,9 @@ class Renderer(CombatEffectRendererMixin):
                           encounter_name=None,
                           ground_items=None, loot_message="",
                           arena_obstacles=None,
-                          battle_painted=None):
+                          battle_painted=None,
+                          inspect_cursor=-1,
+                          inspect_combatants=None):
         """
         Draw the Ultima III-style combat screen with all party members.
         """
@@ -5221,7 +5223,10 @@ class Renderer(CombatEffectRendererMixin):
         dt_anim = 1.0 / max(self.screen.get_width(), 30)  # approximate dt
         # Use pygame clock for consistent animation
         dt_anim = pygame.time.get_ticks() * 0.001  # we'll use a fixed step
-        if is_player_phase:
+        # Collapse action panel when user is tab-inspecting so the
+        # full party/monster roster stays visible.
+        _inspecting = (inspect_cursor >= 0)
+        if is_player_phase and not _inspecting:
             self._action_panel_expand = min(1.0,
                 self._action_panel_expand + 0.08)
         else:
@@ -5232,8 +5237,32 @@ class Renderer(CombatEffectRendererMixin):
         t = self._action_panel_expand
         ease_t = t * t * (3.0 - 2.0 * t)  # smoothstep
 
-        # Party roster panel (shows all 4 members with sprites and bars)
-        party_h = 300
+        # Determine which combatant is highlighted by inspect cursor
+        _inspect_obj = None
+        if inspect_cursor >= 0 and inspect_combatants:
+            if inspect_cursor < len(inspect_combatants):
+                _inspect_obj = inspect_combatants[inspect_cursor][1]
+
+        # Party roster panel (compact: sprite + name + HP/MP bars)
+        _COMBAT_ROW_H = 40
+        _MIN_ACTION_H = 60  # reserve space for the collapsed action panel
+        _avail_h = arena_bottom - 4 - _MIN_ACTION_H - 12  # total for both panels + gaps
+        num_fighters = len(fighters) if fighters else 0
+        alive_monsters = [m for m in (monsters or []) if m.is_alive()] if monsters else ([monster] if monster and monster.is_alive() else [])
+
+        # Size each panel to fit its members but share available space
+        party_want = (28 + num_fighters * _COMBAT_ROW_H) if fighters else 138
+        monster_want = max(50, 28 + len(alive_monsters) * _COMBAT_ROW_H)
+        total_want = party_want + monster_want
+        if total_want > _avail_h:
+            # Split proportionally, each gets at least 90px
+            ratio = party_want / max(total_want, 1)
+            party_h = max(90, int(_avail_h * ratio))
+            monster_panel_h = max(90, _avail_h - party_h)
+        else:
+            party_h = party_want
+            monster_panel_h = monster_want
+
         if fighters:
             self._u3_party_combat_panel(fighters, active_fighter,
                                         defending_map or {},
@@ -5241,25 +5270,28 @@ class Renderer(CombatEffectRendererMixin):
                                         shield_buffs=shield_buffs or {},
                                         range_buffs=range_buffs or {},
                                         invisibility_buffs=invisibility_buffs or {},
-                                        bless_buffs=bless_buffs or {})
+                                        bless_buffs=bless_buffs or {},
+                                        inspect_highlight=_inspect_obj)
         else:
             self._u3_fighter_panel(fighter, defending, rx, 4, rw, 138,
                                    shield_buffs=shield_buffs or {})
             party_h = 138
 
         monster_y = 4 + party_h + 4
-        alive_monsters = [m for m in (monsters or []) if m.is_alive()] if monsters else ([monster] if monster and monster.is_alive() else [])
-        monster_panel_h = max(50, 28 + 68 * len(alive_monsters))
         self._u3_monster_panel_multi(alive_monsters, rx, monster_y, rw, monster_panel_h,
                                      source_state=is_outdoor and "overworld" or "dungeon",
                                      encounter_name=encounter_name,
                                      sleep_buffs=sleep_buffs,
                                      summon_buffs=summon_buffs,
-                                     curse_buffs=curse_buffs)
+                                     curse_buffs=curse_buffs,
+                                     inspect_highlight=_inspect_obj)
 
         # Calculate normal (collapsed) and expanded action panel positions
         normal_action_y = monster_y + monster_panel_h + 4
-        expanded_action_y = 4  # top of the right panel area
+        # Expand to at most 75% of the right panel so the party/monster
+        # roster remains partially visible at the top.
+        total_panel_h = arena_bottom - 4
+        expanded_action_y = 4 + int(total_panel_h * 0.25)
         action_y = int(normal_action_y + (expanded_action_y - normal_action_y) * ease_t)
         action_h = arena_bottom - action_y
 
@@ -6480,115 +6512,115 @@ class Renderer(CombatEffectRendererMixin):
                                 defending_map, x, y, w, h,
                                 shield_buffs=None, range_buffs=None,
                                 invisibility_buffs=None,
-                                bless_buffs=None):
-        """Party roster with character sprites and HP/MP bars."""
+                                bless_buffs=None,
+                                inspect_highlight=None):
+        """Compact party roster: sprite, name + numbers, HP/MP bars per row."""
         self._u3_panel(x, y, w, h)
         f = self.font
+        fs = self.font_small
         tx = x + 8
-        ty = y + 6
+        header_y = y + 6
 
-        self._u3_text("PARTY", tx, ty, self._U3_ORANGE, f)
-        ty += 22
+        self._u3_text("PARTY", tx, header_y, self._U3_ORANGE, f)
 
-        sprite_size = 32  # sprite display area
-        bar_w = w - sprite_size - 30  # bar width after sprite + padding
-        bar_h = 8
+        ROW_H = 40
+        sprite_size = 32
+        content_top = y + 24  # below header
+        content_h = h - 28    # available height for rows
+        total_content = len(fighters) * ROW_H
+
+        # ── Scroll offset based on inspect highlight ──
+        scroll_offset = 0
+        if inspect_highlight is not None:
+            for idx, member in enumerate(fighters):
+                if member is inspect_highlight:
+                    row_y = idx * ROW_H
+                    # Scroll down if row is below visible area
+                    if row_y + ROW_H > content_h:
+                        scroll_offset = row_y + ROW_H - content_h
+                    break
+        # Clamp scroll offset
+        max_scroll = max(0, total_content - content_h)
+        scroll_offset = max(0, min(scroll_offset, max_scroll))
+
+        # ── Clip to content area ──
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(x + 1, content_top, w - 2, content_h))
+
+        info_x = tx + sprite_size + 6
+        bar_w = x + w - info_x - 8  # bars fill from info_x to panel right edge
+        bar_h = 6
 
         for i, member in enumerate(fighters):
+            row_top = content_top + i * ROW_H - scroll_offset
+            # Skip rows entirely outside visible area
+            if row_top + ROW_H < content_top or row_top > content_top + content_h:
+                continue
+
             is_active = (member is active_fighter)
-            is_def = defending_map.get(member, False)
-            row_top = ty
+            is_inspected = (inspect_highlight is not None
+                            and member is inspect_highlight)
+
+            # ── Inspect highlight bar ──
+            if is_inspected:
+                hl = pygame.Surface((w - 4, ROW_H), pygame.SRCALPHA)
+                hl.fill((100, 200, 255, 40))
+                self.screen.blit(hl, (x + 2, row_top))
+                pygame.draw.rect(self.screen, (100, 200, 255),
+                                 (x + 2, row_top, w - 4, ROW_H), 1)
 
             # ── Character sprite ──
             sprite = self._get_member_sprite(member)
             if sprite:
                 sx = tx
-                sy = row_top + 2
+                sy = row_top + (ROW_H - sprite_size) // 2
                 if not member.is_alive():
-                    # Dim the sprite for dead members
                     dim = sprite.copy()
                     dim.set_alpha(80)
                     self.screen.blit(dim, (sx, sy))
                 else:
                     self.screen.blit(sprite, (sx, sy))
                     if is_active:
-                        # Orange highlight box around active character
                         pygame.draw.rect(self.screen, self._U3_ORANGE,
                                          pygame.Rect(sx - 2, sy - 2,
                                                      sprite.get_width() + 4,
                                                      sprite.get_height() + 4), 2)
 
-            # ── Name + class (to the right of sprite) ──
-            info_x = tx + sprite_size + 6
-
+            # ── Name + HP/MP numbers on one line ──
             if not member.is_alive():
                 name_color = self._U3_RED
             elif is_active:
                 name_color = self._U3_ORANGE
             else:
                 name_color = self._U3_WHITE
+            self._u3_text(member.name, info_x, row_top + 2, name_color, f)
 
-            wpn_label = member.weapon if member.weapon else "Fists"
-            self._u3_text(member.name, info_x, row_top, name_color, f)
-
-            # ── Stat line: AC, weapon, damage dice ──
-            stat_y = row_top + 16
-            ac_val = member.get_ac()
-            dice_c, dice_s, dice_b = member.get_damage_dice()
-            dmg_str = f"{dice_c}d{dice_s}"
-            if dice_b > 0:
-                dmg_str += f"+{dice_b}"
-            elif dice_b < 0:
-                dmg_str += f"{dice_b}"
-            stat_line = f"AC:{ac_val}  {wpn_label}  DMG:{dmg_str}"
-            self._u3_text(stat_line, info_x, stat_y, (180, 210, 230), self.font_small)
-
-            # ── HP bar + numeric readout ──
-            bar_y = row_top + 28
-            hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
-            hp_bar_w = bar_w - 60  # leave room for numbers
-            self._u3_draw_stat_bar(info_x, bar_y, hp_bar_w, bar_h,
-                                   member.hp, member.max_hp, hp_color)
-            hp_txt = f"{member.hp}/{member.max_hp}"
-            self._u3_text(hp_txt, info_x + hp_bar_w + 4, bar_y - 2,
-                          self._U3_WHITE, self.font_small)
-
-            # ── MP bar + numeric readout ──
-            mp_y = bar_y + bar_h + 3
+            # Right-aligned HP / MP numbers on the name line
             mp_val = member.current_mp
             mp_max = member.max_mp
+            hp_txt = f"{member.hp}/{member.max_hp}"
             if mp_max > 0:
-                self._u3_draw_stat_bar(info_x, mp_y, hp_bar_w, bar_h,
-                                       mp_val, mp_max, (100, 100, 255))
                 mp_txt = f"{mp_val}/{mp_max}"
-                self._u3_text(mp_txt, info_x + hp_bar_w + 4, mp_y - 2,
-                              self._U3_WHITE, self.font_small)
+                nums = f"{hp_txt}  {mp_txt}"
+            else:
+                nums = hp_txt
+            nums_surf = fs.render(nums, True, (200, 200, 200))
+            self.screen.blit(nums_surf,
+                             (x + w - 10 - nums_surf.get_width(), row_top + 4))
 
-            # ── DEF / SHLD indicators ──
-            indicator_y = row_top + 28
-            if is_def:
-                self._u3_text("DEF", x + w - 40, indicator_y, self._U3_ORANGE, self.font_small)
-                indicator_y += 12
-            if shield_buffs and shield_buffs.get(member):
-                self._u3_text("SHLD", x + w - 44, indicator_y, (100, 180, 255), self.font_small)
-                indicator_y += 12
-            if range_buffs and range_buffs.get(member):
-                self._u3_text("FAST", x + w - 44, indicator_y, (80, 255, 120), self.font_small)
-                indicator_y += 12
-            if invisibility_buffs and invisibility_buffs.get(member):
-                self._u3_text("INVIS", x + w - 48, indicator_y, (180, 200, 255), self.font_small)
-                indicator_y += 12
-            if bless_buffs and bless_buffs.get(member):
-                self._u3_text("BLSS", x + w - 44, indicator_y, (255, 215, 80), self.font_small)
+            # ── HP bar (green, full width) ──
+            hp_bar_y = row_top + 22
+            hp_color = self._U3_GREEN if member.hp > member.max_hp * 0.3 else self._U3_RED
+            self._u3_draw_stat_bar(info_x, hp_bar_y, bar_w, bar_h,
+                                   member.hp, member.max_hp, hp_color)
 
-            # ── Ammo indicator for throwable weapons ──
-            if member.is_throwable_weapon():
-                ammo_count = member.get_ammo()
-                ammo_color = self._U3_WHITE if ammo_count > 0 else self._U3_RED
-                ammo_y = mp_y if mp_max > 0 else bar_y + bar_h + 3
-                self._u3_text(f"x{ammo_count}", x + w - 32, ammo_y - 2, ammo_color, self.font_small)
+            # ── MP bar (blue, full width) ──
+            if mp_max > 0:
+                mp_bar_y = hp_bar_y + bar_h + 2
+                self._u3_draw_stat_bar(info_x, mp_bar_y, bar_w, bar_h,
+                                       mp_val, mp_max, (100, 100, 255))
 
-            ty += 68  # row height per character
+        self.screen.set_clip(prev_clip)
 
     def _u3_fighter_panel(self, fighter, defending, x, y, w, h,
                           shield_buffs=None):
@@ -6672,29 +6704,65 @@ class Renderer(CombatEffectRendererMixin):
     def _u3_monster_panel_multi(self, monsters, x, y, w, h,
                                source_state="dungeon", encounter_name=None,
                                sleep_buffs=None, summon_buffs=None,
-                               curse_buffs=None):
-        """Monster stats panel matching the party panel format with sprites and bars."""
+                               curse_buffs=None,
+                               inspect_highlight=None):
+        """Compact monster roster: sprite, name, HP bar per row."""
         self._u3_panel(x, y, w, h)
         f = self.font
         tx = x + 8
-        ty = y + 6
+        header_y = y + 6
 
         label = encounter_name or ("ENEMY" if len(monsters) == 1 else "ENEMIES")
-        self._u3_text(label, tx, ty, self._U3_RED, f)
-        ty += 22
+        self._u3_text(label, tx, header_y, self._U3_RED, f)
 
-        sprite_size = 32  # sprite display area (matches party panel)
-        bar_w = w - sprite_size - 30  # bar width after sprite + padding
-        bar_h = 8
+        ROW_H = 40
+        sprite_size = 32
+        bar_h = 6
+        content_top = y + 24
+        content_h = h - 28
+        total_content = len(monsters) * ROW_H
 
-        for mon in monsters:
-            row_top = ty
+        # ── Scroll offset based on inspect highlight ──
+        scroll_offset = 0
+        if inspect_highlight is not None:
+            for idx, mon in enumerate(monsters):
+                if mon is inspect_highlight:
+                    row_y = idx * ROW_H
+                    if row_y + ROW_H > content_h:
+                        scroll_offset = row_y + ROW_H - content_h
+                    break
+        max_scroll = max(0, total_content - content_h)
+        scroll_offset = max(0, min(scroll_offset, max_scroll))
+
+        # ── Clip to content area ──
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(x + 1, content_top, w - 2, content_h))
+
+        info_x = tx + sprite_size + 6
+        bar_w = x + w - info_x - 8
+        fs = self.font_small
+
+        for i, mon in enumerate(monsters):
+            row_top = content_top + i * ROW_H - scroll_offset
+            if row_top + ROW_H < content_top or row_top > content_top + content_h:
+                continue
+
+            is_inspected = (inspect_highlight is not None
+                            and mon is inspect_highlight)
+
+            # ── Inspect highlight bar ──
+            if is_inspected:
+                hl = pygame.Surface((w - 4, ROW_H), pygame.SRCALPHA)
+                hl.fill((100, 200, 255, 40))
+                self.screen.blit(hl, (x + 2, row_top))
+                pygame.draw.rect(self.screen, (100, 200, 255),
+                                 (x + 2, row_top, w - 4, ROW_H), 1)
 
             # ── Monster sprite ──
             sprite = self._get_monster_sprite(mon)
             if sprite:
                 sx = tx
-                sy = row_top + 2
+                sy = row_top + (ROW_H - sprite_size) // 2
                 if not mon.is_alive():
                     dim = sprite.copy()
                     dim.set_alpha(80)
@@ -6702,23 +6770,22 @@ class Renderer(CombatEffectRendererMixin):
                 else:
                     self.screen.blit(sprite, (sx, sy))
 
-            # ── Name (to the right of sprite) ──
-            info_x = tx + sprite_size + 6
+            # ── Name + HP/MP numbers on one line ──
             is_charmed = getattr(mon, "charmed", False)
             is_summoned = (summon_buffs and mon in summon_buffs) if summon_buffs else False
             is_sleeping = (sleep_buffs and mon in sleep_buffs) if sleep_buffs else False
             is_cursed = (curse_buffs and mon in curse_buffs) if curse_buffs else False
             if is_summoned:
-                name_color = (120, 220, 140)  # Green for summoned
+                name_color = (120, 220, 140)
                 display_name = f"{mon.name} (Summon)"
             elif is_charmed:
-                name_color = (255, 120, 200)  # Pink for charmed
+                name_color = (255, 120, 200)
                 display_name = f"{mon.name} (Ally)"
             elif is_sleeping:
-                name_color = (120, 140, 220)  # Blue for sleeping
+                name_color = (120, 140, 220)
                 display_name = f"{mon.name} (Zzz)"
             elif is_cursed and mon.is_alive():
-                name_color = (180, 80, 200)  # Purple for cursed
+                name_color = (180, 80, 200)
                 display_name = f"{mon.name} (Cursed)"
             elif mon.is_alive():
                 name_color = self._U3_RED
@@ -6726,41 +6793,33 @@ class Renderer(CombatEffectRendererMixin):
             else:
                 name_color = (120, 40, 40)
                 display_name = mon.name
-            self._u3_text(display_name, info_x, row_top, name_color, f)
+            self._u3_text(display_name, info_x, row_top + 2, name_color, f)
 
-            # ── Stat line: AC, damage dice, attack bonus ──
-            stat_y = row_top + 16
-            dmg_str = f"{mon.damage_dice}d{mon.damage_sides}"
-            if mon.damage_bonus > 0:
-                dmg_str += f"+{mon.damage_bonus}"
-            elif mon.damage_bonus < 0:
-                dmg_str += f"{mon.damage_bonus}"
-            atk_str = f"+{mon.attack_bonus}" if mon.attack_bonus >= 0 else f"{mon.attack_bonus}"
-            stat_line = f"AC:{mon.ac}  ATK:{atk_str}  DMG:{dmg_str}"
-            self._u3_text(stat_line, info_x, stat_y, (210, 190, 170), self.font_small)
-
-            # ── HP bar + numeric readout (green→red like party panel) ──
-            bar_y = row_top + 28
-            hp_color = self._U3_GREEN if mon.hp > mon.max_hp * 0.3 else self._U3_RED
-            hp_bar_w = bar_w - 60  # leave room for numbers
-            self._u3_draw_stat_bar(info_x, bar_y, hp_bar_w, bar_h,
-                                   mon.hp, mon.max_hp, hp_color)
-            hp_txt = f"{mon.hp}/{mon.max_hp}"
-            self._u3_text(hp_txt, info_x + hp_bar_w + 4, bar_y - 2,
-                          self._U3_WHITE, self.font_small)
-
-            # ── MP bar + numeric readout (matches party panel layout) ──
-            mp_y = bar_y + bar_h + 3
+            # Right-aligned HP / MP numbers on the name line
             mon_mp = getattr(mon, 'current_mp', 0)
             mon_mp_max = getattr(mon, 'max_mp', 0)
+            hp_txt = f"{mon.hp}/{mon.max_hp}"
             if mon_mp_max > 0:
-                self._u3_draw_stat_bar(info_x, mp_y, hp_bar_w, bar_h,
-                                       mon_mp, mon_mp_max, (100, 100, 255))
-                mp_txt = f"{mon_mp}/{mon_mp_max}"
-                self._u3_text(mp_txt, info_x + hp_bar_w + 4, mp_y - 2,
-                              self._U3_WHITE, self.font_small)
+                nums = f"{hp_txt}  {mon_mp}/{mon_mp_max}"
+            else:
+                nums = hp_txt
+            nums_surf = fs.render(nums, True, (200, 200, 200))
+            self.screen.blit(nums_surf,
+                             (x + w - 10 - nums_surf.get_width(), row_top + 4))
 
-            ty += 68  # row height per monster (matches party panel)
+            # ── HP bar (green, full width) ──
+            hp_bar_y = row_top + 22
+            hp_color = self._U3_GREEN if mon.hp > mon.max_hp * 0.3 else self._U3_RED
+            self._u3_draw_stat_bar(info_x, hp_bar_y, bar_w, bar_h,
+                                   mon.hp, mon.max_hp, hp_color)
+
+            # ── MP bar (blue, full width) ──
+            if mon_mp_max > 0:
+                mp_bar_y = hp_bar_y + bar_h + 2
+                self._u3_draw_stat_bar(info_x, mp_bar_y, bar_w, bar_h,
+                                       mon_mp, mon_mp_max, (100, 100, 255))
+
+        self.screen.set_clip(prev_clip)
 
     def _u3_action_panel(self, phase, selected_action, is_adjacent,
                          x, y, w, h, active_fighter=None,
@@ -14133,6 +14192,249 @@ class Renderer(CombatEffectRendererMixin):
 
         self.screen.set_clip(prev_clip)
 
+    def draw_combat_inspect_sheet(self, ctype, obj,
+                                    shield_buffs=None, range_buffs=None,
+                                    invisibility_buffs=None, bless_buffs=None,
+                                    sleep_buffs=None, summon_buffs=None,
+                                    curse_buffs=None, defending_map=None):
+        """Draw a centered detail sheet for the inspected combatant."""
+        sw, sh = self.screen.get_size()
+        pw, ph = 420, 380
+        px = (sw - pw) // 2
+        py = (sh - ph) // 2 - 20
+
+        # Dark overlay behind
+        dim = pygame.Surface((sw, sh), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 160))
+        self.screen.blit(dim, (0, 0))
+
+        self._u3_panel(px, py, pw, ph)
+        f = self.font
+        fm = self.font_med
+        fs = self.font_small
+        dx = px + 16
+        dy = py + 12
+        max_pw = pw - 32
+
+        if ctype == "player":
+            member = obj
+            # ── Header: sprite + name ──
+            sprite = self._get_member_sprite(member)
+            if sprite:
+                self.screen.blit(sprite, (dx, dy))
+                ndx = dx + 40
+            else:
+                ndx = dx
+            self._u3_text(member.name, ndx, dy,
+                          self._U3_ORANGE, f)
+            cls_name = getattr(member, "char_class", "")
+            race_name = getattr(member, "race", "")
+            lvl = getattr(member, "level", 1)
+            self._u3_text(
+                f"Level {lvl} {race_name} {cls_name}",
+                ndx, dy + 20, (180, 180, 200), fm)
+            dy += 48
+
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (dx, dy), (px + pw - 16, dy), 1)
+            dy += 8
+
+            # ── Stats ──
+            hp_color = (self._U3_GREEN if member.hp > member.max_hp * 0.3
+                        else self._U3_RED)
+            self._u3_text(f"HP: {member.hp}/{member.max_hp}",
+                          dx, dy, hp_color, fm)
+            mp_val = member.current_mp
+            mp_max = member.max_mp
+            if mp_max > 0:
+                self._u3_text(f"MP: {mp_val}/{mp_max}",
+                              dx + 140, dy, (100, 100, 255), fm)
+            dy += 22
+
+            ac_val = member.get_ac()
+            dice_c, dice_s, dice_b = member.get_damage_dice()
+            dmg_str = f"{dice_c}d{dice_s}"
+            if dice_b > 0:
+                dmg_str += f"+{dice_b}"
+            elif dice_b < 0:
+                dmg_str += f"{dice_b}"
+            self._u3_text(f"AC: {ac_val}", dx, dy,
+                          (180, 210, 230), fm)
+            self._u3_text(f"DMG: {dmg_str}", dx + 100, dy,
+                          (180, 210, 230), fm)
+            dy += 22
+
+            wpn = member.weapon if member.weapon else "Fists"
+            armor = getattr(member, "armor", None) or "None"
+            self._u3_text(f"Weapon: {wpn}", dx, dy,
+                          (170, 170, 190), fm)
+            dy += 20
+            self._u3_text(f"Armor: {armor}", dx, dy,
+                          (170, 170, 190), fm)
+            dy += 24
+
+            # ── Base attributes ──
+            attrs = ["str", "dex", "con", "int", "wis"]
+            attr_strs = []
+            for a in attrs:
+                val = getattr(member, a, None)
+                if val is not None:
+                    attr_strs.append(f"{a.upper()}: {val}")
+            if attr_strs:
+                self._u3_text("  ".join(attr_strs), dx, dy,
+                              (160, 160, 180), fs)
+                dy += 18
+
+            # ── Active effects ──
+            dy += 4
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (dx, dy), (px + pw - 16, dy), 1)
+            dy += 8
+            self._u3_text("Active Effects:", dx, dy,
+                          self._U3_ORANGE, fm)
+            dy += 20
+
+            effects = []
+            if defending_map and defending_map.get(member):
+                effects.append(("Defending", self._U3_ORANGE))
+            if shield_buffs and shield_buffs.get(member):
+                effects.append(("Shield", (100, 180, 255)))
+            if range_buffs and range_buffs.get(member):
+                effects.append(("Haste", (80, 255, 120)))
+            if invisibility_buffs and invisibility_buffs.get(member):
+                effects.append(("Invisible", (180, 200, 255)))
+            if bless_buffs and bless_buffs.get(member):
+                effects.append(("Blessed", (255, 215, 80)))
+            if getattr(member, "poisoned", False):
+                effects.append(("Poisoned", (100, 200, 50)))
+            if not member.is_alive():
+                effects.append(("Dead", self._U3_RED))
+
+            if effects:
+                for label, color in effects:
+                    self._u3_text(f"  {label}", dx, dy, color, fm)
+                    dy += 18
+            else:
+                self._u3_text("  None", dx, dy,
+                              (120, 120, 140), fm)
+
+        else:
+            # ── Monster ──
+            mon = obj
+            sprite = self._get_monster_sprite(mon)
+            if sprite:
+                self.screen.blit(sprite, (dx, dy))
+                ndx = dx + 40
+            else:
+                ndx = dx
+            self._u3_text(mon.name, ndx, dy, self._U3_RED, f)
+            tags = []
+            if mon.undead:
+                tags.append("Undead")
+            if mon.humanoid:
+                tags.append("Humanoid")
+            if mon.terrain == "sea":
+                tags.append("Aquatic")
+            tag_str = ", ".join(tags) if tags else "Creature"
+            self._u3_text(tag_str, ndx, dy + 20,
+                          (180, 180, 200), fm)
+            dy += 48
+
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (dx, dy), (px + pw - 16, dy), 1)
+            dy += 8
+
+            # ── Stats ──
+            hp_color = (self._U3_GREEN if mon.hp > mon.max_hp * 0.3
+                        else self._U3_RED)
+            self._u3_text(f"HP: {mon.hp}/{mon.max_hp}",
+                          dx, dy, hp_color, fm)
+            dy += 22
+
+            ac_val = mon.ac
+            atk = mon.attack_bonus
+            atk_str = f"+{atk}" if atk >= 0 else f"{atk}"
+            dmg_str = f"{mon.damage_dice}d{mon.damage_sides}"
+            if mon.damage_bonus > 0:
+                dmg_str += f"+{mon.damage_bonus}"
+            elif mon.damage_bonus < 0:
+                dmg_str += f"{mon.damage_bonus}"
+            self._u3_text(f"AC: {ac_val}", dx, dy,
+                          (210, 190, 170), fm)
+            self._u3_text(f"ATK: {atk_str}", dx + 80, dy,
+                          (210, 190, 170), fm)
+            self._u3_text(f"DMG: {dmg_str}", dx + 180, dy,
+                          (210, 190, 170), fm)
+            dy += 22
+
+            # ── Ranged attack info ──
+            if mon.ranged:
+                r = mon.ranged
+                rng = r.get("range", "?")
+                rlabel = r.get("label", "Ranged")
+                rdmg = f"{r.get('damage_dice', 1)}d{r.get('damage_sides', 4)}"
+                rb = r.get("damage_bonus", 0)
+                if rb > 0:
+                    rdmg += f"+{rb}"
+                elif rb < 0:
+                    rdmg += f"{rb}"
+                self._u3_text(
+                    f"Ranged: {rlabel} (Range {rng}, {rdmg})",
+                    dx, dy, (200, 180, 160), fm)
+                dy += 20
+
+            # ── Spell abilities ──
+            if mon.spells:
+                self._u3_text("Abilities:", dx, dy,
+                              (200, 180, 160), fm)
+                dy += 18
+                for sp in mon.spells[:4]:
+                    sp_name = sp.get("name", sp.get("type", "???"))
+                    self._u3_text(f"  {sp_name}", dx, dy,
+                                  (180, 170, 160), fs)
+                    dy += 16
+
+            # ── XP / Gold ──
+            dy += 4
+            self._u3_text(
+                f"XP: {mon.xp_reward}  Gold: {mon.gold_reward}",
+                dx, dy, (170, 170, 140), fm)
+            dy += 24
+
+            # ── Active effects ──
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (dx, dy), (px + pw - 16, dy), 1)
+            dy += 8
+            self._u3_text("Active Effects:", dx, dy,
+                          self._U3_RED, fm)
+            dy += 20
+
+            effects = []
+            if getattr(mon, "charmed", False):
+                effects.append(("Charmed (Ally)", (255, 120, 200)))
+            if sleep_buffs and mon in sleep_buffs:
+                effects.append(("Sleeping", (120, 140, 220)))
+            if summon_buffs and mon in summon_buffs:
+                effects.append(("Summoned", (120, 220, 140)))
+            if curse_buffs and mon in curse_buffs:
+                effects.append(("Cursed", (180, 80, 200)))
+            if not mon.is_alive():
+                effects.append(("Dead", (120, 40, 40)))
+
+            if effects:
+                for label, color in effects:
+                    self._u3_text(f"  {label}", dx, dy, color, fm)
+                    dy += 18
+            else:
+                self._u3_text("  None", dx, dy,
+                              (120, 120, 140), fm)
+
+        # Footer hint
+        self._u3_text(
+            "[TAB] Next  [E/ESC] Close",
+            px + pw // 2 - 80, py + ph - 24,
+            self._U3_HINT, fs)
+
     def draw_combat_help_overlay(self):
         """Draw a full-screen overlay showing all combat controls."""
         # Reuse help fonts (created lazily by overworld help)
@@ -14252,7 +14554,8 @@ class Renderer(CombatEffectRendererMixin):
         lines_other = [
             ("[L]", "Open game log"),
             ("[H]", "Toggle this help screen"),
-            ("[E]", "Open equipment screen"),
+            ("[TAB]", "Cycle through combatants"),
+            ("[E]", "Inspect highlighted combatant"),
         ]
         for key, desc in lines_other:
             ks = f.render(key, True, (255, 255, 255))

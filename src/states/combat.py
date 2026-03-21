@@ -187,6 +187,10 @@ class CombatState(BaseState):
         # Help overlay
         self.showing_help = False
 
+        # Inspect (Tab to cycle, E to examine)
+        self.inspect_cursor = -1       # -1 = no selection; 0..N = combatant
+        self.showing_inspect = False   # True = detail sheet overlay
+
         # Active fighter index (which party member's turn it is)
         self.active_idx = 0
         self.fighters = []        # list of alive PartyMembers in combat
@@ -814,6 +818,19 @@ class CombatState(BaseState):
                         self.log_scroll = max(0, self.log_scroll - 3)
             return
 
+        # ── Inspect detail sheet overlay ──
+        if self.showing_inspect:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_e, pygame.K_ESCAPE):
+                        self.showing_inspect = False
+                    elif event.key == pygame.K_TAB:
+                        self._inspect_tab(
+                            reverse=bool(
+                                event.mod & pygame.KMOD_SHIFT))
+                        self.showing_inspect = False
+            return
+
         # During animation phases, no input
         if self.phase in (PHASE_PROJECTILE, PHASE_MELEE_ANIM, PHASE_FIREBALL, PHASE_HEAL, PHASE_SHIELD, PHASE_TURN_UNDEAD, PHASE_CHARM, PHASE_SLEEP, PHASE_TELEPORT, PHASE_INVISIBILITY, PHASE_ANIMATE_DEAD, PHASE_AOE_FIREBALL, PHASE_AOE_EXPLOSION, PHASE_LIGHTNING_BOLT, PHASE_CURE_POISON, PHASE_BLESS, PHASE_CURSE, PHASE_MONSTER_SPELL, PHASE_SMITE):
             return
@@ -874,6 +891,26 @@ class CombatState(BaseState):
             if event.key == pygame.K_h:
                 self.showing_help = True
                 return
+
+            # ── Tab: cycle inspect cursor through combatants ──
+            if event.key == pygame.K_TAB:
+                self._inspect_tab(
+                    reverse=bool(event.mod & pygame.KMOD_SHIFT))
+                return
+
+            # ── E: open inspect detail sheet ──
+            if event.key == pygame.K_e:
+                if self.inspect_cursor >= 0:
+                    self.showing_inspect = True
+                else:
+                    # First press: select the first combatant
+                    self.inspect_cursor = 0
+                    self.showing_inspect = True
+                return
+
+            # ── Any non-Tab/E key clears the inspect highlight ──
+            if self.inspect_cursor >= 0:
+                self.inspect_cursor = -1
 
             # ── PHASE_PLAYER: menu navigation + WASD move + spacebar skip ──
             if self.phase == PHASE_PLAYER:
@@ -5047,6 +5084,42 @@ class CombatState(BaseState):
             f"All enemies defeated! +{total_xp} XP each!"
         )
 
+    # ── Inspect (Tab / E) helpers ─────────────────────────────
+
+    def _inspect_combatants(self):
+        """Build an ordered list of (type, obj) for Tab cycling.
+
+        Returns fighters first, then alive monsters.
+        """
+        result = []
+        for f in self.fighters:
+            result.append(("player", f))
+        for m in (self.monsters or []):
+            if m.is_alive():
+                result.append(("monster", m))
+        return result
+
+    def _inspect_tab(self, reverse=False):
+        """Cycle the inspect cursor through all combatants."""
+        combatants = self._inspect_combatants()
+        n = len(combatants)
+        if n == 0:
+            return
+        if self.inspect_cursor < 0:
+            self.inspect_cursor = 0
+        else:
+            step = -1 if reverse else 1
+            self.inspect_cursor = (self.inspect_cursor + step) % n
+        # Close detail sheet when tabbing
+        self.showing_inspect = False
+
+    def _inspect_get_current(self):
+        """Return (type, obj) for the current inspect cursor, or None."""
+        combatants = self._inspect_combatants()
+        if 0 <= self.inspect_cursor < len(combatants):
+            return combatants[self.inspect_cursor]
+        return None
+
     def _end_combat(self, won):
         # Remove dead monsters from the source state's tracking
         if won and self.monster_refs:
@@ -5190,7 +5263,23 @@ class CombatState(BaseState):
             loot_message=self.loot_message,
             arena_obstacles=self.arena_obstacles,
             battle_painted=getattr(self, "battle_painted", None),
+            inspect_cursor=self.inspect_cursor,
+            inspect_combatants=self._inspect_combatants(),
         )
+        # Inspect detail sheet (drawn on top of everything)
+        if self.showing_inspect:
+            cur = self._inspect_get_current()
+            if cur:
+                ctype, obj = cur
+                renderer.draw_combat_inspect_sheet(ctype, obj,
+                    shield_buffs=self.shield_buffs,
+                    range_buffs=self.range_buffs,
+                    invisibility_buffs=self.invisibility_buffs,
+                    bless_buffs=self.bless_buffs,
+                    sleep_buffs=self.sleep_buffs,
+                    summon_buffs=self.summon_buffs,
+                    curse_buffs=self.curse_buffs,
+                    defending_map=self.defending)
         # DEBUG: smite flash overlay
         if self.phase == PHASE_SMITE and hasattr(self, "smite_flash"):
             alpha = int(255 * self.smite_flash)
