@@ -151,7 +151,7 @@
       40
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/door"
   },
   "14": {
     "name": "Exit",
@@ -162,7 +162,7 @@
       60
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/exit"
   },
   "20": {
     "name": "Stone Floor",
@@ -340,17 +340,6 @@
     "context": "town",
     "sprite": "town/altar"
   },
-  "36": {
-    "name": "Custom Circle",
-    "walkable": false,
-    "color": [
-      128,
-      128,
-      128
-    ],
-    "context": "town",
-    "sprite": "unique_tiles/seal_of_binding"
-  },
   "37": {
     "name": "Brick",
     "walkable": false,
@@ -361,16 +350,5 @@
     ],
     "context": "town",
     "sprite": "town/brick_wall_red"
-  },
-  "38": {
-    "name": "Counter Copy",
-    "walkable": false,
-    "color": [
-      140,
-      100,
-      60
-    ],
-    "context": "town",
-    "sprite": "town/counter"
   }
 }

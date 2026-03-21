@@ -183,13 +183,15 @@
       "path": "src/assets/game/terrain/town_door.png",
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 13
     },
     "exit": {
       "path": "src/assets/game/terrain/town_exit.png",
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 14
     },
     "altar": {
       "path": "src/assets/game/dungeon/altar.png",
