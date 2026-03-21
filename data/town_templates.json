@@ -5,321 +5,321 @@
       "width": 18,
       "height": 19,
       "tiles": {
-        "1,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "1,1": {
+          "tile_id": 36,
+          "path": "game/terrain/town_door.png",
+          "name": "New Tile 36"
         },
-        "2,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "7,2": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
         },
-        "3,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "8,2": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
         },
-        "4,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "8,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
         },
-        "5,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "7,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
         },
-        "5,1": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "6,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
         },
-        "5,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+        "6,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "9,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "9,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,4": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
+        },
+        "8,4": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
+        },
+        "8,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,4": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "9,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "9,4": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
         },
         "1,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "1,1": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "2,1": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "3,1": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "4,1": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "4,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "2,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "3,2": {
-          "tile_id": 13,
+          "tile_id": 36,
           "path": "game/terrain/town_door.png",
-          "name": "Door"
+          "name": "New Tile 36"
         },
-        "2,4": {
+        "1,4": {
+          "tile_id": 36,
+          "path": "game/terrain/town_door.png",
+          "name": "New Tile 36"
+        },
+        "2,3": {
+          "tile_id": 36,
+          "path": "game/landmarks/moongate_active.png",
+          "name": "Custom Circle"
+        },
+        "6,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,6": {
+          "tile_id": 36,
+          "path": "game/landmarks/moongate_active.png",
+          "name": "Custom Circle"
+        },
+        "8,6": {
           "tile_id": 12,
           "path": "game/terrain/town_counter.png",
           "name": "Counter"
         },
-        "3,4": {
-          "tile_id": 12,
-          "path": "game/terrain/town_counter.png",
-          "name": "Counter"
+        "8,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
         },
-        "3,5": {
-          "tile_id": null,
+        "7,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,6": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "9,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "9,6": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,7": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "4,5": {
-          "tile_id": null,
+        "7,7": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "5,5": {
-          "tile_id": null,
+        "8,7": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "5,6": {
-          "tile_id": null,
+        "6,8": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "5,7": {
-          "tile_id": null,
+        "6,9": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "5,8": {
-          "tile_id": null,
+        "7,9": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "5,9": {
-          "tile_id": null,
+        "8,9": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "3,9": {
-          "tile_id": null,
+        "7,8": {
+          "tile_id": 36,
+          "path": "game/landmarks/moongate_active.png",
+          "name": "Custom Circle"
+        },
+        "9,7": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "3,8": {
-          "tile_id": null,
+        "10,7": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "3,7": {
-          "tile_id": null,
+        "11,7": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "3,6": {
-          "tile_id": null,
+        "9,8": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "4,6": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
+        "9,9": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
         },
-        "4,9": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
+        "10,9": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "11,9": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "10,8": {
+          "tile_id": 36,
+          "path": "game/landmarks/moongate_active.png",
+          "name": "Custom Circle"
         }
       }
     }
   ],
   "features": [
     {
-      "name": "Shrine",
+      "name": "Town Feature 1",
       "width": 8,
       "height": 8,
       "tiles": {
-        "0,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "1,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "2,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "3,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "4,0": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "4,1": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "4,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "0,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "0,1": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
-        "1,1": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "2,1": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "3,1": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
-        },
-        "3,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
-        },
         "1,2": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_brown.png",
-          "name": "Brick Wall Brown"
+          "tile_id": 36,
+          "path": "game/landmarks/moongate_active.png",
+          "name": "Custom Circle"
         },
         "2,2": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
-        },
-        "1,4": {
           "tile_id": 12,
           "path": "game/terrain/town_counter.png",
           "name": "Counter"
         },
-        "2,4": {
-          "tile_id": 12,
-          "path": "game/terrain/town_counter.png",
-          "name": "Counter"
+        "2,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "1,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "0,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "0,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
         }
       }
     },
     {
-      "name": "Library",
+      "name": "Town Feature 2",
       "width": 8,
       "height": 8,
       "tiles": {
-        "2,2": {
-          "tile_id": null,
+        "1,1": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "3,2": {
-          "tile_id": null,
+        "2,1": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "4,2": {
-          "tile_id": null,
+        "3,1": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "4,3": {
-          "tile_id": null,
+        "1,2": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
-        "4,4": {
-          "tile_id": null,
+        "1,3": {
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "4,5": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "4,6": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "2,6": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "2,5": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
-        },
-        "2,4": {
-          "tile_id": null,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
         "2,3": {
-          "tile_id": null,
+          "tile_id": 37,
           "path": "unassigned/brick_wall_red.png",
-          "name": "Brick Wall Red"
+          "name": "Brick"
         },
         "3,3": {
-          "tile_id": 35,
-          "path": "game/dungeon/altar.png",
-          "name": "Altar"
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
         },
-        "3,6": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
+        "2,2": {
+          "tile_id": 36,
+          "path": "game/landmarks/moongate_active.png",
+          "name": "Custom Circle"
         }
       }
     }

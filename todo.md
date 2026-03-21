@@ -1,7 +1,5 @@
 
 Polish Content Systems
-- Clean up UI and make consistent throughout game
-- Add Quick-Save feature: the load screen gets a new "Quick Save" slot and while in-game the player can use control-s or command-s to quick save the current game. Make this work for dungeon and towns as well (actually all saves should accommodate that)
 - add editing screens for content templates (spells, items, classes, monsters, shops)
 - modules should inherit but be able to override some things like town appearance, shops, etc
 - Towns: work on towns, tighten up their appearance. Think of better ways to organize layouts. Add editing for town types that can be used in modules. Create a better shop experience. Create unique items for shops.

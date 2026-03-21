@@ -181,14 +181,12 @@
     },
     "door": {
       "path": "src/assets/game/terrain/town_door.png",
-      "tile_id": 13,
       "usable_in": [
         "town"
       ]
     },
     "exit": {
       "path": "src/assets/game/terrain/town_exit.png",
-      "tile_id": 14,
       "usable_in": [
         "town"
       ]
@@ -224,7 +222,8 @@
       "path": "src/assets/unassigned/brick_wall_red.png",
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 37
     },
     "floor_gray": {
       "path": "src/assets/game/terrain/floor_gray.png",
@@ -1009,7 +1008,8 @@
       "usable_in": [
         "town",
         "unique_tiles"
-      ]
+      ],
+      "tile_id": 36
     },
     "poison_swamp": {
       "path": "src/assets/game/landmarks/poison_swamp.png",

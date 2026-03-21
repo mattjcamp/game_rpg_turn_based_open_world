@@ -1,0 +1,365 @@
+{
+  "0": {
+    "name": "Grass",
+    "walkable": true,
+    "color": [
+      34,
+      139,
+      34
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "1": {
+    "name": "Water",
+    "walkable": false,
+    "color": [
+      30,
+      90,
+      180
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "2": {
+    "name": "Forest",
+    "walkable": true,
+    "color": [
+      0,
+      80,
+      0
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "3": {
+    "name": "Mountain",
+    "walkable": false,
+    "color": [
+      130,
+      130,
+      130
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "4": {
+    "name": "Town",
+    "walkable": true,
+    "color": [
+      180,
+      140,
+      80
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "5": {
+    "name": "Dungeon",
+    "walkable": true,
+    "color": [
+      120,
+      40,
+      80
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "6": {
+    "name": "Path",
+    "walkable": true,
+    "color": [
+      160,
+      140,
+      100
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "7": {
+    "name": "Sand",
+    "walkable": true,
+    "color": [
+      210,
+      190,
+      130
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "8": {
+    "name": "Bridge",
+    "walkable": true,
+    "color": [
+      140,
+      100,
+      50
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "9": {
+    "name": "Cleared Dungeon",
+    "walkable": true,
+    "color": [
+      80,
+      70,
+      60
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
+  "10": {
+    "name": "Floor",
+    "walkable": true,
+    "color": [
+      160,
+      130,
+      100
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "11": {
+    "name": "Wall",
+    "walkable": false,
+    "color": [
+      90,
+      70,
+      50
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "12": {
+    "name": "Counter",
+    "walkable": false,
+    "color": [
+      140,
+      100,
+      60
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "13": {
+    "name": "Door",
+    "walkable": true,
+    "color": [
+      120,
+      80,
+      40
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "14": {
+    "name": "Exit",
+    "walkable": true,
+    "color": [
+      60,
+      180,
+      60
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "20": {
+    "name": "Stone Floor",
+    "walkable": true,
+    "color": [
+      50,
+      45,
+      40
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "21": {
+    "name": "Stone Wall",
+    "walkable": false,
+    "color": [
+      30,
+      28,
+      25
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "22": {
+    "name": "Stairs Up",
+    "walkable": true,
+    "color": [
+      80,
+      75,
+      60
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "23": {
+    "name": "Chest",
+    "walkable": true,
+    "color": [
+      50,
+      45,
+      40
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "24": {
+    "name": "Trap",
+    "walkable": true,
+    "color": [
+      50,
+      45,
+      40
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "25": {
+    "name": "Stairs Down",
+    "walkable": true,
+    "color": [
+      60,
+      50,
+      45
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "26": {
+    "name": "Door",
+    "walkable": true,
+    "color": [
+      120,
+      80,
+      40
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "27": {
+    "name": "Artifact",
+    "walkable": true,
+    "color": [
+      200,
+      180,
+      50
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "28": {
+    "name": "Portal",
+    "walkable": true,
+    "color": [
+      100,
+      200,
+      255
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "29": {
+    "name": "Locked Door",
+    "walkable": false,
+    "color": [
+      100,
+      60,
+      30
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "30": {
+    "name": "Machine",
+    "walkable": true,
+    "color": [
+      160,
+      80,
+      200
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "31": {
+    "name": "Key Slot",
+    "walkable": false,
+    "color": [
+      100,
+      60,
+      160
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "32": {
+    "name": "Puddle",
+    "walkable": true,
+    "color": [
+      30,
+      50,
+      70
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "33": {
+    "name": "Moss",
+    "walkable": true,
+    "color": [
+      25,
+      55,
+      22
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "34": {
+    "name": "Wall Torch",
+    "walkable": false,
+    "color": [
+      160,
+      120,
+      40
+    ],
+    "context": "dungeon",
+    "sprite": ""
+  },
+  "35": {
+    "name": "Altar",
+    "walkable": false,
+    "color": [
+      200,
+      160,
+      100
+    ],
+    "context": "town",
+    "sprite": ""
+  },
+  "36": {
+    "name": "Custom Circle",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "unique_tiles/seal_of_binding"
+  },
+  "37": {
+    "name": "Brick",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/brick_wall_red"
+  }
+}

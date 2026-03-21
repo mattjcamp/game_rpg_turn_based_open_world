@@ -300,6 +300,10 @@ class Game:
             {"name": "examine", "label": "Examine Screen"},
         ]
 
+        # Restore user-created / edited tile defs from disk so the
+        # rest of the game (town rendering etc.) sees them at startup.
+        self._feat_restore_tile_defs_from_disk()
+
         # Tile Gallery — 3-level folder hierarchy
         # Level 1: category folders, Level 2: sprites, Level 3: tag editor
         self._feat_gallery_list = []         # unique sprite entries (for saving)
@@ -2496,19 +2500,84 @@ class Game:
     # ── Tile Types editor ──────────────────────────────────────
     # ══════════════════════════════════════════════════════════
 
+    def _feat_restore_tile_defs_from_disk(self):
+        """Called once at startup to merge saved tile_defs.json into
+        the in-memory settings.TILE_DEFS and _TILE_CONTEXT so the rest
+        of the game (town rendering, map, etc.) sees user-created tiles."""
+        import json
+        from src import settings
+        try:
+            with open(self._feat_tiles_path(), "r") as f:
+                saved = json.load(f)
+        except (OSError, ValueError):
+            return  # no saved file yet — nothing to restore
+        for tid_str, entry in saved.items():
+            tid = int(tid_str)
+            color = entry.get("color", [128, 128, 128])
+            if isinstance(color, list):
+                color = tuple(color)
+            settings.TILE_DEFS[tid] = {
+                "name": entry.get("name", f"Tile {tid}"),
+                "walkable": entry.get("walkable", True),
+                "color": color,
+            }
+            ctx = entry.get("context")
+            if ctx:
+                self._TILE_CONTEXT[tid] = ctx
+
+    def _feat_tiles_path(self):
+        """Path to tile_defs.json."""
+        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "tile_defs.json")
+
     def _feat_load_tiles(self):
-        """Load tile types from settings.TILE_DEFS into the editor."""
+        """Load tile types from disk (tile_defs.json) merged with
+        hardcoded settings.TILE_DEFS into the editor."""
+        import json
         from src.settings import TILE_DEFS
+        from src import settings
+
+        # --- Load saved overrides / additions from JSON ----------------
+        saved = {}
+        try:
+            with open(self._feat_tiles_path(), "r") as f:
+                saved = json.load(f)          # {str(tile_id): {...}, ...}
+        except (OSError, ValueError):
+            saved = {}
+
+        # Apply saved data back into the in-memory TILE_DEFS and
+        # _TILE_CONTEXT so the rest of the game sees them too.
+        for tid_str, entry in saved.items():
+            tid = int(tid_str)
+            color = entry.get("color", [128, 128, 128])
+            if isinstance(color, list):
+                color = tuple(color)
+            settings.TILE_DEFS[tid] = {
+                "name": entry.get("name", f"Tile {tid}"),
+                "walkable": entry.get("walkable", True),
+                "color": color,
+            }
+            ctx = entry.get("context")
+            if ctx:
+                self._TILE_CONTEXT[tid] = ctx
+
+        # --- Build editor list from the (now-merged) TILE_DEFS --------
         tiles = []
-        for tile_id in sorted(TILE_DEFS.keys()):
-            tdef = TILE_DEFS[tile_id]
+        for tile_id in sorted(settings.TILE_DEFS.keys()):
+            tdef = settings.TILE_DEFS[tile_id]
             context = self._TILE_CONTEXT.get(tile_id, "overworld")
+            # Carry over saved sprite key if present
+            sprite_key = ""
+            s = saved.get(str(tile_id))
+            if s:
+                sprite_key = s.get("sprite", "")
             tiles.append({
                 "_tile_id": tile_id,
                 "name": tdef.get("name", f"Tile {tile_id}"),
                 "walkable": tdef.get("walkable", True),
                 "color": list(tdef.get("color", (128, 128, 128))),
                 "_context": context,
+                "_sprite": sprite_key,
             })
         self._feat_tile_list = tiles
         self._feat_tile_in_folder = False
@@ -2560,16 +2629,116 @@ class Game:
         self._feat_tile_in_folder = True
 
     def _feat_save_tiles(self):
-        """Write tile definitions back to settings.TILE_DEFS
-        (in-memory; these are code-defined constants)."""
+        """Write tile definitions back to settings.TILE_DEFS, update
+        the _TILE_CONTEXT map, persist to tile_defs.json, and update
+        the tile manifest for new / changed tiles."""
+        import json
         from src import settings
+
+        disk_data = {}  # what goes to tile_defs.json
+
         for tile in self._feat_tile_list:
             tid = tile["_tile_id"]
+            color = tile.get("color", [128, 128, 128])
+            if isinstance(color, list):
+                color = tuple(color)
             if tid in settings.TILE_DEFS:
                 settings.TILE_DEFS[tid]["name"] = tile["name"]
                 settings.TILE_DEFS[tid]["walkable"] = tile["walkable"]
-                settings.TILE_DEFS[tid]["color"] = tuple(tile["color"])
+                settings.TILE_DEFS[tid]["color"] = color
+            else:
+                # New tile — add to TILE_DEFS
+                settings.TILE_DEFS[tid] = {
+                    "name": tile["name"],
+                    "walkable": tile["walkable"],
+                    "color": color,
+                }
+            # Keep _TILE_CONTEXT in sync
+            ctx = tile.get("_context")
+            if ctx:
+                self._TILE_CONTEXT[tid] = ctx
+
+            # Build the JSON entry for this tile
+            disk_data[str(tid)] = {
+                "name": tile["name"],
+                "walkable": tile["walkable"],
+                "color": list(color) if isinstance(color, tuple) else color,
+                "context": tile.get("_context", "overworld"),
+                "sprite": tile.get("_sprite", ""),
+            }
+
+        # Write to data/tile_defs.json
+        try:
+            with open(self._feat_tiles_path(), "w") as f:
+                json.dump(disk_data, f, indent=2)
+        except OSError:
+            pass
+
+        # Persist sprite assignments to the tile manifest
+        self._feat_save_tile_sprites()
+        # Invalidate cached town brushes so new/changed tiles appear
+        self._feat_townlayout_brushes = None
         return True
+
+    def _feat_save_tile_sprites(self):
+        """Update tile_manifest.json with sprite ↔ tile_id bindings.
+
+        Before writing new assignments, clear any stale tile_id entries
+        so that each tile_id maps to exactly one manifest sprite.
+        """
+        import json, os
+        mpath = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "tile_manifest.json")
+        try:
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            return
+
+        # Build a set of tile_ids that have sprite assignments
+        assigned_tids = set()
+        for tile in self._feat_tile_list:
+            sprite_key = tile.get("_sprite", "")
+            if sprite_key and "/" in sprite_key:
+                assigned_tids.add(tile["_tile_id"])
+
+        # First pass: clear stale tile_id assignments for any tile_id
+        # that is about to be reassigned, so only one entry ends up
+        # owning each tile_id.
+        for cat in manifest:
+            if cat.startswith("_"):
+                continue
+            section = manifest.get(cat, {})
+            if not isinstance(section, dict):
+                continue
+            for _name, entry in section.items():
+                if isinstance(entry, dict) and entry.get("tile_id") in assigned_tids:
+                    del entry["tile_id"]
+
+        # Second pass: set the correct tile_id on the chosen sprite
+        for tile in self._feat_tile_list:
+            sprite_key = tile.get("_sprite", "")
+            tid = tile["_tile_id"]
+            if not sprite_key:
+                continue
+            parts = sprite_key.split("/", 1)
+            if len(parts) != 2:
+                continue
+            cat, name = parts
+            section = manifest.get(cat)
+            if isinstance(section, dict) and name in section:
+                entry = section[name]
+                if isinstance(entry, dict):
+                    entry["tile_id"] = tid
+        try:
+            with open(mpath, "w") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError:
+            pass
+        # Reload the renderer's manifest cache so sprite lookups pick up
+        # the new tile_id assignments immediately.
+        self.renderer.reload_sprites()
 
     def _feat_build_tile_fields(self, tile):
         """Build editable field list for a single tile type."""
@@ -2601,11 +2770,20 @@ class Game:
             self._feat_tile_buffer = \
                 self._feat_tile_fields[self._feat_tile_field][2]
 
+    def _feat_tile_real_index(self):
+        """Resolve the folder-relative cursor to a real _feat_tile_list index."""
+        if (self._feat_tile_in_folder
+                and self._feat_tile_folder_tiles
+                and self._feat_tile_cursor < len(self._feat_tile_folder_tiles)):
+            return self._feat_tile_folder_tiles[self._feat_tile_cursor]
+        return self._feat_tile_cursor
+
     def _feat_save_tile_fields(self):
         """Apply edited fields back to the tile dict."""
-        if self._feat_tile_cursor >= len(self._feat_tile_list):
+        real_idx = self._feat_tile_real_index()
+        if real_idx >= len(self._feat_tile_list):
             return
-        tile = self._feat_tile_list[self._feat_tile_cursor]
+        tile = self._feat_tile_list[real_idx]
         if self._feat_tile_fields:
             entry = self._feat_tile_fields[self._feat_tile_field]
             entry[2] = self._feat_tile_buffer
@@ -2656,10 +2834,28 @@ class Game:
         """Return choice options for a tile field."""
         if key == "_sprite":
             from src import data_registry as DR
-            # Combine sprites from all terrain-related categories
+            # Use sprites from the category matching the tile's context
+            context = None
+            if (self._feat_tile_folder_tiles
+                    and self._feat_tile_cursor < len(self._feat_tile_folder_tiles)):
+                ti = self._feat_tile_folder_tiles[self._feat_tile_cursor]
+                if ti < len(self._feat_tile_list):
+                    context = self._feat_tile_list[ti].get("_context")
+            if not context:
+                # Fallback: use the current folder name
+                if (self._feat_tile_folders
+                        and self._feat_tile_folder_cursor < len(
+                            self._feat_tile_folders)):
+                    context = self._feat_tile_folders[
+                        self._feat_tile_folder_cursor]["name"]
+            # Map context to gallery categories
+            if context in ("overworld", "town", "dungeon"):
+                cats = [context]
+            else:
+                cats = ["overworld", "town", "dungeon"]
             seen = set()
             result = []
-            for cat in ("overworld", "town", "dungeon"):
+            for cat in cats:
                 for s in DR.sprites_for_category(cat):
                     if s not in seen:
                         seen.add(s)
@@ -2670,14 +2866,25 @@ class Game:
         return []
 
     def _feat_add_tile(self):
-        """Add a new tile type with the next available ID."""
+        """Add a new tile type with the next available ID in the current folder."""
         used_ids = {t["_tile_id"] for t in self._feat_tile_list}
         new_id = max(used_ids) + 1 if used_ids else 100
+        # Determine context from the currently selected folder
+        context = "overworld"
+        if (self._feat_tile_folders
+                and self._feat_tile_folder_cursor < len(self._feat_tile_folders)):
+            context = self._feat_tile_folders[
+                self._feat_tile_folder_cursor]["name"]
+        # Don't add tiles to virtual folders (examine reuses overworld,
+        # battle uses procedural tiles).
+        if context in ("examine", "battle"):
+            context = "overworld"
         new_tile = {
             "_tile_id": new_id,
             "name": f"New Tile {new_id}",
             "walkable": True,
             "color": [128, 128, 128],
+            "_context": context,
         }
         self._feat_tile_list.append(new_tile)
         self._feat_tile_cursor = len(self._feat_tile_list) - 1
@@ -2686,12 +2893,14 @@ class Game:
         """Remove the currently selected tile type."""
         if not self._feat_tile_list:
             return
-        idx = self._feat_tile_cursor
-        if 0 <= idx < len(self._feat_tile_list):
-            self._feat_tile_list.pop(idx)
-            if self._feat_tile_cursor >= len(self._feat_tile_list):
-                self._feat_tile_cursor = max(
-                    0, len(self._feat_tile_list) - 1)
+        real_idx = self._feat_tile_real_index()
+        if 0 <= real_idx < len(self._feat_tile_list):
+            self._feat_tile_list.pop(real_idx)
+            # Keep the folder-relative cursor in bounds after removal
+            folder_len = len(self._feat_tile_folder_tiles) - 1 \
+                if self._feat_tile_in_folder else len(self._feat_tile_list)
+            if self._feat_tile_cursor >= folder_len:
+                self._feat_tile_cursor = max(0, folder_len - 1)
 
     # ══════════════════════════════════════════════════════════
     # ── Tile Gallery (read-only) ───────────────────────────────
@@ -2957,46 +3166,98 @@ class Game:
         self._feat_townlayout_brushes = None
 
     def _feat_get_townlayout_brushes(self):
-        """Build brush list from the Town category in the tile manifest."""
+        """Build brush list from the Tile Types (TILE_DEFS) for town context."""
         if self._feat_townlayout_brushes is not None:
             return self._feat_townlayout_brushes
         brushes = [
             {"name": "Eraser", "tile_id": None, "path": None},
         ]
-        # Pull all sprites tagged for 'town' usage from the manifest
+        # Collect town tile IDs from Tile Types definitions
+        from src.settings import TILE_DEFS
+        town_ids = sorted(
+            tid for tid, ctx in self._TILE_CONTEXT.items()
+            if ctx == "town"
+        )
+
+        # Load saved tile defs for authoritative sprite keys
+        saved_tile_defs = {}
+        try:
+            with open(self._feat_tiles_path(), "r") as f:
+                saved_tile_defs = json.load(f)
+        except (OSError, ValueError):
+            pass
+
+        # Load manifest for resolving sprite key → file path
+        manifest = {}
         try:
             mpath = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)),
                 "data", "tile_manifest.json")
             with open(mpath) as f:
                 manifest = json.load(f)
-            # Scan every category for sprites with 'town' in usable_in
-            seen_paths = set()
-            for cat in sorted(manifest.keys()):
+        except (OSError, ValueError):
+            pass
+
+        def _resolve_sprite_path(tid):
+            """Get the sprite asset path for a tile_id.
+
+            Priority: 1) saved _sprite key from tile_defs.json
+                      2) manifest tile_id reverse lookup (first match)
+            """
+            # Try the authoritative sprite key from tile_defs.json
+            saved = saved_tile_defs.get(str(tid), {})
+            sprite_key = saved.get("sprite", "")
+            if sprite_key and "/" in sprite_key:
+                cat, name = sprite_key.split("/", 1)
+                section = manifest.get(cat, {})
+                if isinstance(section, dict):
+                    entry = section.get(name, {})
+                    if isinstance(entry, dict) and "path" in entry:
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        return p
+            # Also check the in-memory tile list (for unsaved changes)
+            for tile in getattr(self, "_feat_tile_list", []):
+                if tile.get("_tile_id") == tid:
+                    sk = tile.get("_sprite", "")
+                    if sk and "/" in sk:
+                        cat, name = sk.split("/", 1)
+                        section = manifest.get(cat, {})
+                        if isinstance(section, dict):
+                            entry = section.get(name, {})
+                            if isinstance(entry, dict) and "path" in entry:
+                                p = entry["path"]
+                                if p.startswith("src/assets/"):
+                                    p = p[len("src/assets/"):]
+                                return p
+                    break
+            # Fallback: scan manifest for first entry with this tile_id
+            for cat in manifest:
                 if cat.startswith("_"):
                     continue
                 section = manifest.get(cat, {})
                 if not isinstance(section, dict):
                     continue
-                for name, entry in sorted(section.items()):
-                    if not (isinstance(entry, dict) and "path" in entry):
-                        continue
-                    usable = entry.get("usable_in", [cat])
-                    if "town" not in usable:
-                        continue
-                    p = entry["path"]
-                    if p in seen_paths:
-                        continue
-                    seen_paths.add(p)
-                    if p.startswith("src/assets/"):
-                        p = p[len("src/assets/"):]
-                    brushes.append({
-                        "name": name.replace("_", " ").title(),
-                        "tile_id": entry.get("tile_id"),
-                        "path": p,
-                    })
-        except (OSError, ValueError):
-            pass
+                for _name, entry in section.items():
+                    if (isinstance(entry, dict)
+                            and entry.get("tile_id") == tid
+                            and "path" in entry):
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        return p
+            return None
+
+        for tid in town_ids:
+            td = TILE_DEFS.get(tid)
+            if not td:
+                continue
+            brushes.append({
+                "name": td.get("name", f"Tile {tid}"),
+                "tile_id": tid,
+                "path": _resolve_sprite_path(tid),
+            })
 
         # ── Append town features as composite brushes (only for layouts) ──
         sub = self._feat_town_active_sub or "layouts"
@@ -6287,6 +6548,8 @@ class Game:
             if event.key == pygame.K_UP:
                 entry[2] = buf
                 self._feat_dirty = True
+                if ed == "tiles":
+                    ctx["save_fields"]()
                 idx = (field_idx - 1) % n
                 idx = self._feat_next_editable_generic(fields, idx)
                 ctx["set_field_idx"](idx)
@@ -6295,6 +6558,8 @@ class Game:
             elif event.key == pygame.K_DOWN:
                 entry[2] = buf
                 self._feat_dirty = True
+                if ed == "tiles":
+                    ctx["save_fields"]()
                 idx = (field_idx + 1) % n
                 idx = self._feat_next_editable_generic(fields, idx)
                 ctx["set_field_idx"](idx)
@@ -6313,7 +6578,12 @@ class Game:
                         else:
                             ci = (ci - 1) % len(choices)
                         ctx["set_buffer"](choices[ci])
+                        entry[2] = choices[ci]
                         self._feat_dirty = True
+                        # Tile-specific: live-sync field values to the
+                        # tile dict so the list preview updates immediately.
+                        if ed == "tiles":
+                            ctx["save_fields"]()
                         # Spell-specific: casting_type → classes sync
                         if ed == "spells" and entry[1] == "casting_type":
                             new_cls = ", ".join(
@@ -6775,10 +7045,12 @@ class Game:
                     self._feat_level = 3
             elif self._is_new_shortcut(event):
                 self._feat_add_tile()
+                self._feat_save_tiles()
                 self._feat_rebuild_tile_folders()
                 self._feat_tile_enter_folder()
             elif self._is_delete_shortcut(event):
                 self._feat_remove_tile()
+                self._feat_save_tiles()
                 self._feat_rebuild_tile_folders()
                 self._feat_tile_enter_folder()
             return
@@ -6809,6 +7081,13 @@ class Game:
                 if n > 0:
                     self._feat_tile_enter_folder()
                     self._feat_level = 2
+            elif self._is_new_shortcut(event):
+                # Create a new tile in the selected folder and enter it
+                self._feat_add_tile()
+                self._feat_save_tiles()
+                self._feat_rebuild_tile_folders()
+                self._feat_tile_enter_folder()
+                self._feat_level = 2
             return
 
         # ── Level 1: list browser ──
@@ -7015,6 +7294,8 @@ class Game:
             elif cat["label"] == "Town Layouts":
                 self._feat_active_editor = "townlayouts"
                 self._feat_load_townlayouts()
+                # Force brush palette to rebuild from current TILE_DEFS
+                self._feat_townlayout_brushes = None
                 self._feat_level = 1
 
     def _feat_editor_ctx(self):

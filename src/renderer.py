@@ -7730,13 +7730,10 @@ class Renderer(CombatEffectRendererMixin):
                                 pygame.Rect(mx - 1, my - 1, mw + 2, mh + 2), 1)
                             text_x = icon_x + 28
                         elif b.get("tile_id") is not None:
-                            # Colored square for base tiles
-                            TCOL = {10: (120, 100, 80),
-                                    11: (70, 55, 40),
-                                    12: (110, 80, 50),
-                                    13: (100, 70, 35),
-                                    14: (50, 150, 50)}
-                            tc = TCOL.get(b["tile_id"], (80, 80, 80))
+                            # Colored square for tiles without sprites
+                            from src.settings import TILE_DEFS as _TD
+                            _tdef = _TD.get(b["tile_id"], {})
+                            tc = _tdef.get("color", (80, 80, 80))
                             pygame.draw.rect(
                                 self.screen, tc,
                                 pygame.Rect(icon_x, by + 4, 22, 22))
@@ -9021,14 +9018,10 @@ class Renderer(CombatEffectRendererMixin):
         gx = rx + (rw - grid_w) // 2
         gy = ry
 
-        # Town tile colors
-        TILE_COLORS = {
-            10: (120, 100, 80),   # Floor
-            11: (70, 55, 40),     # Wall
-            12: (110, 80, 50),    # Counter
-            13: (100, 70, 35),    # Door
-            14: (50, 150, 50),    # Exit
-        }
+        # Town tile colors — pull from TILE_DEFS for full coverage
+        from src.settings import TILE_DEFS
+        TILE_COLORS = {tid: tdef.get("color", (80, 80, 80))
+                       for tid, tdef in TILE_DEFS.items()}
 
         tiles = layout.get("tiles", {})
 
@@ -9220,9 +9213,16 @@ class Renderer(CombatEffectRendererMixin):
                     return s
             return None
 
-        # Tile type — look up by tile_id via manifest
+        # Tile type — prefer the _sprite key (category/name) set by the
+        # editor, then fall back to manifest tile_id lookup.
         tile_id = item.get("_tile_id")
         if tile_id is not None:
+            sprite_key = item.get("_sprite", "")
+            if sprite_key and "/" in sprite_key:
+                cat, name = sprite_key.split("/", 1)
+                sprite = self._manifest.get_sprite_by_name(cat, name, size)
+                if sprite:
+                    return sprite
             sprite = self._manifest.get_sprite(tile_id, size)
             if sprite:
                 return sprite
