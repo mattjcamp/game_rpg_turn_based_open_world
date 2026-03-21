@@ -8,7 +8,7 @@
       34
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/grass"
   },
   "1": {
     "name": "Water",
@@ -19,7 +19,7 @@
       180
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/water"
   },
   "2": {
     "name": "Forest",
@@ -30,7 +30,7 @@
       0
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/forest"
   },
   "3": {
     "name": "Mountain",
@@ -41,7 +41,7 @@
       130
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/mountain"
   },
   "4": {
     "name": "Town",
@@ -52,7 +52,7 @@
       80
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/town"
   },
   "5": {
     "name": "Dungeon",
@@ -63,7 +63,7 @@
       80
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/dungeon"
   },
   "6": {
     "name": "Path",
@@ -74,7 +74,7 @@
       100
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/path"
   },
   "7": {
     "name": "Sand",
@@ -85,7 +85,7 @@
       130
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/sand"
   },
   "8": {
     "name": "Bridge",
@@ -96,7 +96,7 @@
       50
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/bridge"
   },
   "9": {
     "name": "Cleared Dungeon",
@@ -107,7 +107,7 @@
       60
     ],
     "context": "overworld",
-    "sprite": ""
+    "sprite": "overworld/dungeon_cleared"
   },
   "10": {
     "name": "Floor",
@@ -118,7 +118,7 @@
       100
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/floor"
   },
   "11": {
     "name": "Wall",
@@ -129,7 +129,7 @@
       50
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/wall"
   },
   "12": {
     "name": "Counter",
@@ -140,7 +140,7 @@
       60
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/counter"
   },
   "13": {
     "name": "Door",
@@ -173,7 +173,7 @@
       40
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/dfloor"
   },
   "21": {
     "name": "Stone Wall",
@@ -184,7 +184,7 @@
       25
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/dwall"
   },
   "22": {
     "name": "Stairs Up",
@@ -195,7 +195,7 @@
       60
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/stairs"
   },
   "23": {
     "name": "Chest",
@@ -206,7 +206,7 @@
       40
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/chest"
   },
   "24": {
     "name": "Trap",
@@ -217,7 +217,7 @@
       40
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/trap"
   },
   "25": {
     "name": "Stairs Down",
@@ -228,7 +228,7 @@
       45
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/stairs_down"
   },
   "26": {
     "name": "Door",
@@ -239,7 +239,7 @@
       40
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/ddoor"
   },
   "27": {
     "name": "Artifact",
@@ -250,7 +250,7 @@
       50
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/artifact"
   },
   "28": {
     "name": "Portal",
@@ -261,7 +261,7 @@
       255
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/portal"
   },
   "29": {
     "name": "Locked Door",
@@ -272,7 +272,7 @@
       30
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/locked_door"
   },
   "30": {
     "name": "Machine",
@@ -283,7 +283,7 @@
       200
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/machine"
   },
   "31": {
     "name": "Key Slot",
@@ -294,7 +294,7 @@
       160
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/keyslot"
   },
   "32": {
     "name": "Puddle",
@@ -305,7 +305,7 @@
       70
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/puddle"
   },
   "33": {
     "name": "Moss",
@@ -316,7 +316,7 @@
       22
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/moss"
   },
   "34": {
     "name": "Wall Torch",
@@ -327,7 +327,7 @@
       40
     ],
     "context": "dungeon",
-    "sprite": ""
+    "sprite": "dungeon/wall_torch"
   },
   "35": {
     "name": "Altar",
@@ -338,7 +338,7 @@
       100
     ],
     "context": "town",
-    "sprite": ""
+    "sprite": "town/altar"
   },
   "36": {
     "name": "Custom Circle",
@@ -361,5 +361,16 @@
     ],
     "context": "town",
     "sprite": "town/brick_wall_red"
+  },
+  "38": {
+    "name": "Counter Copy",
+    "walkable": false,
+    "color": [
+      140,
+      100,
+      60
+    ],
+    "context": "town",
+    "sprite": "town/counter"
   }
 }

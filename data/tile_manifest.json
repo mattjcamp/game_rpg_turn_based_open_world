@@ -4,73 +4,73 @@
   "overworld": {
     "grass": {
       "path": "src/assets/game/terrain/grass.png",
-      "tile_id": 0,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 0
     },
     "water": {
       "path": "src/assets/game/terrain/water.png",
-      "tile_id": 1,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 1
     },
     "forest": {
       "path": "src/assets/game/terrain/forest.png",
-      "tile_id": 2,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 2
     },
     "mountain": {
       "path": "src/assets/game/terrain/mountain.png",
-      "tile_id": 3,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 3
     },
     "town": {
       "path": "src/assets/game/terrain/town.png",
-      "tile_id": 4,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 4
     },
     "dungeon": {
       "path": "src/assets/game/terrain/dungeon.png",
-      "tile_id": 5,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 5
     },
     "path": {
       "path": "src/assets/game/terrain/path.png",
-      "tile_id": 6,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 6
     },
     "sand": {
       "path": "src/assets/game/terrain/sand.png",
-      "tile_id": 7,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 7
     },
     "bridge": {
       "path": "src/assets/game/terrain/bridge.png",
-      "tile_id": 8,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 8
     },
     "dungeon_cleared": {
       "path": "src/assets/game/terrain/dungeon_cleared.png",
-      "tile_id": 9,
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 9
     },
     "party_marker": {
       "path": "src/assets/game/terrain/party_marker.png",
@@ -160,24 +160,24 @@
   "town": {
     "floor": {
       "path": "src/assets/game/terrain/town_floor.png",
-      "tile_id": 10,
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 10
     },
     "wall": {
       "path": "src/assets/game/terrain/town_wall.png",
-      "tile_id": 11,
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 11
     },
     "counter": {
       "path": "src/assets/game/terrain/town_counter.png",
-      "tile_id": 12,
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 12
     },
     "door": {
       "path": "src/assets/game/terrain/town_door.png",
@@ -193,24 +193,24 @@
     },
     "altar": {
       "path": "src/assets/game/dungeon/altar.png",
-      "tile_id": 35,
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 35
     },
     "machine": {
       "path": "src/assets/game/dungeon/machine.png",
-      "tile_id": 30,
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 30
     },
     "keyslot": {
       "path": "src/assets/game/dungeon/keyslot.png",
-      "tile_id": 31,
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 31
     },
     "brick_wall_brown": {
       "path": "src/assets/unassigned/brick_wall_brown.png",
@@ -229,101 +229,100 @@
       "path": "src/assets/game/terrain/floor_gray.png",
       "usable_in": [
         "town"
-      ],
-      "tile_id": 10
+      ]
     }
   },
   "dungeon": {
     "dfloor": {
       "path": "src/assets/game/dungeon/stone_floor.png",
-      "tile_id": 20,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 20
     },
     "dwall": {
       "path": "src/assets/game/dungeon/stone_wall.png",
-      "tile_id": 21,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 21
     },
     "stairs": {
       "path": "src/assets/game/dungeon/stairs_up.png",
-      "tile_id": 22,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 22
     },
     "chest": {
       "path": "src/assets/game/dungeon/chest_tile.png",
-      "tile_id": 23,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 23
     },
     "trap": {
       "path": "src/assets/game/dungeon/trap.png",
-      "tile_id": 24,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 24
     },
     "stairs_down": {
       "path": "src/assets/game/dungeon/stairs_down.png",
-      "tile_id": 25,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 25
     },
     "ddoor": {
       "path": "src/assets/game/dungeon/dungeon_door.png",
-      "tile_id": 26,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 26
     },
     "artifact": {
       "path": "src/assets/game/dungeon/artifact.png",
-      "tile_id": 27,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 27
     },
     "portal": {
       "path": "src/assets/game/dungeon/portal.png",
-      "tile_id": 28,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 28
     },
     "locked_door": {
       "path": "src/assets/game/dungeon/locked_door_new.png",
-      "tile_id": 29,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 29
     },
     "puddle": {
       "path": "src/assets/game/dungeon/puddle.png",
-      "tile_id": 32,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 32
     },
     "moss": {
       "path": "src/assets/game/dungeon/moss.png",
-      "tile_id": 33,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 33
     },
     "wall_torch": {
       "path": "src/assets/game/dungeon/wall_torch.png",
-      "tile_id": 34,
       "usable_in": [
         "dungeon"
-      ]
+      ],
+      "tile_id": 34
     }
   },
   "people": {

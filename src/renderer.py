@@ -9628,8 +9628,8 @@ class Renderer(CombatEffectRendererMixin):
 
         # Footer
         self._u3_text(
-            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Delete  [Esc] Back",
-            SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Duplicate  [Ctrl+D] Delete  [Esc] Back",
+            SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
             self._U3_HINT, fs)
 
     def draw_module_screen(self, modules, cursor, active_path,

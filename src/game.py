@@ -2566,11 +2566,15 @@ class Game:
         for tile_id in sorted(settings.TILE_DEFS.keys()):
             tdef = settings.TILE_DEFS[tile_id]
             context = self._TILE_CONTEXT.get(tile_id, "overworld")
-            # Carry over saved sprite key if present
+            # Carry over saved sprite key if present; for tiles that
+            # were never edited, resolve from the manifest so every
+            # tile carries an explicit _sprite for reliable rendering.
             sprite_key = ""
             s = saved.get(str(tile_id))
             if s:
                 sprite_key = s.get("sprite", "")
+            if not sprite_key:
+                sprite_key = self._feat_tile_sprite_key(tile_id) or ""
             tiles.append({
                 "_tile_id": tile_id,
                 "name": tdef.get("name", f"Tile {tile_id}"),
@@ -2696,12 +2700,18 @@ class Game:
         except (OSError, ValueError):
             return
 
-        # Build a set of tile_ids that have sprite assignments
+        # Build sprite_key → lowest tile_id mapping.  When multiple
+        # tiles share the same sprite, the manifest tile_id goes to the
+        # lowest (original) tile_id so existing lookups keep working.
+        sprite_to_tid = {}   # "cat/name" → lowest tile_id
         assigned_tids = set()
         for tile in self._feat_tile_list:
             sprite_key = tile.get("_sprite", "")
             if sprite_key and "/" in sprite_key:
-                assigned_tids.add(tile["_tile_id"])
+                tid = tile["_tile_id"]
+                assigned_tids.add(tid)
+                if sprite_key not in sprite_to_tid or tid < sprite_to_tid[sprite_key]:
+                    sprite_to_tid[sprite_key] = tid
 
         # First pass: clear stale tile_id assignments for any tile_id
         # that is about to be reassigned, so only one entry ends up
@@ -2716,12 +2726,8 @@ class Game:
                 if isinstance(entry, dict) and entry.get("tile_id") in assigned_tids:
                     del entry["tile_id"]
 
-        # Second pass: set the correct tile_id on the chosen sprite
-        for tile in self._feat_tile_list:
-            sprite_key = tile.get("_sprite", "")
-            tid = tile["_tile_id"]
-            if not sprite_key:
-                continue
+        # Second pass: assign the lowest tile_id per sprite key
+        for sprite_key, tid in sprite_to_tid.items():
             parts = sprite_key.split("/", 1)
             if len(parts) != 2:
                 continue
@@ -2887,6 +2893,32 @@ class Game:
             "_context": context,
         }
         self._feat_tile_list.append(new_tile)
+        self._feat_tile_cursor = len(self._feat_tile_list) - 1
+
+    def _feat_duplicate_tile(self):
+        """Duplicate the currently selected tile type with a new ID."""
+        if not self._feat_tile_list:
+            return
+        real_idx = self._feat_tile_real_index()
+        if real_idx < 0 or real_idx >= len(self._feat_tile_list):
+            return
+        src = self._feat_tile_list[real_idx]
+        used_ids = {t["_tile_id"] for t in self._feat_tile_list}
+        new_id = max(used_ids) + 1 if used_ids else 100
+        # Resolve sprite: use explicit _sprite if set, otherwise look up
+        # from the manifest via the source tile's tile_id.
+        sprite_key = src.get("_sprite", "")
+        if not sprite_key:
+            sprite_key = self._feat_tile_sprite_key(src.get("_tile_id"))
+        dup = {
+            "_tile_id": new_id,
+            "name": f"{src['name']} Copy",
+            "walkable": src.get("walkable", True),
+            "color": list(src.get("color", [128, 128, 128])),
+            "_context": src.get("_context", "overworld"),
+            "_sprite": sprite_key or "",
+        }
+        self._feat_tile_list.append(dup)
         self._feat_tile_cursor = len(self._feat_tile_list) - 1
 
     def _feat_remove_tile(self):
@@ -7043,8 +7075,9 @@ class Game:
                     self._feat_tile_editing = True
                     self._feat_dirty = False
                     self._feat_level = 3
-            elif self._is_new_shortcut(event):
-                self._feat_add_tile()
+            elif self._is_new_shortcut(event) or self._is_copy_shortcut(event):
+                # Ctrl+N / Ctrl+C both duplicate the selected tile
+                self._feat_duplicate_tile()
                 self._feat_save_tiles()
                 self._feat_rebuild_tile_folders()
                 self._feat_tile_enter_folder()
