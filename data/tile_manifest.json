@@ -225,6 +225,13 @@
       "usable_in": [
         "town"
       ]
+    },
+    "floor_gray": {
+      "path": "src/assets/game/terrain/floor_gray.png",
+      "usable_in": [
+        "town"
+      ],
+      "tile_id": 10
     }
   },
   "dungeon": {

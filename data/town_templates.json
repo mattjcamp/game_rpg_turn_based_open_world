@@ -209,6 +209,41 @@
           "tile_id": 13,
           "path": "game/terrain/town_door.png",
           "name": "Door"
+        },
+        "2,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         }
       }
     }

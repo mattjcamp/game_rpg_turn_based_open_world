@@ -3238,8 +3238,10 @@ class Game:
                 "path": new_rel_path,
                 "usable_in": list(entry.get("usable_in", [cat])),
             }
-            if entry.get("tile_id") is not None:
-                section[new_name]["tile_id"] = entry["tile_id"]
+            # NOTE: Do NOT copy tile_id from original.
+            # Duplicates must have no tile_id so the renderer loads
+            # their own sprite file instead of sharing the original's
+            # cached sprite.
 
         try:
             with open(mpath, "w") as f:

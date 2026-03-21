@@ -8861,21 +8861,27 @@ class Renderer(CombatEffectRendererMixin):
                     size // 2, size // 2, name, size - 8)
                 self.screen = old2
                 return icon_surf
-            elif category in ("overworld", "town") and \
-                    tile_id is not None:
-                # Use the live sprite from the renderer cache —
-                # this is exactly what the game draws on screen,
-                # so edits are always in sync.
-                sprite = self._tile_sprites.get(tile_id)
-                if sprite:
-                    self.screen = old_screen
-                    if size != ts:
-                        return pygame.transform.scale(
-                            sprite.copy(), (size, size))
-                    return sprite.copy()
-                # Fallback to procedural
-                self._u3_draw_overworld_tile(
-                    tile_id, 0, 0, ts, 5, 5)
+            elif category in ("overworld", "town"):
+                # Always use the raw manifest sprite (the actual PNG
+                # on disk) so the gallery preview matches what the
+                # pixel editor shows and edits.
+                self.screen = old_screen
+                raw = self._manifest.get_sprite_by_name(
+                    category, name, size)
+                if raw:
+                    return raw
+                # Fallback: try the renderer tile cache
+                if tile_id is not None:
+                    sprite = self._tile_sprites.get(tile_id)
+                    if sprite:
+                        if size != ts:
+                            return pygame.transform.scale(
+                                sprite.copy(), (size, size))
+                        return sprite.copy()
+                    # Last resort: procedural
+                    self.screen = surf
+                    self._u3_draw_overworld_tile(
+                        tile_id, 0, 0, ts, 5, 5)
             elif category == "dungeon" and tile_id is not None:
                 palette = self._get_dungeon_palette(0)
                 self._u3_draw_dungeon_tile(
