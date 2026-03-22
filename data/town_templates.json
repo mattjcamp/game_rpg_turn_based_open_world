@@ -304,11 +304,6 @@
           "path": "game/terrain/town_wall.png",
           "name": "Wall"
         },
-        "4,6": {
-          "tile_id": 13,
-          "path": "game/terrain/town_door.png",
-          "name": "Door"
-        },
         "2,4": {
           "tile_id": 12,
           "path": "game/terrain/town_counter.png",
@@ -358,6 +353,12 @@
           "tile_id": 10,
           "path": "game/terrain/town_floor.png",
           "name": "Floor"
+        },
+        "4,6": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door",
+          "to_town": true
         }
       }
     }

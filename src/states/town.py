@@ -606,6 +606,14 @@ class TownState(InventoryMixin, BaseState):
     def _check_tile_events(self):
         """Check if the party stepped on a special tile."""
         party = self.game.party
+
+        # If inside an interior, check for "to_town" exit positions
+        if getattr(self, "_in_interior", False):
+            exit_positions = getattr(self, "_interior_exit_positions", set())
+            if (party.col, party.row) in exit_positions:
+                self._exit_interior()
+                return
+
         tile_id = self.town_data.tile_map.get_tile(
             party.col, party.row
         )
@@ -676,18 +684,30 @@ class TownState(InventoryMixin, BaseState):
         self.town_data.npcs = []  # interiors have no NPCs (for now)
         self.town_data.interior_links = {}
 
-        # Place party at the exit tile (or center if none found)
+        # Collect "to_town" exit positions for runtime exit detection
+        self._interior_exit_positions = set()
         entry_placed = False
         for pos_key, td in interior.get("tiles", {}).items():
-            if td.get("tile_id") == TILE_EXIT:
+            if td.get("to_town"):
                 parts = pos_key.split(",")
-                self.game.party.col = int(parts[0])
-                self.game.party.row = int(parts[1])
-                entry_placed = True
-                break
+                c, r = int(parts[0]), int(parts[1])
+                self._interior_exit_positions.add((c, r))
+                if not entry_placed:
+                    self.game.party.col = c
+                    self.game.party.row = r
+                    entry_placed = True
         if not entry_placed:
-            self.game.party.col = iw // 2
-            self.game.party.row = ih // 2
+            # Fallback: look for TILE_EXIT, then center
+            for pos_key, td in interior.get("tiles", {}).items():
+                if td.get("tile_id") == TILE_EXIT:
+                    parts = pos_key.split(",")
+                    self.game.party.col = int(parts[0])
+                    self.game.party.row = int(parts[1])
+                    entry_placed = True
+                    break
+            if not entry_placed:
+                self.game.party.col = iw // 2
+                self.game.party.row = ih // 2
 
         # Update camera
         self.game.camera.map_width = iw
@@ -1662,7 +1682,9 @@ class TownState(InventoryMixin, BaseState):
         self.game.camera.map_height = self.town_data.tile_map.height
         self.game.camera.update(self.game.party.col, self.game.party.row)
         self._in_interior = False
-        self.show_message("Back outside.", 1000)
+        self.show_message(
+            f"Leaving {getattr(self, '_interior_name', 'building')}...",
+            1000)
 
     def update(self, dt):
         """Update timers."""

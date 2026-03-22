@@ -7776,10 +7776,17 @@ class Renderer(CombatEffectRendererMixin):
                             interior_pick_cursor,
                             interior_pick_scroll)
 
-                    # Footer
+                    # Footer — context-sensitive hint
+                    if town_active_sub == "interiors":
+                        footer_txt = (
+                            "[Arrows/WASD] Move  [Enter] Paint  "
+                            "[I] Back to Town  [Tab] Brush  [Esc] Back")
+                    else:
+                        footer_txt = (
+                            "[Arrows/WASD] Move  [Enter] Paint  "
+                            "[I] Link Interior  [Tab] Brush  [Esc] Back")
                     self._u3_text(
-                        "[Arrows/WASD] Move  [Enter] Paint  "
-                        "[I] Link Interior  [Tab] Brush  [Esc] Back",
+                        footer_txt,
                         SCREEN_WIDTH // 2 - 240,
                         SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
@@ -9078,22 +9085,34 @@ class Renderer(CombatEffectRendererMixin):
                 pygame.draw.rect(self.screen, (40, 35, 30),
                                  pygame.Rect(px, py, ts, ts), 1)
 
-                # Interior-link indicator: cyan border + small "I" badge
+                # Interior-link / to_town indicator
                 if pos_key in tiles:
                     td = tiles[pos_key]
-                    if td.get("interior"):
-                        pygame.draw.rect(self.screen, (80, 220, 255),
+                    badge_char = None
+                    badge_border = None
+                    badge_bg = None
+                    if td.get("to_town"):
+                        # Green border + "T" badge for exit-to-town
+                        badge_border = (60, 220, 80)
+                        badge_bg = (0, 160, 40)
+                        badge_char = "T"
+                    elif td.get("interior"):
+                        # Cyan border + "I" badge for interior link
+                        badge_border = (80, 220, 255)
+                        badge_bg = (0, 140, 200)
+                        badge_char = "I"
+                    if badge_char:
+                        pygame.draw.rect(self.screen, badge_border,
                                          pygame.Rect(px, py, ts, ts), 2)
-                        # Small "I" badge in the top-right corner
                         badge_sz = max(ts // 3, 6)
                         bx = px + ts - badge_sz - 1
-                        by = py + 1
-                        pygame.draw.rect(self.screen, (0, 140, 200),
-                                         pygame.Rect(bx, by, badge_sz, badge_sz))
+                        by_ = py + 1
+                        pygame.draw.rect(self.screen, badge_bg,
+                                         pygame.Rect(bx, by_, badge_sz, badge_sz))
                         if badge_sz >= 8:
                             tiny = self.font_tiny if hasattr(self, 'font_tiny') else self.font_small
-                            isf = tiny.render("I", True, (255, 255, 255))
-                            self.screen.blit(isf, (bx + 1, by))
+                            isf = tiny.render(badge_char, True, (255, 255, 255))
+                            self.screen.blit(isf, (bx + 1, by_))
 
         # Draw cursor
         if cx >= 0 and cy >= 0:

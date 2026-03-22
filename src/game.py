@@ -3574,28 +3574,43 @@ class Game:
             else:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx + 1) % n
         elif event.key == pygame.K_i:
-            # Open interior-link picker for the tile under cursor
             pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
             if pos_key in layout["tiles"]:
-                interiors = self._feat_town_lists.get("interiors", [])
-                # Build picker list: "(none)" + all interior names
-                self._feat_interior_picking = True
-                self._feat_interior_pick_cursor = 0
-                self._feat_interior_pick_scroll = 0
-                # Pre-select the current link if one exists
-                current = layout["tiles"][pos_key].get("interior", "")
-                if current:
-                    for i, intr in enumerate(interiors):
-                        if intr["name"] == current:
-                            self._feat_interior_pick_cursor = i + 1  # +1 for (none)
-                            break
+                sub = self._feat_town_active_sub or "layouts"
+                if sub == "interiors":
+                    # Toggle "to_town" on this tile (entry/exit point)
+                    td = layout["tiles"][pos_key]
+                    if td.get("to_town"):
+                        del td["to_town"]
+                    else:
+                        td["to_town"] = True
+                    self._feat_dirty = True
+                else:
+                    # Open interior-link picker for layouts
+                    interiors = self._feat_town_lists.get("interiors", [])
+                    self._feat_interior_picking = True
+                    self._feat_interior_pick_cursor = 0
+                    self._feat_interior_pick_scroll = 0
+                    current = layout["tiles"][pos_key].get("interior", "")
+                    if current:
+                        for i, intr in enumerate(interiors):
+                            if intr["name"] == current:
+                                self._feat_interior_pick_cursor = i + 1
+                                break
         elif event.key == pygame.K_x:
-            # Quick-remove interior link from tile under cursor
+            # Quick-remove link from tile under cursor
             pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
             td = layout["tiles"].get(pos_key)
-            if td and "interior" in td:
-                del td["interior"]
-                self._feat_dirty = True
+            if td:
+                sub = self._feat_town_active_sub or "layouts"
+                if sub == "interiors":
+                    if "to_town" in td:
+                        del td["to_town"]
+                        self._feat_dirty = True
+                else:
+                    if "interior" in td:
+                        del td["interior"]
+                        self._feat_dirty = True
 
     def _feat_handle_interior_picker_input(self, event):
         """Handle input for the interior-link picker overlay."""
