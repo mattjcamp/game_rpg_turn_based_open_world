@@ -920,13 +920,31 @@ class Game:
             else:
                 place_machine = False
             tc = town_configs.get(tid, {})
-            td = generate_town(tname, seed=town_seed,
-                               layout_index=town_ordinal,
-                               has_key_dungeons=bool(self.key_dungeons),
-                               innkeeper_quests=inn_quests,
-                               gnome_machine=place_machine,
-                               keys_needed=gnome_keys_needed,
-                               town_config=tc)
+            custom_layout = tc.get("layout", "")
+            if custom_layout:
+                # Use a player-created layout from town_templates.json
+                td = self._build_town_from_layout(
+                    custom_layout, tname,
+                    town_style=tc.get("style", "medieval"))
+                if td is None:
+                    # Layout not found — fall back to procedural
+                    td = generate_town(
+                        tname, seed=town_seed,
+                        layout_index=town_ordinal,
+                        has_key_dungeons=bool(self.key_dungeons),
+                        innkeeper_quests=inn_quests,
+                        gnome_machine=place_machine,
+                        keys_needed=gnome_keys_needed,
+                        town_config=tc)
+            else:
+                td = generate_town(
+                    tname, seed=town_seed,
+                    layout_index=town_ordinal,
+                    has_key_dungeons=bool(self.key_dungeons),
+                    innkeeper_quests=inn_quests,
+                    gnome_machine=place_machine,
+                    keys_needed=gnome_keys_needed,
+                    town_config=tc)
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:
@@ -3166,6 +3184,69 @@ class Game:
         except OSError:
             pass
 
+    def _build_town_from_layout(self, layout_name, town_name,
+                                 town_style="medieval"):
+        """Build a TownData from a custom layout in town_templates.json.
+
+        Searches the loaded layouts list for *layout_name*, constructs a
+        TileMap from its tile grid, extracts interior links, and finds the
+        exit tile to set the entry position.
+
+        Returns a TownData, or *None* if the layout isn't found.
+        """
+        from src.tile_map import TileMap
+        from src.town_generator import TownData
+
+        # Ensure layouts are loaded from disk (they may not be if the
+        # town editor hasn't been opened yet this session).
+        layouts = self._feat_town_lists.get("layouts", [])
+        if not layouts:
+            self._feat_load_townlayouts()
+            layouts = self._feat_town_lists.get("layouts", [])
+        layout = None
+        for l in layouts:
+            if l["name"] == layout_name:
+                layout = l
+                break
+        if layout is None:
+            return None
+
+        w = layout.get("width", 20)
+        h = layout.get("height", 20)
+        tiles_dict = layout.get("tiles", {})
+
+        # Build tile map — default to Grass (0) for unpainted cells
+        from src.settings import TILE_GRASS, TILE_EXIT
+        tm = TileMap(w, h, default_tile=TILE_GRASS)
+        interior_links = {}
+        entry_col, entry_row = 0, h - 1  # fallback
+
+        for key, td in tiles_dict.items():
+            # Keys are "col,row"
+            try:
+                parts = key.split(",")
+                col, row = int(parts[0]), int(parts[1])
+            except (ValueError, IndexError):
+                continue
+            tile_id = td.get("tile_id", 10)
+            tm.set_tile(col, row, tile_id)
+            # Check for interior link
+            if td.get("interior"):
+                interior_links[(col, row)] = td["interior"]
+            # Check for exit tile to set entry position
+            if tile_id == TILE_EXIT:
+                entry_col, entry_row = col, row
+
+        return TownData(
+            tile_map=tm,
+            npcs=[],
+            name=town_name,
+            entry_col=entry_col,
+            entry_row=entry_row,
+            town_style=town_style,
+            interior_links=interior_links,
+        )
+
     def _feat_add_townlayout(self):
         """Add a new empty item to the active sub-editor."""
         sub = self._feat_town_active_sub or "layouts"
@@ -4147,11 +4228,16 @@ class Game:
                     TOWN_STYLE_KEYS.index(tc_style)]
             except (ValueError, IndexError):
                 style_display = "Medieval"
+            # Resolve custom layout display name
+            tc_layout = tc.get("layout", "")
+            layout_display = tc_layout if tc_layout else "Procedural"
             # Build fields
             fields = [
                 ["Name", f"town_{i}_name", tname, "text", True],
                 ["Description", f"town_{i}_desc",
                  town.get("description", ""), "text", True],
+                ["Layout", f"town_{i}_layout", layout_display,
+                 "choice", True],
                 ["Size", f"town_{i}_size", size_display, "choice", True],
                 ["Style", f"town_{i}_style", style_display, "choice", True],
             ]
@@ -5914,6 +6000,13 @@ class Game:
             return ["Yes", "No"]
         elif key == "innkeeper_quests":
             return ["Yes", "No"]
+        elif key.endswith("_layout") and key.startswith("town_"):
+            # "Procedural" + all layout names from town_templates.json
+            layouts = self._feat_town_lists.get("layouts", [])
+            if not layouts:
+                self._feat_load_townlayouts()
+                layouts = self._feat_town_lists.get("layouts", [])
+            return ["Procedural"] + [l["name"] for l in layouts]
         elif key.endswith("_size") and key.startswith("town_"):
             from src.module_loader import TOWN_SIZE_NAMES
             return TOWN_SIZE_NAMES
@@ -6206,6 +6299,12 @@ class Game:
                         tc["style"] = TOWN_STYLE_KEYS[si]
                     except (ValueError, IndexError):
                         tc["style"] = "medieval"
+                elif suffix == "layout":
+                    tc = towns[idx].setdefault("town_config", {})
+                    if val and val != "Procedural":
+                        tc["layout"] = val
+                    else:
+                        tc.pop("layout", None)
                 elif suffix.startswith("bldg_"):
                     bldg_key = suffix[5:]  # strip "bldg_"
                     if bldg_key in TOWN_BUILDING_KEYS:
