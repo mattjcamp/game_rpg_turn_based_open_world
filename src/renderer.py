@@ -7338,6 +7338,20 @@ class Renderer(CombatEffectRendererMixin):
                               pxedit_replace_src_color=(0, 0, 0, 255),
                               pxedit_replace_dst=0,
                               pxedit_replace_sel="src",
+                              rfeat_folders=None,
+                              rfeat_folder_cursor=0,
+                              rfeat_folder_scroll=0,
+                              rfeat_list=None,
+                              rfeat_cursor=0,
+                              rfeat_scroll=0,
+                              rfeat_editing=False,
+                              rfeat_cx=0,
+                              rfeat_cy=0,
+                              rfeat_brush_idx=0,
+                              rfeat_brushes=None,
+                              rfeat_naming=False,
+                              rfeat_name_buf="",
+                              rfeat_current_ctx="town",
                               townlayout_list=None,
                               townlayout_cursor=0,
                               townlayout_scroll=0,
@@ -7501,6 +7515,20 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text(line, right_x + 16, dy,
                                   (180, 180, 200), fm)
                     dy += 22
+            elif selected_cat == "Reusable Features":
+                self._u3_text("Reusable Features", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Create reusable tile patterns",
+                    "that can be stamped into town",
+                    "and dungeon layouts. Build shops,",
+                    "rooms, and landmarks once, then",
+                    "reuse them across your maps.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
             elif selected_cat == "Tile Gallery":
                 self._u3_text("Tile Gallery", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
@@ -7626,6 +7654,16 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_naming=gallery_naming,
                         gallery_name_buf=gallery_name_buf,
                         gallery_detail_cursor=gallery_detail_cursor)
+            elif ed == "features":
+                self._draw_rfeat_editor(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    level, rfeat_folders or [], rfeat_folder_cursor,
+                    rfeat_folder_scroll, rfeat_list or [], rfeat_cursor,
+                    rfeat_scroll, rfeat_editing, rfeat_cx, rfeat_cy,
+                    rfeat_brush_idx, rfeat_brushes or [],
+                    rfeat_naming, rfeat_name_buf, rfeat_current_ctx,
+                    fm, fs, f)
+
             elif ed == "townlayouts" and not townlayout_editing and town_active_sub is None:
                 # ── Town list view (list of all town layouts) ──
                 self._u3_text("Town Layouts", left_x + 12, panel_y + 8,
@@ -7729,7 +7767,7 @@ class Renderer(CombatEffectRendererMixin):
                         icon = node["icon"]
                         name = node["name"]
                         nc = self._U3_WHITE if selected else (180, 180, 180)
-                        self._u3_text(f"{prefix}[{icon}] {name}",
+                        self._u3_text(f"{prefix}{name}",
                                       left_x + 14, dy + 12, nc, fm)
 
                     # Right panel: preview
@@ -9764,6 +9802,252 @@ class Renderer(CombatEffectRendererMixin):
         # Plain icon names (sword, herb, etc.) → caller uses _draw_item_icon
         return None
 
+    def _draw_rfeat_editor(self, left_x, left_w, right_x, right_w,
+                            panel_y, panel_h, level,
+                            folders, folder_cursor, folder_scroll,
+                            feat_list, feat_cursor, feat_scroll,
+                            editing, cx, cy, brush_idx, brushes,
+                            naming, name_buf, current_ctx,
+                            fm, fs, f):
+        """Draw the Reusable Features editor at all levels."""
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+
+        if level == 1:
+            # ── Folder list (Town / Dungeon / Overworld) ──
+            self._u3_text("Reusable Features", left_x + 12,
+                          panel_y + 8, self._U3_ORANGE, fs)
+            row_h = 34
+            ly = panel_y + 30
+            max_visible = (panel_h - 40) // row_h
+            dscroll = folder_scroll
+            if folder_cursor < dscroll:
+                dscroll = folder_cursor
+            if folder_cursor >= dscroll + max_visible:
+                dscroll = folder_cursor - max_visible + 1
+            dy = ly
+            for fi in range(dscroll, min(dscroll + max_visible,
+                                         len(folders))):
+                fld = folders[fi]
+                selected = (fi == folder_cursor)
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, dy - 1))
+                prefix = "> " if selected else "  "
+                nc = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{fld['label']}",
+                              left_x + 10, dy + 4, nc, fm)
+                cnt = str(fld["count"])
+                cw = fs.size(cnt)[0]
+                sc = (140, 180, 140) if selected else (120, 120, 140)
+                self._u3_text(cnt, left_x + left_w - cw - 12,
+                              dy + 6, sc, fs)
+                dy += row_h
+
+            # Right panel: folder description
+            if 0 <= folder_cursor < len(folders):
+                fld = folders[folder_cursor]
+                dy = panel_y + 12
+                self._u3_text(fld["label"], right_x + 16, dy,
+                              self._U3_WHITE, f)
+                dy += 28
+                descs = {
+                    "town": [
+                        "Reusable tile patterns for town",
+                        "layouts: shops, houses, rooms,",
+                        "and other interior structures.",
+                    ],
+                    "dungeon": [
+                        "Reusable tile patterns for",
+                        "dungeon maps: corridors, rooms,",
+                        "traps, and puzzle elements.",
+                    ],
+                    "overworld": [
+                        "Reusable tile patterns for the",
+                        "overworld map: terrain features,",
+                        "landmarks, and points of interest.",
+                    ],
+                }
+                for line in descs.get(fld["name"], []):
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+                if fld["count"] > 0:
+                    dy += 10
+                    self._u3_text(f"{fld['count']} features",
+                                  right_x + 16, dy,
+                                  (140, 140, 160), fs)
+
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
+                SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
+                self._U3_HINT, fs)
+
+        elif level == 2 or (level == 3 and not editing):
+            # ── Feature list inside folder ──
+            ctx_label = current_ctx.title()
+            self._u3_text(f"{ctx_label} Features",
+                          left_x + 12, panel_y + 8,
+                          self._U3_ORANGE, fs)
+            row_h = 34
+            ly = panel_y + 30
+            max_visible = (panel_h - 40) // row_h
+            dscroll = feat_scroll
+            if feat_cursor < dscroll:
+                dscroll = feat_cursor
+            if feat_cursor >= dscroll + max_visible:
+                dscroll = feat_cursor - max_visible + 1
+            dy = ly
+            for fi in range(dscroll, min(dscroll + max_visible,
+                                         len(feat_list))):
+                item = feat_list[fi]
+                selected = (fi == feat_cursor)
+                if selected:
+                    bar = pygame.Surface((left_w - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (left_x + 2, dy - 1))
+                prefix = "> " if selected else "  "
+                nc = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{item['name']}",
+                              left_x + 10, dy + 4, nc, fm)
+                dims = f"{item['width']}x{item['height']}"
+                dw = fs.size(dims)[0]
+                sc = (140, 180, 140) if selected else (120, 120, 140)
+                self._u3_text(dims, left_x + left_w - dw - 12,
+                              dy + 6, sc, fs)
+                dy += row_h
+
+            # Right panel: preview of selected feature
+            if 0 <= feat_cursor < len(feat_list):
+                feat = feat_list[feat_cursor]
+                self._u3_text(feat["name"], right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dims = f"{feat['width']} x {feat['height']}"
+                self._u3_text(dims, right_x + 16, panel_y + 36,
+                              (140, 140, 160), fs)
+                # Draw grid preview
+                self._draw_townlayout_preview(
+                    right_x + 12, panel_y + 56,
+                    right_w - 24, panel_h - 80,
+                    feat, -1, -1, -1, None)
+
+            # Naming overlay
+            if naming:
+                nm_x = left_x + 10
+                nm_y = panel_y + panel_h // 2 - 30
+                nm_w = left_w - 20
+                nm_h = 50
+                overlay = pygame.Surface(
+                    (left_w, panel_h), pygame.SRCALPHA)
+                overlay.fill((20, 18, 30, 200))
+                self.screen.blit(overlay, (left_x, panel_y))
+                self._u3_text("Rename:", nm_x + 4, nm_y - 18,
+                              self._U3_ORANGE, fs)
+                pygame.draw.rect(self.screen, (60, 55, 80),
+                                 pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+                pygame.draw.rect(self.screen, (200, 180, 80),
+                                 pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+                display_text = name_buf
+                elapsed = pygame.time.get_ticks() / 1000.0
+                if int(elapsed * 2) % 2 == 0:
+                    display_text += "|"
+                self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                              self._U3_WHITE, fm)
+                self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                              nm_x + 4, nm_y + nm_h + 6,
+                              self._U3_HINT, fs)
+            else:
+                self._u3_text(
+                    "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
+                    "[Ctrl+D] Delete  [N] Rename  [Esc] Back",
+                    SCREEN_WIDTH // 2 - 240, SCREEN_HEIGHT - 45,
+                    self._U3_HINT, fs)
+
+        elif level == 3 and editing:
+            # ── Grid painter ──
+            if 0 <= feat_cursor < len(feat_list):
+                feat = feat_list[feat_cursor]
+
+                # Left panel: brush palette
+                self._u3_text(
+                    f"Editing: {feat.get('name', '?')}",
+                    left_x + 12, panel_y + 8,
+                    self._U3_ORANGE, fm)
+                self._u3_text("BRUSH PALETTE", left_x + 12,
+                              panel_y + 30, (120, 120, 160), fs)
+                brush_row_h = 32
+                brush_y0 = panel_y + 48
+                max_brush_vis = (panel_h - 100) // brush_row_h
+                b_scroll = max(0, brush_idx - max_brush_vis + 1)
+                for bi in range(b_scroll,
+                                min(b_scroll + max_brush_vis,
+                                    len(brushes))):
+                    by = brush_y0 + (bi - b_scroll) * brush_row_h
+                    b = brushes[bi]
+                    is_sel = (bi == brush_idx)
+                    if is_sel:
+                        bar = pygame.Surface(
+                            (left_w - 8, brush_row_h - 2),
+                            pygame.SRCALPHA)
+                        bar.fill((255, 200, 60, 40))
+                        self.screen.blit(bar, (left_x + 4, by))
+                        pygame.draw.rect(
+                            self.screen, (200, 160, 60),
+                            (left_x + 4, by,
+                             left_w - 8, brush_row_h - 2), 1)
+                    icon_x = left_x + 12
+                    text_x = icon_x + 4
+                    b_path = b.get("path")
+                    if b_path:
+                        spr = self._get_unique_tile_sprite(
+                            b_path, 22)
+                        if spr:
+                            self.screen.blit(spr, (icon_x, by + 4))
+                            text_x = icon_x + 28
+                    bc = self._U3_WHITE if is_sel else (160, 160, 170)
+                    self._u3_text(b["name"], text_x, by + 6,
+                                  bc, fs)
+
+                # Right panel: grid
+                self._draw_townlayout_preview(
+                    right_x + 12, panel_y + 12,
+                    right_w - 24, panel_h - 24,
+                    feat, cx, cy, brush_idx, brushes)
+
+                # Naming overlay
+                if naming:
+                    nm_x = left_x + 10
+                    nm_y = panel_y + panel_h // 2 - 30
+                    nm_w = left_w - 20
+                    nm_h = 50
+                    overlay = pygame.Surface(
+                        (left_w, panel_h), pygame.SRCALPHA)
+                    overlay.fill((20, 18, 30, 200))
+                    self.screen.blit(overlay, (left_x, panel_y))
+                    self._u3_text("Rename:", nm_x + 4, nm_y - 18,
+                                  self._U3_ORANGE, fs)
+                    pygame.draw.rect(self.screen, (60, 55, 80),
+                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+                    pygame.draw.rect(self.screen, (200, 180, 80),
+                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+                    display_text = name_buf
+                    elapsed = pygame.time.get_ticks() / 1000.0
+                    if int(elapsed * 2) % 2 == 0:
+                        display_text += "|"
+                    self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                                  self._U3_WHITE, fm)
+                    self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                                  nm_x + 4, nm_y + nm_h + 6,
+                                  self._U3_HINT, fs)
+                else:
+                    self._u3_text(
+                        "[Arrows] Move  [Enter] Paint  [Tab/B] Brush  "
+                        "[N] Rename  [Ctrl+S] Save  [Esc] Back",
+                        SCREEN_WIDTH // 2 - 260, SCREEN_HEIGHT - 45,
+                        self._U3_HINT, fs)
+
     def _draw_tile_folder_list(self, left_x, left_w, right_x,
                                 right_w, panel_y, panel_h,
                                 folders, cursor, scroll,
@@ -9851,8 +10135,8 @@ class Renderer(CombatEffectRendererMixin):
 
         # Footer
         self._u3_text(
-            "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
-            SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
+            "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] Add  [Esc] Back",
+            SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT - 45,
             self._U3_HINT, fs)
 
     def _draw_features_generic_list(self, left_x, left_w, right_x,
@@ -9950,8 +10234,7 @@ class Renderer(CombatEffectRendererMixin):
                 elif "hp" in item:
                     sub = f"HP {item['hp']}  AC {item['ac']}"
                 elif "_tile_id" in item:
-                    walk = "Walk" if item.get("walkable") else "Block"
-                    sub = f"ID {item['_tile_id']}  {walk}"
+                    sub = ""
                 if sub:
                     sc = (140, 180, 140) if selected else (120, 120, 140)
                     self._u3_text(sub, sub_x, dy + 22, sc, fs)
@@ -10131,25 +10414,14 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(walk_str,
                               right_x + 16, dy, (180, 180, 200), fs)
                 dy += 22
-                color = item.get("color", [128, 128, 128])
-                if isinstance(color, (list, tuple)) and len(color) == 3:
-                    # Draw labeled color swatch (minimap color)
-                    self._u3_text("Map Color:",
-                                  right_x + 16, dy + 2,
-                                  (140, 140, 160), fs)
-                    swatch_x = right_x + 96
-                    swatch = pygame.Surface((40, 18))
-                    swatch.fill(tuple(color))
-                    self.screen.blit(swatch, (swatch_x, dy + 1))
-                    pygame.draw.rect(self.screen, (80, 70, 50),
-                                     (swatch_x, dy + 1, 40, 18), 1)
-                    dy += 28
 
-        # Footer
-        self._u3_text(
-            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Duplicate  [Ctrl+D] Delete  [Esc] Back",
-            SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
-            self._U3_HINT, fs)
+        # Footer — Ctrl+N duplicates for tiles, adds new for items/monsters
+        add_label = "Add" if title in ("Items", "Monsters") else "Duplicate"
+        hint = (f"[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] {add_label}"
+                "  [Ctrl+D] Delete  [Esc] Back")
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
+                      self._U3_HINT, fs)
 
     def draw_module_screen(self, modules, cursor, active_path,
                            message=None, confirm_delete=False,

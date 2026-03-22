@@ -217,6 +217,7 @@ class Game:
             {"label": "Monsters", "icon": "X"},
             {"label": "Tile Types", "icon": "T"},
             {"label": "Tile Gallery", "icon": "G"},
+            {"label": "Reusable Features", "icon": "F"},
             {"label": "Town Layouts", "icon": "L"},
         ]
         self._modules_from_features = False  # True when modules opened from features
@@ -381,6 +382,25 @@ class Game:
         self._feat_interior_picking = False    # True when picker overlay is open
         self._feat_interior_pick_cursor = 0    # cursor in the picker list
         self._feat_interior_pick_scroll = 0    # scroll offset for the list
+
+        # Reusable Features editor state
+        self._feat_rfeat_lists = {
+            "town": [], "dungeon": [], "overworld": [],
+        }
+        self._feat_rfeat_folders = []       # folder dicts with name/label/count
+        self._feat_rfeat_folder_cursor = 0
+        self._feat_rfeat_folder_scroll = 0
+        self._feat_rfeat_in_folder = False
+        self._feat_rfeat_cursor = 0
+        self._feat_rfeat_scroll = 0
+        self._feat_rfeat_current_ctx = "town"  # which folder we're in
+        self._feat_rfeat_editing = False     # True when in grid painter
+        self._feat_rfeat_cx = 0
+        self._feat_rfeat_cy = 0
+        self._feat_rfeat_brush_idx = 0
+        self._feat_rfeat_brushes = None
+        self._feat_rfeat_naming = False
+        self._feat_rfeat_name_buf = ""
 
         self._feat_pxedit_palette = [
             (0, 0, 0, 255),        # Black
@@ -2699,6 +2719,17 @@ class Game:
                     "walkable": tile["walkable"],
                     "color": color,
                 }
+            # Sync interaction fields into TILE_DEFS for runtime access
+            itype = tile.get("interaction_type", "none")
+            if itype and itype != "none":
+                settings.TILE_DEFS[tid]["interaction_type"] = itype
+                idata = tile.get("interaction_data", "")
+                if idata:
+                    settings.TILE_DEFS[tid]["interaction_data"] = idata
+            else:
+                # Clear stale interaction fields if type was set to "none"
+                settings.TILE_DEFS[tid].pop("interaction_type", None)
+                settings.TILE_DEFS[tid].pop("interaction_data", None)
             # Keep _TILE_CONTEXT in sync
             ctx = tile.get("_context")
             if ctx:
@@ -3190,6 +3221,222 @@ class Game:
             return False
         return True
 
+    # ── Reusable Features editor ──────────────────────────────────
+
+    _RFEAT_FOLDER_ORDER = [
+        {"name": "town",      "label": "Town"},
+        {"name": "dungeon",   "label": "Dungeon"},
+        {"name": "overworld", "label": "Overworld"},
+    ]
+    _RFEAT_DEFAULTS = {
+        "town":      {"width": 8, "height": 8},
+        "dungeon":   {"width": 8, "height": 8},
+        "overworld": {"width": 8, "height": 8},
+    }
+
+    def _feat_rfeat_path(self):
+        """Path to reusable_features.json."""
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "reusable_features.json")
+
+    def _feat_load_rfeat(self):
+        """Load reusable features from disk."""
+        import json
+        data = {}
+        try:
+            with open(self._feat_rfeat_path(), "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            pass
+        for ctx in ("town", "dungeon", "overworld"):
+            items = []
+            for raw in data.get(ctx, []):
+                items.append({
+                    "name": raw.get("name", "Unnamed"),
+                    "width": raw.get("width",
+                                     self._RFEAT_DEFAULTS[ctx]["width"]),
+                    "height": raw.get("height",
+                                      self._RFEAT_DEFAULTS[ctx]["height"]),
+                    "tiles": dict(raw.get("tiles", {})),
+                })
+            self._feat_rfeat_lists[ctx] = items
+        self._feat_rfeat_folder_cursor = 0
+        self._feat_rfeat_folder_scroll = 0
+        self._feat_rfeat_in_folder = False
+        self._feat_rebuild_rfeat_folders()
+
+    def _feat_save_rfeat(self):
+        """Persist reusable features to disk."""
+        import json
+        data = {}
+        for ctx in ("town", "dungeon", "overworld"):
+            raw = []
+            for feat in self._feat_rfeat_lists.get(ctx, []):
+                raw.append({
+                    "name": feat["name"],
+                    "width": feat["width"],
+                    "height": feat["height"],
+                    "tiles": dict(feat.get("tiles", {})),
+                })
+            data[ctx] = raw
+        try:
+            with open(self._feat_rfeat_path(), "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            pass
+
+    def _feat_rebuild_rfeat_folders(self):
+        """Build folder list with feature counts per context."""
+        folders = []
+        for fdef in self._RFEAT_FOLDER_ORDER:
+            fname = fdef["name"]
+            count = len(self._feat_rfeat_lists.get(fname, []))
+            folders.append({
+                "name": fname,
+                "label": fdef["label"],
+                "count": count,
+            })
+        self._feat_rfeat_folders = folders
+
+    def _feat_rfeat_enter_folder(self):
+        """Enter the selected context folder."""
+        if self._feat_rfeat_folder_cursor >= len(self._feat_rfeat_folders):
+            return
+        self._feat_rfeat_current_ctx = self._feat_rfeat_folders[
+            self._feat_rfeat_folder_cursor]["name"]
+        self._feat_rfeat_in_folder = True
+        self._feat_rfeat_cursor = 0
+        self._feat_rfeat_scroll = 0
+
+    def _feat_rfeat_current_list(self):
+        """Return the feature list for the current folder."""
+        return self._feat_rfeat_lists.get(
+            self._feat_rfeat_current_ctx, [])
+
+    def _feat_rfeat_add(self):
+        """Add a new reusable feature in the current folder."""
+        ctx = self._feat_rfeat_current_ctx
+        defaults = self._RFEAT_DEFAULTS[ctx]
+        items = self._feat_rfeat_lists.get(ctx, [])
+        n = len(items) + 1
+        items.append({
+            "name": f"Feature {n}",
+            "width": defaults["width"],
+            "height": defaults["height"],
+            "tiles": {},
+        })
+        self._feat_rfeat_lists[ctx] = items
+        self._feat_rfeat_cursor = len(items) - 1
+        self._feat_rebuild_rfeat_folders()
+
+    def _feat_rfeat_remove(self):
+        """Remove the selected reusable feature."""
+        items = self._feat_rfeat_current_list()
+        if not items:
+            return
+        idx = self._feat_rfeat_cursor
+        if 0 <= idx < len(items):
+            items.pop(idx)
+            if self._feat_rfeat_cursor >= len(items):
+                self._feat_rfeat_cursor = max(0, len(items) - 1)
+        self._feat_rebuild_rfeat_folders()
+
+    def _feat_rfeat_enter_painter(self):
+        """Enter the grid painter for the selected feature."""
+        items = self._feat_rfeat_current_list()
+        if not items or self._feat_rfeat_cursor >= len(items):
+            return
+        self._feat_rfeat_editing = True
+        self._feat_rfeat_cx = 0
+        self._feat_rfeat_cy = 0
+        self._feat_rfeat_brush_idx = 0
+        self._feat_rfeat_brushes = None
+
+    def _feat_get_rfeat_brushes(self):
+        """Build brush list for the reusable features editor."""
+        if self._feat_rfeat_brushes is not None:
+            return self._feat_rfeat_brushes
+        brushes = [
+            {"name": "Eraser", "tile_id": None, "path": None},
+        ]
+        from src.settings import TILE_DEFS
+        ctx = self._feat_rfeat_current_ctx
+        ctx_ids = sorted(
+            tid for tid, c in self._TILE_CONTEXT.items()
+            if c == ctx
+        )
+        manifest = {}
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            pass
+        saved_tile_defs = {}
+        try:
+            with open(self._feat_tiles_path(), "r") as f:
+                saved_tile_defs = json.load(f)
+        except (OSError, ValueError):
+            pass
+
+        def _resolve_path(tid):
+            saved = saved_tile_defs.get(str(tid), {})
+            sprite_key = saved.get("sprite", "")
+            if sprite_key and "/" in sprite_key:
+                cat, name = sprite_key.split("/", 1)
+                section = manifest.get(cat, {})
+                if isinstance(section, dict):
+                    entry = section.get(name, {})
+                    if isinstance(entry, dict) and "path" in entry:
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        return p
+            for tile in getattr(self, "_feat_tile_list", []):
+                if tile.get("_tile_id") == tid:
+                    sk = tile.get("_sprite", "")
+                    if sk and "/" in sk:
+                        cat, name = sk.split("/", 1)
+                        section = manifest.get(cat, {})
+                        if isinstance(section, dict):
+                            entry = section.get(name, {})
+                            if isinstance(entry, dict) and "path" in entry:
+                                p = entry["path"]
+                                if p.startswith("src/assets/"):
+                                    p = p[len("src/assets/"):]
+                                return p
+                    break
+            for cat in manifest:
+                if cat.startswith("_"):
+                    continue
+                section = manifest.get(cat, {})
+                if not isinstance(section, dict):
+                    continue
+                for _name, entry in section.items():
+                    if (isinstance(entry, dict)
+                            and entry.get("tile_id") == tid
+                            and "path" in entry):
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        return p
+            return None
+
+        for tid in ctx_ids:
+            td = TILE_DEFS.get(tid)
+            if not td:
+                continue
+            brushes.append({
+                "name": td.get("name", f"Tile {tid}"),
+                "tile_id": tid,
+                "path": _resolve_path(tid),
+            })
+        self._feat_rfeat_brushes = brushes
+        return brushes
+
     # ── Default sizes for each sub-editor type ──
     _TOWN_SUB_DEFAULTS = {
         "layouts":   {"name_prefix": "Town Layout",   "width": 18, "height": 19},
@@ -3577,6 +3824,19 @@ class Game:
         if is_editing_layout:
             features = self._feat_town_lists.get("features", [])
             for fi, feat in enumerate(features):
+                if not feat.get("tiles"):
+                    continue  # skip empty features
+                brushes.append({
+                    "name": f"\u2726 {feat['name']}",
+                    "tile_id": None,
+                    "path": None,
+                    "feature": feat,
+                })
+
+            # Also append reusable features (town context) from the new system
+            self._feat_load_rfeat()  # ensure data is loaded from disk
+            rfeat_town = self._feat_rfeat_lists.get("town", [])
+            for feat in rfeat_town:
                 if not feat.get("tiles"):
                     continue  # skip empty features
                 brushes.append({
@@ -7357,7 +7617,7 @@ class Game:
 
         # ── Level 2: editing individual fields ──
         # (tiles and gallery use level 2 for browsing, not field editing)
-        if self._feat_level == 2 and ctx and ed not in ("tiles", "gallery"):
+        if self._feat_level == 2 and ctx and ed not in ("tiles", "gallery", "features"):
             self._feat_handle_field_editing(event, ctx, ed, exit_level=1)
             return
 
@@ -7658,6 +7918,163 @@ class Game:
                     self._feat_level = 2
             return
 
+        # ── Level 3: Reusable Features grid painter ──
+        if self._feat_level == 3 and ed == "features":
+            if self._feat_rfeat_naming:
+                # Naming overlay
+                if event.key == pygame.K_RETURN:
+                    items = self._feat_rfeat_current_list()
+                    if 0 <= self._feat_rfeat_cursor < len(items):
+                        items[self._feat_rfeat_cursor]["name"] = (
+                            self._feat_rfeat_name_buf or "Unnamed")
+                    self._feat_rfeat_naming = False
+                    # If we entered naming from level 2 (not editing),
+                    # return to level 2
+                    if not self._feat_rfeat_editing:
+                        self._feat_save_rfeat()
+                        self._feat_level = 2
+                elif event.key == pygame.K_ESCAPE:
+                    self._feat_rfeat_naming = False
+                    if not self._feat_rfeat_editing:
+                        self._feat_level = 2
+                elif event.key == pygame.K_BACKSPACE:
+                    self._feat_rfeat_name_buf = self._feat_rfeat_name_buf[:-1]
+                elif event.unicode and event.unicode.isprintable():
+                    self._feat_rfeat_name_buf += event.unicode
+                return
+            if self._feat_rfeat_editing:
+                # Grid painter
+                items = self._feat_rfeat_current_list()
+                if self._feat_rfeat_cursor >= len(items):
+                    return
+                feat = items[self._feat_rfeat_cursor]
+                w = feat["width"]
+                h = feat["height"]
+                if event.key == pygame.K_ESCAPE:
+                    if self._feat_dirty:
+                        def _rfeat_save():
+                            self._feat_save_rfeat()
+                            self._feat_rfeat_editing = False
+                            self._feat_dirty = False
+                        def _rfeat_discard():
+                            self._feat_rfeat_editing = False
+                            self._feat_dirty = False
+                        self._show_unsaved_dialog(_rfeat_save, _rfeat_discard)
+                    else:
+                        self._feat_rfeat_editing = False
+                elif self._is_save_shortcut(event):
+                    self._feat_save_rfeat()
+                    self._feat_dirty = False
+                elif event.key in (pygame.K_UP, pygame.K_w):
+                    self._feat_rfeat_cy = max(0, self._feat_rfeat_cy - 1)
+                elif event.key in (pygame.K_DOWN, pygame.K_s):
+                    self._feat_rfeat_cy = min(h - 1, self._feat_rfeat_cy + 1)
+                elif event.key in (pygame.K_LEFT, pygame.K_a):
+                    self._feat_rfeat_cx = max(0, self._feat_rfeat_cx - 1)
+                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                    self._feat_rfeat_cx = min(w - 1, self._feat_rfeat_cx + 1)
+                elif event.key == pygame.K_RETURN:
+                    brushes = self._feat_get_rfeat_brushes()
+                    brush = brushes[self._feat_rfeat_brush_idx]
+                    pos_key = f"{self._feat_rfeat_cx},{self._feat_rfeat_cy}"
+                    self._feat_dirty = True
+                    if brush["name"] == "Eraser":
+                        feat["tiles"].pop(pos_key, None)
+                    else:
+                        feat["tiles"][pos_key] = {
+                            "tile_id": brush["tile_id"],
+                            "path": brush.get("path"),
+                            "name": brush["name"],
+                        }
+                elif event.key in (pygame.K_TAB, pygame.K_b):
+                    brushes = self._feat_get_rfeat_brushes()
+                    n = len(brushes)
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self._feat_rfeat_brush_idx = (
+                            self._feat_rfeat_brush_idx - 1) % n
+                    else:
+                        self._feat_rfeat_brush_idx = (
+                            self._feat_rfeat_brush_idx + 1) % n
+                elif event.key == pygame.K_n:
+                    items = self._feat_rfeat_current_list()
+                    if 0 <= self._feat_rfeat_cursor < len(items):
+                        self._feat_rfeat_naming = True
+                        self._feat_rfeat_name_buf = items[
+                            self._feat_rfeat_cursor]["name"]
+                return
+            return
+
+        # ── Level 2: Reusable Features list inside folder ──
+        if self._feat_level == 2 and ed == "features":
+            items = self._feat_rfeat_current_list()
+            n = len(items)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_rfeat()
+                self._feat_rfeat_in_folder = False
+                self._feat_level = 1
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_rfeat_cursor = (
+                    self._feat_rfeat_cursor - 1) % n
+                self._feat_rfeat_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_rfeat_cursor,
+                        self._feat_rfeat_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_rfeat_cursor = (
+                    self._feat_rfeat_cursor + 1) % n
+                self._feat_rfeat_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_rfeat_cursor,
+                        self._feat_rfeat_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self._feat_rfeat_enter_painter()
+                    self._feat_dirty = False
+                    self._feat_level = 3
+            elif self._is_new_shortcut(event):
+                self._feat_rfeat_add()
+                self._feat_save_rfeat()
+            elif self._is_delete_shortcut(event) and n > 0:
+                self._feat_rfeat_remove()
+                self._feat_save_rfeat()
+            elif event.key == pygame.K_n:
+                # Rename selected feature
+                if n > 0:
+                    self._feat_rfeat_naming = True
+                    self._feat_rfeat_name_buf = items[
+                        self._feat_rfeat_cursor]["name"]
+                    self._feat_level = 3  # naming uses level 3 overlay
+            return
+
+        # ── Level 1: Reusable Features folder list ──
+        if self._feat_level == 1 and ed == "features":
+            n = len(self._feat_rfeat_folders)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_rfeat()
+                self._feat_level = 0
+                self._feat_active_editor = None
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self._feat_rfeat_folder_cursor = (
+                    self._feat_rfeat_folder_cursor - 1) % n
+                self._feat_rfeat_folder_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_rfeat_folder_cursor,
+                        self._feat_rfeat_folder_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_rfeat_folder_cursor = (
+                    self._feat_rfeat_folder_cursor + 1) % n
+                self._feat_rfeat_folder_scroll = \
+                    self._feat_adjust_scroll_generic(
+                        self._feat_rfeat_folder_cursor,
+                        self._feat_rfeat_folder_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self._feat_rfeat_enter_folder()
+                    self._feat_level = 2
+            return
+
         # ── Level 3: tile field editor (inside folder) ──
         if self._feat_level == 3 and ed == "tiles":
             if ctx:
@@ -7879,7 +8296,7 @@ class Game:
 
         # ── Level 1: generic list (items, monsters) ──
         if self._feat_level == 1 and ctx and ed not in (
-                "tiles", "gallery", "spells"):
+                "tiles", "gallery", "spells", "features"):
             lst = ctx["list"]()
             n = len(lst)
             if event.key == pygame.K_ESCAPE:
@@ -7938,14 +8355,23 @@ class Game:
                 self._feat_level = 1
             elif cat["label"] == "Tile Types":
                 self._feat_active_editor = "tiles"
+                self.renderer.reload_sprites()
                 self._feat_load_tiles()
                 self._feat_level = 1
             elif cat["label"] == "Tile Gallery":
                 self._feat_active_editor = "gallery"
+                self.renderer.reload_sprites()
                 self._feat_load_gallery()
+                self._feat_level = 1
+            elif cat["label"] == "Reusable Features":
+                self._feat_active_editor = "features"
+                self.renderer.reload_sprites()
+                self._feat_load_rfeat()
+                self._feat_rfeat_brushes = None
                 self._feat_level = 1
             elif cat["label"] == "Town Layouts":
                 self._feat_active_editor = "townlayouts"
+                self.renderer.reload_sprites()
                 self._feat_load_townlayouts()
                 # Force brush palette to rebuild from current TILE_DEFS
                 self._feat_townlayout_brushes = None
@@ -8149,6 +8575,23 @@ class Game:
             "pxedit_replace_src_color": self._feat_pxedit_replace_src_color,
             "pxedit_replace_dst": self._feat_pxedit_replace_dst,
             "pxedit_replace_sel": self._feat_pxedit_replace_sel,
+            # ── Reusable Features ──
+            "rfeat_folders": self._feat_rfeat_folders,
+            "rfeat_folder_cursor": self._feat_rfeat_folder_cursor,
+            "rfeat_folder_scroll": self._feat_rfeat_folder_scroll,
+            "rfeat_list": (self._feat_rfeat_current_list()
+                           if ed == "features" else []),
+            "rfeat_cursor": self._feat_rfeat_cursor,
+            "rfeat_scroll": self._feat_rfeat_scroll,
+            "rfeat_editing": self._feat_rfeat_editing,
+            "rfeat_cx": self._feat_rfeat_cx,
+            "rfeat_cy": self._feat_rfeat_cy,
+            "rfeat_brush_idx": self._feat_rfeat_brush_idx,
+            "rfeat_brushes": (self._feat_get_rfeat_brushes()
+                              if ed == "features" else []),
+            "rfeat_naming": self._feat_rfeat_naming,
+            "rfeat_name_buf": self._feat_rfeat_name_buf,
+            "rfeat_current_ctx": self._feat_rfeat_current_ctx,
             # ── Town layouts ──
             "townlayout_list": self._feat_townlayout_list,
             "townlayout_cursor": self._feat_townlayout_cursor,

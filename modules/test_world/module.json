@@ -66,6 +66,6 @@
       "defend"
     ],
     "key_dungeons": [],
-    "innkeeper_quests": false
+    "innkeeper_quests": true
   }
 }

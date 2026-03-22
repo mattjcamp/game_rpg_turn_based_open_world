@@ -232,6 +232,13 @@
       "usable_in": [
         "town"
       ]
+    },
+    "shop_sign": {
+      "path": "src/assets/game/terrain/shop_sign.png",
+      "usable_in": [
+        "town"
+      ],
+      "tile_id": 38
     }
   },
   "dungeon": {
@@ -1009,8 +1016,7 @@
       "usable_in": [
         "town",
         "unique_tiles"
-      ],
-      "tile_id": 38
+      ]
     },
     "poison_swamp": {
       "path": "src/assets/game/landmarks/poison_swamp.png",

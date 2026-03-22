@@ -140,7 +140,9 @@
       60
     ],
     "context": "town",
-    "sprite": "town/counter"
+    "sprite": "town/counter",
+    "interaction_type": "shop",
+    "interaction_data": "general"
   },
   "13": {
     "name": "Door",
@@ -361,31 +363,5 @@
     ],
     "context": "town",
     "sprite": "town/brick_wall_red"
-  },
-  "38": {
-    "name": "Shrine",
-    "walkable": false,
-    "color": [
-      140,
-      100,
-      60
-    ],
-    "context": "town",
-    "sprite": "unique_tiles/seal_of_binding",
-    "interaction_type": "sign",
-    "interaction_data": "General Store"
-  },
-  "39": {
-    "name": "Shop Counter",
-    "walkable": false,
-    "color": [
-      140,
-      100,
-      60
-    ],
-    "context": "town",
-    "sprite": "town/counter",
-    "interaction_type": "shop",
-    "interaction_data": "general"
   }
 }

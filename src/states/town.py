@@ -659,6 +659,8 @@ class TownState(InventoryMixin, BaseState):
         from src.settings import TILE_DEFS
         tile_id = self.town_data.tile_map.get_tile(col, row)
         tdef = TILE_DEFS.get(tile_id)
+        itype_dbg = tdef.get("interaction_type", "NONE") if tdef else "NO_TDEF"
+        print(f"[DEBUG] bump ({col},{row}) tid={tile_id} itype={itype_dbg} tdef_keys={list(tdef.keys()) if tdef else 'N/A'}")
         if not tdef:
             return
         itype = tdef.get("interaction_type", "")

@@ -1,0 +1,100 @@
+{
+  "town": [
+    {
+      "name": "Brick Wall",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "0,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "5,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "7,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        }
+      }
+    },
+    {
+      "name": "Brick Wall Vertical",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "0,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,3": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,4": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,6": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,7": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        }
+      }
+    }
+  ],
+  "dungeon": [],
+  "overworld": []
+}

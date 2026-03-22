@@ -1,16 +1,16 @@
 
-Overview Editor
+Overview Map Editor
+- Locate this under Modules
 - create a UI Navigation first
-
-Edit Game Features
-- Modules
-- Spells
-- Items
-- Monsters
-- Tile Types
-- Tile Gallery
-- Town Layout Templates
-- - Town Details, Town Interiors, Town Layout 
+-- Edit Game Features
+--- Modules
+--- Spells
+--- Items
+--- Monsters
+--- Tile Types
+--- Tile Gallery
+--- Town Layout Templates
+---- Town Details, Town Interiors, Town Layout 
 
 
 Create Good Content for Levels 1-5 (to start)
