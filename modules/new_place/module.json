@@ -45,7 +45,7 @@
         "name": "Driftport",
         "description": "A seaside port battered by salt winds and rich with the smell of fish.",
         "town_config": {
-          "layout": "Philly",
+          "layout": "Town One",
           "size": "medium",
           "style": "medieval",
           "buildings": [

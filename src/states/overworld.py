@@ -75,8 +75,16 @@ class OverworldState(InventoryMixin, BaseState):
         self.town_action_cursor = 0           # 0=Enter, 1=Leave
         self.town_action_info = {}            # {name, description}
 
+        # Grace flag: skip one tile-event check after returning from a
+        # town/dungeon so the player isn't immediately prompted to re-enter
+        # the location they just left.
+        self._exit_grace = False
+
     def enter(self):
         self._apply_pending_combat_rewards()
+        # Skip the first tile-event check so we don't immediately re-enter
+        # the town/dungeon we just left.
+        self._exit_grace = True
         if self.pending_combat_message:
             self.show_message(self.pending_combat_message, 2500)
             self.pending_combat_message = None
@@ -621,6 +629,12 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _check_tile_events(self):
         """Check if the party stepped on a special tile."""
+        # After returning from a town/dungeon, skip the first check so
+        # the player isn't immediately prompted to re-enter.
+        if self._exit_grace:
+            self._exit_grace = False
+            return
+
         tile_id = self.game.tile_map.get_tile(
             self.game.party.col, self.game.party.row
         )
