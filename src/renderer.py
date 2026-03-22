@@ -7332,7 +7332,11 @@ class Renderer(CombatEffectRendererMixin):
                               interior_pick_cursor=0,
                               interior_pick_scroll=0,
                               interior_list=None,
-                              interior_pick_sub="layouts"):
+                              interior_pick_sub="layouts",
+                              town_picker_active=False,
+                              town_picker_cursor=0,
+                              town_picker_layouts=None,
+                              town_picker_mode="new"):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7668,7 +7672,14 @@ class Renderer(CombatEffectRendererMixin):
                     w = tl_list[i].get("width", 18)
                     h = tl_list[i].get("height", 19)
                     sc = (140, 180, 140) if selected else (120, 120, 140)
-                    self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
+                    # Show parent_town for interiors
+                    parent = tl_list[i].get("parent_town", "")
+                    if town_active_sub == "interiors" and parent:
+                        self._u3_text(
+                            f"{w}x{h}  [{parent}]",
+                            left_x + 30, dy + 22, sc, fs)
+                    else:
+                        self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
 
                 # Right panel: preview of selected layout
                 if 0 <= townlayout_cursor < len(tl_list):
@@ -7704,9 +7715,25 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text("[Enter] Confirm  [Esc] Cancel",
                                   nm_x + 4, nm_y + nm_h + 6,
                                   self._U3_HINT, fs)
+                # ── Town picker overlay (for choosing parent layout) ──
+                if town_picker_active and town_picker_layouts:
+                    self._draw_town_picker_overlay(
+                        left_x, panel_y, left_w, panel_h,
+                        town_picker_layouts, town_picker_cursor,
+                        town_picker_mode)
+                elif townlayout_naming:
+                    pass  # already drawn above
                 else:
+                    if town_active_sub == "interiors":
+                        footer = (
+                            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
+                            "[C] Copy  [Ctrl+D] Delete  [N] Rename  [Esc] Back")
+                    else:
+                        footer = (
+                            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
+                            "[Ctrl+D] Delete  [N] Rename  [Esc] Back")
                     self._u3_text(
-                        "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Delete  [N] Rename  [Esc] Back",
+                        footer,
                         SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
 
@@ -9193,6 +9220,49 @@ class Renderer(CombatEffectRendererMixin):
             cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts, ts, ts)
             pygame.draw.rect(self.screen, (255, 200, pulse),
                              cursor_rect, 2)
+
+    def _draw_town_picker_overlay(self, rx, ry, rw, rh,
+                                   layouts, cursor, mode="new"):
+        """Draw the town picker overlay for selecting a parent layout."""
+        fs = self.font_small
+        f = self.font
+
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 210))
+        self.screen.blit(overlay, (rx, ry))
+
+        if mode == "copy":
+            title = "COPY TO WHICH TOWN?"
+        else:
+            title = "SELECT PARENT TOWN"
+        self._u3_text(title, rx + rw // 2 - 70, ry + 12,
+                       self._U3_ORANGE, f)
+        self._u3_text("Choose the layout this interior belongs to:",
+                       rx + 16, ry + 38, (180, 180, 200), fs)
+
+        row_h = 32
+        list_y0 = ry + 62
+        max_vis = max(1, (rh - 80) // row_h)
+        n = len(layouts)
+        scroll = max(0, cursor - max_vis + 1)
+        scroll = min(scroll, max(0, n - max_vis))
+
+        for i in range(scroll, min(scroll + max_vis, n)):
+            by = list_y0 + (i - scroll) * row_h
+            is_sel = (i == cursor)
+            if is_sel:
+                bar = pygame.Surface((rw - 24, row_h - 2), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 50))
+                self.screen.blit(bar, (rx + 12, by))
+                pygame.draw.rect(self.screen, (200, 160, 60),
+                                 (rx + 12, by, rw - 24, row_h - 2), 1)
+            nc = (255, 255, 100) if is_sel else (180, 180, 200)
+            name = layouts[i].get("name", "Unnamed")
+            self._u3_text(name, rx + 24, by + 7, nc, fs)
+
+        # Footer
+        self._u3_text("[Up/Down] Select  [Enter] Confirm  [Esc] Cancel",
+                       rx + 16, ry + rh - 22, self._U3_HINT, fs)
 
     def _draw_townlayout_replace_overlay(self, rx, ry, rw, rh,
                                           brushes, src_tile, src_name,

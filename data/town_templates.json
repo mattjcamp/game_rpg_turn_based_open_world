@@ -318,34 +318,34 @@
           "name": "Brick"
         },
         "7,3": {
-          "tile_id": 37,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick"
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         },
         "7,5": {
-          "tile_id": 37,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick"
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         },
         "7,6": {
-          "tile_id": 37,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick"
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         },
         "6,6": {
-          "tile_id": 37,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick"
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         },
         "5,6": {
-          "tile_id": 37,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick"
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         },
         "4,6": {
-          "tile_id": 37,
-          "path": "unassigned/brick_wall_red.png",
-          "name": "Brick"
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
         },
         "7,4": {
           "tile_id": 13,
@@ -644,7 +644,7 @@
           "tile_id": 13,
           "path": "game/terrain/town_door.png",
           "name": "Door",
-          "interior": "Cellar"
+          "interior": "Cellar - new town"
         },
         "3,3": {
           "tile_id": 11,
@@ -2276,7 +2276,8 @@
           "name": "Door",
           "to_town": true
         }
-      }
+      },
+      "parent_town": "Town Original"
     },
     {
       "name": "Red Brick Shop",
@@ -2435,7 +2436,8 @@
           "name": "Door",
           "to_town": true
         }
-      }
+      },
+      "parent_town": "Town Original"
     },
     {
       "name": "Cellar",
@@ -2648,7 +2650,222 @@
           "path": "game/terrain/town_wall.png",
           "name": "Wall"
         }
-      }
+      },
+      "parent_town": "New Town"
+    },
+    {
+      "name": "Cellar - new town",
+      "width": 14,
+      "height": 15,
+      "tiles": {
+        "2,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "4,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "5,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "2,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "2,4": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,4": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door",
+          "interior": "Red Brick Shop"
+        },
+        "4,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,7": {
+          "tile_id": 30,
+          "path": "game/dungeon/machine.png",
+          "name": "Machine"
+        },
+        "5,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,6": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,6": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,7": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "3,8": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "4,8": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "5,9": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "4,9": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "6,9": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,9": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "8,8": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "8,9": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "8,7": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "8,6": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,6": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,5": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,4": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "7,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        }
+      },
+      "parent_town": "New Town"
     }
   ]
 }

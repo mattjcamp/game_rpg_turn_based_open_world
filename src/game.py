@@ -377,6 +377,9 @@ class Game:
         self._feat_townlayout_replace_src_name = ""    # display name of source tile
         self._feat_townlayout_replace_src_empty = False  # True when replacing empty cells
         self._feat_townlayout_replace_dst_idx = 0      # brush index for destination
+        # Town picker overlay (shown when creating a new interior to pick parent)
+        self._feat_town_picker_active = False
+        self._feat_town_picker_cursor = 0
         # Interior-link picker (opened with I in the grid painter)
         self._feat_interior_picking = False    # True when picker overlay is open
         self._feat_interior_pick_cursor = 0    # cursor in the picker list
@@ -3146,18 +3149,53 @@ class Game:
             defaults = self._TOWN_SUB_DEFAULTS[sub_key]
             raw = data.get(sub_key, [])
             for tl in raw:
-                items.append({
+                item = {
                     "name": tl.get("name", "Unnamed"),
                     "width": tl.get("width", defaults["width"]),
                     "height": tl.get("height", defaults["height"]),
                     "tiles": dict(tl.get("tiles", {})),
-                })
+                }
+                # Interiors carry a parent_town to scope them to a layout
+                if sub_key == "interiors":
+                    item["parent_town"] = tl.get("parent_town", "")
+                items.append(item)
             self._feat_town_lists[sub_key] = items
+
+        # ── Auto-migrate: assign unscoped interiors to their parent town ──
+        self._feat_migrate_interior_parents()
+
         self._feat_town_subfolder_cursor = 0
         self._feat_town_active_sub = None
         self._feat_townlayout_cursor = 0
         self._feat_townlayout_scroll = 0
         self._feat_townlayout_editing = False
+
+    def _feat_migrate_interior_parents(self):
+        """Auto-assign parent_town to interiors that don't have one yet.
+
+        Scans all layouts to find which interior names are referenced,
+        then assigns the first referencing layout as the parent.
+        """
+        interiors = self._feat_town_lists.get("interiors", [])
+        unscoped = [i for i in interiors if not i.get("parent_town")]
+        if not unscoped:
+            return
+        # Build a map: interior_name → first layout that references it
+        name_to_town = {}
+        for layout in self._feat_town_lists.get("layouts", []):
+            for td in layout.get("tiles", {}).values():
+                iname = td.get("interior")
+                if iname and iname not in name_to_town:
+                    name_to_town[iname] = layout["name"]
+        # Assign parent_town based on references found
+        changed = False
+        for interior in unscoped:
+            parent = name_to_town.get(interior["name"], "")
+            if parent:
+                interior["parent_town"] = parent
+                changed = True
+        if changed:
+            self._feat_save_townlayouts()
 
     @property
     def _feat_townlayout_list(self):
@@ -3176,12 +3214,15 @@ class Game:
         for sub_key in ("layouts", "features", "interiors"):
             raw = []
             for tl in self._feat_town_lists.get(sub_key, []):
-                raw.append({
+                item = {
                     "name": tl["name"],
                     "width": tl["width"],
                     "height": tl["height"],
                     "tiles": dict(tl.get("tiles", {})),
-                })
+                }
+                if sub_key == "interiors":
+                    item["parent_town"] = tl.get("parent_town", "")
+                raw.append(item)
             data[sub_key] = raw
         path = self._feat_town_templates_path()
         try:
@@ -3261,19 +3302,30 @@ class Game:
             overworld_exits=overworld_exits,
         )
 
-    def _feat_add_townlayout(self):
-        """Add a new empty item to the active sub-editor."""
+    def _feat_add_townlayout(self, parent_town=""):
+        """Add a new empty item to the active sub-editor.
+
+        Parameters
+        ----------
+        parent_town : str
+            For interiors, the name of the parent layout this interior
+            belongs to.  Ignored for layouts and features.
+        """
         sub = self._feat_town_active_sub or "layouts"
         defaults = self._TOWN_SUB_DEFAULTS[sub]
         items = self._feat_town_lists[sub]
         idx = len(items)
-        items.append({
+        item = {
             "name": f"{defaults['name_prefix']} {idx + 1}",
             "width": defaults["width"],
             "height": defaults["height"],
             "tiles": {},
-        })
+        }
+        if sub == "interiors":
+            item["parent_town"] = parent_town
+        items.append(item)
         self._feat_townlayout_cursor = idx
+        return item
 
     def _feat_remove_townlayout(self):
         """Remove the currently selected item from the active sub-editor."""
@@ -3417,6 +3469,11 @@ class Game:
             self._handle_unsaved_dialog_input(event)
             return
 
+        # ── Town picker overlay (for new interior parent selection) ──
+        if self._feat_town_picker_active:
+            self._feat_handle_town_picker_input(event)
+            return
+
         # ── Naming mode: capture text input ──
         if self._feat_townlayout_naming:
             self._feat_handle_townlayout_naming_input(event)
@@ -3474,14 +3531,81 @@ class Game:
             self._feat_dirty = False
             self._feat_level = 2
         elif self._is_new_shortcut(event):
-            self._feat_add_townlayout()
+            if self._feat_town_active_sub == "interiors":
+                # Open town picker to choose parent layout for new interior
+                layouts = self._feat_town_lists.get("layouts", [])
+                if layouts:
+                    self._feat_town_picker_active = True
+                    self._feat_town_picker_cursor = 0
+                    self._feat_town_picker_mode = "new"
+                else:
+                    # No layouts exist — create interior without parent
+                    self._feat_add_townlayout(parent_town="")
+            else:
+                self._feat_add_townlayout()
         elif self._is_delete_shortcut(event) and n > 0:
             self._feat_remove_townlayout()
+        elif event.key == pygame.K_c and n > 0:
+            # Copy/duplicate current interior as independent instance
+            if self._feat_town_active_sub == "interiors":
+                self._feat_copy_interior_source = self._feat_townlayout_cursor
+                layouts = self._feat_town_lists.get("layouts", [])
+                if layouts:
+                    self._feat_town_picker_active = True
+                    self._feat_town_picker_cursor = 0
+                    self._feat_town_picker_mode = "copy"
+                else:
+                    self._feat_do_copy_interior("")
         elif event.key == pygame.K_n and n > 0:
             # Enter naming mode for the selected item
             item = self._feat_townlayout_list[self._feat_townlayout_cursor]
             self._feat_townlayout_naming = True
             self._feat_townlayout_name_buf = item.get("name", "")
+
+    def _feat_do_copy_interior(self, parent_town):
+        """Duplicate the selected interior as a new independent instance."""
+        import copy
+        interiors = self._feat_town_lists.get("interiors", [])
+        src_idx = getattr(self, "_feat_copy_interior_source", 0)
+        if src_idx >= len(interiors):
+            return
+        src = interiors[src_idx]
+        new_item = {
+            "name": f"{src['name']} (Copy)",
+            "width": src["width"],
+            "height": src["height"],
+            "tiles": copy.deepcopy(src.get("tiles", {})),
+            "parent_town": parent_town,
+        }
+        interiors.append(new_item)
+        self._feat_townlayout_cursor = len(interiors) - 1
+        self._feat_dirty = True
+
+    def _feat_handle_town_picker_input(self, event):
+        """Handle input for the town picker overlay (select parent layout).
+
+        Supports two modes:
+          - "new" (default): creates a new empty interior with the chosen parent
+          - "copy": duplicates the selected interior with the chosen parent
+        """
+        layouts = self._feat_town_lists.get("layouts", [])
+        n = len(layouts)
+        if event.key == pygame.K_ESCAPE:
+            self._feat_town_picker_active = False
+        elif event.key == pygame.K_UP and n > 0:
+            self._feat_town_picker_cursor = (
+                self._feat_town_picker_cursor - 1) % n
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._feat_town_picker_cursor = (
+                self._feat_town_picker_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
+            parent_name = layouts[self._feat_town_picker_cursor]["name"]
+            mode = getattr(self, "_feat_town_picker_mode", "new")
+            if mode == "copy":
+                self._feat_do_copy_interior(parent_name)
+            else:
+                self._feat_add_townlayout(parent_town=parent_name)
+            self._feat_town_picker_active = False
 
     def _feat_handle_townlayout_naming_input(self, event):
         """Handle text input while renaming a town layout/feature/interior."""
@@ -3603,15 +3727,26 @@ class Game:
                 self._feat_interior_pick_scroll = 0
                 # Store context so picker knows which options to show
                 self._feat_interior_pick_sub = sub
-                # Build filtered interior list (exclude self for interiors)
+                # Build filtered interior list scoped by parent_town
                 interiors = self._feat_town_lists.get("interiors", [])
                 if sub == "interiors":
+                    # Editing an interior — show sibling interiors
+                    # (same parent_town, exclude self)
                     current_name = layout.get("name", "")
+                    parent = layout.get("parent_town", "")
                     self._feat_interior_pick_list = [
                         intr for intr in interiors
-                        if intr["name"] != current_name]
+                        if intr["name"] != current_name
+                        and (not parent or intr.get("parent_town", "") == parent
+                             or not intr.get("parent_town"))]
                 else:
-                    self._feat_interior_pick_list = list(interiors)
+                    # Editing a layout — show only interiors belonging
+                    # to this layout (by parent_town == layout name)
+                    layout_name = layout.get("name", "")
+                    self._feat_interior_pick_list = [
+                        intr for intr in interiors
+                        if intr.get("parent_town", "") == layout_name
+                        or not intr.get("parent_town")]
                 # Pre-select current link
                 pick_list = self._feat_interior_pick_list
                 if td.get("to_town"):
@@ -8099,6 +8234,10 @@ class Game:
                     interior_list=getattr(self, "_feat_interior_pick_list",
                                           self._feat_town_lists.get("interiors", [])),
                     interior_pick_sub=getattr(self, "_feat_interior_pick_sub", "layouts"),
+                    town_picker_active=self._feat_town_picker_active,
+                    town_picker_cursor=self._feat_town_picker_cursor,
+                    town_picker_layouts=self._feat_town_lists.get("layouts", []),
+                    town_picker_mode=getattr(self, "_feat_town_picker_mode", "new"),
                 )
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
