@@ -114,9 +114,14 @@ class Renderer(CombatEffectRendererMixin):
         for name in m.names_in("town"):
             entry = m.get_entry_by_name("town", name)
             if entry and "tile_id" in entry:
-                sprite = m.get_sprite(entry["tile_id"], dst_ts)
+                tid = entry["tile_id"]
+                sprite = m.get_sprite(tid, dst_ts)
                 if sprite:
-                    self._tile_sprites[entry["tile_id"]] = sprite
+                    self._tile_sprites[tid] = sprite
+                    # Ensure custom/user tiles are in the town tile map
+                    # so _u3_draw_town_tile can find them
+                    if tid not in self._town_tile_map:
+                        self._town_tile_map[tid] = tid
 
         # ── Load dungeon base tiles from manifest ──
         for name in m.names_in("dungeon"):
