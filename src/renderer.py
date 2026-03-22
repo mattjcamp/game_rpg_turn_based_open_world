@@ -7326,7 +7326,8 @@ class Renderer(CombatEffectRendererMixin):
                               interior_picking=False,
                               interior_pick_cursor=0,
                               interior_pick_scroll=0,
-                              interior_list=None):
+                              interior_list=None,
+                              interior_pick_sub="layouts"):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7819,7 +7820,8 @@ class Renderer(CombatEffectRendererMixin):
                             right_w - 16, panel_h - 16,
                             interior_list or [],
                             interior_pick_cursor,
-                            interior_pick_scroll)
+                            interior_pick_scroll,
+                            interior_pick_sub)
 
                     # Footer — context-sensitive hint
                     if town_active_sub == "interiors":
@@ -9173,8 +9175,9 @@ class Renderer(CombatEffectRendererMixin):
                              cursor_rect, 2)
 
     def _draw_interior_picker(self, rx, ry, rw, rh,
-                               interiors, cursor, scroll):
-        """Draw the interior-link picker overlay on top of the grid."""
+                               interiors, cursor, scroll,
+                               sub="layouts"):
+        """Draw the unified link picker overlay on top of the grid."""
         fs = self.font_small
         f = self.font
 
@@ -9189,9 +9192,15 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text("[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel",
                       rx + 16, ry + 34, (140, 140, 160), fs)
 
-        # List: 0=(none), 1=Return to Overworld, 2..=interiors
-        items = (["(none)", "\u2190 Return to Overworld"]
-                 + [i["name"] for i in interiors])
+        # Build item list based on context
+        # Index 0 = (none)
+        # Index 1 = context-dependent special option
+        # Index 2+ = interior spaces (filtered)
+        if sub == "interiors":
+            special = "\u2190 Back to Town"
+        else:
+            special = "\u2190 Return to Overworld"
+        items = ["(none)", special] + [i["name"] for i in interiors]
         n = len(items)
         row_h = 28
         list_y0 = ry + 60

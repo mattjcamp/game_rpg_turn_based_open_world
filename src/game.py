@@ -3585,62 +3585,64 @@ class Game:
             pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
             if pos_key in layout["tiles"]:
                 sub = self._feat_town_active_sub or "layouts"
+                td = layout["tiles"][pos_key]
+                # Open unified link picker for all sub-editors
+                self._feat_interior_picking = True
+                self._feat_interior_pick_cursor = 0
+                self._feat_interior_pick_scroll = 0
+                # Store context so picker knows which options to show
+                self._feat_interior_pick_sub = sub
+                # Build filtered interior list (exclude self for interiors)
+                interiors = self._feat_town_lists.get("interiors", [])
                 if sub == "interiors":
-                    # Toggle "to_town" on this tile (entry/exit point)
-                    td = layout["tiles"][pos_key]
-                    if td.get("to_town"):
-                        del td["to_town"]
-                    else:
-                        td["to_town"] = True
-                    self._feat_dirty = True
+                    current_name = layout.get("name", "")
+                    self._feat_interior_pick_list = [
+                        intr for intr in interiors
+                        if intr["name"] != current_name]
                 else:
-                    # Open link picker for layouts:
-                    # (none), Return to Overworld, then all interiors
-                    interiors = self._feat_town_lists.get("interiors", [])
-                    self._feat_interior_picking = True
-                    self._feat_interior_pick_cursor = 0
-                    self._feat_interior_pick_scroll = 0
-                    td = layout["tiles"][pos_key]
-                    if td.get("to_overworld"):
+                    self._feat_interior_pick_list = list(interiors)
+                # Pre-select current link
+                pick_list = self._feat_interior_pick_list
+                if td.get("to_town"):
+                    # "Back to Town" is index 1 for interiors
+                    if sub == "interiors":
                         self._feat_interior_pick_cursor = 1
-                    elif td.get("interior"):
-                        current = td["interior"]
-                        for i, intr in enumerate(interiors):
-                            if intr["name"] == current:
-                                # +2: skip (none) and Return to Overworld
-                                self._feat_interior_pick_cursor = i + 2
-                                break
+                elif td.get("to_overworld"):
+                    # "Return to Overworld" is index 1 for layouts
+                    if sub == "layouts":
+                        self._feat_interior_pick_cursor = 1
+                elif td.get("interior"):
+                    current = td["interior"]
+                    for i, intr in enumerate(pick_list):
+                        if intr["name"] == current:
+                            self._feat_interior_pick_cursor = i + 2
+                            break
         elif event.key == pygame.K_x:
-            # Quick-remove link from tile under cursor
+            # Quick-remove any link from tile under cursor
             pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
             td = layout["tiles"].get(pos_key)
             if td:
-                sub = self._feat_town_active_sub or "layouts"
-                if sub == "interiors":
-                    if "to_town" in td:
-                        del td["to_town"]
-                        self._feat_dirty = True
-                else:
-                    changed = False
-                    if "interior" in td:
-                        del td["interior"]
+                changed = False
+                for link_key in ("interior", "to_overworld", "to_town"):
+                    if link_key in td:
+                        del td[link_key]
                         changed = True
-                    if "to_overworld" in td:
-                        del td["to_overworld"]
-                        changed = True
-                    if changed:
-                        self._feat_dirty = True
+                if changed:
+                    self._feat_dirty = True
 
     def _feat_handle_interior_picker_input(self, event):
-        """Handle input for the interior-link picker overlay.
+        """Handle input for the unified link picker overlay.
 
         The picker list is:
           0 = (none)
-          1 = Return to Overworld
-          2.. = interior spaces
+          1 = context-dependent special option:
+              - layouts:   "Return to Overworld"
+              - interiors: "Back to Town"
+          2.. = interior spaces (filtered)
         """
-        interiors = self._feat_town_lists.get("interiors", [])
-        n = len(interiors) + 2  # +2 for "(none)" and "Return to Overworld"
+        pick_list = getattr(self, "_feat_interior_pick_list", [])
+        sub = getattr(self, "_feat_interior_pick_sub", "layouts")
+        n = len(pick_list) + 2  # +2 for "(none)" and special option
 
         if event.key == pygame.K_ESCAPE:
             self._feat_interior_picking = False
@@ -3666,15 +3668,19 @@ class Game:
             td = layout["tiles"].get(pos_key)
             if td:
                 idx = self._feat_interior_pick_cursor
-                # Clear any previous link type
-                td.pop("interior", None)
-                td.pop("to_overworld", None)
+                # Clear all previous link types
+                for lk in ("interior", "to_overworld", "to_town"):
+                    td.pop(lk, None)
                 if idx == 0:
                     pass  # "(none)" — links already cleared
                 elif idx == 1:
-                    td["to_overworld"] = True
+                    # Special option depends on context
+                    if sub == "interiors":
+                        td["to_town"] = True
+                    else:
+                        td["to_overworld"] = True
                 else:
-                    td["interior"] = interiors[idx - 2]["name"]
+                    td["interior"] = pick_list[idx - 2]["name"]
                 self._feat_dirty = True
             self._feat_interior_picking = False
 
@@ -7994,7 +8000,9 @@ class Game:
                     interior_picking=self._feat_interior_picking,
                     interior_pick_cursor=self._feat_interior_pick_cursor,
                     interior_pick_scroll=self._feat_interior_pick_scroll,
-                    interior_list=self._feat_town_lists.get("interiors", []),
+                    interior_list=getattr(self, "_feat_interior_pick_list",
+                                          self._feat_town_lists.get("interiors", [])),
+                    interior_pick_sub=getattr(self, "_feat_interior_pick_sub", "layouts"),
                 )
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
