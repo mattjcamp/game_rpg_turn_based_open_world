@@ -2013,23 +2013,11 @@ class Game:
         self._feat_spell_scroll_f = 0
         self._feat_spell_buffer = ""
         # Advance to first editable field
-        self._feat_spell_field = self._feat_next_editable(0)
+        self._feat_spell_field = self._feat_next_editable_generic(
+            self._feat_spell_fields, 0)
         if self._feat_spell_fields:
             self._feat_spell_buffer = \
                 self._feat_spell_fields[self._feat_spell_field][2]
-
-    def _feat_next_editable(self, start):
-        """Find next editable field index from start."""
-        n = len(self._feat_spell_fields)
-        if n == 0:
-            return 0
-        idx = start % n
-        for _ in range(n):
-            entry = self._feat_spell_fields[idx]
-            if len(entry) > 4 and entry[4] and entry[3] != "section":
-                return idx
-            idx = (idx + 1) % n
-        return start % n
 
     def _feat_resort_spells(self):
         """Re-sort spell list and update cursor to follow the
@@ -7191,6 +7179,157 @@ class Game:
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             self.title_options[self.title_cursor]["action"]()
 
+    # ────────────────────────────────────────────────────────────
+    # Unified field editor — shared by all record-based editors
+    # (spells, items, monsters, tiles).  Called from level 2
+    # (spells/items/monsters) and level 3 (tiles).
+    # ────────────────────────────────────────────────────────────
+    def _feat_handle_field_editing(self, event, ctx, ed, exit_level):
+        """Unified field-editor input handler.
+
+        Parameters
+        ----------
+        event      : pygame event (KEYDOWN)
+        ctx        : editor context dict from _feat_editor_ctx()
+        ed         : editor name string ("spells", "items", etc.)
+        exit_level : _feat_level to return to on ESC (1 for most, 2 for tiles)
+        """
+        # Editors that need live-sync (save_fields on every change)
+        # to support conditional fields or live list-preview updates.
+        needs_live_sync = (ed == "tiles")
+
+        # ── Save shortcut (Ctrl+S) ──
+        if self._is_save_shortcut(event):
+            ctx["save_fields"]()
+            if ed == "spells":
+                self._feat_resort_spells()
+            ctx["save_disk"]()
+            self._feat_dirty = False
+            return
+
+        # ── Escape ──
+        if event.key == pygame.K_ESCAPE:
+            if self._feat_dirty:
+                def _save_and_exit():
+                    ctx["save_fields"]()
+                    if ed == "spells":
+                        self._feat_resort_spells()
+                        self._feat_save_spells()
+                        self._feat_spell_filter(
+                            self._feat_spell_sel_ctype,
+                            self._feat_spell_sel_level)
+                    ctx["save_disk"]()
+                    ctx["set_editing"](False)
+                    self._feat_level = exit_level
+                    self._feat_dirty = False
+                def _discard_and_exit():
+                    if ed == "spells":
+                        saved_ct = self._feat_spell_sel_ctype
+                        saved_lv = self._feat_spell_sel_level
+                        self._feat_load_spells()
+                        self._feat_spell_sel_ctype = saved_ct
+                        self._feat_spell_sel_level = saved_lv
+                        self._feat_spell_nav = 2
+                        self._feat_spell_filter(saved_ct, saved_lv)
+                    ctx["set_editing"](False)
+                    self._feat_level = exit_level
+                    self._feat_dirty = False
+                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                if ed == "spells":
+                    self._feat_spell_filter(
+                        self._feat_spell_sel_ctype,
+                        self._feat_spell_sel_level)
+                ctx["set_editing"](False)
+                self._feat_level = exit_level
+            return
+
+        # ── Read current field state ──
+        fields = ctx["fields"]()
+        n = len(fields)
+        if n == 0:
+            return
+        field_idx = ctx["field_idx"]()
+        entry = fields[field_idx]
+        ftype = entry[3] if len(entry) > 3 else "text"
+        buf = ctx["buffer"]()
+
+        # ── UP / DOWN navigation ──
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            entry[2] = buf
+            self._feat_dirty = True
+            if needs_live_sync:
+                ctx["save_fields"]()
+                # Re-read — save may have triggered a field rebuild
+                fields = ctx["fields"]()
+                n = len(fields)
+                field_idx = ctx["field_idx"]()
+            direction = -1 if event.key == pygame.K_UP else 1
+            idx = (field_idx + direction) % n
+            idx = self._feat_next_editable_generic(fields, idx)
+            ctx["set_field_idx"](idx)
+            ctx["set_buffer"](fields[idx][2])
+            ctx["adjust_field_scroll"]()
+
+        # ── Choice / Sprite cycling (LEFT / RIGHT) ──
+        elif ftype in ("choice", "sprite"):
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                choices = ctx["get_choices"](entry[1])
+                if choices:
+                    try:
+                        ci = choices.index(buf)
+                    except ValueError:
+                        ci = 0
+                    if event.key == pygame.K_RIGHT:
+                        ci = (ci + 1) % len(choices)
+                    else:
+                        ci = (ci - 1) % len(choices)
+                    ctx["set_buffer"](choices[ci])
+                    entry[2] = choices[ci]
+                    self._feat_dirty = True
+                    if needs_live_sync:
+                        ctx["save_fields"]()
+                    # Spell-specific: casting_type → allowable_classes sync
+                    if ed == "spells" and entry[1] == "casting_type":
+                        new_cls = ", ".join(
+                            self._feat_default_classes(choices[ci]))
+                        for fe in self._feat_spell_fields:
+                            if fe[1] == "allowable_classes":
+                                fe[2] = new_cls
+                                break
+
+        # ── Int field editing ──
+        elif ftype == "int":
+            if event.key == pygame.K_BACKSPACE:
+                ctx["set_buffer"](buf[:-1])
+                self._feat_dirty = True
+            elif event.key == pygame.K_LEFT:
+                try:
+                    v = int(buf) - 1
+                    ctx["set_buffer"](str(max(0, v)))
+                    self._feat_dirty = True
+                except ValueError:
+                    pass
+            elif event.key == pygame.K_RIGHT:
+                try:
+                    v = int(buf) + 1
+                    ctx["set_buffer"](str(v))
+                    self._feat_dirty = True
+                except ValueError:
+                    pass
+            elif event.unicode and event.unicode.isdigit():
+                ctx["set_buffer"](buf + event.unicode)
+                self._feat_dirty = True
+
+        # ── Text field editing ──
+        elif ftype == "text":
+            if event.key == pygame.K_BACKSPACE:
+                ctx["set_buffer"](buf[:-1])
+                self._feat_dirty = True
+            elif event.unicode and event.unicode.isprintable():
+                ctx["set_buffer"](buf + event.unicode)
+                self._feat_dirty = True
+
     def _handle_features_input(self, event):
         """Handle input for the Game Features editor.
 
@@ -7219,134 +7358,7 @@ class Game:
         # ── Level 2: editing individual fields ──
         # (tiles and gallery use level 2 for browsing, not field editing)
         if self._feat_level == 2 and ctx and ed not in ("tiles", "gallery"):
-            if self._is_save_shortcut(event):
-                # Save without leaving the editor
-                ctx["save_fields"]()
-                if ed == "spells":
-                    self._feat_resort_spells()
-                ctx["save_disk"]()
-                self._feat_dirty = False
-                return
-            if event.key == pygame.K_ESCAPE:
-                if self._feat_dirty:
-                    def _save_and_exit():
-                        ctx["save_fields"]()
-                        if ed == "spells":
-                            self._feat_resort_spells()
-                            self._feat_save_spells()
-                            self._feat_spell_filter(
-                                self._feat_spell_sel_ctype,
-                                self._feat_spell_sel_level)
-                        ctx["save_disk"]()
-                        ctx["set_editing"](False)
-                        self._feat_level = 1
-                        self._feat_dirty = False
-                    def _discard_and_exit():
-                        if ed == "spells":
-                            # Reload to discard; re-filter
-                            saved_ct = self._feat_spell_sel_ctype
-                            saved_lv = self._feat_spell_sel_level
-                            self._feat_load_spells()
-                            self._feat_spell_sel_ctype = saved_ct
-                            self._feat_spell_sel_level = saved_lv
-                            self._feat_spell_nav = 2
-                            self._feat_spell_filter(saved_ct, saved_lv)
-                        ctx["set_editing"](False)
-                        self._feat_level = 1
-                        self._feat_dirty = False
-                    self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-                else:
-                    if ed == "spells":
-                        self._feat_spell_filter(
-                            self._feat_spell_sel_ctype,
-                            self._feat_spell_sel_level)
-                    ctx["set_editing"](False)
-                    self._feat_level = 1
-                return
-            fields = ctx["fields"]()
-            n = len(fields)
-            if n == 0:
-                return
-            field_idx = ctx["field_idx"]()
-            entry = fields[field_idx]
-            ftype = entry[3] if len(entry) > 3 else "text"
-            buf = ctx["buffer"]()
-
-            if event.key == pygame.K_UP:
-                entry[2] = buf
-                self._feat_dirty = True
-                if ed == "tiles":
-                    ctx["save_fields"]()
-                idx = (field_idx - 1) % n
-                idx = self._feat_next_editable_generic(fields, idx)
-                ctx["set_field_idx"](idx)
-                ctx["set_buffer"](fields[idx][2])
-                ctx["adjust_field_scroll"]()
-            elif event.key == pygame.K_DOWN:
-                entry[2] = buf
-                self._feat_dirty = True
-                if ed == "tiles":
-                    ctx["save_fields"]()
-                idx = (field_idx + 1) % n
-                idx = self._feat_next_editable_generic(fields, idx)
-                ctx["set_field_idx"](idx)
-                ctx["set_buffer"](fields[idx][2])
-                ctx["adjust_field_scroll"]()
-            elif ftype in ("choice", "sprite"):
-                if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                    choices = ctx["get_choices"](entry[1])
-                    if choices:
-                        try:
-                            ci = choices.index(buf)
-                        except ValueError:
-                            ci = 0
-                        if event.key == pygame.K_RIGHT:
-                            ci = (ci + 1) % len(choices)
-                        else:
-                            ci = (ci - 1) % len(choices)
-                        ctx["set_buffer"](choices[ci])
-                        entry[2] = choices[ci]
-                        self._feat_dirty = True
-                        # Tile-specific: live-sync field values to the
-                        # tile dict so the list preview updates immediately.
-                        if ed == "tiles":
-                            ctx["save_fields"]()
-                        # Spell-specific: casting_type → classes sync
-                        if ed == "spells" and entry[1] == "casting_type":
-                            new_cls = ", ".join(
-                                self._feat_default_classes(choices[ci]))
-                            for fe in self._feat_spell_fields:
-                                if fe[1] == "allowable_classes":
-                                    fe[2] = new_cls
-                                    break
-            elif ftype == "int":
-                if event.key == pygame.K_BACKSPACE:
-                    ctx["set_buffer"](buf[:-1])
-                    self._feat_dirty = True
-                elif event.key == pygame.K_LEFT:
-                    try:
-                        v = int(buf) - 1
-                        ctx["set_buffer"](str(max(0, v)))
-                        self._feat_dirty = True
-                    except ValueError:
-                        pass
-                elif event.key == pygame.K_RIGHT:
-                    try:
-                        v = int(buf) + 1
-                        ctx["set_buffer"](str(v))
-                        self._feat_dirty = True
-                    except ValueError:
-                        pass
-                elif event.unicode and event.unicode.isdigit():
-                    ctx["set_buffer"](buf + event.unicode)
-                    self._feat_dirty = True
-            elif ftype == "text":
-                if event.key == pygame.K_BACKSPACE:
-                    ctx["set_buffer"](buf[:-1])
-                    self._feat_dirty = True
-                elif event.unicode and event.unicode.isprintable():
-                    ctx["set_buffer"](buf + event.unicode)
-                    self._feat_dirty = True
+            self._feat_handle_field_editing(event, ctx, ed, exit_level=1)
             return
 
         # ── Level 4: pixel editor ──
@@ -7648,108 +7660,8 @@ class Game:
 
         # ── Level 3: tile field editor (inside folder) ──
         if self._feat_level == 3 and ed == "tiles":
-            # Reuse generic level-2 field editing logic via ctx
             if ctx:
-                if self._is_save_shortcut(event):
-                    # Save without leaving the editor
-                    ctx["save_fields"]()
-                    ctx["save_disk"]()
-                    self._feat_dirty = False
-                    return
-                if event.key == pygame.K_ESCAPE:
-                    if self._feat_dirty:
-                        def _save_and_exit():
-                            ctx["save_fields"]()
-                            ctx["save_disk"]()
-                            ctx["set_editing"](False)
-                            self._feat_level = 2
-                            self._feat_dirty = False
-                        def _discard_and_exit():
-                            ctx["set_editing"](False)
-                            self._feat_level = 2
-                            self._feat_dirty = False
-                        self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-                    else:
-                        ctx["set_editing"](False)
-                        self._feat_level = 2
-                    return
-                fields = ctx["fields"]()
-                n = len(fields)
-                if n == 0:
-                    return
-                field_idx = ctx["field_idx"]()
-                entry = fields[field_idx]
-                ftype = entry[3] if len(entry) > 3 else "text"
-                buf = ctx["buffer"]()
-                if event.key == pygame.K_UP:
-                    entry[2] = buf
-                    self._feat_dirty = True
-                    ctx["save_fields"]()
-                    # Re-read after save (rebuild may have changed list)
-                    fields = ctx["fields"]()
-                    n = len(fields)
-                    field_idx = ctx["field_idx"]()
-                    idx = (field_idx - 1) % n
-                    idx = self._feat_next_editable_generic(fields, idx)
-                    ctx["set_field_idx"](idx)
-                    ctx["set_buffer"](fields[idx][2])
-                    ctx["adjust_field_scroll"]()
-                elif event.key == pygame.K_DOWN:
-                    entry[2] = buf
-                    self._feat_dirty = True
-                    ctx["save_fields"]()
-                    # Re-read after save (rebuild may have changed list)
-                    fields = ctx["fields"]()
-                    n = len(fields)
-                    field_idx = ctx["field_idx"]()
-                    idx = (field_idx + 1) % n
-                    idx = self._feat_next_editable_generic(fields, idx)
-                    ctx["set_field_idx"](idx)
-                    ctx["set_buffer"](fields[idx][2])
-                    ctx["adjust_field_scroll"]()
-                elif ftype in ("choice", "sprite"):
-                    if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                        choices = ctx["get_choices"](entry[1])
-                        if choices:
-                            try:
-                                ci = choices.index(buf)
-                            except ValueError:
-                                ci = 0
-                            if event.key == pygame.K_RIGHT:
-                                ci = (ci + 1) % len(choices)
-                            else:
-                                ci = (ci - 1) % len(choices)
-                            ctx["set_buffer"](choices[ci])
-                            entry[2] = choices[ci]
-                            self._feat_dirty = True
-                            # Live-sync to tile dict; may trigger field rebuild
-                            ctx["save_fields"]()
-                elif ftype == "int":
-                    if event.key == pygame.K_BACKSPACE:
-                        ctx["set_buffer"](buf[:-1])
-                        self._feat_dirty = True
-                    elif event.key == pygame.K_LEFT:
-                        try:
-                            ctx["set_buffer"](str(max(0, int(buf) - 1)))
-                            self._feat_dirty = True
-                        except ValueError:
-                            pass
-                    elif event.key == pygame.K_RIGHT:
-                        try:
-                            ctx["set_buffer"](str(int(buf) + 1))
-                            self._feat_dirty = True
-                        except ValueError:
-                            pass
-                    elif event.unicode and event.unicode.isdigit():
-                        ctx["set_buffer"](buf + event.unicode)
-                        self._feat_dirty = True
-                elif ftype == "text":
-                    if event.key == pygame.K_BACKSPACE:
-                        ctx["set_buffer"](buf[:-1])
-                        self._feat_dirty = True
-                    elif event.unicode and event.unicode.isprintable():
-                        ctx["set_buffer"](buf + event.unicode)
-                        self._feat_dirty = True
+                self._feat_handle_field_editing(event, ctx, ed, exit_level=2)
             return
 
         # ── Level 2: tile list inside folder ──
@@ -8149,6 +8061,133 @@ class Game:
             }
         return None
 
+    def _feat_render_state(self):
+        """Build and return the full keyword-arg dict for draw_features_screen.
+
+        Organises all editor state into a single dict so the caller
+        is a one-liner instead of 80+ keyword arguments.  The renderer
+        signature is unchanged — it still receives these as kwargs.
+        New editors only need to add their block here.
+        """
+        ed = self._feat_active_editor
+        state = {
+            # ── Core ──
+            "categories": self._feat_categories,
+            "cat_cursor": self._feat_cursor,
+            "level": self._feat_level,
+            "active_editor": ed,
+            # ── Spells ──
+            "spell_list": self._feat_spell_list,
+            "spell_cursor": self._feat_spell_cursor,
+            "spell_scroll": self._feat_spell_scroll,
+            "spell_editing": self._feat_spell_editing,
+            "spell_fields": self._feat_spell_fields,
+            "spell_field": self._feat_spell_field,
+            "spell_buffer": self._feat_spell_buffer,
+            "spell_field_scroll": self._feat_spell_scroll_f,
+            "spell_nav": self._feat_spell_nav,
+            "spell_ctype_cursor": self._feat_spell_ctype_cursor,
+            "spell_level_cursor": self._feat_spell_level_cursor,
+            "spell_level_scroll": self._feat_spell_level_scroll,
+            "spell_sel_ctype": self._feat_spell_sel_ctype,
+            "spell_sel_level": self._feat_spell_sel_level,
+            "spell_filtered": self._feat_spell_filtered,
+            # ── Items ──
+            "item_list": self._feat_item_list,
+            "item_cursor": self._feat_item_cursor,
+            "item_scroll": self._feat_item_scroll,
+            "item_editing": self._feat_item_editing,
+            "item_fields": self._feat_item_fields,
+            "item_field": self._feat_item_field,
+            "item_buffer": self._feat_item_buffer,
+            "item_field_scroll": self._feat_item_scroll_f,
+            # ── Monsters ──
+            "mon_list": self._feat_mon_list,
+            "mon_cursor": self._feat_mon_cursor,
+            "mon_scroll": self._feat_mon_scroll,
+            "mon_editing": self._feat_mon_editing,
+            "mon_fields": self._feat_mon_fields,
+            "mon_field": self._feat_mon_field,
+            "mon_buffer": self._feat_mon_buffer,
+            "mon_field_scroll": self._feat_mon_scroll_f,
+            # ── Tiles ──
+            "tile_list": self._feat_tile_list,
+            "tile_folders": self._feat_tile_folders,
+            "tile_folder_cursor": self._feat_tile_folder_cursor,
+            "tile_folder_scroll": self._feat_tile_folder_scroll,
+            "tile_folder_tiles": self._feat_tile_folder_tiles,
+            "tile_cursor": self._feat_tile_cursor,
+            "tile_scroll": self._feat_tile_scroll,
+            "tile_editing": self._feat_tile_editing,
+            "tile_fields": self._feat_tile_fields,
+            "tile_field": self._feat_tile_field,
+            "tile_buffer": self._feat_tile_buffer,
+            "tile_field_scroll": self._feat_tile_scroll_f,
+            # ── Gallery ──
+            "gallery_list": self._feat_gallery_list,
+            "gallery_cat_list": self._feat_gallery_cat_list,
+            "gallery_cat_cursor": self._feat_gallery_cat_cursor,
+            "gallery_cat_scroll": self._feat_gallery_cat_scroll,
+            "gallery_sprites": self._feat_gallery_sprites,
+            "gallery_spr_cursor": self._feat_gallery_spr_cursor,
+            "gallery_spr_scroll": self._feat_gallery_spr_scroll,
+            "gallery_tag_cursor": self._feat_gallery_tag_cursor,
+            "gallery_all_cats": self._feat_gallery_all_cats,
+            "gallery_naming": self._feat_gallery_naming,
+            "gallery_name_buf": self._feat_gallery_name_buf,
+            "gallery_detail_cursor": self._feat_gallery_detail_cursor,
+            # ── Pixel editor ──
+            "pxedit_pixels": self._feat_pxedit_pixels,
+            "pxedit_cx": self._feat_pxedit_cx,
+            "pxedit_cy": self._feat_pxedit_cy,
+            "pxedit_w": self._feat_pxedit_w,
+            "pxedit_h": self._feat_pxedit_h,
+            "pxedit_color_idx": self._feat_pxedit_color_idx,
+            "pxedit_palette": self._feat_pxedit_palette,
+            "pxedit_focus": self._feat_pxedit_focus,
+            "pxedit_replacing": self._feat_pxedit_replacing,
+            "pxedit_replace_src_color": self._feat_pxedit_replace_src_color,
+            "pxedit_replace_dst": self._feat_pxedit_replace_dst,
+            "pxedit_replace_sel": self._feat_pxedit_replace_sel,
+            # ── Town layouts ──
+            "townlayout_list": self._feat_townlayout_list,
+            "townlayout_cursor": self._feat_townlayout_cursor,
+            "townlayout_scroll": self._feat_townlayout_scroll,
+            "townlayout_editing": self._feat_townlayout_editing,
+            "townlayout_cx": self._feat_townlayout_cx,
+            "townlayout_cy": self._feat_townlayout_cy,
+            "townlayout_brush_idx": self._feat_townlayout_brush_idx,
+            "townlayout_brushes": (
+                self._feat_get_townlayout_brushes()
+                if ed == "townlayouts" else []),
+            "townlayout_naming": self._feat_townlayout_naming,
+            "townlayout_name_buf": self._feat_townlayout_name_buf,
+            "town_node_cursor": self._feat_town_node_cursor,
+            "town_detail_editing": self._feat_town_detail_editing,
+            "town_desc_buf": self._feat_town_desc_buf,
+            "town_active_sub": self._feat_town_active_sub,
+            "town_selected_idx": self._feat_town_selected_idx,
+            "townlayout_replacing": self._feat_townlayout_replacing,
+            "townlayout_replace_src_tile": self._feat_townlayout_replace_src_tile,
+            "townlayout_replace_src_name": self._feat_townlayout_replace_src_name,
+            "townlayout_replace_src_empty": self._feat_townlayout_replace_src_empty,
+            "townlayout_replace_dst_idx": self._feat_townlayout_replace_dst_idx,
+            "interior_picking": self._feat_interior_picking,
+            "interior_pick_cursor": self._feat_interior_pick_cursor,
+            "interior_pick_scroll": self._feat_interior_pick_scroll,
+            "interior_list": getattr(
+                self, "_feat_interior_pick_list",
+                self._feat_town_lists.get("interiors", [])),
+            "interior_pick_sub": getattr(
+                self, "_feat_interior_pick_sub", "layouts"),
+            "town_picker_active": self._feat_town_picker_active,
+            "town_picker_cursor": self._feat_town_picker_cursor,
+            "town_picker_layouts": self._feat_town_lists.get("layouts", []),
+            "town_picker_mode": getattr(
+                self, "_feat_town_picker_mode", "new"),
+        }
+        return state
+
     def _handle_settings_input(self, event):
         """Handle input while the settings screen is open."""
         if event.type != pygame.KEYDOWN:
@@ -8403,108 +8442,7 @@ class Game:
                 self.renderer.draw_form_party_screen(self)
             elif self.showing_features:
                 self.renderer.draw_features_screen(
-                    categories=self._feat_categories,
-                    cat_cursor=self._feat_cursor,
-                    level=self._feat_level,
-                    active_editor=self._feat_active_editor,
-                    spell_list=self._feat_spell_list,
-                    spell_cursor=self._feat_spell_cursor,
-                    spell_scroll=self._feat_spell_scroll,
-                    spell_editing=self._feat_spell_editing,
-                    spell_fields=self._feat_spell_fields,
-                    spell_field=self._feat_spell_field,
-                    spell_buffer=self._feat_spell_buffer,
-                    spell_field_scroll=self._feat_spell_scroll_f,
-                    spell_nav=self._feat_spell_nav,
-                    spell_ctype_cursor=self._feat_spell_ctype_cursor,
-                    spell_level_cursor=self._feat_spell_level_cursor,
-                    spell_level_scroll=self._feat_spell_level_scroll,
-                    spell_sel_ctype=self._feat_spell_sel_ctype,
-                    spell_sel_level=self._feat_spell_sel_level,
-                    spell_filtered=self._feat_spell_filtered,
-                    item_list=self._feat_item_list,
-                    item_cursor=self._feat_item_cursor,
-                    item_scroll=self._feat_item_scroll,
-                    item_editing=self._feat_item_editing,
-                    item_fields=self._feat_item_fields,
-                    item_field=self._feat_item_field,
-                    item_buffer=self._feat_item_buffer,
-                    item_field_scroll=self._feat_item_scroll_f,
-                    mon_list=self._feat_mon_list,
-                    mon_cursor=self._feat_mon_cursor,
-                    mon_scroll=self._feat_mon_scroll,
-                    mon_editing=self._feat_mon_editing,
-                    mon_fields=self._feat_mon_fields,
-                    mon_field=self._feat_mon_field,
-                    mon_buffer=self._feat_mon_buffer,
-                    mon_field_scroll=self._feat_mon_scroll_f,
-                    tile_list=self._feat_tile_list,
-                    tile_folders=self._feat_tile_folders,
-                    tile_folder_cursor=self._feat_tile_folder_cursor,
-                    tile_folder_scroll=self._feat_tile_folder_scroll,
-                    tile_folder_tiles=self._feat_tile_folder_tiles,
-                    tile_cursor=self._feat_tile_cursor,
-                    tile_scroll=self._feat_tile_scroll,
-                    tile_editing=self._feat_tile_editing,
-                    tile_fields=self._feat_tile_fields,
-                    tile_field=self._feat_tile_field,
-                    tile_buffer=self._feat_tile_buffer,
-                    tile_field_scroll=self._feat_tile_scroll_f,
-                    gallery_list=self._feat_gallery_list,
-                    gallery_cat_list=self._feat_gallery_cat_list,
-                    gallery_cat_cursor=self._feat_gallery_cat_cursor,
-                    gallery_cat_scroll=self._feat_gallery_cat_scroll,
-                    gallery_sprites=self._feat_gallery_sprites,
-                    gallery_spr_cursor=self._feat_gallery_spr_cursor,
-                    gallery_spr_scroll=self._feat_gallery_spr_scroll,
-                    gallery_tag_cursor=self._feat_gallery_tag_cursor,
-                    gallery_all_cats=self._feat_gallery_all_cats,
-                    gallery_naming=self._feat_gallery_naming,
-                    gallery_name_buf=self._feat_gallery_name_buf,
-                    gallery_detail_cursor=self._feat_gallery_detail_cursor,
-                    pxedit_pixels=self._feat_pxedit_pixels,
-                    pxedit_cx=self._feat_pxedit_cx,
-                    pxedit_cy=self._feat_pxedit_cy,
-                    pxedit_w=self._feat_pxedit_w,
-                    pxedit_h=self._feat_pxedit_h,
-                    pxedit_color_idx=self._feat_pxedit_color_idx,
-                    pxedit_palette=self._feat_pxedit_palette,
-                    pxedit_focus=self._feat_pxedit_focus,
-                    pxedit_replacing=self._feat_pxedit_replacing,
-                    pxedit_replace_src_color=self._feat_pxedit_replace_src_color,
-                    pxedit_replace_dst=self._feat_pxedit_replace_dst,
-                    pxedit_replace_sel=self._feat_pxedit_replace_sel,
-                    townlayout_list=self._feat_townlayout_list,
-                    townlayout_cursor=self._feat_townlayout_cursor,
-                    townlayout_scroll=self._feat_townlayout_scroll,
-                    townlayout_editing=self._feat_townlayout_editing,
-                    townlayout_cx=self._feat_townlayout_cx,
-                    townlayout_cy=self._feat_townlayout_cy,
-                    townlayout_brush_idx=self._feat_townlayout_brush_idx,
-                    townlayout_brushes=self._feat_get_townlayout_brushes() if self._feat_active_editor == "townlayouts" else [],
-                    townlayout_naming=self._feat_townlayout_naming,
-                    townlayout_name_buf=self._feat_townlayout_name_buf,
-                    town_node_cursor=self._feat_town_node_cursor,
-                    town_detail_editing=self._feat_town_detail_editing,
-                    town_desc_buf=self._feat_town_desc_buf,
-                    town_active_sub=self._feat_town_active_sub,
-                    town_selected_idx=self._feat_town_selected_idx,
-                    townlayout_replacing=self._feat_townlayout_replacing,
-                    townlayout_replace_src_tile=self._feat_townlayout_replace_src_tile,
-                    townlayout_replace_src_name=self._feat_townlayout_replace_src_name,
-                    townlayout_replace_src_empty=self._feat_townlayout_replace_src_empty,
-                    townlayout_replace_dst_idx=self._feat_townlayout_replace_dst_idx,
-                    interior_picking=self._feat_interior_picking,
-                    interior_pick_cursor=self._feat_interior_pick_cursor,
-                    interior_pick_scroll=self._feat_interior_pick_scroll,
-                    interior_list=getattr(self, "_feat_interior_pick_list",
-                                          self._feat_town_lists.get("interiors", [])),
-                    interior_pick_sub=getattr(self, "_feat_interior_pick_sub", "layouts"),
-                    town_picker_active=self._feat_town_picker_active,
-                    town_picker_cursor=self._feat_town_picker_cursor,
-                    town_picker_layouts=self._feat_town_lists.get("layouts", []),
-                    town_picker_mode=getattr(self, "_feat_town_picker_mode", "new"),
-                )
+                    **self._feat_render_state())
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
             elif self.showing_modules:
