@@ -3681,7 +3681,14 @@ class Game:
         if sub == "interiors":
             item["parent_town"] = parent_town
         items.append(item)
-        self._feat_townlayout_cursor = idx
+        # For interiors, set cursor based on the filtered list (which may
+        # be shorter than the full interiors list) so it points at the
+        # newly added item.
+        if sub == "interiors":
+            filtered = self._feat_townlayout_list
+            self._feat_townlayout_cursor = max(0, len(filtered) - 1)
+        else:
+            self._feat_townlayout_cursor = idx
         return item
 
     def _feat_remove_townlayout(self):
@@ -4029,6 +4036,8 @@ class Game:
                     self._feat_do_copy_interior("")
             elif event.key == pygame.K_n and n > 0:
                 # Rename interior
+                if self._feat_townlayout_cursor >= n:
+                    self._feat_townlayout_cursor = max(0, n - 1)
                 item = interiors[self._feat_townlayout_cursor]
                 self._feat_townlayout_naming = True
                 self._feat_townlayout_name_buf = item.get("name", "")
@@ -7956,12 +7965,15 @@ class Game:
                             self._feat_save_rfeat()
                             self._feat_rfeat_editing = False
                             self._feat_dirty = False
+                            self._feat_level = 2
                         def _rfeat_discard():
                             self._feat_rfeat_editing = False
                             self._feat_dirty = False
+                            self._feat_level = 2
                         self._show_unsaved_dialog(_rfeat_save, _rfeat_discard)
                     else:
                         self._feat_rfeat_editing = False
+                        self._feat_level = 2
                 elif self._is_save_shortcut(event):
                     self._feat_save_rfeat()
                     self._feat_dirty = False

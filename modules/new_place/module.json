@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "id": "bucks_county",
-    "name": "Bucks County",
+    "id": "new_place",
+    "name": "New Place",
     "author": "",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Fernford.",
+    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Driftport.",
     "version": "0.1.0"
   },
   "settings": {
     "tile_size": 32,
-    "map_width": 32,
-    "map_height": 24,
+    "map_width": 64,
+    "map_height": 48,
     "viewport_cols": 30,
     "viewport_rows": 26,
     "max_party_size": 4,
@@ -41,13 +41,13 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "fernford",
-        "name": "Fernford",
+        "id": "driftport",
+        "name": "Driftport",
         "description": "A seaside port battered by salt winds and rich with the smell of fish.",
         "town_config": {
-          "layout": "Yardley",
+          "layout": "Philly",
           "size": "medium",
-          "style": "mountain",
+          "style": "medieval",
           "buildings": [
             "shrine"
           ]
@@ -59,13 +59,32 @@
   "progression": {
     "win_condition": {
       "type": "collect_keys",
-      "total_keys": 0,
-      "deliver_to": "town_fountain"
+      "total_keys": 1,
+      "deliver_to": "town_vault"
     },
     "starting_quests": [
-      "purify"
+      "reclaim"
     ],
-    "key_dungeons": [],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Howling Cavern",
+        "key_name": "Crystal Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Bones litter the threshold of Howling Cavern. Whatever guards this place does not welcome visitors.",
+        "quest_type": "retrieve",
+        "quest_objective": "Purge Howling Cavern of evil and secure the Crystal Key",
+        "quest_hint": "Dark forces have claimed this place as their own.",
+        "kill_target": "",
+        "kill_count": 0,
+        "size": "medium",
+        "torch_density": "medium",
+        "random_encounters": true,
+        "exit_portal": true,
+        "levels": []
+      }
+    ],
     "innkeeper_quests": false
   }
 }

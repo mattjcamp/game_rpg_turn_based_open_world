@@ -93,6 +93,120 @@
           "name": "Brick"
         }
       }
+    },
+    {
+      "name": "Shop Facade",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "0,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,2": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door"
+        },
+        "3,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        }
+      }
+    },
+    {
+      "name": "Centerpiece",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "0,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "1,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "2,2": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "1,3": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        },
+        "1,1": {
+          "tile_id": 11,
+          "path": "game/terrain/town_wall.png",
+          "name": "Wall"
+        }
+      }
     }
   ],
   "dungeon": [],
