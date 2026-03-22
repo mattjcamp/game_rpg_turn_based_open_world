@@ -68,7 +68,8 @@ class TownData:
 
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
                  keyslot_positions=None, town_style="medieval",
-                 building_signs=None, interior_links=None):
+                 building_signs=None, interior_links=None,
+                 overworld_exits=None):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -87,6 +88,9 @@ class TownData:
         # to that interior space.  The interior data (tile grid, NPCs)
         # is stored separately in town_templates.json.
         self.interior_links = interior_links or {}
+        # Overworld exit positions: set of (col, row)
+        # When the player steps on one, they return to the overworld.
+        self.overworld_exits = overworld_exits or set()
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""

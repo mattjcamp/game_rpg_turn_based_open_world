@@ -59,6 +59,7 @@ TILE_MOSS      = 33
 TILE_WALL_TORCH = 34
 # Town-interior special tiles
 TILE_ALTAR     = 35
+TILE_VOID      = 36  # Black empty space (non-walkable, for interior edges)
 
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
@@ -97,6 +98,7 @@ TILE_DEFS = {
     TILE_MOSS:       {"color": (25, 55, 22),   "walkable": True,  "name": "Moss"},
     TILE_WALL_TORCH: {"color": (160, 120, 40), "walkable": False, "name": "Wall Torch"},
     TILE_ALTAR:      {"color": (200, 160, 100), "walkable": False, "name": "Altar"},
+    TILE_VOID:       {"color": (0, 0, 0),       "walkable": False, "name": "Void"},
 }
 
 # ----- Colors (UI) -----

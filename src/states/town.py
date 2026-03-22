@@ -619,8 +619,16 @@ class TownState(InventoryMixin, BaseState):
         )
         if tile_id == TILE_EXIT:
             self._exit_town()
+            return
         elif tile_id == TILE_MACHINE:
             self._interact_machine()
+            return
+
+        # Check for overworld exit (custom layout "Return to Overworld")
+        ow_exits = getattr(self.town_data, "overworld_exits", set())
+        if (party.col, party.row) in ow_exits:
+            self._exit_town()
+            return
 
         # Check for interior links (editor-defined door → interior)
         links = getattr(self.town_data, "interior_links", {})
@@ -663,16 +671,11 @@ class TownState(InventoryMixin, BaseState):
 
         # Build a tile map from the interior grid
         from src.tile_map import TileMap
+        from src.settings import TILE_VOID
         iw = interior.get("width", 14)
         ih = interior.get("height", 15)
-        from src.settings import TILE_DEFS
-        TILE_WALL = 11
-        TILE_FLOOR = 10
-        imap = TileMap(iw, ih)
-        # Fill with walls, then apply the painted tiles
-        for r in range(ih):
-            for c in range(iw):
-                imap.set_tile(c, r, TILE_WALL)
+        imap = TileMap(iw, ih, default_tile=TILE_VOID, oob_tile=TILE_VOID)
+        # Apply the painted tiles (unpainted stays as black void)
         for pos_key, td in interior.get("tiles", {}).items():
             parts = pos_key.split(",")
             c, r = int(parts[0]), int(parts[1])

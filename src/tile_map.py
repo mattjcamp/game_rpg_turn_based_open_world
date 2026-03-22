@@ -17,9 +17,12 @@ from src.settings import *
 class TileMap:
     """Holds a 2D grid of tile IDs and provides access methods."""
 
-    def __init__(self, width, height, default_tile=TILE_GRASS):
+    def __init__(self, width, height, default_tile=TILE_GRASS,
+                 oob_tile=None):
         self.width = width
         self.height = height
+        # Tile returned for out-of-bounds queries (default: TILE_WATER)
+        self.oob_tile = oob_tile if oob_tile is not None else TILE_WATER
         # 2D list: self.tiles[row][col]
         self.tiles = [[default_tile for _ in range(width)] for _ in range(height)]
         # Unique tiles: (col, row) -> tile definition dict from unique_tiles.json
@@ -30,10 +33,10 @@ class TileMap:
         self.unique_cooldowns = {}
 
     def get_tile(self, col, row):
-        """Get tile ID at (col, row). Returns TILE_WATER for out-of-bounds."""
+        """Get tile ID at (col, row). Returns oob_tile for out-of-bounds."""
         if 0 <= col < self.width and 0 <= row < self.height:
             return self.tiles[row][col]
-        return TILE_WATER  # ocean beyond map edges
+        return self.oob_tile
 
     def set_tile(self, col, row, tile_id):
         """Set tile ID at (col, row)."""

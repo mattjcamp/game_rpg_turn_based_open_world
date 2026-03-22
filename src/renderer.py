@@ -160,6 +160,38 @@ class Renderer(CombatEffectRendererMixin):
             if sprite:
                 self._villager_sprites.append(sprite)
 
+        # ── Load custom tile sprites from tile_defs.json ──
+        # User-created tiles store a sprite key like "town/brick_wall_red"
+        # that maps to a manifest entry with a file path.
+        self._custom_tile_paths = {}  # tile_id -> asset-relative path
+        try:
+            import json as _json
+            defs_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_defs.json")
+            with open(defs_path, "r") as _f:
+                _saved = _json.load(_f)
+            for _tid_str, _tdef in _saved.items():
+                _tid = int(_tid_str)
+                if _tid in self._tile_sprites:
+                    continue  # already loaded via manifest tile_id
+                sprite_key = _tdef.get("sprite", "")
+                if sprite_key and "/" in sprite_key:
+                    cat, name = sprite_key.split("/", 1)
+                    entry = m.get_entry_by_name(cat, name)
+                    if entry and "path" in entry:
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        self._custom_tile_paths[_tid] = p
+                        sprite = self._get_unique_tile_sprite(p, dst_ts)
+                        if sprite:
+                            self._tile_sprites[_tid] = sprite
+                            # Also add to town tile map so lookup works
+                            self._town_tile_map[_tid] = _tid
+        except (OSError, ValueError):
+            pass
+
         # ── Load skeleton fallback for monster sprite misses ──
         self._skeleton_fallback = m.get_sprite_by_name(
             "monsters", "skeleton", dst_ts)
@@ -509,10 +541,18 @@ class Renderer(CombatEffectRendererMixin):
         tile_map = town_data.tile_map
 
         # ── compute camera offset ──
-        off_c = party.col - cols // 2
-        off_r = party.row - rows // 2
-        off_c = max(0, min(off_c, tile_map.width - cols))
-        off_r = max(0, min(off_r, tile_map.height - rows))
+        # When the map is smaller than the viewport, center it;
+        # otherwise clamp so we don't scroll past the edges.
+        if tile_map.width <= cols:
+            off_c = -(cols - tile_map.width) // 2
+        else:
+            off_c = party.col - cols // 2
+            off_c = max(0, min(off_c, tile_map.width - cols))
+        if tile_map.height <= rows:
+            off_r = -(rows - tile_map.height) // 2
+        else:
+            off_r = party.row - rows // 2
+            off_r = max(0, min(off_r, tile_map.height - rows))
 
         # ── Build keyslot lookup: (col,row) → slot_index ──
         self._keyslot_index = {}
@@ -9096,6 +9136,11 @@ class Renderer(CombatEffectRendererMixin):
                         badge_border = (60, 220, 80)
                         badge_bg = (0, 160, 40)
                         badge_char = "T"
+                    elif td.get("to_overworld"):
+                        # Orange border + "O" badge for return-to-overworld
+                        badge_border = (255, 180, 60)
+                        badge_bg = (200, 120, 0)
+                        badge_char = "O"
                     elif td.get("interior"):
                         # Cyan border + "I" badge for interior link
                         badge_border = (80, 220, 255)
@@ -9134,13 +9179,14 @@ class Renderer(CombatEffectRendererMixin):
         self.screen.blit(overlay, (rx, ry))
 
         # Title
-        self._u3_text("Link to Interior",
+        self._u3_text("Link Tile",
                       rx + 16, ry + 10, (80, 220, 255), f)
         self._u3_text("[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel",
                       rx + 16, ry + 34, (140, 140, 160), fs)
 
-        # List: index 0 = "(none)", then all interiors
-        items = ["(none)"] + [i["name"] for i in interiors]
+        # List: 0=(none), 1=Return to Overworld, 2..=interiors
+        items = (["(none)", "\u2190 Return to Overworld"]
+                 + [i["name"] for i in interiors])
         n = len(items)
         row_h = 28
         list_y0 = ry + 60
@@ -9159,9 +9205,12 @@ class Renderer(CombatEffectRendererMixin):
                 pygame.draw.rect(self.screen, (80, 220, 255),
                                  (rx + 16, iy, rw - 32, row_h - 2), 1)
             label = items[idx]
-            col = (255, 255, 255) if is_sel else (180, 180, 200)
             if idx == 0:
                 col = (255, 120, 120) if is_sel else (160, 120, 120)
+            elif idx == 1:
+                col = (120, 255, 120) if is_sel else (120, 180, 120)
+            else:
+                col = (255, 255, 255) if is_sel else (180, 180, 200)
             self._u3_text(label, rx + 24, iy + 4, col, fs)
 
     def _render_tile_preview(self, category, name, tile_id, size=96):
