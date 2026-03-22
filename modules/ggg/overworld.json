@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "ravenshire",
+      "id": "ironglen",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -17,7 +17,7 @@
       "clear_radius": 3
     },
     {
-      "id": "oakglen",
+      "id": "nettlewall",
       "type": "town",
       "col": 16,
       "row": 16,
@@ -25,7 +25,7 @@
       "clear_radius": 3
     },
     {
-      "id": "town_shrine",
+      "id": "town_fountain",
       "type": "machine",
       "col": 18,
       "row": 8,

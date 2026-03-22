@@ -725,6 +725,10 @@ class TownState(InventoryMixin, BaseState):
             tid = td.get("tile_id")
             if tid is not None and 0 <= c < iw and 0 <= r < ih:
                 imap.set_tile(c, r, tid)
+                # Store sprite path so runtime rendering matches the editor
+                path = td.get("path")
+                if path:
+                    imap.sprite_overrides[(c, r)] = path
 
         self.town_data.tile_map = imap
         self.town_data.npcs = []  # interiors have no NPCs (for now)

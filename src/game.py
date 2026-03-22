@@ -3278,6 +3278,10 @@ class Game:
                 continue
             tile_id = td.get("tile_id", 10)
             tm.set_tile(col, row, tile_id)
+            # Store sprite path so runtime rendering matches the editor
+            path = td.get("path")
+            if path:
+                tm.sprite_overrides[(col, row)] = path
             # Check for interior link
             if td.get("interior"):
                 interior_links[(col, row)] = td["interior"]

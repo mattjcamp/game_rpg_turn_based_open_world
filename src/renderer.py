@@ -568,6 +568,7 @@ class Renderer(CombatEffectRendererMixin):
         town_style = getattr(town_data, "town_style", "medieval")
         palette = self._get_town_palette(town_style)
         sx, sy = self._shake_offset
+        sprite_overrides = getattr(tile_map, "sprite_overrides", {})
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
@@ -575,10 +576,12 @@ class Renderer(CombatEffectRendererMixin):
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts + sx
                 py = sr * ts + sy
+                override_path = sprite_overrides.get((wc, wr))
                 self._u3_draw_town_tile(tid, px, py, ts, wc, wr,
                                         keys_inserted=keys_inserted,
                                         palette=palette,
-                                        town_style=town_style)
+                                        town_style=town_style,
+                                        sprite_path=override_path)
 
         # ── 1b. Building name signs ──
         # Render building names on the top wall row of each building.
@@ -958,7 +961,8 @@ class Renderer(CombatEffectRendererMixin):
 
     def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr,
                             keys_inserted=0, palette=None,
-                            town_style="medieval"):
+                            town_style="medieval",
+                            sprite_path=None):
         """Draw a single town tile using sprite sheet art when available.
 
         *palette* is a dict from ``_TOWN_PALETTES`` that supplies all
@@ -969,6 +973,10 @@ class Renderer(CombatEffectRendererMixin):
         wall, door, counter, exit) skip the sprite lookup so the
         palette-coloured procedural art is used instead — this makes
         each town style visually distinct.
+
+        *sprite_path*, when set, is a per-tile sprite override from a
+        custom layout — it takes priority over the manifest/gate lookup
+        so runtime rendering matches the editor.
         """
         from src.settings import (
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
@@ -977,6 +985,13 @@ class Renderer(CombatEffectRendererMixin):
         )
         if palette is None:
             palette = self._TOWN_PALETTES["medieval"]
+
+        # ── Custom layout sprite override (highest priority) ──
+        if sprite_path:
+            sprite = self._get_unique_tile_sprite(sprite_path, ts)
+            if sprite:
+                self.screen.blit(sprite, (px, py))
+                return
 
         # Tiles whose look should change per town style — skip sprites
         # for non-default styles so the palette procedural path is used.

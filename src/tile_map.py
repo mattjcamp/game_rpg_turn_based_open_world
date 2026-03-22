@@ -25,6 +25,9 @@ class TileMap:
         self.oob_tile = oob_tile if oob_tile is not None else TILE_WATER
         # 2D list: self.tiles[row][col]
         self.tiles = [[default_tile for _ in range(width)] for _ in range(height)]
+        # Sprite overrides: (col, row) -> asset path from custom layouts
+        # Used so the runtime renderer matches the editor's visuals.
+        self.sprite_overrides = {}
         # Unique tiles: (col, row) -> tile definition dict from unique_tiles.json
         self.unique_tiles = {}
         # Tracks which unique tiles have already been triggered (one_time)

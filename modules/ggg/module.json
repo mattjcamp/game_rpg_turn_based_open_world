@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "testie",
-    "name": "Testie",
-    "author": "hype",
-    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Ravenshire to break the spell.",
+    "id": "ggg",
+    "name": "ggg",
+    "author": "",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ironglen.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,11 +41,11 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ravenshire",
-        "name": "Ravenshire",
-        "description": "A quiet hamlet nestled among rolling hills, known for its warm hearths.",
+        "id": "ironglen",
+        "name": "Ironglen",
+        "description": "A hillside town whose cobbled streets wind between stone cottages.",
         "town_config": {
-          "layout": "Town Original",
+          "layout": "Town One",
           "size": "medium",
           "style": "medieval",
           "buildings": [
@@ -54,16 +54,16 @@
         }
       },
       {
-        "id": "oakglen",
-        "name": "Oakglen",
-        "description": "A bustling market town where traders from distant lands hawk exotic wares.",
+        "id": "nettlewall",
+        "name": "Nettlewall",
+        "description": "A fortified settlement perched on a rocky bluff overlooking the valley.",
         "town_config": {
+          "layout": "Town Different",
           "size": "medium",
           "style": "medieval",
           "buildings": [
             "shrine"
-          ],
-          "layout": "New Town"
+          ]
         }
       }
     ],
@@ -73,22 +73,22 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_shrine"
+      "deliver_to": "town_fountain"
     },
     "starting_quests": [
-      "awaken"
+      "purify"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Crimson Tomb",
-        "key_name": "Bronze Key",
+        "name": "Twisted Barrow",
+        "key_name": "Onyx Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "Water seeps from the walls near Crimson Tomb's entrance. The stone steps descend into darkness.",
+        "description": "The air around Twisted Barrow shimmers with faint heat. Strange runes glow along the doorframe.",
         "quest_type": "retrieve",
-        "quest_objective": "Explore Crimson Tomb and recover the lost Bronze Key",
-        "quest_hint": "The artifact was hidden here long ago by a forgotten order.",
+        "quest_objective": "Purge Twisted Barrow of evil and secure the Onyx Key",
+        "quest_hint": "Dark forces have claimed this place as their own.",
         "kill_target": "",
         "kill_count": 0,
         "size": "medium",
