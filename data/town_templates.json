@@ -4,7 +4,1720 @@
       "name": "Yardley",
       "width": 18,
       "height": 19,
-      "tiles": {},
+      "tiles": {
+        "0,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "5,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "7,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "8,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "9,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "10,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "11,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "12,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "13,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "14,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "15,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "16,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "17,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,1": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,2": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,3": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,3": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,4": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,4": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,5": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,6": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,6": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,6": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,7": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,7": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,7": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,8": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,8": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,8": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,9": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,9": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,9": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,10": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,10": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,10": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,11": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,11": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,11": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,12": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,12": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,12": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,13": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,13": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,13": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,14": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "2,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "3,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,14": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,14": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,15": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,15": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,15": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,15": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,15": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,16": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,16": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,16": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,16": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,17": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,17": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,17": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "6,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "7,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "8,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "9,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "10,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "11,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "12,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "13,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "14,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "15,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "16,17": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "17,17": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "5,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "7,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "8,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "9,18": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door",
+          "to_overworld": true
+        },
+        "10,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "11,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "12,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "13,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "14,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "15,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "16,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "17,18": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,16": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door",
+          "interior": "Shop"
+        }
+      },
       "description": ""
     }
   ],
@@ -3189,10 +4902,112 @@
       "parent_town": "Town One"
     },
     {
-      "name": "Interior 4",
+      "name": "Shop",
       "width": 14,
       "height": 15,
-      "tiles": {},
+      "tiles": {
+        "2,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "5,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,2": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,3": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,4": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,3": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,4": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "6,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "3,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "5,5": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "4,5": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door",
+          "to_town": true
+        },
+        "3,3": {
+          "tile_id": 12,
+          "path": "game/terrain/town_counter.png",
+          "name": "Counter"
+        },
+        "3,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,4": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "5,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        },
+        "4,3": {
+          "tile_id": 10,
+          "path": "game/terrain/town_floor.png",
+          "name": "Floor"
+        }
+      },
       "parent_town": "Yardley"
     }
   ]

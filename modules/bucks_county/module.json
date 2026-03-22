@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "test_world",
-    "name": "Test World",
+    "id": "bucks_county",
+    "name": "Bucks County",
     "author": "",
-    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Ivymarch.",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Fernford.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,13 +41,13 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ivymarch",
-        "name": "Ivymarch",
-        "description": "A hillside town whose cobbled streets wind between stone cottages.",
+        "id": "fernford",
+        "name": "Fernford",
+        "description": "A seaside port battered by salt winds and rich with the smell of fish.",
         "town_config": {
-          "layout": "Simple Town",
+          "layout": "Yardley",
           "size": "medium",
-          "style": "medieval",
+          "style": "mountain",
           "buildings": [
             "shrine"
           ]
@@ -60,12 +60,12 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 0,
-      "deliver_to": "town_armory"
+      "deliver_to": "town_fountain"
     },
     "starting_quests": [
-      "defend"
+      "purify"
     ],
     "key_dungeons": [],
-    "innkeeper_quests": true
+    "innkeeper_quests": false
   }
 }
