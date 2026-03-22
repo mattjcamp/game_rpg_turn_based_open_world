@@ -2544,11 +2544,19 @@ class Game:
             color = entry.get("color", [128, 128, 128])
             if isinstance(color, list):
                 color = tuple(color)
-            settings.TILE_DEFS[tid] = {
+            tdef = {
                 "name": entry.get("name", f"Tile {tid}"),
                 "walkable": entry.get("walkable", True),
                 "color": color,
             }
+            # Carry interaction fields into TILE_DEFS for runtime access
+            itype = entry.get("interaction_type", "")
+            if itype and itype != "none":
+                tdef["interaction_type"] = itype
+                idata = entry.get("interaction_data", "")
+                if idata:
+                    tdef["interaction_data"] = idata
+            settings.TILE_DEFS[tid] = tdef
             ctx = entry.get("context")
             if ctx:
                 self._TILE_CONTEXT[tid] = ctx
@@ -2580,11 +2588,19 @@ class Game:
             color = entry.get("color", [128, 128, 128])
             if isinstance(color, list):
                 color = tuple(color)
-            settings.TILE_DEFS[tid] = {
+            tdef = {
                 "name": entry.get("name", f"Tile {tid}"),
                 "walkable": entry.get("walkable", True),
                 "color": color,
             }
+            # Carry interaction fields into TILE_DEFS for runtime access
+            itype = entry.get("interaction_type", "")
+            if itype and itype != "none":
+                tdef["interaction_type"] = itype
+                idata = entry.get("interaction_data", "")
+                if idata:
+                    tdef["interaction_data"] = idata
+            settings.TILE_DEFS[tid] = tdef
             ctx = entry.get("context")
             if ctx:
                 self._TILE_CONTEXT[tid] = ctx
@@ -2886,6 +2902,9 @@ class Game:
                             self._feat_tile_field = fi
                             self._feat_tile_buffer = val
                             break
+                    # Break out of the for loop — the old field list is
+                    # stale after rebuild, continuing would overwrite data
+                    break
             elif key == "interaction_data":
                 tile["interaction_data"] = val
 
@@ -3653,10 +3672,12 @@ class Game:
             elif self._is_new_shortcut(event):
                 # Add new town layout
                 self._feat_add_townlayout()
-                self._feat_dirty = True
+                self._feat_save_townlayouts()
+                self._feat_dirty = False
             elif self._is_delete_shortcut(event) and n > 0:
                 self._feat_remove_townlayout()
-                self._feat_dirty = True
+                self._feat_save_townlayouts()
+                self._feat_dirty = False
             elif event.key == pygame.K_n and n > 0:
                 # Rename the selected town
                 item = layouts[self._feat_townlayout_cursor]
@@ -3742,10 +3763,12 @@ class Game:
                 # Add new interior scoped to current town
                 selected_town = self._get_selected_town_name()
                 self._feat_add_townlayout(parent_town=selected_town or "")
-                self._feat_dirty = True
+                self._feat_save_townlayouts()
+                self._feat_dirty = False
             elif self._is_delete_shortcut(event) and n > 0:
                 self._feat_remove_townlayout()
-                self._feat_dirty = True
+                self._feat_save_townlayouts()
+                self._feat_dirty = False
             elif event.key == pygame.K_c and n > 0:
                 # Copy interior to another town
                 self._feat_copy_interior_source = self._feat_townlayout_cursor
@@ -7661,6 +7684,11 @@ class Game:
                 if event.key == pygame.K_UP:
                     entry[2] = buf
                     self._feat_dirty = True
+                    ctx["save_fields"]()
+                    # Re-read after save (rebuild may have changed list)
+                    fields = ctx["fields"]()
+                    n = len(fields)
+                    field_idx = ctx["field_idx"]()
                     idx = (field_idx - 1) % n
                     idx = self._feat_next_editable_generic(fields, idx)
                     ctx["set_field_idx"](idx)
@@ -7669,6 +7697,11 @@ class Game:
                 elif event.key == pygame.K_DOWN:
                     entry[2] = buf
                     self._feat_dirty = True
+                    ctx["save_fields"]()
+                    # Re-read after save (rebuild may have changed list)
+                    fields = ctx["fields"]()
+                    n = len(fields)
+                    field_idx = ctx["field_idx"]()
                     idx = (field_idx + 1) % n
                     idx = self._feat_next_editable_generic(fields, idx)
                     ctx["set_field_idx"](idx)
@@ -7687,7 +7720,10 @@ class Game:
                             else:
                                 ci = (ci - 1) % len(choices)
                             ctx["set_buffer"](choices[ci])
+                            entry[2] = choices[ci]
                             self._feat_dirty = True
+                            # Live-sync to tile dict; may trigger field rebuild
+                            ctx["save_fields"]()
                 elif ftype == "int":
                     if event.key == pygame.K_BACKSPACE:
                         ctx["set_buffer"](buf[:-1])

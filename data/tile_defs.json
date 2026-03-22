@@ -371,7 +371,9 @@
       60
     ],
     "context": "town",
-    "sprite": "unique_tiles/seal_of_binding"
+    "sprite": "unique_tiles/seal_of_binding",
+    "interaction_type": "sign",
+    "interaction_data": "General Store"
   },
   "39": {
     "name": "Shop Counter",

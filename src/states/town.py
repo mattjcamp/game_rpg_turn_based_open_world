@@ -586,6 +586,8 @@ class TownState(InventoryMixin, BaseState):
             # Tick Galadriel's Light step counter
             self._tick_galadriels_light()
         else:
+            # Non-walkable tile — check for tile interaction
+            self._try_tile_interaction(target_col, target_row)
             self.move_cooldown = MOVE_REPEAT_DELAY
 
     def _tick_galadriels_light(self):
@@ -609,10 +611,15 @@ class TownState(InventoryMixin, BaseState):
 
         # If inside an interior, check for "to_town" / "back" exit positions
         if getattr(self, "_in_interior", False):
-            exit_positions = getattr(self, "_interior_exit_positions", set())
-            if (party.col, party.row) in exit_positions:
-                self._exit_interior()
-                return
+            # Skip exit check on the first move after entering so the player
+            # isn't immediately ejected when spawning on an exit tile.
+            if getattr(self, "_interior_entry_grace", False):
+                self._interior_entry_grace = False
+            else:
+                exit_positions = getattr(self, "_interior_exit_positions", set())
+                if (party.col, party.row) in exit_positions:
+                    self._exit_interior()
+                    return
             # Check for interior-to-interior links while inside
             links = getattr(self.town_data, "interior_links", {})
             interior_name = links.get((party.col, party.row))
@@ -641,6 +648,35 @@ class TownState(InventoryMixin, BaseState):
         interior_name = links.get((party.col, party.row))
         if interior_name:
             self._enter_interior(interior_name, party.col, party.row)
+
+    def _try_tile_interaction(self, col, row):
+        """Check if a non-walkable tile has an interaction defined in TILE_DEFS.
+
+        Called when the player bumps into a non-walkable tile.  Looks up the
+        tile's interaction_type from TILE_DEFS and triggers the appropriate
+        action (shop, sign, etc.).
+        """
+        from src.settings import TILE_DEFS
+        tile_id = self.town_data.tile_map.get_tile(col, row)
+        tdef = TILE_DEFS.get(tile_id)
+        if not tdef:
+            return
+        itype = tdef.get("interaction_type", "")
+        if not itype or itype == "none":
+            return
+        idata = tdef.get("interaction_data", "")
+
+        if itype == "shop":
+            self.showing_shop = True
+            self.shop_mode = "buy"
+            self.shop_cursor = 0
+            self.shop_sell_cursor = 0
+            self.shop_message = ""
+            self.shop_message_timer = 0
+            self.shop_type = idata or "general"
+        elif itype == "sign":
+            if idata:
+                self.show_message(idata, 4000)
 
     def _enter_interior(self, interior_name, door_col, door_row):
         """Transition into a building interior."""
@@ -711,6 +747,7 @@ class TownState(InventoryMixin, BaseState):
         })
         self._interior_name = interior_name
         self._in_interior = True
+        self._interior_entry_grace = True  # skip first exit check
 
         # Build a tile map from the interior grid
         from src.tile_map import TileMap
@@ -738,15 +775,13 @@ class TownState(InventoryMixin, BaseState):
         interior_links = {}
         entry_placed = False
         first_walkable = None
+        exit_positions = []
         for pos_key, td in interior.get("tiles", {}).items():
             parts = pos_key.split(",")
             c, r = int(parts[0]), int(parts[1])
             if td.get("to_town"):
                 self._interior_exit_positions.add((c, r))
-                if not entry_placed:
-                    self.game.party.col = c
-                    self.game.party.row = r
-                    entry_placed = True
+                exit_positions.append((c, r))
             if td.get("interior"):
                 interior_links[(c, r)] = td["interior"]
             # Track any walkable tile as fallback spawn point
@@ -756,6 +791,37 @@ class TownState(InventoryMixin, BaseState):
                 tdef = TILE_DEFS.get(tid, {})
                 if tdef.get("walkable", False):
                     first_walkable = (c, r)
+        # Place party on a walkable tile near the exit door, searching
+        # outward in a BFS so the player doesn't spawn trapped in a wall.
+        if exit_positions and not entry_placed:
+            from src.settings import TILE_DEFS as _TD
+            ec, er = exit_positions[0]
+            # BFS from the exit tile, find nearest walkable that isn't an exit
+            visited = set()
+            queue = [(ec, er)]
+            visited.add((ec, er))
+            while queue and not entry_placed:
+                cx, cy = queue.pop(0)
+                for dc, dr in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    nc, nr = cx + dc, cy + dr
+                    if (nc, nr) in visited:
+                        continue
+                    visited.add((nc, nr))
+                    if not (0 <= nc < iw and 0 <= nr < ih):
+                        continue
+                    ntid = imap.get_tile(nc, nr)
+                    if _TD.get(ntid, {}).get("walkable", False):
+                        if (nc, nr) not in self._interior_exit_positions:
+                            self.game.party.col = nc
+                            self.game.party.row = nr
+                            entry_placed = True
+                            break
+                    queue.append((nc, nr))
+            # Last resort: place on the exit tile itself
+            if not entry_placed:
+                self.game.party.col = ec
+                self.game.party.row = er
+                entry_placed = True
         self.town_data.interior_links = interior_links
         self.town_data.overworld_exits = set()
         if not entry_placed:

@@ -2,7 +2,7 @@
   "music_enabled": false,
   "smite_enabled": true,
   "start_with_equipment": false,
-  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/real_world",
+  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/test_world",
   "soundtrack_style": "Cinematic",
   "start_level": 1
 }

@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "id": "test_world",
+    "name": "Test World",
+    "author": "",
+    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Ivymarch.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 32,
+    "map_height": 24,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "tile": null,
+      "base_tile": "grass"
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "tile": null,
+      "base_tile": "grass"
+    }
+  },
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "ivymarch",
+        "name": "Ivymarch",
+        "description": "A hillside town whose cobbled streets wind between stone cottages.",
+        "town_config": {
+          "layout": "Simple Town",
+          "size": "medium",
+          "style": "medieval",
+          "buildings": [
+            "shrine"
+          ]
+        }
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 0,
+      "deliver_to": "town_armory"
+    },
+    "starting_quests": [
+      "defend"
+    ],
+    "key_dungeons": [],
+    "innkeeper_quests": false
+  }
+}
