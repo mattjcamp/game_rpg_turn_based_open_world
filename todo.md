@@ -2,10 +2,26 @@ Town
 - Add interactable tiles for shops and more in town
 - Inventory for shops
 
+Overview Editor
+- create a UI Navigation first
+
+Edit Game Features
+- Modules
+
+- Spells
+- Items
+- Monsters
+- Tile Types
+- Tile Gallery
+- Town Layouts
+
+
+
+
+
 Polish Content Systems
 - add editing screens for content templates (spells, items, classes, monsters, shops)
 - modules should inherit but be able to override some things like town appearance, shops, etc
-
 - modules should have the option for an over arching cohesive quest
 - areas of the overview map should have different attributes (movement, types of monster spawns)
 

@@ -653,13 +653,13 @@ class Game:
             kd_list = prog.get("key_dungeons", [])
             if kd_list:
                 self._init_key_dungeons(kd_list)
-                if mod_id == "keys_of_shadow":
-                    # Duskhollow is unique to Keys of Shadow
-                    self.darkness_active = True
-                    self.town_data = generate_duskhollow()
-                else:
-                    # Generate all towns from the manifest
-                    self._init_module_towns()
+            if mod_id == "keys_of_shadow":
+                # Duskhollow is unique to Keys of Shadow
+                self.darkness_active = True
+                self.town_data = generate_duskhollow()
+            else:
+                # Generate all towns from the manifest
+                self._init_module_towns()
 
         self._game_started = True
         self.showing_title = False
@@ -2603,6 +2603,14 @@ class Game:
                 sprite_key = s.get("sprite", "")
             if not sprite_key:
                 sprite_key = self._feat_tile_sprite_key(tile_id) or ""
+            # Load interaction fields from saved data
+            interact_type = ""
+            interact_data = ""
+            if s:
+                interact_type = s.get("interaction_type", "none")
+                interact_data = s.get("interaction_data", "")
+            if not interact_type:
+                interact_type = "none"
             tiles.append({
                 "_tile_id": tile_id,
                 "name": tdef.get("name", f"Tile {tile_id}"),
@@ -2610,6 +2618,8 @@ class Game:
                 "color": list(tdef.get("color", (128, 128, 128))),
                 "_context": context,
                 "_sprite": sprite_key,
+                "interaction_type": interact_type,
+                "interaction_data": interact_data,
             })
         self._feat_tile_list = tiles
         self._feat_tile_in_folder = False
@@ -2691,13 +2701,21 @@ class Game:
                 self._TILE_CONTEXT[tid] = ctx
 
             # Build the JSON entry for this tile
-            disk_data[str(tid)] = {
+            entry_data = {
                 "name": tile["name"],
                 "walkable": tile["walkable"],
                 "color": list(color) if isinstance(color, tuple) else color,
                 "context": tile.get("_context", "overworld"),
                 "sprite": tile.get("_sprite", ""),
             }
+            # Only persist interaction fields if they have meaningful values
+            itype = tile.get("interaction_type", "none")
+            if itype and itype != "none":
+                entry_data["interaction_type"] = itype
+                idata = tile.get("interaction_data", "")
+                if idata:
+                    entry_data["interaction_data"] = idata
+            disk_data[str(tid)] = entry_data
 
         # Write to data/tile_defs.json
         try:
@@ -2784,6 +2802,9 @@ class Game:
         if not sprite_key:
             sprite_key = self._feat_tile_sprite_key(
                 tile.get("_tile_id"))
+        # Interaction fields
+        interact = tile.get("interaction_type", "none")
+        interact_data = tile.get("interaction_data", "")
         fields = [
             ["-- Tile Type --", "_hdr1", "", "section", False],
             ["ID", "_tile_id",
@@ -2793,7 +2814,19 @@ class Game:
             ["Walkable", "walkable",
              str(tile.get("walkable", True)), "choice", True],
             ["Color (R,G,B)", "_color", color_str, "text", True],
+            ["-- Interaction --", "_hdr2", "", "section", False],
+            ["Interaction", "interaction_type", interact, "choice", True],
         ]
+        # Conditionally show the data field based on interaction type
+        if interact == "shop":
+            fields.append(
+                ["Shop Type", "interaction_data", interact_data, "choice", True])
+        elif interact == "sign":
+            fields.append(
+                ["Sign Text", "interaction_data", interact_data, "text", True])
+        elif interact != "none":
+            fields.append(
+                ["Data", "interaction_data", interact_data, "text", True])
         self._feat_tile_fields = fields
         self._feat_tile_field = 0
         self._feat_tile_scroll_f = 0
@@ -2838,6 +2871,23 @@ class Game:
                 tile[key] = val == "True"
             elif key == "name":
                 tile[key] = val
+            elif key == "interaction_type":
+                old_type = tile.get("interaction_type", "none")
+                tile["interaction_type"] = val
+                # When interaction type changes, reset interaction_data
+                # and rebuild fields to show/hide the conditional field
+                if val != old_type:
+                    tile["interaction_data"] = ""
+                    # Rebuild fields so the conditional data field updates
+                    self._feat_build_tile_fields(tile)
+                    # Re-position cursor on the interaction_type field
+                    for fi, fe in enumerate(self._feat_tile_fields):
+                        if fe[1] == "interaction_type":
+                            self._feat_tile_field = fi
+                            self._feat_tile_buffer = val
+                            break
+            elif key == "interaction_data":
+                tile["interaction_data"] = val
 
     @staticmethod
     def _feat_tile_sprite_key(tile_id):
@@ -2897,6 +2947,17 @@ class Game:
             return sorted(result)
         if key == "walkable":
             return ["True", "False"]
+        if key == "interaction_type":
+            return ["none", "shop", "sign"]
+        if key == "interaction_data":
+            # When interaction_type is "shop", offer shop type choices
+            real_idx = self._feat_tile_real_index()
+            if real_idx < len(self._feat_tile_list):
+                tile = self._feat_tile_list[real_idx]
+                if tile.get("interaction_type") == "shop":
+                    return ["general", "reagent", "weapon", "armor",
+                            "magic", "inn", "guild"]
+            return []
         return []
 
     def _feat_add_tile(self):
@@ -2919,6 +2980,8 @@ class Game:
             "walkable": True,
             "color": [128, 128, 128],
             "_context": context,
+            "interaction_type": "none",
+            "interaction_data": "",
         }
         self._feat_tile_list.append(new_tile)
         self._feat_tile_cursor = len(self._feat_tile_list) - 1

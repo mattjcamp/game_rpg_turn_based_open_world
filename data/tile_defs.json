@@ -372,5 +372,18 @@
     ],
     "context": "town",
     "sprite": "unique_tiles/seal_of_binding"
+  },
+  "39": {
+    "name": "Shop Counter",
+    "walkable": false,
+    "color": [
+      140,
+      100,
+      60
+    ],
+    "context": "town",
+    "sprite": "town/counter",
+    "interaction_type": "shop",
+    "interaction_data": "general"
   }
 }

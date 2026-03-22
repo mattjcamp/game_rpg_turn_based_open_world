@@ -1,0 +1,40 @@
+{
+  "size": {
+    "width": 32,
+    "height": 24
+  },
+  "start_position": {
+    "col": 16,
+    "row": 10
+  },
+  "landmarks": [
+    {
+      "id": "briarbrook",
+      "type": "town",
+      "col": 16,
+      "row": 8,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "town_vault",
+      "type": "machine",
+      "col": 18,
+      "row": 8,
+      "tile": "TILE_MACHINE",
+      "clear_radius": 1
+    }
+  ],
+  "paths": [
+    {
+      "from": [
+        16,
+        10
+      ],
+      "to": [
+        16,
+        8
+      ]
+    }
+  ]
+}
