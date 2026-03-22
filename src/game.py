@@ -371,6 +371,12 @@ class Game:
         self._feat_townlayout_brushes = None  # built lazily from manifest
         self._feat_townlayout_naming = False   # True when typing a name
         self._feat_townlayout_name_buf = ""    # text buffer for naming
+        # Tile replace mode (opened with R in the grid painter)
+        self._feat_townlayout_replacing = False    # True when replace overlay is open
+        self._feat_townlayout_replace_src_tile = None  # tile_id of source tile under cursor
+        self._feat_townlayout_replace_src_name = ""    # display name of source tile
+        self._feat_townlayout_replace_src_empty = False  # True when replacing empty cells
+        self._feat_townlayout_replace_dst_idx = 0      # brush index for destination
         # Interior-link picker (opened with I in the grid painter)
         self._feat_interior_picking = False    # True when picker overlay is open
         self._feat_interior_pick_cursor = 0    # cursor in the picker list
@@ -3416,6 +3422,11 @@ class Game:
             self._feat_handle_townlayout_naming_input(event)
             return
 
+        # ── Tile replace overlay ──
+        if self._feat_townlayout_replacing:
+            self._feat_handle_townlayout_replace_input(event)
+            return
+
         # ── Interior picker overlay ──
         if self._feat_interior_picking:
             self._feat_handle_interior_picker_input(event)
@@ -3629,6 +3640,86 @@ class Game:
                         changed = True
                 if changed:
                     self._feat_dirty = True
+        elif event.key == pygame.K_r:
+            # Enter tile replace mode — source = tile under cursor (or empty)
+            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
+            td = layout["tiles"].get(pos_key)
+            self._feat_townlayout_replacing = True
+            if td:
+                self._feat_townlayout_replace_src_tile = td.get("tile_id")
+                self._feat_townlayout_replace_src_name = td.get("name", "")
+                self._feat_townlayout_replace_src_empty = False
+            else:
+                self._feat_townlayout_replace_src_tile = None
+                self._feat_townlayout_replace_src_name = "(Empty)"
+                self._feat_townlayout_replace_src_empty = True
+            self._feat_townlayout_replace_dst_idx = self._feat_townlayout_brush_idx
+
+    def _feat_handle_townlayout_replace_input(self, event):
+        """Handle input for the tile replace overlay.
+
+        Up/Down navigates the brush palette to pick a destination tile.
+        Enter/Space executes the batch replace across the entire layout.
+        Escape cancels replace mode.
+        """
+        if event.key == pygame.K_ESCAPE:
+            self._feat_townlayout_replacing = False
+            return
+
+        brushes = self._feat_get_townlayout_brushes()
+        n = len(brushes)
+
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self._feat_townlayout_replace_dst_idx = (
+                self._feat_townlayout_replace_dst_idx - 1) % n
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self._feat_townlayout_replace_dst_idx = (
+                self._feat_townlayout_replace_dst_idx + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Execute batch replace
+            if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
+                self._feat_townlayout_replacing = False
+                return
+            layout = self._feat_townlayout_list[self._feat_townlayout_cursor]
+            dst_brush = brushes[self._feat_townlayout_replace_dst_idx]
+            src_tile = self._feat_townlayout_replace_src_tile
+            src_empty = self._feat_townlayout_replace_src_empty
+            w = layout["width"]
+            h = layout["height"]
+            tiles = layout.get("tiles", {})
+            changed = False
+            if src_empty:
+                # Source is empty cells — fill all empty positions with dst
+                if dst_brush["name"] != "Eraser":
+                    for r in range(h):
+                        for c in range(w):
+                            pk = f"{c},{r}"
+                            if pk not in tiles:
+                                tiles[pk] = {
+                                    "tile_id": dst_brush["tile_id"],
+                                    "path": dst_brush.get("path"),
+                                    "name": dst_brush["name"],
+                                }
+                                changed = True
+            elif dst_brush["name"] == "Eraser":
+                # Replace all source tiles with empty (remove them)
+                keys_to_remove = [
+                    k for k, v in tiles.items()
+                    if v.get("tile_id") == src_tile]
+                for k in keys_to_remove:
+                    del tiles[k]
+                    changed = True
+            else:
+                # Replace all source tiles with destination tile
+                for k, v in tiles.items():
+                    if v.get("tile_id") == src_tile:
+                        v["tile_id"] = dst_brush["tile_id"]
+                        v["path"] = dst_brush.get("path")
+                        v["name"] = dst_brush["name"]
+                        changed = True
+            if changed:
+                self._feat_dirty = True
+            self._feat_townlayout_replacing = False
 
     def _feat_handle_interior_picker_input(self, event):
         """Handle input for the unified link picker overlay.
@@ -7997,6 +8088,11 @@ class Game:
                     town_subfolders=self._feat_town_subfolders,
                     town_subfolder_cursor=self._feat_town_subfolder_cursor,
                     town_active_sub=self._feat_town_active_sub,
+                    townlayout_replacing=self._feat_townlayout_replacing,
+                    townlayout_replace_src_tile=self._feat_townlayout_replace_src_tile,
+                    townlayout_replace_src_name=self._feat_townlayout_replace_src_name,
+                    townlayout_replace_src_empty=self._feat_townlayout_replace_src_empty,
+                    townlayout_replace_dst_idx=self._feat_townlayout_replace_dst_idx,
                     interior_picking=self._feat_interior_picking,
                     interior_pick_cursor=self._feat_interior_pick_cursor,
                     interior_pick_scroll=self._feat_interior_pick_scroll,

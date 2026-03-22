@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "silvermarch",
+      "id": "ravenshire",
       "type": "town",
       "col": 16,
       "row": 8,
@@ -17,7 +17,15 @@
       "clear_radius": 3
     },
     {
-      "id": "town_vault",
+      "id": "oakglen",
+      "type": "town",
+      "col": 16,
+      "row": 16,
+      "tile": "TILE_TOWN",
+      "clear_radius": 3
+    },
+    {
+      "id": "town_shrine",
       "type": "machine",
       "col": 18,
       "row": 8,
@@ -42,6 +50,16 @@
       "to": [
         22,
         12
+      ]
+    },
+    {
+      "from": [
+        16,
+        8
+      ],
+      "to": [
+        16,
+        16
       ]
     },
     {

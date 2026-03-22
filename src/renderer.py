@@ -7323,6 +7323,11 @@ class Renderer(CombatEffectRendererMixin):
                               town_subfolders=None,
                               town_subfolder_cursor=0,
                               town_active_sub=None,
+                              townlayout_replacing=False,
+                              townlayout_replace_src_tile=None,
+                              townlayout_replace_src_name="",
+                              townlayout_replace_src_empty=False,
+                              townlayout_replace_dst_idx=0,
                               interior_picking=False,
                               interior_pick_cursor=0,
                               interior_pick_scroll=0,
@@ -7823,15 +7828,30 @@ class Renderer(CombatEffectRendererMixin):
                             interior_pick_scroll,
                             interior_pick_sub)
 
+                    # ── Tile replace overlay ──
+                    if townlayout_replacing and brushes:
+                        self._draw_townlayout_replace_overlay(
+                            right_x + 8, panel_y + 8,
+                            right_w - 16, panel_h - 16,
+                            brushes,
+                            townlayout_replace_src_tile,
+                            townlayout_replace_src_name,
+                            townlayout_replace_src_empty,
+                            townlayout_replace_dst_idx)
+
                     # Footer — context-sensitive hint
-                    if town_active_sub == "interiors":
+                    if townlayout_replacing:
+                        footer_txt = (
+                            "[Up/Down] Select Destination  "
+                            "[Enter] Replace All  [Esc] Cancel")
+                    elif town_active_sub == "interiors":
                         footer_txt = (
                             "[Arrows/WASD] Move  [Enter] Paint  "
-                            "[I] Back to Town  [Tab] Brush  [Esc] Back")
+                            "[I] Back to Town  [R] Replace  [Tab] Brush  [Esc] Back")
                     else:
                         footer_txt = (
                             "[Arrows/WASD] Move  [Enter] Paint  "
-                            "[I] Link Interior  [Tab] Brush  [Esc] Back")
+                            "[I] Link Interior  [R] Replace  [Tab] Brush  [Esc] Back")
                     self._u3_text(
                         footer_txt,
                         SCREEN_WIDTH // 2 - 240,
@@ -9173,6 +9193,120 @@ class Renderer(CombatEffectRendererMixin):
             cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts, ts, ts)
             pygame.draw.rect(self.screen, (255, 200, pulse),
                              cursor_rect, 2)
+
+    def _draw_townlayout_replace_overlay(self, rx, ry, rw, rh,
+                                          brushes, src_tile, src_name,
+                                          src_empty, dst_idx):
+        """Draw the tile replace overlay on top of the grid.
+
+        Shows the source tile being replaced and a scrollable list of
+        destination brushes to choose from.
+        """
+        fs = self.font_small
+        f = self.font
+
+        # Semi-transparent backdrop
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))
+        self.screen.blit(overlay, (rx, ry))
+
+        # Title
+        self._u3_text("REPLACE TILE", rx + rw // 2 - 50, ry + 10,
+                       self._U3_ORANGE, f)
+
+        # Source tile info
+        src_label = src_name or f"Tile {src_tile}"
+        self._u3_text(f"From: {src_label}", rx + 16, ry + 38,
+                       (255, 120, 120), fs)
+
+        # Source tile color swatch
+        from src.settings import TILE_DEFS
+        swatch_x = rx + rw - 60
+        if src_empty:
+            # Draw checkerboard for empty
+            for qr in range(2):
+                for qc in range(2):
+                    qx = swatch_x + qc * 10
+                    qy = ry + 32 + qr * 10
+                    qcol = (45, 45, 45) if (qr + qc) % 2 == 0 else (30, 30, 30)
+                    pygame.draw.rect(self.screen, qcol,
+                                     pygame.Rect(qx, qy, 10, 10))
+        else:
+            src_def = TILE_DEFS.get(src_tile, {})
+            src_col = src_def.get("color", (80, 80, 80))
+            pygame.draw.rect(self.screen, src_col,
+                             pygame.Rect(swatch_x, ry + 32, 20, 20))
+        pygame.draw.rect(self.screen, (120, 100, 80),
+                         pygame.Rect(swatch_x, ry + 32, 20, 20), 1)
+
+        # Divider
+        pygame.draw.line(self.screen, (80, 70, 60),
+                         (rx + 12, ry + 58), (rx + rw - 12, ry + 58))
+
+        # "To:" label
+        self._u3_text("To:", rx + 16, ry + 64,
+                       (120, 220, 120), fs)
+
+        # Scrollable brush list
+        row_h = 28
+        list_y0 = ry + 84
+        max_vis = max(1, (rh - 100) // row_h)
+        n = len(brushes)
+
+        # Keep selected item visible
+        scroll = max(0, dst_idx - max_vis + 1)
+        scroll = min(scroll, max(0, n - max_vis))
+
+        for bi in range(scroll, min(scroll + max_vis, n)):
+            by = list_y0 + (bi - scroll) * row_h
+            b = brushes[bi]
+            is_sel = (bi == dst_idx)
+
+            if is_sel:
+                # Highlight bar
+                bar = pygame.Surface((rw - 24, row_h - 2), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 50))
+                self.screen.blit(bar, (rx + 12, by))
+                pygame.draw.rect(self.screen, (200, 160, 60),
+                                 (rx + 12, by, rw - 24, row_h - 2), 1)
+
+            # Sprite preview or color swatch (18px)
+            icon_x = rx + 18
+            text_x = icon_x + 4
+            b_path = b.get("path")
+            if b_path:
+                spr = self._get_unique_tile_sprite(b_path, 18)
+                if spr:
+                    self.screen.blit(spr, (icon_x, by + 4))
+                    text_x = icon_x + 24
+            elif b.get("tile_id") is not None:
+                tc = TILE_DEFS.get(b["tile_id"], {}).get("color", (80, 80, 80))
+                pygame.draw.rect(self.screen, tc,
+                                 pygame.Rect(icon_x, by + 4, 18, 18))
+                pygame.draw.rect(self.screen, (60, 50, 40),
+                                 pygame.Rect(icon_x, by + 4, 18, 18), 1)
+                text_x = icon_x + 24
+            elif b["name"] == "Eraser":
+                # Draw an X for eraser
+                ex = icon_x + 2
+                ey = by + 6
+                pygame.draw.line(self.screen, (200, 60, 60),
+                                 (ex, ey), (ex + 14, ey + 14), 2)
+                pygame.draw.line(self.screen, (200, 60, 60),
+                                 (ex + 14, ey), (ex, ey + 14), 2)
+                text_x = icon_x + 24
+
+            nc = (255, 255, 100) if is_sel else (180, 180, 200)
+            self._u3_text(b["name"], text_x, by + 5, nc, fs)
+
+        # Scroll indicators
+        if scroll > 0:
+            self._u3_text("\u25b2", rx + rw // 2 - 4, list_y0 - 14,
+                           (160, 160, 180), fs)
+        if scroll + max_vis < n:
+            self._u3_text("\u25bc", rx + rw // 2 - 4,
+                           list_y0 + max_vis * row_h,
+                           (160, 160, 180), fs)
 
     def _draw_interior_picker(self, rx, ry, rw, rh,
                                interiors, cursor, scroll,
