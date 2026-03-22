@@ -1,25 +1,19 @@
-Town 
-- Add interactable tiles for shops and more in town
-- Inventory for shops
 
 Overview Editor
 - create a UI Navigation first
 
 Edit Game Features
 - Modules
-
 - Spells
 - Items
 - Monsters
 - Tile Types
 - Tile Gallery
-- Town Layouts
+- Town Layout Templates
+- - Town Details, Town Interiors, Town Layout 
 
 
-
-
-
-Polish Content Systems
+Create Good Content for Levels 1-5 (to start)
 - add editing screens for content templates (spells, items, classes, monsters, shops)
 - modules should inherit but be able to override some things like town appearance, shops, etc
 - modules should have the option for an over arching cohesive quest
