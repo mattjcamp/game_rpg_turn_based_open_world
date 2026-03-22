@@ -7277,7 +7277,11 @@ class Renderer(CombatEffectRendererMixin):
                               townlayout_name_buf="",
                               town_subfolders=None,
                               town_subfolder_cursor=0,
-                              town_active_sub=None):
+                              town_active_sub=None,
+                              interior_picking=False,
+                              interior_pick_cursor=0,
+                              interior_pick_scroll=0,
+                              interior_list=None):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7763,11 +7767,20 @@ class Renderer(CombatEffectRendererMixin):
                         layout, townlayout_cx, townlayout_cy,
                         townlayout_brush_idx, brushes)
 
+                    # ── Interior picker overlay ──
+                    if interior_picking:
+                        self._draw_interior_picker(
+                            right_x + 8, panel_y + 8,
+                            right_w - 16, panel_h - 16,
+                            interior_list or [],
+                            interior_pick_cursor,
+                            interior_pick_scroll)
+
                     # Footer
                     self._u3_text(
                         "[Arrows/WASD] Move  [Enter] Paint  "
-                        "[Tab] Brush  [Ctrl+S] Save  [Esc] Save & Back",
-                        SCREEN_WIDTH // 2 - 230,
+                        "[I] Link Interior  [Tab] Brush  [Esc] Back",
+                        SCREEN_WIDTH // 2 - 240,
                         SCREEN_HEIGHT - 45,
                         self._U3_HINT, fs)
 
@@ -9065,6 +9078,23 @@ class Renderer(CombatEffectRendererMixin):
                 pygame.draw.rect(self.screen, (40, 35, 30),
                                  pygame.Rect(px, py, ts, ts), 1)
 
+                # Interior-link indicator: cyan border + small "I" badge
+                if pos_key in tiles:
+                    td = tiles[pos_key]
+                    if td.get("interior"):
+                        pygame.draw.rect(self.screen, (80, 220, 255),
+                                         pygame.Rect(px, py, ts, ts), 2)
+                        # Small "I" badge in the top-right corner
+                        badge_sz = max(ts // 3, 6)
+                        bx = px + ts - badge_sz - 1
+                        by = py + 1
+                        pygame.draw.rect(self.screen, (0, 140, 200),
+                                         pygame.Rect(bx, by, badge_sz, badge_sz))
+                        if badge_sz >= 8:
+                            tiny = self.font_tiny if hasattr(self, 'font_tiny') else self.font_small
+                            isf = tiny.render("I", True, (255, 255, 255))
+                            self.screen.blit(isf, (bx + 1, by))
+
         # Draw cursor
         if cx >= 0 and cy >= 0:
             elapsed = pygame.time.get_ticks() / 1000.0
@@ -9072,6 +9102,48 @@ class Renderer(CombatEffectRendererMixin):
             cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts, ts, ts)
             pygame.draw.rect(self.screen, (255, 200, pulse),
                              cursor_rect, 2)
+
+    def _draw_interior_picker(self, rx, ry, rw, rh,
+                               interiors, cursor, scroll):
+        """Draw the interior-link picker overlay on top of the grid."""
+        fs = self.font_small
+        f = self.font
+
+        # Semi-transparent backdrop
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (rx, ry))
+
+        # Title
+        self._u3_text("Link to Interior",
+                      rx + 16, ry + 10, (80, 220, 255), f)
+        self._u3_text("[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel",
+                      rx + 16, ry + 34, (140, 140, 160), fs)
+
+        # List: index 0 = "(none)", then all interiors
+        items = ["(none)"] + [i["name"] for i in interiors]
+        n = len(items)
+        row_h = 28
+        list_y0 = ry + 60
+        max_vis = max(1, (rh - 80) // row_h)
+
+        for vi in range(max_vis):
+            idx = scroll + vi
+            if idx >= n:
+                break
+            iy = list_y0 + vi * row_h
+            is_sel = (idx == cursor)
+            if is_sel:
+                bar = pygame.Surface((rw - 32, row_h - 2), pygame.SRCALPHA)
+                bar.fill((80, 220, 255, 40))
+                self.screen.blit(bar, (rx + 16, iy))
+                pygame.draw.rect(self.screen, (80, 220, 255),
+                                 (rx + 16, iy, rw - 32, row_h - 2), 1)
+            label = items[idx]
+            col = (255, 255, 255) if is_sel else (180, 180, 200)
+            if idx == 0:
+                col = (255, 120, 120) if is_sel else (160, 120, 120)
+            self._u3_text(label, rx + 24, iy + 4, col, fs)
 
     def _render_tile_preview(self, category, name, tile_id, size=96):
         """Render a tile preview surface showing how it looks in-game.

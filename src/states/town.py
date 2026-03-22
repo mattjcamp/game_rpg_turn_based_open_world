@@ -605,13 +605,95 @@ class TownState(InventoryMixin, BaseState):
 
     def _check_tile_events(self):
         """Check if the party stepped on a special tile."""
+        party = self.game.party
         tile_id = self.town_data.tile_map.get_tile(
-            self.game.party.col, self.game.party.row
+            party.col, party.row
         )
         if tile_id == TILE_EXIT:
             self._exit_town()
         elif tile_id == TILE_MACHINE:
             self._interact_machine()
+
+        # Check for interior links (editor-defined door → interior)
+        links = getattr(self.town_data, "interior_links", {})
+        interior_name = links.get((party.col, party.row))
+        if interior_name:
+            self._enter_interior(interior_name, party.col, party.row)
+
+    def _enter_interior(self, interior_name, door_col, door_row):
+        """Transition into a building interior."""
+        # Load the interior grid from town_templates.json
+        import json, os
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data", "town_templates.json")
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            self.show_message("The door is locked.", 1500)
+            return
+        interiors = data.get("interiors", [])
+        interior = None
+        for entry in interiors:
+            if entry.get("name") == interior_name:
+                interior = entry
+                break
+        if not interior or not interior.get("tiles"):
+            self.show_message("The door is locked.", 1500)
+            return
+
+        # Store where we came from so we can return
+        self._interior_return_col = door_col
+        self._interior_return_row = door_row
+        self._interior_return_map = self.town_data.tile_map
+        self._interior_return_npcs = self.town_data.npcs
+        self._interior_return_links = getattr(
+            self.town_data, "interior_links", {})
+        self._interior_name = interior_name
+        self._in_interior = True
+
+        # Build a tile map from the interior grid
+        from src.tile_map import TileMap
+        iw = interior.get("width", 14)
+        ih = interior.get("height", 15)
+        from src.settings import TILE_DEFS
+        TILE_WALL = 11
+        TILE_FLOOR = 10
+        imap = TileMap(iw, ih)
+        # Fill with walls, then apply the painted tiles
+        for r in range(ih):
+            for c in range(iw):
+                imap.set_tile(c, r, TILE_WALL)
+        for pos_key, td in interior.get("tiles", {}).items():
+            parts = pos_key.split(",")
+            c, r = int(parts[0]), int(parts[1])
+            tid = td.get("tile_id")
+            if tid is not None and 0 <= c < iw and 0 <= r < ih:
+                imap.set_tile(c, r, tid)
+
+        self.town_data.tile_map = imap
+        self.town_data.npcs = []  # interiors have no NPCs (for now)
+        self.town_data.interior_links = {}
+
+        # Place party at the exit tile (or center if none found)
+        entry_placed = False
+        for pos_key, td in interior.get("tiles", {}).items():
+            if td.get("tile_id") == TILE_EXIT:
+                parts = pos_key.split(",")
+                self.game.party.col = int(parts[0])
+                self.game.party.row = int(parts[1])
+                entry_placed = True
+                break
+        if not entry_placed:
+            self.game.party.col = iw // 2
+            self.game.party.row = ih // 2
+
+        # Update camera
+        self.game.camera.map_width = iw
+        self.game.camera.map_height = ih
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self.show_message(f"Entering {interior_name}...", 1500)
 
     # ── Machine interaction (Keys of Shadow) ──────────────────
 
@@ -1557,11 +1639,30 @@ class TownState(InventoryMixin, BaseState):
                 pass
 
     def _exit_town(self):
-        """Leave the town and return to the overworld."""
-        # Restore party position on the overworld
+        """Leave the town (or exit an interior back to the town)."""
+        # If inside a building interior, return to the town map
+        if getattr(self, "_in_interior", False):
+            self._exit_interior()
+            return
+        # Otherwise leave the town entirely
         self.game.party.col = self.overworld_col
         self.game.party.row = self.overworld_row
         self.game.change_state("overworld")
+
+    def _exit_interior(self):
+        """Return from a building interior to the town map."""
+        self.town_data.tile_map = self._interior_return_map
+        self.town_data.npcs = self._interior_return_npcs
+        self.town_data.interior_links = self._interior_return_links
+        # Place party back at the door tile
+        self.game.party.col = self._interior_return_col
+        self.game.party.row = self._interior_return_row
+        # Restore camera
+        self.game.camera.map_width = self.town_data.tile_map.width
+        self.game.camera.map_height = self.town_data.tile_map.height
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self._in_interior = False
+        self.show_message("Back outside.", 1000)
 
     def update(self, dt):
         """Update timers."""

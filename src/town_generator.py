@@ -68,7 +68,7 @@ class TownData:
 
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
                  keyslot_positions=None, town_style="medieval",
-                 building_signs=None):
+                 building_signs=None, interior_links=None):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -82,6 +82,11 @@ class TownData:
         #   text (str), row (int), col (int), width (int in tiles)
         # Used by the renderer to overlay text on building walls.
         self.building_signs = building_signs or []
+        # Interior links: {(col, row): interior_name}
+        # When the player steps on a linked tile, the game transitions
+        # to that interior space.  The interior data (tile grid, NPCs)
+        # is stored separately in town_templates.json.
+        self.interior_links = interior_links or {}
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""

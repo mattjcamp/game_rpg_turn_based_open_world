@@ -371,6 +371,10 @@ class Game:
         self._feat_townlayout_brushes = None  # built lazily from manifest
         self._feat_townlayout_naming = False   # True when typing a name
         self._feat_townlayout_name_buf = ""    # text buffer for naming
+        # Interior-link picker (opened with I in the grid painter)
+        self._feat_interior_picking = False    # True when picker overlay is open
+        self._feat_interior_pick_cursor = 0    # cursor in the picker list
+        self._feat_interior_pick_scroll = 0    # scroll offset for the list
 
         self._feat_pxedit_palette = [
             (0, 0, 0, 255),        # Black
@@ -3323,6 +3327,11 @@ class Game:
             self._feat_handle_townlayout_naming_input(event)
             return
 
+        # ── Interior picker overlay ──
+        if self._feat_interior_picking:
+            self._feat_handle_interior_picker_input(event)
+            return
+
         if self._feat_townlayout_editing:
             # Grid painter mode
             self._feat_handle_townlayout_painter_input(event)
@@ -3483,6 +3492,66 @@ class Game:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx - 1) % n
             else:
                 self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx + 1) % n
+        elif event.key == pygame.K_i:
+            # Open interior-link picker for the tile under cursor
+            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
+            if pos_key in layout["tiles"]:
+                interiors = self._feat_town_lists.get("interiors", [])
+                # Build picker list: "(none)" + all interior names
+                self._feat_interior_picking = True
+                self._feat_interior_pick_cursor = 0
+                self._feat_interior_pick_scroll = 0
+                # Pre-select the current link if one exists
+                current = layout["tiles"][pos_key].get("interior", "")
+                if current:
+                    for i, intr in enumerate(interiors):
+                        if intr["name"] == current:
+                            self._feat_interior_pick_cursor = i + 1  # +1 for (none)
+                            break
+        elif event.key == pygame.K_x:
+            # Quick-remove interior link from tile under cursor
+            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
+            td = layout["tiles"].get(pos_key)
+            if td and "interior" in td:
+                del td["interior"]
+                self._feat_dirty = True
+
+    def _feat_handle_interior_picker_input(self, event):
+        """Handle input for the interior-link picker overlay."""
+        interiors = self._feat_town_lists.get("interiors", [])
+        n = len(interiors) + 1  # +1 for "(none)" at index 0
+
+        if event.key == pygame.K_ESCAPE:
+            self._feat_interior_picking = False
+            return
+        if event.key == pygame.K_UP:
+            self._feat_interior_pick_cursor = (
+                self._feat_interior_pick_cursor - 1) % n
+            self._feat_interior_pick_scroll = (
+                self._feat_adjust_scroll_generic(
+                    self._feat_interior_pick_cursor,
+                    self._feat_interior_pick_scroll))
+        elif event.key == pygame.K_DOWN:
+            self._feat_interior_pick_cursor = (
+                self._feat_interior_pick_cursor + 1) % n
+            self._feat_interior_pick_scroll = (
+                self._feat_adjust_scroll_generic(
+                    self._feat_interior_pick_cursor,
+                    self._feat_interior_pick_scroll))
+        elif event.key == pygame.K_RETURN:
+            # Apply the selection
+            layout = self._feat_townlayout_list[self._feat_townlayout_cursor]
+            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
+            td = layout["tiles"].get(pos_key)
+            if td:
+                idx = self._feat_interior_pick_cursor
+                if idx == 0:
+                    # "(none)" — remove link
+                    td.pop("interior", None)
+                else:
+                    td["interior"] = interiors[idx - 1]["name"]
+                self._feat_dirty = True
+            self._feat_interior_picking = False
 
     def _feat_pxedit_open(self):
         """Open the pixel editor for the currently selected sprite."""
@@ -7779,6 +7848,10 @@ class Game:
                     town_subfolders=self._feat_town_subfolders,
                     town_subfolder_cursor=self._feat_town_subfolder_cursor,
                     town_active_sub=self._feat_town_active_sub,
+                    interior_picking=self._feat_interior_picking,
+                    interior_pick_cursor=self._feat_interior_pick_cursor,
+                    interior_pick_scroll=self._feat_interior_pick_scroll,
+                    interior_list=self._feat_town_lists.get("interiors", []),
                 )
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
