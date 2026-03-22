@@ -1,4 +1,18 @@
 
+Edit Game Settings
+- Modules
+- - Module List
+- - - Module Detail
+- - - Settings
+- - - Towns
+- - - Dungeons
+- - - Overview Map
+- - - - Settings (Map Size, Type, Initial Build)
+- - - - Map Layout (Editable Tiles)
+- - - - Unique Tiles (Unique Tiles that can be placed on Overview Map)
+- - - - Interior Map Locations (Unique locations that can be placed)
+
+
 Overview Map Editor
 - Locate this under Modules
 - create a UI Navigation first

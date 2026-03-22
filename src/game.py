@@ -4965,23 +4965,18 @@ class Game:
             ],
         })
 
-        # 2) Settings (read-only except innkeeper quests toggle)
+        # 2) Settings (only innkeeper quests toggle remains here;
+        #    world size / season / time-of-day moved to Overview Map)
         innkeeper_quests = manifest.get("progression", {}).get(
             "innkeeper_quests", False)
         sections.append({
             "label": "Settings",
             "icon": ">",
             "fields": [
-                ["World Size", "world_size",
-                 mod_settings["world_size"], "choice", False],
                 ["Towns", "num_towns",
                  str(mod_settings["num_towns"]), "int", False],
                 ["Quests", "num_quests",
                  str(mod_settings["num_quests"]), "int", False],
-                ["Season", "season",
-                 mod_settings["season"], "choice", False],
-                ["Time of Day", "time_of_day",
-                 mod_settings["time_of_day"], "choice", False],
                 ["Innkeeper Quests", "innkeeper_quests",
                  "Yes" if innkeeper_quests else "No", "choice", True],
             ],
@@ -5119,21 +5114,23 @@ class Game:
                          if n_quests else "none"),
         })
 
-        # 6) Unique Tiles folder — each tile is a child + [+] Add Tile
+        # 6) Overview Map folder — sub-sections for map editing
+        #    (Load unique tiles first — they live inside Overview Map now)
         unique_tiles_data = manifest.get("unique_tiles", {})
         self.module_edit_unique_tiles = [
             {"id": tid, **tdef}
             for tid, tdef in unique_tiles_data.items()
         ]
-        utile_children = self._build_unique_tiles_sections()
-        n_utiles = len(self.module_edit_unique_tiles)
+        overworld_cfg = manifest.get("world", {}).get(
+            "overworld_config", {})
+        omap_children = self._build_overview_map_sections(
+            overworld_cfg, manifest, mod_settings)
         sections.append({
-            "label": "Unique Tiles",
+            "label": "Overview Map",
             "icon": "F",
-            "folder": "unique_tiles",
-            "children": utile_children,
-            "subtitle": (f"{n_utiles} tile{'s' if n_utiles != 1 else ''}"
-                         if n_utiles > 0 else "no tiles"),
+            "folder": "overview_map",
+            "children": omap_children,
+            "subtitle": overworld_cfg.get("type", "Procedural"),
         })
 
         self.module_edit_sections = sections
@@ -6212,6 +6209,97 @@ class Game:
             "fields": fields,
         }
 
+    # ── Overview Map sub-section builders ──────────────────────────
+
+    def _build_overview_map_sections(self, overworld_cfg, manifest,
+                                      mod_settings=None):
+        """Build the child section list for the Overview Map folder.
+
+        Returns four sub-sections:
+        1) Settings   – world size, season, time of day, map type,
+                        initial build
+        2) Map Layout – placeholder for the editable tile grid
+        3) Unique Tiles – unique tile placements on the overview map
+        4) Interior Map Locations – placeable unique locations
+        """
+        if mod_settings is None:
+            mod_settings = {}
+
+        # ── 1) Settings ──
+        #    World Size / Season / Time of Day come from the module's
+        #    settings (previously shown at top-level Settings section).
+        #    Map Type and Initial Build are overview-map-specific.
+        world_size = mod_settings.get("world_size", "Medium")
+        season = mod_settings.get("season", "Summer")
+        time_of_day = mod_settings.get("time_of_day", "Noon")
+        map_type = overworld_cfg.get("type", "Procedural")
+        initial_build = overworld_cfg.get(
+            "initial_build", "Random")
+
+        settings_fields = [
+            ["World Size", "omap_world_size", world_size,
+             "choice", True],
+            ["Season", "omap_season", season, "choice", True],
+            ["Time of Day", "omap_time_of_day", time_of_day,
+             "choice", True],
+            ["Map Type", "omap_type", map_type, "choice", True],
+            ["Initial Build", "omap_initial_build",
+             initial_build, "choice", True],
+        ]
+        settings_sec = {
+            "label": "Settings",
+            "icon": ">",
+            "fields": settings_fields,
+        }
+
+        # ── 2) Map Layout ──
+        map_layout_sec = {
+            "label": "Map Layout",
+            "icon": "G",
+            "fields": [
+                ["— Editable Tiles —", "_omap_layout_header",
+                 "", "section", False],
+            ],
+            "subtitle": "editable tiles",
+        }
+
+        # ── 3) Unique Tiles (moved from top-level into Overview Map) ──
+        utile_children = self._build_unique_tiles_sections()
+        n_utiles = len(self.module_edit_unique_tiles)
+        unique_tiles_sec = {
+            "label": "Unique Tiles",
+            "icon": "F",
+            "folder": "unique_tiles",
+            "children": utile_children,
+            "subtitle": (
+                f"{n_utiles} tile{'s' if n_utiles != 1 else ''}"
+                if n_utiles > 0 else "no tiles"),
+        }
+
+        # ── 4) Interior Map Locations ──
+        interior_locs = overworld_cfg.get("interior_locations", [])
+        n_locs = len(interior_locs)
+        interior_sec = {
+            "label": "Interior Map Locations",
+            "icon": "I",
+            "fields": [
+                ["— Placeable Locations —",
+                 "_omap_intlocs_header", "", "section", False],
+            ],
+            "subtitle": (
+                f"{n_locs} location{'s' if n_locs != 1 else ''}"
+                if n_locs else "none"),
+        }
+
+        return [settings_sec, map_layout_sec,
+                unique_tiles_sec, interior_sec]
+
+    def _in_overview_map_folder(self):
+        """Return True if the section browser is inside the Overview Map folder."""
+        return (self._module_edit_folder_label == "Overview Map"
+                and self.module_edit_nav_stack
+                and self.module_edit_level == 0)
+
     def _build_unique_tiles_sections(self):
         """Build the full section list for the Unique Tiles folder:
         one child per tile, plus a [+] Add Tile action at the end."""
@@ -6806,6 +6894,20 @@ class Game:
             return self._get_utile_tile_graphics()
         elif key.endswith("_basetile") and key.startswith("utile_"):
             return self._UTILE_BASE_TILES
+        # Overview Map choices
+        elif key == "omap_world_size":
+            from src.module_loader import WORLD_SIZE_NAMES
+            return WORLD_SIZE_NAMES
+        elif key == "omap_season":
+            from src.module_loader import SEASON_NAMES
+            return SEASON_NAMES
+        elif key == "omap_time_of_day":
+            from src.module_loader import TIME_OF_DAY_NAMES
+            return TIME_OF_DAY_NAMES
+        elif key == "omap_type":
+            return ["Procedural", "Custom"]
+        elif key == "omap_initial_build":
+            return ["Random", "Blank", "Template"]
         # No match
 
         return []
@@ -7207,6 +7309,47 @@ class Game:
                 data["unique_tiles"] = ut_dict
             else:
                 data.pop("unique_tiles", None)
+
+            # ── Overview Map settings (omap_*) ──
+            #    World Size, Season, Time of Day are stored in the
+            #    module's core settings so the procedural generator
+            #    keeps working exactly as before.
+            from src.module_loader import (WORLD_SIZE_PRESETS,
+                                           _SEASON_MONTHS,
+                                           _TIME_HOURS)
+            omap_keys = {k: v for k, v in values.items()
+                         if k.startswith("omap_")}
+            if omap_keys:
+                # World Size → settings.map_width / map_height
+                ws = omap_keys.get("omap_world_size")
+                if ws and ws in WORLD_SIZE_PRESETS:
+                    settings_d = data.setdefault("settings", {})
+                    dims = WORLD_SIZE_PRESETS[ws]
+                    settings_d["map_width"] = dims["map_width"]
+                    settings_d["map_height"] = dims["map_height"]
+
+                # Season → settings.start_time.month
+                season_val = omap_keys.get("omap_season")
+                if season_val and season_val in _SEASON_MONTHS:
+                    settings_d = data.setdefault("settings", {})
+                    st = settings_d.setdefault("start_time", {})
+                    st["month"] = _SEASON_MONTHS[season_val]
+
+                # Time of Day → settings.start_time.hour
+                tod_val = omap_keys.get("omap_time_of_day")
+                if tod_val and tod_val in _TIME_HOURS:
+                    settings_d = data.setdefault("settings", {})
+                    st = settings_d.setdefault("start_time", {})
+                    st["hour"] = _TIME_HOURS[tod_val]
+
+                # Overview-map-specific keys
+                world = data.setdefault("world", {})
+                ow_cfg = world.setdefault("overworld_config", {})
+                if "omap_type" in omap_keys:
+                    ow_cfg["type"] = omap_keys["omap_type"]
+                if "omap_initial_build" in omap_keys:
+                    ow_cfg["initial_build"] = \
+                        omap_keys["omap_initial_build"]
 
             # Write back
             try:

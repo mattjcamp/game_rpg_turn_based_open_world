@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "ttttt",
-    "name": "ttttt",
-    "author": "",
-    "description": "Ancient seals have been scattered across the land. Recover them from dangerous dungeons and return them to the altar in Stormhold to restore the protective ward.",
+    "id": "test_overview",
+    "name": "Test Overview",
+    "author": "Me",
+    "description": "An invasion threatens the realm. Forge powerful weapons from artifacts hidden in treacherous dungeons and deliver them to the armory in Stormridge.",
     "version": "0.1.0"
   },
   "settings": {
@@ -41,29 +41,32 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "stormhold",
-        "name": "Stormhold",
-        "description": "A quiet hamlet nestled among rolling hills, known for its warm hearths.",
+        "id": "stormridge",
+        "name": "Stormridge",
+        "description": "A bustling market town where traders from distant lands hawk exotic wares.",
         "town_config": {
           "size": "medium",
           "style": "medieval",
           "buildings": [
             "shrine"
-          ],
-          "layout": "Newtown"
+          ]
         }
       }
     ],
-    "dungeons": []
+    "dungeons": [],
+    "overworld_config": {
+      "type": "Procedural",
+      "initial_build": "Random"
+    }
   },
   "progression": {
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 0,
-      "deliver_to": "town_altar"
+      "deliver_to": "town_armory"
     },
     "starting_quests": [
-      "restore"
+      "defend"
     ],
     "key_dungeons": [],
     "innkeeper_quests": false

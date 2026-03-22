@@ -11055,6 +11055,12 @@ class Renderer(CombatEffectRendererMixin):
             elif icon == "U":
                 badge_color = (140, 100, 160)
                 badge_text = "U"
+            elif icon == "G":
+                badge_color = (80, 140, 120)
+                badge_text = "G"
+            elif icon == "I":
+                badge_color = (120, 130, 160)
+                badge_text = "I"
             elif icon == "+":
                 badge_color = (80, 140, 80)
                 badge_text = "+"
