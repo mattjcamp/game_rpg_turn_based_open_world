@@ -347,17 +347,7 @@ class Game:
         self._unsaved_dialog_discard_cb = None # callable: exit without saving
         self._feat_dirty = False               # True when editor has unsaved changes
 
-        # Town editor state — three sub-editors share same grid painter
-        self._feat_town_subfolders = [
-            {"name": "layouts", "label": "Town Layouts",
-             "icon": "L", "desc": "Full town map layouts"},
-            {"name": "features", "label": "Town Features",
-             "icon": "F", "desc": "Reusable features (fountains, buildings)"},
-            {"name": "interiors", "label": "Town Interior Spaces",
-             "icon": "I", "desc": "Building interiors"},
-        ]
-        self._feat_town_subfolder_cursor = 0
-        self._feat_town_active_sub = None     # "layouts" / "features" / "interiors"
+        # Town editor state — restructured for new hierarchy
         # Per-sub-editor lists stored by key
         self._feat_town_lists = {
             "layouts": [], "features": [], "interiors": [],
@@ -371,13 +361,20 @@ class Game:
         self._feat_townlayout_brushes = None  # built lazily from manifest
         self._feat_townlayout_naming = False   # True when typing a name
         self._feat_townlayout_name_buf = ""    # text buffer for naming
+        # New state for town editor hierarchy
+        self._feat_town_active_sub = None     # None (town list), "nodes" (3-node selection),
+                                               # "details" (editing details), "interiors" (interior list)
+        self._feat_town_selected_idx = 0      # index into layouts[] for the currently selected town
+        self._feat_town_node_cursor = 0       # 0=Details, 1=Interiors, 2=Layout
+        self._feat_town_detail_editing = False  # True when editing name/desc
+        self._feat_town_desc_buf = ""         # text buffer for description
         # Tile replace mode (opened with R in the grid painter)
         self._feat_townlayout_replacing = False    # True when replace overlay is open
         self._feat_townlayout_replace_src_tile = None  # tile_id of source tile under cursor
         self._feat_townlayout_replace_src_name = ""    # display name of source tile
         self._feat_townlayout_replace_src_empty = False  # True when replacing empty cells
         self._feat_townlayout_replace_dst_idx = 0      # brush index for destination
-        # Town picker overlay (shown when creating a new interior to pick parent)
+        # Town picker overlay (shown when copying interior to pick parent)
         self._feat_town_picker_active = False
         self._feat_town_picker_cursor = 0
         # Interior-link picker (opened with I in the grid painter)
@@ -3155,6 +3152,9 @@ class Game:
                     "height": tl.get("height", defaults["height"]),
                     "tiles": dict(tl.get("tiles", {})),
                 }
+                # Layouts carry a description
+                if sub_key == "layouts":
+                    item["description"] = tl.get("description", "")
                 # Interiors carry a parent_town to scope them to a layout
                 if sub_key == "interiors":
                     item["parent_town"] = tl.get("parent_town", "")
@@ -3164,8 +3164,10 @@ class Game:
         # ── Auto-migrate: assign unscoped interiors to their parent town ──
         self._feat_migrate_interior_parents()
 
-        self._feat_town_subfolder_cursor = 0
         self._feat_town_active_sub = None
+        self._feat_town_node_cursor = 0
+        self._feat_town_detail_editing = False
+        self._feat_town_desc_buf = ""
         self._feat_townlayout_cursor = 0
         self._feat_townlayout_scroll = 0
         self._feat_townlayout_editing = False
@@ -3199,14 +3201,44 @@ class Game:
 
     @property
     def _feat_townlayout_list(self):
-        """Return the active sub-editor's item list."""
-        sub = self._feat_town_active_sub or "layouts"
-        return self._feat_town_lists.get(sub, [])
+        """Return the appropriate list based on active_sub state.
+
+        - When active_sub is None, "nodes", or "details": return layouts list (town list)
+        - When active_sub is "interiors": return filtered interiors for selected town
+        """
+        if self._feat_town_active_sub in ("interiors", "details", "nodes") or self._feat_town_active_sub is None:
+            # For town list, nodes, details views: return layouts
+            if self._feat_town_active_sub is None or self._feat_town_active_sub in ("nodes", "details"):
+                return self._feat_town_lists.get("layouts", [])
+            # For interiors view: return filtered list scoped to selected town
+            if self._feat_town_active_sub == "interiors":
+                selected_town = self._get_selected_town_name()
+                if selected_town:
+                    return [i for i in self._feat_town_lists.get("interiors", [])
+                            if i.get("parent_town") == selected_town]
+                return []
+        return self._feat_town_lists.get("layouts", [])
 
     @_feat_townlayout_list.setter
     def _feat_townlayout_list(self, value):
-        sub = self._feat_town_active_sub or "layouts"
-        self._feat_town_lists[sub] = value
+        """Set the list based on active_sub state.
+
+        For interiors, this just replaces the entire list since we work
+        with filtered views. The naming/painting handlers update items
+        directly by reference, so the filtered list changes are reflected
+        in the main interiors list.
+        """
+        if self._feat_town_active_sub == "interiors":
+            self._feat_town_lists["interiors"] = value
+        else:
+            self._feat_town_lists["layouts"] = value
+
+    def _get_selected_town_name(self):
+        """Get the name of the currently selected town."""
+        layouts = self._feat_town_lists.get("layouts", [])
+        if 0 <= self._feat_town_selected_idx < len(layouts):
+            return layouts[self._feat_town_selected_idx]["name"]
+        return None
 
     def _feat_save_townlayouts(self):
         """Persist all town sub-editor lists to town_templates.json."""
@@ -3220,6 +3252,8 @@ class Game:
                     "height": tl["height"],
                     "tiles": dict(tl.get("tiles", {})),
                 }
+                if sub_key == "layouts":
+                    item["description"] = tl.get("description", "")
                 if sub_key == "interiors":
                     item["parent_town"] = tl.get("parent_town", "")
                 raw.append(item)
@@ -3325,6 +3359,8 @@ class Game:
             "height": defaults["height"],
             "tiles": {},
         }
+        if sub == "layouts":
+            item["description"] = ""
         if sub == "interiors":
             item["parent_town"] = parent_town
         items.append(item)
@@ -3333,13 +3369,31 @@ class Game:
 
     def _feat_remove_townlayout(self):
         """Remove the currently selected item from the active sub-editor."""
-        items = self._feat_townlayout_list
-        if not items:
-            return
-        idx = self._feat_townlayout_cursor
-        items.pop(idx)
-        if self._feat_townlayout_cursor >= len(items):
-            self._feat_townlayout_cursor = max(0, len(items) - 1)
+        if self._feat_town_active_sub == "interiors":
+            # For interiors, we need to find and remove from the full list
+            filtered_items = self._feat_townlayout_list
+            if not filtered_items or self._feat_townlayout_cursor >= len(filtered_items):
+                return
+            item_to_remove = filtered_items[self._feat_townlayout_cursor]
+            # Find and remove this item from the full interiors list
+            all_interiors = self._feat_town_lists.get("interiors", [])
+            try:
+                all_interiors.remove(item_to_remove)
+            except ValueError:
+                pass
+            # Recalculate filtered list and adjust cursor
+            filtered_items = self._feat_townlayout_list
+            if self._feat_townlayout_cursor >= len(filtered_items):
+                self._feat_townlayout_cursor = max(0, len(filtered_items) - 1)
+        else:
+            # For layouts/features, remove from list directly
+            items = self._feat_townlayout_list
+            if not items:
+                return
+            idx = self._feat_townlayout_cursor
+            items.pop(idx)
+            if self._feat_townlayout_cursor >= len(items):
+                self._feat_townlayout_cursor = max(0, len(items) - 1)
 
     def _feat_enter_townlayout_painter(self):
         """Enter the grid painter for the selected item."""
@@ -3446,9 +3500,11 @@ class Game:
                 "path": _resolve_sprite_path(tid),
             })
 
-        # ── Append town features as composite brushes (only for layouts) ──
+        # ── Append town features as composite brushes (only for town layouts, not interiors) ──
+        # Features should appear when editing a layout, but not when editing an interior
         sub = self._feat_town_active_sub or "layouts"
-        if sub == "layouts":
+        is_editing_layout = sub in (None, "nodes", "details")
+        if is_editing_layout:
             features = self._feat_town_lists.get("features", [])
             for fi, feat in enumerate(features):
                 if not feat.get("tiles"):
@@ -3464,7 +3520,15 @@ class Game:
         return brushes
 
     def _feat_handle_townlayout_input(self, event):
-        """Handle input for the town layouts editor."""
+        """Handle input for the town layouts editor with new hierarchy.
+
+        Navigation flow:
+        - active_sub is None → Town list (show layouts, Enter goes to nodes)
+        - active_sub == "nodes" → Node selection (3 nodes, Enter opens selected)
+        - active_sub == "details" → Detail editing (name/description text fields)
+        - active_sub == "interiors" → Interior list for this town
+        - Grid painter (editing=True) works for both layout and interior editing
+        """
         if event.type != pygame.KEYDOWN:
             return
 
@@ -3473,7 +3537,7 @@ class Game:
             self._handle_unsaved_dialog_input(event)
             return
 
-        # ── Town picker overlay (for new interior parent selection) ──
+        # ── Town picker overlay (for copying interior to pick parent) ──
         if self._feat_town_picker_active:
             self._feat_handle_town_picker_input(event)
             return
@@ -3481,6 +3545,11 @@ class Game:
         # ── Naming mode: capture text input ──
         if self._feat_townlayout_naming:
             self._feat_handle_townlayout_naming_input(event)
+            return
+
+        # ── Detail editing mode (editing name/description) ──
+        if self._feat_town_detail_editing:
+            self._feat_handle_town_detail_editing_input(event)
             return
 
         # ── Tile replace overlay ──
@@ -3498,60 +3567,124 @@ class Game:
             self._feat_handle_townlayout_painter_input(event)
             return
 
-        # ── Sub-folder selection (when no sub-editor is active) ──
+        # ── Town list (active_sub is None) ──
         if self._feat_town_active_sub is None:
-            n = len(self._feat_town_subfolders)
+            layouts = self._feat_town_lists.get("layouts", [])
+            n = len(layouts)
             if event.key == pygame.K_ESCAPE:
                 self._feat_level = 0
                 self._feat_active_editor = None
             elif event.key == pygame.K_UP and n > 0:
-                self._feat_town_subfolder_cursor = (
-                    self._feat_town_subfolder_cursor - 1) % n
+                self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
+                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
+                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
             elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_town_subfolder_cursor = (
-                    self._feat_town_subfolder_cursor + 1) % n
+                self._feat_townlayout_cursor = (self._feat_townlayout_cursor + 1) % n
+                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
+                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
-                sub = self._feat_town_subfolders[self._feat_town_subfolder_cursor]
-                self._feat_town_active_sub = sub["name"]
-                self._feat_townlayout_cursor = 0
-                self._feat_townlayout_scroll = 0
+                # Enter the nodes view for this town
+                self._feat_town_selected_idx = self._feat_townlayout_cursor
+                self._feat_town_active_sub = "nodes"
+                self._feat_town_node_cursor = 0
+            elif self._is_new_shortcut(event):
+                # Add new town layout
+                self._feat_add_townlayout()
+                self._feat_dirty = True
+            elif self._is_delete_shortcut(event) and n > 0:
+                self._feat_remove_townlayout()
+                self._feat_dirty = True
+            elif event.key == pygame.K_n and n > 0:
+                # Rename the selected town
+                item = layouts[self._feat_townlayout_cursor]
+                self._feat_townlayout_naming = True
+                self._feat_townlayout_name_buf = item.get("name", "")
             return
 
-        # List mode (level 1) — inside a sub-editor
-        n = len(self._feat_townlayout_list)
-        if event.key == pygame.K_ESCAPE:
-            self._feat_save_townlayouts()
-            self._feat_town_active_sub = None
-        elif event.key == pygame.K_UP and n > 0:
-            self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
-            self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
-                self._feat_townlayout_cursor, self._feat_townlayout_scroll)
-        elif event.key == pygame.K_DOWN and n > 0:
-            self._feat_townlayout_cursor = (self._feat_townlayout_cursor + 1) % n
-            self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
-                self._feat_townlayout_cursor, self._feat_townlayout_scroll)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
-            self._feat_enter_townlayout_painter()
-            self._feat_dirty = False
-            self._feat_level = 2
-        elif self._is_new_shortcut(event):
-            if self._feat_town_active_sub == "interiors":
-                # Open town picker to choose parent layout for new interior
+        # ── Node selection (active_sub == "nodes") ──
+        if self._feat_town_active_sub == "nodes":
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_townlayouts()
+                self._feat_town_active_sub = None
+            elif event.key == pygame.K_UP:
+                self._feat_town_node_cursor = (self._feat_town_node_cursor - 1) % 3
+            elif event.key == pygame.K_DOWN:
+                self._feat_town_node_cursor = (self._feat_town_node_cursor + 1) % 3
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                # Open the selected node
+                if self._feat_town_node_cursor == 0:
+                    # Town Details — point cursor at selected town for renderer
+                    self._feat_townlayout_cursor = self._feat_town_selected_idx
+                    self._feat_town_active_sub = "details"
+                    self._feat_town_detail_editing = False
+                elif self._feat_town_node_cursor == 1:
+                    # Town Interiors
+                    self._feat_town_active_sub = "interiors"
+                    self._feat_townlayout_cursor = 0
+                    self._feat_townlayout_scroll = 0
+                elif self._feat_town_node_cursor == 2:
+                    # Town Layout (enter grid painter) — point cursor at selected town
+                    self._feat_townlayout_cursor = self._feat_town_selected_idx
+                    self._feat_enter_townlayout_painter()
+                    self._feat_dirty = False
+                    self._feat_level = 2
+            return
+
+        # ── Detail editing (active_sub == "details") ──
+        if self._feat_town_active_sub == "details":
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_townlayouts()
+                self._feat_town_active_sub = "nodes"
+            elif event.key == pygame.K_n:
+                # Start editing name — set cursor to match selected town
+                # so the shared naming handler updates the right item
+                self._feat_townlayout_cursor = self._feat_town_selected_idx
                 layouts = self._feat_town_lists.get("layouts", [])
-                if layouts:
-                    self._feat_town_picker_active = True
-                    self._feat_town_picker_cursor = 0
-                    self._feat_town_picker_mode = "new"
-                else:
-                    # No layouts exist — create interior without parent
-                    self._feat_add_townlayout(parent_town="")
-            else:
-                self._feat_add_townlayout()
-        elif self._is_delete_shortcut(event) and n > 0:
-            self._feat_remove_townlayout()
-        elif event.key == pygame.K_c and n > 0:
-            # Copy/duplicate current interior as independent instance
-            if self._feat_town_active_sub == "interiors":
+                if 0 <= self._feat_town_selected_idx < len(layouts):
+                    item = layouts[self._feat_town_selected_idx]
+                    self._feat_townlayout_naming = True
+                    self._feat_townlayout_name_buf = item.get("name", "")
+            elif event.key == pygame.K_d:
+                # Start editing description
+                self._feat_town_detail_editing = True
+                layouts = self._feat_town_lists.get("layouts", [])
+                if 0 <= self._feat_town_selected_idx < len(layouts):
+                    item = layouts[self._feat_town_selected_idx]
+                    self._feat_town_desc_buf = item.get("description", "")
+            return
+
+        # ── Interior list (active_sub == "interiors") ──
+        if self._feat_town_active_sub == "interiors":
+            interiors = self._feat_townlayout_list  # filtered by parent_town
+            n = len(interiors)
+            if event.key == pygame.K_ESCAPE:
+                self._feat_save_townlayouts()
+                self._feat_town_active_sub = "nodes"
+                # Restore cursor to the selected town index for layout operations
+                self._feat_townlayout_cursor = self._feat_town_selected_idx
+            elif event.key == pygame.K_UP and n > 0:
+                self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
+                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
+                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self._feat_townlayout_cursor = (self._feat_townlayout_cursor + 1) % n
+                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
+                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
+                # Enter grid painter for selected interior
+                self._feat_enter_townlayout_painter()
+                self._feat_dirty = False
+                self._feat_level = 2
+            elif self._is_new_shortcut(event):
+                # Add new interior scoped to current town
+                selected_town = self._get_selected_town_name()
+                self._feat_add_townlayout(parent_town=selected_town or "")
+                self._feat_dirty = True
+            elif self._is_delete_shortcut(event) and n > 0:
+                self._feat_remove_townlayout()
+                self._feat_dirty = True
+            elif event.key == pygame.K_c and n > 0:
+                # Copy interior to another town
                 self._feat_copy_interior_source = self._feat_townlayout_cursor
                 layouts = self._feat_town_lists.get("layouts", [])
                 if layouts:
@@ -3560,20 +3693,48 @@ class Game:
                     self._feat_town_picker_mode = "copy"
                 else:
                     self._feat_do_copy_interior("")
-        elif event.key == pygame.K_n and n > 0:
-            # Enter naming mode for the selected item
-            item = self._feat_townlayout_list[self._feat_townlayout_cursor]
-            self._feat_townlayout_naming = True
-            self._feat_townlayout_name_buf = item.get("name", "")
+            elif event.key == pygame.K_n and n > 0:
+                # Rename interior
+                item = interiors[self._feat_townlayout_cursor]
+                self._feat_townlayout_naming = True
+                self._feat_townlayout_name_buf = item.get("name", "")
+            return
+
+    def _feat_handle_town_detail_editing_input(self, event):
+        """Handle text input while editing town description."""
+        if event.key == pygame.K_RETURN:
+            # Confirm the description
+            layouts = self._feat_town_lists.get("layouts", [])
+            if 0 <= self._feat_town_selected_idx < len(layouts):
+                layouts[self._feat_town_selected_idx]["description"] = self._feat_town_desc_buf
+                self._feat_save_townlayouts()
+            self._feat_town_detail_editing = False
+            self._feat_town_desc_buf = ""
+        elif event.key == pygame.K_ESCAPE:
+            # Cancel editing
+            self._feat_town_detail_editing = False
+            self._feat_town_desc_buf = ""
+        elif event.key == pygame.K_BACKSPACE:
+            self._feat_town_desc_buf = self._feat_town_desc_buf[:-1]
+        else:
+            # Append typed character (if printable)
+            ch = event.unicode
+            if ch and ch.isprintable() and len(self._feat_town_desc_buf) < 200:
+                self._feat_town_desc_buf += ch
 
     def _feat_do_copy_interior(self, parent_town):
         """Duplicate the selected interior as a new independent instance."""
         import copy
         interiors = self._feat_town_lists.get("interiors", [])
-        src_idx = getattr(self, "_feat_copy_interior_source", 0)
-        if src_idx >= len(interiors):
+
+        # Get the source interior
+        # The _feat_copy_interior_source is set from the filtered list
+        # In interiors view, _feat_townlayout_cursor is the index into filtered list
+        filtered_idx = getattr(self, "_feat_copy_interior_source", 0)
+        filtered_list = self._feat_townlayout_list
+        if filtered_idx >= len(filtered_list):
             return
-        src = interiors[src_idx]
+        src = filtered_list[filtered_idx]
         new_item = {
             "name": f"{src['name']} (Copy)",
             "width": src["width"],
@@ -8224,9 +8385,11 @@ class Game:
                     townlayout_brushes=self._feat_get_townlayout_brushes() if self._feat_active_editor == "townlayouts" else [],
                     townlayout_naming=self._feat_townlayout_naming,
                     townlayout_name_buf=self._feat_townlayout_name_buf,
-                    town_subfolders=self._feat_town_subfolders,
-                    town_subfolder_cursor=self._feat_town_subfolder_cursor,
+                    town_node_cursor=self._feat_town_node_cursor,
+                    town_detail_editing=self._feat_town_detail_editing,
+                    town_desc_buf=self._feat_town_desc_buf,
                     town_active_sub=self._feat_town_active_sub,
+                    town_selected_idx=self._feat_town_selected_idx,
                     townlayout_replacing=self._feat_townlayout_replacing,
                     townlayout_replace_src_tile=self._feat_townlayout_replace_src_tile,
                     townlayout_replace_src_name=self._feat_townlayout_replace_src_name,

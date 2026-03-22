@@ -981,10 +981,16 @@ class Renderer(CombatEffectRendererMixin):
         from src.settings import (
             TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR,
+            TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR, TILE_VOID,
         )
         if palette is None:
             palette = self._TOWN_PALETTES["medieval"]
+
+        # ── TILE_VOID always renders as black (border / unpainted cells) ──
+        if tile_id == TILE_VOID:
+            pygame.draw.rect(self.screen, (0, 0, 0),
+                             pygame.Rect(px, py, ts, ts))
+            return
 
         # ── Custom layout sprite override (highest priority) ──
         if sprite_path:
@@ -4625,6 +4631,13 @@ class Renderer(CombatEffectRendererMixin):
             lines[-1] = last + ".."
         return lines if lines else ["(empty)"]
 
+    def _wrap_text(self, text, font, max_width, max_lines=4):
+        """Word-wrap *text* into lines that fit within *max_width* pixels.
+
+        Returns a list of strings. Simple wrapper around _wrap_text_px.
+        """
+        return self._wrap_text_px(text, font, max_width, max_lines)
+
     def _draw_floating_message(self, message, y=16, max_width=None):
         """Draw a word-wrapped floating message box centred on screen.
 
@@ -7335,9 +7348,11 @@ class Renderer(CombatEffectRendererMixin):
                               townlayout_brushes=None,
                               townlayout_naming=False,
                               townlayout_name_buf="",
-                              town_subfolders=None,
-                              town_subfolder_cursor=0,
+                              town_node_cursor=0,
+                              town_detail_editing=False,
+                              town_desc_buf="",
                               town_active_sub=None,
+                              town_selected_idx=0,
                               townlayout_replacing=False,
                               townlayout_replace_src_tile=None,
                               townlayout_replace_src_name="",
@@ -7612,59 +7627,8 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_name_buf=gallery_name_buf,
                         gallery_detail_cursor=gallery_detail_cursor)
             elif ed == "townlayouts" and not townlayout_editing and town_active_sub is None:
-                # ── Town sub-folder selection ──
-                self._u3_text("Town Editor", left_x + 12, panel_y + 8,
-                               self._U3_ORANGE, fs)
-                folders = town_subfolders or []
-                row_h = 56
-                ly = panel_y + 34
-                for i, fld in enumerate(folders):
-                    dy = ly + i * row_h
-                    selected = (i == town_subfolder_cursor)
-                    if selected:
-                        bar = pygame.Surface((left_w - 4, row_h - 4),
-                                             pygame.SRCALPHA)
-                        bar.fill((255, 200, 60, 30))
-                        self.screen.blit(bar, (left_x + 2, dy))
-                    prefix = "> " if selected else "  "
-                    icon = fld.get("icon", "?")
-                    label = fld.get("label", "?")
-                    nc = self._U3_WHITE if selected else (180, 180, 180)
-                    self._u3_text(f"{prefix}[{icon}] {label}",
-                                  left_x + 14, dy + 6, nc, fm)
-                    desc = fld.get("desc", "")
-                    dc = (140, 180, 140) if selected else (120, 120, 140)
-                    self._u3_text(f"    {desc}",
-                                  left_x + 14, dy + 28, dc, fs)
-
-                # Right panel: brief description
-                self._u3_text("Select a sub-editor",
-                              right_x + 30, panel_y + 40,
-                              (140, 140, 160), fm)
-                self._u3_text("Choose a category to create and edit",
-                              right_x + 30, panel_y + 68,
-                              (120, 120, 140), fs)
-                self._u3_text("town maps, reusable features, or",
-                              right_x + 30, panel_y + 86,
-                              (120, 120, 140), fs)
-                self._u3_text("building interiors.",
-                              right_x + 30, panel_y + 104,
-                              (120, 120, 140), fs)
-
-                self._u3_text(
-                    "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
-                    SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT - 45,
-                    self._U3_HINT, fs)
-
-            elif ed == "townlayouts" and not townlayout_editing and town_active_sub is not None:
-                # ── Town item list (inside a sub-editor) ──
-                # Determine label from active sub
-                sub_label = "Town Layouts"
-                for fld in (town_subfolders or []):
-                    if fld.get("name") == town_active_sub:
-                        sub_label = fld.get("label", sub_label)
-                        break
-                self._u3_text(sub_label, left_x + 12, panel_y + 8,
+                # ── Town list view (list of all town layouts) ──
+                self._u3_text("Town Layouts", left_x + 12, panel_y + 8,
                                self._U3_ORANGE, fs)
                 row_h = 40
                 ly = panel_y + 30
@@ -7687,16 +7651,9 @@ class Renderer(CombatEffectRendererMixin):
                     w = tl_list[i].get("width", 18)
                     h = tl_list[i].get("height", 19)
                     sc = (140, 180, 140) if selected else (120, 120, 140)
-                    # Show parent_town for interiors
-                    parent = tl_list[i].get("parent_town", "")
-                    if town_active_sub == "interiors" and parent:
-                        self._u3_text(
-                            f"{w}x{h}  [{parent}]",
-                            left_x + 30, dy + 22, sc, fs)
-                    else:
-                        self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
+                    self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
 
-                # Right panel: preview of selected layout
+                # Right panel: preview of selected town
                 if 0 <= townlayout_cursor < len(tl_list):
                     layout = tl_list[townlayout_cursor]
                     self._draw_townlayout_preview(
@@ -7706,7 +7663,6 @@ class Renderer(CombatEffectRendererMixin):
 
                 # ── Naming overlay ──
                 if townlayout_naming:
-                    # Draw a text input box over the selected item
                     nm_x = left_x + 10
                     nm_y = panel_y + panel_h // 2 - 30
                     nm_w = left_w - 20
@@ -7721,7 +7677,6 @@ class Renderer(CombatEffectRendererMixin):
                     pygame.draw.rect(self.screen, (200, 180, 80),
                                      pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
                     display_text = townlayout_name_buf
-                    # Blinking cursor
                     elapsed = pygame.time.get_ticks() / 1000.0
                     if int(elapsed * 2) % 2 == 0:
                         display_text += "|"
@@ -7730,27 +7685,218 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text("[Enter] Confirm  [Esc] Cancel",
                                   nm_x + 4, nm_y + nm_h + 6,
                                   self._U3_HINT, fs)
-                # ── Town picker overlay (for choosing parent layout) ──
-                if town_picker_active and town_picker_layouts:
-                    self._draw_town_picker_overlay(
-                        left_x, panel_y, left_w, panel_h,
-                        town_picker_layouts, town_picker_cursor,
-                        town_picker_mode)
-                elif townlayout_naming:
-                    pass  # already drawn above
                 else:
-                    if town_active_sub == "interiors":
-                        footer = (
-                            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
-                            "[C] Copy  [Ctrl+D] Delete  [N] Rename  [Esc] Back")
+                    footer = (
+                        "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] Add  "
+                        "[Ctrl+D] Delete  [N] Rename  [Esc] Back")
+                    self._u3_text(
+                        footer,
+                        SCREEN_WIDTH // 2 - 240, SCREEN_HEIGHT - 45,
+                        self._U3_HINT, fs)
+
+            elif ed == "townlayouts" and not townlayout_editing and town_active_sub is not None:
+                # ── Context-dependent rendering based on active_sub ──
+
+                if town_active_sub == "nodes":
+                    # ── Node selection view (3 nodes) ──
+                    self._u3_text("Town Details", left_x + 12, panel_y + 8,
+                                   self._U3_ORANGE, fs)
+                    # Get selected town name
+                    tl_list = townlayout_list or []
+                    town_name = (tl_list[townlayout_cursor]["name"]
+                                if 0 <= townlayout_cursor < len(tl_list)
+                                else "Unknown")
+                    self._u3_text(f"({town_name})", left_x + 12, panel_y + 26,
+                                   (180, 180, 180), fs)
+
+                    # 3 nodes
+                    nodes = [
+                        {"name": "Town Details", "icon": "D"},
+                        {"name": "Town Interiors", "icon": "I"},
+                        {"name": "Town Layout", "icon": "L"},
+                    ]
+                    node_y = panel_y + 60
+                    node_h = 50
+                    for i, node in enumerate(nodes):
+                        dy = node_y + i * node_h
+                        selected = (i == town_node_cursor)
+                        if selected:
+                            bar = pygame.Surface((left_w - 4, node_h - 4),
+                                                 pygame.SRCALPHA)
+                            bar.fill((255, 200, 60, 30))
+                            self.screen.blit(bar, (left_x + 2, dy))
+                        prefix = "> " if selected else "  "
+                        icon = node["icon"]
+                        name = node["name"]
+                        nc = self._U3_WHITE if selected else (180, 180, 180)
+                        self._u3_text(f"{prefix}[{icon}] {name}",
+                                      left_x + 14, dy + 12, nc, fm)
+
+                    # Right panel: preview
+                    if 0 <= townlayout_cursor < len(tl_list):
+                        layout = tl_list[townlayout_cursor]
+                        self._draw_townlayout_preview(
+                            right_x + 12, panel_y + 12,
+                            right_w - 24, panel_h - 24,
+                            layout, -1, -1, -1, None)
+
+                    footer = "[Up/Dn] Select Node  [Enter] Open  [Esc] Back"
+                    self._u3_text(footer,
+                                  SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
+                                  self._U3_HINT, fs)
+
+                elif town_active_sub == "details":
+                    # ── Town details editing view ──
+                    self._u3_text("Town Details", left_x + 12, panel_y + 8,
+                                   self._U3_ORANGE, fs)
+                    tl_list = townlayout_list or []
+                    if 0 <= townlayout_cursor < len(tl_list):
+                        town = tl_list[townlayout_cursor]
+                        town_name = town.get("name", "")
+                        town_desc = town.get("description", "")
+
+                        # Display name and description
+                        self._u3_text("Name:", left_x + 14, panel_y + 40,
+                                      (180, 180, 200), fs)
+                        self._u3_text(town_name, left_x + 80, panel_y + 40,
+                                      self._U3_WHITE, fm)
+
+                        self._u3_text("Description:", left_x + 14, panel_y + 70,
+                                      (180, 180, 200), fs)
+                        # Draw description text with wrapping
+                        desc_lines = self._wrap_text(town_desc, fs, left_w - 40)
+                        desc_y = panel_y + 90
+                        for line in desc_lines[:5]:  # Show up to 5 lines
+                            self._u3_text(line, left_x + 14, desc_y,
+                                          (160, 160, 180), fs)
+                            desc_y += 18
+
+                        # ── Description editing overlay ──
+                        if town_detail_editing:
+                            nm_x = left_x + 10
+                            nm_y = panel_y + panel_h // 2 - 50
+                            nm_w = left_w - 20
+                            nm_h = 80
+                            overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+                            overlay.fill((20, 18, 30, 200))
+                            self.screen.blit(overlay, (left_x, panel_y))
+                            self._u3_text("Edit Description:", nm_x + 4, nm_y - 18,
+                                          self._U3_ORANGE, fs)
+                            pygame.draw.rect(self.screen, (60, 55, 80),
+                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+                            pygame.draw.rect(self.screen, (200, 180, 80),
+                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+                            display_text = town_desc_buf
+                            elapsed = pygame.time.get_ticks() / 1000.0
+                            if int(elapsed * 2) % 2 == 0:
+                                display_text += "|"
+                            self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                                          self._U3_WHITE, fm)
+                            self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                                          nm_x + 4, nm_y + nm_h + 6,
+                                          self._U3_HINT, fs)
+                        elif townlayout_naming:
+                            nm_x = left_x + 10
+                            nm_y = panel_y + panel_h // 2 - 30
+                            nm_w = left_w - 20
+                            nm_h = 50
+                            overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+                            overlay.fill((20, 18, 30, 200))
+                            self.screen.blit(overlay, (left_x, panel_y))
+                            self._u3_text("Rename:", nm_x + 4, nm_y - 18,
+                                          self._U3_ORANGE, fs)
+                            pygame.draw.rect(self.screen, (60, 55, 80),
+                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+                            pygame.draw.rect(self.screen, (200, 180, 80),
+                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+                            display_text = townlayout_name_buf
+                            elapsed = pygame.time.get_ticks() / 1000.0
+                            if int(elapsed * 2) % 2 == 0:
+                                display_text += "|"
+                            self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                                          self._U3_WHITE, fm)
+                            self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                                          nm_x + 4, nm_y + nm_h + 6,
+                                          self._U3_HINT, fs)
+                        else:
+                            footer = "[N] Edit Name  [D] Edit Description  [Esc] Back"
+                            self._u3_text(footer,
+                                          SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
+                                          self._U3_HINT, fs)
+
+                elif town_active_sub == "interiors":
+                    # ── Interior list view (filtered by parent_town) ──
+                    self._u3_text("Town Interiors", left_x + 12, panel_y + 8,
+                                   self._U3_ORANGE, fs)
+                    row_h = 40
+                    ly = panel_y + 30
+                    max_visible = (panel_h - 40) // row_h
+                    tl_list = townlayout_list or []
+                    tl_scroll = townlayout_scroll
+                    for i in range(tl_scroll, min(tl_scroll + max_visible, len(tl_list))):
+                        draw_i = i - tl_scroll
+                        dy = ly + draw_i * row_h
+                        selected = (i == townlayout_cursor)
+                        if selected:
+                            bar = pygame.Surface((left_w - 4, row_h - 2),
+                                                 pygame.SRCALPHA)
+                            bar.fill((255, 200, 60, 30))
+                            self.screen.blit(bar, (left_x + 2, dy))
+                        prefix = "> " if selected else "  "
+                        name = tl_list[i].get("name", "Unnamed")
+                        nc = self._U3_WHITE if selected else (180, 180, 180)
+                        self._u3_text(f"{prefix}{name}", left_x + 14, dy + 4, nc, fm)
+                        w = tl_list[i].get("width", 18)
+                        h = tl_list[i].get("height", 19)
+                        sc = (140, 180, 140) if selected else (120, 120, 140)
+                        self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
+
+                    # Right panel: preview of selected interior
+                    if 0 <= townlayout_cursor < len(tl_list):
+                        layout = tl_list[townlayout_cursor]
+                        self._draw_townlayout_preview(
+                            right_x + 12, panel_y + 12,
+                            right_w - 24, panel_h - 24,
+                            layout, -1, -1, -1, None)
+
+                    # ── Naming overlay ──
+                    if townlayout_naming:
+                        nm_x = left_x + 10
+                        nm_y = panel_y + panel_h // 2 - 30
+                        nm_w = left_w - 20
+                        nm_h = 50
+                        overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
+                        overlay.fill((20, 18, 30, 200))
+                        self.screen.blit(overlay, (left_x, panel_y))
+                        self._u3_text("Rename:", nm_x + 4, nm_y - 18,
+                                      self._U3_ORANGE, fs)
+                        pygame.draw.rect(self.screen, (60, 55, 80),
+                                         pygame.Rect(nm_x, nm_y, nm_w, nm_h))
+                        pygame.draw.rect(self.screen, (200, 180, 80),
+                                         pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
+                        display_text = townlayout_name_buf
+                        elapsed = pygame.time.get_ticks() / 1000.0
+                        if int(elapsed * 2) % 2 == 0:
+                            display_text += "|"
+                        self._u3_text(display_text, nm_x + 8, nm_y + 14,
+                                      self._U3_WHITE, fm)
+                        self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                                      nm_x + 4, nm_y + nm_h + 6,
+                                      self._U3_HINT, fs)
+                    # ── Town picker overlay (for copying interior) ──
+                    elif town_picker_active and town_picker_layouts:
+                        self._draw_town_picker_overlay(
+                            left_x, panel_y, left_w, panel_h,
+                            town_picker_layouts, town_picker_cursor,
+                            town_picker_mode)
                     else:
                         footer = (
                             "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
-                            "[Ctrl+D] Delete  [N] Rename  [Esc] Back")
-                    self._u3_text(
-                        footer,
-                        SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
-                        self._U3_HINT, fs)
+                            "[C] Copy  [Ctrl+D] Delete  [N] Rename  [Esc] Back")
+                        self._u3_text(
+                            footer,
+                            SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
+                            self._U3_HINT, fs)
 
             elif ed == "townlayouts" and townlayout_editing:
                 # ── Town Layout grid painter ──

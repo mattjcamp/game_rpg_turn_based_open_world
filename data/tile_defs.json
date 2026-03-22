@@ -340,6 +340,17 @@
     "context": "town",
     "sprite": "town/altar"
   },
+  "36": {
+    "name": "Void",
+    "walkable": false,
+    "color": [
+      0,
+      0,
+      0
+    ],
+    "context": "overworld",
+    "sprite": ""
+  },
   "37": {
     "name": "Brick",
     "walkable": false,
@@ -350,5 +361,16 @@
     ],
     "context": "town",
     "sprite": "town/brick_wall_red"
+  },
+  "38": {
+    "name": "Shrine",
+    "walkable": false,
+    "color": [
+      140,
+      100,
+      60
+    ],
+    "context": "town",
+    "sprite": "unique_tiles/seal_of_binding"
   }
 }
