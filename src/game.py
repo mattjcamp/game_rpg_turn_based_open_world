@@ -4960,6 +4960,9 @@ class Game:
         self.module_edit_is_new = False
 
         # ── Build section list for hierarchical navigation ──
+        # Pre-init _omap_interior_list so _build_overview_map_sections can set it
+        if not hasattr(self, "_omap_interior_list"):
+            self._omap_interior_list = []
         sections = []
 
         # 1) Module Details
@@ -5154,6 +5157,34 @@ class Game:
         self.module_edit_utile_preview = False
         self._battle_screen_active = False
         self._map_editor_active = False
+        # Overview interior map locations editor state
+        self._omap_interior_active = False   # interior list is showing
+        # NOTE: _omap_interior_list is populated by _build_overview_map_sections()
+        # above — do NOT reset it here or the loaded interiors will be wiped out.
+        self._omap_interior_cursor = 0
+        self._omap_interior_scroll = 0
+        self._omap_interior_editing = False  # grid painter open
+        self._omap_interior_cx = 1
+        self._omap_interior_cy = 1
+        self._omap_interior_brush_idx = 0
+        self._omap_interior_brushes = None   # cached brush list
+        self._omap_interior_dirty = False
+        self._omap_interior_naming = False
+        self._omap_interior_name_buf = ""
+        # Interior link picker in the overview map editor
+        self._omap_int_picking = False
+        self._omap_int_pick_cursor = 0
+        self._omap_int_pick_scroll = 0
+        # Replace tile overlay in the interior painter
+        self._omap_int_replacing = False
+        self._omap_int_replace_src_tile = None
+        self._omap_int_replace_src_name = ""
+        self._omap_int_replace_src_empty = False
+        self._omap_int_replace_dst_idx = 0
+        # Interior-to-interior / back-to-overworld link picker
+        self._omap_int_link_picking = False
+        self._omap_int_link_pick_cursor = 0
+        self._omap_int_link_pick_list = []
         # Store dungeon levels for editing
         self.module_edit_dungeon_levels = {}
         for i, dung in enumerate(dungeons):
@@ -5332,6 +5363,11 @@ class Game:
         # ── Map Layout section opens the overview map editor ──
         if sec.get("is_map_editor"):
             self._enter_map_editor()
+            return
+
+        # ── Interior Map Locations opens the interior list editor ──
+        if sec.get("is_omap_interior_folder"):
+            self._enter_omap_interior_list()
             return
 
         # ── Individual unique tile drills into its field editor ──
@@ -6156,6 +6192,10 @@ class Game:
             "brush_idx": self._map_editor_brush,
             "brush_name": brush_name,
             "dirty": self._map_editor_dirty,
+            "tile_links": getattr(self, "_omap_tile_links", {}),
+            "int_picking": getattr(self, "_omap_int_picking", False),
+            "int_pick_cursor": getattr(self, "_omap_int_pick_cursor", 0),
+            "int_pick_list": self._omap_interior_list,
         }
 
     # ── Unique Tiles editing ─────────────────────────────────────
@@ -6250,7 +6290,7 @@ class Game:
         3) Unique Tiles – unique tile placements on the overview map
         4) Interior Map Locations – placeable unique locations
         """
-        import os
+        import os, json
         if mod_settings is None:
             mod_settings = {}
 
@@ -6332,15 +6372,22 @@ class Game:
         }
 
         # ── 4) Interior Map Locations ──
-        interior_locs = overworld_cfg.get("interior_locations", [])
-        n_locs = len(interior_locs)
+        # Load interiors from static_overworld.json if present
+        interiors = []
+        if has_static:
+            try:
+                with open(static_path, "r") as fh:
+                    sdata = json.load(fh)
+                interiors = sdata.get("interiors", [])
+            except (OSError, json.JSONDecodeError):
+                pass
+        self._omap_interior_list = interiors
+        n_locs = len(interiors)
         interior_sec = {
             "label": "Interior Map Locations",
             "icon": "I",
-            "fields": [
-                ["— Placeable Locations —",
-                 "_omap_intlocs_header", "", "section", False],
-            ],
+            "is_omap_interior_folder": True,
+            "fields": [],
             "subtitle": (
                 f"{n_locs} location{'s' if n_locs != 1 else ''}"
                 if n_locs else "none"),
@@ -6512,11 +6559,19 @@ class Game:
         ] + ["Eraser"]
         self._map_editor_brush = 0  # index into palette
         self._map_editor_dirty = False
+        # Load tile links and interior list for linking
+        self._omap_tile_links = sdata.get("tile_links", {})
+        self._omap_int_picking = False
         self._map_editor_scroll_to_cursor()
 
     def _handle_map_editor_input(self, event):
         """Handle input in the overview map tile editor."""
         import json, os
+
+        # ── Interior picker overlay intercepts all keys ──
+        if getattr(self, "_omap_int_picking", False):
+            self._handle_omap_int_picker_input(event)
+            return
 
         if event.key == pygame.K_ESCAPE:
             # Save if dirty, then exit
@@ -6583,6 +6638,23 @@ class Game:
                 self._map_editor_tiles[r][c] = tile_id
                 self._map_editor_dirty = True
 
+        # ── Link interior (I key) ──
+        elif event.key == pygame.K_i:
+            self._omap_int_picking = True
+            self._omap_int_pick_cursor = 0
+            self._omap_int_pick_scroll = 0
+
+        # ── Remove link (X key) ──
+        elif event.key == pygame.K_x:
+            r = self._map_editor_cursor_r
+            c = self._map_editor_cursor_c
+            pos_key = f"{c},{r}"
+            self._omap_tile_links = getattr(
+                self, "_omap_tile_links", {})
+            if pos_key in self._omap_tile_links:
+                del self._omap_tile_links[pos_key]
+                self._map_editor_dirty = True
+
         # ── Quick-save (Ctrl+S) ──
         elif self._is_save_shortcut(event):
             self._save_map_editor()
@@ -6630,6 +6702,7 @@ class Game:
         sdata["tiles"] = self._map_editor_tiles
         sdata["width"] = self._map_editor_w
         sdata["height"] = self._map_editor_h
+        sdata["tile_links"] = getattr(self, "_omap_tile_links", {})
 
         try:
             with open(static_path, "w") as fh:
@@ -6640,6 +6713,609 @@ class Game:
             self.module_message = "Save failed!"
             self.module_msg_timer = 2.0
         self._map_editor_dirty = False
+
+    # ── Overview Interior Map Locations ──────────────────────────────
+
+    def _enter_omap_interior_list(self):
+        """Open the interior list editor for overview map locations."""
+        self._omap_interior_active = True
+        self._omap_interior_cursor = 0
+        self._omap_interior_scroll = 0
+        self._omap_interior_editing = False
+        self._omap_interior_naming = False
+
+    def _handle_omap_interior_list_input(self, event):
+        """Handle input in the overview interior list browser."""
+        import json, os
+
+        # ── Naming mode (rename / new name) ──
+        if self._omap_interior_naming:
+            self._handle_omap_interior_naming_input(event)
+            return
+
+        n = len(self._omap_interior_list)
+
+        if event.key == pygame.K_ESCAPE:
+            self._omap_interior_active = False
+            self._refresh_overview_map_sections()
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._omap_interior_cursor = (
+                self._omap_interior_cursor - 1) % n
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._omap_interior_cursor = (
+                self._omap_interior_cursor + 1) % n
+
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
+            # Enter grid painter for selected interior
+            self._enter_omap_interior_painter()
+
+        elif self._is_new_shortcut(event):
+            # Add a new interior
+            idx = len(self._omap_interior_list)
+            self._omap_interior_list.append({
+                "name": f"Interior {idx + 1}",
+                "width": 20,
+                "height": 16,
+                "tiles": {},
+            })
+            self._omap_interior_cursor = idx
+            self._save_omap_interiors()
+
+        elif self._is_delete_shortcut(event) and n > 0:
+            # Delete the selected interior
+            removed = self._omap_interior_list.pop(
+                self._omap_interior_cursor)
+            # Also remove any tile links referencing this interior
+            self._remove_omap_interior_links(removed.get("name", ""))
+            if self._omap_interior_cursor >= len(self._omap_interior_list):
+                self._omap_interior_cursor = max(
+                    0, len(self._omap_interior_list) - 1)
+            self._save_omap_interiors()
+
+        elif event.key == pygame.K_n and n > 0:
+            # Rename interior
+            item = self._omap_interior_list[self._omap_interior_cursor]
+            self._omap_interior_naming = True
+            self._omap_interior_name_buf = item.get("name", "")
+
+    def _handle_omap_interior_naming_input(self, event):
+        """Handle text input during interior rename."""
+        if event.key == pygame.K_RETURN:
+            name = self._omap_interior_name_buf.strip()
+            if name and self._omap_interior_cursor < len(
+                    self._omap_interior_list):
+                old_name = self._omap_interior_list[
+                    self._omap_interior_cursor].get("name", "")
+                self._omap_interior_list[
+                    self._omap_interior_cursor]["name"] = name
+                # Update any tile links with the old name
+                self._rename_omap_interior_links(old_name, name)
+                self._save_omap_interiors()
+            self._omap_interior_naming = False
+            self._omap_interior_name_buf = ""
+        elif event.key == pygame.K_ESCAPE:
+            self._omap_interior_naming = False
+            self._omap_interior_name_buf = ""
+        elif event.key == pygame.K_BACKSPACE:
+            self._omap_interior_name_buf = (
+                self._omap_interior_name_buf[:-1])
+        elif event.unicode and len(self._omap_interior_name_buf) < 40:
+            self._omap_interior_name_buf += event.unicode
+
+    def _enter_omap_interior_painter(self):
+        """Enter the grid painter for the selected overview interior."""
+        if self._omap_interior_cursor >= len(self._omap_interior_list):
+            return
+        self._omap_interior_editing = True
+        self._omap_interior_cx = 1
+        self._omap_interior_cy = 1
+        self._omap_interior_brush_idx = 0
+        self._omap_interior_brushes = None  # rebuild
+        self._omap_interior_dirty = False
+
+    def _get_omap_interior_brushes(self):
+        """Build brush list from dungeon tile types for overview interiors."""
+        if self._omap_interior_brushes is not None:
+            return self._omap_interior_brushes
+        import json, os
+        from src.settings import TILE_DEFS
+
+        brushes = [
+            {"name": "Eraser", "tile_id": None, "path": None},
+        ]
+
+        # Collect dungeon tile IDs from Tile Types definitions
+        dungeon_ids = sorted(
+            tid for tid, ctx in self._TILE_CONTEXT.items()
+            if ctx == "dungeon"
+        )
+
+        # Load saved tile defs for sprite key resolution
+        saved_tile_defs = {}
+        try:
+            with open(self._feat_tiles_path(), "r") as f:
+                saved_tile_defs = json.load(f)
+        except (OSError, ValueError):
+            pass
+
+        manifest = {}
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            pass
+
+        def _resolve_sprite_path(tid):
+            saved = saved_tile_defs.get(str(tid), {})
+            sprite_key = saved.get("sprite", "")
+            if sprite_key and "/" in sprite_key:
+                cat, name = sprite_key.split("/", 1)
+                section = manifest.get(cat, {})
+                if isinstance(section, dict):
+                    entry = section.get(name, {})
+                    if isinstance(entry, dict) and "path" in entry:
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        return p
+            for tile in getattr(self, "_feat_tile_list", []):
+                if tile.get("_tile_id") == tid:
+                    sk = tile.get("_sprite", "")
+                    if sk and "/" in sk:
+                        cat, name = sk.split("/", 1)
+                        section = manifest.get(cat, {})
+                        if isinstance(section, dict):
+                            entry = section.get(name, {})
+                            if isinstance(entry, dict) and "path" in entry:
+                                p = entry["path"]
+                                if p.startswith("src/assets/"):
+                                    p = p[len("src/assets/"):]
+                                return p
+                    break
+            for cat in manifest:
+                if cat.startswith("_"):
+                    continue
+                section = manifest.get(cat, {})
+                if not isinstance(section, dict):
+                    continue
+                for _name, entry in section.items():
+                    if (isinstance(entry, dict)
+                            and entry.get("tile_id") == tid
+                            and "path" in entry):
+                        p = entry["path"]
+                        if p.startswith("src/assets/"):
+                            p = p[len("src/assets/"):]
+                        return p
+            return None
+
+        for tid in dungeon_ids:
+            td = TILE_DEFS.get(tid)
+            if not td:
+                continue
+            brushes.append({
+                "name": td.get("name", f"Tile {tid}"),
+                "tile_id": tid,
+                "path": _resolve_sprite_path(tid),
+            })
+
+        self._omap_interior_brushes = brushes
+        return brushes
+
+    def _handle_omap_interior_painter_input(self, event):
+        """Handle input in the overview interior grid painter."""
+        if self._omap_interior_cursor >= len(self._omap_interior_list):
+            self._omap_interior_editing = False
+            return
+
+        # ── Intercept: replace tile overlay ──
+        if self._omap_int_replacing:
+            self._handle_omap_int_replace_input(event)
+            return
+
+        # ── Intercept: interior link picker overlay ──
+        if self._omap_int_link_picking:
+            self._handle_omap_int_link_picker_input(event)
+            return
+
+        layout = self._omap_interior_list[self._omap_interior_cursor]
+        w = layout.get("width", 20)
+        h = layout.get("height", 16)
+        brushes = self._get_omap_interior_brushes()
+
+        if event.key == pygame.K_ESCAPE:
+            if self._omap_interior_dirty:
+                self._save_omap_interiors()
+            self._omap_interior_editing = False
+            self._omap_interior_dirty = False
+            return
+
+        # Cursor movement (arrows + WASD)
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self._omap_interior_cy = max(0, self._omap_interior_cy - 1)
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self._omap_interior_cy = min(h - 1, self._omap_interior_cy + 1)
+        elif event.key in (pygame.K_LEFT, pygame.K_a):
+            self._omap_interior_cx = max(0, self._omap_interior_cx - 1)
+        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+            self._omap_interior_cx = min(w - 1, self._omap_interior_cx + 1)
+
+        # Brush cycling
+        elif event.key == pygame.K_TAB:
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_SHIFT:
+                self._omap_interior_brush_idx = (
+                    (self._omap_interior_brush_idx - 1)
+                    % len(brushes))
+            else:
+                self._omap_interior_brush_idx = (
+                    (self._omap_interior_brush_idx + 1)
+                    % len(brushes))
+
+        # Paint tile
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            cx = self._omap_interior_cx
+            cy = self._omap_interior_cy
+            pos_key = f"{cx},{cy}"
+            brush = brushes[self._omap_interior_brush_idx]
+            tiles = layout.setdefault("tiles", {})
+            if brush["tile_id"] is None:
+                # Eraser
+                if pos_key in tiles:
+                    del tiles[pos_key]
+                    self._omap_interior_dirty = True
+            else:
+                td = {"tile_id": brush["tile_id"],
+                      "name": brush["name"]}
+                if brush.get("path"):
+                    td["path"] = brush["path"]
+                # Preserve existing link fields
+                old = tiles.get(pos_key, {})
+                for lk in ("interior", "to_overworld"):
+                    if lk in old:
+                        td[lk] = old[lk]
+                tiles[pos_key] = td
+                self._omap_interior_dirty = True
+
+        # ── Replace tile (R key) ──
+        elif event.key == pygame.K_r:
+            cx = self._omap_interior_cx
+            cy = self._omap_interior_cy
+            pos_key = f"{cx},{cy}"
+            tiles = layout.get("tiles", {})
+            td = tiles.get(pos_key)
+            self._omap_int_replacing = True
+            if td:
+                self._omap_int_replace_src_tile = td.get("tile_id")
+                self._omap_int_replace_src_name = td.get(
+                    "name", f"Tile {td.get('tile_id', '?')}")
+                self._omap_int_replace_src_empty = False
+            else:
+                self._omap_int_replace_src_tile = None
+                self._omap_int_replace_src_name = "(Empty)"
+                self._omap_int_replace_src_empty = True
+            self._omap_int_replace_dst_idx = self._omap_interior_brush_idx
+
+        # ── Link interior / overworld exit (I key) ──
+        elif event.key == pygame.K_i:
+            current_name = layout.get("name", "")
+            # Build pick list: sibling interiors (exclude self)
+            self._omap_int_link_pick_list = [
+                intr for intr in self._omap_interior_list
+                if intr.get("name", "") != current_name
+            ]
+            self._omap_int_link_picking = True
+            # Pre-select based on current tile's link
+            cx = self._omap_interior_cx
+            cy = self._omap_interior_cy
+            pos_key = f"{cx},{cy}"
+            tiles = layout.get("tiles", {})
+            td = tiles.get(pos_key, {})
+            if td.get("to_overworld"):
+                self._omap_int_link_pick_cursor = 1
+            elif td.get("interior"):
+                iname = td["interior"]
+                found = False
+                for pi, intr in enumerate(self._omap_int_link_pick_list):
+                    if intr.get("name") == iname:
+                        self._omap_int_link_pick_cursor = pi + 2
+                        found = True
+                        break
+                if not found:
+                    self._omap_int_link_pick_cursor = 0
+            else:
+                self._omap_int_link_pick_cursor = 0
+
+        # ── Remove link (X key) ──
+        elif event.key == pygame.K_x:
+            cx = self._omap_interior_cx
+            cy = self._omap_interior_cy
+            pos_key = f"{cx},{cy}"
+            tiles = layout.get("tiles", {})
+            if pos_key in tiles:
+                td = tiles[pos_key]
+                changed = False
+                for lk in ("interior", "to_overworld"):
+                    if lk in td:
+                        del td[lk]
+                        changed = True
+                if changed:
+                    self._omap_interior_dirty = True
+
+        # Quick-save
+        elif self._is_save_shortcut(event):
+            self._save_omap_interiors()
+            self._omap_interior_dirty = False
+
+    def _handle_omap_int_picker_input(self, event):
+        """Handle input while the interior link picker is open in the
+        overview map editor."""
+        interiors = self._omap_interior_list
+        # Options: (none), then each interior name
+        n_options = 1 + len(interiors)
+
+        if event.key == pygame.K_ESCAPE:
+            self._omap_int_picking = False
+        elif event.key == pygame.K_UP:
+            self._omap_int_pick_cursor = max(
+                0, self._omap_int_pick_cursor - 1)
+        elif event.key == pygame.K_DOWN:
+            self._omap_int_pick_cursor = min(
+                n_options - 1, self._omap_int_pick_cursor + 1)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            r = self._map_editor_cursor_r
+            c = self._map_editor_cursor_c
+            pos_key = f"{c},{r}"
+            self._omap_tile_links = getattr(
+                self, "_omap_tile_links", {})
+            if self._omap_int_pick_cursor == 0:
+                # "(none)" — remove link
+                if pos_key in self._omap_tile_links:
+                    del self._omap_tile_links[pos_key]
+                    self._map_editor_dirty = True
+            else:
+                # Link to selected interior
+                idx = self._omap_int_pick_cursor - 1
+                if idx < len(interiors):
+                    self._omap_tile_links[pos_key] = {
+                        "interior": interiors[idx]["name"],
+                    }
+                    self._map_editor_dirty = True
+            self._omap_int_picking = False
+
+    def _handle_omap_int_replace_input(self, event):
+        """Handle input while the replace tile overlay is open."""
+        brushes = self._get_omap_interior_brushes()
+        n = len(brushes)
+
+        if event.key == pygame.K_ESCAPE:
+            self._omap_int_replacing = False
+            return
+
+        if event.key == pygame.K_UP:
+            self._omap_int_replace_dst_idx = (
+                (self._omap_int_replace_dst_idx - 1) % n)
+        elif event.key == pygame.K_DOWN:
+            self._omap_int_replace_dst_idx = (
+                (self._omap_int_replace_dst_idx + 1) % n)
+
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            layout = self._omap_interior_list[self._omap_interior_cursor]
+            tiles = layout.setdefault("tiles", {})
+            w = layout.get("width", 20)
+            h = layout.get("height", 16)
+            dst_brush = brushes[self._omap_int_replace_dst_idx]
+            src_tile = self._omap_int_replace_src_tile
+            src_empty = self._omap_int_replace_src_empty
+
+            if src_empty:
+                # Replace all empty cells with destination
+                if dst_brush["tile_id"] is not None:
+                    for r in range(h):
+                        for c in range(w):
+                            pk = f"{c},{r}"
+                            if pk not in tiles:
+                                td = {"tile_id": dst_brush["tile_id"],
+                                      "name": dst_brush["name"]}
+                                if dst_brush.get("path"):
+                                    td["path"] = dst_brush["path"]
+                                tiles[pk] = td
+                    self._omap_interior_dirty = True
+            elif dst_brush["tile_id"] is None:
+                # Replace source tiles with eraser (remove)
+                to_del = [k for k, v in tiles.items()
+                          if v.get("tile_id") == src_tile]
+                for k in to_del:
+                    del tiles[k]
+                if to_del:
+                    self._omap_interior_dirty = True
+            else:
+                # Replace source tile_id with destination
+                for k, v in tiles.items():
+                    if v.get("tile_id") == src_tile:
+                        v["tile_id"] = dst_brush["tile_id"]
+                        v["name"] = dst_brush["name"]
+                        if dst_brush.get("path"):
+                            v["path"] = dst_brush["path"]
+                        elif "path" in v:
+                            del v["path"]
+                        self._omap_interior_dirty = True
+
+            self._omap_int_replacing = False
+
+    def _handle_omap_int_link_picker_input(self, event):
+        """Handle input while the interior link picker is open in the
+        interior painter."""
+        pick_list = self._omap_int_link_pick_list
+        # Options: 0=(none), 1=Return to Overworld, 2+=interior names
+        n_options = 2 + len(pick_list)
+
+        if event.key == pygame.K_ESCAPE:
+            self._omap_int_link_picking = False
+            return
+
+        if event.key == pygame.K_UP:
+            self._omap_int_link_pick_cursor = max(
+                0, self._omap_int_link_pick_cursor - 1)
+        elif event.key == pygame.K_DOWN:
+            self._omap_int_link_pick_cursor = min(
+                n_options - 1, self._omap_int_link_pick_cursor + 1)
+
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            layout = self._omap_interior_list[self._omap_interior_cursor]
+            cx = self._omap_interior_cx
+            cy = self._omap_interior_cy
+            pos_key = f"{cx},{cy}"
+            tiles = layout.setdefault("tiles", {})
+            if pos_key not in tiles:
+                # Need a tile to attach the link to — skip if empty
+                self._omap_int_link_picking = False
+                return
+            td = tiles[pos_key]
+            idx = self._omap_int_link_pick_cursor
+
+            # Clear all link types first
+            for lk in ("interior", "to_overworld"):
+                td.pop(lk, None)
+
+            if idx == 0:
+                pass  # "(none)" — links cleared above
+            elif idx == 1:
+                # Return to Overworld
+                td["to_overworld"] = True
+            else:
+                # Link to sibling interior
+                pi = idx - 2
+                if pi < len(pick_list):
+                    td["interior"] = pick_list[pi]["name"]
+
+            self._omap_interior_dirty = True
+            self._omap_int_link_picking = False
+
+    def _save_omap_interiors(self):
+        """Save overview interiors to static_overworld.json."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        static_path = os.path.join(mod["path"], "static_overworld.json")
+
+        try:
+            with open(static_path, "r") as fh:
+                sdata = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            sdata = {}
+
+        sdata["interiors"] = self._omap_interior_list
+
+        try:
+            with open(static_path, "w") as fh:
+                json.dump(sdata, fh)
+        except OSError:
+            pass
+
+    def _remove_omap_interior_links(self, interior_name):
+        """Remove tile links referencing a deleted interior from the
+        overview map and from other interiors."""
+        if not interior_name:
+            return
+        # Remove from overworld tile links
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        static_path = os.path.join(mod["path"], "static_overworld.json")
+        try:
+            with open(static_path, "r") as fh:
+                sdata = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return
+        # Remove from tile_links
+        links = sdata.get("tile_links", {})
+        to_remove = [k for k, v in links.items()
+                     if v.get("interior") == interior_name]
+        for k in to_remove:
+            del links[k]
+        if to_remove:
+            sdata["tile_links"] = links
+            try:
+                with open(static_path, "w") as fh:
+                    json.dump(sdata, fh)
+            except OSError:
+                pass
+
+    def _rename_omap_interior_links(self, old_name, new_name):
+        """Update tile links when an interior is renamed."""
+        if not old_name or not new_name:
+            return
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        static_path = os.path.join(mod["path"], "static_overworld.json")
+        try:
+            with open(static_path, "r") as fh:
+                sdata = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return
+        links = sdata.get("tile_links", {})
+        changed = False
+        for k, v in links.items():
+            if v.get("interior") == old_name:
+                v["interior"] = new_name
+                changed = True
+        if changed:
+            sdata["tile_links"] = links
+            try:
+                with open(static_path, "w") as fh:
+                    json.dump(sdata, fh)
+            except OSError:
+                pass
+
+    def _get_omap_interior_editor_data(self):
+        """Return dict describing overview interior painter state for
+        the renderer."""
+        if not self._omap_interior_editing:
+            return None
+        if self._omap_interior_cursor >= len(self._omap_interior_list):
+            return None
+        layout = self._omap_interior_list[self._omap_interior_cursor]
+        brushes = self._get_omap_interior_brushes()
+        return {
+            "layout": layout,
+            "cx": self._omap_interior_cx,
+            "cy": self._omap_interior_cy,
+            "brush_idx": self._omap_interior_brush_idx,
+            "brushes": brushes,
+            "dirty": self._omap_interior_dirty,
+            # Replace overlay
+            "replacing": self._omap_int_replacing,
+            "replace_src_tile": self._omap_int_replace_src_tile,
+            "replace_src_name": self._omap_int_replace_src_name,
+            "replace_src_empty": self._omap_int_replace_src_empty,
+            "replace_dst_idx": self._omap_int_replace_dst_idx,
+            # Interior link picker
+            "link_picking": self._omap_int_link_picking,
+            "link_pick_cursor": self._omap_int_link_pick_cursor,
+            "link_pick_list": self._omap_int_link_pick_list,
+        }
+
+    def _get_omap_interior_list_data(self):
+        """Return dict describing the overview interior list state for
+        the renderer."""
+        if not self._omap_interior_active:
+            return None
+        return {
+            "interiors": self._omap_interior_list,
+            "cursor": self._omap_interior_cursor,
+            "scroll": self._omap_interior_scroll,
+            "naming": self._omap_interior_naming,
+            "name_buf": self._omap_interior_name_buf,
+        }
 
     def _build_unique_tiles_sections(self):
         """Build the full section list for the Unique Tiles folder:
@@ -7055,6 +7731,16 @@ class Game:
         # ── Overview map editor mode ──
         if getattr(self, "_map_editor_active", False):
             self._handle_map_editor_input(event)
+            return
+
+        # ── Overview interior painter mode ──
+        if getattr(self, "_omap_interior_editing", False):
+            self._handle_omap_interior_painter_input(event)
+            return
+
+        # ── Overview interior list mode ──
+        if getattr(self, "_omap_interior_active", False):
+            self._handle_omap_interior_list_input(event)
             return
 
         # ── Level 0: section browser ──
@@ -9425,6 +10111,15 @@ class Game:
                     edit_map_editor=(
                         self._get_map_editor_data()
                         if getattr(self, "_map_editor_active", False)
+                        else None),
+                    edit_omap_interior_list=(
+                        self._get_omap_interior_list_data()
+                        if getattr(self, "_omap_interior_active", False)
+                        and not getattr(self, "_omap_interior_editing", False)
+                        else None),
+                    edit_omap_interior_painter=(
+                        self._get_omap_interior_editor_data()
+                        if getattr(self, "_omap_interior_editing", False)
                         else None))
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()

@@ -34,6 +34,9 @@ class TileMap:
         self.triggered_unique = set()
         # Cooldown timers: tile_id -> remaining steps
         self.unique_cooldowns = {}
+        # Overworld interior data (populated by load_static_overworld)
+        self.tile_links = {}          # "col,row" -> {"interior": name}
+        self.overworld_interiors = [] # list of interior dicts
 
     def get_tile(self, col, row):
         """Get tile ID at (col, row). Returns oob_tile for out-of-bounds."""
@@ -136,6 +139,10 @@ def load_static_overworld(module_path):
         udef = ut.get("def", {})
         if uid:
             tmap.place_unique(c, r, uid, udef)
+
+    # Attach overworld interior data for runtime use
+    tmap.tile_links = data.get("tile_links", {})
+    tmap.overworld_interiors = data.get("interiors", [])
 
     return tmap
 

@@ -237,6 +237,7 @@
     "shop_sign": {
       "path": "src/assets/game/terrain/shop_sign.png",
       "usable_in": [
+        "overworld",
         "town"
       ]
     }

@@ -2409,7 +2409,8 @@ class Renderer(CombatEffectRendererMixin):
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts
                 py = sr * ts
-                self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr)
+                self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr,
+                                            tile_map=tile_map)
 
         # ── 1b. draw unique tile sprites (tiles with a graphic) ──
         for (uc, ur), utile in tile_map.unique_tiles.items():
@@ -2591,7 +2592,8 @@ class Renderer(CombatEffectRendererMixin):
 
     # ── overworld tile rendering ─────────────────────────────
 
-    def _u3_draw_overworld_tile(self, tile_id, px, py, ts, wc, wr):
+    def _u3_draw_overworld_tile(self, tile_id, px, py, ts, wc, wr,
+                                tile_map=None):
         """Draw a single overworld tile using sprite sheet art when available,
         falling back to procedural drawing for tiles without sprites."""
         from src.settings import (
@@ -2599,6 +2601,16 @@ class Renderer(CombatEffectRendererMixin):
             TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
             TILE_MACHINE, TILE_KEYSLOT, TILE_DUNGEON_CLEARED,
         )
+
+        # Check sprite_overrides on the tile_map (used by interiors)
+        if tile_map is not None:
+            override_path = getattr(tile_map, "sprite_overrides", {}).get(
+                (wc, wr))
+            if override_path:
+                sprite = self._get_unique_tile_sprite(override_path, ts)
+                if sprite:
+                    self.screen.blit(sprite, (px, py))
+                    return
 
         # Try sprite sheet first
         sprite = self._get_tile_sprite(tile_id)
@@ -10438,7 +10450,9 @@ class Renderer(CombatEffectRendererMixin):
                            edit_in_dungeon_sub=False,
                            edit_utile_preview=None,
                            edit_battle_preview=None,
-                           edit_map_editor=None):
+                           edit_map_editor=None,
+                           edit_omap_interior_list=None,
+                           edit_omap_interior_painter=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -10457,9 +10471,21 @@ class Renderer(CombatEffectRendererMixin):
         edit_in_encounters : True when editing encounters within a level
         edit_utile_preview : dict with preview data, or None
         edit_battle_preview : dict with battle screen editor data, or None
+        edit_omap_interior_list : dict with overview interior list data
+        edit_omap_interior_painter : dict with overview interior painter data
         """
         import math
         self.screen.fill((0, 0, 0))
+
+        # ── Full-screen overview interior painter ──
+        if edit_omap_interior_painter:
+            self._draw_omap_interior_painter(edit_omap_interior_painter)
+            return
+
+        # ── Full-screen overview interior list ──
+        if edit_omap_interior_list:
+            self._draw_omap_interior_list(edit_omap_interior_list)
+            return
 
         # ── Full-screen map editor takes over the entire screen ──
         if edit_map_editor:
@@ -11165,18 +11191,538 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.rect(self.screen, (255, 200, pulse),
                              (cx, cy, ts, ts), 2)
 
+        # ── Interior-link badges on tiles ──
+        tile_links = data.get("tile_links", {})
+        for link_key, link_val in tile_links.items():
+            parts = link_key.split(",")
+            if len(parts) != 2:
+                continue
+            lc, lr = int(parts[0]), int(parts[1])
+            if cam_c <= lc < end_c and cam_r <= lr < end_r:
+                bx = ox + (lc - cam_c) * ts
+                by_ = oy + (lr - cam_r) * ts
+                pygame.draw.rect(self.screen, (80, 220, 255),
+                                 (bx, by_, ts, ts), 2)
+                badge_sz = max(ts // 3, 8)
+                ibx = bx + ts - badge_sz - 1
+                iby = by_ + 1
+                pygame.draw.rect(self.screen, (0, 140, 200),
+                                 (ibx, iby, badge_sz, badge_sz))
+                if badge_sz >= 8:
+                    tiny = (self.font_tiny if hasattr(self, 'font_tiny')
+                            else self.font_small)
+                    isf = tiny.render("I", True, (255, 255, 255))
+                    self.screen.blit(isf, (ibx + 1, iby))
+
         # Grid border
         pygame.draw.rect(self.screen, (60, 50, 40),
                          (grid_x, grid_y, grid_w, grid_h), 1)
 
+        # ── Interior picker overlay ──
+        if data.get("int_picking"):
+            self._draw_omap_int_picker_overlay(
+                grid_x, grid_y, grid_w, grid_h,
+                data.get("int_pick_list", []),
+                data.get("int_pick_cursor", 0))
+
         # ── Footer hints ──
         hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                "[Tab] Brush  [Ctrl+S] Save  [Esc] Back")
+                "[Tab] Brush  [I] Link Interior  [X] Unlink  [Esc] Back")
         hw = fs.size(hint)[0]
         self._u3_text(hint,
                       SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - footer_h + 4,
                       self._U3_HINT, fs)
+
+    # ── Overview Interior rendering methods ─────────────────────────
+
+    def _draw_omap_int_picker_overlay(self, rx, ry, rw, rh,
+                                       interiors, cursor):
+        """Draw the interior link picker overlay in the map editor."""
+        fs = self.font_small
+        f = self.font
+
+        ow = min(rw - 40, 300)
+        oh = min(rh - 40, 40 + (1 + len(interiors)) * 28)
+        ox = rx + (rw - ow) // 2
+        oy = ry + (rh - oh) // 2
+
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 220))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (80, 220, 255),
+                         (ox, oy, ow, oh), 1)
+
+        self._u3_text("LINK INTERIOR", ox + 10, oy + 6,
+                      self._U3_ORANGE, f)
+
+        row_h = 28
+        ly = oy + 32
+        # Option 0: (none)
+        options = ["(none)"] + [i.get("name", "?") for i in interiors]
+        for i, label in enumerate(options):
+            y = ly + i * row_h
+            if y + row_h > oy + oh:
+                break
+            is_sel = (i == cursor)
+            if is_sel:
+                bar = pygame.Surface((ow - 8, row_h - 2), pygame.SRCALPHA)
+                bar.fill((80, 220, 255, 40))
+                self.screen.blit(bar, (ox + 4, y))
+            nc = (255, 100, 100) if i == 0 else (
+                (255, 255, 100) if is_sel else (180, 180, 200))
+            prefix = "> " if is_sel else "  "
+            self._u3_text(f"{prefix}{label}", ox + 10, y + 4, nc, fs)
+
+    def _draw_omap_interior_list(self, data):
+        """Draw the full-screen overview interior list browser."""
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        self.screen.fill((10, 8, 20))
+
+        # Header
+        header_h = 36
+        pygame.draw.rect(self.screen, (20, 16, 30),
+                         (0, 0, SCREEN_WIDTH, header_h))
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (0, header_h - 1),
+                         (SCREEN_WIDTH, header_h - 1), 1)
+        self._u3_text("INTERIOR MAP LOCATIONS", 16, 6,
+                      self._U3_ORANGE, fm)
+
+        interiors = data.get("interiors", [])
+        cursor = data.get("cursor", 0)
+        naming = data.get("naming", False)
+        name_buf = data.get("name_buf", "")
+        n = len(interiors)
+
+        row_h = 40
+        list_y0 = header_h + 16
+        max_vis = (SCREEN_HEIGHT - header_h - 60) // row_h
+
+        if n == 0:
+            self._u3_text("No interiors yet. Press [Ctrl+N] to add one.",
+                          SCREEN_WIDTH // 2 - 160,
+                          SCREEN_HEIGHT // 2 - 10,
+                          (140, 140, 160), fs)
+        else:
+            scroll = max(0, cursor - max_vis + 1)
+            for i in range(scroll, min(scroll + max_vis, n)):
+                y = list_y0 + (i - scroll) * row_h
+                is_sel = (i == cursor)
+                item = interiors[i]
+
+                if is_sel:
+                    bar = pygame.Surface(
+                        (SCREEN_WIDTH - 40, row_h - 2), pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 40))
+                    self.screen.blit(bar, (20, y))
+                    pygame.draw.rect(self.screen, (200, 160, 60),
+                                     (20, y, SCREEN_WIDTH - 40,
+                                      row_h - 2), 1)
+
+                prefix = "> " if is_sel else "  "
+                nc = (255, 255, 100) if is_sel else (180, 180, 200)
+
+                if naming and is_sel:
+                    # Show name editing
+                    display = name_buf + "_"
+                    self._u3_text(f"{prefix}{display}", 30, y + 8,
+                                  (255, 200, 60), fm)
+                else:
+                    name = item.get("name", "Unnamed")
+                    w = item.get("width", 20)
+                    h = item.get("height", 16)
+                    tiles_n = len(item.get("tiles", {}))
+                    self._u3_text(f"{prefix}{name}", 30, y + 4,
+                                  nc, fm)
+                    sub = f"{w}x{h}  {tiles_n} tiles"
+                    self._u3_text(sub, 50, y + 22,
+                                  (120, 120, 140), fs)
+
+        # Footer
+        footer_y = SCREEN_HEIGHT - 36
+        hint = ("[Up/Dn] Browse  [Enter] Edit  "
+                "[Ctrl+N] New  [Ctrl+D] Delete  [N] Rename  [Esc] Back")
+        hw = fs.size(hint)[0]
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - hw // 2,
+                      footer_y,
+                      self._U3_HINT, fs)
+
+    def _draw_omap_interior_painter(self, data):
+        """Draw the overview interior grid painter – split panel with
+        dungeon brush palette on the left, tile grid on the right.
+        Uses the same visual style as the town layout editor."""
+        import math as _math
+        from src.settings import (
+            TILE_DEFS, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE,
+        )
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        self.screen.fill((10, 8, 20))
+
+        layout = data["layout"]
+        brushes = data["brushes"]
+        cx = data["cx"]
+        cy = data["cy"]
+        brush_idx = data["brush_idx"]
+        dirty = data["dirty"]
+
+        tw = layout.get("width", 20)
+        th = layout.get("height", 16)
+        tiles = layout.get("tiles", {})
+
+        # ── Header ──
+        header_h = 36
+        pygame.draw.rect(self.screen, (20, 16, 30),
+                         (0, 0, SCREEN_WIDTH, header_h))
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (0, header_h - 1),
+                         (SCREEN_WIDTH, header_h - 1), 1)
+        title = f"EDITING: {layout.get('name', '?')}"
+        if dirty:
+            title += " *"
+        self._u3_text(title, 16, 6, self._U3_ORANGE, fm)
+
+        coord_text = f"({cx},{cy})  [{tw}x{th}]"
+        ctw = fm.size(coord_text)[0]
+        self._u3_text(coord_text, SCREEN_WIDTH - ctw - 16, 6,
+                      (140, 140, 160), fm)
+
+        # ── Layout ──
+        footer_h = 28
+        left_w = 180
+        panel_y = header_h + 2
+        panel_h = SCREEN_HEIGHT - header_h - footer_h - 4
+        right_x = left_w + 4
+        right_w = SCREEN_WIDTH - right_x - 4
+        left_x = 4
+
+        # ── Left panel: brush palette ──
+        pygame.draw.rect(self.screen, (18, 14, 28),
+                         (left_x, panel_y, left_w, panel_h))
+        pygame.draw.rect(self.screen, (60, 50, 40),
+                         (left_x, panel_y, left_w, panel_h), 1)
+
+        self._u3_text("BRUSH PALETTE", left_x + 10, panel_y + 6,
+                      (120, 120, 160), fs)
+
+        brush_row_h = 32
+        brush_y0 = panel_y + 26
+        max_brush_vis = (panel_h - 60) // brush_row_h
+        b_scroll = max(0, brush_idx - max_brush_vis + 1)
+
+        for bi in range(b_scroll,
+                        min(b_scroll + max_brush_vis, len(brushes))):
+            by = brush_y0 + (bi - b_scroll) * brush_row_h
+            is_sel = (bi == brush_idx)
+            b = brushes[bi]
+
+            if is_sel:
+                bar = pygame.Surface(
+                    (left_w - 8, brush_row_h - 2), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 40))
+                self.screen.blit(bar, (left_x + 4, by))
+                pygame.draw.rect(self.screen, (200, 160, 60),
+                                 (left_x + 4, by,
+                                  left_w - 8, brush_row_h - 2), 1)
+
+            # Sprite preview
+            icon_x = left_x + 12
+            text_x = icon_x + 4
+            b_path = b.get("path")
+            if b_path:
+                spr = self._get_unique_tile_sprite(b_path, 22)
+                if spr:
+                    self.screen.blit(spr, (icon_x, by + 4))
+                    text_x = icon_x + 28
+            elif b.get("tile_id") is not None:
+                from src.settings import TILE_DEFS as _TD
+                _tdef = _TD.get(b["tile_id"], {})
+                tc = _tdef.get("color", (80, 80, 80))
+                pygame.draw.rect(self.screen, tc,
+                                 pygame.Rect(icon_x, by + 4, 22, 22))
+                pygame.draw.rect(self.screen, (60, 50, 40),
+                                 pygame.Rect(icon_x, by + 4, 22, 22), 1)
+                text_x = icon_x + 28
+            nc = (255, 255, 100) if is_sel else (180, 180, 200)
+            self._u3_text(b["name"], text_x, by + 6, nc, fs)
+
+        self._u3_text("[Tab] Next Brush",
+                      left_x + 10, panel_y + panel_h - 36,
+                      (140, 140, 160), fs)
+        self._u3_text("[Shift+Tab] Prev",
+                      left_x + 10, panel_y + panel_h - 20,
+                      (140, 140, 160), fs)
+
+        # ── Right panel: tile grid ──
+        grid_x = right_x + 4
+        grid_y = panel_y + 4
+        grid_w = right_w - 8
+        grid_h = panel_h - 8
+
+        # Calculate tile size to fit
+        ts = min(grid_w // tw, grid_h // th, 24)
+        total_w = tw * ts
+        total_h = th * ts
+        gx = grid_x + (grid_w - total_w) // 2
+        gy = grid_y + (grid_h - total_h) // 2
+
+        # Draw background
+        pygame.draw.rect(self.screen, (8, 6, 16),
+                         (grid_x, grid_y, grid_w, grid_h))
+
+        # Town tile colors from TILE_DEFS
+        TILE_COLORS = {tid: tdef.get("color", (80, 80, 80))
+                       for tid, tdef in TILE_DEFS.items()}
+
+        for r in range(th):
+            for c in range(tw):
+                px = gx + c * ts
+                py = gy + r * ts
+                pos_key = f"{c},{r}"
+
+                if pos_key in tiles:
+                    td = tiles[pos_key]
+                    tid = td.get("tile_id")
+                    # Try sprite
+                    path = td.get("path")
+                    drawn = False
+                    if path:
+                        sprite = self._get_unique_tile_sprite(path, ts)
+                        if sprite:
+                            self.screen.blit(sprite, (px, py))
+                            drawn = True
+                    if not drawn:
+                        col = TILE_COLORS.get(tid, (80, 80, 80))
+                        pygame.draw.rect(self.screen, col,
+                                         pygame.Rect(px, py, ts, ts))
+
+                    # Link badges
+                    badge_char = None
+                    badge_border = None
+                    badge_bg = None
+                    if td.get("to_overworld"):
+                        badge_border = (255, 180, 60)
+                        badge_bg = (200, 120, 0)
+                        badge_char = "O"
+                    elif td.get("interior"):
+                        badge_border = (80, 220, 255)
+                        badge_bg = (0, 140, 200)
+                        badge_char = "I"
+                    if badge_char:
+                        pygame.draw.rect(self.screen, badge_border,
+                                         pygame.Rect(px, py, ts, ts), 2)
+                        badge_sz = max(ts // 3, 6)
+                        bxb = px + ts - badge_sz - 1
+                        byb = py + 1
+                        pygame.draw.rect(self.screen, badge_bg,
+                                         pygame.Rect(bxb, byb,
+                                                     badge_sz, badge_sz))
+                        if badge_sz >= 8:
+                            tiny = (self.font_tiny
+                                    if hasattr(self, 'font_tiny')
+                                    else self.font_small)
+                            isf = tiny.render(badge_char, True,
+                                              (255, 255, 255))
+                            self.screen.blit(isf, (bxb + 1, byb))
+                else:
+                    # Checkerboard pattern for empty cells
+                    half = max(ts // 2, 1)
+                    for qr in range(2):
+                        for qc in range(2):
+                            qx = px + qc * half
+                            qy = py + qr * half
+                            qcol = ((45, 45, 45) if (qr + qc) % 2 == 0
+                                    else (30, 30, 30))
+                            pygame.draw.rect(self.screen, qcol,
+                                             pygame.Rect(qx, qy,
+                                                         half, half))
+
+                # Grid lines
+                pygame.draw.rect(self.screen, (40, 35, 30),
+                                 pygame.Rect(px, py, ts, ts), 1)
+
+        # Cursor
+        if cx >= 0 and cy >= 0:
+            elapsed = pygame.time.get_ticks() / 1000.0
+            pulse = int(80 + 40 * _math.sin(elapsed * 4))
+            cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts,
+                                      ts, ts)
+            pygame.draw.rect(self.screen, (255, 200, pulse),
+                             cursor_rect, 2)
+
+        # Grid border
+        pygame.draw.rect(self.screen, (60, 50, 40),
+                         (grid_x, grid_y, grid_w, grid_h), 1)
+
+        # ── Replace tile overlay ──
+        if data.get("replacing"):
+            self._draw_omap_int_replace_overlay(
+                grid_x, grid_y, grid_w, grid_h,
+                brushes,
+                data.get("replace_src_tile"),
+                data.get("replace_src_name", ""),
+                data.get("replace_src_empty", False),
+                data.get("replace_dst_idx", 0))
+
+        # ── Interior link picker overlay ──
+        if data.get("link_picking"):
+            self._draw_omap_int_link_picker(
+                grid_x, grid_y, grid_w, grid_h,
+                data.get("link_pick_list", []),
+                data.get("link_pick_cursor", 0))
+
+        # ── Footer ──
+        if data.get("replacing"):
+            hint = ("[Up/Dn] Select Destination  "
+                    "[Enter] Replace All  [Esc] Cancel")
+        elif data.get("link_picking"):
+            hint = ("[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel")
+        else:
+            hint = ("[Arrows/WASD] Move  [Enter] Paint  "
+                    "[I] Link  [R] Replace  [X] Unlink  "
+                    "[Tab] Brush  [Esc] Back")
+        hw = fs.size(hint)[0]
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - hw // 2,
+                      SCREEN_HEIGHT - footer_h + 4,
+                      self._U3_HINT, fs)
+
+    def _draw_omap_int_replace_overlay(self, rx, ry, rw, rh,
+                                        brushes, src_tile, src_name,
+                                        src_empty, dst_idx):
+        """Draw the replace-tile overlay for overview interior painter."""
+        from src.settings import TILE_DEFS
+        fs = self.font_small
+        f = self.font
+
+        ow = min(rw - 20, 280)
+        oh = rh - 20
+        ox = rx + (rw - ow) // 2
+        oy = ry + 10
+
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 220))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (200, 160, 60),
+                         (ox, oy, ow, oh), 1)
+
+        self._u3_text("REPLACE TILE", ox + 10, oy + 6,
+                      self._U3_ORANGE, f)
+
+        # Source info
+        src_y = oy + 30
+        self._u3_text("Source:", ox + 10, src_y, (140, 140, 160), fs)
+        if src_empty:
+            # Checkerboard swatch
+            sw = 18
+            for qr in range(2):
+                for qc in range(2):
+                    qcol = ((50, 50, 50) if (qr + qc) % 2 == 0
+                            else (35, 35, 35))
+                    pygame.draw.rect(self.screen, qcol,
+                                     pygame.Rect(ox + 70 + qc * (sw // 2),
+                                                 src_y + qr * (sw // 2),
+                                                 sw // 2, sw // 2))
+        else:
+            tdef = TILE_DEFS.get(src_tile, {})
+            tc = tdef.get("color", (80, 80, 80))
+            pygame.draw.rect(self.screen, tc,
+                             pygame.Rect(ox + 70, src_y, 18, 18))
+        self._u3_text(src_name, ox + 95, src_y + 2, (255, 255, 200), fs)
+
+        # Destination list
+        dst_y0 = src_y + 28
+        self._u3_text("Destination:", ox + 10, dst_y0,
+                      (140, 140, 160), fs)
+        row_h = 26
+        list_y0 = dst_y0 + 20
+        max_vis = (oy + oh - list_y0 - 10) // row_h
+        scroll = max(0, dst_idx - max_vis + 1)
+
+        for i in range(scroll, min(scroll + max_vis, len(brushes))):
+            ly = list_y0 + (i - scroll) * row_h
+            is_sel = (i == dst_idx)
+            if is_sel:
+                bar = pygame.Surface((ow - 16, row_h - 2), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 40))
+                self.screen.blit(bar, (ox + 8, ly))
+
+            b = brushes[i]
+            # Swatch
+            if b.get("tile_id") is not None:
+                tdef = TILE_DEFS.get(b["tile_id"], {})
+                tc = tdef.get("color", (80, 80, 80))
+                pygame.draw.rect(self.screen, tc,
+                                 pygame.Rect(ox + 14, ly + 2, 16, 16))
+            else:
+                pygame.draw.rect(self.screen, (40, 35, 50),
+                                 pygame.Rect(ox + 14, ly + 2, 16, 16))
+                pygame.draw.line(self.screen, (200, 80, 80),
+                                 (ox + 16, ly + 4),
+                                 (ox + 28, ly + 16), 1)
+
+            nc = (255, 255, 100) if is_sel else (180, 180, 200)
+            prefix = "> " if is_sel else "  "
+            self._u3_text(f"{prefix}{b['name']}", ox + 36, ly + 2,
+                          nc, fs)
+
+    def _draw_omap_int_link_picker(self, rx, ry, rw, rh,
+                                    pick_list, cursor):
+        """Draw the interior link picker overlay for the interior painter.
+
+        Options: (none), Return to Overworld, then sibling interiors.
+        """
+        fs = self.font_small
+        f = self.font
+
+        ow = min(rw - 40, 320)
+        n_opts = 2 + len(pick_list)
+        oh = min(rh - 40, 40 + n_opts * 28)
+        ox = rx + (rw - ow) // 2
+        oy = ry + (rh - oh) // 2
+
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 220))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (80, 220, 255),
+                         (ox, oy, ow, oh), 1)
+
+        self._u3_text("LINK TO", ox + 10, oy + 6,
+                      self._U3_ORANGE, f)
+
+        row_h = 28
+        ly = oy + 32
+
+        # Build options list
+        options = (["(none)", "\u2190 Return to Overworld"]
+                   + [i.get("name", "?") for i in pick_list])
+
+        for i, label in enumerate(options):
+            y = ly + i * row_h
+            if y + row_h > oy + oh:
+                break
+            is_sel = (i == cursor)
+            if is_sel:
+                bar = pygame.Surface((ow - 8, row_h - 2), pygame.SRCALPHA)
+                bar.fill((80, 220, 255, 40))
+                self.screen.blit(bar, (ox + 4, y))
+
+            if i == 0:
+                nc = (255, 100, 100)  # red for "(none)"
+            elif i == 1:
+                nc = (100, 255, 100)  # green for overworld exit
+            else:
+                nc = (255, 255, 100) if is_sel else (180, 180, 200)
+            prefix = "> " if is_sel else "  "
+            self._u3_text(f"{prefix}{label}", ox + 10, y + 4, nc, fs)
 
     def _draw_section_browser(self, rx, ry, rw, rh,
                                sections, cursor, scroll=0,

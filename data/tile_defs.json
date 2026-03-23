@@ -374,5 +374,16 @@
     ],
     "context": "overworld",
     "sprite": "overworld/island_jungle"
+  },
+  "39": {
+    "name": "Grotto",
+    "walkable": false,
+    "color": [
+      130,
+      130,
+      130
+    ],
+    "context": "overworld",
+    "sprite": "overworld/dungeon"
   }
 }

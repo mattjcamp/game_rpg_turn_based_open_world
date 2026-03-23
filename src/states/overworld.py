@@ -80,6 +80,17 @@ class OverworldState(InventoryMixin, BaseState):
         # the location they just left.
         self._exit_grace = False
 
+        # ── Overworld interior state ──
+        self._in_overworld_interior = False
+        self._overworld_interior_stack = []
+        self._overworld_interior_exit_positions = set()
+        self._overworld_interior_links = {}  # {(col,row): interior_name}
+        self._overworld_interior_name = ""
+        self._overworld_interior_entry_grace = False
+        # Stashed overworld state restored on exit
+        self._stashed_overworld_tile_map = None
+        self._stashed_overworld_monsters = None
+
     def enter(self):
         self._apply_pending_combat_rewards()
         # Skip the first tile-event check so we don't immediately re-enter
@@ -421,12 +432,13 @@ class OverworldState(InventoryMixin, BaseState):
                 party.clock.advance(5)
                 self.game.tile_map.tick_cooldowns()
                 self._check_tile_events()
-                # Move orcs after party moves
-                self._move_monsters()
-                self._check_monster_contact()
-                # Occasionally respawn orcs that were killed
-                if random.random() < 0.08:
-                    self._spawn_orcs()
+                # Move orcs after party moves (not inside interiors)
+                if not self._in_overworld_interior:
+                    self._move_monsters()
+                    self._check_monster_contact()
+                    # Occasionally respawn orcs that were killed
+                    if random.random() < 0.08:
+                        self._spawn_orcs()
                 # Tick Galadriel's Light step counter
                 self._tick_galadriels_light()
             else:
@@ -635,8 +647,29 @@ class OverworldState(InventoryMixin, BaseState):
             self._exit_grace = False
             return
 
+        party = self.game.party
+
+        # ── If inside an overworld interior, check exits and links ──
+        if self._in_overworld_interior:
+            # Skip exit check on the first move after entering so the
+            # player isn't immediately ejected when spawning on an exit.
+            if self._overworld_interior_entry_grace:
+                self._overworld_interior_entry_grace = False
+            else:
+                if (party.col, party.row) in self._overworld_interior_exit_positions:
+                    self._exit_overworld_interior()
+                    return
+            # Interior-to-interior links
+            interior_name = self._overworld_interior_links.get(
+                (party.col, party.row))
+            if interior_name:
+                self._enter_overworld_interior(
+                    interior_name, party.col, party.row)
+                return
+            return  # no other tile events inside interiors
+
         tile_id = self.game.tile_map.get_tile(
-            self.game.party.col, self.game.party.row
+            party.col, party.row
         )
 
         if tile_id == TILE_TOWN:
@@ -644,12 +677,12 @@ class OverworldState(InventoryMixin, BaseState):
             return
 
         elif tile_id == TILE_DUNGEON:
-            pcol, prow = self.game.party.col, self.game.party.row
+            pcol, prow = party.col, party.row
             self._show_dungeon_action(pcol, prow)
             return
 
         elif tile_id == TILE_DUNGEON_CLEARED:
-            pcol, prow = self.game.party.col, self.game.party.row
+            pcol, prow = party.col, party.row
             self._show_dungeon_action(pcol, prow)
             return
 
@@ -660,13 +693,212 @@ class OverworldState(InventoryMixin, BaseState):
         elif tile_id == TILE_CHEST:
             self._open_chest()
             # Restore the original tile that was under the chest
-            pos = (self.game.party.col, self.game.party.row)
+            pos = (party.col, party.row)
             original = self.chest_under_tiles.pop(pos, TILE_GRASS)
             self.game.tile_map.set_tile(pos[0], pos[1], original)
             return
 
+        # ── Overworld interior link check ──
+        pcol, prow = party.col, party.row
+        tmap = self.game.tile_map
+        link = tmap.tile_links.get(f"{pcol},{prow}")
+        if link and link.get("interior"):
+            self._enter_overworld_interior(
+                link["interior"], pcol, prow)
+            return
+
         # ── Unique tile check ──
         self._check_unique_tile()
+
+    # ── Overworld interior entry / exit ──────────────────────
+
+    def _enter_overworld_interior(self, interior_name, door_col, door_row):
+        """Transition into an overworld interior (dungeon-style map)."""
+        tmap = self.game.tile_map
+
+        # If the target interior is already in the stack, unwind back to it
+        # instead of nesting deeper (same pattern as town.py).
+        stack = self._overworld_interior_stack
+        for i in range(len(stack) - 1, -1, -1):
+            if stack[i].get("name") == interior_name:
+                while len(stack) > i + 1:
+                    stack.pop()
+                prev = stack.pop()
+                self.game.tile_map = prev["tile_map"]
+                self._overworld_interior_links = prev["interior_links"]
+                self._overworld_interior_exit_positions = prev["exit_positions"]
+                self.game.party.col = prev["col"]
+                self.game.party.row = prev["row"]
+                self._overworld_interior_name = prev.get("name", "")
+                if not stack:
+                    self._in_overworld_interior = False
+                    # Restore overworld state
+                    if self._stashed_overworld_tile_map is not None:
+                        self.game.tile_map = self._stashed_overworld_tile_map
+                        self._stashed_overworld_tile_map = None
+                    if self._stashed_overworld_monsters is not None:
+                        self.overworld_monsters = self._stashed_overworld_monsters
+                        self._stashed_overworld_monsters = None
+                self.game.camera.map_width = self.game.tile_map.width
+                self.game.camera.map_height = self.game.tile_map.height
+                self.game.camera.update(
+                    self.game.party.col, self.game.party.row)
+                self.show_message(
+                    f"Returning to {interior_name}...", 1000)
+                return
+
+        # Find the interior definition from the overworld tile map's
+        # interiors list (loaded from static_overworld.json).
+        src_tmap = self._stashed_overworld_tile_map or tmap
+        interiors = getattr(src_tmap, "overworld_interiors", [])
+        interior = None
+        for entry in interiors:
+            if entry.get("name") == interior_name:
+                interior = entry
+                break
+        if not interior or not interior.get("tiles"):
+            self.show_message("Nothing here.", 1500)
+            return
+
+        # Push current state onto the interior stack
+        self._overworld_interior_stack.append({
+            "col": door_col,
+            "row": door_row,
+            "tile_map": self.game.tile_map,
+            "interior_links": dict(self._overworld_interior_links),
+            "exit_positions": set(self._overworld_interior_exit_positions),
+            "name": self._overworld_interior_name,
+        })
+
+        # First time entering from the overworld — stash the overworld map
+        if not self._in_overworld_interior:
+            self._stashed_overworld_tile_map = tmap
+            self._stashed_overworld_monsters = list(self.overworld_monsters)
+            self.overworld_monsters = []  # no roaming orcs in interiors
+
+        self._overworld_interior_name = interior_name
+        self._in_overworld_interior = True
+        self._overworld_interior_entry_grace = True
+
+        # Build a tile map from the interior grid (dungeon tiles)
+        from src.tile_map import TileMap
+        from src.settings import TILE_VOID
+        iw = interior.get("width", 14)
+        ih = interior.get("height", 15)
+        imap = TileMap(iw, ih, default_tile=TILE_VOID, oob_tile=TILE_VOID)
+
+        for pos_key, td in interior.get("tiles", {}).items():
+            parts = pos_key.split(",")
+            c, r = int(parts[0]), int(parts[1])
+            tid = td.get("tile_id")
+            if tid is not None and 0 <= c < iw and 0 <= r < ih:
+                imap.set_tile(c, r, tid)
+                path = td.get("path")
+                if path:
+                    imap.sprite_overrides[(c, r)] = path
+
+        self.game.tile_map = imap
+
+        # Collect exit positions and interior-to-interior links
+        self._overworld_interior_exit_positions = set()
+        self._overworld_interior_links = {}
+        exit_positions = []
+        first_walkable = None
+        entry_placed = False
+
+        for pos_key, td in interior.get("tiles", {}).items():
+            parts = pos_key.split(",")
+            c, r = int(parts[0]), int(parts[1])
+            if td.get("to_overworld"):
+                self._overworld_interior_exit_positions.add((c, r))
+                exit_positions.append((c, r))
+            if td.get("interior"):
+                self._overworld_interior_links[(c, r)] = td["interior"]
+            # Track any walkable tile as fallback spawn
+            tid = td.get("tile_id")
+            if first_walkable is None and tid is not None:
+                from src.settings import TILE_DEFS
+                tdef = TILE_DEFS.get(tid, {})
+                if tdef.get("walkable", False):
+                    first_walkable = (c, r)
+
+        # BFS from exit tile to find nearest walkable non-exit tile for spawn
+        if exit_positions and not entry_placed:
+            from src.settings import TILE_DEFS as _TD
+            ec, er = exit_positions[0]
+            visited = set()
+            queue = [(ec, er)]
+            visited.add((ec, er))
+            while queue and not entry_placed:
+                cx, cy = queue.pop(0)
+                for dc, dr in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    nc, nr = cx + dc, cy + dr
+                    if (nc, nr) in visited:
+                        continue
+                    visited.add((nc, nr))
+                    if not (0 <= nc < iw and 0 <= nr < ih):
+                        continue
+                    ntid = imap.get_tile(nc, nr)
+                    if _TD.get(ntid, {}).get("walkable", False):
+                        if (nc, nr) not in self._overworld_interior_exit_positions:
+                            self.game.party.col = nc
+                            self.game.party.row = nr
+                            entry_placed = True
+                            break
+                    queue.append((nc, nr))
+            # Last resort: place on the exit tile itself
+            if not entry_placed:
+                self.game.party.col = ec
+                self.game.party.row = er
+                entry_placed = True
+
+        if not entry_placed and first_walkable:
+            self.game.party.col = first_walkable[0]
+            self.game.party.row = first_walkable[1]
+            entry_placed = True
+
+        if not entry_placed:
+            self.game.party.col = iw // 2
+            self.game.party.row = ih // 2
+
+        # Update camera
+        self.game.camera.map_width = iw
+        self.game.camera.map_height = ih
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self.show_message(f"Entering {interior_name}...", 1500)
+
+    def _exit_overworld_interior(self):
+        """Return from an overworld interior to the previous level."""
+        stack = self._overworld_interior_stack
+        if not stack:
+            self._in_overworld_interior = False
+            return
+        prev = stack.pop()
+        self.game.tile_map = prev["tile_map"]
+        self.game.party.col = prev["col"]
+        self.game.party.row = prev["row"]
+        self._overworld_interior_exit_positions = prev.get(
+            "exit_positions", set())
+        self._overworld_interior_links = prev.get("interior_links", {})
+        leaving_name = self._overworld_interior_name
+        self._overworld_interior_name = prev.get("name", "")
+
+        # If the stack is now empty, we're back on the overworld
+        if not stack:
+            self._in_overworld_interior = False
+            # Restore the stashed overworld tile map (which has tile_links etc)
+            if self._stashed_overworld_tile_map is not None:
+                self.game.tile_map = self._stashed_overworld_tile_map
+                self._stashed_overworld_tile_map = None
+            if self._stashed_overworld_monsters is not None:
+                self.overworld_monsters = self._stashed_overworld_monsters
+                self._stashed_overworld_monsters = None
+
+        self.game.camera.map_width = self.game.tile_map.width
+        self.game.camera.map_height = self.game.tile_map.height
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self._exit_grace = True  # don't re-trigger the tile link immediately
+        self.show_message(f"Leaving {leaving_name}...", 1000)
 
     # ── Unique tile interaction ────────────────────────────────
 
