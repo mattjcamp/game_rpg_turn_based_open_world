@@ -100,6 +100,46 @@ class TileMap:
             del self.unique_cooldowns[key]
 
 
+# ── Static overworld loader ────────────────────────────────────
+
+def load_static_overworld(module_path):
+    """Load a pre-generated static overworld map from a module.
+
+    Looks for ``static_overworld.json`` in *module_path*.  If the file
+    exists and is valid, returns a fully-populated :class:`TileMap`.
+    Otherwise returns ``None`` so the caller can fall back to procedural
+    generation.
+    """
+    static_path = os.path.join(module_path, "static_overworld.json")
+    if not os.path.isfile(static_path):
+        return None
+    try:
+        with open(static_path, "r") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    w = data.get("width", 0)
+    h = data.get("height", 0)
+    tiles = data.get("tiles")
+    if not (w > 0 and h > 0 and tiles and len(tiles) == h):
+        return None
+
+    tmap = TileMap(w, h, default_tile=TILE_GRASS)
+    tmap.tiles = tiles
+    tmap.seed = data.get("seed", 0)
+
+    # Restore unique tile placements
+    for ut in data.get("unique_tile_placements", []):
+        c, r = ut.get("col", 0), ut.get("row", 0)
+        uid = ut.get("id", "")
+        udef = ut.get("def", {})
+        if uid:
+            tmap.place_unique(c, r, uid, udef)
+
+    return tmap
+
+
 # ── Unique tile loader ──────────────────────────────────────────
 
 def load_unique_tiles(data_dir=None):

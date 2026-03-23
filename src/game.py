@@ -538,13 +538,22 @@ class Game:
             from src.party import reload_module_data as _rp
             _rp()
 
-        # ── Regenerate the overworld map from module config ──
+        # ── Load overworld map ──
+        # If the module has a static (custom) map, use it directly.
+        # Otherwise fall back to procedural generation.
         overworld_cfg = None
         if self.module_manifest:
             overworld_cfg = self.module_manifest.get("_overworld_cfg")
-        self.tile_map = create_test_map(
-            overworld_cfg=overworld_cfg,
-            data_dir=self.active_module_path)
+        from src.tile_map import load_static_overworld
+        static_map = None
+        if self.active_module_path:
+            static_map = load_static_overworld(self.active_module_path)
+        if static_map is not None:
+            self.tile_map = static_map
+        else:
+            self.tile_map = create_test_map(
+                overworld_cfg=overworld_cfg,
+                data_dir=self.active_module_path)
         self.camera = Camera(self.tile_map.width, self.tile_map.height)
 
         if self.party.members:
@@ -4985,8 +4994,6 @@ class Game:
         # 3) Towns folder
         from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
                                        TOWN_STYLE_NAMES, TOWN_STYLE_KEYS,
-                                       TOWN_BUILDING_KEYS,
-                                       TOWN_BUILDING_NAMES,
                                        DEFAULT_TOWN_CONFIG)
         towns = manifest.get("world", {}).get("towns", [])
         town_children = []
@@ -5010,7 +5017,8 @@ class Game:
             # Resolve custom layout display name
             tc_layout = tc.get("layout", "")
             layout_display = tc_layout if tc_layout else "Procedural"
-            # Build fields
+            # Build fields (procedural towns always get general store,
+            # shrine, and inn — custom buildings via template engine)
             fields = [
                 ["Name", f"town_{i}_name", tname, "text", True],
                 ["Description", f"town_{i}_desc",
@@ -5020,15 +5028,6 @@ class Game:
                 ["Size", f"town_{i}_size", size_display, "choice", True],
                 ["Style", f"town_{i}_style", style_display, "choice", True],
             ]
-            # Add a Yes/No toggle for each optional building
-            tc_buildings = tc.get("buildings",
-                                  DEFAULT_TOWN_CONFIG["buildings"])
-            for bkey, bname in zip(TOWN_BUILDING_KEYS,
-                                   TOWN_BUILDING_NAMES):
-                enabled = "Yes" if bkey in tc_buildings else "No"
-                fields.append(
-                    [bname, f"town_{i}_bldg_{bkey}", enabled,
-                     "choice", True])
             town_children.append({
                 "label": tname,
                 "icon": "T",
@@ -5154,6 +5153,7 @@ class Game:
         self.module_edit_active_utile = -1
         self.module_edit_utile_preview = False
         self._battle_screen_active = False
+        self._map_editor_active = False
         # Store dungeon levels for editing
         self.module_edit_dungeon_levels = {}
         for i, dung in enumerate(dungeons):
@@ -5327,6 +5327,11 @@ class Game:
         # ── Battle Screen section drills into battle screen painter ──
         if sec.get("is_battle_screen"):
             self._enter_battle_screen_editor(sec["enc_idx"])
+            return
+
+        # ── Map Layout section opens the overview map editor ──
+        if sec.get("is_map_editor"):
+            self._enter_map_editor()
             return
 
         # ── Individual unique tile drills into its field editor ──
@@ -6131,6 +6136,28 @@ class Game:
             "settings_cursor": self._battle_settings_cursor,
         }
 
+    def _get_map_editor_data(self):
+        """Return a dict describing the overview map editor state."""
+        if not getattr(self, "_map_editor_active", False):
+            return None
+        from src.settings import TILE_DEFS
+        palette = self._map_editor_palette
+        brush_id = palette[self._map_editor_brush]
+        brush_name = TILE_DEFS.get(brush_id, {}).get("name", "?")
+        return {
+            "tiles": self._map_editor_tiles,
+            "width": self._map_editor_w,
+            "height": self._map_editor_h,
+            "cursor_col": self._map_editor_cursor_c,
+            "cursor_row": self._map_editor_cursor_r,
+            "cam_col": self._map_editor_cam_c,
+            "cam_row": self._map_editor_cam_r,
+            "palette": palette,
+            "brush_idx": self._map_editor_brush,
+            "brush_name": brush_name,
+            "dirty": self._map_editor_dirty,
+        }
+
     # ── Unique Tiles editing ─────────────────────────────────────
 
     # Base tile choice list for the editor
@@ -6215,13 +6242,15 @@ class Game:
                                       mod_settings=None):
         """Build the child section list for the Overview Map folder.
 
-        Returns four sub-sections:
+        Returns sub-sections:
         1) Settings   – world size, season, time of day, map type,
                         initial build
-        2) Map Layout – placeholder for the editable tile grid
+        2) Map Layout – editable tile grid (opens map editor when
+                        a static map has been generated)
         3) Unique Tiles – unique tile placements on the overview map
         4) Interior Map Locations – placeable unique locations
         """
+        import os
         if mod_settings is None:
             mod_settings = {}
 
@@ -6253,14 +6282,40 @@ class Game:
         }
 
         # ── 2) Map Layout ──
-        map_layout_sec = {
-            "label": "Map Layout",
-            "icon": "G",
-            "fields": [
-                ["— Editable Tiles —", "_omap_layout_header",
-                 "", "section", False],
-            ],
-            "subtitle": "editable tiles",
+        # Check whether a static map already exists for this module
+        mod = self.module_list[self.module_cursor]
+        static_path = os.path.join(mod["path"], "static_overworld.json")
+        has_static = os.path.isfile(static_path)
+
+        if has_static:
+            map_layout_sec = {
+                "label": "Map Layout",
+                "icon": "G",
+                "is_map_editor": True,
+                "fields": [],
+                "subtitle": "static map (editable)",
+            }
+        else:
+            map_layout_sec = {
+                "label": "Map Layout",
+                "icon": "G",
+                "fields": [
+                    ["— No Map Generated —",
+                     "_omap_layout_header", "", "section", False],
+                    ["Use Generate Map to create one",
+                     "_omap_layout_hint", "", "section", False],
+                ],
+                "subtitle": "no map yet",
+            }
+
+        # ── Generate Map action ──
+        generate_label = ("Re-Generate Map" if has_static
+                          else "Generate Map")
+        generate_sec = {
+            "label": generate_label,
+            "icon": "+",
+            "fields": [],
+            "action": "generate_overworld",
         }
 
         # ── 3) Unique Tiles (moved from top-level into Overview Map) ──
@@ -6291,7 +6346,7 @@ class Game:
                 if n_locs else "none"),
         }
 
-        return [settings_sec, map_layout_sec,
+        return [settings_sec, generate_sec, map_layout_sec,
                 unique_tiles_sec, interior_sec]
 
     def _in_overview_map_folder(self):
@@ -6299,6 +6354,254 @@ class Game:
         return (self._module_edit_folder_label == "Overview Map"
                 and self.module_edit_nav_stack
                 and self.module_edit_level == 0)
+
+    # ── Static overworld generation & map editor ─────────────────
+
+    def _generate_static_overworld(self):
+        """Generate a procedural overworld and save it as a static map.
+
+        Uses the module's overworld.json config (landmarks, paths, etc.)
+        just like a normal new-game would, but persists the resulting
+        tile grid to ``static_overworld.json`` in the module directory.
+        """
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        mod_path = mod["path"]
+
+        # Load the module's overworld config (same as new-game does)
+        manifest_path = os.path.join(mod_path, "module.json")
+        try:
+            with open(manifest_path, "r") as fh:
+                manifest = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            self.module_message = "Failed to read module!"
+            self.module_msg_timer = 2.0
+            return
+
+        world = manifest.get("world", {})
+        overworld_file = world.get("overworld")
+        overworld_cfg = None
+        if overworld_file:
+            ow_path = os.path.join(mod_path, overworld_file)
+            if os.path.isfile(ow_path):
+                with open(ow_path, "r") as fh:
+                    overworld_cfg = json.load(fh)
+
+        # Generate the map using the existing procedural generator
+        from src.tile_map import create_test_map
+        tmap = create_test_map(
+            overworld_cfg=overworld_cfg, data_dir=mod_path)
+
+        # Serialize the tile grid + metadata to a static file
+        static_data = {
+            "width": tmap.width,
+            "height": tmap.height,
+            "seed": tmap.seed,
+            "tiles": tmap.tiles,  # 2D list of tile IDs
+        }
+        # Also persist unique tile placements
+        if tmap.unique_tiles:
+            ut_list = []
+            for (c, r), udef in tmap.unique_tiles.items():
+                ut_list.append({
+                    "col": c, "row": r,
+                    "id": udef.get("id", ""),
+                    "def": {k: v for k, v in udef.items()
+                            if k != "id"},
+                })
+            static_data["unique_tile_placements"] = ut_list
+
+        static_path = os.path.join(mod_path, "static_overworld.json")
+        try:
+            with open(static_path, "w") as fh:
+                json.dump(static_data, fh)
+        except OSError:
+            self.module_message = "Failed to save map!"
+            self.module_msg_timer = 2.0
+            return
+
+        self.module_message = "Map generated!"
+        self.module_msg_timer = 2.0
+
+        # Refresh the Overview Map sub-sections so Map Layout
+        # shows "static map (editable)" and button says Re-Generate
+        self._refresh_overview_map_sections()
+
+    def _refresh_overview_map_sections(self):
+        """Rebuild the Overview Map folder's children after generation."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+
+        from src.module_loader import get_module_settings
+        mod_settings = get_module_settings(mod["path"]) or {
+            "world_size": "Medium", "num_towns": 0, "num_quests": 0,
+            "season": "Summer", "time_of_day": "Noon",
+        }
+        manifest_path = os.path.join(mod["path"], "module.json")
+        try:
+            with open(manifest_path, "r") as fh:
+                manifest = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            manifest = {}
+        overworld_cfg = manifest.get("world", {}).get(
+            "overworld_config", {})
+
+        new_children = self._build_overview_map_sections(
+            overworld_cfg, manifest, mod_settings)
+
+        # We are inside the Overview Map folder — replace current sections
+        self.module_edit_sections = new_children
+        self.module_edit_section_cursor = min(
+            self.module_edit_section_cursor,
+            max(0, len(new_children) - 1))
+        self._adjust_section_scroll()
+
+        # Also update the parent nav-stack entry's children
+        if self.module_edit_nav_stack:
+            parent_sections = self.module_edit_nav_stack[-1][0]
+            for sec in parent_sections:
+                if sec.get("folder") == "overview_map":
+                    sec["children"] = new_children
+                    break
+
+    def _enter_map_editor(self):
+        """Enter the interactive overview map editor."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        static_path = os.path.join(mod["path"], "static_overworld.json")
+
+        if not os.path.isfile(static_path):
+            self.module_message = "Generate a map first!"
+            self.module_msg_timer = 2.0
+            return
+
+        try:
+            with open(static_path, "r") as fh:
+                sdata = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            self.module_message = "Failed to load map!"
+            self.module_msg_timer = 2.0
+            return
+
+        self._map_editor_active = True
+        self._map_editor_tiles = sdata["tiles"]  # 2D list [row][col]
+        self._map_editor_w = sdata["width"]
+        self._map_editor_h = sdata["height"]
+        self._map_editor_cursor_c = self._map_editor_w // 2
+        self._map_editor_cursor_r = self._map_editor_h // 2
+        self._map_editor_cam_c = max(
+            0, self._map_editor_cursor_c - 10)
+        self._map_editor_cam_r = max(
+            0, self._map_editor_cursor_r - 8)
+        # Tile palette: overworld-only tiles the user can paint
+        from src.settings import (TILE_GRASS, TILE_WATER, TILE_FOREST,
+                                  TILE_MOUNTAIN, TILE_SAND, TILE_PATH,
+                                  TILE_BRIDGE, TILE_TOWN, TILE_DUNGEON)
+        self._map_editor_palette = [
+            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_SAND, TILE_PATH, TILE_BRIDGE,
+            TILE_TOWN, TILE_DUNGEON,
+        ]
+        self._map_editor_brush = 0  # index into palette
+        self._map_editor_dirty = False
+
+    def _handle_map_editor_input(self, event):
+        """Handle input in the overview map tile editor."""
+        import json, os
+
+        if event.key == pygame.K_ESCAPE:
+            # Save if dirty, then exit
+            if self._map_editor_dirty:
+                self._save_map_editor()
+            self._map_editor_active = False
+            self._refresh_overview_map_sections()
+            return
+
+        mc = self._map_editor_cursor_c
+        mr = self._map_editor_cursor_r
+        w = self._map_editor_w
+        h = self._map_editor_h
+
+        # ── Cursor movement ──
+        if event.key == pygame.K_UP:
+            self._map_editor_cursor_r = max(0, mr - 1)
+        elif event.key == pygame.K_DOWN:
+            self._map_editor_cursor_r = min(h - 1, mr + 1)
+        elif event.key == pygame.K_LEFT:
+            self._map_editor_cursor_c = max(0, mc - 1)
+        elif event.key == pygame.K_RIGHT:
+            self._map_editor_cursor_c = min(w - 1, mc + 1)
+
+        # ── Brush selection ([ and ] or < >) ──
+        elif event.key in (pygame.K_LEFTBRACKET, pygame.K_COMMA):
+            self._map_editor_brush = (
+                (self._map_editor_brush - 1)
+                % len(self._map_editor_palette))
+        elif event.key in (pygame.K_RIGHTBRACKET, pygame.K_PERIOD):
+            self._map_editor_brush = (
+                (self._map_editor_brush + 1)
+                % len(self._map_editor_palette))
+
+        # ── Paint tile (Enter or Space) ──
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            tile_id = self._map_editor_palette[self._map_editor_brush]
+            r = self._map_editor_cursor_r
+            c = self._map_editor_cursor_c
+            if self._map_editor_tiles[r][c] != tile_id:
+                self._map_editor_tiles[r][c] = tile_id
+                self._map_editor_dirty = True
+
+        # ── Quick-save (Ctrl+S) ──
+        elif self._is_save_shortcut(event):
+            self._save_map_editor()
+
+        # ── Keep camera centred on cursor ──
+        self._map_editor_scroll_to_cursor()
+
+    def _map_editor_scroll_to_cursor(self):
+        """Keep the viewport centred around the cursor."""
+        # Viewport is roughly 20 cols x 16 rows at the panel size
+        vw, vh = 20, 14
+        cc = self._map_editor_cursor_c
+        cr = self._map_editor_cursor_r
+        self._map_editor_cam_c = max(
+            0, min(cc - vw // 2, self._map_editor_w - vw))
+        self._map_editor_cam_r = max(
+            0, min(cr - vh // 2, self._map_editor_h - vh))
+
+    def _save_map_editor(self):
+        """Persist the current map editor tiles to static_overworld.json."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        static_path = os.path.join(mod["path"], "static_overworld.json")
+
+        try:
+            with open(static_path, "r") as fh:
+                sdata = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            sdata = {}
+
+        sdata["tiles"] = self._map_editor_tiles
+        sdata["width"] = self._map_editor_w
+        sdata["height"] = self._map_editor_h
+
+        try:
+            with open(static_path, "w") as fh:
+                json.dump(sdata, fh)
+            self.module_message = "Map saved!"
+            self.module_msg_timer = 2.0
+        except OSError:
+            self.module_message = "Save failed!"
+            self.module_msg_timer = 2.0
+        self._map_editor_dirty = False
 
     def _build_unique_tiles_sections(self):
         """Build the full section list for the Unique Tiles folder:
@@ -6711,6 +7014,11 @@ class Game:
             self._handle_battle_screen_input(event)
             return
 
+        # ── Overview map editor mode ──
+        if getattr(self, "_map_editor_active", False):
+            self._handle_map_editor_input(event)
+            return
+
         # ── Level 0: section browser ──
         if self.module_edit_level == 0:
             self._handle_section_browser_input(event)
@@ -6780,6 +7088,8 @@ class Game:
                 self._add_monster_to_encounter()
             elif action == "add_tile":
                 self._add_unique_tile()
+            elif action == "generate_overworld":
+                self._generate_static_overworld()
             elif action == "remove_level":
                 pass  # handled by 'd' key
             else:
@@ -6885,8 +7195,8 @@ class Game:
         elif key.endswith("_style") and key.startswith("town_"):
             from src.module_loader import TOWN_STYLE_NAMES
             return TOWN_STYLE_NAMES
-        elif "_bldg_" in key and key.startswith("town_"):
-            return ["Yes", "No"]
+        # (building toggles removed — procedural towns always get
+        # general store, shrine, inn; custom buildings via templates)
         elif key.endswith("_randenc"):
             return ["Yes", "No"]
         # Unique tile choices
@@ -9073,6 +9383,10 @@ class Game:
                     edit_battle_preview=(
                         self._get_battle_screen_preview_data()
                         if getattr(self, "_battle_screen_active", False)
+                        else None),
+                    edit_map_editor=(
+                        self._get_map_editor_data()
+                        if getattr(self, "_map_editor_active", False)
                         else None))
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()

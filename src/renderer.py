@@ -10437,7 +10437,8 @@ class Renderer(CombatEffectRendererMixin):
                            edit_in_encounters=False,
                            edit_in_dungeon_sub=False,
                            edit_utile_preview=None,
-                           edit_battle_preview=None):
+                           edit_battle_preview=None,
+                           edit_map_editor=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -10648,6 +10649,11 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_battle_screen_editor(
                 right_x, panel_y, right_w, panel_h, edit_battle_preview)
 
+        # ── Overview map editor ──
+        elif edit_map_editor:
+            self._draw_map_editor(
+                right_x, panel_y, right_w, panel_h, edit_map_editor)
+
         # ── Edit mode overlay ──
         elif edit_mode:
             if edit_is_new and edit_fields:
@@ -10709,6 +10715,9 @@ class Renderer(CombatEffectRendererMixin):
             hint = ""   # hints are rendered inside the preview panel
         elif edit_battle_preview:
             hint = ""   # hints are rendered inside the battle editor panel
+        elif edit_map_editor:
+            hint = ("[ARROWS] Move  [ENTER] Paint  "
+                    "[,/.] Brush  [CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
@@ -10965,6 +10974,101 @@ class Renderer(CombatEffectRendererMixin):
         blink = pygame.time.get_ticks() % 1200 < 800
         action_color = self._U3_ORANGE if blink else (140, 100, 40)
         self._u3_text(action_label, rx + 16, dy, action_color, fm)
+
+    def _draw_map_editor(self, rx, ry, rw, rh, data):
+        """Draw the overview map tile editor in the right panel.
+
+        *data* is a dict with keys: tiles, width, height, cursor_col,
+        cursor_row, cam_col, cam_row, palette, brush_idx, brush_name,
+        dirty.
+        """
+        from src.settings import TILE_DEFS
+        fm = self.font_med
+        fs = self.font_small
+
+        # Semi-transparent overlay background
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        # ── Header ──
+        title = "MAP EDITOR"
+        if data["dirty"]:
+            title += " *"
+        self._u3_text(title, rx + 16, ry + 6, self._U3_ORANGE, fm)
+
+        # Brush indicator
+        brush_text = f"Brush: {data['brush_name']}"
+        self._u3_text(brush_text, rx + 16, ry + 26,
+                      (180, 180, 200), fs)
+
+        # Coordinates
+        coord_text = (f"({data['cursor_col']}, {data['cursor_row']})"
+                      f"  {data['width']}x{data['height']}")
+        tw = fs.size(coord_text)[0]
+        self._u3_text(coord_text, rx + rw - tw - 16, ry + 26,
+                      (140, 140, 160), fs)
+
+        # ── Tile grid ──
+        grid_top = ry + 44
+        grid_left = rx + 4
+        grid_bottom = ry + rh - 34
+        grid_right = rx + rw - 4
+        grid_w = grid_right - grid_left
+        grid_h = grid_bottom - grid_top
+
+        # Calculate tile size to fit viewport
+        # Target ~20 cols visible
+        ts = max(4, min(grid_w // 22, grid_h // 16, 16))
+        cols_visible = grid_w // ts
+        rows_visible = grid_h // ts
+
+        cam_c = data["cam_col"]
+        cam_r = data["cam_row"]
+        tiles = data["tiles"]
+        map_h = data["height"]
+        map_w = data["width"]
+
+        for vr in range(rows_visible):
+            for vc in range(cols_visible):
+                mc = cam_c + vc
+                mr = cam_r + vr
+                if 0 <= mc < map_w and 0 <= mr < map_h:
+                    tile_id = tiles[mr][mc]
+                    tdef = TILE_DEFS.get(tile_id)
+                    color = tdef["color"] if tdef else (60, 60, 60)
+                else:
+                    color = (20, 20, 40)  # out of bounds
+
+                px = grid_left + vc * ts
+                py = grid_top + vr * ts
+                pygame.draw.rect(self.screen, color,
+                                 (px, py, ts - 1, ts - 1))
+
+                # Cursor highlight
+                if mc == data["cursor_col"] and mr == data["cursor_row"]:
+                    pygame.draw.rect(
+                        self.screen, (255, 255, 255),
+                        (px, py, ts - 1, ts - 1), 1)
+
+        # ── Palette bar at bottom ──
+        pal_y = grid_bottom + 4
+        pal_x = grid_left + 4
+        pal_ts = min(18, (grid_w - 8) // max(
+            len(data["palette"]), 1))
+        for pi, tid in enumerate(data["palette"]):
+            tdef = TILE_DEFS.get(tid)
+            color = tdef["color"] if tdef else (60, 60, 60)
+            bx = pal_x + pi * (pal_ts + 2)
+            by = pal_y
+            pygame.draw.rect(self.screen, color,
+                             (bx, by, pal_ts, pal_ts))
+            if pi == data["brush_idx"]:
+                pygame.draw.rect(self.screen, (255, 255, 255),
+                                 (bx - 1, by - 1,
+                                  pal_ts + 2, pal_ts + 2), 1)
 
     def _draw_section_browser(self, rx, ry, rw, rh,
                                sections, cursor, scroll=0,

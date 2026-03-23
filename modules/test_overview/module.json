@@ -55,7 +55,7 @@
     ],
     "dungeons": [],
     "overworld_config": {
-      "type": "Procedural",
+      "type": "Custom",
       "initial_build": "Random"
     }
   },
