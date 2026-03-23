@@ -6140,10 +6140,9 @@ class Game:
         """Return a dict describing the overview map editor state."""
         if not getattr(self, "_map_editor_active", False):
             return None
-        from src.settings import TILE_DEFS
         palette = self._map_editor_palette
-        brush_id = palette[self._map_editor_brush]
-        brush_name = TILE_DEFS.get(brush_id, {}).get("name", "?")
+        pal_names = self._map_editor_palette_names
+        brush_name = pal_names[self._map_editor_brush]
         return {
             "tiles": self._map_editor_tiles,
             "width": self._map_editor_w,
@@ -6153,6 +6152,7 @@ class Game:
             "cam_col": self._map_editor_cam_c,
             "cam_row": self._map_editor_cam_r,
             "palette": palette,
+            "palette_names": pal_names,
             "brush_idx": self._map_editor_brush,
             "brush_name": brush_name,
             "dirty": self._map_editor_dirty,
@@ -6499,17 +6499,28 @@ class Game:
             0, self._map_editor_cursor_c - 10)
         self._map_editor_cam_r = max(
             0, self._map_editor_cursor_r - 8)
-        # Tile palette: overworld-only tiles the user can paint
-        from src.settings import (TILE_GRASS, TILE_WATER, TILE_FOREST,
-                                  TILE_MOUNTAIN, TILE_SAND, TILE_PATH,
-                                  TILE_BRIDGE, TILE_TOWN, TILE_DUNGEON)
+        # Tile palette: all overworld tile types + eraser
+        from src.settings import (
+            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_SAND, TILE_PATH, TILE_BRIDGE,
+            TILE_TOWN, TILE_DUNGEON, TILE_DUNGEON_CLEARED,
+            TILE_MACHINE)
+        # -1 is the eraser (resets tile to TILE_GRASS)
         self._map_editor_palette = [
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
             TILE_SAND, TILE_PATH, TILE_BRIDGE,
-            TILE_TOWN, TILE_DUNGEON,
+            TILE_TOWN, TILE_DUNGEON, TILE_DUNGEON_CLEARED,
+            TILE_MACHINE, -1,
+        ]
+        self._map_editor_palette_names = [
+            "Grass", "Water", "Forest", "Mountain",
+            "Sand", "Path", "Bridge",
+            "Town", "Dungeon", "Cleared",
+            "Machine", "Eraser",
         ]
         self._map_editor_brush = 0  # index into palette
         self._map_editor_dirty = False
+        self._map_editor_scroll_to_cursor()
 
     def _handle_map_editor_input(self, event):
         """Handle input in the overview map tile editor."""
@@ -6529,16 +6540,35 @@ class Game:
         h = self._map_editor_h
 
         # ── Cursor movement ──
+        moved = False
         if event.key == pygame.K_UP:
             self._map_editor_cursor_r = max(0, mr - 1)
+            moved = True
         elif event.key == pygame.K_DOWN:
             self._map_editor_cursor_r = min(h - 1, mr + 1)
+            moved = True
         elif event.key == pygame.K_LEFT:
             self._map_editor_cursor_c = max(0, mc - 1)
+            moved = True
         elif event.key == pygame.K_RIGHT:
             self._map_editor_cursor_c = min(w - 1, mc + 1)
+            moved = True
 
-        # ── Brush selection ([ and ] or < >) ──
+        if moved:
+            self._map_editor_scroll_to_cursor()
+            return
+
+        # ── Brush selection (Tab / Shift+Tab, or [ / ]) ──
+        elif event.key == pygame.K_TAB:
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_SHIFT:
+                self._map_editor_brush = (
+                    (self._map_editor_brush - 1)
+                    % len(self._map_editor_palette))
+            else:
+                self._map_editor_brush = (
+                    (self._map_editor_brush + 1)
+                    % len(self._map_editor_palette))
         elif event.key in (pygame.K_LEFTBRACKET, pygame.K_COMMA):
             self._map_editor_brush = (
                 (self._map_editor_brush - 1)
@@ -6550,7 +6580,11 @@ class Game:
 
         # ── Paint tile (Enter or Space) ──
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            from src.settings import TILE_GRASS as _TG
             tile_id = self._map_editor_palette[self._map_editor_brush]
+            # Eraser (-1) resets to grass
+            if tile_id == -1:
+                tile_id = _TG
             r = self._map_editor_cursor_r
             c = self._map_editor_cursor_c
             if self._map_editor_tiles[r][c] != tile_id:
@@ -6561,19 +6595,31 @@ class Game:
         elif self._is_save_shortcut(event):
             self._save_map_editor()
 
-        # ── Keep camera centred on cursor ──
-        self._map_editor_scroll_to_cursor()
-
     def _map_editor_scroll_to_cursor(self):
-        """Keep the viewport centred around the cursor."""
-        # Viewport is roughly 20 cols x 16 rows at the panel size
-        vw, vh = 20, 14
+        """Keep the viewport centred around the cursor.
+
+        Viewport dimensions mirror the renderer layout:
+        right panel width = SCREEN_WIDTH - 188, tile size = 32.
+        """
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE
+        header_h = 36
+        footer_h = 28
+        left_w = 180
+        right_w = SCREEN_WIDTH - left_w - 4 - 4
+        grid_w = right_w - 8
+        grid_h = SCREEN_HEIGHT - header_h - footer_h - 4 - 8
+        vis_cols = grid_w // TILE_SIZE
+        vis_rows = grid_h // TILE_SIZE
+
         cc = self._map_editor_cursor_c
         cr = self._map_editor_cursor_r
+        # Centre cursor in viewport, clamped to map bounds
         self._map_editor_cam_c = max(
-            0, min(cc - vw // 2, self._map_editor_w - vw))
+            0, min(cc - vis_cols // 2,
+                   self._map_editor_w - vis_cols))
         self._map_editor_cam_r = max(
-            0, min(cr - vh // 2, self._map_editor_h - vh))
+            0, min(cr - vis_rows // 2,
+                   self._map_editor_h - vis_rows))
 
     def _save_map_editor(self):
         """Persist the current map editor tiles to static_overworld.json."""

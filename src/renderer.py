@@ -10461,6 +10461,11 @@ class Renderer(CombatEffectRendererMixin):
         import math
         self.screen.fill((0, 0, 0))
 
+        # ── Full-screen map editor takes over the entire screen ──
+        if edit_map_editor:
+            self._draw_map_editor_fullscreen(edit_map_editor)
+            return
+
         fm = self.font_med
         f = self.font
         fs = self.font_small
@@ -10648,11 +10653,6 @@ class Renderer(CombatEffectRendererMixin):
         elif edit_battle_preview:
             self._draw_battle_screen_editor(
                 right_x, panel_y, right_w, panel_h, edit_battle_preview)
-
-        # ── Overview map editor ──
-        elif edit_map_editor:
-            self._draw_map_editor(
-                right_x, panel_y, right_w, panel_h, edit_map_editor)
 
         # ── Edit mode overlay ──
         elif edit_mode:
@@ -10975,100 +10975,208 @@ class Renderer(CombatEffectRendererMixin):
         action_color = self._U3_ORANGE if blink else (140, 100, 40)
         self._u3_text(action_label, rx + 16, dy, action_color, fm)
 
-    def _draw_map_editor(self, rx, ry, rw, rh, data):
-        """Draw the overview map tile editor in the right panel.
+    def _draw_map_editor_fullscreen(self, data):
+        """Draw the overview map tile editor – split panel with brush
+        palette on the left, scrollable sprite-based map grid on the right.
 
-        *data* is a dict with keys: tiles, width, height, cursor_col,
-        cursor_row, cam_col, cam_row, palette, brush_idx, brush_name,
-        dirty.
+        Mirrors the visual style of the town layout editor but uses
+        ``_u3_draw_overworld_tile`` for proper sprite / procedural
+        tile rendering.
         """
-        from src.settings import TILE_DEFS
+        import math as _math
+        from src.settings import (
+            TILE_DEFS, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE,
+        )
         fm = self.font_med
         fs = self.font_small
+        f = self.font
 
-        # Semi-transparent overlay background
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((10, 8, 20, 230))
-        self.screen.blit(overlay, (rx, ry))
-        pygame.draw.rect(self.screen, (140, 120, 60),
-                         (rx, ry, rw, rh), 1)
+        self.screen.fill((10, 8, 20))
 
-        # ── Header ──
-        title = "MAP EDITOR"
+        # ── Layout constants ──
+        header_h = 36
+        footer_h = 28
+        left_w = 180          # brush palette panel width
+        panel_y = header_h + 2
+        panel_h = SCREEN_HEIGHT - header_h - footer_h - 4
+        right_x = left_w + 4
+        right_w = SCREEN_WIDTH - right_x - 4
+
+        # ── Header bar ──
+        pygame.draw.rect(self.screen, (20, 16, 30),
+                         (0, 0, SCREEN_WIDTH, header_h))
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (0, header_h - 1),
+                         (SCREEN_WIDTH, header_h - 1), 1)
+
+        title = "OVERVIEW MAP EDITOR"
         if data["dirty"]:
             title += " *"
-        self._u3_text(title, rx + 16, ry + 6, self._U3_ORANGE, fm)
+        self._u3_text(title, 16, 6, self._U3_ORANGE, fm)
 
-        # Brush indicator
-        brush_text = f"Brush: {data['brush_name']}"
-        self._u3_text(brush_text, rx + 16, ry + 26,
-                      (180, 180, 200), fs)
+        # Coordinates + tile name + map size
+        tile_name = ""
+        cr, cc = data["cursor_row"], data["cursor_col"]
+        if 0 <= cr < data["height"] and 0 <= cc < data["width"]:
+            tid = data["tiles"][cr][cc]
+            td = TILE_DEFS.get(tid)
+            if td:
+                tile_name = td["name"]
+        coord_text = (f"({cc},{cr}) {tile_name}"
+                      f"  [{data['width']}x{data['height']}]")
+        tw = fm.size(coord_text)[0]
+        self._u3_text(coord_text, SCREEN_WIDTH - tw - 16, 6,
+                      (140, 140, 160), fm)
 
-        # Coordinates
-        coord_text = (f"({data['cursor_col']}, {data['cursor_row']})"
-                      f"  {data['width']}x{data['height']}")
-        tw = fs.size(coord_text)[0]
-        self._u3_text(coord_text, rx + rw - tw - 16, ry + 26,
+        # ── Left panel: brush palette ──
+        left_x = 4
+        pygame.draw.rect(self.screen, (18, 14, 28),
+                         (left_x, panel_y, left_w, panel_h))
+        pygame.draw.rect(self.screen, (60, 50, 40),
+                         (left_x, panel_y, left_w, panel_h), 1)
+
+        self._u3_text("BRUSH PALETTE", left_x + 10, panel_y + 6,
+                      (120, 120, 160), fs)
+
+        palette = data["palette"]
+        palette_names = data.get("palette_names", [])
+        brush_idx = data["brush_idx"]
+        brush_row_h = 36
+        brush_y0 = panel_y + 26
+        max_brush_vis = (panel_h - 60) // brush_row_h
+        # Scroll so selected brush stays visible
+        b_scroll = max(0, brush_idx - max_brush_vis + 1)
+
+        for bi in range(b_scroll,
+                        min(b_scroll + max_brush_vis, len(palette))):
+            by = brush_y0 + (bi - b_scroll) * brush_row_h
+            is_sel = (bi == brush_idx)
+            tid = palette[bi]
+
+            # Selected highlight bar
+            if is_sel:
+                bar = pygame.Surface(
+                    (left_w - 8, brush_row_h - 2), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 40))
+                self.screen.blit(bar, (left_x + 4, by))
+                pygame.draw.rect(self.screen, (200, 160, 60),
+                                 (left_x + 4, by,
+                                  left_w - 8, brush_row_h - 2), 1)
+
+            icon_x = left_x + 10
+            icon_sz = 26
+            text_x = icon_x + icon_sz + 6
+
+            if tid == -1:
+                # Eraser icon
+                pygame.draw.rect(self.screen, (40, 35, 50),
+                                 (icon_x, by + 4, icon_sz, icon_sz))
+                pygame.draw.line(self.screen, (200, 80, 80),
+                                 (icon_x + 3, by + 7),
+                                 (icon_x + icon_sz - 4,
+                                  by + 4 + icon_sz - 4), 2)
+                pygame.draw.line(self.screen, (200, 80, 80),
+                                 (icon_x + icon_sz - 4, by + 7),
+                                 (icon_x + 3,
+                                  by + 4 + icon_sz - 4), 2)
+                pygame.draw.rect(self.screen, (80, 60, 60),
+                                 (icon_x, by + 4, icon_sz, icon_sz), 1)
+            else:
+                # Draw a mini overworld tile sprite as the icon
+                # Create a temporary surface at TILE_SIZE, draw the
+                # tile into it, then scale to icon_sz.
+                tmp = pygame.Surface((TILE_SIZE, TILE_SIZE))
+                tmp.fill((10, 8, 20))
+                saved = self.screen
+                self.screen = tmp
+                self._u3_draw_overworld_tile(tid, 0, 0, TILE_SIZE, 0, 0)
+                self.screen = saved
+                scaled = pygame.transform.scale(tmp, (icon_sz, icon_sz))
+                self.screen.blit(scaled, (icon_x, by + 4))
+                pygame.draw.rect(self.screen, (60, 50, 40),
+                                 (icon_x, by + 4, icon_sz, icon_sz), 1)
+
+            # Label
+            label = (palette_names[bi] if bi < len(palette_names)
+                     else "?")
+            nc = (255, 255, 100) if is_sel else (180, 180, 200)
+            self._u3_text(label, text_x, by + 8, nc, fs)
+
+        # Brush cycle hint at bottom of palette
+        self._u3_text("[Tab] Next Brush",
+                      left_x + 10,
+                      panel_y + panel_h - 36,
+                      (140, 140, 160), fs)
+        self._u3_text("[Shift+Tab] Prev",
+                      left_x + 10,
+                      panel_y + panel_h - 20,
                       (140, 140, 160), fs)
 
-        # ── Tile grid ──
-        grid_top = ry + 44
-        grid_left = rx + 4
-        grid_bottom = ry + rh - 34
-        grid_right = rx + rw - 4
-        grid_w = grid_right - grid_left
-        grid_h = grid_bottom - grid_top
+        # ── Right panel: scrollable map grid with sprites ──
+        grid_x = right_x + 4
+        grid_y = panel_y + 4
+        grid_w = right_w - 8
+        grid_h = panel_h - 8
 
-        # Calculate tile size to fit viewport
-        # Target ~20 cols visible
-        ts = max(4, min(grid_w // 22, grid_h // 16, 16))
-        cols_visible = grid_w // ts
-        rows_visible = grid_h // ts
-
-        cam_c = data["cam_col"]
-        cam_r = data["cam_row"]
-        tiles = data["tiles"]
-        map_h = data["height"]
         map_w = data["width"]
+        map_h = data["height"]
+        tiles = data["tiles"]
+        cam_c = data.get("cam_col", 0)
+        cam_r = data.get("cam_row", 0)
 
-        for vr in range(rows_visible):
-            for vc in range(cols_visible):
-                mc = cam_c + vc
-                mr = cam_r + vr
-                if 0 <= mc < map_w and 0 <= mr < map_h:
-                    tile_id = tiles[mr][mc]
-                    tdef = TILE_DEFS.get(tile_id)
-                    color = tdef["color"] if tdef else (60, 60, 60)
-                else:
-                    color = (20, 20, 40)  # out of bounds
+        # Use a fixed tile size for sprite rendering (TILE_SIZE = 32)
+        ts = TILE_SIZE
+        # How many tiles fit in the viewport
+        vis_cols = grid_w // ts
+        vis_rows = grid_h // ts
+        # Clamp camera
+        cam_c = max(0, min(cam_c, map_w - vis_cols))
+        cam_r = max(0, min(cam_r, map_h - vis_rows))
 
-                px = grid_left + vc * ts
-                py = grid_top + vr * ts
-                pygame.draw.rect(self.screen, color,
-                                 (px, py, ts - 1, ts - 1))
+        # Centre the grid if the map is smaller than the viewport
+        total_draw_w = min(map_w, vis_cols) * ts
+        total_draw_h = min(map_h, vis_rows) * ts
+        ox = grid_x + (grid_w - total_draw_w) // 2
+        oy = grid_y + (grid_h - total_draw_h) // 2
 
-                # Cursor highlight
-                if mc == data["cursor_col"] and mr == data["cursor_row"]:
-                    pygame.draw.rect(
-                        self.screen, (255, 255, 255),
-                        (px, py, ts - 1, ts - 1), 1)
+        # Background behind the grid
+        pygame.draw.rect(self.screen, (8, 6, 16),
+                         (grid_x, grid_y, grid_w, grid_h))
 
-        # ── Palette bar at bottom ──
-        pal_y = grid_bottom + 4
-        pal_x = grid_left + 4
-        pal_ts = min(18, (grid_w - 8) // max(
-            len(data["palette"]), 1))
-        for pi, tid in enumerate(data["palette"]):
-            tdef = TILE_DEFS.get(tid)
-            color = tdef["color"] if tdef else (60, 60, 60)
-            bx = pal_x + pi * (pal_ts + 2)
-            by = pal_y
-            pygame.draw.rect(self.screen, color,
-                             (bx, by, pal_ts, pal_ts))
-            if pi == data["brush_idx"]:
-                pygame.draw.rect(self.screen, (255, 255, 255),
-                                 (bx - 1, by - 1,
-                                  pal_ts + 2, pal_ts + 2), 1)
+        # Draw visible tiles using sprite-based rendering
+        end_c = min(cam_c + vis_cols, map_w)
+        end_r = min(cam_r + vis_rows, map_h)
+        for mr in range(cam_r, end_r):
+            for mc in range(cam_c, end_c):
+                tile_id = tiles[mr][mc]
+                px = ox + (mc - cam_c) * ts
+                py = oy + (mr - cam_r) * ts
+                self._u3_draw_overworld_tile(tile_id, px, py, ts, mc, mr)
+
+        # ── Cursor highlight (animated pulse) ──
+        cur_c = data["cursor_col"]
+        cur_r = data["cursor_row"]
+        # Only draw cursor if it's in the visible viewport
+        if (cam_c <= cur_c < end_c and cam_r <= cur_r < end_r):
+            elapsed = pygame.time.get_ticks() / 1000.0
+            pulse = int(80 + 40 * _math.sin(elapsed * 4))
+            cx = ox + (cur_c - cam_c) * ts
+            cy = oy + (cur_r - cam_r) * ts
+            pygame.draw.rect(self.screen, (255, 200, pulse),
+                             (cx, cy, ts, ts), 2)
+
+        # Grid border
+        pygame.draw.rect(self.screen, (60, 50, 40),
+                         (grid_x, grid_y, grid_w, grid_h), 1)
+
+        # ── Footer hints ──
+        hint = ("[Arrows] Move  [Enter/Space] Paint  "
+                "[Tab] Brush  [Ctrl+S] Save  [Esc] Back")
+        hw = fs.size(hint)[0]
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - hw // 2,
+                      SCREEN_HEIGHT - footer_h + 4,
+                      self._U3_HINT, fs)
 
     def _draw_section_browser(self, rx, ry, rw, rh,
                                sections, cursor, scroll=0,
