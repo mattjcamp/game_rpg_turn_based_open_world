@@ -82,7 +82,8 @@
       "path": "src/assets/unassigned/island_jungle.png",
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 38
     },
     "shrine_church": {
       "path": "src/assets/unassigned/shrine_church.png",
@@ -237,8 +238,7 @@
       "path": "src/assets/game/terrain/shop_sign.png",
       "usable_in": [
         "town"
-      ],
-      "tile_id": 38
+      ]
     }
   },
   "dungeon": {

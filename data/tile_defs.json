@@ -363,5 +363,16 @@
     ],
     "context": "town",
     "sprite": "town/brick_wall_red"
+  },
+  "38": {
+    "name": "Jungle",
+    "walkable": true,
+    "color": [
+      34,
+      139,
+      34
+    ],
+    "context": "overworld",
+    "sprite": "overworld/island_jungle"
   }
 }

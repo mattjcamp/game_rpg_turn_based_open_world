@@ -6499,25 +6499,17 @@ class Game:
             0, self._map_editor_cursor_c - 10)
         self._map_editor_cam_r = max(
             0, self._map_editor_cursor_r - 8)
-        # Tile palette: all overworld tile types + eraser
-        from src.settings import (
-            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_SAND, TILE_PATH, TILE_BRIDGE,
-            TILE_TOWN, TILE_DUNGEON, TILE_DUNGEON_CLEARED,
-            TILE_MACHINE)
-        # -1 is the eraser (resets tile to TILE_GRASS)
-        self._map_editor_palette = [
-            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_SAND, TILE_PATH, TILE_BRIDGE,
-            TILE_TOWN, TILE_DUNGEON, TILE_DUNGEON_CLEARED,
-            TILE_MACHINE, -1,
-        ]
+        # Tile palette: dynamically include ALL overworld tile types
+        # (built-in + user-created from the features editor) + eraser.
+        from src.settings import TILE_DEFS
+        ow_ids = sorted(
+            tid for tid, ctx in self._TILE_CONTEXT.items()
+            if ctx == "overworld" and tid in TILE_DEFS
+        )
+        self._map_editor_palette = ow_ids + [-1]
         self._map_editor_palette_names = [
-            "Grass", "Water", "Forest", "Mountain",
-            "Sand", "Path", "Bridge",
-            "Town", "Dungeon", "Cleared",
-            "Machine", "Eraser",
-        ]
+            TILE_DEFS[tid]["name"] for tid in ow_ids
+        ] + ["Eraser"]
         self._map_editor_brush = 0  # index into palette
         self._map_editor_dirty = False
         self._map_editor_scroll_to_cursor()
