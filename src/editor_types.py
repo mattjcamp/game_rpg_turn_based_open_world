@@ -146,6 +146,9 @@ class MapEditorHubRS:
     field_cursor: int = 0
     field_buffer: str = ""
     field_scroll: int = 0
+    naming: bool = False
+    name_buf: str = ""
+    naming_is_new: bool = False
 
 
 # ─── Top-level render state ──────────────────────────────────────────

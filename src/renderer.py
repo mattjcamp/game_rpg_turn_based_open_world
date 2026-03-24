@@ -6847,7 +6847,8 @@ class Renderer(CombatEffectRendererMixin):
         # ── Footer ──
         footer_y = SCREEN_HEIGHT - 36
         if nav_depth > 0:
-            hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
+            hint = ("[Up/Dn] Browse  [Enter] Open  [^N] New  "
+                    "[^D] Delete  [F2] Rename  [Esc] Back")
         else:
             hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
         hw = fs.size(hint)[0]
@@ -6855,6 +6856,36 @@ class Renderer(CombatEffectRendererMixin):
                       SCREEN_WIDTH // 2 - hw // 2,
                       footer_y,
                       self._U3_HINT, fs)
+
+        # ── Naming overlay ──
+        naming = data.get("naming", False)
+        if naming:
+            name_buf = data.get("name_buf", "")
+            is_new = data.get("naming_is_new", False)
+            title = "New Template" if is_new else "Rename Template"
+            ow, oh = 360, 100
+            ox = SCREEN_WIDTH // 2 - ow // 2
+            oy = SCREEN_HEIGHT // 2 - oh // 2
+            overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+            overlay.fill((20, 16, 30, 240))
+            self.screen.blit(overlay, (ox, oy))
+            pygame.draw.rect(self.screen, (200, 160, 60),
+                             (ox, oy, ow, oh), 1)
+            self._u3_text(title, ox + 16, oy + 10,
+                          self._U3_ORANGE, fm)
+            # Text field
+            field_x = ox + 16
+            field_y = oy + 40
+            field_w = ow - 32
+            pygame.draw.rect(self.screen, (40, 35, 50),
+                             (field_x, field_y, field_w, 26))
+            pygame.draw.rect(self.screen, (120, 100, 60),
+                             (field_x, field_y, field_w, 26), 1)
+            self._u3_text(name_buf + "_", field_x + 6, field_y + 4,
+                          self._U3_WHITE, fs)
+            self._u3_text("[Enter] Confirm   [Esc] Cancel",
+                          ox + 16, oy + 74,
+                          self._U3_HINT, fs)
 
     def _draw_meh_fields(self, data, header_h):
         """Draw the field editor for the Map Editor hub."""
@@ -7263,6 +7294,9 @@ class Renderer(CombatEffectRendererMixin):
                         "field_cursor": meh_field_cursor,
                         "field_buffer": meh_field_buffer,
                         "field_scroll": meh_field_scroll,
+                        "naming": mh.naming,
+                        "name_buf": mh.name_buf,
+                        "naming_is_new": mh.naming_is_new,
                     }
                     self.draw_map_editor_hub(hub_data)
 

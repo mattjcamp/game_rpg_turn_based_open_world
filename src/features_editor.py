@@ -49,6 +49,25 @@ class FeaturesEditor:
         self.meh_field = 0                  # field cursor
         self.meh_buffer = ""                # field edit buffer
         self.meh_field_scroll = 0           # field scroll offset
+        self.meh_naming = False             # True when typing a template name
+        self.meh_name_buf = ""              # text buffer for naming/renaming
+        self.meh_naming_is_new = False      # True if naming a new template, False if renaming
+
+        # Default map_config per folder type (used when adding new templates).
+        # Values are plain dicts; the actual STORAGE_*/GRID_* constants are
+        # resolved in _meh_folder_default_config() at runtime.
+        self._MEH_FOLDER_DEFAULTS = {
+            "me_overview":  {"storage": "dense",  "grid": "fixed",
+                             "ctx": "overworld", "w": 16, "h": 12},
+            "me_dungeon":   {"storage": "dense",  "grid": "scrollable",
+                             "ctx": "dungeon",   "w": 32, "h": 32},
+            "me_examine":   {"storage": "sparse", "grid": "fixed",
+                             "ctx": "dungeon",   "w": 12, "h": 10},
+            "me_enclosure": {"storage": "sparse", "grid": "fixed",
+                             "ctx": "dungeon",   "w": 16, "h": 14},
+            "me_battle":    {"storage": "sparse", "grid": "fixed",
+                             "ctx": "dungeon",   "w": 20, "h": 16},
+        }
 
         # --- Spell editor state ---
         self.spell_list = []                # list of spell dicts
@@ -1782,6 +1801,103 @@ class FeaturesEditor:
     # ── Map Editor Hub Methods ────────────────────────────────
     # ══════════════════════════════════════════════════════════
 
+    def _meh_current_folder_key(self):
+        """Return the folder key (e.g. 'me_overview') of the folder we're
+        currently browsing inside, or None if at the top level."""
+        if not self.meh_nav_stack:
+            return None
+        # The parent sections list is on the stack; look at the section
+        # that was selected to enter this folder.
+        parent_secs, parent_cur, _, _ = self.meh_nav_stack[-1]
+        if parent_cur < len(parent_secs):
+            return parent_secs[parent_cur].get("folder")
+        return None
+
+    def _meh_folder_default_config(self):
+        """Return a map_config dict for a new template in the current folder."""
+        from src.map_editor import (
+            STORAGE_DENSE, STORAGE_SPARSE, GRID_SCROLLABLE, GRID_FIXED,
+        )
+        folder_key = self._meh_current_folder_key()
+        defaults = self._MEH_FOLDER_DEFAULTS.get(folder_key)
+        if not defaults:
+            # Fallback — generic small map
+            return {
+                "storage": STORAGE_SPARSE,
+                "grid_type": GRID_FIXED,
+                "tile_context": "dungeon",
+                "width": 12, "height": 10,
+            }
+        storage_map = {"dense": STORAGE_DENSE, "sparse": STORAGE_SPARSE}
+        grid_map = {"fixed": GRID_FIXED, "scrollable": GRID_SCROLLABLE}
+        return {
+            "storage": storage_map.get(defaults["storage"], STORAGE_SPARSE),
+            "grid_type": grid_map.get(defaults["grid"], GRID_FIXED),
+            "tile_context": defaults["ctx"],
+            "width": defaults["w"],
+            "height": defaults["h"],
+        }
+
+    def meh_add_template(self, name):
+        """Add a new map template with *name* to the current folder."""
+        new_sec = {
+            "label": name,
+            "subtitle": "",
+            "map_config": self._meh_folder_default_config(),
+        }
+        self.meh_sections.append(new_sec)
+        self.meh_cursor = len(self.meh_sections) - 1
+        self._meh_update_parent_subtitle()
+
+    def meh_delete_template(self):
+        """Delete the currently selected template from the current folder."""
+        n = len(self.meh_sections)
+        if n == 0:
+            return
+        sec = self.meh_sections[self.meh_cursor]
+        # Don't allow deleting folders or redirect entries
+        if sec.get("folder") or sec.get("_editor_redirect"):
+            return
+        self.meh_sections.pop(self.meh_cursor)
+        n -= 1
+        if n == 0:
+            self.meh_cursor = 0
+        elif self.meh_cursor >= n:
+            self.meh_cursor = n - 1
+        self._meh_update_parent_subtitle()
+
+    def meh_rename_template(self, new_name):
+        """Rename the currently selected template."""
+        n = len(self.meh_sections)
+        if n == 0:
+            return
+        sec = self.meh_sections[self.meh_cursor]
+        if sec.get("folder") or sec.get("_editor_redirect"):
+            return
+        sec["label"] = new_name
+
+    def _meh_update_parent_subtitle(self):
+        """Update the parent folder's subtitle to reflect current child count."""
+        if not self.meh_nav_stack:
+            return
+        parent_secs, parent_cur, _, _ = self.meh_nav_stack[-1]
+        if parent_cur < len(parent_secs):
+            parent = parent_secs[parent_cur]
+            # Only update template folders (not the Tiles folder)
+            if parent.get("folder", "").startswith("me_"):
+                count = len(self.meh_sections)
+                parent["subtitle"] = (
+                    f"{count} template{'s' if count != 1 else ''}")
+
+    def _meh_is_template_item(self):
+        """Return True if the currently selected item is an editable template
+        (not a folder or an editor redirect)."""
+        n = len(self.meh_sections)
+        if n == 0:
+            return False
+        sec = self.meh_sections[self.meh_cursor]
+        return not sec.get("folder") and not sec.get("_editor_redirect")
+
     def build_map_editor_hub_sections(self):
         """Build the section list for the top-level Map Editor hub.
 
@@ -2772,6 +2888,26 @@ class FeaturesEditor:
                 self.meh_field_scroll = 0
                 self.level = 1
 
+    def _handle_meh_naming_input(self, event):
+        """Handle text input while naming/renaming a map template."""
+        if event.key == pygame.K_ESCAPE:
+            self.meh_naming = False
+            return
+        if event.key == pygame.K_RETURN:
+            name = self.meh_name_buf.strip()
+            if name:
+                if self.meh_naming_is_new:
+                    self.meh_add_template(name)
+                else:
+                    self.meh_rename_template(name)
+            self.meh_naming = False
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self.meh_name_buf = self.meh_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self.meh_name_buf += event.unicode
+
     def handle_mapeditor_input(self, event):
         """Handle input for the Map Editor inside the features screen.
 
@@ -2784,6 +2920,11 @@ class FeaturesEditor:
         # ── Fullscreen map editor active (launched from a template) ──
         if self.meh_editor_active:
             self._meh_input_handler.handle(event)
+            return
+
+        # ── Naming/renaming overlay ──
+        if self.meh_naming:
+            self._handle_meh_naming_input(event)
             return
 
         # ── Section browsing mode ──
@@ -2802,6 +2943,28 @@ class FeaturesEditor:
                 # Return to features category list
                 self.level = 0
                 self.active_editor = None
+            return
+
+        # ── Add new template (Ctrl+N) — only inside a template folder ──
+        if self._is_new_shortcut(event) and self.meh_nav_stack:
+            folder_key = self._meh_current_folder_key()
+            if folder_key and folder_key in self._MEH_FOLDER_DEFAULTS:
+                self.meh_naming = True
+                self.meh_naming_is_new = True
+                self.meh_name_buf = ""
+                return
+
+        # ── Delete template (Ctrl+D) — only on template items ──
+        if self._is_delete_shortcut(event) and self._meh_is_template_item():
+            self.meh_delete_template()
+            return
+
+        # ── Rename template (F2) — only on template items ──
+        if event.key == pygame.K_F2 and self._meh_is_template_item():
+            sec = self.meh_sections[self.meh_cursor]
+            self.meh_naming = True
+            self.meh_naming_is_new = False
+            self.meh_name_buf = sec.get("label", "")
             return
 
         if event.key == pygame.K_UP and n > 0:
@@ -3229,6 +3392,9 @@ class FeaturesEditor:
                 field_cursor=self.meh_field,
                 field_buffer=self.meh_buffer,
                 field_scroll=self.meh_field_scroll,
+                naming=self.meh_naming,
+                name_buf=self.meh_name_buf,
+                naming_is_new=self.meh_naming_is_new,
             ),
         )
 
