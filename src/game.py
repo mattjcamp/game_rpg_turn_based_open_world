@@ -860,6 +860,73 @@ class Game:
                 seed=seed,
             )
 
+    def _build_town_from_layout(self, layout_name, town_name,
+                                 town_style="medieval"):
+        """Build a TownData from a custom layout in town_templates.json.
+
+        Searches the loaded layouts list for *layout_name*, constructs a
+        TileMap from its tile grid, extracts interior links, and finds the
+        exit tile to set the entry position.
+
+        Returns a TownData, or *None* if the layout isn't found.
+        """
+        from src.tile_map import TileMap
+        from src.town_generator import TownData
+
+        fe = self.features_editor
+        layouts = fe.town_lists.get("layouts", [])
+        if not layouts:
+            fe.load_townlayouts()
+            layouts = fe.town_lists.get("layouts", [])
+        layout = None
+        for l in layouts:
+            if l["name"] == layout_name:
+                layout = l
+                break
+        if layout is None:
+            return None
+
+        w = layout.get("width", 20)
+        h = layout.get("height", 20)
+        tiles_dict = layout.get("tiles", {})
+
+        from src.settings import TILE_VOID, TILE_EXIT
+        tm = TileMap(w, h, default_tile=TILE_VOID, oob_tile=TILE_VOID)
+        interior_links = {}
+        overworld_exits = set()
+        entry_col, entry_row = 0, h - 1
+
+        for key, td in tiles_dict.items():
+            try:
+                parts = key.split(",")
+                col, row = int(parts[0]), int(parts[1])
+            except (ValueError, IndexError):
+                continue
+            tile_id = td.get("tile_id", 10)
+            tm.set_tile(col, row, tile_id)
+            path = td.get("path")
+            if path:
+                tm.sprite_overrides[(col, row)] = path
+            if td.get("interior"):
+                interior_links[(col, row)] = td["interior"]
+            if td.get("to_overworld"):
+                overworld_exits.add((col, row))
+                if entry_col == 0 and entry_row == h - 1:
+                    entry_col, entry_row = col, row
+            if tile_id == TILE_EXIT:
+                entry_col, entry_row = col, row
+
+        return TownData(
+            tile_map=tm,
+            npcs=[],
+            name=town_name,
+            entry_col=entry_col,
+            entry_row=entry_row,
+            town_style=town_style,
+            interior_links=interior_links,
+            overworld_exits=overworld_exits,
+        )
+
     def discover_single_key_dungeon(self, dungeon_key_str):
         """Reveal a single key dungeon by its ``'col,row'`` string key."""
         parts = dungeon_key_str.split(",")

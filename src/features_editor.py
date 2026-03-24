@@ -258,6 +258,43 @@ class FeaturesEditor:
         }
 
     # ══════════════════════════════════════════════════════════
+    # ── Town Template Methods ─────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def town_templates_path(self):
+        """Return path to the standalone town_templates.json file."""
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "town_templates.json")
+
+    def load_townlayouts(self):
+        """Load all town sub-editor lists from town_templates.json."""
+        data = {}
+        path = self.town_templates_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            pass
+        for sub_key in ("layouts", "features", "interiors"):
+            items = []
+            defaults = self._TOWN_SUB_DEFAULTS[sub_key]
+            raw = data.get(sub_key, [])
+            for tl in raw:
+                item = {
+                    "name": tl.get("name", "Unnamed"),
+                    "width": tl.get("width", defaults["width"]),
+                    "height": tl.get("height", defaults["height"]),
+                    "tiles": dict(tl.get("tiles", {})),
+                }
+                if sub_key == "layouts":
+                    item["description"] = tl.get("description", "")
+                if sub_key == "interiors":
+                    item["parent_town"] = tl.get("parent_town", "")
+                items.append(item)
+            self.town_lists[sub_key] = items
+
+    # ══════════════════════════════════════════════════════════
     # ── Tile Editor Methods ────────────────────────────────────
     # ══════════════════════════════════════════════════════════
 
@@ -1763,9 +1800,9 @@ class FeaturesEditor:
                 "subtitle": "A base layout for the overworld map",
                 "map_config": {
                     "storage": STORAGE_DENSE,
-                    "grid_type": GRID_SCROLLABLE,
+                    "grid_type": GRID_FIXED,
                     "tile_context": "overworld",
-                    "width": 48, "height": 48,
+                    "width": 16, "height": 12,
                 },
             },
         ]
@@ -1886,7 +1923,7 @@ class FeaturesEditor:
     def _meh_launch_editor(self, sec):
         """Launch the unified map editor for a Map Editor hub template."""
         from src.map_editor import (
-            MapEditorConfig, MapEditorState,
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_overworld_brushes, build_interior_brushes,
             STORAGE_DENSE, STORAGE_SPARSE,
         )
@@ -1961,6 +1998,7 @@ class FeaturesEditor:
 
         self.meh_editor_active = True
         self.game._map_editor_state = state
+        self._meh_input_handler = MapEditorInputHandler(state)
 
     def _meh_next_editable(self, start, direction=1):
         """Find next editable field index."""
@@ -2092,17 +2130,989 @@ class FeaturesEditor:
             return field_idx - max_visible + 1
         return scroll
 
+    def open_modules(self):
+        """Open the module browser from within the features editor."""
+        self.game._refresh_module_list()
+        self.game.showing_features = False
+        self.game.showing_modules = True
+        self.game._modules_from_features = True
+        self.game.module_message = None
+        self.game.module_msg_timer = 0.0
+        self.game.module_confirm_delete = False
+        self.game.module_edit_mode = False
+        self.game.module_edit_is_new = False
+
     # ══════════════════════════════════════════════════════════
     # ── Main Input Handlers ────────────────────────────────────
     # ══════════════════════════════════════════════════════════
 
     def handle_input(self, event):
-        """Main input dispatcher for the features editor."""
-        self.game._handle_features_input(event)
+        """Handle input for the Game Features editor.
+
+        Uses active_editor to dispatch to the correct data
+        structures while sharing the same level-1/level-2 navigation logic.
+        """
+        if event.type != pygame.KEYDOWN:
+            return
+
+        # Intercept input when unsaved-changes dialog is showing
+        if self.game._unsaved_dialog_active:
+            self.game._handle_unsaved_dialog_input(event)
+            return
+
+        # Map Editor hub has its own section-browser input handler
+        if self.active_editor == "mapeditor":
+            self.handle_mapeditor_input(event)
+            return
+
+        # ── Resolve active editor data pointers ──
+        ed = self.active_editor
+        # Build a context dict so the level-1 and level-2 code
+        # can work generically across all editor types
+        ctx = self.editor_ctx()
+
+        # ── Level 2: editing individual fields ──
+        # (tiles and gallery use level 2 for browsing, not field editing)
+        if self.level == 2 and ctx and ed not in ("tiles", "gallery", "features"):
+            self.handle_field_editing(event, ctx, ed, exit_level=1)
+            return
+
+        # ── Level 4: pixel editor ──
+        if self.level == 5 and ed == "gallery":
+            px = self.pxedit_pixels
+            if px is None:
+                self.level = 3
+                return
+            w = self.pxedit_w
+            h = self.pxedit_h
+            n_pal = len(self.pxedit_palette)
+            pal_cols = 4  # palette grid columns
+
+            # ── Color replace mode ──
+            if self.pxedit_replacing:
+                if event.key == pygame.K_ESCAPE:
+                    self.pxedit_replacing = False
+                elif event.key == pygame.K_LEFT:
+                    self.pxedit_replace_dst = (
+                        self.pxedit_replace_dst - 1) % n_pal
+                elif event.key == pygame.K_RIGHT:
+                    self.pxedit_replace_dst = (
+                        self.pxedit_replace_dst + 1) % n_pal
+                elif event.key == pygame.K_UP:
+                    self.pxedit_replace_dst = (
+                        self.pxedit_replace_dst - pal_cols) % n_pal
+                elif event.key == pygame.K_DOWN:
+                    self.pxedit_replace_dst = (
+                        self.pxedit_replace_dst + pal_cols) % n_pal
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    # Snapshot for undo before batch replace
+                    self.pxedit_undo_stack.append(
+                        [list(row) for row in px])
+                    # Execute: match the exact pixel color from canvas
+                    src_c = self.pxedit_replace_src_color
+                    dst_c = self.pxedit_palette[
+                        self.pxedit_replace_dst]
+                    for row in px:
+                        for xi in range(len(row)):
+                            if tuple(row[xi]) == tuple(src_c):
+                                row[xi] = dst_c
+                    self.dirty = True
+                    self.pxedit_replacing = False
+                return
+
+            if self._is_save_shortcut(event):
+                # Save without leaving the pixel editor
+                self.pxedit_save()
+                self.game.renderer.reload_sprites()
+                self.dirty = False
+                return
+
+            if event.key == pygame.K_ESCAPE:
+                if self.pxedit_focus == "palette":
+                    # Escape from palette returns to canvas
+                    self.pxedit_focus = "canvas"
+                else:
+                    if self.dirty:
+                        def _save_and_exit():
+                            self.pxedit_save()
+                            self.pxedit_pixels = None
+                            self.game.renderer.reload_sprites()
+                            self.level = 3
+                            self.dirty = False
+                        def _discard_and_exit():
+                            self.pxedit_pixels = None
+                            self.game.renderer.reload_sprites()
+                            self.level = 3
+                            self.dirty = False
+                        self.game._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                    else:
+                        self.pxedit_pixels = None
+                        self.game.renderer.reload_sprites()
+                        self.level = 3
+                return
+
+            # Tab toggles focus between canvas and palette
+            if event.key == pygame.K_TAB:
+                if self.pxedit_focus == "canvas":
+                    self.pxedit_focus = "palette"
+                else:
+                    self.pxedit_focus = "canvas"
+                return
+
+            if self.pxedit_focus == "palette":
+                # ── Palette navigation (grid: 4 columns) ──
+                ci = self.pxedit_color_idx
+                if event.key == pygame.K_LEFT:
+                    self.pxedit_color_idx = (ci - 1) % n_pal
+                elif event.key == pygame.K_RIGHT:
+                    self.pxedit_color_idx = (ci + 1) % n_pal
+                elif event.key == pygame.K_UP:
+                    self.pxedit_color_idx = (
+                        ci - pal_cols) % n_pal
+                elif event.key == pygame.K_DOWN:
+                    self.pxedit_color_idx = (
+                        ci + pal_cols) % n_pal
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    # Confirm selection, return to canvas
+                    self.pxedit_focus = "canvas"
+                return
+
+            # ── Canvas mode ──
+            if event.key == pygame.K_UP:
+                self.pxedit_cy = (
+                    self.pxedit_cy - 1) % h
+            elif event.key == pygame.K_DOWN:
+                self.pxedit_cy = (
+                    self.pxedit_cy + 1) % h
+            elif event.key == pygame.K_LEFT:
+                self.pxedit_cx = (
+                    self.pxedit_cx - 1) % w
+            elif event.key == pygame.K_RIGHT:
+                self.pxedit_cx = (
+                    self.pxedit_cx + 1) % w
+            # Paint with current color
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                # Snapshot for undo
+                self.pxedit_undo_stack.append(
+                    [list(row) for row in px])
+                color = self.pxedit_palette[
+                    self.pxedit_color_idx]
+                px[self.pxedit_cy][self.pxedit_cx] = color
+                self.dirty = True
+            # Quick palette cycle: Q = prev, E = next
+            elif event.key == pygame.K_q:
+                self.pxedit_color_idx = (
+                    self.pxedit_color_idx - 1) % n_pal
+            elif event.key == pygame.K_e:
+                self.pxedit_color_idx = (
+                    self.pxedit_color_idx + 1) % n_pal
+            # Pick color from canvas (P = eyedropper)
+            elif event.key == pygame.K_p:
+                picked = tuple(
+                    px[self.pxedit_cy][self.pxedit_cx])
+                best_i = 0
+                best_d = float("inf")
+                for pi, pc in enumerate(self.pxedit_palette):
+                    d = sum((a - b) ** 2
+                            for a, b in zip(picked[:3], pc[:3]))
+                    if d < best_d:
+                        best_d = d
+                        best_i = pi
+                self.pxedit_color_idx = best_i
+            # Enter color replace mode (R) — source = exact color under cursor
+            elif event.key == pygame.K_r:
+                picked = tuple(
+                    px[self.pxedit_cy][self.pxedit_cx])
+                self.pxedit_replacing = True
+                self.pxedit_replace_src_color = picked
+                self.pxedit_replace_dst = self.pxedit_color_idx
+                self.pxedit_replace_sel = "dst"
+            # Undo (Ctrl+Z or U)
+            elif (event.key == pygame.K_z
+                  and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))) \
+                    or event.key == pygame.K_u:
+                if self.pxedit_undo_stack:
+                    restored = self.pxedit_undo_stack.pop()
+                    # Copy restored data back into the live pixel array
+                    for yi in range(len(restored)):
+                        px[yi][:] = restored[yi]
+                    self.dirty = True
+            return
+
+        # ── Level 4: gallery tag editing ──
+        if self.level == 4 and ed == "gallery":
+            n_tags = len(self.gallery_all_cats)
+            if self._is_save_shortcut(event):
+                # Save without leaving the tag editor
+                self.save_gallery()
+                self.dirty = False
+                return
+            if event.key == pygame.K_ESCAPE:
+                if self.dirty:
+                    def _save_and_exit():
+                        self.save_gallery()
+                        self.level = 3
+                        self._rebuild_gallery_cats()
+                        self.dirty = False
+                    def _discard_and_exit():
+                        self.level = 3
+                        self._rebuild_gallery_cats()
+                        self.dirty = False
+                    self.game._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+                else:
+                    self.level = 3
+                    self._rebuild_gallery_cats()
+                return
+            if event.key == pygame.K_UP:
+                self.gallery_tag_cursor = (
+                    self.gallery_tag_cursor - 1) % n_tags
+            elif event.key == pygame.K_DOWN:
+                self.gallery_tag_cursor = (
+                    self.gallery_tag_cursor + 1) % n_tags
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE,
+                               pygame.K_LEFT, pygame.K_RIGHT):
+                self.gallery_toggle_tag()
+                self.dirty = True
+            return
+
+        # ── Level 3: gallery tile detail / edit screen ──
+        if self.level == 3 and ed == "gallery":
+            # ── Naming mode: capture text input ──
+            if self.gallery_naming:
+                self.handle_gallery_naming_input(event)
+                return
+            n_fields = 3  # Name, Categories, Edit Pixels
+            if event.key == pygame.K_ESCAPE:
+                self.level = 2
+                return
+            if event.key == pygame.K_UP:
+                self.gallery_detail_cursor = (
+                    self.gallery_detail_cursor - 1) % n_fields
+            elif event.key == pygame.K_DOWN:
+                self.gallery_detail_cursor = (
+                    self.gallery_detail_cursor + 1) % n_fields
+            elif event.key == pygame.K_RETURN:
+                cur = self.gallery_detail_cursor
+                if cur == 0:
+                    # Name → enter naming mode
+                    gi = self.gallery_cur_gi()
+                    if gi is not None:
+                        self.gallery_naming = True
+                        self.gallery_name_buf = \
+                            self.gallery_list[gi]["name"]
+                elif cur == 1:
+                    # Categories → open tag editor (Level 4)
+                    self.gallery_tag_cursor = 0
+                    self.dirty = False
+                    self.level = 4
+                elif cur == 2:
+                    # Edit Pixels → open pixel editor (Level 5)
+                    if self.pxedit_open():
+                        self.level = 5
+            return
+
+        # ── Level 2: gallery sprite list ──
+        if self.level == 2 and ed == "gallery":
+            n = len(self.gallery_sprites)
+            if event.key == pygame.K_ESCAPE:
+                self.save_gallery()
+                self._rebuild_gallery_cats()
+                self.level = 1
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self.gallery_spr_cursor = (
+                    self.gallery_spr_cursor - 1) % n
+                self.gallery_spr_scroll = \
+                    self._adjust_scroll_generic(
+                        self.gallery_spr_cursor,
+                        self.gallery_spr_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self.gallery_spr_cursor = (
+                    self.gallery_spr_cursor + 1) % n
+                self.gallery_spr_scroll = \
+                    self._adjust_scroll_generic(
+                        self.gallery_spr_cursor,
+                        self.gallery_spr_scroll)
+            elif event.key == pygame.K_RETURN:
+                # Enter → open tile detail / edit screen
+                if n > 0:
+                    self.gallery_detail_cursor = 0
+                    self.level = 3
+            elif self._is_copy_shortcut(event):
+                if n > 0:
+                    self.gallery_duplicate()
+            elif self._is_delete_shortcut(event) and n > 0:
+                self.gallery_delete()
+            return
+
+        # ── Level 1: gallery category folders ──
+        if self.level == 1 and ed == "gallery":
+            n = len(self.gallery_cat_list)
+            if event.key == pygame.K_ESCAPE:
+                self.save_gallery()
+                if self.launched_from_maps:
+                    self.return_to_maps_hub()
+                else:
+                    self.level = 0
+                    self.active_editor = None
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self.gallery_cat_cursor = (
+                    self.gallery_cat_cursor - 1) % n
+                self.gallery_cat_scroll = \
+                    self._adjust_scroll_generic(
+                        self.gallery_cat_cursor,
+                        self.gallery_cat_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self.gallery_cat_cursor = (
+                    self.gallery_cat_cursor + 1) % n
+                self.gallery_cat_scroll = \
+                    self._adjust_scroll_generic(
+                        self.gallery_cat_cursor,
+                        self.gallery_cat_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self.gallery_enter_cat()
+                    self.dirty = False
+                    self.level = 2
+            return
+
+        # ── Level 3: tile field editor (inside folder) ──
+        if self.level == 3 and ed == "tiles":
+            if ctx:
+                self.handle_field_editing(event, ctx, ed, exit_level=2)
+            return
+
+        # ── Level 2: tile list inside folder ──
+        if self.level == 2 and ed == "tiles":
+            tiles_in = self.tile_folder_tiles
+            n = len(tiles_in)
+            if event.key == pygame.K_ESCAPE:
+                self.save_tiles()
+                self.tile_in_folder = False
+                self.level = 1
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self.tile_cursor = (
+                    self.tile_cursor - 1) % n
+                self.tile_scroll = \
+                    self._adjust_scroll_generic(
+                        self.tile_cursor,
+                        self.tile_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self.tile_cursor = (
+                    self.tile_cursor + 1) % n
+                self.tile_scroll = \
+                    self._adjust_scroll_generic(
+                        self.tile_cursor,
+                        self.tile_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    ti = tiles_in[self.tile_cursor]
+                    tile = self.tile_list[ti]
+                    self.build_tile_fields(tile)
+                    self.tile_editing = True
+                    self.dirty = False
+                    self.level = 3
+            elif self._is_new_shortcut(event) or self._is_copy_shortcut(event):
+                # Ctrl+N / Ctrl+C both duplicate the selected tile
+                self.duplicate_tile()
+                self.save_tiles()
+                self._rebuild_tile_folders()
+                self.tile_enter_folder()
+            elif self._is_delete_shortcut(event):
+                self.remove_tile()
+                self.save_tiles()
+                self._rebuild_tile_folders()
+                self.tile_enter_folder()
+            return
+
+        # ── Level 1: tile folder list ──
+        if self.level == 1 and ed == "tiles":
+            n = len(self.tile_folders)
+            if event.key == pygame.K_ESCAPE:
+                self.save_tiles()
+                if self.launched_from_maps:
+                    self.return_to_maps_hub()
+                else:
+                    self.level = 0
+                    self.active_editor = None
+                return
+            if event.key == pygame.K_UP and n > 0:
+                self.tile_folder_cursor = (
+                    self.tile_folder_cursor - 1) % n
+                self.tile_folder_scroll = \
+                    self._adjust_scroll_generic(
+                        self.tile_folder_cursor,
+                        self.tile_folder_scroll)
+            elif event.key == pygame.K_DOWN and n > 0:
+                self.tile_folder_cursor = (
+                    self.tile_folder_cursor + 1) % n
+                self.tile_folder_scroll = \
+                    self._adjust_scroll_generic(
+                        self.tile_folder_cursor,
+                        self.tile_folder_scroll)
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    self.tile_enter_folder()
+                    self.level = 2
+            elif self._is_new_shortcut(event):
+                # Create a new tile in the selected folder and enter it
+                self.add_tile()
+                self.save_tiles()
+                self._rebuild_tile_folders()
+                self.tile_enter_folder()
+                self.level = 2
+            return
+
+        # ── Level 1: list browser ──
+        # (tiles and gallery have their own level-1 handlers above)
+        # ── Spell 3-tier folder navigation ──
+        if self.level == 1 and ed == "spells":
+            nav = self.spell_nav
+            if nav == 0:
+                # Tier 0: casting type folders
+                ctypes = self.spell_casting_types()
+                n = len(ctypes)
+                if event.key == pygame.K_ESCAPE:
+                    self.save_spells()
+                    self.level = 0
+                    self.active_editor = None
+                elif event.key == pygame.K_UP and n > 0:
+                    self.spell_ctype_cursor = (
+                        self.spell_ctype_cursor - 1) % n
+                elif event.key == pygame.K_DOWN and n > 0:
+                    self.spell_ctype_cursor = (
+                        self.spell_ctype_cursor + 1) % n
+                elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+                    self.spell_sel_ctype = ctypes[
+                        self.spell_ctype_cursor]
+                    self.spell_level_cursor = 0
+                    self.spell_level_scroll = 0
+                    self.spell_nav = 1
+                elif self._is_save_shortcut(event):
+                    self.save_spells()
+            elif nav == 1:
+                # Tier 1: level folders for selected casting type
+                levels = self.spell_levels_for_ctype(
+                    self.spell_sel_ctype)
+                n = len(levels)
+                if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+                    self.spell_nav = 0
+                elif event.key == pygame.K_UP and n > 0:
+                    self.spell_level_cursor = (
+                        self.spell_level_cursor - 1) % n
+                    self.spell_level_scroll = (
+                        self._adjust_scroll_generic(
+                            self.spell_level_cursor,
+                            self.spell_level_scroll))
+                elif event.key == pygame.K_DOWN and n > 0:
+                    self.spell_level_cursor = (
+                        self.spell_level_cursor + 1) % n
+                    self.spell_level_scroll = (
+                        self._adjust_scroll_generic(
+                            self.spell_level_cursor,
+                            self.spell_level_scroll))
+                elif event.key in (pygame.K_RETURN,
+                                   pygame.K_RIGHT) and n > 0:
+                    lvl, _count = levels[self.spell_level_cursor]
+                    self.spell_sel_level = lvl
+                    self.spell_filter(
+                        self.spell_sel_ctype, lvl)
+                    self.spell_nav = 2
+                elif self._is_new_shortcut(event):
+                    # Add spell with current casting type + first
+                    # available level
+                    self.add_spell()
+                    new_s = self.spell_list[-1]
+                    new_s["casting_type"] = self.spell_sel_ctype
+                    new_s["allowable_classes"] = (
+                        self.default_classes(
+                            self.spell_sel_ctype))
+                    self.resort_spells()
+                    self.save_spells()
+                elif self._is_save_shortcut(event):
+                    self.save_spells()
+            elif nav == 2:
+                # Tier 2: spells at selected casting type + level
+                filt = self.spell_filtered
+                n = len(filt)
+                if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+                    self.spell_nav = 1
+                elif event.key == pygame.K_UP and n > 0:
+                    self.spell_cursor = (
+                        self.spell_cursor - 1) % n
+                    self.spell_scroll = (
+                        self._adjust_scroll_generic(
+                            self.spell_cursor,
+                            self.spell_scroll))
+                elif event.key == pygame.K_DOWN and n > 0:
+                    self.spell_cursor = (
+                        self.spell_cursor + 1) % n
+                    self.spell_scroll = (
+                        self._adjust_scroll_generic(
+                            self.spell_cursor,
+                            self.spell_scroll))
+                elif event.key in (pygame.K_RETURN,
+                                   pygame.K_RIGHT) and n > 0:
+                    real_idx = filt[self.spell_cursor]
+                    # Save filter position; point cursor at real
+                    # index for the field editor
+                    self.spell_filter_pos = (
+                        self.spell_cursor)
+                    self.spell_cursor = real_idx
+                    spell = self.spell_list[real_idx]
+                    self.build_spell_fields(spell)
+                    self.spell_editing = True
+                    self.dirty = False
+                    self.level = 2
+                elif self._is_new_shortcut(event):
+                    self.add_spell()
+                    new_s = self.spell_list[-1]
+                    new_s["casting_type"] = self.spell_sel_ctype
+                    new_s["min_level"] = self.spell_sel_level
+                    new_s["allowable_classes"] = (
+                        self.default_classes(
+                            self.spell_sel_ctype))
+                    self.resort_spells()
+                    self.save_spells()
+                    self.spell_filter(
+                        self.spell_sel_ctype,
+                        self.spell_sel_level)
+                    self.spell_cursor = max(
+                        0, len(self.spell_filtered) - 1)
+                elif self._is_delete_shortcut(event) and n > 0:
+                    real_idx = filt[self.spell_cursor]
+                    self.spell_list.pop(real_idx)
+                    self.save_spells()
+                    self.spell_filter(
+                        self.spell_sel_ctype,
+                        self.spell_sel_level)
+                    if self.spell_cursor >= len(
+                            self.spell_filtered):
+                        self.spell_cursor = max(
+                            0, len(self.spell_filtered) - 1)
+                    # If level is now empty, go back to level list
+                    if not self.spell_filtered:
+                        self.spell_nav = 1
+                elif self._is_save_shortcut(event):
+                    self.save_spells()
+            return
+
+        # ── Level 1: generic list (items, monsters) ──
+        if self.level == 1 and ctx and ed not in (
+                "tiles", "gallery", "spells", "features"):
+            lst = ctx["list"]()
+            n = len(lst)
+            if event.key == pygame.K_ESCAPE:
+                ctx["save_disk"]()
+                self.level = 0
+                self.active_editor = None
+                return
+            if event.key == pygame.K_UP and n > 0:
+                ctx["set_cursor"]((ctx["cursor"]() - 1) % n)
+                ctx["adjust_scroll"]()
+            elif event.key == pygame.K_DOWN and n > 0:
+                ctx["set_cursor"]((ctx["cursor"]() + 1) % n)
+                ctx["adjust_scroll"]()
+            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+                if n > 0:
+                    item = lst[ctx["cursor"]()]
+                    ctx["build_fields"](item)
+                    ctx["set_editing"](True)
+                    self.dirty = False
+                    self.level = 2
+            elif self._is_new_shortcut(event):
+                ctx["add"]()
+                ctx["adjust_scroll"]()
+            elif self._is_delete_shortcut(event):
+                ctx["remove"]()
+            elif self._is_save_shortcut(event):
+                ctx["save_disk"]()
+            return
+
+        # ── Level 0: category list ──
+        n = len(self.categories)
+        if event.key == pygame.K_ESCAPE:
+            self.game.showing_features = False
+            self.game.showing_title = True
+            return
+        if event.key == pygame.K_UP:
+            self.cursor = (self.cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self.cursor = (self.cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE,
+                           pygame.K_RIGHT):
+            cat = self.categories[self.cursor]
+            if cat["label"] == "Modules":
+                self.open_modules()
+            elif cat["label"] == "Spells":
+                self.active_editor = "spells"
+                self.load_spells()
+                self.level = 1
+            elif cat["label"] == "Items":
+                self.active_editor = "items"
+                self.load_items()
+                self.level = 1
+            elif cat["label"] == "Monsters":
+                self.active_editor = "monsters"
+                self.load_monsters()
+                self.level = 1
+            elif cat["label"] == "Maps":
+                self.active_editor = "mapeditor"
+                self.meh_sections = self.build_map_editor_hub_sections()
+                self.meh_cursor = 0
+                self.meh_scroll = 0
+                self.meh_nav_stack = []
+                self.meh_folder_label = ""
+                self.meh_level = 0
+                self.meh_fields = []
+                self.meh_field = 0
+                self.meh_buffer = ""
+                self.meh_field_scroll = 0
+                self.level = 1
 
     def handle_mapeditor_input(self, event):
-        """Handle input for the Map Editor inside the features screen."""
-        self.game._handle_mapeditor_feat_input(event)
+        """Handle input for the Map Editor inside the features screen.
+
+        Reuses the meh_* state variables for section/folder/field browsing.
+        When the actual map editor is active, delegates to its handler.
+        """
+        if event.type != pygame.KEYDOWN:
+            return
+
+        # ── Fullscreen map editor active (launched from a template) ──
+        if self.meh_editor_active:
+            self._meh_input_handler.handle(event)
+            return
+
+        # ── Section browsing mode ──
+        n = len(self.meh_sections)
+
+        if event.key == pygame.K_ESCAPE:
+            if self.meh_nav_stack:
+                # Pop up one folder level
+                (prev_secs, prev_cur, prev_scroll,
+                 prev_label) = self.meh_nav_stack.pop()
+                self.meh_sections = prev_secs
+                self.meh_cursor = prev_cur
+                self.meh_scroll = prev_scroll
+                self.meh_folder_label = prev_label
+            else:
+                # Return to features category list
+                self.level = 0
+                self.active_editor = None
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self.meh_cursor = (self.meh_cursor - 1) % n
+        elif event.key == pygame.K_DOWN and n > 0:
+            self.meh_cursor = (self.meh_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            sec = self.meh_sections[self.meh_cursor]
+            if sec.get("_editor_redirect"):
+                # Redirect to a different editor (e.g. tiles, gallery)
+                redirect = sec["_editor_redirect"]
+                self.launched_from_maps = True
+                if redirect == "tiles":
+                    self.active_editor = "tiles"
+                    self.game.renderer.reload_sprites()
+                    self.load_tiles()
+                    self.level = 1
+                elif redirect == "gallery":
+                    self.active_editor = "gallery"
+                    self.game.renderer.reload_sprites()
+                    self.load_gallery()
+                    self.level = 1
+            elif sec.get("folder"):
+                # Enter folder
+                self.meh_nav_stack.append((
+                    self.meh_sections,
+                    self.meh_cursor,
+                    self.meh_scroll,
+                    self.meh_folder_label,
+                ))
+                self.meh_sections = list(sec.get("children", []))
+                self.meh_cursor = 0
+                self.meh_scroll = 0
+                self.meh_folder_label = sec.get("label", "")
+            elif sec.get("map_config"):
+                # Launch the actual map editor
+                self._meh_launch_editor(sec)
+        elif event.key == pygame.K_LEFT:
+            if self.meh_nav_stack:
+                (prev_secs, prev_cur, prev_scroll,
+                 prev_label) = self.meh_nav_stack.pop()
+                self.meh_sections = prev_secs
+                self.meh_cursor = prev_cur
+                self.meh_scroll = prev_scroll
+                self.meh_folder_label = prev_label
+
+    def editor_ctx(self):
+        """Return a dict of lambdas/refs for the active editor,
+        allowing generic level-1 and level-2 logic."""
+        ed = self.active_editor
+        if ed == "spells":
+            return {
+                "list": lambda: self.spell_list,
+                "cursor": lambda: self.spell_cursor,
+                "set_cursor": lambda v: setattr(self, "spell_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "spell_scroll",
+                    self._adjust_scroll_generic(
+                        self.spell_cursor, self.spell_scroll)),
+                "fields": lambda: self.spell_fields,
+                "field_idx": lambda: self.spell_field,
+                "set_field_idx": lambda v: setattr(self, "spell_field", v),
+                "buffer": lambda: self.spell_buffer,
+                "set_buffer": lambda v: setattr(self, "spell_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "spell_scroll_f",
+                    self._adjust_field_scroll_generic(
+                        self.spell_field, self.spell_scroll_f)),
+                "build_fields": self.build_spell_fields,
+                "save_fields": self.save_spell_fields,
+                "save_disk": self.save_spells,
+                "set_editing": lambda v: setattr(self, "spell_editing", v),
+                "add": self.add_spell,
+                "remove": self.remove_spell,
+                "get_choices": self.get_spell_choices,
+                "needs_live_sync": False,
+                "on_choice_change": self.spell_on_choice_change,
+                "on_save_exit": self.spell_on_save_exit,
+                "on_discard_exit": self.spell_on_discard_exit,
+                "on_clean_exit": self.spell_on_clean_exit,
+            }
+        elif ed == "items":
+            return {
+                "list": lambda: self.item_list,
+                "cursor": lambda: self.item_cursor,
+                "set_cursor": lambda v: setattr(self, "item_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "item_scroll",
+                    self._adjust_scroll_generic(
+                        self.item_cursor, self.item_scroll)),
+                "fields": lambda: self.item_fields,
+                "field_idx": lambda: self.item_field,
+                "set_field_idx": lambda v: setattr(self, "item_field", v),
+                "buffer": lambda: self.item_buffer,
+                "set_buffer": lambda v: setattr(self, "item_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "item_scroll_f",
+                    self._adjust_field_scroll_generic(
+                        self.item_field, self.item_scroll_f)),
+                "build_fields": self.build_item_fields,
+                "save_fields": self.save_item_fields,
+                "save_disk": self.save_items,
+                "set_editing": lambda v: setattr(self, "item_editing", v),
+                "add": self.add_item,
+                "remove": self.remove_item,
+                "get_choices": self.get_item_choices,
+                "needs_live_sync": False,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
+            }
+        elif ed == "monsters":
+            return {
+                "list": lambda: self.mon_list,
+                "cursor": lambda: self.mon_cursor,
+                "set_cursor": lambda v: setattr(self, "mon_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "mon_scroll",
+                    self._adjust_scroll_generic(
+                        self.mon_cursor, self.mon_scroll)),
+                "fields": lambda: self.mon_fields,
+                "field_idx": lambda: self.mon_field,
+                "set_field_idx": lambda v: setattr(self, "mon_field", v),
+                "buffer": lambda: self.mon_buffer,
+                "set_buffer": lambda v: setattr(self, "mon_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "mon_scroll_f",
+                    self._adjust_field_scroll_generic(
+                        self.mon_field, self.mon_scroll_f)),
+                "build_fields": self.build_mon_fields,
+                "save_fields": self.save_mon_fields,
+                "save_disk": self.save_monsters,
+                "set_editing": lambda v: setattr(self, "mon_editing", v),
+                "add": self.add_monster,
+                "remove": self.remove_monster,
+                "get_choices": self.get_mon_choices,
+                "needs_live_sync": False,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
+            }
+        elif ed == "tiles":
+            return {
+                "list": lambda: self.tile_list,
+                "cursor": lambda: self.tile_cursor,
+                "set_cursor": lambda v: setattr(self, "tile_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "tile_scroll",
+                    self._adjust_scroll_generic(
+                        self.tile_cursor, self.tile_scroll)),
+                "fields": lambda: self.tile_fields,
+                "field_idx": lambda: self.tile_field,
+                "set_field_idx": lambda v: setattr(self, "tile_field", v),
+                "buffer": lambda: self.tile_buffer,
+                "set_buffer": lambda v: setattr(self, "tile_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "tile_scroll_f",
+                    self._adjust_field_scroll_generic(
+                        self.tile_field, self.tile_scroll_f)),
+                "build_fields": self.build_tile_fields,
+                "save_fields": self.save_tile_fields,
+                "save_disk": self.save_tiles,
+                "set_editing": lambda v: setattr(self, "tile_editing", v),
+                "add": self.add_tile,
+                "remove": self.remove_tile,
+                "get_choices": self.get_tile_choices,
+                "needs_live_sync": True,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
+            }
+        return None
+
+    def handle_field_editing(self, event, ctx, ed, exit_level):
+        """Unified field-editor input handler.
+
+        Parameters
+        ----------
+        event      : pygame event (KEYDOWN)
+        ctx        : editor context dict from editor_ctx()
+        ed         : editor name string ("spells", "items", etc.)
+        exit_level : level to return to on ESC (1 for most, 2 for tiles)
+        """
+        # Editors that need live-sync (save_fields on every change)
+        # to support conditional fields or live list-preview updates.
+        needs_live_sync = ctx.get("needs_live_sync", False)
+
+        # Editor-specific hooks (may be None for editors that don't need them)
+        on_choice_change = ctx.get("on_choice_change")
+        on_save_exit = ctx.get("on_save_exit")
+        on_discard_exit = ctx.get("on_discard_exit")
+        on_clean_exit = ctx.get("on_clean_exit")
+
+        # ── Save shortcut (Ctrl+S) ──
+        if self._is_save_shortcut(event):
+            ctx["save_fields"]()
+            if on_save_exit:
+                on_save_exit()
+            else:
+                ctx["save_disk"]()
+            self.dirty = False
+            return
+
+        # ── Escape ──
+        if event.key == pygame.K_ESCAPE:
+            if self.dirty:
+                def _save_and_exit():
+                    ctx["save_fields"]()
+                    if on_save_exit:
+                        on_save_exit()
+                    else:
+                        ctx["save_disk"]()
+                    ctx["set_editing"](False)
+                    self.level = exit_level
+                    self.dirty = False
+                def _discard_and_exit():
+                    if on_discard_exit:
+                        on_discard_exit()
+                    ctx["set_editing"](False)
+                    self.level = exit_level
+                    self.dirty = False
+                self.game._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
+            else:
+                if on_clean_exit:
+                    on_clean_exit()
+                ctx["set_editing"](False)
+                self.level = exit_level
+            return
+
+        # ── Read current field state ──
+        fields = ctx["fields"]()
+        n = len(fields)
+        if n == 0:
+            return
+        field_idx = ctx["field_idx"]()
+        entry = fields[field_idx]
+        ftype = entry.field_type
+        buf = ctx["buffer"]()
+
+        # ── UP / DOWN navigation ──
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            entry.value = buf
+            self.dirty = True
+            if needs_live_sync:
+                ctx["save_fields"]()
+                # Re-read — save may have triggered a field rebuild
+                fields = ctx["fields"]()
+                n = len(fields)
+                field_idx = ctx["field_idx"]()
+            direction = -1 if event.key == pygame.K_UP else 1
+            idx = (field_idx + direction) % n
+            idx = self._next_editable_generic(fields, idx)
+            ctx["set_field_idx"](idx)
+            ctx["set_buffer"](fields[idx].value)
+            ctx["adjust_field_scroll"]()
+
+        # ── Choice / Sprite cycling (LEFT / RIGHT) ──
+        elif ftype in ("choice", "sprite"):
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                choices = ctx["get_choices"](entry.key)
+                if choices:
+                    try:
+                        ci = choices.index(buf)
+                    except ValueError:
+                        ci = 0
+                    if event.key == pygame.K_RIGHT:
+                        ci = (ci + 1) % len(choices)
+                    else:
+                        ci = (ci - 1) % len(choices)
+                    ctx["set_buffer"](choices[ci])
+                    entry.value = choices[ci]
+                    self.dirty = True
+                    if needs_live_sync:
+                        ctx["save_fields"]()
+                    if on_choice_change:
+                        on_choice_change(entry, choices[ci])
+
+        # ── Int field editing ──
+        elif ftype == "int":
+            if event.key == pygame.K_BACKSPACE:
+                ctx["set_buffer"](buf[:-1])
+                self.dirty = True
+            elif event.key == pygame.K_LEFT:
+                try:
+                    v = int(buf) - 1
+                    ctx["set_buffer"](str(max(0, v)))
+                    self.dirty = True
+                except ValueError:
+                    pass
+            elif event.key == pygame.K_RIGHT:
+                try:
+                    v = int(buf) + 1
+                    ctx["set_buffer"](str(v))
+                    self.dirty = True
+                except ValueError:
+                    pass
+            elif event.unicode and event.unicode.isdigit():
+                ctx["set_buffer"](buf + event.unicode)
+                self.dirty = True
+
+        # ── Text field editing ──
+        elif ftype == "text":
+            if event.key == pygame.K_BACKSPACE:
+                ctx["set_buffer"](buf[:-1])
+                self.dirty = True
+            elif event.unicode and event.unicode.isprintable():
+                ctx["set_buffer"](buf + event.unicode)
+                self.dirty = True
 
     def open_from_title(self):
         """Open the Game Features editor from the title screen."""
@@ -2221,3 +3231,79 @@ class FeaturesEditor:
                 field_scroll=self.meh_field_scroll,
             ),
         )
+
+    # ══════════════════════════════════════════════════════════
+    # ── Helper Methods ─────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _next_editable_generic(fields, start):
+        """Find next editable field index from start in any field list.
+
+        Supports both FieldEntry dataclass instances and legacy
+        positional lists (used by the module editor).
+        """
+        n = len(fields)
+        if n == 0:
+            return 0
+        idx = start % n
+        for _ in range(n):
+            entry = fields[idx]
+            if isinstance(entry, FieldEntry):
+                if entry.editable and entry.field_type != "section":
+                    return idx
+            else:
+                # Legacy list format: [label, key, value, type, editable]
+                if len(entry) > 4 and entry[4] and entry[3] != "section":
+                    return idx
+            idx = (idx + 1) % n
+        return start % n
+
+    @staticmethod
+    def _adjust_scroll_generic(cursor, scroll, max_visible=14):
+        """Generic scroll adjustment. Returns new scroll value."""
+        if cursor < scroll:
+            return cursor
+        if cursor >= scroll + max_visible:
+            return cursor - max_visible + 1
+        return scroll
+
+    @staticmethod
+    def _adjust_field_scroll_generic(field_idx, scroll):
+        """Generic field scroll adjustment."""
+        row_h = 38
+        panel_h = 500
+        max_visible = panel_h // row_h
+        if field_idx < scroll:
+            return field_idx
+        if field_idx >= scroll + max_visible:
+            return field_idx - max_visible + 1
+        return scroll
+
+    @staticmethod
+    def _is_save_shortcut(event):
+        """Return True if the event is Ctrl+S or Cmd+S (universal save)."""
+        if event.key != pygame.K_s:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
+    @staticmethod
+    def _is_new_shortcut(event):
+        """Return True if the event is Ctrl+N or Cmd+N (universal new)."""
+        if event.key != pygame.K_n:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
+    @staticmethod
+    def _is_delete_shortcut(event):
+        """Return True if the event is Ctrl+D or Cmd+D (universal delete)."""
+        if event.key != pygame.K_d:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+
+    @staticmethod
+    def _is_copy_shortcut(event):
+        """Return True if the event is Ctrl+C or Cmd+C (universal copy/duplicate)."""
+        if event.key != pygame.K_c:
+            return False
+        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
