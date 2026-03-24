@@ -5817,168 +5817,6 @@ class Renderer(CombatEffectRendererMixin):
         base = os.path.splitext(os.path.basename(brush))[0]
         return base.replace("_", " ").title()
 
-    def _draw_utile_examine_preview(self, rx, ry, rw, rh, preview):
-        """Draw the interactive examine-area editor in the module panel.
-
-        Parameters
-        ----------
-        rx, ry, rw, rh : panel rectangle
-        preview : dict with tile_type, tile_name, description,
-                  tile_graphic, painted, cursor_col, cursor_row, brush
-        """
-        from src.settings import TILE_GRASS
-        fm = self.font_med
-        fs = self.font_small
-
-        # Dark overlay
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((10, 8, 20, 230))
-        self.screen.blit(overlay, (rx, ry))
-        pygame.draw.rect(self.screen, (100, 80, 50),
-                         (rx, ry, rw, rh), 1)
-
-        tile_type = preview.get("tile_type", TILE_GRASS)
-        tile_name = preview.get("tile_name", "Unknown")
-        painted = preview.get("painted", {})
-        cursor_col = preview.get("cursor_col", 5)
-        cursor_row = preview.get("cursor_row", 6)
-        brush = preview.get("brush", "eraser")
-
-        # ── Header ──
-        dy = ry + 8
-        self._u3_text("EXAMINE EDITOR", rx + 16, dy,
-                       (200, 180, 120), fm)
-        dy += 20
-        self._u3_text(tile_name, rx + 16, dy,
-                       self._U3_WHITE, fs)
-        dy += 16
-        pygame.draw.line(self.screen, (60, 60, 100),
-                         (rx + 12, dy), (rx + rw - 12, dy), 1)
-        dy += 6
-
-        # ── Miniature examine grid ──
-        cols = self._EXAMINE_COLS
-        rows = self._EXAMINE_ROWS
-        margin_x = 16
-        ts = min(20, (rw - margin_x * 2) // cols)
-        grid_w = cols * ts
-        grid_h = rows * ts
-        gx = rx + (rw - grid_w) // 2
-        gy = dy + 2
-
-        # Draw the terrain grid
-        for r in range(rows):
-            for c in range(cols):
-                px = gx + c * ts
-                py = gy + r * ts
-                is_edge = (c == 0 or c == cols - 1
-                           or r == 0 or r == rows - 1)
-                if is_edge:
-                    self._draw_examine_edge_tile(px, py, ts, tile_type,
-                                                 c, r)
-                else:
-                    self._draw_examine_floor_tile(px, py, ts, tile_type,
-                                                  c, r)
-
-        # Draw painted sprites on top of floor tiles
-        for (pc, pr), gfx in painted.items():
-            if gfx:
-                sprite = self._get_unique_tile_sprite(gfx, ts)
-                if sprite:
-                    self.screen.blit(sprite, (gx + pc * ts, gy + pr * ts))
-
-        # Draw placed items on top of floor tiles
-        placed_items = preview.get("placed_items", {})
-        if placed_items:
-            from src.party import ITEM_INFO
-            icon_sz = max(ts - 4, 8)
-            for (ic, ir), item_name in placed_items.items():
-                icx = gx + ic * ts + ts // 2
-                icy = gy + ir * ts + ts // 2
-                info = ITEM_INFO.get(item_name, {})
-                icon_type = info.get("icon", "potion")
-                self._draw_item_icon(icx, icy, icon_type, icon_sz)
-
-        # Draw cursor highlight (blinking amber outline)
-        import time
-        mode = preview.get("mode", "tile")
-        blink = int(time.time() * 4) % 2 == 0
-        if mode == "tile":
-            cur_color = (255, 200, 60) if blink else (180, 140, 40)
-        else:
-            cur_color = (100, 255, 160) if blink else (50, 160, 90)
-        cur_rect = pygame.Rect(gx + cursor_col * ts, gy + cursor_row * ts,
-                               ts, ts)
-        pygame.draw.rect(self.screen, cur_color, cur_rect, 2)
-
-        dy = gy + grid_h + 6
-
-        # ── Mode indicator ──
-        tile_label_color = (255, 200, 100) if mode == "tile" \
-            else (180, 180, 200)
-        item_label_color = (100, 255, 160) if mode == "item" \
-            else (180, 180, 200)
-        self._u3_text("Tiles", rx + 12, dy, tile_label_color, fs)
-        self._u3_text("/", rx + 55, dy, (180, 180, 200), fs)
-        self._u3_text("Items", rx + 63, dy, item_label_color, fs)
-        mode_hint = "[I] switch"
-        mhw = fs.size(mode_hint)[0]
-        self._u3_text(mode_hint, rx + rw - mhw - 12, dy,
-                       (80, 80, 160), fs)
-        dy += 16
-
-        # ── Brush / item selector ──
-        brush = preview.get("brush", "eraser")
-        arrow_color = (100, 180, 255)
-        if mode == "tile":
-            label = "Brush:"
-            brush_name = self._brush_friendly_name(brush)
-        else:
-            label = "Item:"
-            brush_name = brush  # item names are already friendly
-        self._u3_text(label, rx + 12, dy, (160, 160, 180), fs)
-        label_w = fs.size(label)[0]
-        name_x = rx + 14 + label_w + 4
-        self._u3_text("<", name_x - 10, dy, arrow_color, fs)
-        self._u3_text(brush_name, name_x, dy,
-                       (255, 255, 200), fs)
-        name_w = fs.size(brush_name)[0]
-        self._u3_text(">", name_x + name_w + 6, dy, arrow_color, fs)
-        dy += 18
-
-        # Preview of current brush / item
-        if brush != "eraser":
-            if mode == "tile":
-                preview_sz = min(32, ts * 2)
-                sprite = self._get_unique_tile_sprite(brush, preview_sz)
-                if sprite:
-                    self.screen.blit(sprite, (rx + 16, dy))
-                dy += preview_sz + 4
-            else:
-                # Draw item icon preview
-                from src.party import ITEM_INFO
-                info = ITEM_INFO.get(brush, {})
-                icon_type = info.get("icon", "potion")
-                self._draw_item_icon(rx + 30, dy + 14, icon_type, 24)
-                dy += 32
-        else:
-            # Draw small X for eraser
-            ex, ey = rx + 16, dy
-            esz = 16
-            pygame.draw.line(self.screen, (200, 80, 80),
-                             (ex, ey), (ex + esz, ey + esz), 2)
-            pygame.draw.line(self.screen, (200, 80, 80),
-                             (ex + esz, ey), (ex, ey + esz), 2)
-            dy += esz + 6
-
-        # ── Footer hints ──
-        hint_y = ry + rh - 36
-        action = "Paint" if mode == "tile" else "Place"
-        self._u3_text(f"[Arrows] Move  [ENTER] {action}",
-                       rx + 10, hint_y, self._U3_HINT, fs)
-        self._u3_text("[TAB/B] Cycle  [I] Mode  [ESC] Done",
-                       rx + 10, hint_y + 14, self._U3_HINT, fs)
-
     def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):
         """Draw an interior floor tile themed by overworld tile type."""
         from src.settings import (
@@ -6094,196 +5932,6 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.circle(self.screen, (80, 80, 80), (cx, cy), 5)
 
     # ── Battle screen editor (module editor) ─────────────────────
-    def _draw_battle_screen_editor(self, rx, ry, rw, rh, preview):
-        """Draw the interactive battle screen editor in the module panel.
-
-        Parameters
-        ----------
-        rx, ry, rw, rh : panel rectangle
-        preview : dict with style, music, obstacles, painted,
-                  cursor_col, cursor_row, brush, mode, settings_cursor
-        """
-        import time
-        fm = self.font_med
-        fs = self.font_small
-
-        # Dark overlay
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((10, 8, 20, 230))
-        self.screen.blit(overlay, (rx, ry))
-        pygame.draw.rect(self.screen, (80, 100, 160),
-                         (rx, ry, rw, rh), 1)
-
-        style = preview.get("style", "dungeon")
-        music = preview.get("music", "Default")
-        obstacles = preview.get("obstacles", {})
-        painted = preview.get("painted", {})
-        cursor_col = preview.get("cursor_col", 9)
-        cursor_row = preview.get("cursor_row", 10)
-        brush = preview.get("brush", "eraser")
-        mode = preview.get("mode", "obstacle")
-        settings_cursor = preview.get("settings_cursor", 0)
-        is_outdoor = (style == "outdoor")
-
-        # ── Header ──
-        dy = ry + 6
-        self._u3_text("BATTLE SCREEN", rx + 12, dy,
-                       (120, 160, 220), fm)
-        dy += 18
-
-        if mode == "settings":
-            # Draw settings sub-page
-            self._draw_battle_settings_page(
-                rx, dy, rw, rh - (dy - ry), style, music,
-                settings_cursor)
-            return
-
-        # ── Miniature arena grid ──
-        cols = self._ARENA_COLS  # 18
-        rows = self._ARENA_ROWS  # 21
-        margin_x = 8
-        ts = min(16, (rw - margin_x * 2) // cols)
-        grid_w = cols * ts
-        grid_h = rows * ts
-        gx = rx + (rw - grid_w) // 2
-        gy = dy + 2
-
-        # Draw the arena grid
-        for r in range(rows):
-            for c in range(cols):
-                px = gx + c * ts
-                py = gy + r * ts
-                wall = (c == 0 or c == cols - 1
-                        or r == 0 or r == rows - 1)
-                if is_outdoor:
-                    if wall:
-                        # Mini forest edge
-                        pygame.draw.rect(self.screen, (10, 50, 10),
-                                         pygame.Rect(px, py, ts, ts))
-                    else:
-                        # Mini grass floor
-                        pygame.draw.rect(self.screen, (15, 60, 15),
-                                         pygame.Rect(px, py, ts, ts))
-                else:
-                    if wall:
-                        # Mini brick wall
-                        pygame.draw.rect(self.screen, self._U3_BRICK2,
-                                         pygame.Rect(px, py, ts, ts))
-                        if ts >= 8:
-                            by = py + 1
-                            pygame.draw.rect(
-                                self.screen, self._U3_BRICK1,
-                                pygame.Rect(px + 1, by, ts - 2, ts // 2 - 1))
-                    else:
-                        # Mini dungeon floor
-                        pygame.draw.rect(self.screen, self._U3_BLACK,
-                                         pygame.Rect(px, py, ts, ts))
-                        seed = (c * 31 + r * 17)
-                        if seed % 7 < 2:
-                            dx = (seed * 7) % max(1, ts - 4) + 2
-                            ddy = (seed * 13) % max(1, ts - 4) + 2
-                            pygame.draw.rect(
-                                self.screen, self._U3_DKGRN,
-                                pygame.Rect(px + dx, py + ddy, 1, 1))
-
-        # Draw painted sprites on the grid
-        for (pc, pr), gfx in painted.items():
-            if gfx:
-                sprite = self._get_unique_tile_sprite(gfx, ts)
-                if sprite:
-                    self.screen.blit(sprite,
-                                     (gx + pc * ts, gy + pr * ts))
-
-        # Draw obstacles on the grid
-        for (oc, orow), obs_type in obstacles.items():
-            ox = gx + oc * ts
-            oy = gy + orow * ts
-            self._draw_battle_mini_obstacle(ox, oy, ts, obs_type)
-
-        # Draw cursor highlight
-        blink = int(time.time() * 4) % 2 == 0
-        if mode == "obstacle":
-            cur_color = (255, 150, 50) if blink else (180, 100, 30)
-        else:
-            cur_color = (100, 200, 255) if blink else (50, 130, 180)
-        cur_rect = pygame.Rect(gx + cursor_col * ts,
-                               gy + cursor_row * ts, ts, ts)
-        pygame.draw.rect(self.screen, cur_color, cur_rect, 2)
-
-        dy = gy + grid_h + 6
-
-        # ── Mode indicator ──
-        obs_color = (255, 150, 50) if mode == "obstacle" \
-            else (160, 160, 180)
-        tile_color = (100, 200, 255) if mode == "tile" \
-            else (160, 160, 180)
-        self._u3_text("Obstacles", rx + 10, dy, obs_color, fm)
-        obs_w = fm.size("Obstacles")[0]
-        self._u3_text("  /  ", rx + 10 + obs_w, dy, (160, 160, 180), fm)
-        slash_w = fm.size("  /  ")[0]
-        self._u3_text("Tiles", rx + 10 + obs_w + slash_w, dy,
-                       tile_color, fm)
-        dy += 22
-
-        # ── Current brush with graphic preview ──
-        if brush is not None:
-            if mode == "obstacle":
-                brush_name = brush.title()
-            else:
-                brush_name = self._brush_friendly_name(brush)
-            arrow_color = (100, 180, 255)
-            preview_size = 20
-            # Draw brush graphic preview
-            preview_x = rx + 12
-            preview_y = dy
-            if brush == "eraser":
-                # Draw an X for eraser
-                ex = preview_x + preview_size // 2
-                ey = preview_y + preview_size // 2
-                r2 = preview_size // 2 - 2
-                pygame.draw.line(self.screen, (200, 80, 80),
-                                 (ex - r2, ey - r2),
-                                 (ex + r2, ey + r2), 2)
-                pygame.draw.line(self.screen, (200, 80, 80),
-                                 (ex + r2, ey - r2),
-                                 (ex - r2, ey + r2), 2)
-            elif mode == "obstacle":
-                # Draw mini obstacle graphic
-                self._draw_battle_mini_obstacle(
-                    preview_x, preview_y, preview_size, brush)
-            else:
-                # Draw tile sprite preview
-                sprite = self._get_unique_tile_sprite(brush, preview_size)
-                if sprite:
-                    self.screen.blit(sprite, (preview_x, preview_y))
-            # Brush name with arrows
-            text_x = preview_x + preview_size + 8
-            text_y = preview_y + 2
-            self._u3_text("<", text_x, text_y, arrow_color, fm)
-            aw = fm.size("< ")[0]
-            self._u3_text(brush_name, text_x + aw, text_y,
-                          (255, 255, 200), fm)
-            nw = fm.size(brush_name)[0]
-            self._u3_text(">", text_x + aw + nw + 4, text_y,
-                          arrow_color, fm)
-            dy += max(preview_size + 4, 22)
-
-        # ── Style & music summary ──
-        self._u3_text(f"Style: {style.title()}", rx + 10, dy,
-                       (180, 180, 200), fm)
-        dy += 18
-        self._u3_text(f"Music: {music}", rx + 10, dy,
-                       (180, 180, 200), fm)
-        dy += 18
-
-        # ── Footer hints ──
-        hint_y = ry + rh - 40
-        action = "Place" if mode == "obstacle" else "Paint"
-        self._u3_text(f"[Arrows] Move  [Enter] {action}",
-                       rx + 8, hint_y, self._U3_HINT, fs)
-        self._u3_text("[Tab] Cycle  [I] Mode  [O] Settings",
-                       rx + 8, hint_y + 16, self._U3_HINT, fs)
-
     def _draw_battle_settings_page(self, rx, dy, rw, rh,
                                     style, music, cursor):
         """Draw the settings sub-page for the battle screen editor."""
@@ -7299,6 +6947,169 @@ class Renderer(CombatEffectRendererMixin):
                           SCREEN_HEIGHT - 28,
                           cr_color, self.font_small)
 
+    # ── Map Editor hub screen ─────────────────────────────────────
+
+    def draw_map_editor_hub(self, data):
+        """Draw the top-level Map Editor hub screen.
+
+        A simple section browser with folder navigation and field editing.
+        """
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        self.screen.fill((10, 8, 20))
+
+        sections = data["sections"]
+        cursor = data["cursor"]
+        scroll = data.get("scroll", 0)
+        nav_depth = data.get("nav_depth", 0)
+        folder_label = data.get("folder_label", "")
+        level = data.get("level", 0)
+
+        # ── Header ──
+        header_h = 50
+        pygame.draw.rect(self.screen, (20, 16, 30),
+                         (0, 0, SCREEN_WIDTH, header_h))
+        pygame.draw.line(self.screen, (80, 60, 40),
+                         (0, header_h - 1),
+                         (SCREEN_WIDTH, header_h - 1), 1)
+
+        if nav_depth > 0 and folder_label:
+            self._u3_text("MAP EDITOR", 16, 6,
+                          (120, 100, 80), fs)
+            self._u3_text(folder_label.upper(), 16, 22,
+                          self._U3_ORANGE, fm)
+        else:
+            self._u3_text("MAP EDITOR", 16, 14,
+                          self._U3_ORANGE, fm)
+
+        # ── Field editing mode ──
+        if level == 1:
+            self._draw_meh_fields(data, header_h)
+            return
+
+        # ── Section list ──
+        n = len(sections)
+        row_h = 48
+        list_x = 40
+        list_y0 = header_h + 20
+        max_vis = (SCREEN_HEIGHT - header_h - 60) // row_h
+
+        if n == 0:
+            self._u3_text("No map templates yet.",
+                          SCREEN_WIDTH // 2 - 80,
+                          SCREEN_HEIGHT // 2 - 10,
+                          (140, 140, 160), fs)
+        else:
+            sc = max(0, cursor - max_vis + 1)
+            for i in range(sc, min(sc + max_vis, n)):
+                y = list_y0 + (i - sc) * row_h
+                sec = sections[i]
+                is_sel = (i == cursor)
+
+                if is_sel:
+                    bar = pygame.Surface(
+                        (SCREEN_WIDTH - 80, row_h - 4), pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 40))
+                    self.screen.blit(bar, (list_x, y))
+                    pygame.draw.rect(self.screen, (200, 160, 60),
+                                     (list_x, y,
+                                      SCREEN_WIDTH - 80, row_h - 4), 1)
+
+                label = sec.get("label", "?")
+                subtitle = sec.get("subtitle", "")
+                is_folder = bool(sec.get("folder"))
+
+                # Label
+                nc = (255, 255, 100) if is_sel else (200, 200, 220)
+                prefix = "> " if is_sel else "  "
+                self._u3_text(f"{prefix}{label}",
+                              list_x + 12, y + 4, nc, fm)
+
+                # Subtitle
+                if subtitle:
+                    self._u3_text(subtitle, list_x + 30, y + 24,
+                                  (120, 120, 140), fs)
+
+                # Folder arrow
+                if is_folder and is_sel:
+                    self._u3_text("\u25B6", SCREEN_WIDTH - 100, y + 8,
+                                  (200, 160, 60), f)
+
+        # ── Footer ──
+        footer_y = SCREEN_HEIGHT - 36
+        if nav_depth > 0:
+            hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
+        else:
+            hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
+        hw = fs.size(hint)[0]
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - hw // 2,
+                      footer_y,
+                      self._U3_HINT, fs)
+
+    def _draw_meh_fields(self, data, header_h):
+        """Draw the field editor for the Map Editor hub."""
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+        fm = self.font_med
+        fs = self.font_small
+
+        fields = data.get("fields", [])
+        fi = data.get("field_cursor", 0)
+        buf = data.get("field_buffer", "")
+        n = len(fields)
+
+        row_h = 36
+        field_x = 60
+        field_y0 = header_h + 20
+
+        for i in range(n):
+            y = field_y0 + i * row_h
+            if y + row_h > SCREEN_HEIGHT - 50:
+                break
+
+            label = fields[i][0]
+            value = fields[i][2]
+            ftype = fields[i][3] if len(fields[i]) > 3 else "text"
+            editable = fields[i][4] if len(fields[i]) > 4 else True
+            is_sel = (i == fi)
+
+            if ftype == "section":
+                # Section header (not editable)
+                self._u3_text(label, field_x, y + 8,
+                              (120, 120, 160), fm)
+                continue
+
+            # Label
+            lc = (200, 200, 220) if editable else (100, 100, 120)
+            self._u3_text(label, field_x, y + 2, lc, fs)
+
+            # Value
+            val_x = field_x + 200
+            if is_sel and editable:
+                # Editing indicator
+                display = buf + "_"
+                self._u3_text(display, val_x, y + 2,
+                              (255, 200, 60), fm)
+                pygame.draw.rect(self.screen, (200, 160, 60),
+                                 (field_x - 4, y - 2,
+                                  SCREEN_WIDTH - field_x - 56,
+                                  row_h - 4), 1)
+            else:
+                vc = (180, 180, 200) if editable else (80, 80, 100)
+                self._u3_text(str(value), val_x, y + 2, vc, fs)
+
+        # Footer
+        footer_y = SCREEN_HEIGHT - 36
+        hint = "[Up/Dn] Navigate  [Type] Edit  [Enter] Save  [Esc] Back"
+        hw = fs.size(hint)[0]
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - hw // 2,
+                      footer_y,
+                      self._U3_HINT, fs)
+
     # ── Game Features editor screen ──────────────────────────────
 
     def draw_features_screen(self, categories, cat_cursor, level,
@@ -7350,49 +7161,18 @@ class Renderer(CombatEffectRendererMixin):
                               pxedit_replace_src_color=(0, 0, 0, 255),
                               pxedit_replace_dst=0,
                               pxedit_replace_sel="src",
-                              rfeat_folders=None,
-                              rfeat_folder_cursor=0,
-                              rfeat_folder_scroll=0,
-                              rfeat_list=None,
-                              rfeat_cursor=0,
-                              rfeat_scroll=0,
-                              rfeat_editing=False,
-                              rfeat_cx=0,
-                              rfeat_cy=0,
-                              rfeat_brush_idx=0,
-                              rfeat_brushes=None,
-                              rfeat_naming=False,
-                              rfeat_name_buf="",
-                              rfeat_current_ctx="town",
-                              townlayout_list=None,
-                              townlayout_cursor=0,
-                              townlayout_scroll=0,
-                              townlayout_editing=False,
-                              townlayout_cx=0,
-                              townlayout_cy=0,
-                              townlayout_brush_idx=0,
-                              townlayout_brushes=None,
-                              townlayout_naming=False,
-                              townlayout_name_buf="",
-                              town_node_cursor=0,
-                              town_detail_editing=False,
-                              town_desc_buf="",
-                              town_active_sub=None,
-                              town_selected_idx=0,
-                              townlayout_replacing=False,
-                              townlayout_replace_src_tile=None,
-                              townlayout_replace_src_name="",
-                              townlayout_replace_src_empty=False,
-                              townlayout_replace_dst_idx=0,
-                              interior_picking=False,
-                              interior_pick_cursor=0,
-                              interior_pick_scroll=0,
-                              interior_list=None,
-                              interior_pick_sub="layouts",
-                              town_picker_active=False,
-                              town_picker_cursor=0,
-                              town_picker_layouts=None,
-                              town_picker_mode="new"):
+                              meh_editor_active=False,
+                              meh_editor_data=None,
+                              meh_sections=None,
+                              meh_cursor=0,
+                              meh_scroll=0,
+                              meh_nav_depth=0,
+                              meh_folder_label="",
+                              meh_level=0,
+                              meh_fields=None,
+                              meh_field_cursor=0,
+                              meh_field_buffer="",
+                              meh_field_scroll=0):
         """Draw the Game Features editor screen."""
         self.screen.fill((0, 0, 0))
         fm = self.font_med
@@ -7400,7 +7180,7 @@ class Renderer(CombatEffectRendererMixin):
         fs = self.font_small
 
         # ── Header ──
-        self._u3_text("Edit Game Features", SCREEN_WIDTH // 2 - 80,
+        self._u3_text("Edit Game", SCREEN_WIDTH // 2 - 80,
                        20, self._U3_ORANGE, f)
         pygame.draw.line(self.screen, (80, 60, 40),
                          (80, 50), (SCREEN_WIDTH - 80, 50), 1)
@@ -7527,20 +7307,6 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text(line, right_x + 16, dy,
                                   (180, 180, 200), fm)
                     dy += 22
-            elif selected_cat == "Reusable Features":
-                self._u3_text("Reusable Features", right_x + 16,
-                              panel_y + 12, self._U3_WHITE, f)
-                dy = panel_y + 44
-                for line in [
-                    "Create reusable tile patterns",
-                    "that can be stamped into town",
-                    "and dungeon layouts. Build shops,",
-                    "rooms, and landmarks once, then",
-                    "reuse them across your maps.",
-                ]:
-                    self._u3_text(line, right_x + 16, dy,
-                                  (180, 180, 200), fm)
-                    dy += 22
             elif selected_cat == "Tile Gallery":
                 self._u3_text("Tile Gallery", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
@@ -7555,8 +7321,21 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text(line, right_x + 16, dy,
                                   (180, 180, 200), fm)
                     dy += 22
+            elif selected_cat == "Map Editor":
+                self._u3_text("Map Editor", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Create and manage map templates",
+                    "for all game contexts: overworld,",
+                    "dungeons, examine screens,",
+                    "enclosures, and battle arenas.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
             else:
-                self._u3_text("Game Features", right_x + 16,
+                self._u3_text("Edit Game", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
                 dy = panel_y + 44
                 self._u3_text(
@@ -7666,435 +7445,25 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_naming=gallery_naming,
                         gallery_name_buf=gallery_name_buf,
                         gallery_detail_cursor=gallery_detail_cursor)
-            elif ed == "features":
-                self._draw_rfeat_editor(
-                    left_x, left_w, right_x, right_w, panel_y, panel_h,
-                    level, rfeat_folders or [], rfeat_folder_cursor,
-                    rfeat_folder_scroll, rfeat_list or [], rfeat_cursor,
-                    rfeat_scroll, rfeat_editing, rfeat_cx, rfeat_cy,
-                    rfeat_brush_idx, rfeat_brushes or [],
-                    rfeat_naming, rfeat_name_buf, rfeat_current_ctx,
-                    fm, fs, f)
-
-            elif ed == "townlayouts" and not townlayout_editing and town_active_sub is None:
-                # ── Town list view (list of all town layouts) ──
-                self._u3_text("Town Layouts", left_x + 12, panel_y + 8,
-                               self._U3_ORANGE, fs)
-                row_h = 40
-                ly = panel_y + 30
-                max_visible = (panel_h - 40) // row_h
-                tl_list = townlayout_list or []
-                tl_scroll = townlayout_scroll
-                for i in range(tl_scroll, min(tl_scroll + max_visible, len(tl_list))):
-                    draw_i = i - tl_scroll
-                    dy = ly + draw_i * row_h
-                    selected = (i == townlayout_cursor)
-                    if selected:
-                        bar = pygame.Surface((left_w - 4, row_h - 2),
-                                             pygame.SRCALPHA)
-                        bar.fill((255, 200, 60, 30))
-                        self.screen.blit(bar, (left_x + 2, dy))
-                    prefix = "> " if selected else "  "
-                    name = tl_list[i].get("name", "Unnamed")
-                    nc = self._U3_WHITE if selected else (180, 180, 180)
-                    self._u3_text(f"{prefix}{name}", left_x + 14, dy + 4, nc, fm)
-                    w = tl_list[i].get("width", 18)
-                    h = tl_list[i].get("height", 19)
-                    sc = (140, 180, 140) if selected else (120, 120, 140)
-                    self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
-
-                # Right panel: preview of selected town
-                if 0 <= townlayout_cursor < len(tl_list):
-                    layout = tl_list[townlayout_cursor]
-                    self._draw_townlayout_preview(
-                        right_x + 12, panel_y + 12,
-                        right_w - 24, panel_h - 24,
-                        layout, -1, -1, -1, None)
-
-                # ── Naming overlay ──
-                if townlayout_naming:
-                    nm_x = left_x + 10
-                    nm_y = panel_y + panel_h // 2 - 30
-                    nm_w = left_w - 20
-                    nm_h = 50
-                    overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
-                    overlay.fill((20, 18, 30, 200))
-                    self.screen.blit(overlay, (left_x, panel_y))
-                    self._u3_text("Rename:", nm_x + 4, nm_y - 18,
-                                  self._U3_ORANGE, fs)
-                    pygame.draw.rect(self.screen, (60, 55, 80),
-                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h))
-                    pygame.draw.rect(self.screen, (200, 180, 80),
-                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
-                    display_text = townlayout_name_buf
-                    elapsed = pygame.time.get_ticks() / 1000.0
-                    if int(elapsed * 2) % 2 == 0:
-                        display_text += "|"
-                    self._u3_text(display_text, nm_x + 8, nm_y + 14,
-                                  self._U3_WHITE, fm)
-                    self._u3_text("[Enter] Confirm  [Esc] Cancel",
-                                  nm_x + 4, nm_y + nm_h + 6,
-                                  self._U3_HINT, fs)
+            elif ed == "mapeditor":
+                if meh_editor_active and meh_editor_data:
+                    # Fullscreen map editor (launched from a template)
+                    self._draw_map_editor_fullscreen(meh_editor_data)
                 else:
-                    footer = (
-                        "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] Add  "
-                        "[Ctrl+D] Delete  [N] Rename  [Esc] Back")
-                    self._u3_text(
-                        footer,
-                        SCREEN_WIDTH // 2 - 240, SCREEN_HEIGHT - 45,
-                        self._U3_HINT, fs)
-
-            elif ed == "townlayouts" and not townlayout_editing and town_active_sub is not None:
-                # ── Context-dependent rendering based on active_sub ──
-
-                if town_active_sub == "nodes":
-                    # ── Node selection view (3 nodes) ──
-                    self._u3_text("Town Details", left_x + 12, panel_y + 8,
-                                   self._U3_ORANGE, fs)
-                    # Get selected town name
-                    tl_list = townlayout_list or []
-                    town_name = (tl_list[townlayout_cursor]["name"]
-                                if 0 <= townlayout_cursor < len(tl_list)
-                                else "Unknown")
-                    self._u3_text(f"({town_name})", left_x + 12, panel_y + 26,
-                                   (180, 180, 180), fs)
-
-                    # 3 nodes
-                    nodes = [
-                        {"name": "Town Details", "icon": "D"},
-                        {"name": "Town Interiors", "icon": "I"},
-                        {"name": "Town Layout", "icon": "L"},
-                    ]
-                    node_y = panel_y + 60
-                    node_h = 50
-                    for i, node in enumerate(nodes):
-                        dy = node_y + i * node_h
-                        selected = (i == town_node_cursor)
-                        if selected:
-                            bar = pygame.Surface((left_w - 4, node_h - 4),
-                                                 pygame.SRCALPHA)
-                            bar.fill((255, 200, 60, 30))
-                            self.screen.blit(bar, (left_x + 2, dy))
-                        prefix = "> " if selected else "  "
-                        icon = node["icon"]
-                        name = node["name"]
-                        nc = self._U3_WHITE if selected else (180, 180, 180)
-                        self._u3_text(f"{prefix}{name}",
-                                      left_x + 14, dy + 12, nc, fm)
-
-                    # Right panel: preview
-                    if 0 <= townlayout_cursor < len(tl_list):
-                        layout = tl_list[townlayout_cursor]
-                        self._draw_townlayout_preview(
-                            right_x + 12, panel_y + 12,
-                            right_w - 24, panel_h - 24,
-                            layout, -1, -1, -1, None)
-
-                    footer = "[Up/Dn] Select Node  [Enter] Open  [Esc] Back"
-                    self._u3_text(footer,
-                                  SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 45,
-                                  self._U3_HINT, fs)
-
-                elif town_active_sub == "details":
-                    # ── Town details editing view ──
-                    self._u3_text("Town Details", left_x + 12, panel_y + 8,
-                                   self._U3_ORANGE, fs)
-                    tl_list = townlayout_list or []
-                    if 0 <= townlayout_cursor < len(tl_list):
-                        town = tl_list[townlayout_cursor]
-                        town_name = town.get("name", "")
-                        town_desc = town.get("description", "")
-
-                        # Display name and description
-                        self._u3_text("Name:", left_x + 14, panel_y + 40,
-                                      (180, 180, 200), fs)
-                        self._u3_text(town_name, left_x + 80, panel_y + 40,
-                                      self._U3_WHITE, fm)
-
-                        self._u3_text("Description:", left_x + 14, panel_y + 70,
-                                      (180, 180, 200), fs)
-                        # Draw description text with wrapping
-                        desc_lines = self._wrap_text(town_desc, fs, left_w - 40)
-                        desc_y = panel_y + 90
-                        for line in desc_lines[:5]:  # Show up to 5 lines
-                            self._u3_text(line, left_x + 14, desc_y,
-                                          (160, 160, 180), fs)
-                            desc_y += 18
-
-                        # ── Description editing overlay ──
-                        if town_detail_editing:
-                            nm_x = left_x + 10
-                            nm_y = panel_y + panel_h // 2 - 50
-                            nm_w = left_w - 20
-                            nm_h = 80
-                            overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
-                            overlay.fill((20, 18, 30, 200))
-                            self.screen.blit(overlay, (left_x, panel_y))
-                            self._u3_text("Edit Description:", nm_x + 4, nm_y - 18,
-                                          self._U3_ORANGE, fs)
-                            pygame.draw.rect(self.screen, (60, 55, 80),
-                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h))
-                            pygame.draw.rect(self.screen, (200, 180, 80),
-                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
-                            display_text = town_desc_buf
-                            elapsed = pygame.time.get_ticks() / 1000.0
-                            if int(elapsed * 2) % 2 == 0:
-                                display_text += "|"
-                            self._u3_text(display_text, nm_x + 8, nm_y + 14,
-                                          self._U3_WHITE, fm)
-                            self._u3_text("[Enter] Confirm  [Esc] Cancel",
-                                          nm_x + 4, nm_y + nm_h + 6,
-                                          self._U3_HINT, fs)
-                        elif townlayout_naming:
-                            nm_x = left_x + 10
-                            nm_y = panel_y + panel_h // 2 - 30
-                            nm_w = left_w - 20
-                            nm_h = 50
-                            overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
-                            overlay.fill((20, 18, 30, 200))
-                            self.screen.blit(overlay, (left_x, panel_y))
-                            self._u3_text("Rename:", nm_x + 4, nm_y - 18,
-                                          self._U3_ORANGE, fs)
-                            pygame.draw.rect(self.screen, (60, 55, 80),
-                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h))
-                            pygame.draw.rect(self.screen, (200, 180, 80),
-                                             pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
-                            display_text = townlayout_name_buf
-                            elapsed = pygame.time.get_ticks() / 1000.0
-                            if int(elapsed * 2) % 2 == 0:
-                                display_text += "|"
-                            self._u3_text(display_text, nm_x + 8, nm_y + 14,
-                                          self._U3_WHITE, fm)
-                            self._u3_text("[Enter] Confirm  [Esc] Cancel",
-                                          nm_x + 4, nm_y + nm_h + 6,
-                                          self._U3_HINT, fs)
-                        else:
-                            footer = "[N] Edit Name  [D] Edit Description  [Esc] Back"
-                            self._u3_text(footer,
-                                          SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
-                                          self._U3_HINT, fs)
-
-                elif town_active_sub == "interiors":
-                    # ── Interior list view (filtered by parent_town) ──
-                    self._u3_text("Town Interiors", left_x + 12, panel_y + 8,
-                                   self._U3_ORANGE, fs)
-                    row_h = 40
-                    ly = panel_y + 30
-                    max_visible = (panel_h - 40) // row_h
-                    tl_list = townlayout_list or []
-                    tl_scroll = townlayout_scroll
-                    for i in range(tl_scroll, min(tl_scroll + max_visible, len(tl_list))):
-                        draw_i = i - tl_scroll
-                        dy = ly + draw_i * row_h
-                        selected = (i == townlayout_cursor)
-                        if selected:
-                            bar = pygame.Surface((left_w - 4, row_h - 2),
-                                                 pygame.SRCALPHA)
-                            bar.fill((255, 200, 60, 30))
-                            self.screen.blit(bar, (left_x + 2, dy))
-                        prefix = "> " if selected else "  "
-                        name = tl_list[i].get("name", "Unnamed")
-                        nc = self._U3_WHITE if selected else (180, 180, 180)
-                        self._u3_text(f"{prefix}{name}", left_x + 14, dy + 4, nc, fm)
-                        w = tl_list[i].get("width", 18)
-                        h = tl_list[i].get("height", 19)
-                        sc = (140, 180, 140) if selected else (120, 120, 140)
-                        self._u3_text(f"{w}x{h}", left_x + 30, dy + 22, sc, fs)
-
-                    # Right panel: preview of selected interior
-                    if 0 <= townlayout_cursor < len(tl_list):
-                        layout = tl_list[townlayout_cursor]
-                        self._draw_townlayout_preview(
-                            right_x + 12, panel_y + 12,
-                            right_w - 24, panel_h - 24,
-                            layout, -1, -1, -1, None)
-
-                    # ── Naming overlay ──
-                    if townlayout_naming:
-                        nm_x = left_x + 10
-                        nm_y = panel_y + panel_h // 2 - 30
-                        nm_w = left_w - 20
-                        nm_h = 50
-                        overlay = pygame.Surface((left_w, panel_h), pygame.SRCALPHA)
-                        overlay.fill((20, 18, 30, 200))
-                        self.screen.blit(overlay, (left_x, panel_y))
-                        self._u3_text("Rename:", nm_x + 4, nm_y - 18,
-                                      self._U3_ORANGE, fs)
-                        pygame.draw.rect(self.screen, (60, 55, 80),
-                                         pygame.Rect(nm_x, nm_y, nm_w, nm_h))
-                        pygame.draw.rect(self.screen, (200, 180, 80),
-                                         pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
-                        display_text = townlayout_name_buf
-                        elapsed = pygame.time.get_ticks() / 1000.0
-                        if int(elapsed * 2) % 2 == 0:
-                            display_text += "|"
-                        self._u3_text(display_text, nm_x + 8, nm_y + 14,
-                                      self._U3_WHITE, fm)
-                        self._u3_text("[Enter] Confirm  [Esc] Cancel",
-                                      nm_x + 4, nm_y + nm_h + 6,
-                                      self._U3_HINT, fs)
-                    # ── Town picker overlay (for copying interior) ──
-                    elif town_picker_active and town_picker_layouts:
-                        self._draw_town_picker_overlay(
-                            left_x, panel_y, left_w, panel_h,
-                            town_picker_layouts, town_picker_cursor,
-                            town_picker_mode)
-                    else:
-                        footer = (
-                            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
-                            "[C] Copy  [Ctrl+D] Delete  [N] Rename  [Esc] Back")
-                        self._u3_text(
-                            footer,
-                            SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT - 45,
-                            self._U3_HINT, fs)
-
-            elif ed == "townlayouts" and townlayout_editing:
-                # ── Town Layout grid painter ──
-                tl_list = townlayout_list or []
-                if 0 <= townlayout_cursor < len(tl_list):
-                    layout = tl_list[townlayout_cursor]
-                    brushes = townlayout_brushes or []
-                    brush_name = (brushes[townlayout_brush_idx]["name"]
-                                  if brushes and townlayout_brush_idx < len(brushes)
-                                  else "?")
-
-                    # ── Left panel: brush palette ──
-                    self._u3_text(f"Editing: {layout.get('name', '?')}",
-                                  left_x + 12, panel_y + 8,
-                                  self._U3_ORANGE, fm)
-                    self._u3_text("BRUSH PALETTE", left_x + 12,
-                                  panel_y + 30, (120, 120, 160), fs)
-                    brush_row_h = 32
-                    brush_y0 = panel_y + 48
-                    max_brush_vis = (panel_h - 100) // brush_row_h
-                    # Scroll so selected brush is visible
-                    b_scroll = max(0, townlayout_brush_idx - max_brush_vis + 1)
-                    for bi in range(b_scroll,
-                                    min(b_scroll + max_brush_vis,
-                                        len(brushes))):
-                        by = brush_y0 + (bi - b_scroll) * brush_row_h
-                        b = brushes[bi]
-                        is_sel = (bi == townlayout_brush_idx)
-                        if is_sel:
-                            bar = pygame.Surface(
-                                (left_w - 8, brush_row_h - 2),
-                                pygame.SRCALPHA)
-                            bar.fill((255, 200, 60, 40))
-                            self.screen.blit(bar, (left_x + 4, by))
-                            pygame.draw.rect(
-                                self.screen, (200, 160, 60),
-                                (left_x + 4, by,
-                                 left_w - 8, brush_row_h - 2), 1)
-                        # Sprite preview (24px)
-                        icon_x = left_x + 12
-                        text_x = icon_x + 4
-                        b_path = b.get("path")
-                        if b_path:
-                            spr = self._get_unique_tile_sprite(
-                                b_path, 22)
-                            if spr:
-                                self.screen.blit(
-                                    spr, (icon_x, by + 4))
-                                text_x = icon_x + 28
-                        elif b.get("feature") is not None:
-                            # Composite feature — draw mini grid icon
-                            feat = b["feature"]
-                            fw = feat.get("width", 8)
-                            fh = feat.get("height", 8)
-                            ft = feat.get("tiles", {})
-                            mini_ts = max(1, min(22 // max(fw, fh), 4))
-                            mw = fw * mini_ts
-                            mh = fh * mini_ts
-                            mx = icon_x + (22 - mw) // 2
-                            my = by + 4 + (22 - mh) // 2
-                            pygame.draw.rect(
-                                self.screen, (35, 35, 45),
-                                pygame.Rect(mx - 1, my - 1, mw + 2, mh + 2))
-                            for fk in ft:
-                                pts = fk.split(",")
-                                fc, fr = int(pts[0]), int(pts[1])
-                                pygame.draw.rect(
-                                    self.screen, (100, 200, 160),
-                                    pygame.Rect(mx + fc * mini_ts,
-                                                my + fr * mini_ts,
-                                                mini_ts, mini_ts))
-                            pygame.draw.rect(
-                                self.screen, (80, 180, 140),
-                                pygame.Rect(mx - 1, my - 1, mw + 2, mh + 2), 1)
-                            text_x = icon_x + 28
-                        elif b.get("tile_id") is not None:
-                            # Colored square for tiles without sprites
-                            from src.settings import TILE_DEFS as _TD
-                            _tdef = _TD.get(b["tile_id"], {})
-                            tc = _tdef.get("color", (80, 80, 80))
-                            pygame.draw.rect(
-                                self.screen, tc,
-                                pygame.Rect(icon_x, by + 4, 22, 22))
-                            pygame.draw.rect(
-                                self.screen, (60, 50, 40),
-                                pygame.Rect(icon_x, by + 4, 22, 22), 1)
-                            text_x = icon_x + 28
-                        nc = ((255, 255, 100) if is_sel
-                              else (180, 180, 200))
-                        self._u3_text(b["name"], text_x, by + 6,
-                                      nc, fs)
-
-                    # Hint at bottom of left panel
-                    self._u3_text("[Tab] Next Brush",
-                                  left_x + 12,
-                                  panel_y + panel_h - 40,
-                                  (140, 140, 160), fs)
-                    self._u3_text("[Shift+Tab] Prev",
-                                  left_x + 12,
-                                  panel_y + panel_h - 24,
-                                  (140, 140, 160), fs)
-
-                    # ── Right panel: grid ──
-                    self._draw_townlayout_preview(
-                        right_x + 8, panel_y + 8,
-                        right_w - 16, panel_h - 16,
-                        layout, townlayout_cx, townlayout_cy,
-                        townlayout_brush_idx, brushes)
-
-                    # ── Interior picker overlay ──
-                    if interior_picking:
-                        self._draw_interior_picker(
-                            right_x + 8, panel_y + 8,
-                            right_w - 16, panel_h - 16,
-                            interior_list or [],
-                            interior_pick_cursor,
-                            interior_pick_scroll,
-                            interior_pick_sub)
-
-                    # ── Tile replace overlay ──
-                    if townlayout_replacing and brushes:
-                        self._draw_townlayout_replace_overlay(
-                            right_x + 8, panel_y + 8,
-                            right_w - 16, panel_h - 16,
-                            brushes,
-                            townlayout_replace_src_tile,
-                            townlayout_replace_src_name,
-                            townlayout_replace_src_empty,
-                            townlayout_replace_dst_idx)
-
-                    # Footer — context-sensitive hint
-                    if townlayout_replacing:
-                        footer_txt = (
-                            "[Up/Down] Select Destination  "
-                            "[Enter] Replace All  [Esc] Cancel")
-                    elif town_active_sub == "interiors":
-                        footer_txt = (
-                            "[Arrows/WASD] Move  [Enter] Paint  "
-                            "[I] Back to Town  [R] Replace  [Tab] Brush  [Esc] Back")
-                    else:
-                        footer_txt = (
-                            "[Arrows/WASD] Move  [Enter] Paint  "
-                            "[I] Link Interior  [R] Replace  [Tab] Brush  [Esc] Back")
-                    self._u3_text(
-                        footer_txt,
-                        SCREEN_WIDTH // 2 - 240,
-                        SCREEN_HEIGHT - 45,
-                        self._U3_HINT, fs)
+                    # Hub browser
+                    hub_data = {
+                        "sections": meh_sections or [],
+                        "cursor": meh_cursor,
+                        "scroll": meh_scroll,
+                        "nav_depth": meh_nav_depth,
+                        "folder_label": meh_folder_label,
+                        "level": meh_level,
+                        "fields": meh_fields or [],
+                        "field_cursor": meh_field_cursor,
+                        "field_buffer": meh_field_buffer,
+                        "field_scroll": meh_field_scroll,
+                    }
+                    self.draw_map_editor_hub(hub_data)
 
     def _draw_features_spell_nav(self, left_x, left_w, right_x,
                                   right_w, panel_y, panel_h,
@@ -9322,326 +8691,6 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(hint, SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - 30, self._U3_HINT, fs)
 
-    def _draw_townlayout_preview(self, rx, ry, rw, rh,
-                                  layout, cx, cy, brush_idx, brushes):
-        """Draw a town layout grid preview/editor.
-
-        Parameters
-        ----------
-        rx, ry, rw, rh : bounding rectangle
-        layout : dict with width, height, tiles
-        cx, cy : cursor position (-1 = no cursor)
-        brush_idx : current brush index (-1 = no brush indicator)
-        brushes : list of brush dicts
-        """
-        tw = layout.get("width", 18)
-        th = layout.get("height", 19)
-        # Calculate tile size to fit
-        ts = min(rw // tw, rh // th, 24)
-        grid_w = tw * ts
-        grid_h = th * ts
-        gx = rx + (rw - grid_w) // 2
-        gy = ry
-
-        # Town tile colors — pull from TILE_DEFS for full coverage
-        from src.settings import TILE_DEFS
-        TILE_COLORS = {tid: tdef.get("color", (80, 80, 80))
-                       for tid, tdef in TILE_DEFS.items()}
-
-        tiles = layout.get("tiles", {})
-
-        for r in range(th):
-            for c in range(tw):
-                px = gx + c * ts
-                py = gy + r * ts
-                pos_key = f"{c},{r}"
-                is_edge = (c == 0 or c == tw - 1 or r == 0 or r == th - 1)
-
-                if pos_key in tiles:
-                    td = tiles[pos_key]
-                    tid = td.get("tile_id")
-                    # Try to load a sprite if path is set
-                    path = td.get("path")
-                    drawn = False
-                    if path:
-                        sprite = self._get_unique_tile_sprite(path, ts)
-                        if sprite:
-                            self.screen.blit(sprite, (px, py))
-                            drawn = True
-                    if not drawn:
-                        col = TILE_COLORS.get(tid, (80, 80, 80))
-                        pygame.draw.rect(self.screen, col,
-                                         pygame.Rect(px, py, ts, ts))
-                else:
-                    # Transparent checkerboard pattern
-                    half = max(ts // 2, 1)
-                    for qr in range(2):
-                        for qc in range(2):
-                            qx = px + qc * half
-                            qy = py + qr * half
-                            if (qr + qc) % 2 == 0:
-                                qcol = (45, 45, 45)
-                            else:
-                                qcol = (30, 30, 30)
-                            pygame.draw.rect(self.screen, qcol,
-                                             pygame.Rect(qx, qy, half, half))
-
-                # Grid lines
-                pygame.draw.rect(self.screen, (40, 35, 30),
-                                 pygame.Rect(px, py, ts, ts), 1)
-
-                # Interior-link / to_town indicator
-                if pos_key in tiles:
-                    td = tiles[pos_key]
-                    badge_char = None
-                    badge_border = None
-                    badge_bg = None
-                    if td.get("to_town"):
-                        # Green border + "T" badge for exit-to-town
-                        badge_border = (60, 220, 80)
-                        badge_bg = (0, 160, 40)
-                        badge_char = "T"
-                    elif td.get("to_overworld"):
-                        # Orange border + "O" badge for return-to-overworld
-                        badge_border = (255, 180, 60)
-                        badge_bg = (200, 120, 0)
-                        badge_char = "O"
-                    elif td.get("interior"):
-                        # Cyan border + "I" badge for interior link
-                        badge_border = (80, 220, 255)
-                        badge_bg = (0, 140, 200)
-                        badge_char = "I"
-                    if badge_char:
-                        pygame.draw.rect(self.screen, badge_border,
-                                         pygame.Rect(px, py, ts, ts), 2)
-                        badge_sz = max(ts // 3, 6)
-                        bx = px + ts - badge_sz - 1
-                        by_ = py + 1
-                        pygame.draw.rect(self.screen, badge_bg,
-                                         pygame.Rect(bx, by_, badge_sz, badge_sz))
-                        if badge_sz >= 8:
-                            tiny = self.font_tiny if hasattr(self, 'font_tiny') else self.font_small
-                            isf = tiny.render(badge_char, True, (255, 255, 255))
-                            self.screen.blit(isf, (bx + 1, by_))
-
-        # Draw cursor
-        if cx >= 0 and cy >= 0:
-            elapsed = pygame.time.get_ticks() / 1000.0
-            pulse = int(80 + 40 * math.sin(elapsed * 4))
-            cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts, ts, ts)
-            pygame.draw.rect(self.screen, (255, 200, pulse),
-                             cursor_rect, 2)
-
-    def _draw_town_picker_overlay(self, rx, ry, rw, rh,
-                                   layouts, cursor, mode="new"):
-        """Draw the town picker overlay for selecting a parent layout."""
-        fs = self.font_small
-        f = self.font
-
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 210))
-        self.screen.blit(overlay, (rx, ry))
-
-        if mode == "copy":
-            title = "COPY TO WHICH TOWN?"
-        else:
-            title = "SELECT PARENT TOWN"
-        self._u3_text(title, rx + rw // 2 - 70, ry + 12,
-                       self._U3_ORANGE, f)
-        self._u3_text("Choose the layout this interior belongs to:",
-                       rx + 16, ry + 38, (180, 180, 200), fs)
-
-        row_h = 32
-        list_y0 = ry + 62
-        max_vis = max(1, (rh - 80) // row_h)
-        n = len(layouts)
-        scroll = max(0, cursor - max_vis + 1)
-        scroll = min(scroll, max(0, n - max_vis))
-
-        for i in range(scroll, min(scroll + max_vis, n)):
-            by = list_y0 + (i - scroll) * row_h
-            is_sel = (i == cursor)
-            if is_sel:
-                bar = pygame.Surface((rw - 24, row_h - 2), pygame.SRCALPHA)
-                bar.fill((255, 200, 60, 50))
-                self.screen.blit(bar, (rx + 12, by))
-                pygame.draw.rect(self.screen, (200, 160, 60),
-                                 (rx + 12, by, rw - 24, row_h - 2), 1)
-            nc = (255, 255, 100) if is_sel else (180, 180, 200)
-            name = layouts[i].get("name", "Unnamed")
-            self._u3_text(name, rx + 24, by + 7, nc, fs)
-
-        # Footer
-        self._u3_text("[Up/Down] Select  [Enter] Confirm  [Esc] Cancel",
-                       rx + 16, ry + rh - 22, self._U3_HINT, fs)
-
-    def _draw_townlayout_replace_overlay(self, rx, ry, rw, rh,
-                                          brushes, src_tile, src_name,
-                                          src_empty, dst_idx):
-        """Draw the tile replace overlay on top of the grid.
-
-        Shows the source tile being replaced and a scrollable list of
-        destination brushes to choose from.
-        """
-        fs = self.font_small
-        f = self.font
-
-        # Semi-transparent backdrop
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 200))
-        self.screen.blit(overlay, (rx, ry))
-
-        # Title
-        self._u3_text("REPLACE TILE", rx + rw // 2 - 50, ry + 10,
-                       self._U3_ORANGE, f)
-
-        # Source tile info
-        src_label = src_name or f"Tile {src_tile}"
-        self._u3_text(f"From: {src_label}", rx + 16, ry + 38,
-                       (255, 120, 120), fs)
-
-        # Source tile color swatch
-        from src.settings import TILE_DEFS
-        swatch_x = rx + rw - 60
-        if src_empty:
-            # Draw checkerboard for empty
-            for qr in range(2):
-                for qc in range(2):
-                    qx = swatch_x + qc * 10
-                    qy = ry + 32 + qr * 10
-                    qcol = (45, 45, 45) if (qr + qc) % 2 == 0 else (30, 30, 30)
-                    pygame.draw.rect(self.screen, qcol,
-                                     pygame.Rect(qx, qy, 10, 10))
-        else:
-            src_def = TILE_DEFS.get(src_tile, {})
-            src_col = src_def.get("color", (80, 80, 80))
-            pygame.draw.rect(self.screen, src_col,
-                             pygame.Rect(swatch_x, ry + 32, 20, 20))
-        pygame.draw.rect(self.screen, (120, 100, 80),
-                         pygame.Rect(swatch_x, ry + 32, 20, 20), 1)
-
-        # Divider
-        pygame.draw.line(self.screen, (80, 70, 60),
-                         (rx + 12, ry + 58), (rx + rw - 12, ry + 58))
-
-        # "To:" label
-        self._u3_text("To:", rx + 16, ry + 64,
-                       (120, 220, 120), fs)
-
-        # Scrollable brush list
-        row_h = 28
-        list_y0 = ry + 84
-        max_vis = max(1, (rh - 100) // row_h)
-        n = len(brushes)
-
-        # Keep selected item visible
-        scroll = max(0, dst_idx - max_vis + 1)
-        scroll = min(scroll, max(0, n - max_vis))
-
-        for bi in range(scroll, min(scroll + max_vis, n)):
-            by = list_y0 + (bi - scroll) * row_h
-            b = brushes[bi]
-            is_sel = (bi == dst_idx)
-
-            if is_sel:
-                # Highlight bar
-                bar = pygame.Surface((rw - 24, row_h - 2), pygame.SRCALPHA)
-                bar.fill((255, 200, 60, 50))
-                self.screen.blit(bar, (rx + 12, by))
-                pygame.draw.rect(self.screen, (200, 160, 60),
-                                 (rx + 12, by, rw - 24, row_h - 2), 1)
-
-            # Sprite preview or color swatch (18px)
-            icon_x = rx + 18
-            text_x = icon_x + 4
-            b_path = b.get("path")
-            if b_path:
-                spr = self._get_unique_tile_sprite(b_path, 18)
-                if spr:
-                    self.screen.blit(spr, (icon_x, by + 4))
-                    text_x = icon_x + 24
-            elif b.get("tile_id") is not None:
-                tc = TILE_DEFS.get(b["tile_id"], {}).get("color", (80, 80, 80))
-                pygame.draw.rect(self.screen, tc,
-                                 pygame.Rect(icon_x, by + 4, 18, 18))
-                pygame.draw.rect(self.screen, (60, 50, 40),
-                                 pygame.Rect(icon_x, by + 4, 18, 18), 1)
-                text_x = icon_x + 24
-            elif b["name"] == "Eraser":
-                # Draw an X for eraser
-                ex = icon_x + 2
-                ey = by + 6
-                pygame.draw.line(self.screen, (200, 60, 60),
-                                 (ex, ey), (ex + 14, ey + 14), 2)
-                pygame.draw.line(self.screen, (200, 60, 60),
-                                 (ex + 14, ey), (ex, ey + 14), 2)
-                text_x = icon_x + 24
-
-            nc = (255, 255, 100) if is_sel else (180, 180, 200)
-            self._u3_text(b["name"], text_x, by + 5, nc, fs)
-
-        # Scroll indicators
-        if scroll > 0:
-            self._u3_text("\u25b2", rx + rw // 2 - 4, list_y0 - 14,
-                           (160, 160, 180), fs)
-        if scroll + max_vis < n:
-            self._u3_text("\u25bc", rx + rw // 2 - 4,
-                           list_y0 + max_vis * row_h,
-                           (160, 160, 180), fs)
-
-    def _draw_interior_picker(self, rx, ry, rw, rh,
-                               interiors, cursor, scroll,
-                               sub="layouts"):
-        """Draw the unified link picker overlay on top of the grid."""
-        fs = self.font_small
-        f = self.font
-
-        # Semi-transparent backdrop
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))
-        self.screen.blit(overlay, (rx, ry))
-
-        # Title
-        self._u3_text("Link Tile",
-                      rx + 16, ry + 10, (80, 220, 255), f)
-        self._u3_text("[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel",
-                      rx + 16, ry + 34, (140, 140, 160), fs)
-
-        # Build item list based on context
-        # Index 0 = (none)
-        # Index 1 = context-dependent special option
-        # Index 2+ = interior spaces (filtered)
-        if sub == "interiors":
-            special = "\u2190 Back to Town"
-        else:
-            special = "\u2190 Return to Overworld"
-        items = ["(none)", special] + [i["name"] for i in interiors]
-        n = len(items)
-        row_h = 28
-        list_y0 = ry + 60
-        max_vis = max(1, (rh - 80) // row_h)
-
-        for vi in range(max_vis):
-            idx = scroll + vi
-            if idx >= n:
-                break
-            iy = list_y0 + vi * row_h
-            is_sel = (idx == cursor)
-            if is_sel:
-                bar = pygame.Surface((rw - 32, row_h - 2), pygame.SRCALPHA)
-                bar.fill((80, 220, 255, 40))
-                self.screen.blit(bar, (rx + 16, iy))
-                pygame.draw.rect(self.screen, (80, 220, 255),
-                                 (rx + 16, iy, rw - 32, row_h - 2), 1)
-            label = items[idx]
-            if idx == 0:
-                col = (255, 120, 120) if is_sel else (160, 120, 120)
-            elif idx == 1:
-                col = (120, 255, 120) if is_sel else (120, 180, 120)
-            else:
-                col = (255, 255, 255) if is_sel else (180, 180, 200)
-            self._u3_text(label, rx + 24, iy + 4, col, fs)
-
     def _render_tile_preview(self, category, name, tile_id, size=96):
         """Render a tile preview surface showing how it looks in-game.
 
@@ -9813,252 +8862,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # Plain icon names (sword, herb, etc.) → caller uses _draw_item_icon
         return None
-
-    def _draw_rfeat_editor(self, left_x, left_w, right_x, right_w,
-                            panel_y, panel_h, level,
-                            folders, folder_cursor, folder_scroll,
-                            feat_list, feat_cursor, feat_scroll,
-                            editing, cx, cy, brush_idx, brushes,
-                            naming, name_buf, current_ctx,
-                            fm, fs, f):
-        """Draw the Reusable Features editor at all levels."""
-        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
-
-        if level == 1:
-            # ── Folder list (Town / Dungeon / Overworld) ──
-            self._u3_text("Reusable Features", left_x + 12,
-                          panel_y + 8, self._U3_ORANGE, fs)
-            row_h = 34
-            ly = panel_y + 30
-            max_visible = (panel_h - 40) // row_h
-            dscroll = folder_scroll
-            if folder_cursor < dscroll:
-                dscroll = folder_cursor
-            if folder_cursor >= dscroll + max_visible:
-                dscroll = folder_cursor - max_visible + 1
-            dy = ly
-            for fi in range(dscroll, min(dscroll + max_visible,
-                                         len(folders))):
-                fld = folders[fi]
-                selected = (fi == folder_cursor)
-                if selected:
-                    bar = pygame.Surface((left_w - 4, row_h - 2),
-                                         pygame.SRCALPHA)
-                    bar.fill((255, 200, 60, 30))
-                    self.screen.blit(bar, (left_x + 2, dy - 1))
-                prefix = "> " if selected else "  "
-                nc = self._U3_WHITE if selected else (180, 180, 180)
-                self._u3_text(f"{prefix}{fld['label']}",
-                              left_x + 10, dy + 4, nc, fm)
-                cnt = str(fld["count"])
-                cw = fs.size(cnt)[0]
-                sc = (140, 180, 140) if selected else (120, 120, 140)
-                self._u3_text(cnt, left_x + left_w - cw - 12,
-                              dy + 6, sc, fs)
-                dy += row_h
-
-            # Right panel: folder description
-            if 0 <= folder_cursor < len(folders):
-                fld = folders[folder_cursor]
-                dy = panel_y + 12
-                self._u3_text(fld["label"], right_x + 16, dy,
-                              self._U3_WHITE, f)
-                dy += 28
-                descs = {
-                    "town": [
-                        "Reusable tile patterns for town",
-                        "layouts: shops, houses, rooms,",
-                        "and other interior structures.",
-                    ],
-                    "dungeon": [
-                        "Reusable tile patterns for",
-                        "dungeon maps: corridors, rooms,",
-                        "traps, and puzzle elements.",
-                    ],
-                    "overworld": [
-                        "Reusable tile patterns for the",
-                        "overworld map: terrain features,",
-                        "landmarks, and points of interest.",
-                    ],
-                }
-                for line in descs.get(fld["name"], []):
-                    self._u3_text(line, right_x + 16, dy,
-                                  (180, 180, 200), fm)
-                    dy += 22
-                if fld["count"] > 0:
-                    dy += 10
-                    self._u3_text(f"{fld['count']} features",
-                                  right_x + 16, dy,
-                                  (140, 140, 160), fs)
-
-            self._u3_text(
-                "[Up/Dn] Browse  [Enter] Open  [Esc] Back",
-                SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 45,
-                self._U3_HINT, fs)
-
-        elif level == 2 or (level == 3 and not editing):
-            # ── Feature list inside folder ──
-            ctx_label = current_ctx.title()
-            self._u3_text(f"{ctx_label} Features",
-                          left_x + 12, panel_y + 8,
-                          self._U3_ORANGE, fs)
-            row_h = 34
-            ly = panel_y + 30
-            max_visible = (panel_h - 40) // row_h
-            dscroll = feat_scroll
-            if feat_cursor < dscroll:
-                dscroll = feat_cursor
-            if feat_cursor >= dscroll + max_visible:
-                dscroll = feat_cursor - max_visible + 1
-            dy = ly
-            for fi in range(dscroll, min(dscroll + max_visible,
-                                         len(feat_list))):
-                item = feat_list[fi]
-                selected = (fi == feat_cursor)
-                if selected:
-                    bar = pygame.Surface((left_w - 4, row_h - 2),
-                                         pygame.SRCALPHA)
-                    bar.fill((255, 200, 60, 30))
-                    self.screen.blit(bar, (left_x + 2, dy - 1))
-                prefix = "> " if selected else "  "
-                nc = self._U3_WHITE if selected else (180, 180, 180)
-                self._u3_text(f"{prefix}{item['name']}",
-                              left_x + 10, dy + 4, nc, fm)
-                dims = f"{item['width']}x{item['height']}"
-                dw = fs.size(dims)[0]
-                sc = (140, 180, 140) if selected else (120, 120, 140)
-                self._u3_text(dims, left_x + left_w - dw - 12,
-                              dy + 6, sc, fs)
-                dy += row_h
-
-            # Right panel: preview of selected feature
-            if 0 <= feat_cursor < len(feat_list):
-                feat = feat_list[feat_cursor]
-                self._u3_text(feat["name"], right_x + 16,
-                              panel_y + 12, self._U3_WHITE, f)
-                dims = f"{feat['width']} x {feat['height']}"
-                self._u3_text(dims, right_x + 16, panel_y + 36,
-                              (140, 140, 160), fs)
-                # Draw grid preview
-                self._draw_townlayout_preview(
-                    right_x + 12, panel_y + 56,
-                    right_w - 24, panel_h - 80,
-                    feat, -1, -1, -1, None)
-
-            # Naming overlay
-            if naming:
-                nm_x = left_x + 10
-                nm_y = panel_y + panel_h // 2 - 30
-                nm_w = left_w - 20
-                nm_h = 50
-                overlay = pygame.Surface(
-                    (left_w, panel_h), pygame.SRCALPHA)
-                overlay.fill((20, 18, 30, 200))
-                self.screen.blit(overlay, (left_x, panel_y))
-                self._u3_text("Rename:", nm_x + 4, nm_y - 18,
-                              self._U3_ORANGE, fs)
-                pygame.draw.rect(self.screen, (60, 55, 80),
-                                 pygame.Rect(nm_x, nm_y, nm_w, nm_h))
-                pygame.draw.rect(self.screen, (200, 180, 80),
-                                 pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
-                display_text = name_buf
-                elapsed = pygame.time.get_ticks() / 1000.0
-                if int(elapsed * 2) % 2 == 0:
-                    display_text += "|"
-                self._u3_text(display_text, nm_x + 8, nm_y + 14,
-                              self._U3_WHITE, fm)
-                self._u3_text("[Enter] Confirm  [Esc] Cancel",
-                              nm_x + 4, nm_y + nm_h + 6,
-                              self._U3_HINT, fs)
-            else:
-                self._u3_text(
-                    "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
-                    "[Ctrl+D] Delete  [N] Rename  [Esc] Back",
-                    SCREEN_WIDTH // 2 - 240, SCREEN_HEIGHT - 45,
-                    self._U3_HINT, fs)
-
-        elif level == 3 and editing:
-            # ── Grid painter ──
-            if 0 <= feat_cursor < len(feat_list):
-                feat = feat_list[feat_cursor]
-
-                # Left panel: brush palette
-                self._u3_text(
-                    f"Editing: {feat.get('name', '?')}",
-                    left_x + 12, panel_y + 8,
-                    self._U3_ORANGE, fm)
-                self._u3_text("BRUSH PALETTE", left_x + 12,
-                              panel_y + 30, (120, 120, 160), fs)
-                brush_row_h = 32
-                brush_y0 = panel_y + 48
-                max_brush_vis = (panel_h - 100) // brush_row_h
-                b_scroll = max(0, brush_idx - max_brush_vis + 1)
-                for bi in range(b_scroll,
-                                min(b_scroll + max_brush_vis,
-                                    len(brushes))):
-                    by = brush_y0 + (bi - b_scroll) * brush_row_h
-                    b = brushes[bi]
-                    is_sel = (bi == brush_idx)
-                    if is_sel:
-                        bar = pygame.Surface(
-                            (left_w - 8, brush_row_h - 2),
-                            pygame.SRCALPHA)
-                        bar.fill((255, 200, 60, 40))
-                        self.screen.blit(bar, (left_x + 4, by))
-                        pygame.draw.rect(
-                            self.screen, (200, 160, 60),
-                            (left_x + 4, by,
-                             left_w - 8, brush_row_h - 2), 1)
-                    icon_x = left_x + 12
-                    text_x = icon_x + 4
-                    b_path = b.get("path")
-                    if b_path:
-                        spr = self._get_unique_tile_sprite(
-                            b_path, 22)
-                        if spr:
-                            self.screen.blit(spr, (icon_x, by + 4))
-                            text_x = icon_x + 28
-                    bc = self._U3_WHITE if is_sel else (160, 160, 170)
-                    self._u3_text(b["name"], text_x, by + 6,
-                                  bc, fs)
-
-                # Right panel: grid
-                self._draw_townlayout_preview(
-                    right_x + 12, panel_y + 12,
-                    right_w - 24, panel_h - 24,
-                    feat, cx, cy, brush_idx, brushes)
-
-                # Naming overlay
-                if naming:
-                    nm_x = left_x + 10
-                    nm_y = panel_y + panel_h // 2 - 30
-                    nm_w = left_w - 20
-                    nm_h = 50
-                    overlay = pygame.Surface(
-                        (left_w, panel_h), pygame.SRCALPHA)
-                    overlay.fill((20, 18, 30, 200))
-                    self.screen.blit(overlay, (left_x, panel_y))
-                    self._u3_text("Rename:", nm_x + 4, nm_y - 18,
-                                  self._U3_ORANGE, fs)
-                    pygame.draw.rect(self.screen, (60, 55, 80),
-                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h))
-                    pygame.draw.rect(self.screen, (200, 180, 80),
-                                     pygame.Rect(nm_x, nm_y, nm_w, nm_h), 2)
-                    display_text = name_buf
-                    elapsed = pygame.time.get_ticks() / 1000.0
-                    if int(elapsed * 2) % 2 == 0:
-                        display_text += "|"
-                    self._u3_text(display_text, nm_x + 8, nm_y + 14,
-                                  self._U3_WHITE, fm)
-                    self._u3_text("[Enter] Confirm  [Esc] Cancel",
-                                  nm_x + 4, nm_y + nm_h + 6,
-                                  self._U3_HINT, fs)
-                else:
-                    self._u3_text(
-                        "[Arrows] Move  [Enter] Paint  [Tab/B] Brush  "
-                        "[N] Rename  [Ctrl+S] Save  [Esc] Back",
-                        SCREEN_WIDTH // 2 - 260, SCREEN_HEIGHT - 45,
-                        self._U3_HINT, fs)
 
     def _draw_tile_folder_list(self, left_x, left_w, right_x,
                                 right_w, panel_y, panel_h,
@@ -10443,16 +9246,7 @@ class Renderer(CombatEffectRendererMixin):
                            edit_scroll=0,
                            edit_level=0, edit_sections=None,
                            edit_section_cursor=0,
-                           edit_section_scroll=0,
-                           edit_nav_depth=0,
-                           edit_nav_label="",
-                           edit_in_encounters=False,
-                           edit_in_dungeon_sub=False,
-                           edit_utile_preview=None,
-                           edit_battle_preview=None,
-                           edit_map_editor=None,
-                           edit_omap_interior_list=None,
-                           edit_omap_interior_painter=None):
+                           edit_section_scroll=0):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -10467,30 +9261,14 @@ class Renderer(CombatEffectRendererMixin):
         edit_field       : index of the field being edited
         edit_fields      : list of [label, key, value, type, editable]
         edit_buffer      : current text being typed
-        edit_nav_depth   : nesting depth in section navigation
-        edit_in_encounters : True when editing encounters within a level
-        edit_utile_preview : dict with preview data, or None
-        edit_battle_preview : dict with battle screen editor data, or None
-        edit_omap_interior_list : dict with overview interior list data
-        edit_omap_interior_painter : dict with overview interior painter data
+        edit_scroll      : scroll offset for field list
+        edit_level       : 0 = section browser, 1 = field editor
+        edit_sections    : list of section dicts
+        edit_section_cursor : which section is highlighted
+        edit_section_scroll : scroll offset for section list
         """
         import math
         self.screen.fill((0, 0, 0))
-
-        # ── Full-screen overview interior painter ──
-        if edit_omap_interior_painter:
-            self._draw_omap_interior_painter(edit_omap_interior_painter)
-            return
-
-        # ── Full-screen overview interior list ──
-        if edit_omap_interior_list:
-            self._draw_omap_interior_list(edit_omap_interior_list)
-            return
-
-        # ── Full-screen map editor takes over the entire screen ──
-        if edit_map_editor:
-            self._draw_map_editor_fullscreen(edit_map_editor)
-            return
 
         fm = self.font_med
         f = self.font
@@ -10670,18 +9448,8 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text(id_text, right_x + 16, id_y,
                           (140, 140, 160), fs)
 
-        # ── Unique-tile examine preview ──
-        if edit_utile_preview:
-            self._draw_utile_examine_preview(
-                right_x, panel_y, right_w, panel_h, edit_utile_preview)
-
-        # ── Battle screen editor preview ──
-        elif edit_battle_preview:
-            self._draw_battle_screen_editor(
-                right_x, panel_y, right_w, panel_h, edit_battle_preview)
-
         # ── Edit mode overlay ──
-        elif edit_mode:
+        if edit_mode:
             if edit_is_new and edit_fields:
                 # Flat field editor for create-new mode
                 self._draw_module_edit_overlay(
@@ -10693,17 +9461,13 @@ class Renderer(CombatEffectRendererMixin):
                 self._draw_section_browser(
                     right_x, panel_y, right_w, panel_h,
                     edit_sections, edit_section_cursor,
-                    edit_section_scroll,
-                    nav_depth=edit_nav_depth,
-                    nav_label=edit_nav_label)
+                    edit_section_scroll)
             elif edit_level == 1:
                 # Field editor within a section (level 1)
                 sec_label = ""
                 if edit_sections and 0 <= edit_section_cursor < len(
                         edit_sections):
                     sec_label = edit_sections[edit_section_cursor]["label"]
-                if edit_in_encounters:
-                    sec_label = f"Encounters: {sec_label}"
                 if edit_fields:
                     self._draw_module_edit_overlay(
                         right_x, panel_y, right_w, panel_h,
@@ -10737,35 +9501,11 @@ class Renderer(CombatEffectRendererMixin):
         # ── Footer hints ──
         hint_y = SCREEN_HEIGHT - 45
         hint_color = self._U3_HINT
-        if edit_utile_preview:
-            hint = ""   # hints are rendered inside the preview panel
-        elif edit_battle_preview:
-            hint = ""   # hints are rendered inside the battle editor panel
-        elif edit_map_editor:
-            hint = ("[ARROWS] Move  [ENTER] Paint  "
-                    "[,/.] Brush  [CTRL+S] Save  [ESC] Back")
-        elif edit_mode and edit_is_new:
+        if edit_mode and edit_is_new:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[LT/RT] Adjust  [CTRL+S] Create  [ESC] Cancel")
-        elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
-                and edit_in_encounters:
-            # Inside level sub-sections (encounters list)
-            hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[Ctrl+N] Add  [Ctrl+D] Remove  [ESC] Back")
-        elif edit_mode and edit_level == 0 and edit_nav_depth > 0 \
-                and edit_in_dungeon_sub:
-            # Inside dungeon sub-sections (levels)
-            hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[Ctrl+N] Add Level  [Ctrl+D] Remove  [ESC] Back")
-        elif edit_mode and edit_level == 0 and edit_nav_depth > 0:
-            # Inside a folder or other sub-section
-            hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_level == 0:
             hint = ("[UP/DN] Browse  [ENTER] Open  "
-                    "[CTRL+S] Save  [ESC] Back")
-        elif edit_mode and edit_level == 1 and edit_in_encounters:
-            hint = ("[UP/DN] Field  [LT/RT] Adjust  "
                     "[CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_level == 1:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
@@ -11002,731 +9742,12 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(action_label, rx + 16, dy, action_color, fm)
 
     def _draw_map_editor_fullscreen(self, data):
-        """Draw the overview map tile editor – split panel with brush
-        palette on the left, scrollable sprite-based map grid on the right.
-
-        Mirrors the visual style of the town layout editor but uses
-        ``_u3_draw_overworld_tile`` for proper sprite / procedural
-        tile rendering.
-        """
-        import math as _math
-        from src.settings import (
-            TILE_DEFS, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE,
-        )
-        fm = self.font_med
-        fs = self.font_small
-        f = self.font
-
-        self.screen.fill((10, 8, 20))
-
-        # ── Layout constants ──
-        header_h = 36
-        footer_h = 28
-        left_w = 180          # brush palette panel width
-        panel_y = header_h + 2
-        panel_h = SCREEN_HEIGHT - header_h - footer_h - 4
-        right_x = left_w + 4
-        right_w = SCREEN_WIDTH - right_x - 4
-
-        # ── Header bar ──
-        pygame.draw.rect(self.screen, (20, 16, 30),
-                         (0, 0, SCREEN_WIDTH, header_h))
-        pygame.draw.line(self.screen, (80, 60, 40),
-                         (0, header_h - 1),
-                         (SCREEN_WIDTH, header_h - 1), 1)
-
-        title = "OVERVIEW MAP EDITOR"
-        if data["dirty"]:
-            title += " *"
-        self._u3_text(title, 16, 6, self._U3_ORANGE, fm)
-
-        # Coordinates + tile name + map size
-        tile_name = ""
-        cr, cc = data["cursor_row"], data["cursor_col"]
-        if 0 <= cr < data["height"] and 0 <= cc < data["width"]:
-            tid = data["tiles"][cr][cc]
-            td = TILE_DEFS.get(tid)
-            if td:
-                tile_name = td["name"]
-        coord_text = (f"({cc},{cr}) {tile_name}"
-                      f"  [{data['width']}x{data['height']}]")
-        tw = fm.size(coord_text)[0]
-        self._u3_text(coord_text, SCREEN_WIDTH - tw - 16, 6,
-                      (140, 140, 160), fm)
-
-        # ── Left panel: brush palette ──
-        left_x = 4
-        pygame.draw.rect(self.screen, (18, 14, 28),
-                         (left_x, panel_y, left_w, panel_h))
-        pygame.draw.rect(self.screen, (60, 50, 40),
-                         (left_x, panel_y, left_w, panel_h), 1)
-
-        self._u3_text("BRUSH PALETTE", left_x + 10, panel_y + 6,
-                      (120, 120, 160), fs)
-
-        palette = data["palette"]
-        palette_names = data.get("palette_names", [])
-        brush_idx = data["brush_idx"]
-        brush_row_h = 36
-        brush_y0 = panel_y + 26
-        max_brush_vis = (panel_h - 60) // brush_row_h
-        # Scroll so selected brush stays visible
-        b_scroll = max(0, brush_idx - max_brush_vis + 1)
-
-        for bi in range(b_scroll,
-                        min(b_scroll + max_brush_vis, len(palette))):
-            by = brush_y0 + (bi - b_scroll) * brush_row_h
-            is_sel = (bi == brush_idx)
-            tid = palette[bi]
-
-            # Selected highlight bar
-            if is_sel:
-                bar = pygame.Surface(
-                    (left_w - 8, brush_row_h - 2), pygame.SRCALPHA)
-                bar.fill((255, 200, 60, 40))
-                self.screen.blit(bar, (left_x + 4, by))
-                pygame.draw.rect(self.screen, (200, 160, 60),
-                                 (left_x + 4, by,
-                                  left_w - 8, brush_row_h - 2), 1)
-
-            icon_x = left_x + 10
-            icon_sz = 26
-            text_x = icon_x + icon_sz + 6
-
-            if tid == -1:
-                # Eraser icon
-                pygame.draw.rect(self.screen, (40, 35, 50),
-                                 (icon_x, by + 4, icon_sz, icon_sz))
-                pygame.draw.line(self.screen, (200, 80, 80),
-                                 (icon_x + 3, by + 7),
-                                 (icon_x + icon_sz - 4,
-                                  by + 4 + icon_sz - 4), 2)
-                pygame.draw.line(self.screen, (200, 80, 80),
-                                 (icon_x + icon_sz - 4, by + 7),
-                                 (icon_x + 3,
-                                  by + 4 + icon_sz - 4), 2)
-                pygame.draw.rect(self.screen, (80, 60, 60),
-                                 (icon_x, by + 4, icon_sz, icon_sz), 1)
-            else:
-                # Draw a mini overworld tile sprite as the icon
-                # Create a temporary surface at TILE_SIZE, draw the
-                # tile into it, then scale to icon_sz.
-                tmp = pygame.Surface((TILE_SIZE, TILE_SIZE))
-                tmp.fill((10, 8, 20))
-                saved = self.screen
-                self.screen = tmp
-                self._u3_draw_overworld_tile(tid, 0, 0, TILE_SIZE, 0, 0)
-                self.screen = saved
-                scaled = pygame.transform.scale(tmp, (icon_sz, icon_sz))
-                self.screen.blit(scaled, (icon_x, by + 4))
-                pygame.draw.rect(self.screen, (60, 50, 40),
-                                 (icon_x, by + 4, icon_sz, icon_sz), 1)
-
-            # Label
-            label = (palette_names[bi] if bi < len(palette_names)
-                     else "?")
-            nc = (255, 255, 100) if is_sel else (180, 180, 200)
-            self._u3_text(label, text_x, by + 8, nc, fs)
-
-        # Brush cycle hint at bottom of palette
-        self._u3_text("[Tab] Next Brush",
-                      left_x + 10,
-                      panel_y + panel_h - 36,
-                      (140, 140, 160), fs)
-        self._u3_text("[Shift+Tab] Prev",
-                      left_x + 10,
-                      panel_y + panel_h - 20,
-                      (140, 140, 160), fs)
-
-        # ── Right panel: scrollable map grid with sprites ──
-        grid_x = right_x + 4
-        grid_y = panel_y + 4
-        grid_w = right_w - 8
-        grid_h = panel_h - 8
-
-        map_w = data["width"]
-        map_h = data["height"]
-        tiles = data["tiles"]
-        cam_c = data.get("cam_col", 0)
-        cam_r = data.get("cam_row", 0)
-
-        # Use a fixed tile size for sprite rendering (TILE_SIZE = 32)
-        ts = TILE_SIZE
-        # How many tiles fit in the viewport
-        vis_cols = grid_w // ts
-        vis_rows = grid_h // ts
-        # Clamp camera
-        cam_c = max(0, min(cam_c, map_w - vis_cols))
-        cam_r = max(0, min(cam_r, map_h - vis_rows))
-
-        # Centre the grid if the map is smaller than the viewport
-        total_draw_w = min(map_w, vis_cols) * ts
-        total_draw_h = min(map_h, vis_rows) * ts
-        ox = grid_x + (grid_w - total_draw_w) // 2
-        oy = grid_y + (grid_h - total_draw_h) // 2
-
-        # Background behind the grid
-        pygame.draw.rect(self.screen, (8, 6, 16),
-                         (grid_x, grid_y, grid_w, grid_h))
-
-        # Draw visible tiles using sprite-based rendering
-        end_c = min(cam_c + vis_cols, map_w)
-        end_r = min(cam_r + vis_rows, map_h)
-        for mr in range(cam_r, end_r):
-            for mc in range(cam_c, end_c):
-                tile_id = tiles[mr][mc]
-                px = ox + (mc - cam_c) * ts
-                py = oy + (mr - cam_r) * ts
-                self._u3_draw_overworld_tile(tile_id, px, py, ts, mc, mr)
-
-        # ── Cursor highlight (animated pulse) ──
-        cur_c = data["cursor_col"]
-        cur_r = data["cursor_row"]
-        # Only draw cursor if it's in the visible viewport
-        if (cam_c <= cur_c < end_c and cam_r <= cur_r < end_r):
-            elapsed = pygame.time.get_ticks() / 1000.0
-            pulse = int(80 + 40 * _math.sin(elapsed * 4))
-            cx = ox + (cur_c - cam_c) * ts
-            cy = oy + (cur_r - cam_r) * ts
-            pygame.draw.rect(self.screen, (255, 200, pulse),
-                             (cx, cy, ts, ts), 2)
-
-        # ── Interior-link badges on tiles ──
-        tile_links = data.get("tile_links", {})
-        for link_key, link_val in tile_links.items():
-            parts = link_key.split(",")
-            if len(parts) != 2:
-                continue
-            lc, lr = int(parts[0]), int(parts[1])
-            if cam_c <= lc < end_c and cam_r <= lr < end_r:
-                bx = ox + (lc - cam_c) * ts
-                by_ = oy + (lr - cam_r) * ts
-                pygame.draw.rect(self.screen, (80, 220, 255),
-                                 (bx, by_, ts, ts), 2)
-                badge_sz = max(ts // 3, 8)
-                ibx = bx + ts - badge_sz - 1
-                iby = by_ + 1
-                pygame.draw.rect(self.screen, (0, 140, 200),
-                                 (ibx, iby, badge_sz, badge_sz))
-                if badge_sz >= 8:
-                    tiny = (self.font_tiny if hasattr(self, 'font_tiny')
-                            else self.font_small)
-                    isf = tiny.render("I", True, (255, 255, 255))
-                    self.screen.blit(isf, (ibx + 1, iby))
-
-        # Grid border
-        pygame.draw.rect(self.screen, (60, 50, 40),
-                         (grid_x, grid_y, grid_w, grid_h), 1)
-
-        # ── Interior picker overlay ──
-        if data.get("int_picking"):
-            self._draw_omap_int_picker_overlay(
-                grid_x, grid_y, grid_w, grid_h,
-                data.get("int_pick_list", []),
-                data.get("int_pick_cursor", 0))
-
-        # ── Footer hints ──
-        hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                "[Tab] Brush  [I] Link Interior  [X] Unlink  [Esc] Back")
-        hw = fs.size(hint)[0]
-        self._u3_text(hint,
-                      SCREEN_WIDTH // 2 - hw // 2,
-                      SCREEN_HEIGHT - footer_h + 4,
-                      self._U3_HINT, fs)
-
-    # ── Overview Interior rendering methods ─────────────────────────
-
-    def _draw_omap_int_picker_overlay(self, rx, ry, rw, rh,
-                                       interiors, cursor):
-        """Draw the interior link picker overlay in the map editor."""
-        fs = self.font_small
-        f = self.font
-
-        ow = min(rw - 40, 300)
-        oh = min(rh - 40, 40 + (1 + len(interiors)) * 28)
-        ox = rx + (rw - ow) // 2
-        oy = ry + (rh - oh) // 2
-
-        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 220))
-        self.screen.blit(overlay, (ox, oy))
-        pygame.draw.rect(self.screen, (80, 220, 255),
-                         (ox, oy, ow, oh), 1)
-
-        self._u3_text("LINK INTERIOR", ox + 10, oy + 6,
-                      self._U3_ORANGE, f)
-
-        row_h = 28
-        ly = oy + 32
-        # Option 0: (none)
-        options = ["(none)"] + [i.get("name", "?") for i in interiors]
-        for i, label in enumerate(options):
-            y = ly + i * row_h
-            if y + row_h > oy + oh:
-                break
-            is_sel = (i == cursor)
-            if is_sel:
-                bar = pygame.Surface((ow - 8, row_h - 2), pygame.SRCALPHA)
-                bar.fill((80, 220, 255, 40))
-                self.screen.blit(bar, (ox + 4, y))
-            nc = (255, 100, 100) if i == 0 else (
-                (255, 255, 100) if is_sel else (180, 180, 200))
-            prefix = "> " if is_sel else "  "
-            self._u3_text(f"{prefix}{label}", ox + 10, y + 4, nc, fs)
-
-    def _draw_omap_interior_list(self, data):
-        """Draw the full-screen overview interior list browser."""
-        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
-        fm = self.font_med
-        fs = self.font_small
-        f = self.font
-
-        self.screen.fill((10, 8, 20))
-
-        # Header
-        header_h = 36
-        pygame.draw.rect(self.screen, (20, 16, 30),
-                         (0, 0, SCREEN_WIDTH, header_h))
-        pygame.draw.line(self.screen, (80, 60, 40),
-                         (0, header_h - 1),
-                         (SCREEN_WIDTH, header_h - 1), 1)
-        self._u3_text("INTERIOR MAP LOCATIONS", 16, 6,
-                      self._U3_ORANGE, fm)
-
-        interiors = data.get("interiors", [])
-        cursor = data.get("cursor", 0)
-        naming = data.get("naming", False)
-        name_buf = data.get("name_buf", "")
-        n = len(interiors)
-
-        row_h = 40
-        list_y0 = header_h + 16
-        max_vis = (SCREEN_HEIGHT - header_h - 60) // row_h
-
-        if n == 0:
-            self._u3_text("No interiors yet. Press [Ctrl+N] to add one.",
-                          SCREEN_WIDTH // 2 - 160,
-                          SCREEN_HEIGHT // 2 - 10,
-                          (140, 140, 160), fs)
-        else:
-            scroll = max(0, cursor - max_vis + 1)
-            for i in range(scroll, min(scroll + max_vis, n)):
-                y = list_y0 + (i - scroll) * row_h
-                is_sel = (i == cursor)
-                item = interiors[i]
-
-                if is_sel:
-                    bar = pygame.Surface(
-                        (SCREEN_WIDTH - 40, row_h - 2), pygame.SRCALPHA)
-                    bar.fill((255, 200, 60, 40))
-                    self.screen.blit(bar, (20, y))
-                    pygame.draw.rect(self.screen, (200, 160, 60),
-                                     (20, y, SCREEN_WIDTH - 40,
-                                      row_h - 2), 1)
-
-                prefix = "> " if is_sel else "  "
-                nc = (255, 255, 100) if is_sel else (180, 180, 200)
-
-                if naming and is_sel:
-                    # Show name editing
-                    display = name_buf + "_"
-                    self._u3_text(f"{prefix}{display}", 30, y + 8,
-                                  (255, 200, 60), fm)
-                else:
-                    name = item.get("name", "Unnamed")
-                    w = item.get("width", 20)
-                    h = item.get("height", 16)
-                    tiles_n = len(item.get("tiles", {}))
-                    self._u3_text(f"{prefix}{name}", 30, y + 4,
-                                  nc, fm)
-                    sub = f"{w}x{h}  {tiles_n} tiles"
-                    self._u3_text(sub, 50, y + 22,
-                                  (120, 120, 140), fs)
-
-        # Footer
-        footer_y = SCREEN_HEIGHT - 36
-        hint = ("[Up/Dn] Browse  [Enter] Edit  "
-                "[Ctrl+N] New  [Ctrl+D] Delete  [N] Rename  [Esc] Back")
-        hw = fs.size(hint)[0]
-        self._u3_text(hint,
-                      SCREEN_WIDTH // 2 - hw // 2,
-                      footer_y,
-                      self._U3_HINT, fs)
-
-    def _draw_omap_interior_painter(self, data):
-        """Draw the overview interior grid painter – split panel with
-        dungeon brush palette on the left, tile grid on the right.
-        Uses the same visual style as the town layout editor."""
-        import math as _math
-        from src.settings import (
-            TILE_DEFS, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE,
-        )
-        fm = self.font_med
-        fs = self.font_small
-        f = self.font
-
-        self.screen.fill((10, 8, 20))
-
-        layout = data["layout"]
-        brushes = data["brushes"]
-        cx = data["cx"]
-        cy = data["cy"]
-        brush_idx = data["brush_idx"]
-        dirty = data["dirty"]
-
-        tw = layout.get("width", 20)
-        th = layout.get("height", 16)
-        tiles = layout.get("tiles", {})
-
-        # ── Header ──
-        header_h = 36
-        pygame.draw.rect(self.screen, (20, 16, 30),
-                         (0, 0, SCREEN_WIDTH, header_h))
-        pygame.draw.line(self.screen, (80, 60, 40),
-                         (0, header_h - 1),
-                         (SCREEN_WIDTH, header_h - 1), 1)
-        title = f"EDITING: {layout.get('name', '?')}"
-        if dirty:
-            title += " *"
-        self._u3_text(title, 16, 6, self._U3_ORANGE, fm)
-
-        coord_text = f"({cx},{cy})  [{tw}x{th}]"
-        ctw = fm.size(coord_text)[0]
-        self._u3_text(coord_text, SCREEN_WIDTH - ctw - 16, 6,
-                      (140, 140, 160), fm)
-
-        # ── Layout ──
-        footer_h = 28
-        left_w = 180
-        panel_y = header_h + 2
-        panel_h = SCREEN_HEIGHT - header_h - footer_h - 4
-        right_x = left_w + 4
-        right_w = SCREEN_WIDTH - right_x - 4
-        left_x = 4
-
-        # ── Left panel: brush palette ──
-        pygame.draw.rect(self.screen, (18, 14, 28),
-                         (left_x, panel_y, left_w, panel_h))
-        pygame.draw.rect(self.screen, (60, 50, 40),
-                         (left_x, panel_y, left_w, panel_h), 1)
-
-        self._u3_text("BRUSH PALETTE", left_x + 10, panel_y + 6,
-                      (120, 120, 160), fs)
-
-        brush_row_h = 32
-        brush_y0 = panel_y + 26
-        max_brush_vis = (panel_h - 60) // brush_row_h
-        b_scroll = max(0, brush_idx - max_brush_vis + 1)
-
-        for bi in range(b_scroll,
-                        min(b_scroll + max_brush_vis, len(brushes))):
-            by = brush_y0 + (bi - b_scroll) * brush_row_h
-            is_sel = (bi == brush_idx)
-            b = brushes[bi]
-
-            if is_sel:
-                bar = pygame.Surface(
-                    (left_w - 8, brush_row_h - 2), pygame.SRCALPHA)
-                bar.fill((255, 200, 60, 40))
-                self.screen.blit(bar, (left_x + 4, by))
-                pygame.draw.rect(self.screen, (200, 160, 60),
-                                 (left_x + 4, by,
-                                  left_w - 8, brush_row_h - 2), 1)
-
-            # Sprite preview
-            icon_x = left_x + 12
-            text_x = icon_x + 4
-            b_path = b.get("path")
-            if b_path:
-                spr = self._get_unique_tile_sprite(b_path, 22)
-                if spr:
-                    self.screen.blit(spr, (icon_x, by + 4))
-                    text_x = icon_x + 28
-            elif b.get("tile_id") is not None:
-                from src.settings import TILE_DEFS as _TD
-                _tdef = _TD.get(b["tile_id"], {})
-                tc = _tdef.get("color", (80, 80, 80))
-                pygame.draw.rect(self.screen, tc,
-                                 pygame.Rect(icon_x, by + 4, 22, 22))
-                pygame.draw.rect(self.screen, (60, 50, 40),
-                                 pygame.Rect(icon_x, by + 4, 22, 22), 1)
-                text_x = icon_x + 28
-            nc = (255, 255, 100) if is_sel else (180, 180, 200)
-            self._u3_text(b["name"], text_x, by + 6, nc, fs)
-
-        self._u3_text("[Tab] Next Brush",
-                      left_x + 10, panel_y + panel_h - 36,
-                      (140, 140, 160), fs)
-        self._u3_text("[Shift+Tab] Prev",
-                      left_x + 10, panel_y + panel_h - 20,
-                      (140, 140, 160), fs)
-
-        # ── Right panel: tile grid ──
-        grid_x = right_x + 4
-        grid_y = panel_y + 4
-        grid_w = right_w - 8
-        grid_h = panel_h - 8
-
-        # Calculate tile size to fit
-        ts = min(grid_w // tw, grid_h // th, 24)
-        total_w = tw * ts
-        total_h = th * ts
-        gx = grid_x + (grid_w - total_w) // 2
-        gy = grid_y + (grid_h - total_h) // 2
-
-        # Draw background
-        pygame.draw.rect(self.screen, (8, 6, 16),
-                         (grid_x, grid_y, grid_w, grid_h))
-
-        # Town tile colors from TILE_DEFS
-        TILE_COLORS = {tid: tdef.get("color", (80, 80, 80))
-                       for tid, tdef in TILE_DEFS.items()}
-
-        for r in range(th):
-            for c in range(tw):
-                px = gx + c * ts
-                py = gy + r * ts
-                pos_key = f"{c},{r}"
-
-                if pos_key in tiles:
-                    td = tiles[pos_key]
-                    tid = td.get("tile_id")
-                    # Try sprite
-                    path = td.get("path")
-                    drawn = False
-                    if path:
-                        sprite = self._get_unique_tile_sprite(path, ts)
-                        if sprite:
-                            self.screen.blit(sprite, (px, py))
-                            drawn = True
-                    if not drawn:
-                        col = TILE_COLORS.get(tid, (80, 80, 80))
-                        pygame.draw.rect(self.screen, col,
-                                         pygame.Rect(px, py, ts, ts))
-
-                    # Link badges
-                    badge_char = None
-                    badge_border = None
-                    badge_bg = None
-                    if td.get("to_overworld"):
-                        badge_border = (255, 180, 60)
-                        badge_bg = (200, 120, 0)
-                        badge_char = "O"
-                    elif td.get("interior"):
-                        badge_border = (80, 220, 255)
-                        badge_bg = (0, 140, 200)
-                        badge_char = "I"
-                    if badge_char:
-                        pygame.draw.rect(self.screen, badge_border,
-                                         pygame.Rect(px, py, ts, ts), 2)
-                        badge_sz = max(ts // 3, 6)
-                        bxb = px + ts - badge_sz - 1
-                        byb = py + 1
-                        pygame.draw.rect(self.screen, badge_bg,
-                                         pygame.Rect(bxb, byb,
-                                                     badge_sz, badge_sz))
-                        if badge_sz >= 8:
-                            tiny = (self.font_tiny
-                                    if hasattr(self, 'font_tiny')
-                                    else self.font_small)
-                            isf = tiny.render(badge_char, True,
-                                              (255, 255, 255))
-                            self.screen.blit(isf, (bxb + 1, byb))
-                else:
-                    # Checkerboard pattern for empty cells
-                    half = max(ts // 2, 1)
-                    for qr in range(2):
-                        for qc in range(2):
-                            qx = px + qc * half
-                            qy = py + qr * half
-                            qcol = ((45, 45, 45) if (qr + qc) % 2 == 0
-                                    else (30, 30, 30))
-                            pygame.draw.rect(self.screen, qcol,
-                                             pygame.Rect(qx, qy,
-                                                         half, half))
-
-                # Grid lines
-                pygame.draw.rect(self.screen, (40, 35, 30),
-                                 pygame.Rect(px, py, ts, ts), 1)
-
-        # Cursor
-        if cx >= 0 and cy >= 0:
-            elapsed = pygame.time.get_ticks() / 1000.0
-            pulse = int(80 + 40 * _math.sin(elapsed * 4))
-            cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts,
-                                      ts, ts)
-            pygame.draw.rect(self.screen, (255, 200, pulse),
-                             cursor_rect, 2)
-
-        # Grid border
-        pygame.draw.rect(self.screen, (60, 50, 40),
-                         (grid_x, grid_y, grid_w, grid_h), 1)
-
-        # ── Replace tile overlay ──
-        if data.get("replacing"):
-            self._draw_omap_int_replace_overlay(
-                grid_x, grid_y, grid_w, grid_h,
-                brushes,
-                data.get("replace_src_tile"),
-                data.get("replace_src_name", ""),
-                data.get("replace_src_empty", False),
-                data.get("replace_dst_idx", 0))
-
-        # ── Interior link picker overlay ──
-        if data.get("link_picking"):
-            self._draw_omap_int_link_picker(
-                grid_x, grid_y, grid_w, grid_h,
-                data.get("link_pick_list", []),
-                data.get("link_pick_cursor", 0))
-
-        # ── Footer ──
-        if data.get("replacing"):
-            hint = ("[Up/Dn] Select Destination  "
-                    "[Enter] Replace All  [Esc] Cancel")
-        elif data.get("link_picking"):
-            hint = ("[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel")
-        else:
-            hint = ("[Arrows/WASD] Move  [Enter] Paint  "
-                    "[I] Link  [R] Replace  [X] Unlink  "
-                    "[Tab] Brush  [Esc] Back")
-        hw = fs.size(hint)[0]
-        self._u3_text(hint,
-                      SCREEN_WIDTH // 2 - hw // 2,
-                      SCREEN_HEIGHT - footer_h + 4,
-                      self._U3_HINT, fs)
-
-    def _draw_omap_int_replace_overlay(self, rx, ry, rw, rh,
-                                        brushes, src_tile, src_name,
-                                        src_empty, dst_idx):
-        """Draw the replace-tile overlay for overview interior painter."""
-        from src.settings import TILE_DEFS
-        fs = self.font_small
-        f = self.font
-
-        ow = min(rw - 20, 280)
-        oh = rh - 20
-        ox = rx + (rw - ow) // 2
-        oy = ry + 10
-
-        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 220))
-        self.screen.blit(overlay, (ox, oy))
-        pygame.draw.rect(self.screen, (200, 160, 60),
-                         (ox, oy, ow, oh), 1)
-
-        self._u3_text("REPLACE TILE", ox + 10, oy + 6,
-                      self._U3_ORANGE, f)
-
-        # Source info
-        src_y = oy + 30
-        self._u3_text("Source:", ox + 10, src_y, (140, 140, 160), fs)
-        if src_empty:
-            # Checkerboard swatch
-            sw = 18
-            for qr in range(2):
-                for qc in range(2):
-                    qcol = ((50, 50, 50) if (qr + qc) % 2 == 0
-                            else (35, 35, 35))
-                    pygame.draw.rect(self.screen, qcol,
-                                     pygame.Rect(ox + 70 + qc * (sw // 2),
-                                                 src_y + qr * (sw // 2),
-                                                 sw // 2, sw // 2))
-        else:
-            tdef = TILE_DEFS.get(src_tile, {})
-            tc = tdef.get("color", (80, 80, 80))
-            pygame.draw.rect(self.screen, tc,
-                             pygame.Rect(ox + 70, src_y, 18, 18))
-        self._u3_text(src_name, ox + 95, src_y + 2, (255, 255, 200), fs)
-
-        # Destination list
-        dst_y0 = src_y + 28
-        self._u3_text("Destination:", ox + 10, dst_y0,
-                      (140, 140, 160), fs)
-        row_h = 26
-        list_y0 = dst_y0 + 20
-        max_vis = (oy + oh - list_y0 - 10) // row_h
-        scroll = max(0, dst_idx - max_vis + 1)
-
-        for i in range(scroll, min(scroll + max_vis, len(brushes))):
-            ly = list_y0 + (i - scroll) * row_h
-            is_sel = (i == dst_idx)
-            if is_sel:
-                bar = pygame.Surface((ow - 16, row_h - 2), pygame.SRCALPHA)
-                bar.fill((255, 200, 60, 40))
-                self.screen.blit(bar, (ox + 8, ly))
-
-            b = brushes[i]
-            # Swatch
-            if b.get("tile_id") is not None:
-                tdef = TILE_DEFS.get(b["tile_id"], {})
-                tc = tdef.get("color", (80, 80, 80))
-                pygame.draw.rect(self.screen, tc,
-                                 pygame.Rect(ox + 14, ly + 2, 16, 16))
-            else:
-                pygame.draw.rect(self.screen, (40, 35, 50),
-                                 pygame.Rect(ox + 14, ly + 2, 16, 16))
-                pygame.draw.line(self.screen, (200, 80, 80),
-                                 (ox + 16, ly + 4),
-                                 (ox + 28, ly + 16), 1)
-
-            nc = (255, 255, 100) if is_sel else (180, 180, 200)
-            prefix = "> " if is_sel else "  "
-            self._u3_text(f"{prefix}{b['name']}", ox + 36, ly + 2,
-                          nc, fs)
-
-    def _draw_omap_int_link_picker(self, rx, ry, rw, rh,
-                                    pick_list, cursor):
-        """Draw the interior link picker overlay for the interior painter.
-
-        Options: (none), Return to Overworld, then sibling interiors.
-        """
-        fs = self.font_small
-        f = self.font
-
-        ow = min(rw - 40, 320)
-        n_opts = 2 + len(pick_list)
-        oh = min(rh - 40, 40 + n_opts * 28)
-        ox = rx + (rw - ow) // 2
-        oy = ry + (rh - oh) // 2
-
-        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 220))
-        self.screen.blit(overlay, (ox, oy))
-        pygame.draw.rect(self.screen, (80, 220, 255),
-                         (ox, oy, ow, oh), 1)
-
-        self._u3_text("LINK TO", ox + 10, oy + 6,
-                      self._U3_ORANGE, f)
-
-        row_h = 28
-        ly = oy + 32
-
-        # Build options list
-        options = (["(none)", "\u2190 Return to Overworld"]
-                   + [i.get("name", "?") for i in pick_list])
-
-        for i, label in enumerate(options):
-            y = ly + i * row_h
-            if y + row_h > oy + oh:
-                break
-            is_sel = (i == cursor)
-            if is_sel:
-                bar = pygame.Surface((ow - 8, row_h - 2), pygame.SRCALPHA)
-                bar.fill((80, 220, 255, 40))
-                self.screen.blit(bar, (ox + 4, y))
-
-            if i == 0:
-                nc = (255, 100, 100)  # red for "(none)"
-            elif i == 1:
-                nc = (100, 255, 100)  # green for overworld exit
-            else:
-                nc = (255, 255, 100) if is_sel else (180, 180, 200)
-            prefix = "> " if is_sel else "  "
-            self._u3_text(f"{prefix}{label}", ox + 10, y + 4, nc, fs)
+        """Draw the overview map tile editor using the unified renderer."""
+        from src.map_editor_renderer import draw_map_editor
+        draw_map_editor(self, data)
 
     def _draw_section_browser(self, rx, ry, rw, rh,
-                               sections, cursor, scroll=0,
-                               nav_depth=0, nav_label=""):
+                               sections, cursor, scroll=0):
         """Draw the section browser (level 0 of hierarchical edit)."""
         fm = self.font_med
         fs = self.font_small
@@ -11739,16 +9760,9 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (140, 120, 60),
                          (rx, ry, rw, rh), 1)
 
-        # Title with breadcrumb
-        if nav_depth > 0 and nav_label:
-            self._u3_text(nav_label, rx + 16, ry + 12,
-                          self._U3_ORANGE, f)
-        elif nav_depth > 0:
-            self._u3_text("EDIT DUNGEON", rx + 16, ry + 12,
-                          self._U3_ORANGE, f)
-        else:
-            self._u3_text("EDIT MODULE", rx + 16, ry + 12,
-                          self._U3_ORANGE, f)
+        # Title
+        self._u3_text("EDIT MODULE", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
 
         # Scrollable section list
         content_top = ry + 44

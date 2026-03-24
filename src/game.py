@@ -126,7 +126,7 @@ class Game:
             {"label": "FORM PARTY", "action": self._title_form_party},
             {"label": "SAVE GAME", "action": self._title_save_game},
             {"label": "LOAD GAME", "action": self._title_load_game},
-            {"label": "EDIT GAME FEATURES", "action": self._title_features},
+            {"label": "EDIT GAME", "action": self._title_features},
             {"label": "SETTINGS", "action": self._title_settings},
             {"label": "QUIT GAME", "action": self._title_quit},
         ]
@@ -149,13 +149,7 @@ class Game:
         self.module_edit_sections = []       # list of section dicts
         self.module_edit_section_cursor = 0  # highlighted section
         self.module_edit_section_scroll = 0  # scroll for section list
-        # Navigation stack for nested section browsing (dungeon sub-sections)
-        self.module_edit_nav_stack = []      # [(sections, cursor, scroll)]
-        self.module_edit_dungeon_levels = {} # {dungeon_idx: [level_data]}
-        self.module_edit_active_dung = -1    # which dungeon index is active
-        self.module_edit_active_level = -1   # which level index (-1=props)
-        self.module_edit_active_enc = -1     # which encounter index
-        self._editing_level_settings = False # True when in level settings
+        self.module_edit_nav_stack = []
         from src.module_loader import get_default_module_path, scan_modules
         self.active_module_path = None
         self.active_module_name = "No Module"
@@ -207,6 +201,19 @@ class Game:
         self._fp_return_to_form_party = False
         self._fp_init()
 
+        # --- Map Editor hub (top-level, game-wide) ---
+        self._meh_editor_active = False  # True when map editor launched from hub
+        self._meh_sections = []       # section list
+        self._meh_cursor = 0          # section cursor
+        self._meh_scroll = 0          # scroll offset
+        self._meh_nav_stack = []      # folder navigation stack
+        self._meh_folder_label = ""   # current folder label
+        self._meh_level = 0           # 0=sections, 1=fields
+        self._meh_fields = []         # field list when editing
+        self._meh_field = 0           # field cursor
+        self._meh_buffer = ""         # field edit buffer
+        self._meh_field_scroll = 0    # field scroll offset
+
         # --- Game Features editor ---
         self.showing_features = False
         self._feat_cursor = 0        # top-level category cursor
@@ -217,8 +224,7 @@ class Game:
             {"label": "Monsters", "icon": "X"},
             {"label": "Tile Types", "icon": "T"},
             {"label": "Tile Gallery", "icon": "G"},
-            {"label": "Reusable Features", "icon": "F"},
-            {"label": "Town Layouts", "icon": "L"},
+            {"label": "Map Editor", "icon": "E"},
         ]
         self._modules_from_features = False  # True when modules opened from features
         # Spell editor state
@@ -348,59 +354,10 @@ class Game:
         self._unsaved_dialog_discard_cb = None # callable: exit without saving
         self._feat_dirty = False               # True when editor has unsaved changes
 
-        # Town editor state — restructured for new hierarchy
-        # Per-sub-editor lists stored by key
+        # Town layout data (used at runtime by _build_town_from_layout)
         self._feat_town_lists = {
             "layouts": [], "features": [], "interiors": [],
         }
-        self._feat_townlayout_cursor = 0
-        self._feat_townlayout_scroll = 0
-        self._feat_townlayout_editing = False  # True when in grid painter
-        self._feat_townlayout_cx = 0          # cursor col in grid
-        self._feat_townlayout_cy = 0          # cursor row in grid
-        self._feat_townlayout_brush_idx = 0   # index into brush palette
-        self._feat_townlayout_brushes = None  # built lazily from manifest
-        self._feat_townlayout_naming = False   # True when typing a name
-        self._feat_townlayout_name_buf = ""    # text buffer for naming
-        # New state for town editor hierarchy
-        self._feat_town_active_sub = None     # None (town list), "nodes" (3-node selection),
-                                               # "details" (editing details), "interiors" (interior list)
-        self._feat_town_selected_idx = 0      # index into layouts[] for the currently selected town
-        self._feat_town_node_cursor = 0       # 0=Details, 1=Interiors, 2=Layout
-        self._feat_town_detail_editing = False  # True when editing name/desc
-        self._feat_town_desc_buf = ""         # text buffer for description
-        # Tile replace mode (opened with R in the grid painter)
-        self._feat_townlayout_replacing = False    # True when replace overlay is open
-        self._feat_townlayout_replace_src_tile = None  # tile_id of source tile under cursor
-        self._feat_townlayout_replace_src_name = ""    # display name of source tile
-        self._feat_townlayout_replace_src_empty = False  # True when replacing empty cells
-        self._feat_townlayout_replace_dst_idx = 0      # brush index for destination
-        # Town picker overlay (shown when copying interior to pick parent)
-        self._feat_town_picker_active = False
-        self._feat_town_picker_cursor = 0
-        # Interior-link picker (opened with I in the grid painter)
-        self._feat_interior_picking = False    # True when picker overlay is open
-        self._feat_interior_pick_cursor = 0    # cursor in the picker list
-        self._feat_interior_pick_scroll = 0    # scroll offset for the list
-
-        # Reusable Features editor state
-        self._feat_rfeat_lists = {
-            "town": [], "dungeon": [], "overworld": [],
-        }
-        self._feat_rfeat_folders = []       # folder dicts with name/label/count
-        self._feat_rfeat_folder_cursor = 0
-        self._feat_rfeat_folder_scroll = 0
-        self._feat_rfeat_in_folder = False
-        self._feat_rfeat_cursor = 0
-        self._feat_rfeat_scroll = 0
-        self._feat_rfeat_current_ctx = "town"  # which folder we're in
-        self._feat_rfeat_editing = False     # True when in grid painter
-        self._feat_rfeat_cx = 0
-        self._feat_rfeat_cy = 0
-        self._feat_rfeat_brush_idx = 0
-        self._feat_rfeat_brushes = None
-        self._feat_rfeat_naming = False
-        self._feat_rfeat_name_buf = ""
 
         self._feat_pxedit_palette = [
             (0, 0, 0, 255),        # Black
@@ -1876,6 +1833,131 @@ class Game:
         """Quit the game."""
         pygame.event.post(pygame.event.Event(pygame.QUIT))
 
+    # ── Map Editor hub (shared helpers) ──────────────────────────
+
+    def _handle_meh_field_input(self, event):
+        """Handle input in the Map Editor hub field editor."""
+        if event.key == pygame.K_ESCAPE:
+            self._meh_level = 0
+            return
+
+        fields = self._meh_fields
+        n = len(fields)
+        if n == 0:
+            self._meh_level = 0
+            return
+
+        fi = self._meh_field
+        ftype = fields[fi][3] if len(fields[fi]) > 3 else "text"
+        editable = fields[fi][4] if len(fields[fi]) > 4 else True
+
+        if event.key == pygame.K_UP:
+            self._meh_field = self._meh_next_editable(fi - 1, -1)
+            self._meh_buffer = str(fields[self._meh_field][2])
+        elif event.key == pygame.K_DOWN:
+            self._meh_field = self._meh_next_editable(fi + 1, 1)
+            self._meh_buffer = str(fields[self._meh_field][2])
+        elif event.key == pygame.K_RETURN:
+            if editable and ftype == "text":
+                fields[fi][2] = self._meh_buffer
+        elif event.key == pygame.K_BACKSPACE:
+            if editable and ftype == "text":
+                self._meh_buffer = self._meh_buffer[:-1]
+        elif event.unicode and editable and ftype == "text":
+            self._meh_buffer += event.unicode
+
+    def _meh_next_editable(self, start, direction=1):
+        """Find next editable field index."""
+        fields = self._meh_fields
+        n = len(fields)
+        if n == 0:
+            return 0
+        idx = start % n
+        for _ in range(n):
+            editable = fields[idx][4] if len(fields[idx]) > 4 else True
+            ftype = fields[idx][3] if len(fields[idx]) > 3 else "text"
+            if editable and ftype != "section":
+                return idx
+            idx = (idx + direction) % n
+        return start % n
+
+    def _handle_mapeditor_feat_input(self, event):
+        """Handle input for the Map Editor inside the features screen.
+
+        Reuses the _meh_* state variables for section/folder/field browsing.
+        When the actual map editor is active, delegates to its handler.
+        """
+        if event.type != pygame.KEYDOWN:
+            return
+
+        # ── Fullscreen map editor active (launched from a template) ──
+        if self._meh_editor_active:
+            self._handle_map_editor_input(event)
+            return
+
+        # ── Section browsing mode ──
+        n = len(self._meh_sections)
+
+        if event.key == pygame.K_ESCAPE:
+            if self._meh_nav_stack:
+                # Pop up one folder level
+                (prev_secs, prev_cur, prev_scroll,
+                 prev_label) = self._meh_nav_stack.pop()
+                self._meh_sections = prev_secs
+                self._meh_cursor = prev_cur
+                self._meh_scroll = prev_scroll
+                self._meh_folder_label = prev_label
+            else:
+                # Return to features category list
+                self._feat_level = 0
+                self._feat_active_editor = None
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._meh_cursor = (self._meh_cursor - 1) % n
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._meh_cursor = (self._meh_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            sec = self._meh_sections[self._meh_cursor]
+            if sec.get("folder"):
+                # Enter folder
+                self._meh_nav_stack.append((
+                    self._meh_sections,
+                    self._meh_cursor,
+                    self._meh_scroll,
+                    self._meh_folder_label,
+                ))
+                self._meh_sections = list(sec.get("children", []))
+                self._meh_cursor = 0
+                self._meh_scroll = 0
+                self._meh_folder_label = sec.get("label", "")
+            elif sec.get("map_config"):
+                # Launch the actual map editor
+                self._meh_launch_editor(sec)
+        elif event.key == pygame.K_LEFT:
+            if self._meh_nav_stack:
+                (prev_secs, prev_cur, prev_scroll,
+                 prev_label) = self._meh_nav_stack.pop()
+                self._meh_sections = prev_secs
+                self._meh_cursor = prev_cur
+                self._meh_scroll = prev_scroll
+                self._meh_folder_label = prev_label
+
+    def _get_map_editor_hub_data(self):
+        """Return render data for the Map Editor hub screen."""
+        return {
+            "sections": self._meh_sections,
+            "cursor": self._meh_cursor,
+            "scroll": self._meh_scroll,
+            "nav_depth": len(self._meh_nav_stack),
+            "folder_label": self._meh_folder_label,
+            "level": self._meh_level,
+            "fields": self._meh_fields,
+            "field_cursor": self._meh_field,
+            "field_buffer": self._meh_buffer,
+            "field_scroll": self._meh_field_scroll,
+        }
+
     # ── Game Features editor ──────────────────────────────────
 
     def _title_features(self):
@@ -3256,223 +3338,6 @@ class Game:
             return False
         return True
 
-    # ── Reusable Features editor ──────────────────────────────────
-
-    _RFEAT_FOLDER_ORDER = [
-        {"name": "town",      "label": "Town"},
-        {"name": "dungeon",   "label": "Dungeon"},
-        {"name": "overworld", "label": "Overworld"},
-    ]
-    _RFEAT_DEFAULTS = {
-        "town":      {"width": 8, "height": 8},
-        "dungeon":   {"width": 8, "height": 8},
-        "overworld": {"width": 8, "height": 8},
-    }
-
-    def _feat_rfeat_path(self):
-        """Path to reusable_features.json."""
-        return os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "data", "reusable_features.json")
-
-    def _feat_load_rfeat(self):
-        """Load reusable features from disk."""
-        import json
-        data = {}
-        try:
-            with open(self._feat_rfeat_path(), "r") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            pass
-        for ctx in ("town", "dungeon", "overworld"):
-            items = []
-            for raw in data.get(ctx, []):
-                items.append({
-                    "name": raw.get("name", "Unnamed"),
-                    "width": raw.get("width",
-                                     self._RFEAT_DEFAULTS[ctx]["width"]),
-                    "height": raw.get("height",
-                                      self._RFEAT_DEFAULTS[ctx]["height"]),
-                    "tiles": dict(raw.get("tiles", {})),
-                })
-            self._feat_rfeat_lists[ctx] = items
-        self._feat_rfeat_folder_cursor = 0
-        self._feat_rfeat_folder_scroll = 0
-        self._feat_rfeat_in_folder = False
-        self._feat_rebuild_rfeat_folders()
-
-    def _feat_save_rfeat(self):
-        """Persist reusable features to disk."""
-        import json
-        data = {}
-        for ctx in ("town", "dungeon", "overworld"):
-            raw = []
-            for feat in self._feat_rfeat_lists.get(ctx, []):
-                raw.append({
-                    "name": feat["name"],
-                    "width": feat["width"],
-                    "height": feat["height"],
-                    "tiles": dict(feat.get("tiles", {})),
-                })
-            data[ctx] = raw
-        try:
-            with open(self._feat_rfeat_path(), "w") as f:
-                json.dump(data, f, indent=2)
-        except OSError:
-            pass
-
-    def _feat_rebuild_rfeat_folders(self):
-        """Build folder list with feature counts per context."""
-        folders = []
-        for fdef in self._RFEAT_FOLDER_ORDER:
-            fname = fdef["name"]
-            count = len(self._feat_rfeat_lists.get(fname, []))
-            folders.append({
-                "name": fname,
-                "label": fdef["label"],
-                "count": count,
-            })
-        self._feat_rfeat_folders = folders
-
-    def _feat_rfeat_enter_folder(self):
-        """Enter the selected context folder."""
-        if self._feat_rfeat_folder_cursor >= len(self._feat_rfeat_folders):
-            return
-        self._feat_rfeat_current_ctx = self._feat_rfeat_folders[
-            self._feat_rfeat_folder_cursor]["name"]
-        self._feat_rfeat_in_folder = True
-        self._feat_rfeat_cursor = 0
-        self._feat_rfeat_scroll = 0
-
-    def _feat_rfeat_current_list(self):
-        """Return the feature list for the current folder."""
-        return self._feat_rfeat_lists.get(
-            self._feat_rfeat_current_ctx, [])
-
-    def _feat_rfeat_add(self):
-        """Add a new reusable feature in the current folder."""
-        ctx = self._feat_rfeat_current_ctx
-        defaults = self._RFEAT_DEFAULTS[ctx]
-        items = self._feat_rfeat_lists.get(ctx, [])
-        n = len(items) + 1
-        items.append({
-            "name": f"Feature {n}",
-            "width": defaults["width"],
-            "height": defaults["height"],
-            "tiles": {},
-        })
-        self._feat_rfeat_lists[ctx] = items
-        self._feat_rfeat_cursor = len(items) - 1
-        self._feat_rebuild_rfeat_folders()
-
-    def _feat_rfeat_remove(self):
-        """Remove the selected reusable feature."""
-        items = self._feat_rfeat_current_list()
-        if not items:
-            return
-        idx = self._feat_rfeat_cursor
-        if 0 <= idx < len(items):
-            items.pop(idx)
-            if self._feat_rfeat_cursor >= len(items):
-                self._feat_rfeat_cursor = max(0, len(items) - 1)
-        self._feat_rebuild_rfeat_folders()
-
-    def _feat_rfeat_enter_painter(self):
-        """Enter the grid painter for the selected feature."""
-        items = self._feat_rfeat_current_list()
-        if not items or self._feat_rfeat_cursor >= len(items):
-            return
-        self._feat_rfeat_editing = True
-        self._feat_rfeat_cx = 0
-        self._feat_rfeat_cy = 0
-        self._feat_rfeat_brush_idx = 0
-        self._feat_rfeat_brushes = None
-
-    def _feat_get_rfeat_brushes(self):
-        """Build brush list for the reusable features editor."""
-        if self._feat_rfeat_brushes is not None:
-            return self._feat_rfeat_brushes
-        brushes = [
-            {"name": "Eraser", "tile_id": None, "path": None},
-        ]
-        from src.settings import TILE_DEFS
-        ctx = self._feat_rfeat_current_ctx
-        ctx_ids = sorted(
-            tid for tid, c in self._TILE_CONTEXT.items()
-            if c == ctx
-        )
-        manifest = {}
-        try:
-            mpath = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "data", "tile_manifest.json")
-            with open(mpath) as f:
-                manifest = json.load(f)
-        except (OSError, ValueError):
-            pass
-        saved_tile_defs = {}
-        try:
-            with open(self._feat_tiles_path(), "r") as f:
-                saved_tile_defs = json.load(f)
-        except (OSError, ValueError):
-            pass
-
-        def _resolve_path(tid):
-            saved = saved_tile_defs.get(str(tid), {})
-            sprite_key = saved.get("sprite", "")
-            if sprite_key and "/" in sprite_key:
-                cat, name = sprite_key.split("/", 1)
-                section = manifest.get(cat, {})
-                if isinstance(section, dict):
-                    entry = section.get(name, {})
-                    if isinstance(entry, dict) and "path" in entry:
-                        p = entry["path"]
-                        if p.startswith("src/assets/"):
-                            p = p[len("src/assets/"):]
-                        return p
-            for tile in getattr(self, "_feat_tile_list", []):
-                if tile.get("_tile_id") == tid:
-                    sk = tile.get("_sprite", "")
-                    if sk and "/" in sk:
-                        cat, name = sk.split("/", 1)
-                        section = manifest.get(cat, {})
-                        if isinstance(section, dict):
-                            entry = section.get(name, {})
-                            if isinstance(entry, dict) and "path" in entry:
-                                p = entry["path"]
-                                if p.startswith("src/assets/"):
-                                    p = p[len("src/assets/"):]
-                                return p
-                    break
-            for cat in manifest:
-                if cat.startswith("_"):
-                    continue
-                section = manifest.get(cat, {})
-                if not isinstance(section, dict):
-                    continue
-                for _name, entry in section.items():
-                    if (isinstance(entry, dict)
-                            and entry.get("tile_id") == tid
-                            and "path" in entry):
-                        p = entry["path"]
-                        if p.startswith("src/assets/"):
-                            p = p[len("src/assets/"):]
-                        return p
-            return None
-
-        for tid in ctx_ids:
-            td = TILE_DEFS.get(tid)
-            if not td:
-                continue
-            brushes.append({
-                "name": td.get("name", f"Tile {tid}"),
-                "tile_id": tid,
-                "path": _resolve_path(tid),
-            })
-        self._feat_rfeat_brushes = brushes
-        return brushes
-
-    # ── Default sizes for each sub-editor type ──
     _TOWN_SUB_DEFAULTS = {
         "layouts":   {"name_prefix": "Town Layout",   "width": 18, "height": 19},
         "features":  {"name_prefix": "Town Feature",  "width": 8,  "height": 8},
@@ -3523,99 +3388,6 @@ class Game:
         self._feat_townlayout_cursor = 0
         self._feat_townlayout_scroll = 0
         self._feat_townlayout_editing = False
-
-    def _feat_migrate_interior_parents(self):
-        """Auto-assign parent_town to interiors that don't have one yet.
-
-        Scans all layouts to find which interior names are referenced,
-        then assigns the first referencing layout as the parent.
-        """
-        interiors = self._feat_town_lists.get("interiors", [])
-        unscoped = [i for i in interiors if not i.get("parent_town")]
-        if not unscoped:
-            return
-        # Build a map: interior_name → first layout that references it
-        name_to_town = {}
-        for layout in self._feat_town_lists.get("layouts", []):
-            for td in layout.get("tiles", {}).values():
-                iname = td.get("interior")
-                if iname and iname not in name_to_town:
-                    name_to_town[iname] = layout["name"]
-        # Assign parent_town based on references found
-        changed = False
-        for interior in unscoped:
-            parent = name_to_town.get(interior["name"], "")
-            if parent:
-                interior["parent_town"] = parent
-                changed = True
-        if changed:
-            self._feat_save_townlayouts()
-
-    @property
-    def _feat_townlayout_list(self):
-        """Return the appropriate list based on active_sub state.
-
-        - When active_sub is None, "nodes", or "details": return layouts list (town list)
-        - When active_sub is "interiors": return filtered interiors for selected town
-        """
-        if self._feat_town_active_sub in ("interiors", "details", "nodes") or self._feat_town_active_sub is None:
-            # For town list, nodes, details views: return layouts
-            if self._feat_town_active_sub is None or self._feat_town_active_sub in ("nodes", "details"):
-                return self._feat_town_lists.get("layouts", [])
-            # For interiors view: return filtered list scoped to selected town
-            if self._feat_town_active_sub == "interiors":
-                selected_town = self._get_selected_town_name()
-                if selected_town:
-                    return [i for i in self._feat_town_lists.get("interiors", [])
-                            if i.get("parent_town") == selected_town]
-                return []
-        return self._feat_town_lists.get("layouts", [])
-
-    @_feat_townlayout_list.setter
-    def _feat_townlayout_list(self, value):
-        """Set the list based on active_sub state.
-
-        For interiors, this just replaces the entire list since we work
-        with filtered views. The naming/painting handlers update items
-        directly by reference, so the filtered list changes are reflected
-        in the main interiors list.
-        """
-        if self._feat_town_active_sub == "interiors":
-            self._feat_town_lists["interiors"] = value
-        else:
-            self._feat_town_lists["layouts"] = value
-
-    def _get_selected_town_name(self):
-        """Get the name of the currently selected town."""
-        layouts = self._feat_town_lists.get("layouts", [])
-        if 0 <= self._feat_town_selected_idx < len(layouts):
-            return layouts[self._feat_town_selected_idx]["name"]
-        return None
-
-    def _feat_save_townlayouts(self):
-        """Persist all town sub-editor lists to town_templates.json."""
-        data = {}
-        for sub_key in ("layouts", "features", "interiors"):
-            raw = []
-            for tl in self._feat_town_lists.get(sub_key, []):
-                item = {
-                    "name": tl["name"],
-                    "width": tl["width"],
-                    "height": tl["height"],
-                    "tiles": dict(tl.get("tiles", {})),
-                }
-                if sub_key == "layouts":
-                    item["description"] = tl.get("description", "")
-                if sub_key == "interiors":
-                    item["parent_town"] = tl.get("parent_town", "")
-                raw.append(item)
-            data[sub_key] = raw
-        path = self._feat_town_templates_path()
-        try:
-            with open(path, "w") as f:
-                json.dump(data, f, indent=2)
-        except OSError:
-            pass
 
     def _build_town_from_layout(self, layout_name, town_name,
                                  town_style="medieval"):
@@ -3691,767 +3463,6 @@ class Game:
             interior_links=interior_links,
             overworld_exits=overworld_exits,
         )
-
-    def _feat_add_townlayout(self, parent_town=""):
-        """Add a new empty item to the active sub-editor.
-
-        Parameters
-        ----------
-        parent_town : str
-            For interiors, the name of the parent layout this interior
-            belongs to.  Ignored for layouts and features.
-        """
-        sub = self._feat_town_active_sub or "layouts"
-        defaults = self._TOWN_SUB_DEFAULTS[sub]
-        items = self._feat_town_lists[sub]
-        idx = len(items)
-        item = {
-            "name": f"{defaults['name_prefix']} {idx + 1}",
-            "width": defaults["width"],
-            "height": defaults["height"],
-            "tiles": {},
-        }
-        if sub == "layouts":
-            item["description"] = ""
-        if sub == "interiors":
-            item["parent_town"] = parent_town
-        items.append(item)
-        # For interiors, set cursor based on the filtered list (which may
-        # be shorter than the full interiors list) so it points at the
-        # newly added item.
-        if sub == "interiors":
-            filtered = self._feat_townlayout_list
-            self._feat_townlayout_cursor = max(0, len(filtered) - 1)
-        else:
-            self._feat_townlayout_cursor = idx
-        return item
-
-    def _feat_remove_townlayout(self):
-        """Remove the currently selected item from the active sub-editor."""
-        if self._feat_town_active_sub == "interiors":
-            # For interiors, we need to find and remove from the full list
-            filtered_items = self._feat_townlayout_list
-            if not filtered_items or self._feat_townlayout_cursor >= len(filtered_items):
-                return
-            item_to_remove = filtered_items[self._feat_townlayout_cursor]
-            # Find and remove this item from the full interiors list
-            all_interiors = self._feat_town_lists.get("interiors", [])
-            try:
-                all_interiors.remove(item_to_remove)
-            except ValueError:
-                pass
-            # Recalculate filtered list and adjust cursor
-            filtered_items = self._feat_townlayout_list
-            if self._feat_townlayout_cursor >= len(filtered_items):
-                self._feat_townlayout_cursor = max(0, len(filtered_items) - 1)
-        else:
-            # For layouts/features, remove from list directly
-            items = self._feat_townlayout_list
-            if not items:
-                return
-            idx = self._feat_townlayout_cursor
-            items.pop(idx)
-            if self._feat_townlayout_cursor >= len(items):
-                self._feat_townlayout_cursor = max(0, len(items) - 1)
-
-    def _feat_enter_townlayout_painter(self):
-        """Enter the grid painter for the selected item."""
-        if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
-            return
-        self._feat_townlayout_editing = True
-        self._feat_townlayout_cx = 1
-        self._feat_townlayout_cy = 1
-        self._feat_townlayout_brush_idx = 0
-        # Invalidate brush cache so features list is rebuilt fresh
-        self._feat_townlayout_brushes = None
-
-    def _feat_get_townlayout_brushes(self):
-        """Build brush list from the Tile Types (TILE_DEFS) for town context."""
-        if self._feat_townlayout_brushes is not None:
-            return self._feat_townlayout_brushes
-        brushes = [
-            {"name": "Eraser", "tile_id": None, "path": None},
-        ]
-        # Collect town tile IDs from Tile Types definitions
-        from src.settings import TILE_DEFS
-        town_ids = sorted(
-            tid for tid, ctx in self._TILE_CONTEXT.items()
-            if ctx == "town"
-        )
-
-        # Load saved tile defs for authoritative sprite keys
-        saved_tile_defs = {}
-        try:
-            with open(self._feat_tiles_path(), "r") as f:
-                saved_tile_defs = json.load(f)
-        except (OSError, ValueError):
-            pass
-
-        # Load manifest for resolving sprite key → file path
-        manifest = {}
-        try:
-            mpath = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "data", "tile_manifest.json")
-            with open(mpath) as f:
-                manifest = json.load(f)
-        except (OSError, ValueError):
-            pass
-
-        def _resolve_sprite_path(tid):
-            """Get the sprite asset path for a tile_id.
-
-            Priority: 1) saved _sprite key from tile_defs.json
-                      2) manifest tile_id reverse lookup (first match)
-            """
-            # Try the authoritative sprite key from tile_defs.json
-            saved = saved_tile_defs.get(str(tid), {})
-            sprite_key = saved.get("sprite", "")
-            if sprite_key and "/" in sprite_key:
-                cat, name = sprite_key.split("/", 1)
-                section = manifest.get(cat, {})
-                if isinstance(section, dict):
-                    entry = section.get(name, {})
-                    if isinstance(entry, dict) and "path" in entry:
-                        p = entry["path"]
-                        if p.startswith("src/assets/"):
-                            p = p[len("src/assets/"):]
-                        return p
-            # Also check the in-memory tile list (for unsaved changes)
-            for tile in getattr(self, "_feat_tile_list", []):
-                if tile.get("_tile_id") == tid:
-                    sk = tile.get("_sprite", "")
-                    if sk and "/" in sk:
-                        cat, name = sk.split("/", 1)
-                        section = manifest.get(cat, {})
-                        if isinstance(section, dict):
-                            entry = section.get(name, {})
-                            if isinstance(entry, dict) and "path" in entry:
-                                p = entry["path"]
-                                if p.startswith("src/assets/"):
-                                    p = p[len("src/assets/"):]
-                                return p
-                    break
-            # Fallback: scan manifest for first entry with this tile_id
-            for cat in manifest:
-                if cat.startswith("_"):
-                    continue
-                section = manifest.get(cat, {})
-                if not isinstance(section, dict):
-                    continue
-                for _name, entry in section.items():
-                    if (isinstance(entry, dict)
-                            and entry.get("tile_id") == tid
-                            and "path" in entry):
-                        p = entry["path"]
-                        if p.startswith("src/assets/"):
-                            p = p[len("src/assets/"):]
-                        return p
-            return None
-
-        for tid in town_ids:
-            td = TILE_DEFS.get(tid)
-            if not td:
-                continue
-            brushes.append({
-                "name": td.get("name", f"Tile {tid}"),
-                "tile_id": tid,
-                "path": _resolve_sprite_path(tid),
-            })
-
-        # ── Append town features as composite brushes (only for town layouts, not interiors) ──
-        # Features should appear when editing a layout, but not when editing an interior
-        sub = self._feat_town_active_sub or "layouts"
-        is_editing_layout = sub in (None, "nodes", "details")
-        if is_editing_layout:
-            features = self._feat_town_lists.get("features", [])
-            for fi, feat in enumerate(features):
-                if not feat.get("tiles"):
-                    continue  # skip empty features
-                brushes.append({
-                    "name": f"\u2726 {feat['name']}",
-                    "tile_id": None,
-                    "path": None,
-                    "feature": feat,
-                })
-
-            # Also append reusable features (town context) from the new system
-            self._feat_load_rfeat()  # ensure data is loaded from disk
-            rfeat_town = self._feat_rfeat_lists.get("town", [])
-            for feat in rfeat_town:
-                if not feat.get("tiles"):
-                    continue  # skip empty features
-                brushes.append({
-                    "name": f"\u2726 {feat['name']}",
-                    "tile_id": None,
-                    "path": None,
-                    "feature": feat,
-                })
-
-        self._feat_townlayout_brushes = brushes
-        return brushes
-
-    def _feat_handle_townlayout_input(self, event):
-        """Handle input for the town layouts editor with new hierarchy.
-
-        Navigation flow:
-        - active_sub is None → Town list (show layouts, Enter goes to nodes)
-        - active_sub == "nodes" → Node selection (3 nodes, Enter opens selected)
-        - active_sub == "details" → Detail editing (name/description text fields)
-        - active_sub == "interiors" → Interior list for this town
-        - Grid painter (editing=True) works for both layout and interior editing
-        """
-        if event.type != pygame.KEYDOWN:
-            return
-
-        # Intercept input when unsaved-changes dialog is showing
-        if self._unsaved_dialog_active:
-            self._handle_unsaved_dialog_input(event)
-            return
-
-        # ── Town picker overlay (for copying interior to pick parent) ──
-        if self._feat_town_picker_active:
-            self._feat_handle_town_picker_input(event)
-            return
-
-        # ── Naming mode: capture text input ──
-        if self._feat_townlayout_naming:
-            self._feat_handle_townlayout_naming_input(event)
-            return
-
-        # ── Detail editing mode (editing name/description) ──
-        if self._feat_town_detail_editing:
-            self._feat_handle_town_detail_editing_input(event)
-            return
-
-        # ── Tile replace overlay ──
-        if self._feat_townlayout_replacing:
-            self._feat_handle_townlayout_replace_input(event)
-            return
-
-        # ── Interior picker overlay ──
-        if self._feat_interior_picking:
-            self._feat_handle_interior_picker_input(event)
-            return
-
-        if self._feat_townlayout_editing:
-            # Grid painter mode
-            self._feat_handle_townlayout_painter_input(event)
-            return
-
-        # ── Town list (active_sub is None) ──
-        if self._feat_town_active_sub is None:
-            layouts = self._feat_town_lists.get("layouts", [])
-            n = len(layouts)
-            if event.key == pygame.K_ESCAPE:
-                self._feat_level = 0
-                self._feat_active_editor = None
-            elif event.key == pygame.K_UP and n > 0:
-                self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
-                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
-                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
-            elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_townlayout_cursor = (self._feat_townlayout_cursor + 1) % n
-                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
-                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
-                # Enter the nodes view for this town
-                self._feat_town_selected_idx = self._feat_townlayout_cursor
-                self._feat_town_active_sub = "nodes"
-                self._feat_town_node_cursor = 0
-            elif self._is_new_shortcut(event):
-                # Add new town layout
-                self._feat_add_townlayout()
-                self._feat_save_townlayouts()
-                self._feat_dirty = False
-            elif self._is_delete_shortcut(event) and n > 0:
-                self._feat_remove_townlayout()
-                self._feat_save_townlayouts()
-                self._feat_dirty = False
-            elif event.key == pygame.K_n and n > 0:
-                # Rename the selected town
-                item = layouts[self._feat_townlayout_cursor]
-                self._feat_townlayout_naming = True
-                self._feat_townlayout_name_buf = item.get("name", "")
-            return
-
-        # ── Node selection (active_sub == "nodes") ──
-        if self._feat_town_active_sub == "nodes":
-            if event.key == pygame.K_ESCAPE:
-                self._feat_save_townlayouts()
-                self._feat_town_active_sub = None
-            elif event.key == pygame.K_UP:
-                self._feat_town_node_cursor = (self._feat_town_node_cursor - 1) % 3
-            elif event.key == pygame.K_DOWN:
-                self._feat_town_node_cursor = (self._feat_town_node_cursor + 1) % 3
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                # Open the selected node
-                if self._feat_town_node_cursor == 0:
-                    # Town Details — point cursor at selected town for renderer
-                    self._feat_townlayout_cursor = self._feat_town_selected_idx
-                    self._feat_town_active_sub = "details"
-                    self._feat_town_detail_editing = False
-                elif self._feat_town_node_cursor == 1:
-                    # Town Interiors
-                    self._feat_town_active_sub = "interiors"
-                    self._feat_townlayout_cursor = 0
-                    self._feat_townlayout_scroll = 0
-                elif self._feat_town_node_cursor == 2:
-                    # Town Layout (enter grid painter) — point cursor at selected town
-                    self._feat_townlayout_cursor = self._feat_town_selected_idx
-                    self._feat_enter_townlayout_painter()
-                    self._feat_dirty = False
-                    self._feat_level = 2
-            return
-
-        # ── Detail editing (active_sub == "details") ──
-        if self._feat_town_active_sub == "details":
-            if event.key == pygame.K_ESCAPE:
-                self._feat_save_townlayouts()
-                self._feat_town_active_sub = "nodes"
-            elif event.key == pygame.K_n:
-                # Start editing name — set cursor to match selected town
-                # so the shared naming handler updates the right item
-                self._feat_townlayout_cursor = self._feat_town_selected_idx
-                layouts = self._feat_town_lists.get("layouts", [])
-                if 0 <= self._feat_town_selected_idx < len(layouts):
-                    item = layouts[self._feat_town_selected_idx]
-                    self._feat_townlayout_naming = True
-                    self._feat_townlayout_name_buf = item.get("name", "")
-            elif event.key == pygame.K_d:
-                # Start editing description
-                self._feat_town_detail_editing = True
-                layouts = self._feat_town_lists.get("layouts", [])
-                if 0 <= self._feat_town_selected_idx < len(layouts):
-                    item = layouts[self._feat_town_selected_idx]
-                    self._feat_town_desc_buf = item.get("description", "")
-            return
-
-        # ── Interior list (active_sub == "interiors") ──
-        if self._feat_town_active_sub == "interiors":
-            interiors = self._feat_townlayout_list  # filtered by parent_town
-            n = len(interiors)
-            if event.key == pygame.K_ESCAPE:
-                self._feat_save_townlayouts()
-                self._feat_town_active_sub = "nodes"
-                # Restore cursor to the selected town index for layout operations
-                self._feat_townlayout_cursor = self._feat_town_selected_idx
-            elif event.key == pygame.K_UP and n > 0:
-                self._feat_townlayout_cursor = (self._feat_townlayout_cursor - 1) % n
-                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
-                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
-            elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_townlayout_cursor = (self._feat_townlayout_cursor + 1) % n
-                self._feat_townlayout_scroll = self._feat_adjust_scroll_generic(
-                    self._feat_townlayout_cursor, self._feat_townlayout_scroll)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
-                # Enter grid painter for selected interior
-                self._feat_enter_townlayout_painter()
-                self._feat_dirty = False
-                self._feat_level = 2
-            elif self._is_new_shortcut(event):
-                # Add new interior scoped to current town
-                selected_town = self._get_selected_town_name()
-                self._feat_add_townlayout(parent_town=selected_town or "")
-                self._feat_save_townlayouts()
-                self._feat_dirty = False
-            elif self._is_delete_shortcut(event) and n > 0:
-                self._feat_remove_townlayout()
-                self._feat_save_townlayouts()
-                self._feat_dirty = False
-            elif event.key == pygame.K_c and n > 0:
-                # Copy interior to another town
-                self._feat_copy_interior_source = self._feat_townlayout_cursor
-                layouts = self._feat_town_lists.get("layouts", [])
-                if layouts:
-                    self._feat_town_picker_active = True
-                    self._feat_town_picker_cursor = 0
-                    self._feat_town_picker_mode = "copy"
-                else:
-                    self._feat_do_copy_interior("")
-            elif event.key == pygame.K_n and n > 0:
-                # Rename interior
-                if self._feat_townlayout_cursor >= n:
-                    self._feat_townlayout_cursor = max(0, n - 1)
-                item = interiors[self._feat_townlayout_cursor]
-                self._feat_townlayout_naming = True
-                self._feat_townlayout_name_buf = item.get("name", "")
-            return
-
-    def _feat_handle_town_detail_editing_input(self, event):
-        """Handle text input while editing town description."""
-        if event.key == pygame.K_RETURN:
-            # Confirm the description
-            layouts = self._feat_town_lists.get("layouts", [])
-            if 0 <= self._feat_town_selected_idx < len(layouts):
-                layouts[self._feat_town_selected_idx]["description"] = self._feat_town_desc_buf
-                self._feat_save_townlayouts()
-            self._feat_town_detail_editing = False
-            self._feat_town_desc_buf = ""
-        elif event.key == pygame.K_ESCAPE:
-            # Cancel editing
-            self._feat_town_detail_editing = False
-            self._feat_town_desc_buf = ""
-        elif event.key == pygame.K_BACKSPACE:
-            self._feat_town_desc_buf = self._feat_town_desc_buf[:-1]
-        else:
-            # Append typed character (if printable)
-            ch = event.unicode
-            if ch and ch.isprintable() and len(self._feat_town_desc_buf) < 200:
-                self._feat_town_desc_buf += ch
-
-    def _feat_do_copy_interior(self, parent_town):
-        """Duplicate the selected interior as a new independent instance."""
-        import copy
-        interiors = self._feat_town_lists.get("interiors", [])
-
-        # Get the source interior
-        # The _feat_copy_interior_source is set from the filtered list
-        # In interiors view, _feat_townlayout_cursor is the index into filtered list
-        filtered_idx = getattr(self, "_feat_copy_interior_source", 0)
-        filtered_list = self._feat_townlayout_list
-        if filtered_idx >= len(filtered_list):
-            return
-        src = filtered_list[filtered_idx]
-        new_item = {
-            "name": f"{src['name']} (Copy)",
-            "width": src["width"],
-            "height": src["height"],
-            "tiles": copy.deepcopy(src.get("tiles", {})),
-            "parent_town": parent_town,
-        }
-        interiors.append(new_item)
-        self._feat_townlayout_cursor = len(interiors) - 1
-        self._feat_dirty = True
-
-    def _feat_handle_town_picker_input(self, event):
-        """Handle input for the town picker overlay (select parent layout).
-
-        Supports two modes:
-          - "new" (default): creates a new empty interior with the chosen parent
-          - "copy": duplicates the selected interior with the chosen parent
-        """
-        layouts = self._feat_town_lists.get("layouts", [])
-        n = len(layouts)
-        if event.key == pygame.K_ESCAPE:
-            self._feat_town_picker_active = False
-        elif event.key == pygame.K_UP and n > 0:
-            self._feat_town_picker_cursor = (
-                self._feat_town_picker_cursor - 1) % n
-        elif event.key == pygame.K_DOWN and n > 0:
-            self._feat_town_picker_cursor = (
-                self._feat_town_picker_cursor + 1) % n
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
-            parent_name = layouts[self._feat_town_picker_cursor]["name"]
-            mode = getattr(self, "_feat_town_picker_mode", "new")
-            if mode == "copy":
-                self._feat_do_copy_interior(parent_name)
-            else:
-                self._feat_add_townlayout(parent_town=parent_name)
-            self._feat_town_picker_active = False
-
-    def _feat_handle_townlayout_naming_input(self, event):
-        """Handle text input while renaming a town layout/feature/interior."""
-        if event.key == pygame.K_RETURN:
-            # Confirm the name
-            items = self._feat_townlayout_list
-            if 0 <= self._feat_townlayout_cursor < len(items):
-                new_name = self._feat_townlayout_name_buf.strip()
-                if new_name:
-                    items[self._feat_townlayout_cursor]["name"] = new_name
-                self._feat_save_townlayouts()
-            self._feat_townlayout_naming = False
-            self._feat_townlayout_name_buf = ""
-        elif event.key == pygame.K_ESCAPE:
-            # Cancel naming
-            self._feat_townlayout_naming = False
-            self._feat_townlayout_name_buf = ""
-        elif event.key == pygame.K_BACKSPACE:
-            self._feat_townlayout_name_buf = self._feat_townlayout_name_buf[:-1]
-        else:
-            # Append typed character (if printable)
-            ch = event.unicode
-            if ch and ch.isprintable() and len(self._feat_townlayout_name_buf) < 40:
-                self._feat_townlayout_name_buf += ch
-
-    def _feat_handle_townlayout_painter_input(self, event):
-        """Handle input in the town layout grid painter."""
-        if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
-            return
-        layout = self._feat_townlayout_list[self._feat_townlayout_cursor]
-        w = layout["width"]
-        h = layout["height"]
-
-        if event.key == pygame.K_ESCAPE:
-            if self._feat_dirty:
-                def _save_and_exit():
-                    self._feat_save_townlayouts()
-                    self._feat_townlayout_editing = False
-                    self._feat_level = 1
-                    self._feat_dirty = False
-                def _discard_and_exit():
-                    self._feat_townlayout_editing = False
-                    self._feat_level = 1
-                    self._feat_dirty = False
-                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-            else:
-                self._feat_townlayout_editing = False
-                self._feat_level = 1
-        elif self._is_save_shortcut(event):
-            # Save (Ctrl+S / Cmd+S) — must be checked before WASD movement
-            self._feat_save_townlayouts()
-            self._feat_dirty = False
-        elif event.key in (pygame.K_UP, pygame.K_w):
-            self._feat_townlayout_cy = max(0, self._feat_townlayout_cy - 1)
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self._feat_townlayout_cy = min(h - 1, self._feat_townlayout_cy + 1)
-        elif event.key in (pygame.K_LEFT, pygame.K_a):
-            self._feat_townlayout_cx = max(0, self._feat_townlayout_cx - 1)
-        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            self._feat_townlayout_cx = min(w - 1, self._feat_townlayout_cx + 1)
-        elif event.key == pygame.K_RETURN:
-            # Paint current brush at cursor
-            brushes = self._feat_get_townlayout_brushes()
-            brush = brushes[self._feat_townlayout_brush_idx]
-            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
-            self._feat_dirty = True
-            if brush["name"] == "Eraser":
-                layout["tiles"].pop(pos_key, None)
-            elif "feature" in brush:
-                # Composite feature brush — cursor marks top-left tile
-                feat = brush["feature"]
-                ftiles = feat.get("tiles", {})
-                # Find the bounding box of actual tiles in the feature
-                min_fc = min_fr = 9999
-                for fkey in ftiles:
-                    pts = fkey.split(",")
-                    fc_, fr_ = int(pts[0]), int(pts[1])
-                    if fc_ < min_fc:
-                        min_fc = fc_
-                    if fr_ < min_fr:
-                        min_fr = fr_
-                if not ftiles:
-                    min_fc = min_fr = 0
-                ox = self._feat_townlayout_cx - min_fc
-                oy = self._feat_townlayout_cy - min_fr
-                for fkey, fval in ftiles.items():
-                    parts = fkey.split(",")
-                    fc, fr = int(parts[0]), int(parts[1])
-                    tx = ox + fc
-                    ty = oy + fr
-                    if 0 <= tx < w and 0 <= ty < h:
-                        layout["tiles"][f"{tx},{ty}"] = {
-                            "tile_id": fval.get("tile_id"),
-                            "path": fval.get("path"),
-                            "name": fval.get("name", ""),
-                        }
-            else:
-                layout["tiles"][pos_key] = {
-                    "tile_id": brush["tile_id"],
-                    "path": brush.get("path"),
-                    "name": brush["name"],
-                }
-        elif event.key in (pygame.K_TAB, pygame.K_b):
-            # Cycle brush
-            brushes = self._feat_get_townlayout_brushes()
-            n = len(brushes)
-            if event.mod & pygame.KMOD_SHIFT:
-                self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx - 1) % n
-            else:
-                self._feat_townlayout_brush_idx = (self._feat_townlayout_brush_idx + 1) % n
-        elif event.key == pygame.K_i:
-            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
-            if pos_key in layout["tiles"]:
-                sub = self._feat_town_active_sub or "layouts"
-                td = layout["tiles"][pos_key]
-                # Open unified link picker for all sub-editors
-                self._feat_interior_picking = True
-                self._feat_interior_pick_cursor = 0
-                self._feat_interior_pick_scroll = 0
-                # Store context so picker knows which options to show
-                self._feat_interior_pick_sub = sub
-                # Build filtered interior list scoped by parent_town
-                interiors = self._feat_town_lists.get("interiors", [])
-                if sub == "interiors":
-                    # Editing an interior — show sibling interiors
-                    # (same parent_town, exclude self)
-                    current_name = layout.get("name", "")
-                    parent = layout.get("parent_town", "")
-                    self._feat_interior_pick_list = [
-                        intr for intr in interiors
-                        if intr["name"] != current_name
-                        and (not parent or intr.get("parent_town", "") == parent
-                             or not intr.get("parent_town"))]
-                else:
-                    # Editing a layout — show only interiors belonging
-                    # to this layout (by parent_town == layout name)
-                    layout_name = layout.get("name", "")
-                    self._feat_interior_pick_list = [
-                        intr for intr in interiors
-                        if intr.get("parent_town", "") == layout_name
-                        or not intr.get("parent_town")]
-                # Pre-select current link
-                pick_list = self._feat_interior_pick_list
-                if td.get("to_town"):
-                    # "Back to Town" is index 1 for interiors
-                    if sub == "interiors":
-                        self._feat_interior_pick_cursor = 1
-                elif td.get("to_overworld"):
-                    # "Return to Overworld" is index 1 for layouts
-                    if sub == "layouts":
-                        self._feat_interior_pick_cursor = 1
-                elif td.get("interior"):
-                    current = td["interior"]
-                    for i, intr in enumerate(pick_list):
-                        if intr["name"] == current:
-                            self._feat_interior_pick_cursor = i + 2
-                            break
-        elif event.key == pygame.K_x:
-            # Quick-remove any link from tile under cursor
-            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
-            td = layout["tiles"].get(pos_key)
-            if td:
-                changed = False
-                for link_key in ("interior", "to_overworld", "to_town"):
-                    if link_key in td:
-                        del td[link_key]
-                        changed = True
-                if changed:
-                    self._feat_dirty = True
-        elif event.key == pygame.K_r:
-            # Enter tile replace mode — source = tile under cursor (or empty)
-            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
-            td = layout["tiles"].get(pos_key)
-            self._feat_townlayout_replacing = True
-            if td:
-                self._feat_townlayout_replace_src_tile = td.get("tile_id")
-                self._feat_townlayout_replace_src_name = td.get("name", "")
-                self._feat_townlayout_replace_src_empty = False
-            else:
-                self._feat_townlayout_replace_src_tile = None
-                self._feat_townlayout_replace_src_name = "(Empty)"
-                self._feat_townlayout_replace_src_empty = True
-            self._feat_townlayout_replace_dst_idx = self._feat_townlayout_brush_idx
-
-    def _feat_handle_townlayout_replace_input(self, event):
-        """Handle input for the tile replace overlay.
-
-        Up/Down navigates the brush palette to pick a destination tile.
-        Enter/Space executes the batch replace across the entire layout.
-        Escape cancels replace mode.
-        """
-        if event.key == pygame.K_ESCAPE:
-            self._feat_townlayout_replacing = False
-            return
-
-        brushes = self._feat_get_townlayout_brushes()
-        n = len(brushes)
-
-        if event.key in (pygame.K_UP, pygame.K_w):
-            self._feat_townlayout_replace_dst_idx = (
-                self._feat_townlayout_replace_dst_idx - 1) % n
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self._feat_townlayout_replace_dst_idx = (
-                self._feat_townlayout_replace_dst_idx + 1) % n
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            # Execute batch replace
-            if self._feat_townlayout_cursor >= len(self._feat_townlayout_list):
-                self._feat_townlayout_replacing = False
-                return
-            layout = self._feat_townlayout_list[self._feat_townlayout_cursor]
-            dst_brush = brushes[self._feat_townlayout_replace_dst_idx]
-            src_tile = self._feat_townlayout_replace_src_tile
-            src_empty = self._feat_townlayout_replace_src_empty
-            w = layout["width"]
-            h = layout["height"]
-            tiles = layout.get("tiles", {})
-            changed = False
-            if src_empty:
-                # Source is empty cells — fill all empty positions with dst
-                if dst_brush["name"] != "Eraser":
-                    for r in range(h):
-                        for c in range(w):
-                            pk = f"{c},{r}"
-                            if pk not in tiles:
-                                tiles[pk] = {
-                                    "tile_id": dst_brush["tile_id"],
-                                    "path": dst_brush.get("path"),
-                                    "name": dst_brush["name"],
-                                }
-                                changed = True
-            elif dst_brush["name"] == "Eraser":
-                # Replace all source tiles with empty (remove them)
-                keys_to_remove = [
-                    k for k, v in tiles.items()
-                    if v.get("tile_id") == src_tile]
-                for k in keys_to_remove:
-                    del tiles[k]
-                    changed = True
-            else:
-                # Replace all source tiles with destination tile
-                for k, v in tiles.items():
-                    if v.get("tile_id") == src_tile:
-                        v["tile_id"] = dst_brush["tile_id"]
-                        v["path"] = dst_brush.get("path")
-                        v["name"] = dst_brush["name"]
-                        changed = True
-            if changed:
-                self._feat_dirty = True
-            self._feat_townlayout_replacing = False
-
-    def _feat_handle_interior_picker_input(self, event):
-        """Handle input for the unified link picker overlay.
-
-        The picker list is:
-          0 = (none)
-          1 = context-dependent special option:
-              - layouts:   "Return to Overworld"
-              - interiors: "Back to Town"
-          2.. = interior spaces (filtered)
-        """
-        pick_list = getattr(self, "_feat_interior_pick_list", [])
-        sub = getattr(self, "_feat_interior_pick_sub", "layouts")
-        n = len(pick_list) + 2  # +2 for "(none)" and special option
-
-        if event.key == pygame.K_ESCAPE:
-            self._feat_interior_picking = False
-            return
-        if event.key == pygame.K_UP:
-            self._feat_interior_pick_cursor = (
-                self._feat_interior_pick_cursor - 1) % n
-            self._feat_interior_pick_scroll = (
-                self._feat_adjust_scroll_generic(
-                    self._feat_interior_pick_cursor,
-                    self._feat_interior_pick_scroll))
-        elif event.key == pygame.K_DOWN:
-            self._feat_interior_pick_cursor = (
-                self._feat_interior_pick_cursor + 1) % n
-            self._feat_interior_pick_scroll = (
-                self._feat_adjust_scroll_generic(
-                    self._feat_interior_pick_cursor,
-                    self._feat_interior_pick_scroll))
-        elif event.key == pygame.K_RETURN:
-            # Apply the selection
-            layout = self._feat_townlayout_list[self._feat_townlayout_cursor]
-            pos_key = f"{self._feat_townlayout_cx},{self._feat_townlayout_cy}"
-            td = layout["tiles"].get(pos_key)
-            if td:
-                idx = self._feat_interior_pick_cursor
-                # Clear all previous link types
-                for lk in ("interior", "to_overworld", "to_town"):
-                    td.pop(lk, None)
-                if idx == 0:
-                    pass  # "(none)" — links already cleared
-                elif idx == 1:
-                    # Special option depends on context
-                    if sub == "interiors":
-                        td["to_town"] = True
-                    else:
-                        td["to_overworld"] = True
-                else:
-                    td["interior"] = pick_list[idx - 2]["name"]
-                self._feat_dirty = True
-            self._feat_interior_picking = False
 
     def _feat_pxedit_open(self):
         """Open the pixel editor for the currently selected sprite."""
@@ -4927,15 +3938,8 @@ class Game:
         self.module_edit_scroll = 0
         # All fields are editable in create mode
         self.module_edit_fields = [
-            ["DETAILS", "", "", "section", False],
             ["Name", "name", "", "text", True],
             ["Author", "author", "", "text", True],
-            ["SETTINGS", "", "", "section", False],
-            ["World Size", "world_size", "Medium", "choice", True],
-            ["Towns", "num_towns", "1", "int", True],
-            ["Quests", "num_quests", "1", "int", True],
-            ["Season", "season", "Summer", "choice", True],
-            ["Time of Day", "time_of_day", "Noon", "choice", True],
         ]
         # Skip to first editable field (past the section header)
         self.module_edit_field = self._next_editable_field(0)
@@ -4961,205 +3965,27 @@ class Game:
             self.module_msg_timer = 2.0
 
     def _enter_module_edit(self):
-        """Enter edit mode for an existing module — hierarchical navigation."""
+        """Enter edit mode for an existing module — Module Details only."""
         if not self.module_list:
             return
         mod = self.module_list[self.module_cursor]
 
-        # Load current settings for display (read-only)
-        from src.module_loader import get_module_settings
-        mod_settings = get_module_settings(mod["path"]) or {
-            "world_size": "Medium", "num_towns": 0, "num_quests": 0,
-            "season": "Summer", "time_of_day": "Noon",
-        }
-
-        # Load full manifest so we can edit towns/dungeons/quests
-        import json, os
-        manifest_path = os.path.join(mod["path"], "module.json")
-        try:
-            with open(manifest_path, "r") as fh:
-                manifest = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            manifest = {}
-
         self.module_edit_mode = True
         self.module_edit_is_new = False
 
-        # ── Build section list for hierarchical navigation ──
-        # Pre-init _omap_interior_list so _build_overview_map_sections can set it
-        if not hasattr(self, "_omap_interior_list"):
-            self._omap_interior_list = []
-        sections = []
-
-        # 1) Module Details
-        sections.append({
-            "label": "Module Details",
-            "icon": ">",
-            "fields": [
-                ["Name", "name", mod["name"], "text", True],
-                ["Author", "author", mod["author"], "text", True],
-                ["Description", "description",
-                 mod.get("description", ""), "text", True],
-            ],
-        })
-
-        # 2) Settings (only innkeeper quests toggle remains here;
-        #    world size / season / time-of-day moved to Overview Map)
-        innkeeper_quests = manifest.get("progression", {}).get(
-            "innkeeper_quests", False)
-        sections.append({
-            "label": "Settings",
-            "icon": ">",
-            "fields": [
-                ["Towns", "num_towns",
-                 str(mod_settings["num_towns"]), "int", False],
-                ["Quests", "num_quests",
-                 str(mod_settings["num_quests"]), "int", False],
-                ["Innkeeper Quests", "innkeeper_quests",
-                 "Yes" if innkeeper_quests else "No", "choice", True],
-            ],
-        })
-
-        # 3) Towns folder
-        from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
-                                       TOWN_STYLE_NAMES, TOWN_STYLE_KEYS,
-                                       DEFAULT_TOWN_CONFIG)
-        towns = manifest.get("world", {}).get("towns", [])
-        town_children = []
-        for i, town in enumerate(towns):
-            tname = town.get("name", f"Town {i+1}")
-            tc = town.get("town_config", {})
-            # Resolve size display name
-            tc_size = tc.get("size", DEFAULT_TOWN_CONFIG["size"])
-            try:
-                size_display = TOWN_SIZE_NAMES[
-                    TOWN_SIZE_KEYS.index(tc_size)]
-            except (ValueError, IndexError):
-                size_display = "Medium"
-            # Resolve style display name
-            tc_style = tc.get("style", DEFAULT_TOWN_CONFIG["style"])
-            try:
-                style_display = TOWN_STYLE_NAMES[
-                    TOWN_STYLE_KEYS.index(tc_style)]
-            except (ValueError, IndexError):
-                style_display = "Medieval"
-            # Resolve custom layout display name
-            tc_layout = tc.get("layout", "")
-            layout_display = tc_layout if tc_layout else "Procedural"
-            # Build fields (procedural towns always get general store,
-            # shrine, and inn — custom buildings via template engine)
-            fields = [
-                ["Name", f"town_{i}_name", tname, "text", True],
-                ["Description", f"town_{i}_desc",
-                 town.get("description", ""), "text", True],
-                ["Layout", f"town_{i}_layout", layout_display,
-                 "choice", True],
-                ["Size", f"town_{i}_size", size_display, "choice", True],
-                ["Style", f"town_{i}_style", style_display, "choice", True],
-            ]
-            town_children.append({
-                "label": tname,
-                "icon": "T",
-                "fields": fields,
-            })
-        n_towns = len(towns)
-        sections.append({
-            "label": "Towns",
-            "icon": "F",
-            "folder": "towns",
-            "children": town_children,
-            "subtitle": (f"{n_towns} town{'s' if n_towns != 1 else ''}"
-                         if n_towns else "none"),
-        })
-
-        # 4) Dungeons folder
-        from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
-        dungeons = manifest.get("progression", {}).get(
-            "key_dungeons", [])
-        dungeon_children = []
-        _TORCH_DENSITY_NAMES = {"high": "High", "medium": "Medium",
-                                "low": "Low"}
-        _DUNGEON_SIZE_NAMES = {"small": "Small", "medium": "Medium",
-                               "large": "Large"}
-        for i, dung in enumerate(dungeons):
-            dname = dung.get("name", f"Dungeon {i+1}")
-            n_levels = len(dung.get("levels", []))
-            td_raw = dung.get("torch_density", "medium")
-            td_display = _TORCH_DENSITY_NAMES.get(td_raw, "Medium")
-            sz_raw = dung.get("size", "medium")
-            sz_display = _DUNGEON_SIZE_NAMES.get(sz_raw, "Medium")
-            re_display = "Yes" if dung.get(
-                "random_encounters", True) else "No"
-            dungeon_children.append({
-                "label": dname,
-                "icon": "D",
-                "dung_idx": i,
+        # ── Build section list — Module Details only ──
+        sections = [
+            {
+                "label": "Module Details",
+                "icon": ">",
                 "fields": [
-                    ["Name", f"dung_{i}_name", dname, "text", True],
-                    ["Description", f"dung_{i}_desc",
-                     dung.get("description", ""), "text", True],
-                    ["Size", f"dung_{i}_dsize", sz_display, "choice", True],
-                    ["Torch Density", f"dung_{i}_tdensity",
-                     td_display, "choice", True],
-                    ["Random Encounters", f"dung_{i}_randenc",
-                     re_display, "choice", True],
+                    ["Name", "name", mod["name"], "text", True],
+                    ["Author", "author", mod["author"], "text", True],
+                    ["Description", "description",
+                     mod.get("description", ""), "text", True],
                 ],
-                "subtitle": (f"{n_levels} level{'s' if n_levels != 1 else ''}"
-                             if n_levels > 0 else "no levels"),
-            })
-        n_dungeons = len(dungeons)
-        sections.append({
-            "label": "Dungeons",
-            "icon": "F",
-            "folder": "dungeons",
-            "children": dungeon_children,
-            "subtitle": (f"{n_dungeons} dungeon{'s' if n_dungeons != 1 else ''}"
-                         if n_dungeons else "none"),
-        })
-
-        # 5) Quests folder
-        town_name_list = [t.get("name", f"Town {j+1}")
-                          for j, t in enumerate(towns)]
-        self._module_edit_town_names = town_name_list
-        quest_children = []
-        for i, dung in enumerate(dungeons):
-            dname = dung.get("name", f"Dungeon {i+1}")
-            fields = self._quest_fields_for_type(
-                i, dung, town_name_list)
-            quest_children.append({
-                "label": f"{dname} Quest",
-                "icon": "Q",
-                "quest_idx": i,
-                "fields": fields,
-            })
-        n_quests = len(dungeons)
-        sections.append({
-            "label": "Quests",
-            "icon": "F",
-            "folder": "quests",
-            "children": quest_children,
-            "subtitle": (f"{n_quests} quest{'s' if n_quests != 1 else ''}"
-                         if n_quests else "none"),
-        })
-
-        # 6) Overview Map folder — sub-sections for map editing
-        #    (Load unique tiles first — they live inside Overview Map now)
-        unique_tiles_data = manifest.get("unique_tiles", {})
-        self.module_edit_unique_tiles = [
-            {"id": tid, **tdef}
-            for tid, tdef in unique_tiles_data.items()
+            },
         ]
-        overworld_cfg = manifest.get("world", {}).get(
-            "overworld_config", {})
-        omap_children = self._build_overview_map_sections(
-            overworld_cfg, manifest, mod_settings)
-        sections.append({
-            "label": "Overview Map",
-            "icon": "F",
-            "folder": "overview_map",
-            "children": omap_children,
-            "subtitle": overworld_cfg.get("type", "Procedural"),
-        })
 
         self.module_edit_sections = sections
         self.module_edit_section_cursor = 0
@@ -5170,2540 +3996,219 @@ class Game:
         self.module_edit_field = 0
         self.module_edit_buffer = ""
         self.module_edit_scroll = 0
-        # Clear navigation stack and dungeon level data
         self.module_edit_nav_stack = []
         self._module_edit_folder_label = ""
-        self.module_edit_active_dung = -1
-        self.module_edit_active_level = -1
-        self.module_edit_active_enc = -1
-        self._editing_level_settings = False
-        # Unique tiles state (list already built above for section 6)
-        self.module_edit_in_unique_tiles = False
-        self.module_edit_active_utile = -1
-        self.module_edit_utile_preview = False
-        self._battle_screen_active = False
-        self._map_editor_active = False
-        # Overview interior map locations editor state
-        self._omap_interior_active = False   # interior list is showing
-        # NOTE: _omap_interior_list is populated by _build_overview_map_sections()
-        # above — do NOT reset it here or the loaded interiors will be wiped out.
-        self._omap_interior_cursor = 0
-        self._omap_interior_scroll = 0
-        self._omap_interior_editing = False  # grid painter open
-        self._omap_interior_cx = 1
-        self._omap_interior_cy = 1
-        self._omap_interior_brush_idx = 0
-        self._omap_interior_brushes = None   # cached brush list
-        self._omap_interior_dirty = False
-        self._omap_interior_naming = False
-        self._omap_interior_name_buf = ""
-        # Interior link picker in the overview map editor
-        self._omap_int_picking = False
-        self._omap_int_pick_cursor = 0
-        self._omap_int_pick_scroll = 0
-        # Replace tile overlay in the interior painter
-        self._omap_int_replacing = False
-        self._omap_int_replace_src_tile = None
-        self._omap_int_replace_src_name = ""
-        self._omap_int_replace_src_empty = False
-        self._omap_int_replace_dst_idx = 0
-        # Interior-to-interior / back-to-overworld link picker
-        self._omap_int_link_picking = False
-        self._omap_int_link_pick_cursor = 0
-        self._omap_int_link_pick_list = []
-        # Store dungeon levels for editing
-        self.module_edit_dungeon_levels = {}
-        for i, dung in enumerate(dungeons):
-            self.module_edit_dungeon_levels[i] = list(
-                dung.get("levels", []))
 
-    def _quest_fields_for_type(self, quest_idx, dung, town_name_list):
-        """Return the field list for a quest section based on quest type.
+    # ── Map Editor section builder ──────────────────────────────
 
-        Only fields relevant to the selected quest type are shown:
-        - Retrieve: Key/Artifact, Objective, Hint, Exit Portal
-        - Kill: Kill Target, Kill Count, Exit Portal
-        - Gnome Machine: Keys Needed, Gnome Town, Objective, Hint
+    def _build_map_editor_hub_sections(self):
+        """Build the section list for the top-level Map Editor hub.
+
+        Returns 5 sub-folders — one per map type — each containing a
+        placeholder example that launches the actual map editor.
         """
-        from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
-        i = quest_idx
-        qt_key = dung.get("quest_type", "retrieve")
-        try:
-            qt_display = QUEST_TYPE_NAMES[
-                QUEST_TYPE_KEYS.index(qt_key)]
-        except (ValueError, IndexError):
-            qt_display = QUEST_TYPE_NAMES[0]
+        from src.map_editor import (
+            STORAGE_DENSE, STORAGE_SPARSE, GRID_SCROLLABLE, GRID_FIXED,
+        )
 
-        fields = [
-            ["Quest Type", f"quest_{i}_qtype",
-             qt_display, "choice", True],
+        # Each child stores its editor config so we can launch it
+        # ── 1) Overview ──
+        overview_children = [
+            {
+                "label": "Overworld Template",
+                "subtitle": "A base layout for the overworld map",
+                "map_config": {
+                    "storage": STORAGE_DENSE,
+                    "grid_type": GRID_SCROLLABLE,
+                    "tile_context": "overworld",
+                    "width": 48, "height": 48,
+                },
+            },
         ]
-        if qt_key == "retrieve":
-            fields += [
-                ["Key / Artifact", f"quest_{i}_key",
-                 dung.get("key_name", "Key"), "text", True],
-                ["Objective", f"quest_{i}_obj",
-                 dung.get("quest_objective", ""), "text", True],
-                ["Hint", f"quest_{i}_hint",
-                 dung.get("quest_hint", ""), "text", True],
-                ["Exit Portal", f"quest_{i}_exitportal",
-                 "Yes" if dung.get("exit_portal", True) else "No",
-                 "choice", True],
-            ]
-        elif qt_key == "kill":
-            fields += [
-                ["Kill Target", f"quest_{i}_ktarget",
-                 dung.get("kill_target", ""), "choice", True],
-                ["Kill Count", f"quest_{i}_kcount",
-                 str(dung.get("kill_count", 0)), "int", True],
-                ["Objective", f"quest_{i}_obj",
-                 dung.get("quest_objective", ""), "text", True],
-                ["Hint", f"quest_{i}_hint",
-                 dung.get("quest_hint", ""), "text", True],
-                ["Exit Portal", f"quest_{i}_exitportal",
-                 "Yes" if dung.get("exit_portal", True) else "No",
-                 "choice", True],
-            ]
-        elif qt_key == "gnome_machine":
-            # Determine current gnome town selection
-            gnome_town = dung.get("gnome_town", "")
-            if not gnome_town and town_name_list:
-                gnome_town = town_name_list[0]
-            fields += [
-                ["Keys Needed", f"quest_{i}_keysneeded",
-                 str(dung.get("keys_needed", 1)), "int", True],
-                ["Gnome Town", f"quest_{i}_gnometown",
-                 gnome_town, "choice", True],
-                ["Key / Artifact", f"quest_{i}_key",
-                 dung.get("key_name", "Key"), "text", True],
-                ["Objective", f"quest_{i}_obj",
-                 dung.get("quest_objective", ""), "text", True],
-                ["Hint", f"quest_{i}_hint",
-                 dung.get("quest_hint", ""), "text", True],
-            ]
-        return fields
-
-    def _on_quest_type_changed(self, field_key):
-        """Rebuild the quest section fields after the quest type is cycled.
-
-        Preserves any shared field values (like Objective / Hint) from
-        the old field list while switching to the appropriate set of
-        fields for the newly selected quest type.
-        """
-        from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
-        # Parse quest index from the field key (quest_<i>_qtype)
-        parts = field_key.split("_")
-        try:
-            quest_idx = int(parts[1])
-        except (IndexError, ValueError):
-            return
-        # Map display name → internal key
-        new_display = self.module_edit_buffer
-        try:
-            qt_key = QUEST_TYPE_KEYS[QUEST_TYPE_NAMES.index(new_display)]
-        except (ValueError, IndexError):
-            qt_key = "retrieve"
-        # Collect current field values so we can carry over shared ones
-        old_vals = {}
-        for entry in self.module_edit_fields:
-            old_vals[entry[1]] = entry[2]
-        # Build a dummy dung dict from old values for the helper
-        i = quest_idx
-        dung = {
-            "quest_type": qt_key,
-            "key_name": old_vals.get(f"quest_{i}_key", "Key"),
-            "kill_target": old_vals.get(f"quest_{i}_ktarget", ""),
-            "kill_count": int(old_vals.get(f"quest_{i}_kcount", "0")
-                              or "0"),
-            "keys_needed": int(old_vals.get(f"quest_{i}_keysneeded", "1")
-                               or "1"),
-            "gnome_town": old_vals.get(f"quest_{i}_gnometown", ""),
-            "quest_objective": old_vals.get(f"quest_{i}_obj", ""),
-            "quest_hint": old_vals.get(f"quest_{i}_hint", ""),
-            "exit_portal": old_vals.get(
-                f"quest_{i}_exitportal", "Yes") == "Yes",
+        overview_sec = {
+            "label": "Overview",
+            "folder": "me_overview",
+            "children": overview_children,
+            "subtitle": f"{len(overview_children)} template"
+                        f"{'s' if len(overview_children) != 1 else ''}",
         }
-        town_names = getattr(self, "_module_edit_town_names", [])
-        new_fields = self._quest_fields_for_type(
-            quest_idx, dung, town_names)
-        # Replace the fields in both the active list and the section
-        self.module_edit_fields[:] = new_fields
-        # Also update the section object so commit gathers the right keys
-        # (may be in current sections, folder children, or nav stack)
-        def _update_quest_sec(sec_list):
-            for sec in sec_list:
-                if sec.get("quest_idx") == quest_idx:
-                    sec["fields"] = new_fields
-                    return True
-                for child in sec.get("children", []):
-                    if child.get("quest_idx") == quest_idx:
-                        child["fields"] = new_fields
-                        return True
-            return False
-        _update_quest_sec(self.module_edit_sections)
-        for stack_entry in getattr(
-                self, "module_edit_nav_stack", []):
-            _update_quest_sec(stack_entry[0])
-        # Reset cursor to the first field (Quest Type) and refresh buffer
-        self.module_edit_field = 0
-        self.module_edit_buffer = new_fields[0][2]
 
-    def _enter_section_fields(self):
-        """Drill into the selected section's fields for editing."""
-        sec = self.module_edit_sections[self.module_edit_section_cursor]
+        # ── 2) Dungeon ──
+        dungeon_children = [
+            {
+                "label": "Goblin Cavern Floor 1",
+                "subtitle": "A winding cave system",
+                "map_config": {
+                    "storage": STORAGE_DENSE,
+                    "grid_type": GRID_SCROLLABLE,
+                    "tile_context": "dungeon",
+                    "width": 32, "height": 32,
+                },
+            },
+        ]
+        dungeon_sec = {
+            "label": "Dungeon",
+            "folder": "me_dungeon",
+            "children": dungeon_children,
+            "subtitle": f"{len(dungeon_children)} template"
+                        f"{'s' if len(dungeon_children) != 1 else ''}",
+        }
 
-        # ── Folder sections drill into child section list ──
-        if sec.get("folder"):
-            self._enter_folder(sec)
-            return
+        # ── 3) Examine Screen ──
+        examine_children = [
+            {
+                "label": "Ancient Shrine",
+                "subtitle": "Vignette for examining a tile",
+                "map_config": {
+                    "storage": STORAGE_SPARSE,
+                    "grid_type": GRID_FIXED,
+                    "tile_context": "dungeon",
+                    "width": 12, "height": 10,
+                },
+            },
+        ]
+        examine_sec = {
+            "label": "Examine Screen",
+            "folder": "me_examine",
+            "children": examine_children,
+            "subtitle": f"{len(examine_children)} template"
+                        f"{'s' if len(examine_children) != 1 else ''}",
+        }
 
-        # ── Dungeon sections drill into a sub-section browser ──
-        if sec.get("icon") == "D" and sec.get("dung_idx") is not None:
-            dung_idx = sec["dung_idx"]
-            self._enter_dungeon_sub(dung_idx)
-            return
+        # ── 4) Enclosure ──
+        enclosure_children = [
+            {
+                "label": "Blacksmith Shop",
+                "subtitle": "Interior space for a town building",
+                "map_config": {
+                    "storage": STORAGE_SPARSE,
+                    "grid_type": GRID_FIXED,
+                    "tile_context": "dungeon",
+                    "width": 16, "height": 14,
+                },
+            },
+        ]
+        enclosure_sec = {
+            "label": "Enclosure",
+            "folder": "me_enclosure",
+            "children": enclosure_children,
+            "subtitle": f"{len(enclosure_children)} template"
+                        f"{'s' if len(enclosure_children) != 1 else ''}",
+        }
 
-        # ── Level sections drill into level sub-browser ──
-        if sec.get("icon") == "L" and sec.get("level_idx") is not None:
-            dung_idx = self.module_edit_active_dung
-            level_idx = sec["level_idx"]
-            self._enter_level_encounters(dung_idx, level_idx)
-            return
-
-        # ── Encounter sections drill into encounter fields ──
-        if sec.get("icon") == "E" and sec.get("enc_idx") is not None:
-            self._enter_encounter_fields(sec["enc_idx"])
-            return
-
-        # ── Monster sections drill into monster choice field ──
-        if sec.get("icon") == "M" and sec.get("mon_idx") is not None:
-            self._editing_level_settings = False
-            # Just enter the field editor for this monster's choice
-            pass  # fall through to normal field editing below
-
-        # ── Battle Screen section drills into battle screen painter ──
-        if sec.get("is_battle_screen"):
-            self._enter_battle_screen_editor(sec["enc_idx"])
-            return
-
-        # ── Map Layout section opens the overview map editor ──
-        if sec.get("is_map_editor"):
-            self._enter_map_editor()
-            return
-
-        # ── Interior Map Locations opens the interior list editor ──
-        if sec.get("is_omap_interior_folder"):
-            self._enter_omap_interior_list()
-            return
-
-        # ── Individual unique tile drills into its field editor ──
-        if sec.get("utile_idx") is not None:
-            self._enter_single_utile_fields(sec["utile_idx"])
-            return
-
-        # ── Level-settings section flag ──
-        if sec.get("is_level_settings"):
-            self._editing_level_settings = True
-
-        # ── Properties and other sections: flat field editor ──
-        self.module_edit_fields = sec["fields"]
-        self.module_edit_field = 0
-        self.module_edit_scroll = 0
-        self.module_edit_level = 1
-        self._feat_dirty = False
-        # Find first editable field
-        self.module_edit_field = self._next_editable_field(0)
-        if self.module_edit_fields:
-            self.module_edit_buffer = \
-                self.module_edit_fields[self.module_edit_field][2]
-
-    def _enter_folder(self, sec):
-        """Push the current section list and show a folder's children."""
-        self.module_edit_nav_stack.append((
-            self.module_edit_sections,
-            self.module_edit_section_cursor,
-            self.module_edit_section_scroll,
-            getattr(self, "_module_edit_folder_label", ""),
-        ))
-        self.module_edit_sections = list(sec.get("children", []))
-        self.module_edit_section_cursor = 0
-        self.module_edit_section_scroll = 0
-        self.module_edit_level = 0
-        # Store folder name for breadcrumb display
-        self._module_edit_folder_label = sec.get("label", "")
-
-    def _enter_dungeon_sub(self, dung_idx):
-        """Push current section browser and show dungeon sub-sections."""
-        # Push current state onto nav stack (with current folder label)
-        self.module_edit_nav_stack.append((
-            self.module_edit_sections,
-            self.module_edit_section_cursor,
-            self.module_edit_section_scroll,
-            getattr(self, "_module_edit_folder_label", ""),
-        ))
-        # Remember dungeon name for breadcrumb
-        sec = self.module_edit_sections[self.module_edit_section_cursor]
-        self._module_edit_folder_label = sec.get("label", "Dungeon")
-        self.module_edit_active_dung = dung_idx
-        self._rebuild_dungeon_sub_sections(dung_idx)
-
-    def _rebuild_dungeon_sub_sections(self, dung_idx):
-        """Build the sub-section list for a dungeon (Properties + Levels)."""
-        # Find the original dungeon section to get its property fields
-        parent_sec = None
-        for sec in self.module_edit_nav_stack[-1][0]:
-            if sec.get("dung_idx") == dung_idx:
-                parent_sec = sec
-                break
-
-        sub_sections = []
-        # 1) Properties section
-        sub_sections.append({
-            "label": "Properties",
-            "icon": ">",
-            "fields": parent_sec["fields"] if parent_sec else [],
-        })
-
-        # 2) One section per dungeon level
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        for li, level in enumerate(levels):
-            lname = level.get("name", f"Floor {li + 1}")
-            enc_count = len(level.get("encounters", []))
-            sub_sections.append({
-                "label": lname,
-                "icon": "L",
-                "level_idx": li,
-                "fields": [],  # built on drill-in
-                "subtitle": f"{enc_count} encounter{'s' if enc_count != 1 else ''}",
-            })
-
-        # 3) [+] Add Level action
-        sub_sections.append({
-            "label": "[+] Add Level",
-            "icon": "+",
-            "fields": [],
-            "action": "add_level",
-        })
-
-        self.module_edit_sections = sub_sections
-        self.module_edit_section_cursor = 0
-        self.module_edit_section_scroll = 0
-        # Stay at level 0 (section browser)
-        self.module_edit_level = 0
-
-    def _enter_level_encounters(self, dung_idx, level_idx):
-        """Drill into a dungeon level — show settings + encounter list."""
-        self.module_edit_active_level = level_idx
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        level = levels[level_idx]
-
-        # Push current sections onto nav stack
-        self.module_edit_nav_stack.append((
-            self.module_edit_sections,
-            self.module_edit_section_cursor,
-            self.module_edit_section_scroll,
-            getattr(self, "_module_edit_folder_label", ""),
-        ))
-        self._module_edit_folder_label = level.get(
-            "name", f"Floor {level_idx + 1}")
-
-        self._rebuild_level_sub_sections(dung_idx, level_idx)
-
-    def _rebuild_level_sub_sections(self, dung_idx, level_idx):
-        """Build the sub-section list for a dungeon level."""
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        level = levels[level_idx]
-        encounters = level.get("encounters", [])
-
-        # Inheritable settings display maps
-        _td_map = {"high": "High", "medium": "Medium", "low": "Low",
-                    "inherit": "Inherit"}
-        _sz_map = {"small": "Small", "medium": "Medium", "large": "Large",
-                   "inherit": "Inherit"}
-        _re_map = {True: "Yes", False: "No", "inherit": "Inherit"}
-
-        # Build settings fields for the "Settings" section
-        settings_fields = []
-        settings_fields.append(["Level Name", f"lvl_{level_idx}_name",
-                                level.get("name", f"Floor {level_idx + 1}"),
-                                "text", True])
-        td_raw = level.get("torch_density", "inherit")
-        settings_fields.append(["Torch Density",
-                                f"lvl_{level_idx}_ftdensity",
-                                _td_map.get(td_raw, "Inherit"),
-                                "choice", True])
-        sz_raw = level.get("size", "inherit")
-        settings_fields.append(["Size",
-                                f"lvl_{level_idx}_fdsize",
-                                _sz_map.get(sz_raw, "Inherit"),
-                                "choice", True])
-        re_raw = level.get("random_encounters", "inherit")
-        settings_fields.append(["Random Encounters",
-                                f"lvl_{level_idx}_frandenc",
-                                _re_map.get(re_raw, "Inherit"),
-                                "choice", True])
-
-        sub_sections = []
-        # 1) Settings section
-        sub_sections.append({
-            "label": "Settings",
-            "icon": ">",
-            "fields": settings_fields,
-            "is_level_settings": True,
-        })
-
-        # 2) One section per encounter
-        for ei, enc in enumerate(encounters):
-            monsters = _normalize_encounter(enc)
-            # Build a compact summary like "Orc x2, Skeleton x1"
-            from collections import Counter
-            counts = Counter(monsters)
-            parts = [f"{m} x{c}" if c > 1 else m
-                     for m, c in counts.items()]
-            subtitle = ", ".join(parts) if parts else "Empty"
-            sub_sections.append({
-                "label": f"Encounter {ei + 1}",
-                "icon": "E",
-                "enc_idx": ei,
-                "subtitle": subtitle,
-            })
-
-        # 3) [+] Add Encounter action
-        sub_sections.append({
-            "label": "[+] Add Encounter",
-            "icon": "+",
-            "fields": [],
-            "action": "add_encounter",
-        })
-
-        self.module_edit_sections = sub_sections
-        self.module_edit_section_cursor = 0
-        self.module_edit_section_scroll = 0
-        self.module_edit_level = 0
-
-    def _enter_encounter_fields(self, enc_idx):
-        """Drill into a single encounter — show monster list."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        level = levels[level_idx]
-        encounters = level.get("encounters", [])
-        if enc_idx < 0 or enc_idx >= len(encounters):
-            return
-
-        self.module_edit_active_enc = enc_idx
-
-        # Normalize legacy format to monsters list, preserving extra keys
-        enc = encounters[enc_idx]
-        monsters = _normalize_encounter(enc)
-        # Update in place — keep battle_screen and other extra keys
-        enc.pop("monster", None)
-        enc.pop("count", None)
-        enc["monsters"] = monsters
-        encounters[enc_idx] = enc
-
-        # Push current sections onto nav stack
-        self.module_edit_nav_stack.append((
-            self.module_edit_sections,
-            self.module_edit_section_cursor,
-            self.module_edit_section_scroll,
-            getattr(self, "_module_edit_folder_label", ""),
-        ))
-        self._module_edit_folder_label = f"Encounter {enc_idx + 1}"
-
-        self._rebuild_encounter_monster_sections(enc_idx)
-
-    def _rebuild_encounter_monster_sections(self, enc_idx):
-        """Build sections showing each monster in an encounter."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        enc = levels[level_idx]["encounters"][enc_idx]
-        monsters = enc.get("monsters", ["Giant Rat"])
-
-        sub_sections = []
-        for mi, mon_name in enumerate(monsters):
-            sub_sections.append({
-                "label": mon_name,
-                "icon": "M",
-                "mon_idx": mi,
-                "enc_idx": enc_idx,
-                "fields": [
-                    ["Monster", f"enc_{enc_idx}_m_{mi}_mon",
-                     mon_name, "choice", True],
-                ],
-            })
-
-        # Battle Screen section
-        bs = enc.get("battle_screen") or {}
-        bs_style = bs.get("style", "dungeon")
-        bs_music = bs.get("music", "Default")
-        n_obs = len(bs.get("obstacles", []))
-        n_painted = len(bs.get("painted", {}))
-        bs_subtitle = bs_style.title()
-        if n_obs or n_painted:
-            bs_subtitle += f" ({n_obs} obs, {n_painted} tiles)"
-        sub_sections.append({
+        # ── 5) Battle Screen ──
+        battle_children = [
+            {
+                "label": "Forest Clearing",
+                "subtitle": "Battle arena with trees and obstacles",
+                "map_config": {
+                    "storage": STORAGE_SPARSE,
+                    "grid_type": GRID_FIXED,
+                    "tile_context": "dungeon",
+                    "width": 20, "height": 16,
+                },
+            },
+        ]
+        battle_sec = {
             "label": "Battle Screen",
-            "icon": "B",
-            "enc_idx": enc_idx,
-            "is_battle_screen": True,
-            "subtitle": bs_subtitle,
-        })
-
-        # [+] Add Monster action
-        sub_sections.append({
-            "label": "[+] Add Monster",
-            "icon": "+",
-            "fields": [],
-            "action": "add_monster",
-        })
-
-        self.module_edit_sections = sub_sections
-        self.module_edit_section_cursor = min(
-            getattr(self, "module_edit_section_cursor", 0),
-            max(0, len(sub_sections) - 1))
-        self.module_edit_section_scroll = 0
-        self.module_edit_level = 0
-
-    def _leave_section_fields(self):
-        """Go back from field editing to the section browser."""
-        # Persist any in-progress buffer back to the field
-        if self.module_edit_fields:
-            entry = self.module_edit_fields[self.module_edit_field]
-            entry[2] = self.module_edit_buffer
-
-        # If we were editing a monster inside an encounter, save it
-        # and return to the encounter monster browser (keep active_enc)
-        if getattr(self, "module_edit_active_enc", -1) >= 0:
-            self._save_monster_field()
-            self.module_edit_level = 0
-            return
-
-        # If we were editing level settings, save them back
-        if getattr(self, "_editing_level_settings", False):
-            self._save_level_settings_fields()
-            self._editing_level_settings = False
-            self.module_edit_level = 0
-            return
-
-        # If we were editing a unique tile, save back to in-memory list
-        # and rebuild the children so tile labels update
-        if self.module_edit_in_unique_tiles:
-            self._save_single_utile_fields()
-            self.module_edit_in_unique_tiles = False
-            self.module_edit_active_utile = -1
-            # Rebuild children list to reflect any name changes
-            if (self._module_edit_folder_label == "Unique Tiles"
-                    and self.module_edit_nav_stack):
-                self._rebuild_unique_tiles_children()
-
-        self.module_edit_level = 0
-
-    def _save_level_settings_fields(self):
-        """Persist level settings field edits back to in-memory level data."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        level = levels[level_idx]
-
-        for entry in self.module_edit_fields:
-            if entry[1] == f"lvl_{level_idx}_name":
-                level["name"] = entry[2]
-                # Update the breadcrumb label to reflect name changes
-                self._module_edit_folder_label = entry[2]
-            elif entry[1] == f"lvl_{level_idx}_ftdensity":
-                v = entry[2]
-                level["torch_density"] = (
-                    "inherit" if v == "Inherit" else v.lower())
-            elif entry[1] == f"lvl_{level_idx}_fdsize":
-                v = entry[2]
-                level["size"] = (
-                    "inherit" if v == "Inherit" else v.lower())
-            elif entry[1] == f"lvl_{level_idx}_frandenc":
-                v = entry[2]
-                if v == "Inherit":
-                    level["random_encounters"] = "inherit"
-                else:
-                    level["random_encounters"] = (v == "Yes")
-
-        # Rebuild sections so labels reflect any changes
-        self._rebuild_level_sub_sections(dung_idx, level_idx)
-
-    def _save_single_encounter_fields(self):
-        """Persist a single encounter's field edits back to level data.
-
-        In the new format, the encounter is ``{"monsters": [...]}``.
-        Each field key looks like ``enc_{enc_idx}_m_{mon_idx}_mon``.
-        """
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        enc_idx = getattr(self, "module_edit_active_enc", -1)
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        level = levels[level_idx]
-        encounters = level.get("encounters", [])
-        if enc_idx < 0 or enc_idx >= len(encounters):
-            return
-
-        # Read monster names back from the field list stored on sections
-        # Keys look like "enc_{enc_idx}_m_{mi}_mon"
-        enc = encounters[enc_idx]
-        monsters = list(enc.get("monsters", ["Giant Rat"]))
-        for entry in self.module_edit_fields:
-            key = entry[1]
-            prefix = f"enc_{enc_idx}_m_"
-            if key.startswith(prefix) and key.endswith("_mon"):
-                try:
-                    mi = int(key[len(prefix):-4])  # strip prefix and "_mon"
-                    if 0 <= mi < len(monsters):
-                        monsters[mi] = entry[2]
-                except (ValueError, IndexError):
-                    pass
-        enc["monsters"] = monsters
-
-    def _leave_dungeon_sub(self):
-        """Pop the nav stack to return from sub-sections or folder."""
-        was_in_encounter = getattr(self, "module_edit_active_enc", -1) >= 0
-        was_in_level = self.module_edit_active_level >= 0
-
-        if self.module_edit_nav_stack:
-            prev = self.module_edit_nav_stack.pop()
-            self.module_edit_sections = prev[0]
-            self.module_edit_section_cursor = prev[1]
-            self.module_edit_section_scroll = prev[2]
-            self._module_edit_folder_label = (
-                prev[3] if len(prev) > 3 else "")
-        else:
-            self._module_edit_folder_label = ""
-
-        if was_in_encounter:
-            # Returning from encounter monster browser to level sub-browser
-            self.module_edit_active_enc = -1
-            dung_idx = self.module_edit_active_dung
-            level_idx = self.module_edit_active_level
-            if dung_idx >= 0 and level_idx >= 0:
-                self._rebuild_level_sub_sections(dung_idx, level_idx)
-                self.module_edit_section_cursor = prev[1]
-                self.module_edit_section_scroll = prev[2]
-        elif was_in_level:
-            # Returning from level sub-browser to dungeon sub-browser
-            dung_idx = self.module_edit_active_dung
-            self.module_edit_active_level = -1
-            self.module_edit_active_enc = -1
-            if dung_idx >= 0:
-                self._rebuild_dungeon_sub_sections(dung_idx)
-                self.module_edit_section_cursor = prev[1]
-                self.module_edit_section_scroll = prev[2]
-        else:
-            # Returning from dungeon sub-browser to top-level
-            self.module_edit_active_dung = -1
-            self.module_edit_active_level = -1
-        self.module_edit_level = 0
-
-    def _add_dungeon_level(self):
-        """Add a new level to the active dungeon."""
-        dung_idx = self.module_edit_active_dung
-        if dung_idx < 0:
-            return
-        levels = self.module_edit_dungeon_levels.setdefault(dung_idx, [])
-        floor_num = len(levels) + 1
-        levels.append({
-            "name": f"Floor {floor_num}",
-            "encounters": [],
-            "random_encounters": "inherit",
-        })
-        # Rebuild sub-sections to show the new level
-        self._rebuild_dungeon_sub_sections(dung_idx)
-        # Move cursor to the newly added level
-        # (it's the second-to-last entry, before [+] Add Level)
-        self.module_edit_section_cursor = max(
-            0, len(self.module_edit_sections) - 2)
-        self._adjust_section_scroll()
-
-    def _remove_dungeon_level(self, level_idx):
-        """Remove a level from the active dungeon."""
-        dung_idx = self.module_edit_active_dung
-        if dung_idx < 0:
-            return
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if 0 <= level_idx < len(levels):
-            levels.pop(level_idx)
-            # Rebuild sub-sections
-            self._rebuild_dungeon_sub_sections(dung_idx)
-            # Clamp cursor
-            n = len(self.module_edit_sections)
-            if self.module_edit_section_cursor >= n:
-                self.module_edit_section_cursor = max(0, n - 1)
-            self._adjust_section_scroll()
-
-    def _add_encounter_to_level(self):
-        """Add a new encounter to the active dungeon level."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        if dung_idx < 0 or level_idx < 0:
-            return
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx >= len(levels):
-            return
-        # Add new encounter to data (new format)
-        levels[level_idx].setdefault("encounters", []).append(
-            {"monsters": ["Giant Rat"]})
-        # Rebuild the level sub-sections
-        self._rebuild_level_sub_sections(dung_idx, level_idx)
-        # Move cursor to the newly added encounter (second-to-last item)
-        self.module_edit_section_cursor = max(
-            0, len(self.module_edit_sections) - 2)
-        self._adjust_section_scroll()
-
-    def _remove_encounter_from_level(self, enc_idx):
-        """Remove the specified encounter from the level."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        if dung_idx < 0 or level_idx < 0:
-            return
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx >= len(levels):
-            return
-        level = levels[level_idx]
-        encounters = level.get("encounters", [])
-        if 0 <= enc_idx < len(encounters):
-            encounters.pop(enc_idx)
-            level["encounters"] = encounters
-        # Rebuild the level sub-sections
-        self._rebuild_level_sub_sections(dung_idx, level_idx)
-        # Clamp cursor
-        n = len(self.module_edit_sections)
-        if self.module_edit_section_cursor >= n:
-            self.module_edit_section_cursor = max(0, n - 1)
-        self._adjust_section_scroll()
-
-    def _save_monster_field(self):
-        """Save the edited monster name back to encounter data and rebuild."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        enc_idx = getattr(self, "module_edit_active_enc", -1)
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        encounters = levels[level_idx].get("encounters", [])
-        if enc_idx < 0 or enc_idx >= len(encounters):
-            return
-        enc = encounters[enc_idx]
-        monsters = enc.get("monsters", ["Giant Rat"])
-
-        # Find which monster was edited from the field key
-        # Keys look like "enc_{enc_idx}_m_{mi}_mon"
-        for entry in self.module_edit_fields:
-            key = entry[1]
-            prefix = f"enc_{enc_idx}_m_"
-            if key.startswith(prefix) and key.endswith("_mon"):
-                try:
-                    mi = int(key[len(prefix):-4])  # strip prefix and "_mon"
-                    if 0 <= mi < len(monsters):
-                        monsters[mi] = entry[2]
-                except (ValueError, IndexError):
-                    pass
-        enc["monsters"] = monsters
-        # Rebuild the monster sections so labels update
-        self._rebuild_encounter_monster_sections(enc_idx)
-
-    def _add_monster_to_encounter(self):
-        """Add a monster to the active encounter's monster list."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        enc_idx = getattr(self, "module_edit_active_enc", -1)
-        if dung_idx < 0 or level_idx < 0 or enc_idx < 0:
-            return
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx >= len(levels):
-            return
-        encounters = levels[level_idx].get("encounters", [])
-        if enc_idx >= len(encounters):
-            return
-        enc = encounters[enc_idx]
-        monsters = enc.get("monsters", ["Giant Rat"])
-        monsters.append("Giant Rat")
-        enc["monsters"] = monsters
-        # Rebuild monster sections
-        self._rebuild_encounter_monster_sections(enc_idx)
-        # Move cursor to the newly added monster (second-to-last)
-        self.module_edit_section_cursor = max(
-            0, len(self.module_edit_sections) - 2)
-        self._adjust_section_scroll()
-
-    def _remove_monster_from_encounter(self, mon_idx):
-        """Remove a monster from the active encounter's monster list."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        enc_idx = getattr(self, "module_edit_active_enc", -1)
-        if dung_idx < 0 or level_idx < 0 or enc_idx < 0:
-            return
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx >= len(levels):
-            return
-        encounters = levels[level_idx].get("encounters", [])
-        if enc_idx >= len(encounters):
-            return
-        enc = encounters[enc_idx]
-        monsters = enc.get("monsters", ["Giant Rat"])
-        if len(monsters) <= 1:
-            return  # Keep at least one monster
-        if 0 <= mon_idx < len(monsters):
-            monsters.pop(mon_idx)
-            enc["monsters"] = monsters
-        # Rebuild monster sections
-        self._rebuild_encounter_monster_sections(enc_idx)
-        # Clamp cursor
-        n = len(self.module_edit_sections)
-        if self.module_edit_section_cursor >= n:
-            self.module_edit_section_cursor = max(0, n - 1)
-        self._adjust_section_scroll()
-
-    # ── Battle Screen editor ─────────────────────────────────────
-
-    # Arena style choices for the battle screen
-    _BATTLE_STYLES = ["dungeon", "outdoor"]
-
-    # Music override choices
-    _BATTLE_MUSIC = ["Default", "Standard", "Dark & Moody", "Quiet",
-                     "Twin Peaks", "Epic Fantasy"]
-
-    # Obstacle palette for painting obstacles on the battle screen
-    _BATTLE_OBSTACLE_TYPES = [
-        "eraser", "tree", "rock", "boulder", "cactus", "pillar", "rubble",
-    ]
-
-    def _enter_battle_screen_editor(self, enc_idx):
-        """Enter the battle screen painter for an encounter."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            return
-        enc = levels[level_idx]["encounters"][enc_idx]
-        bs = enc.get("battle_screen") or {}
-
-        self._battle_screen_active = True
-        self._battle_screen_enc_idx = enc_idx
-        self._battle_screen_style_idx = max(
-            0, self._BATTLE_STYLES.index(bs.get("style", "dungeon"))
-            if bs.get("style", "dungeon") in self._BATTLE_STYLES else 0)
-        self._battle_screen_music_idx = max(
-            0, self._BATTLE_MUSIC.index(bs.get("music", "Default"))
-            if bs.get("music", "Default") in self._BATTLE_MUSIC else 0)
-
-        # Load obstacle placements: list of {"type", "col", "row"}
-        self._battle_screen_obstacles = {}
-        for obs in bs.get("obstacles", []):
-            c, r = obs.get("col", 0), obs.get("row", 0)
-            self._battle_screen_obstacles[(c, r)] = obs.get("type", "rock")
-
-        # Load painted tiles: "col,row" -> sprite_path
-        self._battle_screen_painted = {}
-        for pos_key, gfx in bs.get("painted", {}).items():
-            try:
-                c, r = pos_key.split(",")
-                self._battle_screen_painted[(int(c), int(r))] = gfx
-            except (ValueError, AttributeError):
-                pass
-
-        # Editor cursor and brush
-        self._battle_cursor_col = 9
-        self._battle_cursor_row = 10
-        self._battle_brush_idx = 0  # index into _BATTLE_OBSTACLE_TYPES
-        self._battle_mode = "obstacle"  # "obstacle", "tile", "settings"
-        self._battle_tile_brush_idx = 0  # index into examine brushes
-        self._battle_settings_cursor = 0  # 0=style, 1=music
-        self._feat_dirty = False
-
-    def _leave_battle_screen_editor(self):
-        """Exit the battle screen painter and persist data."""
-        dung_idx = self.module_edit_active_dung
-        level_idx = self.module_edit_active_level
-        enc_idx = self._battle_screen_enc_idx
-        levels = self.module_edit_dungeon_levels.get(dung_idx, [])
-        if level_idx < 0 or level_idx >= len(levels):
-            self._battle_screen_active = False
-            return
-        enc = levels[level_idx]["encounters"][enc_idx]
-
-        # Build battle_screen dict
-        style = self._BATTLE_STYLES[self._battle_screen_style_idx]
-        music = self._BATTLE_MUSIC[self._battle_screen_music_idx]
-        obstacles = []
-        for (c, r), otype in self._battle_screen_obstacles.items():
-            obstacles.append({"type": otype, "col": c, "row": r})
-        painted = {}
-        for (c, r), gfx in self._battle_screen_painted.items():
-            painted[f"{c},{r}"] = gfx
-
-        # Only store if non-default
-        if style != "dungeon" or music != "Default" or obstacles or painted:
-            enc["battle_screen"] = {
-                "style": style,
-                "music": music,
-                "obstacles": obstacles,
-                "painted": painted,
-            }
-        else:
-            enc.pop("battle_screen", None)
-
-        self._battle_screen_active = False
-        # Rebuild encounter sections to update subtitle
-        self._rebuild_encounter_monster_sections(enc_idx)
-
-    def _handle_battle_screen_input(self, event):
-        """Handle input in the battle screen painter."""
-        if event.type != pygame.KEYDOWN:
-            return
-
-        # Intercept input when unsaved-changes dialog is showing
-        if self._unsaved_dialog_active:
-            self._handle_unsaved_dialog_input(event)
-            return
-
-        COLS, ROWS = 18, 21
-
-        if self._battle_mode == "settings":
-            self._handle_battle_settings_input(event)
-            return
-
-        # Movement — arrow keys
-        if event.key in (pygame.K_UP, pygame.K_w):
-            if self._battle_cursor_row > 1:
-                self._battle_cursor_row -= 1
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            if self._battle_cursor_row < ROWS - 2:
-                self._battle_cursor_row += 1
-        elif event.key in (pygame.K_LEFT, pygame.K_a):
-            if self._battle_cursor_col > 1:
-                self._battle_cursor_col -= 1
-        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            if self._battle_cursor_col < COLS - 2:
-                self._battle_cursor_col += 1
-
-        # Mode switch — I cycles obstacle/tile, S goes to settings
-        elif event.key == pygame.K_i:
-            if self._battle_mode == "obstacle":
-                self._battle_mode = "tile"
-            else:
-                self._battle_mode = "obstacle"
-        elif event.key == pygame.K_o:
-            self._battle_mode = "settings"
-
-        # Paint — Enter
-        elif event.key == pygame.K_RETURN:
-            pos = (self._battle_cursor_col, self._battle_cursor_row)
-            self._feat_dirty = True
-            if self._battle_mode == "obstacle":
-                brush = self._BATTLE_OBSTACLE_TYPES[self._battle_brush_idx]
-                if brush == "eraser":
-                    self._battle_screen_obstacles.pop(pos, None)
-                else:
-                    self._battle_screen_obstacles[pos] = brush
-            else:
-                brush = self._get_examine_brushes()[self._battle_tile_brush_idx]
-                if brush == "eraser":
-                    self._battle_screen_painted.pop(pos, None)
-                else:
-                    self._battle_screen_painted[pos] = brush
-
-        # Cycle brush — Tab / B
-        elif event.key in (pygame.K_TAB, pygame.K_b):
-            if self._battle_mode == "obstacle":
-                n = len(self._BATTLE_OBSTACLE_TYPES)
-                if event.mod & pygame.KMOD_SHIFT:
-                    self._battle_brush_idx = (
-                        self._battle_brush_idx - 1) % n
-                else:
-                    self._battle_brush_idx = (
-                        self._battle_brush_idx + 1) % n
-            else:
-                n = len(self._get_examine_brushes())
-                if event.mod & pygame.KMOD_SHIFT:
-                    self._battle_tile_brush_idx = (
-                        self._battle_tile_brush_idx - 1) % n
-                else:
-                    self._battle_tile_brush_idx = (
-                        self._battle_tile_brush_idx + 1) % n
-
-        # Exit
-        elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-            if self._feat_dirty:
-                def _save_and_exit():
-                    self._leave_battle_screen_editor()
-                    self._feat_dirty = False
-                def _discard_and_exit():
-                    self._battle_screen_active = False
-                    self._feat_dirty = False
-                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-            else:
-                self._leave_battle_screen_editor()
-
-    def _handle_battle_settings_input(self, event):
-        """Handle input on the battle screen settings sub-page."""
-        if event.key == pygame.K_UP:
-            self._battle_settings_cursor = max(
-                0, self._battle_settings_cursor - 1)
-        elif event.key == pygame.K_DOWN:
-            self._battle_settings_cursor = min(
-                1, self._battle_settings_cursor + 1)
-        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            delta = 1 if event.key == pygame.K_RIGHT else -1
-            if self._battle_settings_cursor == 0:
-                n = len(self._BATTLE_STYLES)
-                self._battle_screen_style_idx = (
-                    self._battle_screen_style_idx + delta) % n
-            else:
-                n = len(self._BATTLE_MUSIC)
-                self._battle_screen_music_idx = (
-                    self._battle_screen_music_idx + delta) % n
-        elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE,
-                           pygame.K_o):
-            self._battle_mode = "obstacle"
-
-    def _get_battle_screen_preview_data(self):
-        """Return a dict describing the current battle screen editor state."""
-        if not getattr(self, "_battle_screen_active", False):
-            return None
-        style = self._BATTLE_STYLES[self._battle_screen_style_idx]
-        music = self._BATTLE_MUSIC[self._battle_screen_music_idx]
-        if self._battle_mode == "obstacle":
-            brush = self._BATTLE_OBSTACLE_TYPES[self._battle_brush_idx]
-        elif self._battle_mode == "tile":
-            brush = self._get_examine_brushes()[self._battle_tile_brush_idx]
-        else:
-            brush = None
-        return {
-            "style": style,
-            "music": music,
-            "obstacles": self._battle_screen_obstacles,
-            "painted": self._battle_screen_painted,
-            "cursor_col": self._battle_cursor_col,
-            "cursor_row": self._battle_cursor_row,
-            "brush": brush,
-            "mode": self._battle_mode,
-            "settings_cursor": self._battle_settings_cursor,
+            "folder": "me_battle",
+            "children": battle_children,
+            "subtitle": f"{len(battle_children)} template"
+                        f"{'s' if len(battle_children) != 1 else ''}",
         }
 
-    def _get_map_editor_data(self):
-        """Return a dict describing the overview map editor state."""
-        if not getattr(self, "_map_editor_active", False):
-            return None
-        palette = self._map_editor_palette
-        pal_names = self._map_editor_palette_names
-        brush_name = pal_names[self._map_editor_brush]
-        return {
-            "tiles": self._map_editor_tiles,
-            "width": self._map_editor_w,
-            "height": self._map_editor_h,
-            "cursor_col": self._map_editor_cursor_c,
-            "cursor_row": self._map_editor_cursor_r,
-            "cam_col": self._map_editor_cam_c,
-            "cam_row": self._map_editor_cam_r,
-            "palette": palette,
-            "palette_names": pal_names,
-            "brush_idx": self._map_editor_brush,
-            "brush_name": brush_name,
-            "dirty": self._map_editor_dirty,
-            "tile_links": getattr(self, "_omap_tile_links", {}),
-            "int_picking": getattr(self, "_omap_int_picking", False),
-            "int_pick_cursor": getattr(self, "_omap_int_pick_cursor", 0),
-            "int_pick_list": self._omap_interior_list,
-        }
+        return [overview_sec, dungeon_sec, examine_sec,
+                enclosure_sec, battle_sec]
 
-    # ── Unique Tiles editing ─────────────────────────────────────
+    def _meh_launch_editor(self, sec):
+        """Launch the unified map editor for a Map Editor hub template.
 
-    # Base tile choice list for the editor
-    _UTILE_BASE_TILES = [
-        "grass", "forest", "sand", "path", "mountain",
-        "dungeon_floor", "floor",
-    ]
-
-    # Tile graphic choices — built dynamically from the manifest.
-    # "none" means invisible (text-only discovery).
-    _UTILE_TILE_GRAPHICS = None  # built lazily
-
-    @classmethod
-    def _get_utile_tile_graphics(cls):
-        """Build tile graphic choices from the manifest."""
-        if cls._UTILE_TILE_GRAPHICS is not None:
-            return cls._UTILE_TILE_GRAPHICS
-        import json, os
-        choices = ["none"]
-        try:
-            mpath = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "data", "tile_manifest.json")
-            with open(mpath) as f:
-                manifest = json.load(f)
-        except (OSError, ValueError):
-            manifest = {}
-        seen = set()
-        for cat in ("overworld", "town", "dungeon",
-                     "unique_tiles", "objects"):
-            section = manifest.get(cat, {})
-            if not isinstance(section, dict):
-                continue
-            for name, entry in sorted(section.items()):
-                if not (isinstance(entry, dict) and "path" in entry):
-                    continue
-                p = entry["path"]
-                # Convert to assets-relative path
-                if p.startswith("src/assets/"):
-                    p = p[len("src/assets/"):]
-                if p not in seen:
-                    seen.add(p)
-                    choices.append(p)
-        cls._UTILE_TILE_GRAPHICS = choices
-        return choices
-
-    def _in_unique_tiles_folder(self):
-        """Return True if the section browser is inside the Unique Tiles folder."""
-        return (self._module_edit_folder_label == "Unique Tiles"
-                and self.module_edit_nav_stack
-                and self.module_edit_level == 0)
-
-    def _build_utile_child(self, idx, tid, tdef):
-        """Build a single child section dict for a unique tile."""
-        tname = tdef.get("name", tid)
-        # Resolve tile graphic for display — None/empty → "none"
-        raw_tile = tdef.get("tile") or "none"
-        fields = [
-            ["ID", f"utile_{idx}_id",
-             tid, "text", True],
-            ["Name", f"utile_{idx}_name",
-             tname, "text", True],
-            ["Description", f"utile_{idx}_desc",
-             tdef.get("description", ""), "text", True],
-            ["Tile Graphic", f"utile_{idx}_tilegfx",
-             raw_tile, "choice", True],
-            ["Base Tile", f"utile_{idx}_basetile",
-             tdef.get("base_tile", "grass"), "choice", True],
-            [">> Examine Screen Preview",
-             f"utile_{idx}_examine", "", "action", True],
-        ]
-        return {
-            "label": tname,
-            "icon": "U",
-            "utile_idx": idx,
-            "fields": fields,
-        }
-
-    # ── Overview Map sub-section builders ──────────────────────────
-
-    def _build_overview_map_sections(self, overworld_cfg, manifest,
-                                      mod_settings=None):
-        """Build the child section list for the Overview Map folder.
-
-        Returns sub-sections:
-        1) Settings   – world size, season, time of day, map type,
-                        initial build
-        2) Map Layout – editable tile grid (opens map editor when
-                        a static map has been generated)
-        3) Unique Tiles – unique tile placements on the overview map
-        4) Interior Map Locations – placeable unique locations
-        """
-        import os, json
-        if mod_settings is None:
-            mod_settings = {}
-
-        # ── 1) Settings ──
-        #    World Size / Season / Time of Day come from the module's
-        #    settings (previously shown at top-level Settings section).
-        #    Map Type and Initial Build are overview-map-specific.
-        world_size = mod_settings.get("world_size", "Medium")
-        season = mod_settings.get("season", "Summer")
-        time_of_day = mod_settings.get("time_of_day", "Noon")
-        map_type = overworld_cfg.get("type", "Procedural")
-        initial_build = overworld_cfg.get(
-            "initial_build", "Random")
-
-        settings_fields = [
-            ["World Size", "omap_world_size", world_size,
-             "choice", True],
-            ["Season", "omap_season", season, "choice", True],
-            ["Time of Day", "omap_time_of_day", time_of_day,
-             "choice", True],
-            ["Map Type", "omap_type", map_type, "choice", True],
-            ["Initial Build", "omap_initial_build",
-             initial_build, "choice", True],
-        ]
-        settings_sec = {
-            "label": "Settings",
-            "icon": ">",
-            "fields": settings_fields,
-        }
-
-        # ── 2) Map Layout ──
-        # Check whether a static map already exists for this module
-        mod = self.module_list[self.module_cursor]
-        static_path = os.path.join(mod["path"], "static_overworld.json")
-        has_static = os.path.isfile(static_path)
-
-        if has_static:
-            map_layout_sec = {
-                "label": "Map Layout",
-                "icon": "G",
-                "is_map_editor": True,
-                "fields": [],
-                "subtitle": "static map (editable)",
-            }
-        else:
-            map_layout_sec = {
-                "label": "Map Layout",
-                "icon": "G",
-                "fields": [
-                    ["— No Map Generated —",
-                     "_omap_layout_header", "", "section", False],
-                    ["Use Generate Map to create one",
-                     "_omap_layout_hint", "", "section", False],
-                ],
-                "subtitle": "no map yet",
-            }
-
-        # ── Generate Map action ──
-        generate_label = ("Re-Generate Map" if has_static
-                          else "Generate Map")
-        generate_sec = {
-            "label": generate_label,
-            "icon": "+",
-            "fields": [],
-            "action": "generate_overworld",
-        }
-
-        # ── 3) Unique Tiles (moved from top-level into Overview Map) ──
-        utile_children = self._build_unique_tiles_sections()
-        n_utiles = len(self.module_edit_unique_tiles)
-        unique_tiles_sec = {
-            "label": "Unique Tiles",
-            "icon": "F",
-            "folder": "unique_tiles",
-            "children": utile_children,
-            "subtitle": (
-                f"{n_utiles} tile{'s' if n_utiles != 1 else ''}"
-                if n_utiles > 0 else "no tiles"),
-        }
-
-        # ── 4) Interior Map Locations ──
-        # Load interiors from static_overworld.json if present
-        interiors = []
-        if has_static:
-            try:
-                with open(static_path, "r") as fh:
-                    sdata = json.load(fh)
-                interiors = sdata.get("interiors", [])
-            except (OSError, json.JSONDecodeError):
-                pass
-        self._omap_interior_list = interiors
-        n_locs = len(interiors)
-        interior_sec = {
-            "label": "Interior Map Locations",
-            "icon": "I",
-            "is_omap_interior_folder": True,
-            "fields": [],
-            "subtitle": (
-                f"{n_locs} location{'s' if n_locs != 1 else ''}"
-                if n_locs else "none"),
-        }
-
-        return [settings_sec, generate_sec, map_layout_sec,
-                unique_tiles_sec, interior_sec]
-
-    def _in_overview_map_folder(self):
-        """Return True if the section browser is inside the Overview Map folder."""
-        return (self._module_edit_folder_label == "Overview Map"
-                and self.module_edit_nav_stack
-                and self.module_edit_level == 0)
-
-    # ── Static overworld generation & map editor ─────────────────
-
-    def _generate_static_overworld(self):
-        """Generate a procedural overworld and save it as a static map.
-
-        Uses the module's overworld.json config (landmarks, paths, etc.)
-        just like a normal new-game would, but persists the resulting
-        tile grid to ``static_overworld.json`` in the module directory.
+        ``sec`` is the selected child dict which must contain a
+        ``map_config`` key with storage, grid_type, tile_context,
+        width, height.
         """
         import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-        mod_path = mod["path"]
-
-        # Load the module's overworld config (same as new-game does)
-        manifest_path = os.path.join(mod_path, "module.json")
-        try:
-            with open(manifest_path, "r") as fh:
-                manifest = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            self.module_message = "Failed to read module!"
-            self.module_msg_timer = 2.0
-            return
-
-        world = manifest.get("world", {})
-        overworld_file = world.get("overworld")
-        overworld_cfg = None
-        if overworld_file:
-            ow_path = os.path.join(mod_path, overworld_file)
-            if os.path.isfile(ow_path):
-                with open(ow_path, "r") as fh:
-                    overworld_cfg = json.load(fh)
-
-        # Generate the map using the existing procedural generator
-        from src.tile_map import create_test_map
-        tmap = create_test_map(
-            overworld_cfg=overworld_cfg, data_dir=mod_path)
-
-        # Serialize the tile grid + metadata to a static file.
-        # Preserve existing interiors and tile_links if the file already
-        # exists — regenerating the terrain shouldn't destroy hand-crafted
-        # interior locations or overworld links.
-        static_path = os.path.join(mod_path, "static_overworld.json")
-        existing_interiors = []
-        existing_tile_links = {}
-        if os.path.isfile(static_path):
-            try:
-                with open(static_path, "r") as fh:
-                    prev = json.load(fh)
-                existing_interiors = prev.get("interiors", [])
-                existing_tile_links = prev.get("tile_links", {})
-            except (OSError, json.JSONDecodeError):
-                pass
-
-        static_data = {
-            "width": tmap.width,
-            "height": tmap.height,
-            "seed": tmap.seed,
-            "tiles": tmap.tiles,  # 2D list of tile IDs
-        }
-        # Also persist unique tile placements
-        if tmap.unique_tiles:
-            ut_list = []
-            for (c, r), udef in tmap.unique_tiles.items():
-                ut_list.append({
-                    "col": c, "row": r,
-                    "id": udef.get("id", ""),
-                    "def": {k: v for k, v in udef.items()
-                            if k != "id"},
-                })
-            static_data["unique_tile_placements"] = ut_list
-
-        # Restore preserved interior data
-        if existing_interiors:
-            static_data["interiors"] = existing_interiors
-        if existing_tile_links:
-            static_data["tile_links"] = existing_tile_links
-
-        try:
-            with open(static_path, "w") as fh:
-                json.dump(static_data, fh)
-        except OSError:
-            self.module_message = "Failed to save map!"
-            self.module_msg_timer = 2.0
-            return
-
-        self.module_message = "Map generated!"
-        self.module_msg_timer = 2.0
-
-        # Refresh the Overview Map sub-sections so Map Layout
-        # shows "static map (editable)" and button says Re-Generate
-        self._refresh_overview_map_sections()
-
-    def _refresh_overview_map_sections(self):
-        """Rebuild the Overview Map folder's children after generation."""
-        import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-
-        from src.module_loader import get_module_settings
-        mod_settings = get_module_settings(mod["path"]) or {
-            "world_size": "Medium", "num_towns": 0, "num_quests": 0,
-            "season": "Summer", "time_of_day": "Noon",
-        }
-        manifest_path = os.path.join(mod["path"], "module.json")
-        try:
-            with open(manifest_path, "r") as fh:
-                manifest = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            manifest = {}
-        overworld_cfg = manifest.get("world", {}).get(
-            "overworld_config", {})
-
-        new_children = self._build_overview_map_sections(
-            overworld_cfg, manifest, mod_settings)
-
-        # We are inside the Overview Map folder — replace current sections
-        self.module_edit_sections = new_children
-        self.module_edit_section_cursor = min(
-            self.module_edit_section_cursor,
-            max(0, len(new_children) - 1))
-        self._adjust_section_scroll()
-
-        # Also update the parent nav-stack entry's children
-        if self.module_edit_nav_stack:
-            parent_sections = self.module_edit_nav_stack[-1][0]
-            for sec in parent_sections:
-                if sec.get("folder") == "overview_map":
-                    sec["children"] = new_children
-                    break
-
-    def _enter_map_editor(self):
-        """Enter the interactive overview map editor."""
-        import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-        static_path = os.path.join(mod["path"], "static_overworld.json")
-
-        if not os.path.isfile(static_path):
-            self.module_message = "Generate a map first!"
-            self.module_msg_timer = 2.0
-            return
-
-        try:
-            with open(static_path, "r") as fh:
-                sdata = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            self.module_message = "Failed to load map!"
-            self.module_msg_timer = 2.0
-            return
-
-        self._map_editor_active = True
-        self._map_editor_tiles = sdata["tiles"]  # 2D list [row][col]
-        self._map_editor_w = sdata["width"]
-        self._map_editor_h = sdata["height"]
-        self._map_editor_cursor_c = self._map_editor_w // 2
-        self._map_editor_cursor_r = self._map_editor_h // 2
-        self._map_editor_cam_c = max(
-            0, self._map_editor_cursor_c - 10)
-        self._map_editor_cam_r = max(
-            0, self._map_editor_cursor_r - 8)
-        # Tile palette: dynamically include ALL overworld tile types
-        # (built-in + user-created from the features editor) + eraser.
-        from src.settings import TILE_DEFS
-        ow_ids = sorted(
-            tid for tid, ctx in self._TILE_CONTEXT.items()
-            if ctx == "overworld" and tid in TILE_DEFS
-        )
-        self._map_editor_palette = ow_ids + [-1]
-        self._map_editor_palette_names = [
-            TILE_DEFS[tid]["name"] for tid in ow_ids
-        ] + ["Eraser"]
-        self._map_editor_brush = 0  # index into palette
-        self._map_editor_dirty = False
-        # Load tile links and interior list for linking
-        self._omap_tile_links = sdata.get("tile_links", {})
-        self._omap_int_picking = False
-        self._map_editor_scroll_to_cursor()
-
-    def _handle_map_editor_input(self, event):
-        """Handle input in the overview map tile editor."""
-        import json, os
-
-        # ── Interior picker overlay intercepts all keys ──
-        if getattr(self, "_omap_int_picking", False):
-            self._handle_omap_int_picker_input(event)
-            return
-
-        if event.key == pygame.K_ESCAPE:
-            # Save if dirty, then exit
-            if self._map_editor_dirty:
-                self._save_map_editor()
-            self._map_editor_active = False
-            self._refresh_overview_map_sections()
-            return
-
-        mc = self._map_editor_cursor_c
-        mr = self._map_editor_cursor_r
-        w = self._map_editor_w
-        h = self._map_editor_h
-
-        # ── Cursor movement ──
-        moved = False
-        if event.key == pygame.K_UP:
-            self._map_editor_cursor_r = max(0, mr - 1)
-            moved = True
-        elif event.key == pygame.K_DOWN:
-            self._map_editor_cursor_r = min(h - 1, mr + 1)
-            moved = True
-        elif event.key == pygame.K_LEFT:
-            self._map_editor_cursor_c = max(0, mc - 1)
-            moved = True
-        elif event.key == pygame.K_RIGHT:
-            self._map_editor_cursor_c = min(w - 1, mc + 1)
-            moved = True
-
-        if moved:
-            self._map_editor_scroll_to_cursor()
-            return
-
-        # ── Brush selection (Tab / Shift+Tab, or [ / ]) ──
-        elif event.key == pygame.K_TAB:
-            mods = pygame.key.get_mods()
-            if mods & pygame.KMOD_SHIFT:
-                self._map_editor_brush = (
-                    (self._map_editor_brush - 1)
-                    % len(self._map_editor_palette))
-            else:
-                self._map_editor_brush = (
-                    (self._map_editor_brush + 1)
-                    % len(self._map_editor_palette))
-        elif event.key in (pygame.K_LEFTBRACKET, pygame.K_COMMA):
-            self._map_editor_brush = (
-                (self._map_editor_brush - 1)
-                % len(self._map_editor_palette))
-        elif event.key in (pygame.K_RIGHTBRACKET, pygame.K_PERIOD):
-            self._map_editor_brush = (
-                (self._map_editor_brush + 1)
-                % len(self._map_editor_palette))
-
-        # ── Paint tile (Enter or Space) ──
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            from src.settings import TILE_GRASS as _TG
-            tile_id = self._map_editor_palette[self._map_editor_brush]
-            # Eraser (-1) resets to grass
-            if tile_id == -1:
-                tile_id = _TG
-            r = self._map_editor_cursor_r
-            c = self._map_editor_cursor_c
-            if self._map_editor_tiles[r][c] != tile_id:
-                self._map_editor_tiles[r][c] = tile_id
-                self._map_editor_dirty = True
-
-        # ── Link interior (I key) ──
-        elif event.key == pygame.K_i:
-            self._omap_int_picking = True
-            self._omap_int_pick_cursor = 0
-            self._omap_int_pick_scroll = 0
-
-        # ── Remove link (X key) ──
-        elif event.key == pygame.K_x:
-            r = self._map_editor_cursor_r
-            c = self._map_editor_cursor_c
-            pos_key = f"{c},{r}"
-            self._omap_tile_links = getattr(
-                self, "_omap_tile_links", {})
-            if pos_key in self._omap_tile_links:
-                del self._omap_tile_links[pos_key]
-                self._map_editor_dirty = True
-
-        # ── Quick-save (Ctrl+S) ──
-        elif self._is_save_shortcut(event):
-            self._save_map_editor()
-
-    def _map_editor_scroll_to_cursor(self):
-        """Keep the viewport centred around the cursor.
-
-        Viewport dimensions mirror the renderer layout:
-        right panel width = SCREEN_WIDTH - 188, tile size = 32.
-        """
-        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE
-        header_h = 36
-        footer_h = 28
-        left_w = 180
-        right_w = SCREEN_WIDTH - left_w - 4 - 4
-        grid_w = right_w - 8
-        grid_h = SCREEN_HEIGHT - header_h - footer_h - 4 - 8
-        vis_cols = grid_w // TILE_SIZE
-        vis_rows = grid_h // TILE_SIZE
-
-        cc = self._map_editor_cursor_c
-        cr = self._map_editor_cursor_r
-        # Centre cursor in viewport, clamped to map bounds
-        self._map_editor_cam_c = max(
-            0, min(cc - vis_cols // 2,
-                   self._map_editor_w - vis_cols))
-        self._map_editor_cam_r = max(
-            0, min(cr - vis_rows // 2,
-                   self._map_editor_h - vis_rows))
-
-    def _save_map_editor(self):
-        """Persist the current map editor tiles to static_overworld.json."""
-        import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-        static_path = os.path.join(mod["path"], "static_overworld.json")
-
-        try:
-            with open(static_path, "r") as fh:
-                sdata = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            sdata = {}
-
-        sdata["tiles"] = self._map_editor_tiles
-        sdata["width"] = self._map_editor_w
-        sdata["height"] = self._map_editor_h
-        sdata["tile_links"] = getattr(self, "_omap_tile_links", {})
-
-        try:
-            with open(static_path, "w") as fh:
-                json.dump(sdata, fh)
-            self.module_message = "Map saved!"
-            self.module_msg_timer = 2.0
-        except OSError:
-            self.module_message = "Save failed!"
-            self.module_msg_timer = 2.0
-        self._map_editor_dirty = False
-
-    # ── Overview Interior Map Locations ──────────────────────────────
-
-    def _enter_omap_interior_list(self):
-        """Open the interior list editor for overview map locations."""
-        self._omap_interior_active = True
-        self._omap_interior_cursor = 0
-        self._omap_interior_scroll = 0
-        self._omap_interior_editing = False
-        self._omap_interior_naming = False
-
-    def _handle_omap_interior_list_input(self, event):
-        """Handle input in the overview interior list browser."""
-        import json, os
-
-        # ── Naming mode (rename / new name) ──
-        if self._omap_interior_naming:
-            self._handle_omap_interior_naming_input(event)
-            return
-
-        n = len(self._omap_interior_list)
-
-        if event.key == pygame.K_ESCAPE:
-            self._omap_interior_active = False
-            self._refresh_overview_map_sections()
-            return
-
-        if event.key == pygame.K_UP and n > 0:
-            self._omap_interior_cursor = (
-                self._omap_interior_cursor - 1) % n
-        elif event.key == pygame.K_DOWN and n > 0:
-            self._omap_interior_cursor = (
-                self._omap_interior_cursor + 1) % n
-
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE) and n > 0:
-            # Enter grid painter for selected interior
-            self._enter_omap_interior_painter()
-
-        elif self._is_new_shortcut(event):
-            # Add a new interior
-            idx = len(self._omap_interior_list)
-            self._omap_interior_list.append({
-                "name": f"Interior {idx + 1}",
-                "width": 20,
-                "height": 16,
-                "tiles": {},
-            })
-            self._omap_interior_cursor = idx
-            self._save_omap_interiors()
-
-        elif self._is_delete_shortcut(event) and n > 0:
-            # Delete the selected interior
-            removed = self._omap_interior_list.pop(
-                self._omap_interior_cursor)
-            # Also remove any tile links referencing this interior
-            self._remove_omap_interior_links(removed.get("name", ""))
-            if self._omap_interior_cursor >= len(self._omap_interior_list):
-                self._omap_interior_cursor = max(
-                    0, len(self._omap_interior_list) - 1)
-            self._save_omap_interiors()
-
-        elif event.key == pygame.K_n and n > 0:
-            # Rename interior
-            item = self._omap_interior_list[self._omap_interior_cursor]
-            self._omap_interior_naming = True
-            self._omap_interior_name_buf = item.get("name", "")
-
-    def _handle_omap_interior_naming_input(self, event):
-        """Handle text input during interior rename."""
-        if event.key == pygame.K_RETURN:
-            name = self._omap_interior_name_buf.strip()
-            if name and self._omap_interior_cursor < len(
-                    self._omap_interior_list):
-                old_name = self._omap_interior_list[
-                    self._omap_interior_cursor].get("name", "")
-                self._omap_interior_list[
-                    self._omap_interior_cursor]["name"] = name
-                # Update any tile links with the old name
-                self._rename_omap_interior_links(old_name, name)
-                self._save_omap_interiors()
-            self._omap_interior_naming = False
-            self._omap_interior_name_buf = ""
-        elif event.key == pygame.K_ESCAPE:
-            self._omap_interior_naming = False
-            self._omap_interior_name_buf = ""
-        elif event.key == pygame.K_BACKSPACE:
-            self._omap_interior_name_buf = (
-                self._omap_interior_name_buf[:-1])
-        elif event.unicode and len(self._omap_interior_name_buf) < 40:
-            self._omap_interior_name_buf += event.unicode
-
-    def _enter_omap_interior_painter(self):
-        """Enter the grid painter for the selected overview interior."""
-        if self._omap_interior_cursor >= len(self._omap_interior_list):
-            return
-        self._omap_interior_editing = True
-        self._omap_interior_cx = 1
-        self._omap_interior_cy = 1
-        self._omap_interior_brush_idx = 0
-        self._omap_interior_brushes = None  # rebuild
-        self._omap_interior_dirty = False
-
-    def _get_omap_interior_brushes(self):
-        """Build brush list from dungeon tile types for overview interiors."""
-        if self._omap_interior_brushes is not None:
-            return self._omap_interior_brushes
-        import json, os
-        from src.settings import TILE_DEFS
-
-        brushes = [
-            {"name": "Eraser", "tile_id": None, "path": None},
-        ]
-
-        # Collect dungeon tile IDs from Tile Types definitions
-        dungeon_ids = sorted(
-            tid for tid, ctx in self._TILE_CONTEXT.items()
-            if ctx == "dungeon"
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_overworld_brushes, build_interior_brushes,
+            STORAGE_DENSE, STORAGE_SPARSE,
         )
 
-        # Load saved tile defs for sprite key resolution
-        saved_tile_defs = {}
-        try:
-            with open(self._feat_tiles_path(), "r") as f:
-                saved_tile_defs = json.load(f)
-        except (OSError, ValueError):
-            pass
+        mc = sec["map_config"]
+        ctx = mc["tile_context"]
+        w = mc["width"]
+        h = mc["height"]
+        storage = mc["storage"]
+        grid_type = mc["grid_type"]
 
-        manifest = {}
-        try:
-            mpath = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "data", "tile_manifest.json")
-            with open(mpath) as f:
-                manifest = json.load(f)
-        except (OSError, ValueError):
-            pass
-
-        def _resolve_sprite_path(tid):
-            saved = saved_tile_defs.get(str(tid), {})
-            sprite_key = saved.get("sprite", "")
-            if sprite_key and "/" in sprite_key:
-                cat, name = sprite_key.split("/", 1)
-                section = manifest.get(cat, {})
-                if isinstance(section, dict):
-                    entry = section.get(name, {})
-                    if isinstance(entry, dict) and "path" in entry:
-                        p = entry["path"]
-                        if p.startswith("src/assets/"):
-                            p = p[len("src/assets/"):]
-                        return p
-            for tile in getattr(self, "_feat_tile_list", []):
-                if tile.get("_tile_id") == tid:
-                    sk = tile.get("_sprite", "")
-                    if sk and "/" in sk:
-                        cat, name = sk.split("/", 1)
-                        section = manifest.get(cat, {})
-                        if isinstance(section, dict):
-                            entry = section.get(name, {})
-                            if isinstance(entry, dict) and "path" in entry:
-                                p = entry["path"]
-                                if p.startswith("src/assets/"):
-                                    p = p[len("src/assets/"):]
-                                return p
-                    break
-            for cat in manifest:
-                if cat.startswith("_"):
-                    continue
-                section = manifest.get(cat, {})
-                if not isinstance(section, dict):
-                    continue
-                for _name, entry in section.items():
-                    if (isinstance(entry, dict)
-                            and entry.get("tile_id") == tid
-                            and "path" in entry):
-                        p = entry["path"]
-                        if p.startswith("src/assets/"):
-                            p = p[len("src/assets/"):]
-                        return p
-            return None
-
-        for tid in dungeon_ids:
-            td = TILE_DEFS.get(tid)
-            if not td:
-                continue
-            brushes.append({
-                "name": td.get("name", f"Tile {tid}"),
-                "tile_id": tid,
-                "path": _resolve_sprite_path(tid),
-            })
-
-        self._omap_interior_brushes = brushes
-        return brushes
-
-    def _handle_omap_interior_painter_input(self, event):
-        """Handle input in the overview interior grid painter."""
-        if self._omap_interior_cursor >= len(self._omap_interior_list):
-            self._omap_interior_editing = False
-            return
-
-        # ── Intercept: replace tile overlay ──
-        if self._omap_int_replacing:
-            self._handle_omap_int_replace_input(event)
-            return
-
-        # ── Intercept: interior link picker overlay ──
-        if self._omap_int_link_picking:
-            self._handle_omap_int_link_picker_input(event)
-            return
-
-        layout = self._omap_interior_list[self._omap_interior_cursor]
-        w = layout.get("width", 20)
-        h = layout.get("height", 16)
-        brushes = self._get_omap_interior_brushes()
-
-        if event.key == pygame.K_ESCAPE:
-            if self._omap_interior_dirty:
-                self._save_omap_interiors()
-            self._omap_interior_editing = False
-            self._omap_interior_dirty = False
-            return
-
-        # Cursor movement (arrows + WASD)
-        if event.key in (pygame.K_UP, pygame.K_w):
-            self._omap_interior_cy = max(0, self._omap_interior_cy - 1)
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self._omap_interior_cy = min(h - 1, self._omap_interior_cy + 1)
-        elif event.key in (pygame.K_LEFT, pygame.K_a):
-            self._omap_interior_cx = max(0, self._omap_interior_cx - 1)
-        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            self._omap_interior_cx = min(w - 1, self._omap_interior_cx + 1)
-
-        # Brush cycling
-        elif event.key == pygame.K_TAB:
-            mods = pygame.key.get_mods()
-            if mods & pygame.KMOD_SHIFT:
-                self._omap_interior_brush_idx = (
-                    (self._omap_interior_brush_idx - 1)
-                    % len(brushes))
-            else:
-                self._omap_interior_brush_idx = (
-                    (self._omap_interior_brush_idx + 1)
-                    % len(brushes))
-
-        # Paint tile
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            cx = self._omap_interior_cx
-            cy = self._omap_interior_cy
-            pos_key = f"{cx},{cy}"
-            brush = brushes[self._omap_interior_brush_idx]
-            tiles = layout.setdefault("tiles", {})
-            if brush["tile_id"] is None:
-                # Eraser
-                if pos_key in tiles:
-                    del tiles[pos_key]
-                    self._omap_interior_dirty = True
-            else:
-                td = {"tile_id": brush["tile_id"],
-                      "name": brush["name"]}
-                if brush.get("path"):
-                    td["path"] = brush["path"]
-                # Preserve existing link fields
-                old = tiles.get(pos_key, {})
-                for lk in ("interior", "to_overworld"):
-                    if lk in old:
-                        td[lk] = old[lk]
-                tiles[pos_key] = td
-                self._omap_interior_dirty = True
-
-        # ── Replace tile (R key) ──
-        elif event.key == pygame.K_r:
-            cx = self._omap_interior_cx
-            cy = self._omap_interior_cy
-            pos_key = f"{cx},{cy}"
-            tiles = layout.get("tiles", {})
-            td = tiles.get(pos_key)
-            self._omap_int_replacing = True
-            if td:
-                self._omap_int_replace_src_tile = td.get("tile_id")
-                self._omap_int_replace_src_name = td.get(
-                    "name", f"Tile {td.get('tile_id', '?')}")
-                self._omap_int_replace_src_empty = False
-            else:
-                self._omap_int_replace_src_tile = None
-                self._omap_int_replace_src_name = "(Empty)"
-                self._omap_int_replace_src_empty = True
-            self._omap_int_replace_dst_idx = self._omap_interior_brush_idx
-
-        # ── Link interior / overworld exit (I key) ──
-        elif event.key == pygame.K_i:
-            current_name = layout.get("name", "")
-            # Build pick list: sibling interiors (exclude self)
-            self._omap_int_link_pick_list = [
-                intr for intr in self._omap_interior_list
-                if intr.get("name", "") != current_name
-            ]
-            self._omap_int_link_picking = True
-            # Pre-select based on current tile's link
-            cx = self._omap_interior_cx
-            cy = self._omap_interior_cy
-            pos_key = f"{cx},{cy}"
-            tiles = layout.get("tiles", {})
-            td = tiles.get(pos_key, {})
-            if td.get("to_overworld"):
-                self._omap_int_link_pick_cursor = 1
-            elif td.get("interior"):
-                iname = td["interior"]
-                found = False
-                for pi, intr in enumerate(self._omap_int_link_pick_list):
-                    if intr.get("name") == iname:
-                        self._omap_int_link_pick_cursor = pi + 2
-                        found = True
-                        break
-                if not found:
-                    self._omap_int_link_pick_cursor = 0
-            else:
-                self._omap_int_link_pick_cursor = 0
-
-        # ── Remove link (X key) ──
-        elif event.key == pygame.K_x:
-            cx = self._omap_interior_cx
-            cy = self._omap_interior_cy
-            pos_key = f"{cx},{cy}"
-            tiles = layout.get("tiles", {})
-            if pos_key in tiles:
-                td = tiles[pos_key]
-                changed = False
-                for lk in ("interior", "to_overworld"):
-                    if lk in td:
-                        del td[lk]
-                        changed = True
-                if changed:
-                    self._omap_interior_dirty = True
-
-        # Quick-save
-        elif self._is_save_shortcut(event):
-            self._save_omap_interiors()
-            self._omap_interior_dirty = False
-
-    def _handle_omap_int_picker_input(self, event):
-        """Handle input while the interior link picker is open in the
-        overview map editor."""
-        interiors = self._omap_interior_list
-        # Options: (none), then each interior name
-        n_options = 1 + len(interiors)
-
-        if event.key == pygame.K_ESCAPE:
-            self._omap_int_picking = False
-        elif event.key == pygame.K_UP:
-            self._omap_int_pick_cursor = max(
-                0, self._omap_int_pick_cursor - 1)
-        elif event.key == pygame.K_DOWN:
-            self._omap_int_pick_cursor = min(
-                n_options - 1, self._omap_int_pick_cursor + 1)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            r = self._map_editor_cursor_r
-            c = self._map_editor_cursor_c
-            pos_key = f"{c},{r}"
-            self._omap_tile_links = getattr(
-                self, "_omap_tile_links", {})
-            if self._omap_int_pick_cursor == 0:
-                # "(none)" — remove link
-                if pos_key in self._omap_tile_links:
-                    del self._omap_tile_links[pos_key]
-                    self._map_editor_dirty = True
-            else:
-                # Link to selected interior
-                idx = self._omap_int_pick_cursor - 1
-                if idx < len(interiors):
-                    self._omap_tile_links[pos_key] = {
-                        "interior": interiors[idx]["name"],
-                    }
-                    self._map_editor_dirty = True
-            self._omap_int_picking = False
-
-    def _handle_omap_int_replace_input(self, event):
-        """Handle input while the replace tile overlay is open."""
-        brushes = self._get_omap_interior_brushes()
-        n = len(brushes)
-
-        if event.key == pygame.K_ESCAPE:
-            self._omap_int_replacing = False
-            return
-
-        if event.key == pygame.K_UP:
-            self._omap_int_replace_dst_idx = (
-                (self._omap_int_replace_dst_idx - 1) % n)
-        elif event.key == pygame.K_DOWN:
-            self._omap_int_replace_dst_idx = (
-                (self._omap_int_replace_dst_idx + 1) % n)
-
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            layout = self._omap_interior_list[self._omap_interior_cursor]
-            tiles = layout.setdefault("tiles", {})
-            w = layout.get("width", 20)
-            h = layout.get("height", 16)
-            dst_brush = brushes[self._omap_int_replace_dst_idx]
-            src_tile = self._omap_int_replace_src_tile
-            src_empty = self._omap_int_replace_src_empty
-
-            if src_empty:
-                # Replace all empty cells with destination
-                if dst_brush["tile_id"] is not None:
-                    for r in range(h):
-                        for c in range(w):
-                            pk = f"{c},{r}"
-                            if pk not in tiles:
-                                td = {"tile_id": dst_brush["tile_id"],
-                                      "name": dst_brush["name"]}
-                                if dst_brush.get("path"):
-                                    td["path"] = dst_brush["path"]
-                                tiles[pk] = td
-                    self._omap_interior_dirty = True
-            elif dst_brush["tile_id"] is None:
-                # Replace source tiles with eraser (remove)
-                to_del = [k for k, v in tiles.items()
-                          if v.get("tile_id") == src_tile]
-                for k in to_del:
-                    del tiles[k]
-                if to_del:
-                    self._omap_interior_dirty = True
-            else:
-                # Replace source tile_id with destination
-                for k, v in tiles.items():
-                    if v.get("tile_id") == src_tile:
-                        v["tile_id"] = dst_brush["tile_id"]
-                        v["name"] = dst_brush["name"]
-                        if dst_brush.get("path"):
-                            v["path"] = dst_brush["path"]
-                        elif "path" in v:
-                            del v["path"]
-                        self._omap_interior_dirty = True
-
-            self._omap_int_replacing = False
-
-    def _handle_omap_int_link_picker_input(self, event):
-        """Handle input while the interior link picker is open in the
-        interior painter."""
-        pick_list = self._omap_int_link_pick_list
-        # Options: 0=(none), 1=Return to Overworld, 2+=interior names
-        n_options = 2 + len(pick_list)
-
-        if event.key == pygame.K_ESCAPE:
-            self._omap_int_link_picking = False
-            return
-
-        if event.key == pygame.K_UP:
-            self._omap_int_link_pick_cursor = max(
-                0, self._omap_int_link_pick_cursor - 1)
-        elif event.key == pygame.K_DOWN:
-            self._omap_int_link_pick_cursor = min(
-                n_options - 1, self._omap_int_link_pick_cursor + 1)
-
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            layout = self._omap_interior_list[self._omap_interior_cursor]
-            cx = self._omap_interior_cx
-            cy = self._omap_interior_cy
-            pos_key = f"{cx},{cy}"
-            tiles = layout.setdefault("tiles", {})
-            if pos_key not in tiles:
-                # Need a tile to attach the link to — skip if empty
-                self._omap_int_link_picking = False
-                return
-            td = tiles[pos_key]
-            idx = self._omap_int_link_pick_cursor
-
-            # Clear all link types first
-            for lk in ("interior", "to_overworld"):
-                td.pop(lk, None)
-
-            if idx == 0:
-                pass  # "(none)" — links cleared above
-            elif idx == 1:
-                # Return to Overworld
-                td["to_overworld"] = True
-            else:
-                # Link to sibling interior
-                pi = idx - 2
-                if pi < len(pick_list):
-                    td["interior"] = pick_list[pi]["name"]
-
-            self._omap_interior_dirty = True
-            self._omap_int_link_picking = False
-
-    def _save_omap_interiors(self):
-        """Save overview interiors to static_overworld.json."""
-        import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-        static_path = os.path.join(mod["path"], "static_overworld.json")
-
-        try:
-            with open(static_path, "r") as fh:
-                sdata = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            sdata = {}
-
-        sdata["interiors"] = self._omap_interior_list
-
-        try:
-            with open(static_path, "w") as fh:
-                json.dump(sdata, fh)
-        except OSError:
-            pass
-
-    def _remove_omap_interior_links(self, interior_name):
-        """Remove tile links referencing a deleted interior from the
-        overview map and from other interiors."""
-        if not interior_name:
-            return
-        # Remove from overworld tile links
-        import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-        static_path = os.path.join(mod["path"], "static_overworld.json")
-        try:
-            with open(static_path, "r") as fh:
-                sdata = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            return
-        # Remove from tile_links
-        links = sdata.get("tile_links", {})
-        to_remove = [k for k, v in links.items()
-                     if v.get("interior") == interior_name]
-        for k in to_remove:
-            del links[k]
-        if to_remove:
-            sdata["tile_links"] = links
+        # Build brushes based on tile context
+        if ctx == "overworld":
+            brushes = build_overworld_brushes(self._TILE_CONTEXT)
+        else:
+            manifest = {}
             try:
-                with open(static_path, "w") as fh:
-                    json.dump(sdata, fh)
-            except OSError:
+                mpath = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)),
+                    "data", "tile_manifest.json")
+                with open(mpath) as f:
+                    manifest = json.load(f)
+            except (OSError, ValueError):
                 pass
-
-    def _rename_omap_interior_links(self, old_name, new_name):
-        """Update tile links when an interior is renamed."""
-        if not old_name or not new_name:
-            return
-        import json, os
-        if not self.module_list:
-            return
-        mod = self.module_list[self.module_cursor]
-        static_path = os.path.join(mod["path"], "static_overworld.json")
-        try:
-            with open(static_path, "r") as fh:
-                sdata = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            return
-        links = sdata.get("tile_links", {})
-        changed = False
-        for k, v in links.items():
-            if v.get("interior") == old_name:
-                v["interior"] = new_name
-                changed = True
-        if changed:
-            sdata["tile_links"] = links
-            try:
-                with open(static_path, "w") as fh:
-                    json.dump(sdata, fh)
-            except OSError:
-                pass
-
-    def _get_omap_interior_editor_data(self):
-        """Return dict describing overview interior painter state for
-        the renderer."""
-        if not self._omap_interior_editing:
-            return None
-        if self._omap_interior_cursor >= len(self._omap_interior_list):
-            return None
-        layout = self._omap_interior_list[self._omap_interior_cursor]
-        brushes = self._get_omap_interior_brushes()
-        return {
-            "layout": layout,
-            "cx": self._omap_interior_cx,
-            "cy": self._omap_interior_cy,
-            "brush_idx": self._omap_interior_brush_idx,
-            "brushes": brushes,
-            "dirty": self._omap_interior_dirty,
-            # Replace overlay
-            "replacing": self._omap_int_replacing,
-            "replace_src_tile": self._omap_int_replace_src_tile,
-            "replace_src_name": self._omap_int_replace_src_name,
-            "replace_src_empty": self._omap_int_replace_src_empty,
-            "replace_dst_idx": self._omap_int_replace_dst_idx,
-            # Interior link picker
-            "link_picking": self._omap_int_link_picking,
-            "link_pick_cursor": self._omap_int_link_pick_cursor,
-            "link_pick_list": self._omap_int_link_pick_list,
-        }
-
-    def _get_omap_interior_list_data(self):
-        """Return dict describing the overview interior list state for
-        the renderer."""
-        if not self._omap_interior_active:
-            return None
-        return {
-            "interiors": self._omap_interior_list,
-            "cursor": self._omap_interior_cursor,
-            "scroll": self._omap_interior_scroll,
-            "naming": self._omap_interior_naming,
-            "name_buf": self._omap_interior_name_buf,
-        }
-
-    def _build_unique_tiles_sections(self):
-        """Build the full section list for the Unique Tiles folder:
-        one child per tile, plus a [+] Add Tile action at the end."""
-        children = []
-        for i, utile in enumerate(self.module_edit_unique_tiles):
-            tid = utile.get("id", f"tile_{i}")
-            children.append(self._build_utile_child(i, tid, utile))
-        children.append({
-            "label": "[+] Add Tile",
-            "icon": "+",
-            "fields": [],
-            "action": "add_tile",
-        })
-        return children
-
-    def _rebuild_unique_tiles_children(self):
-        """Rebuild the children list in the Unique Tiles folder from
-        the in-memory tile list and refresh the section browser."""
-        children = self._build_unique_tiles_sections()
-        self.module_edit_sections = children
-        n_tiles = len(self.module_edit_unique_tiles)
-        self.module_edit_section_cursor = min(
-            self.module_edit_section_cursor,
-            max(0, len(children) - 1))
-        self._adjust_section_scroll()
-        # Also update the parent folder's subtitle in the nav stack
-        if self.module_edit_nav_stack:
-            parent_sections = self.module_edit_nav_stack[-1][0]
-            for sec in parent_sections:
-                if sec.get("folder") == "unique_tiles":
-                    sec["children"] = children
-                    sec["subtitle"] = (
-                        f"{n_tiles} tile{'s' if n_tiles != 1 else ''}"
-                        if n_tiles > 0 else "no tiles")
-                    break
-
-    def _enter_single_utile_fields(self, utile_idx):
-        """Drill into a single unique tile's fields for editing."""
-        self.module_edit_in_unique_tiles = True
-        self.module_edit_active_utile = utile_idx
-        sec = self.module_edit_sections[self.module_edit_section_cursor]
-        self.module_edit_fields = sec["fields"]
-        self.module_edit_field = 0
-        self.module_edit_scroll = 0
-        self.module_edit_level = 1
-        self.module_edit_field = self._next_editable_field(0)
-        if self.module_edit_fields:
-            self.module_edit_buffer = \
-                self.module_edit_fields[self.module_edit_field][2]
-
-    def _save_single_utile_fields(self):
-        """Persist the current tile's field edits back to in-memory list."""
-        idx = self.module_edit_active_utile
-        if idx < 0 or idx >= len(self.module_edit_unique_tiles):
-            return
-        vals = {}
-        for entry in self.module_edit_fields:
-            k = entry[1]
-            prefix = f"utile_{idx}_"
-            if k.startswith(prefix):
-                suffix = k[len(prefix):]
-                vals[suffix] = entry[2]
-        utile = self.module_edit_unique_tiles[idx]
-        utile["id"] = vals.get("id", utile.get("id", ""))
-        utile["name"] = vals.get("name", utile.get("name", ""))
-        utile["description"] = vals.get("desc", utile.get("description", ""))
-        # Tile graphic: "none" means no sprite (invisible)
-        gfx = vals.get("tilegfx", "none")
-        utile["tile"] = None if gfx == "none" else gfx
-        utile["base_tile"] = vals.get("basetile", utile.get("base_tile", "grass"))
-
-    def _add_unique_tile(self):
-        """Add a new unique tile and refresh the tile list browser."""
-        n = len(self.module_edit_unique_tiles)
-        self.module_edit_unique_tiles.append({
-            "id": f"new_tile_{n + 1}",
-            "name": f"New Tile {n + 1}",
-            "description": "A mysterious feature.",
-            "base_tile": "grass",
-        })
-        self._rebuild_unique_tiles_children()
-        # Move cursor to the new tile
-        self.module_edit_section_cursor = len(
-            self.module_edit_unique_tiles) - 1
-        self._adjust_section_scroll()
-
-    def _remove_unique_tile(self):
-        """Remove the selected unique tile and refresh the tile list."""
-        tiles = self.module_edit_unique_tiles
-        if not tiles:
-            return
-        idx = self.module_edit_section_cursor
-        if idx < 0 or idx >= len(tiles):
-            return
-        tiles.pop(idx)
-        self.module_edit_unique_tiles = tiles
-        self._rebuild_unique_tiles_children()
-
-    # ── Examine preview for unique tiles ────────────────────────
-
-    # Map base_tile names → tile type constants
-    _BASE_TILE_TO_TYPE = None  # built lazily
-
-    @classmethod
-    def _get_base_tile_map(cls):
-        if cls._BASE_TILE_TO_TYPE is None:
-            from src.settings import (
-                TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH,
-                TILE_MOUNTAIN, TILE_DFLOOR, TILE_FLOOR,
+            brushes = build_interior_brushes(
+                self._TILE_CONTEXT,
+                feat_tiles_path=self._feat_tiles_path(),
+                manifest=manifest,
+                feat_tile_list=getattr(self, "_feat_tile_list", None),
             )
-            cls._BASE_TILE_TO_TYPE = {
-                "grass": TILE_GRASS,
-                "forest": TILE_FOREST,
-                "sand": TILE_SAND,
-                "path": TILE_PATH,
-                "mountain": TILE_MOUNTAIN,
-                "dungeon_floor": TILE_DFLOOR,
-                "floor": TILE_FLOOR,
-            }
-        return cls._BASE_TILE_TO_TYPE
 
-    # Brush palette for the examine editor — built dynamically.
-    _EXAMINE_BRUSHES = None  # built lazily
-
-    @classmethod
-    def _get_examine_brushes(cls):
-        """Build examine brush list from the manifest."""
-        if cls._EXAMINE_BRUSHES is not None:
-            return cls._EXAMINE_BRUSHES
-        import json, os
-        brushes = ["eraser"]
-        try:
-            mpath = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "data", "tile_manifest.json")
-            with open(mpath) as f:
-                manifest = json.load(f)
-        except (OSError, ValueError):
-            manifest = {}
-        seen = set()
-        for cat in ("overworld", "town", "dungeon",
-                     "unique_tiles", "objects"):
-            section = manifest.get(cat, {})
-            if not isinstance(section, dict):
-                continue
-            for name, entry in sorted(section.items()):
-                if not (isinstance(entry, dict) and "path" in entry):
-                    continue
-                p = entry["path"]
-                if p.startswith("src/assets/"):
-                    p = p[len("src/assets/"):]
-                if p not in seen:
-                    seen.add(p)
-                    brushes.append(p)
-        cls._EXAMINE_BRUSHES = brushes
-        return brushes
-
-    # Item palette for the examine editor.  "eraser" clears an item.
-    _EXAMINE_ITEMS = [
-        "eraser",
-        "Rock",
-        "Healing Herb",
-        "Healing Potion",
-        "Mana Potion",
-        "Antidote",
-        "Torch",
-        "Arrows",
-        "Bolts",
-        "Stones",
-        "Rope",
-        "Holy Water",
-        "Scroll of Fire",
-        "Lockpick",
-        "Smoke Bomb",
-        "Camping Supplies",
-        "Moonpetal",
-        "Glowcap Mushroom",
-        "Serpent Root",
-        "Brimite Ore",
-        "Spring Water",
-        "Fire Oil",
-    ]
-
-    def _enter_utile_examine_preview(self):
-        """Enter examine-screen preview mode for the active unique tile."""
-        idx = self.module_edit_active_utile
-        if idx < 0 or idx >= len(self.module_edit_unique_tiles):
-            return
-        # Save current field values before switching to preview
-        self._save_single_utile_fields()
-        self.module_edit_utile_preview = True
-        # Editor cursor starts at centre of interior
-        self._examine_cursor_col = 5
-        self._examine_cursor_row = 6
-        self._examine_brush_idx = 0
-        self._examine_item_idx = 0
-        self._examine_mode = "tile"   # "tile" or "item"
-        # Load any existing painted layout into a working dict
-        utile = self.module_edit_unique_tiles[idx]
-        raw = utile.get("examine_layout") or {}
-        self._examine_painted = {}
-        for pos_key, gfx in raw.items():
-            try:
-                c, r = pos_key.split(",")
-                self._examine_painted[(int(c), int(r))] = gfx
-            except (ValueError, AttributeError):
-                pass
-        # Load any existing placed items
-        raw_items = utile.get("examine_items") or {}
-        self._examine_items = {}
-        for pos_key, item_name in raw_items.items():
-            try:
-                c, r = pos_key.split(",")
-                self._examine_items[(int(c), int(r))] = item_name
-            except (ValueError, AttributeError):
-                pass
-        self._feat_dirty = False
-
-    def _leave_utile_examine_preview(self):
-        """Exit examine-screen preview and persist painted layout + items."""
-        idx = self.module_edit_active_utile
-        if 0 <= idx < len(self.module_edit_unique_tiles):
-            # Persist the painted layout back to the in-memory tile dict
-            layout = {}
-            for (c, r), gfx in self._examine_painted.items():
-                layout[f"{c},{r}"] = gfx
-            self.module_edit_unique_tiles[idx]["examine_layout"] = layout
-            # Persist placed items
-            items = {}
-            for (c, r), item_name in self._examine_items.items():
-                items[f"{c},{r}"] = item_name
-            self.module_edit_unique_tiles[idx]["examine_items"] = items
-        self.module_edit_utile_preview = False
-
-    def _handle_examine_preview_input(self, event):
-        """Handle input in the examine preview editor."""
-        # Intercept input when unsaved-changes dialog is showing
-        if self._unsaved_dialog_active:
-            self._handle_unsaved_dialog_input(event)
-            return
-
-        from src.states.examine import EXAMINE_COLS, EXAMINE_ROWS
-
-        # Movement — arrow keys move cursor within interior (1..cols-2)
-        if event.key in (pygame.K_UP, pygame.K_w):
-            if self._examine_cursor_row > 1:
-                self._examine_cursor_row -= 1
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            if self._examine_cursor_row < EXAMINE_ROWS - 2:
-                self._examine_cursor_row += 1
-        elif event.key in (pygame.K_LEFT, pygame.K_a):
-            if self._examine_cursor_col > 1:
-                self._examine_cursor_col -= 1
-        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            if self._examine_cursor_col < EXAMINE_COLS - 2:
-                self._examine_cursor_col += 1
-
-        # Toggle mode — I switches between tile and item modes
-        elif event.key == pygame.K_i:
-            if self._examine_mode == "tile":
-                self._examine_mode = "item"
-            else:
-                self._examine_mode = "tile"
-
-        # Paint / place — Enter
-        elif event.key == pygame.K_RETURN:
-            pos = (self._examine_cursor_col, self._examine_cursor_row)
-            self._feat_dirty = True
-            if self._examine_mode == "tile":
-                brush = self._get_examine_brushes()[self._examine_brush_idx]
-                if brush == "eraser":
-                    self._examine_painted.pop(pos, None)
-                else:
-                    self._examine_painted[pos] = brush
-            else:
-                item = self._EXAMINE_ITEMS[self._examine_item_idx]
-                if item == "eraser":
-                    self._examine_items.pop(pos, None)
-                else:
-                    self._examine_items[pos] = item
-
-        # Cycle brush/item — Tab / B forward, Shift+Tab backward
-        elif event.key in (pygame.K_TAB, pygame.K_b):
-            if self._examine_mode == "tile":
-                n = len(self._get_examine_brushes())
-                if event.mod & pygame.KMOD_SHIFT:
-                    self._examine_brush_idx = (
-                        self._examine_brush_idx - 1) % n
-                else:
-                    self._examine_brush_idx = (
-                        self._examine_brush_idx + 1) % n
-            else:
-                n = len(self._EXAMINE_ITEMS)
-                if event.mod & pygame.KMOD_SHIFT:
-                    self._examine_item_idx = (
-                        self._examine_item_idx - 1) % n
-                else:
-                    self._examine_item_idx = (
-                        self._examine_item_idx + 1) % n
-
-        # Escape / Backspace exits preview
-        elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-            if self._feat_dirty:
-                def _save_and_exit():
-                    self._leave_utile_examine_preview()
-                    self._feat_dirty = False
-                def _discard_and_exit():
-                    self.module_edit_utile_preview = False
-                    self._feat_dirty = False
-                self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
-            else:
-                self._leave_utile_examine_preview()
-
-    def _get_utile_preview_data(self):
-        """Return a dict with the preview data for the active tile."""
-        idx = self.module_edit_active_utile
-        if idx < 0 or idx >= len(self.module_edit_unique_tiles):
-            return None
-        utile = self.module_edit_unique_tiles[idx]
-        bt_map = self._get_base_tile_map()
-        from src.settings import TILE_GRASS
-        mode = getattr(self, "_examine_mode", "tile")
-        if mode == "tile":
-            current_brush = self._get_examine_brushes()[
-                getattr(self, "_examine_brush_idx", 0)]
+        # Build initial tile data
+        if storage == STORAGE_DENSE:
+            # Fill with grass (tile 0) for overworld or
+            # stone floor for dungeons
+            default_tile = 0 if ctx == "overworld" else 10
+            tiles = [[default_tile] * w for _ in range(h)]
         else:
-            current_brush = self._EXAMINE_ITEMS[
-                getattr(self, "_examine_item_idx", 0)]
-        return {
-            "tile_type": bt_map.get(
-                utile.get("base_tile", "grass"), TILE_GRASS),
-            "tile_name": utile.get("name", "Unknown"),
-            "description": utile.get("description", ""),
-            "tile_graphic": utile.get("tile"),
-            "painted": getattr(self, "_examine_painted", {}),
-            "placed_items": getattr(self, "_examine_items", {}),
-            "cursor_col": getattr(self, "_examine_cursor_col", 5),
-            "cursor_row": getattr(self, "_examine_cursor_row", 6),
-            "brush": current_brush,
-            "mode": mode,
-        }
+            # Sparse: start with empty dict; store in the section
+            tiles = sec.setdefault("tiles", {})
+
+        def _on_save(st):
+            # For hub templates we store tiles back into the section
+            if storage == STORAGE_DENSE:
+                sec["tiles"] = st.tiles
+            # Sparse tiles are already the same dict reference
+            st.dirty = False
+
+        def _on_exit(st):
+            self._meh_editor_active = False
+            self._map_editor_state = None
+            self._map_editor_input_handler = None
+
+        config = MapEditorConfig(
+            title=sec.get("label", "MAP EDITOR"),
+            storage=storage,
+            grid_type=grid_type,
+            width=w,
+            height=h,
+            brushes=brushes,
+            tile_context=ctx,
+            supports_tile_links=False,
+            supports_interior_links=(storage == STORAGE_SPARSE),
+            supports_replace=(storage == STORAGE_SPARSE),
+            on_save=_on_save,
+            on_exit=_on_exit,
+        )
+
+        state = MapEditorState(config, tiles=tiles)
+        if storage == STORAGE_SPARSE:
+            state.cursor_col = 1
+            state.cursor_row = 1
+
+        self._meh_editor_active = True
+        self._map_editor_state = state
+        self._map_editor_input_handler = MapEditorInputHandler(
+            state,
+            is_save_shortcut=self._is_save_shortcut,
+        )
 
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
@@ -7753,7 +4258,7 @@ class Game:
             self.module_edit_scroll = y + field_h + 10 - visible_height
 
     def _handle_module_edit_input(self, event):
-        """Handle input while editing module (hierarchical navigation)."""
+        """Handle input while editing module."""
         # Intercept input when unsaved-changes dialog is showing
         if self._unsaved_dialog_active:
             self._handle_unsaved_dialog_input(event)
@@ -7762,31 +4267,6 @@ class Game:
         # ── Create-new mode uses flat field list (no hierarchy) ──
         if self.module_edit_is_new:
             self._handle_module_edit_input_flat(event)
-            return
-
-        # ── Examine preview editor mode ──
-        if getattr(self, "module_edit_utile_preview", False):
-            self._handle_examine_preview_input(event)
-            return
-
-        # ── Battle screen editor mode ──
-        if getattr(self, "_battle_screen_active", False):
-            self._handle_battle_screen_input(event)
-            return
-
-        # ── Overview map editor mode ──
-        if getattr(self, "_map_editor_active", False):
-            self._handle_map_editor_input(event)
-            return
-
-        # ── Overview interior painter mode ──
-        if getattr(self, "_omap_interior_editing", False):
-            self._handle_omap_interior_painter_input(event)
-            return
-
-        # ── Overview interior list mode ──
-        if getattr(self, "_omap_interior_active", False):
-            self._handle_omap_interior_list_input(event)
             return
 
         # ── Level 0: section browser ──
@@ -7801,7 +4281,6 @@ class Game:
                     self._leave_section_fields()
                     self._feat_dirty = False
                 def _discard_and_exit():
-                    # Exit without saving — need to reload the editor state
                     self.module_edit_level = 0
                     self._feat_dirty = False
                 self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
@@ -7809,14 +4288,12 @@ class Game:
                 self._leave_section_fields()
             return
         if self._is_save_shortcut(event):
-            # Save from within field editor
             if self.module_edit_fields:
                 entry = self.module_edit_fields[self.module_edit_field]
                 entry[2] = self.module_edit_buffer
             self._commit_module_edit()
             self._feat_dirty = False
             return
-        # (Unique tile add/remove is now at the section browser level)
 
         self._handle_field_editor_input(event)
 
@@ -7824,19 +4301,11 @@ class Game:
         """Handle input at the section browser level (level 0)."""
         n = len(self.module_edit_sections)
         if event.key == pygame.K_ESCAPE:
-            # If in a dungeon sub-browser, pop back up
-            if self.module_edit_nav_stack:
-                self._leave_dungeon_sub()
-            else:
-                self._commit_module_edit()
-                self.module_edit_mode = False
-                self.module_edit_is_new = False
-                self.module_message = None
-                self._feat_dirty = False
-        elif event.key == pygame.K_LEFT:
-            # Left also goes back from sub-browser
-            if self.module_edit_nav_stack:
-                self._leave_dungeon_sub()
+            self._commit_module_edit()
+            self.module_edit_mode = False
+            self.module_edit_is_new = False
+            self.module_message = None
+            self._feat_dirty = False
         elif event.key == pygame.K_UP:
             self.module_edit_section_cursor = (
                 (self.module_edit_section_cursor - 1) % n)
@@ -7846,62 +4315,7 @@ class Game:
                 (self.module_edit_section_cursor + 1) % n)
             self._adjust_section_scroll()
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
-            sec = self.module_edit_sections[
-                self.module_edit_section_cursor]
-            # Handle action sections
-            action = sec.get("action")
-            if action == "add_level":
-                self._add_dungeon_level()
-            elif action == "add_encounter":
-                self._add_encounter_to_level()
-            elif action == "add_monster":
-                self._add_monster_to_encounter()
-            elif action == "add_tile":
-                self._add_unique_tile()
-            elif action == "generate_overworld":
-                self._generate_static_overworld()
-            elif action == "remove_level":
-                pass  # handled by 'd' key
-            else:
-                self._enter_section_fields()
-        elif self._is_new_shortcut(event):
-            # Ctrl+N to add: context-dependent
-            if self._in_unique_tiles_folder():
-                self._add_unique_tile()
-            elif getattr(self, "module_edit_active_enc", -1) >= 0:
-                # Inside an encounter monster browser — add monster
-                self._add_monster_to_encounter()
-            elif self.module_edit_active_level >= 0:
-                # Inside a level sub-browser — add encounter
-                self._add_encounter_to_level()
-            elif (self.module_edit_nav_stack
-                    and self.module_edit_active_dung >= 0):
-                self._add_dungeon_level()
-        elif self._is_delete_shortcut(event):
-            # Ctrl+D to remove: context-dependent
-            if self._in_unique_tiles_folder():
-                self._remove_unique_tile()
-            elif getattr(self, "module_edit_active_enc", -1) >= 0:
-                # Inside encounter monster browser — remove monster
-                sec = self.module_edit_sections[
-                    self.module_edit_section_cursor]
-                if sec.get("icon") == "M" and sec.get(
-                        "mon_idx") is not None:
-                    self._remove_monster_from_encounter(sec["mon_idx"])
-            elif self.module_edit_active_level >= 0:
-                # Inside a level sub-browser — remove selected encounter
-                sec = self.module_edit_sections[
-                    self.module_edit_section_cursor]
-                if sec.get("icon") == "E" and sec.get(
-                        "enc_idx") is not None:
-                    self._remove_encounter_from_level(sec["enc_idx"])
-            elif (self.module_edit_nav_stack
-                    and self.module_edit_active_dung >= 0):
-                sec = self.module_edit_sections[
-                    self.module_edit_section_cursor]
-                if sec.get("icon") == "L" and sec.get(
-                        "level_idx") is not None:
-                    self._remove_dungeon_level(sec["level_idx"])
+            self._enter_section_fields()
         elif self._is_save_shortcut(event):
             self._commit_module_edit()
 
@@ -7916,80 +4330,34 @@ class Game:
         elif cursor >= self.module_edit_section_scroll + max_visible:
             self.module_edit_section_scroll = cursor - max_visible + 1
 
+    def _enter_section_fields(self):
+        """Enter field editing for the currently selected section."""
+        sec = self.module_edit_sections[self.module_edit_section_cursor]
+        if not sec.get("fields"):
+            return
+        self.module_edit_fields = sec["fields"]
+        self.module_edit_field = 0
+        self.module_edit_scroll = 0
+        self.module_edit_level = 1
+        self._feat_dirty = False
+        self.module_edit_field = self._next_editable_field(0)
+        if self.module_edit_fields:
+            self.module_edit_buffer = \
+                self.module_edit_fields[self.module_edit_field][2]
+
+    def _leave_section_fields(self):
+        """Leave field editing, persist buffer, and return to level 0."""
+        if self.module_edit_fields and self.module_edit_field < len(
+                self.module_edit_fields):
+            entry = self.module_edit_fields[self.module_edit_field]
+            entry[2] = self.module_edit_buffer
+        self.module_edit_level = 0
+        self.module_edit_fields = []
+
     def _get_choices_for_field(self, key):
         """Return the list of valid choices for a choice-type field."""
-        from src.module_loader import (WORLD_SIZE_NAMES,
-                                       SEASON_NAMES,
-                                       TIME_OF_DAY_NAMES,
-                                       QUEST_TYPE_NAMES,
-                                       KILL_QUEST_MONSTERS,
-                                       ENCOUNTER_MONSTERS)
-        if key == "world_size":
-            return WORLD_SIZE_NAMES
-        elif key == "season":
-            return SEASON_NAMES
-        elif key == "time_of_day":
-            return TIME_OF_DAY_NAMES
-        elif key.endswith("_qtype"):
-            return QUEST_TYPE_NAMES
-        elif key.endswith("_ktarget"):
-            return [""] + KILL_QUEST_MONSTERS
-        elif key.endswith("_mon"):
-            return ENCOUNTER_MONSTERS
-        elif key.endswith("_gnometown"):
-            return getattr(self, "_module_edit_town_names", []) or ["(none)"]
-        elif key.endswith("_tdensity"):
-            return ["High", "Medium", "Low"]
-        elif key.endswith("_ftdensity"):
-            return ["Inherit", "High", "Medium", "Low"]
-        elif key.endswith("_dsize"):
-            return ["Small", "Medium", "Large"]
-        elif key.endswith("_fdsize"):
-            return ["Inherit", "Small", "Medium", "Large"]
-        elif key.endswith("_frandenc"):
-            return ["Inherit", "Yes", "No"]
-        elif key.endswith("_exitportal"):
-            return ["Yes", "No"]
-        elif key == "innkeeper_quests":
-            return ["Yes", "No"]
-        elif key.endswith("_layout") and key.startswith("town_"):
-            # "Procedural" + all layout names from town_templates.json
-            layouts = self._feat_town_lists.get("layouts", [])
-            if not layouts:
-                self._feat_load_townlayouts()
-                layouts = self._feat_town_lists.get("layouts", [])
-            return ["Procedural"] + [l["name"] for l in layouts]
-        elif key.endswith("_size") and key.startswith("town_"):
-            from src.module_loader import TOWN_SIZE_NAMES
-            return TOWN_SIZE_NAMES
-        elif key.endswith("_style") and key.startswith("town_"):
-            from src.module_loader import TOWN_STYLE_NAMES
-            return TOWN_STYLE_NAMES
-        # (building toggles removed — procedural towns always get
-        # general store, shrine, inn; custom buildings via templates)
-        elif key.endswith("_randenc"):
-            return ["Yes", "No"]
-        # Unique tile choices
-        elif key.endswith("_tilegfx") and key.startswith("utile_"):
-            return self._get_utile_tile_graphics()
-        elif key.endswith("_basetile") and key.startswith("utile_"):
-            return self._UTILE_BASE_TILES
-        # Overview Map choices
-        elif key == "omap_world_size":
-            from src.module_loader import WORLD_SIZE_NAMES
-            return WORLD_SIZE_NAMES
-        elif key == "omap_season":
-            from src.module_loader import SEASON_NAMES
-            return SEASON_NAMES
-        elif key == "omap_time_of_day":
-            from src.module_loader import TIME_OF_DAY_NAMES
-            return TIME_OF_DAY_NAMES
-        elif key == "omap_type":
-            return ["Procedural", "Custom"]
-        elif key == "omap_initial_build":
-            return ["Random", "Blank", "Template"]
-        # No match
-
+        # Module editor only has text fields now (name, author, desc).
+        # This method remains for any future choice fields.
         return []
 
     def _handle_field_editor_input(self, event):
@@ -8015,48 +4383,8 @@ class Game:
             self.module_edit_buffer = \
                 self.module_edit_fields[self.module_edit_field][2]
             self._adjust_module_edit_scroll()
-        elif field_type == "action":
-            # Action fields respond to Enter/Right
-            if event.key in (pygame.K_RETURN, pygame.K_RIGHT):
-                key = field_entry[1]
-                if key.endswith("_examine"):
-                    self._enter_utile_examine_preview()
-            return
         elif not editable:
             return
-        elif field_type == "choice":
-            choices = self._get_choices_for_field(field_entry[1])
-            if not choices:
-                choices = [self.module_edit_buffer]
-            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                try:
-                    idx = choices.index(self.module_edit_buffer)
-                except ValueError:
-                    idx = 0
-                if event.key == pygame.K_RIGHT:
-                    idx = (idx + 1) % len(choices)
-                else:
-                    idx = (idx - 1) % len(choices)
-                self.module_edit_buffer = choices[idx]
-                self._feat_dirty = True
-                # When quest type changes, rebuild the field list
-                if field_entry[1].endswith("_qtype"):
-                    self._on_quest_type_changed(field_entry[1])
-        elif field_type == "int":
-            if event.key == pygame.K_BACKSPACE:
-                self.module_edit_buffer = self.module_edit_buffer[:-1]
-                self._feat_dirty = True
-            elif event.key == pygame.K_LEFT:
-                val = max(0, int(self.module_edit_buffer or "0") - 1)
-                self.module_edit_buffer = str(val)
-                self._feat_dirty = True
-            elif event.key == pygame.K_RIGHT:
-                val = int(self.module_edit_buffer or "0") + 1
-                self.module_edit_buffer = str(val)
-                self._feat_dirty = True
-            elif event.unicode and event.unicode.isdigit():
-                self.module_edit_buffer += event.unicode
-                self._feat_dirty = True
         else:
             # text field
             if event.key == pygame.K_BACKSPACE:
@@ -8095,36 +4423,10 @@ class Game:
             self._commit_module_edit()
         elif not editable:
             return
-        elif field_type == "choice":
-            choices = self._get_choices_for_field(field_entry[1])
-            if not choices:
-                choices = [self.module_edit_buffer]
-            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                try:
-                    idx = choices.index(self.module_edit_buffer)
-                except ValueError:
-                    idx = 0
-                if event.key == pygame.K_RIGHT:
-                    idx = (idx + 1) % len(choices)
-                else:
-                    idx = (idx - 1) % len(choices)
-                self.module_edit_buffer = choices[idx]
-        elif field_type == "int":
-            if event.key == pygame.K_BACKSPACE:
-                self.module_edit_buffer = self.module_edit_buffer[:-1]
-            elif event.key == pygame.K_LEFT:
-                val = max(0, int(self.module_edit_buffer or "0") - 1)
-                self.module_edit_buffer = str(val)
-            elif event.key == pygame.K_RIGHT:
-                val = int(self.module_edit_buffer or "0") + 1
-                self.module_edit_buffer = str(val)
-            elif event.unicode and event.unicode.isdigit():
-                self.module_edit_buffer += event.unicode
-        else:
-            if event.key == pygame.K_BACKSPACE:
-                self.module_edit_buffer = self.module_edit_buffer[:-1]
-            elif event.unicode and event.unicode.isprintable():
-                self.module_edit_buffer += event.unicode
+        elif event.key == pygame.K_BACKSPACE:
+            self.module_edit_buffer = self.module_edit_buffer[:-1]
+        elif event.unicode and event.unicode.isprintable():
+            self.module_edit_buffer += event.unicode
 
     def _commit_module_edit(self):
         """Create a new module or save edits to an existing one."""
@@ -8132,56 +4434,25 @@ class Game:
         if self.module_edit_level == 1 and self.module_edit_fields:
             entry = self.module_edit_fields[self.module_edit_field]
             entry[2] = self.module_edit_buffer
-            # If editing a monster inside an encounter, save it back
-            if getattr(self, "module_edit_active_enc", -1) >= 0:
-                self._save_monster_field()
-            # If editing level settings, save them back
-            if getattr(self, "_editing_level_settings", False):
-                self._save_level_settings_fields()
-            # If editing a unique tile, save back to in-memory list
-            if self.module_edit_in_unique_tiles:
-                self._save_single_utile_fields()
 
         # Gather all field values into a dict.
-        # For create-new, fields live in self.module_edit_fields.
-        # For existing modules, fields are spread across ALL sections
-        # including those on the nav stack.
         values = {}
         if self.module_edit_is_new:
             sources = [self.module_edit_fields]
         else:
-            # Collect from nav stack (parent sections) + current sections
-            all_sections = []
-            for stack_entry in self.module_edit_nav_stack:
-                all_sections.extend(stack_entry[0])
-            all_sections.extend(self.module_edit_sections)
-            # Flatten: also include children of folder sections
-            expanded = []
-            for s in all_sections:
-                expanded.append(s)
-                if s.get("children"):
-                    expanded.extend(s["children"])
-            sources = [s["fields"] for s in expanded
+            sources = [s["fields"] for s in self.module_edit_sections
                        if s.get("fields")]
         for field_list in sources:
             for entry in field_list:
                 key, value = entry[1], entry[2]
-                if key in ("num_towns", "num_quests"):
-                    values[key] = int(value) if value else 0
-                else:
-                    values[key] = value
+                values[key] = value
 
         if self.module_edit_is_new:
-            # ── Create new module with all settings ──
+            # ── Create new module with defaults ──
             from src.module_loader import create_module
             path = create_module(
                 name=values.get("name", "Untitled"),
                 author=values.get("author", ""),
-                world_size=values.get("world_size", "Medium"),
-                num_towns=values.get("num_towns", 1),
-                num_quests=values.get("num_quests", 1),
-                season=values.get("season", "Summer"),
-                time_of_day=values.get("time_of_day", "Noon"),
             )
             self.module_edit_mode = False
             self.module_edit_is_new = False
@@ -8196,7 +4467,7 @@ class Game:
             self.module_message = "Module created and selected!"
             self.module_msg_timer = 2.0
         else:
-            # ── Update existing module (full content) ──
+            # ── Update existing module (metadata only) ──
             import json, os
             if not self.module_list:
                 self.module_edit_mode = False
@@ -8218,219 +4489,6 @@ class Game:
                 if key in values:
                     meta[key] = values[key]
 
-            # ── Innkeeper quests toggle ──
-            if "innkeeper_quests" in values:
-                prog = data.setdefault("progression", {})
-                prog["innkeeper_quests"] = (
-                    values["innkeeper_quests"] == "Yes")
-
-            # ── Town fields (town_<i>_<field>) ──
-            from src.module_loader import (TOWN_SIZE_NAMES, TOWN_SIZE_KEYS,
-                                           TOWN_STYLE_NAMES,
-                                           TOWN_STYLE_KEYS,
-                                           TOWN_BUILDING_KEYS)
-            towns = data.get("world", {}).get("towns", [])
-            town_field_map = {
-                "name": "name",
-                "desc": "description",
-            }
-            for key, val in values.items():
-                if not key.startswith("town_"):
-                    continue
-                parts = key.split("_", 2)   # town, <i>, <field>
-                if len(parts) < 3:
-                    continue
-                try:
-                    idx = int(parts[1])
-                except ValueError:
-                    continue
-                suffix = parts[2]
-                if not (0 <= idx < len(towns)):
-                    continue
-                json_key = town_field_map.get(suffix)
-                if json_key:
-                    towns[idx][json_key] = val
-                elif suffix == "size":
-                    # Convert display name to key
-                    tc = towns[idx].setdefault("town_config", {})
-                    try:
-                        si = TOWN_SIZE_NAMES.index(val)
-                        tc["size"] = TOWN_SIZE_KEYS[si]
-                    except (ValueError, IndexError):
-                        tc["size"] = "medium"
-                elif suffix == "style":
-                    tc = towns[idx].setdefault("town_config", {})
-                    try:
-                        si = TOWN_STYLE_NAMES.index(val)
-                        tc["style"] = TOWN_STYLE_KEYS[si]
-                    except (ValueError, IndexError):
-                        tc["style"] = "medieval"
-                elif suffix == "layout":
-                    tc = towns[idx].setdefault("town_config", {})
-                    if val and val != "Procedural":
-                        tc["layout"] = val
-                    else:
-                        tc.pop("layout", None)
-                elif suffix.startswith("bldg_"):
-                    bldg_key = suffix[5:]  # strip "bldg_"
-                    if bldg_key in TOWN_BUILDING_KEYS:
-                        tc = towns[idx].setdefault("town_config", {})
-                        blist = tc.setdefault("buildings", [])
-                        if val == "Yes" and bldg_key not in blist:
-                            blist.append(bldg_key)
-                        elif val == "No" and bldg_key in blist:
-                            blist.remove(bldg_key)
-
-            # ── Dungeon fields (dung_<i>_<field>) ──
-            from src.module_loader import QUEST_TYPE_NAMES, QUEST_TYPE_KEYS
-            dungeons = data.get("progression", {}).get(
-                "key_dungeons", [])
-            dung_field_map = {
-                "name": "name",
-                "desc": "description",
-                "tdensity": "torch_density",
-                "dsize": "size",
-                "randenc": "random_encounters",
-            }
-            for key, val in values.items():
-                if not key.startswith("dung_"):
-                    continue
-                parts = key.split("_", 2)   # dung, <i>, <field>
-                if len(parts) < 3:
-                    continue
-                try:
-                    idx = int(parts[1])
-                except ValueError:
-                    continue
-                suffix = parts[2]
-                json_key = dung_field_map.get(suffix)
-                if json_key and 0 <= idx < len(dungeons):
-                    # Torch density / size: convert display name to key
-                    if suffix in ("tdensity", "dsize"):
-                        val = val.lower()
-                    elif suffix == "randenc":
-                        val = (val == "Yes")
-                    dungeons[idx][json_key] = val
-
-            # ── Quest fields (quest_<i>_<field>) ──
-            quest_field_map = {
-                "key": "key_name",
-                "obj": "quest_objective",
-                "hint": "quest_hint",
-                "ktarget": "kill_target",
-            }
-            for key, val in values.items():
-                if not key.startswith("quest_"):
-                    continue
-                parts = key.split("_", 2)   # quest, <i>, <field>
-                if len(parts) < 3:
-                    continue
-                try:
-                    idx = int(parts[1])
-                except ValueError:
-                    continue
-                suffix = parts[2]
-                if suffix == "qtype":
-                    try:
-                        qi = QUEST_TYPE_NAMES.index(val)
-                        if 0 <= idx < len(dungeons):
-                            dungeons[idx]["quest_type"] = \
-                                QUEST_TYPE_KEYS[qi]
-                    except (ValueError, IndexError):
-                        if 0 <= idx < len(dungeons):
-                            dungeons[idx]["quest_type"] = "retrieve"
-                elif suffix == "kcount":
-                    if 0 <= idx < len(dungeons):
-                        dungeons[idx]["kill_count"] = \
-                            int(val) if val else 0
-                elif suffix == "keysneeded":
-                    if 0 <= idx < len(dungeons):
-                        kn = int(val) if val else 1
-                        dungeons[idx]["keys_needed"] = \
-                            max(1, min(8, kn))
-                elif suffix == "exitportal":
-                    if 0 <= idx < len(dungeons):
-                        dungeons[idx]["exit_portal"] = \
-                            (val == "Yes")
-                elif suffix == "gnometown":
-                    if 0 <= idx < len(dungeons):
-                        dungeons[idx]["gnome_town"] = val
-                else:
-                    json_key = quest_field_map.get(suffix)
-                    if json_key and 0 <= idx < len(dungeons):
-                        dungeons[idx][json_key] = val
-
-            # ── Dungeon levels and encounters ──
-            for dung_idx, levels_data in \
-                    self.module_edit_dungeon_levels.items():
-                if 0 <= dung_idx < len(dungeons):
-                    dungeons[dung_idx]["levels"] = levels_data
-
-            # ── Unique tiles ──
-            ut_dict = {}
-            for utile in self.module_edit_unique_tiles:
-                tid = utile.get("id", "")
-                if not tid:
-                    continue
-                entry = {
-                    "name": utile.get("name", ""),
-                    "description": utile.get("description", ""),
-                    "tile": utile.get("tile"),
-                    "base_tile": utile.get("base_tile", "grass"),
-                }
-                el = utile.get("examine_layout")
-                if el:
-                    entry["examine_layout"] = el
-                ei = utile.get("examine_items")
-                if ei:
-                    entry["examine_items"] = ei
-                ut_dict[tid] = entry
-            if ut_dict:
-                data["unique_tiles"] = ut_dict
-            else:
-                data.pop("unique_tiles", None)
-
-            # ── Overview Map settings (omap_*) ──
-            #    World Size, Season, Time of Day are stored in the
-            #    module's core settings so the procedural generator
-            #    keeps working exactly as before.
-            from src.module_loader import (WORLD_SIZE_PRESETS,
-                                           _SEASON_MONTHS,
-                                           _TIME_HOURS)
-            omap_keys = {k: v for k, v in values.items()
-                         if k.startswith("omap_")}
-            if omap_keys:
-                # World Size → settings.map_width / map_height
-                ws = omap_keys.get("omap_world_size")
-                if ws and ws in WORLD_SIZE_PRESETS:
-                    settings_d = data.setdefault("settings", {})
-                    dims = WORLD_SIZE_PRESETS[ws]
-                    settings_d["map_width"] = dims["map_width"]
-                    settings_d["map_height"] = dims["map_height"]
-
-                # Season → settings.start_time.month
-                season_val = omap_keys.get("omap_season")
-                if season_val and season_val in _SEASON_MONTHS:
-                    settings_d = data.setdefault("settings", {})
-                    st = settings_d.setdefault("start_time", {})
-                    st["month"] = _SEASON_MONTHS[season_val]
-
-                # Time of Day → settings.start_time.hour
-                tod_val = omap_keys.get("omap_time_of_day")
-                if tod_val and tod_val in _TIME_HOURS:
-                    settings_d = data.setdefault("settings", {})
-                    st = settings_d.setdefault("start_time", {})
-                    st["hour"] = _TIME_HOURS[tod_val]
-
-                # Overview-map-specific keys
-                world = data.setdefault("world", {})
-                ow_cfg = world.setdefault("overworld_config", {})
-                if "omap_type" in omap_keys:
-                    ow_cfg["type"] = omap_keys["omap_type"]
-                if "omap_initial_build" in omap_keys:
-                    ow_cfg["initial_build"] = \
-                        omap_keys["omap_initial_build"]
-
             # Write back
             try:
                 with open(manifest_path, "w") as fh:
@@ -8441,10 +4499,6 @@ class Game:
 
             self.module_edit_mode = False
             self.module_edit_nav_stack = []
-            self.module_edit_active_dung = -1
-            self.module_edit_active_level = -1
-            self.module_edit_in_unique_tiles = False
-            self.module_edit_active_utile = -1
             if ok:
                 self.module_message = "Module updated!"
                 self.module_msg_timer = 2.0
@@ -8836,9 +4890,9 @@ class Game:
             self._handle_unsaved_dialog_input(event)
             return
 
-        # Town Layouts has its own input handler (bypasses generic ctx system)
-        if self._feat_active_editor == "townlayouts":
-            self._feat_handle_townlayout_input(event)
+        # Map Editor hub has its own section-browser input handler
+        if self._feat_active_editor == "mapeditor":
+            self._handle_mapeditor_feat_input(event)
             return
 
         # ── Resolve active editor data pointers ──
@@ -9150,166 +5204,6 @@ class Game:
                     self._feat_level = 2
             return
 
-        # ── Level 3: Reusable Features grid painter ──
-        if self._feat_level == 3 and ed == "features":
-            if self._feat_rfeat_naming:
-                # Naming overlay
-                if event.key == pygame.K_RETURN:
-                    items = self._feat_rfeat_current_list()
-                    if 0 <= self._feat_rfeat_cursor < len(items):
-                        items[self._feat_rfeat_cursor]["name"] = (
-                            self._feat_rfeat_name_buf or "Unnamed")
-                    self._feat_rfeat_naming = False
-                    # If we entered naming from level 2 (not editing),
-                    # return to level 2
-                    if not self._feat_rfeat_editing:
-                        self._feat_save_rfeat()
-                        self._feat_level = 2
-                elif event.key == pygame.K_ESCAPE:
-                    self._feat_rfeat_naming = False
-                    if not self._feat_rfeat_editing:
-                        self._feat_level = 2
-                elif event.key == pygame.K_BACKSPACE:
-                    self._feat_rfeat_name_buf = self._feat_rfeat_name_buf[:-1]
-                elif event.unicode and event.unicode.isprintable():
-                    self._feat_rfeat_name_buf += event.unicode
-                return
-            if self._feat_rfeat_editing:
-                # Grid painter
-                items = self._feat_rfeat_current_list()
-                if self._feat_rfeat_cursor >= len(items):
-                    return
-                feat = items[self._feat_rfeat_cursor]
-                w = feat["width"]
-                h = feat["height"]
-                if event.key == pygame.K_ESCAPE:
-                    if self._feat_dirty:
-                        def _rfeat_save():
-                            self._feat_save_rfeat()
-                            self._feat_rfeat_editing = False
-                            self._feat_dirty = False
-                            self._feat_level = 2
-                        def _rfeat_discard():
-                            self._feat_rfeat_editing = False
-                            self._feat_dirty = False
-                            self._feat_level = 2
-                        self._show_unsaved_dialog(_rfeat_save, _rfeat_discard)
-                    else:
-                        self._feat_rfeat_editing = False
-                        self._feat_level = 2
-                elif self._is_save_shortcut(event):
-                    self._feat_save_rfeat()
-                    self._feat_dirty = False
-                elif event.key in (pygame.K_UP, pygame.K_w):
-                    self._feat_rfeat_cy = max(0, self._feat_rfeat_cy - 1)
-                elif event.key in (pygame.K_DOWN, pygame.K_s):
-                    self._feat_rfeat_cy = min(h - 1, self._feat_rfeat_cy + 1)
-                elif event.key in (pygame.K_LEFT, pygame.K_a):
-                    self._feat_rfeat_cx = max(0, self._feat_rfeat_cx - 1)
-                elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                    self._feat_rfeat_cx = min(w - 1, self._feat_rfeat_cx + 1)
-                elif event.key == pygame.K_RETURN:
-                    brushes = self._feat_get_rfeat_brushes()
-                    brush = brushes[self._feat_rfeat_brush_idx]
-                    pos_key = f"{self._feat_rfeat_cx},{self._feat_rfeat_cy}"
-                    self._feat_dirty = True
-                    if brush["name"] == "Eraser":
-                        feat["tiles"].pop(pos_key, None)
-                    else:
-                        feat["tiles"][pos_key] = {
-                            "tile_id": brush["tile_id"],
-                            "path": brush.get("path"),
-                            "name": brush["name"],
-                        }
-                elif event.key in (pygame.K_TAB, pygame.K_b):
-                    brushes = self._feat_get_rfeat_brushes()
-                    n = len(brushes)
-                    if event.mod & pygame.KMOD_SHIFT:
-                        self._feat_rfeat_brush_idx = (
-                            self._feat_rfeat_brush_idx - 1) % n
-                    else:
-                        self._feat_rfeat_brush_idx = (
-                            self._feat_rfeat_brush_idx + 1) % n
-                elif event.key == pygame.K_n:
-                    items = self._feat_rfeat_current_list()
-                    if 0 <= self._feat_rfeat_cursor < len(items):
-                        self._feat_rfeat_naming = True
-                        self._feat_rfeat_name_buf = items[
-                            self._feat_rfeat_cursor]["name"]
-                return
-            return
-
-        # ── Level 2: Reusable Features list inside folder ──
-        if self._feat_level == 2 and ed == "features":
-            items = self._feat_rfeat_current_list()
-            n = len(items)
-            if event.key == pygame.K_ESCAPE:
-                self._feat_save_rfeat()
-                self._feat_rfeat_in_folder = False
-                self._feat_level = 1
-                return
-            if event.key == pygame.K_UP and n > 0:
-                self._feat_rfeat_cursor = (
-                    self._feat_rfeat_cursor - 1) % n
-                self._feat_rfeat_scroll = \
-                    self._feat_adjust_scroll_generic(
-                        self._feat_rfeat_cursor,
-                        self._feat_rfeat_scroll)
-            elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_rfeat_cursor = (
-                    self._feat_rfeat_cursor + 1) % n
-                self._feat_rfeat_scroll = \
-                    self._feat_adjust_scroll_generic(
-                        self._feat_rfeat_cursor,
-                        self._feat_rfeat_scroll)
-            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
-                if n > 0:
-                    self._feat_rfeat_enter_painter()
-                    self._feat_dirty = False
-                    self._feat_level = 3
-            elif self._is_new_shortcut(event):
-                self._feat_rfeat_add()
-                self._feat_save_rfeat()
-            elif self._is_delete_shortcut(event) and n > 0:
-                self._feat_rfeat_remove()
-                self._feat_save_rfeat()
-            elif event.key == pygame.K_n:
-                # Rename selected feature
-                if n > 0:
-                    self._feat_rfeat_naming = True
-                    self._feat_rfeat_name_buf = items[
-                        self._feat_rfeat_cursor]["name"]
-                    self._feat_level = 3  # naming uses level 3 overlay
-            return
-
-        # ── Level 1: Reusable Features folder list ──
-        if self._feat_level == 1 and ed == "features":
-            n = len(self._feat_rfeat_folders)
-            if event.key == pygame.K_ESCAPE:
-                self._feat_save_rfeat()
-                self._feat_level = 0
-                self._feat_active_editor = None
-                return
-            if event.key == pygame.K_UP and n > 0:
-                self._feat_rfeat_folder_cursor = (
-                    self._feat_rfeat_folder_cursor - 1) % n
-                self._feat_rfeat_folder_scroll = \
-                    self._feat_adjust_scroll_generic(
-                        self._feat_rfeat_folder_cursor,
-                        self._feat_rfeat_folder_scroll)
-            elif event.key == pygame.K_DOWN and n > 0:
-                self._feat_rfeat_folder_cursor = (
-                    self._feat_rfeat_folder_cursor + 1) % n
-                self._feat_rfeat_folder_scroll = \
-                    self._feat_adjust_scroll_generic(
-                        self._feat_rfeat_folder_cursor,
-                        self._feat_rfeat_folder_scroll)
-            elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
-                if n > 0:
-                    self._feat_rfeat_enter_folder()
-                    self._feat_level = 2
-            return
-
         # ── Level 3: tile field editor (inside folder) ──
         if self._feat_level == 3 and ed == "tiles":
             if ctx:
@@ -9598,18 +5492,18 @@ class Game:
                 self.renderer.reload_sprites()
                 self._feat_load_gallery()
                 self._feat_level = 1
-            elif cat["label"] == "Reusable Features":
-                self._feat_active_editor = "features"
-                self.renderer.reload_sprites()
-                self._feat_load_rfeat()
-                self._feat_rfeat_brushes = None
-                self._feat_level = 1
-            elif cat["label"] == "Town Layouts":
-                self._feat_active_editor = "townlayouts"
-                self.renderer.reload_sprites()
-                self._feat_load_townlayouts()
-                # Force brush palette to rebuild from current TILE_DEFS
-                self._feat_townlayout_brushes = None
+            elif cat["label"] == "Map Editor":
+                self._feat_active_editor = "mapeditor"
+                self._meh_sections = self._build_map_editor_hub_sections()
+                self._meh_cursor = 0
+                self._meh_scroll = 0
+                self._meh_nav_stack = []
+                self._meh_folder_label = ""
+                self._meh_level = 0
+                self._meh_fields = []
+                self._meh_field = 0
+                self._meh_buffer = ""
+                self._meh_field_scroll = 0
                 self._feat_level = 1
 
     def _feat_editor_ctx(self):
@@ -9810,59 +5704,23 @@ class Game:
             "pxedit_replace_src_color": self._feat_pxedit_replace_src_color,
             "pxedit_replace_dst": self._feat_pxedit_replace_dst,
             "pxedit_replace_sel": self._feat_pxedit_replace_sel,
-            # ── Reusable Features ──
-            "rfeat_folders": self._feat_rfeat_folders,
-            "rfeat_folder_cursor": self._feat_rfeat_folder_cursor,
-            "rfeat_folder_scroll": self._feat_rfeat_folder_scroll,
-            "rfeat_list": (self._feat_rfeat_current_list()
-                           if ed == "features" else []),
-            "rfeat_cursor": self._feat_rfeat_cursor,
-            "rfeat_scroll": self._feat_rfeat_scroll,
-            "rfeat_editing": self._feat_rfeat_editing,
-            "rfeat_cx": self._feat_rfeat_cx,
-            "rfeat_cy": self._feat_rfeat_cy,
-            "rfeat_brush_idx": self._feat_rfeat_brush_idx,
-            "rfeat_brushes": (self._feat_get_rfeat_brushes()
-                              if ed == "features" else []),
-            "rfeat_naming": self._feat_rfeat_naming,
-            "rfeat_name_buf": self._feat_rfeat_name_buf,
-            "rfeat_current_ctx": self._feat_rfeat_current_ctx,
-            # ── Town layouts ──
-            "townlayout_list": self._feat_townlayout_list,
-            "townlayout_cursor": self._feat_townlayout_cursor,
-            "townlayout_scroll": self._feat_townlayout_scroll,
-            "townlayout_editing": self._feat_townlayout_editing,
-            "townlayout_cx": self._feat_townlayout_cx,
-            "townlayout_cy": self._feat_townlayout_cy,
-            "townlayout_brush_idx": self._feat_townlayout_brush_idx,
-            "townlayout_brushes": (
-                self._feat_get_townlayout_brushes()
-                if ed == "townlayouts" else []),
-            "townlayout_naming": self._feat_townlayout_naming,
-            "townlayout_name_buf": self._feat_townlayout_name_buf,
-            "town_node_cursor": self._feat_town_node_cursor,
-            "town_detail_editing": self._feat_town_detail_editing,
-            "town_desc_buf": self._feat_town_desc_buf,
-            "town_active_sub": self._feat_town_active_sub,
-            "town_selected_idx": self._feat_town_selected_idx,
-            "townlayout_replacing": self._feat_townlayout_replacing,
-            "townlayout_replace_src_tile": self._feat_townlayout_replace_src_tile,
-            "townlayout_replace_src_name": self._feat_townlayout_replace_src_name,
-            "townlayout_replace_src_empty": self._feat_townlayout_replace_src_empty,
-            "townlayout_replace_dst_idx": self._feat_townlayout_replace_dst_idx,
-            "interior_picking": self._feat_interior_picking,
-            "interior_pick_cursor": self._feat_interior_pick_cursor,
-            "interior_pick_scroll": self._feat_interior_pick_scroll,
-            "interior_list": getattr(
-                self, "_feat_interior_pick_list",
-                self._feat_town_lists.get("interiors", [])),
-            "interior_pick_sub": getattr(
-                self, "_feat_interior_pick_sub", "layouts"),
-            "town_picker_active": self._feat_town_picker_active,
-            "town_picker_cursor": self._feat_town_picker_cursor,
-            "town_picker_layouts": self._feat_town_lists.get("layouts", []),
-            "town_picker_mode": getattr(
-                self, "_feat_town_picker_mode", "new"),
+            # ── Map Editor hub ──
+            "meh_editor_active": self._meh_editor_active,
+            "meh_editor_data": (
+                self._map_editor_state.to_data_dict()
+                if self._meh_editor_active
+                and self._map_editor_state is not None
+                else None),
+            "meh_sections": self._meh_sections,
+            "meh_cursor": self._meh_cursor,
+            "meh_scroll": self._meh_scroll,
+            "meh_nav_depth": len(self._meh_nav_stack),
+            "meh_folder_label": self._meh_folder_label,
+            "meh_level": self._meh_level,
+            "meh_fields": self._meh_fields,
+            "meh_field_cursor": self._meh_field,
+            "meh_field_buffer": self._meh_buffer,
+            "meh_field_scroll": self._meh_field_scroll,
         }
         return state
 
@@ -10138,35 +5996,7 @@ class Game:
                     edit_level=self.module_edit_level,
                     edit_sections=self.module_edit_sections,
                     edit_section_cursor=self.module_edit_section_cursor,
-                    edit_section_scroll=self.module_edit_section_scroll,
-                    edit_nav_depth=len(self.module_edit_nav_stack),
-                    edit_nav_label=getattr(
-                        self, "_module_edit_folder_label", ""),
-                    edit_in_encounters=(
-                        self.module_edit_active_level >= 0),
-                    edit_in_dungeon_sub=(
-                        self.module_edit_active_dung >= 0),
-                    edit_utile_preview=(
-                        self._get_utile_preview_data()
-                        if getattr(self, "module_edit_utile_preview", False)
-                        else None),
-                    edit_battle_preview=(
-                        self._get_battle_screen_preview_data()
-                        if getattr(self, "_battle_screen_active", False)
-                        else None),
-                    edit_map_editor=(
-                        self._get_map_editor_data()
-                        if getattr(self, "_map_editor_active", False)
-                        else None),
-                    edit_omap_interior_list=(
-                        self._get_omap_interior_list_data()
-                        if getattr(self, "_omap_interior_active", False)
-                        and not getattr(self, "_omap_interior_editing", False)
-                        else None),
-                    edit_omap_interior_painter=(
-                        self._get_omap_interior_editor_data()
-                        if getattr(self, "_omap_interior_editing", False)
-                        else None))
+                    edit_section_scroll=self.module_edit_section_scroll)
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
             elif self.showing_game_over:
