@@ -229,9 +229,7 @@ class Game:
             {"label": "Spells", "icon": "S"},
             {"label": "Items", "icon": "I"},
             {"label": "Monsters", "icon": "X"},
-            {"label": "Tile Types", "icon": "T"},
-            {"label": "Tile Gallery", "icon": "G"},
-            {"label": "Map Editor", "icon": "E"},
+            {"label": "Maps", "icon": "E"},
         ]
         self._modules_from_features = False  # True when modules opened from features
         # Spell editor state
@@ -255,6 +253,7 @@ class Game:
         self._feat_level = 0  # 0=categories, 1=list, 2=field editor
         # Which editor is active: "spells", "items", "monsters", "tiles"
         self._feat_active_editor = None
+        self._feat_launched_from_maps = False  # True when tiles/gallery opened via Maps
 
         # Items editor state (mirrors spell editor pattern)
         self._feat_item_list = []        # list of (name, section, data) tuples
@@ -1887,6 +1886,42 @@ class Game:
             idx = (idx + direction) % n
         return start % n
 
+    def _feat_return_to_maps_hub(self):
+        """Return to the Maps hub from a sub-editor (tiles/gallery).
+
+        Restores the mapeditor state and pops back into the Tiles folder
+        so the user lands where they left off.
+        """
+        self._feat_launched_from_maps = False
+        self._feat_active_editor = "mapeditor"
+        # Rebuild sections and navigate into the Tiles folder
+        self._meh_sections = self._build_map_editor_hub_sections()
+        # Find the Tiles folder and enter it
+        for i, sec in enumerate(self._meh_sections):
+            if sec.get("folder") == "me_tiles":
+                self._meh_nav_stack = [(
+                    self._meh_sections,
+                    i,
+                    0,
+                    "",
+                )]
+                self._meh_sections = list(sec.get("children", []))
+                self._meh_cursor = 0
+                self._meh_scroll = 0
+                self._meh_folder_label = sec.get("label", "Tiles")
+                break
+        else:
+            self._meh_cursor = 0
+            self._meh_scroll = 0
+            self._meh_nav_stack = []
+            self._meh_folder_label = ""
+        self._meh_level = 0
+        self._meh_fields = []
+        self._meh_field = 0
+        self._meh_buffer = ""
+        self._meh_field_scroll = 0
+        self._feat_level = 1
+
     def _handle_mapeditor_feat_input(self, event):
         """Handle input for the Map Editor inside the features screen.
 
@@ -1925,7 +1960,21 @@ class Game:
             self._meh_cursor = (self._meh_cursor + 1) % n
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
             sec = self._meh_sections[self._meh_cursor]
-            if sec.get("folder"):
+            if sec.get("_editor_redirect"):
+                # Redirect to a different editor (e.g. tiles, gallery)
+                redirect = sec["_editor_redirect"]
+                self._feat_launched_from_maps = True
+                if redirect == "tiles":
+                    self._feat_active_editor = "tiles"
+                    self.renderer.reload_sprites()
+                    self._feat_load_tiles()
+                    self._feat_level = 1
+                elif redirect == "gallery":
+                    self._feat_active_editor = "gallery"
+                    self.renderer.reload_sprites()
+                    self._feat_load_gallery()
+                    self._feat_level = 1
+            elif sec.get("folder"):
                 # Enter folder
                 self._meh_nav_stack.append((
                     self._meh_sections,
@@ -4072,7 +4121,7 @@ class Game:
             },
         ]
         overview_sec = {
-            "label": "Overview",
+            "label": "Overview Templates",
             "folder": "me_overview",
             "children": overview_children,
             "subtitle": f"{len(overview_children)} template"
@@ -4093,7 +4142,7 @@ class Game:
             },
         ]
         dungeon_sec = {
-            "label": "Dungeon",
+            "label": "Dungeon Templates",
             "folder": "me_dungeon",
             "children": dungeon_children,
             "subtitle": f"{len(dungeon_children)} template"
@@ -4114,7 +4163,7 @@ class Game:
             },
         ]
         examine_sec = {
-            "label": "Examine Screen",
+            "label": "Examine Templates",
             "folder": "me_examine",
             "children": examine_children,
             "subtitle": f"{len(examine_children)} template"
@@ -4135,7 +4184,7 @@ class Game:
             },
         ]
         enclosure_sec = {
-            "label": "Enclosure",
+            "label": "Enclosure Templates",
             "folder": "me_enclosure",
             "children": enclosure_children,
             "subtitle": f"{len(enclosure_children)} template"
@@ -4156,15 +4205,34 @@ class Game:
             },
         ]
         battle_sec = {
-            "label": "Battle Screen",
+            "label": "Battle Templates",
             "folder": "me_battle",
             "children": battle_children,
             "subtitle": f"{len(battle_children)} template"
                         f"{'s' if len(battle_children) != 1 else ''}",
         }
 
+        # ── 6) Tiles folder (Tile Types + Tile Gallery) ──
+        tiles_sec = {
+            "label": "Tiles",
+            "folder": "me_tiles",
+            "children": [
+                {
+                    "label": "Tile Types",
+                    "subtitle": "Edit tile type properties",
+                    "_editor_redirect": "tiles",
+                },
+                {
+                    "label": "Tile Gallery",
+                    "subtitle": "Browse all graphic tiles",
+                    "_editor_redirect": "gallery",
+                },
+            ],
+            "subtitle": "Tile types and gallery",
+        }
+
         return [overview_sec, dungeon_sec, examine_sec,
-                enclosure_sec, battle_sec]
+                enclosure_sec, battle_sec, tiles_sec]
 
     def _meh_launch_editor(self, sec):
         """Launch the unified map editor for a Map Editor hub template.
@@ -5211,8 +5279,11 @@ class Game:
             n = len(self._feat_gallery_cat_list)
             if event.key == pygame.K_ESCAPE:
                 self._feat_save_gallery()
-                self._feat_level = 0
-                self._feat_active_editor = None
+                if self._feat_launched_from_maps:
+                    self._feat_return_to_maps_hub()
+                else:
+                    self._feat_level = 0
+                    self._feat_active_editor = None
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_gallery_cat_cursor = (
@@ -5290,8 +5361,11 @@ class Game:
             n = len(self._feat_tile_folders)
             if event.key == pygame.K_ESCAPE:
                 self._feat_save_tiles()
-                self._feat_level = 0
-                self._feat_active_editor = None
+                if self._feat_launched_from_maps:
+                    self._feat_return_to_maps_hub()
+                else:
+                    self._feat_level = 0
+                    self._feat_active_editor = None
                 return
             if event.key == pygame.K_UP and n > 0:
                 self._feat_tile_folder_cursor = (
@@ -5513,17 +5587,7 @@ class Game:
                 self._feat_active_editor = "monsters"
                 self._feat_load_monsters()
                 self._feat_level = 1
-            elif cat["label"] == "Tile Types":
-                self._feat_active_editor = "tiles"
-                self.renderer.reload_sprites()
-                self._feat_load_tiles()
-                self._feat_level = 1
-            elif cat["label"] == "Tile Gallery":
-                self._feat_active_editor = "gallery"
-                self.renderer.reload_sprites()
-                self._feat_load_gallery()
-                self._feat_level = 1
-            elif cat["label"] == "Map Editor":
+            elif cat["label"] == "Maps":
                 self._feat_active_editor = "mapeditor"
                 self._meh_sections = self._build_map_editor_hub_sections()
                 self._meh_cursor = 0

@@ -7121,42 +7121,16 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(
                     "Changes are saved to data/monsters.json",
                     right_x + 16, dy, (140, 140, 160), fs)
-            elif selected_cat == "Tile Types":
-                self._u3_text("Tile Types", right_x + 16,
-                              panel_y + 12, self._U3_WHITE, f)
-                dy = panel_y + 44
-                for line in [
-                    "Edit tile type properties: name,",
-                    "walkability, and display color.",
-                    "These define how each terrain",
-                    "type behaves in the game world.",
-                ]:
-                    self._u3_text(line, right_x + 16, dy,
-                                  (180, 180, 200), fm)
-                    dy += 22
-            elif selected_cat == "Tile Gallery":
-                self._u3_text("Tile Gallery", right_x + 16,
-                              panel_y + 12, self._U3_WHITE, f)
-                dy = panel_y + 44
-                for line in [
-                    "Browse all graphic tiles available",
-                    "in the game. View each sprite and",
-                    "its manifest key. Use this as a",
-                    "reference when assigning graphics",
-                    "to items, monsters, or tile types.",
-                ]:
-                    self._u3_text(line, right_x + 16, dy,
-                                  (180, 180, 200), fm)
-                    dy += 22
-            elif selected_cat == "Map Editor":
-                self._u3_text("Map Editor", right_x + 16,
+            elif selected_cat == "Maps":
+                self._u3_text("Maps", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
                 dy = panel_y + 44
                 for line in [
                     "Create and manage map templates",
-                    "for all game contexts: overworld,",
-                    "dungeons, examine screens,",
-                    "enclosures, and battle arenas.",
+                    "for overworld, dungeons, examine",
+                    "screens, enclosures, and battles.",
+                    "Also contains tile types and the",
+                    "tile gallery under the Tiles folder.",
                 ]:
                     self._u3_text(line, right_x + 16, dy,
                                   (180, 180, 200), fm)
