@@ -668,21 +668,29 @@ class OverworldState(InventoryMixin, BaseState):
                 return
             return  # no other tile events inside interiors
 
-        tile_id = self.game.tile_map.get_tile(
-            party.col, party.row
-        )
+        # ── Overworld interior link check (highest priority) ──
+        # An explicit tile_link to an interior overrides any tile-type
+        # behaviour (town, dungeon, etc.) so the designer can place an
+        # interior entrance on any tile graphic they like.
+        pcol, prow = party.col, party.row
+        tmap = self.game.tile_map
+        link = tmap.tile_links.get(f"{pcol},{prow}")
+        if link and link.get("interior"):
+            self._enter_overworld_interior(
+                link["interior"], pcol, prow)
+            return
+
+        tile_id = tmap.get_tile(pcol, prow)
 
         if tile_id == TILE_TOWN:
             self._show_town_action()
             return
 
         elif tile_id == TILE_DUNGEON:
-            pcol, prow = party.col, party.row
             self._show_dungeon_action(pcol, prow)
             return
 
         elif tile_id == TILE_DUNGEON_CLEARED:
-            pcol, prow = party.col, party.row
             self._show_dungeon_action(pcol, prow)
             return
 
@@ -693,18 +701,9 @@ class OverworldState(InventoryMixin, BaseState):
         elif tile_id == TILE_CHEST:
             self._open_chest()
             # Restore the original tile that was under the chest
-            pos = (party.col, party.row)
+            pos = (pcol, prow)
             original = self.chest_under_tiles.pop(pos, TILE_GRASS)
-            self.game.tile_map.set_tile(pos[0], pos[1], original)
-            return
-
-        # ── Overworld interior link check ──
-        pcol, prow = party.col, party.row
-        tmap = self.game.tile_map
-        link = tmap.tile_links.get(f"{pcol},{prow}")
-        if link and link.get("interior"):
-            self._enter_overworld_interior(
-                link["interior"], pcol, prow)
+            tmap.set_tile(pos[0], pos[1], original)
             return
 
         # ── Unique tile check ──

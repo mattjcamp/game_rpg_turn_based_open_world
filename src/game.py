@@ -1829,7 +1829,10 @@ class Game:
     def _title_return_to_game(self):
         """Return to the active game, or load the most recent save."""
         if self._game_started:
-            # Game already running — just dismiss the title screen
+            # Game already running — just dismiss the title screen.
+            # Refresh overworld interiors & tile_links from disk in case the
+            # module editor changed them since the game was started.
+            self._refresh_overworld_interior_data()
             self.showing_title = False
             return
 
@@ -1845,6 +1848,29 @@ class Game:
         # Shouldn't reach here (button hidden when no saves exist),
         # but fall back to just dismissing the title screen.
         self.showing_title = False
+
+    def _refresh_overworld_interior_data(self):
+        """Reload overworld interiors & tile_links from static_overworld.json.
+
+        Called when returning to a running game so that any changes made in
+        the module editor (add/delete/rename interiors, re-link tiles) are
+        picked up without requiring a full new-game restart.
+        """
+        import json, os
+        if not self.active_module_path:
+            return
+        static_path = os.path.join(
+            self.active_module_path, "static_overworld.json")
+        if not os.path.isfile(static_path):
+            return
+        try:
+            with open(static_path, "r") as fh:
+                sdata = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return
+        tmap = self.tile_map
+        tmap.tile_links = sdata.get("tile_links", {})
+        tmap.overworld_interiors = sdata.get("interiors", [])
 
     def _title_quit(self):
         """Quit the game."""
@@ -6441,7 +6467,22 @@ class Game:
         tmap = create_test_map(
             overworld_cfg=overworld_cfg, data_dir=mod_path)
 
-        # Serialize the tile grid + metadata to a static file
+        # Serialize the tile grid + metadata to a static file.
+        # Preserve existing interiors and tile_links if the file already
+        # exists — regenerating the terrain shouldn't destroy hand-crafted
+        # interior locations or overworld links.
+        static_path = os.path.join(mod_path, "static_overworld.json")
+        existing_interiors = []
+        existing_tile_links = {}
+        if os.path.isfile(static_path):
+            try:
+                with open(static_path, "r") as fh:
+                    prev = json.load(fh)
+                existing_interiors = prev.get("interiors", [])
+                existing_tile_links = prev.get("tile_links", {})
+            except (OSError, json.JSONDecodeError):
+                pass
+
         static_data = {
             "width": tmap.width,
             "height": tmap.height,
@@ -6460,7 +6501,12 @@ class Game:
                 })
             static_data["unique_tile_placements"] = ut_list
 
-        static_path = os.path.join(mod_path, "static_overworld.json")
+        # Restore preserved interior data
+        if existing_interiors:
+            static_data["interiors"] = existing_interiors
+        if existing_tile_links:
+            static_data["tile_links"] = existing_tile_links
+
         try:
             with open(static_path, "w") as fh:
                 json.dump(static_data, fh)
