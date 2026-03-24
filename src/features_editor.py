@@ -69,6 +69,8 @@ class FeaturesEditor:
                              "ctx": "dungeon",   "w": 16, "h": 14},
             "me_battle":    {"storage": "sparse", "grid": "fixed",
                              "ctx": "dungeon",   "w": 20, "h": 16},
+            "me_object":    {"storage": "sparse", "grid": "fixed",
+                             "ctx": "all",       "w": 8,  "h": 8},
         }
 
         # --- Spell editor state ---
@@ -2158,6 +2160,14 @@ class FeaturesEditor:
                                 "tile_context": "dungeon",
                                 "width": 20, "height": 16}},
             ]),
+            ("me_object", "Object Templates", [
+                {"label": "Stone Foundation",
+                 "subtitle": "Reusable building foundation",
+                 "map_config": {"storage": STORAGE_SPARSE,
+                                "grid_type": GRID_FIXED,
+                                "tile_context": "all",
+                                "width": 8, "height": 8}},
+            ]),
         ]
 
         sections = []
@@ -2202,6 +2212,7 @@ class FeaturesEditor:
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_overworld_brushes, build_interior_brushes,
+            build_all_brushes,
             STORAGE_DENSE, STORAGE_SPARSE,
         )
 
@@ -2212,24 +2223,41 @@ class FeaturesEditor:
         storage = mc["storage"]
         grid_type = mc["grid_type"]
 
+        # Load object templates for the Objects brush folder
+        saved_all = self.load_map_templates()
+        obj_templates = saved_all.get("me_object", [])
+
         # Build brushes based on tile context
+        manifest = {}
+        try:
+            mpath = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data", "tile_manifest.json")
+            with open(mpath) as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            pass
+
         if ctx == "overworld":
-            brushes = build_overworld_brushes(self.TILE_CONTEXT)
+            brushes = build_overworld_brushes(
+                self.TILE_CONTEXT,
+                object_templates=obj_templates,
+            )
+        elif ctx == "all":
+            brushes = build_all_brushes(
+                self.TILE_CONTEXT,
+                feat_tiles_path=self.tiles_path(),
+                manifest=manifest,
+                feat_tile_list=getattr(self, "tile_list", None),
+                object_templates=obj_templates,
+            )
         else:
-            manifest = {}
-            try:
-                mpath = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    "data", "tile_manifest.json")
-                with open(mpath) as f:
-                    manifest = json.load(f)
-            except (OSError, ValueError):
-                pass
             brushes = build_interior_brushes(
                 self.TILE_CONTEXT,
                 feat_tiles_path=self.tiles_path(),
                 manifest=manifest,
                 feat_tile_list=getattr(self, "tile_list", None),
+                object_templates=obj_templates,
             )
 
         # Build initial tile data — reuse saved tiles when available

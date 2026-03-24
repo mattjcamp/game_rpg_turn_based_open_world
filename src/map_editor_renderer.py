@@ -24,7 +24,7 @@ from src.settings import (
     TILE_SIZE,
     TILE_DEFS,
 )
-from src.map_editor import STORAGE_DENSE, STORAGE_SPARSE
+from src.map_editor import STORAGE_DENSE, STORAGE_SPARSE, _object_origin
 
 if TYPE_CHECKING:
     from src.map_editor import Brush
@@ -135,6 +135,29 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
 
 # ─── Brush palette (left panel) ──────────────────────────────────────
 
+_COL_FOLDER_HEADER = (200, 160, 60)
+_COL_FOLDER_ARROW = (200, 160, 60)
+_COL_OBJECT_ICON = (120, 180, 220)
+
+
+def _visible_brush_indices(brushes, brush_folders):
+    """Return list of brush indices that should be displayed (respecting
+    collapsed folder state)."""
+    visible = []
+    cur_group = None
+    collapsed = False
+    for i, b in enumerate(brushes):
+        if getattr(b, 'is_folder_header', False):
+            cur_group = b.name
+            collapsed = not brush_folders.get(b.name, True)
+            visible.append(i)
+        elif collapsed and getattr(b, 'group', None) == cur_group:
+            continue
+        else:
+            visible.append(i)
+    return visible
+
+
 def _draw_brush_palette(renderer, data: Dict):
     screen = renderer.screen
     fs = renderer.font_small
@@ -151,16 +174,26 @@ def _draw_brush_palette(renderer, data: Dict):
     brushes: list = data["brushes"]
     brush_idx: int = data["brush_idx"]
     storage = data["storage"]
+    brush_folders = data.get("brush_folders", {})
 
-    # Row height differs slightly between dense (overview) and sparse
+    # Build visible index list (respects collapsed folders)
+    vis = _visible_brush_indices(brushes, brush_folders)
+
     brush_row_h = 36 if storage == STORAGE_DENSE else 32
     brush_y0 = PANEL_Y + 26
     max_vis = (panel_h - 60) // brush_row_h
-    b_scroll = max(0, brush_idx - max_vis + 1)
 
-    for bi in range(b_scroll,
-                    min(b_scroll + max_vis, len(brushes))):
-        by = brush_y0 + (bi - b_scroll) * brush_row_h
+    # Scroll to keep selected brush in view
+    try:
+        sel_pos = vis.index(brush_idx)
+    except ValueError:
+        sel_pos = 0
+    b_scroll = max(0, sel_pos - max_vis + 1)
+
+    for vi in range(b_scroll,
+                    min(b_scroll + max_vis, len(vis))):
+        bi = vis[vi]
+        by = brush_y0 + (vi - b_scroll) * brush_row_h
         is_sel = (bi == brush_idx)
         brush = brushes[bi]
 
@@ -174,11 +207,51 @@ def _draw_brush_palette(renderer, data: Dict):
                              (LEFT_X + 4, by,
                               LEFT_W - 8, brush_row_h - 2), 1)
 
-        icon_x = LEFT_X + 10 if storage == STORAGE_DENSE else LEFT_X + 12
+        # ── Folder header ──
+        if getattr(brush, 'is_folder_header', False):
+            is_open = brush_folders.get(brush.name, True)
+            arrow = "\u25BC" if is_open else "\u25B6"  # ▼ or ▶
+            renderer._u3_text(
+                arrow, LEFT_X + 10,
+                by + (8 if storage == STORAGE_DENSE else 6),
+                _COL_FOLDER_ARROW, fs)
+            nc = _COL_FOLDER_HEADER if not is_sel else (255, 220, 80)
+            renderer._u3_text(
+                brush.name, LEFT_X + 24,
+                by + (8 if storage == STORAGE_DENSE else 6),
+                nc, fs)
+            continue
+
+        # ── Object brush ──
+        if getattr(brush, 'is_object', False):
+            icon_x = LEFT_X + 18
+            icon_sz = 18
+            # Draw a mini grid icon to represent multi-tile stamp
+            pygame.draw.rect(screen, (35, 40, 55),
+                             (icon_x, by + 4, icon_sz, icon_sz))
+            for gr in range(3):
+                for gc in range(3):
+                    cell = icon_sz // 3
+                    cx = icon_x + gc * cell
+                    cy = by + 4 + gr * cell
+                    if (gr + gc) % 2 == 0:
+                        pygame.draw.rect(screen, _COL_OBJECT_ICON,
+                                         (cx + 1, cy + 1,
+                                          cell - 2, cell - 2))
+            pygame.draw.rect(screen, _COL_PANEL_BORDER,
+                             (icon_x, by + 4, icon_sz, icon_sz), 1)
+            nc = _COL_LABEL_SEL if is_sel else _COL_LABEL_NORMAL
+            renderer._u3_text(
+                brush.name, icon_x + icon_sz + 6,
+                by + (8 if storage == STORAGE_DENSE else 6),
+                nc, fs)
+            continue
+
+        # ── Regular tile brush ──
+        icon_x = LEFT_X + 18 if storage == STORAGE_DENSE else LEFT_X + 18
         icon_sz = 26 if storage == STORAGE_DENSE else 22
         text_x = icon_x + icon_sz + 6
 
-        # Draw icon
         if storage == STORAGE_DENSE:
             _draw_dense_brush_icon(renderer, brush, icon_x, by, icon_sz)
         else:
@@ -238,10 +311,18 @@ def _draw_sparse_brush_icon(renderer, brush, icon_x, by, icon_sz) -> int:
             screen.blit(spr, (icon_x, by + 4))
             text_x = icon_x + icon_sz + 6
     elif brush.tile_id is not None:
-        tdef = TILE_DEFS.get(brush.tile_id, {})
-        tc = tdef.get("color", (80, 80, 80))
-        pygame.draw.rect(screen, tc,
-                         pygame.Rect(icon_x, by + 4, icon_sz, icon_sz))
+        # Try unified sprite cache first (works for all tile types)
+        drawn = False
+        base_spr = renderer._get_tile_sprite(brush.tile_id)
+        if base_spr:
+            scaled = pygame.transform.scale(base_spr, (icon_sz, icon_sz))
+            screen.blit(scaled, (icon_x, by + 4))
+            drawn = True
+        if not drawn:
+            tdef = TILE_DEFS.get(brush.tile_id, {})
+            tc = tdef.get("color", (80, 80, 80))
+            pygame.draw.rect(screen, tc,
+                             pygame.Rect(icon_x, by + 4, icon_sz, icon_sz))
         pygame.draw.rect(screen, _COL_PANEL_BORDER,
                          pygame.Rect(icon_x, by + 4, icon_sz, icon_sz), 1)
         text_x = icon_x + icon_sz + 6
@@ -295,8 +376,31 @@ def _draw_dense_grid(renderer, data: Dict):
             py = oy + (mr - cam_r) * ts
             renderer._u3_draw_overworld_tile(tile_id, px, py, ts, mc, mr)
 
-    # Cursor
+    # Object stamp preview (ghost overlay on dense grid)
+    brushes = data.get("brushes", [])
+    bidx = data.get("brush_idx", 0)
+    cur_brush = brushes[bidx] if bidx < len(brushes) else None
     cur_c, cur_r = data["cursor_col"], data["cursor_row"]
+    if (cur_brush and getattr(cur_brush, 'is_object', False)
+            and cur_brush.object_data):
+        elapsed = pygame.time.get_ticks() / 1000.0
+        pulse_a = int(40 + 20 * math.sin(elapsed * 3))
+        min_c, min_r = _object_origin(cur_brush.object_data)
+        for pos_key in cur_brush.object_data:
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            oc, orow = int(parts[0]), int(parts[1])
+            tc = cur_c + (oc - min_c)
+            tr = cur_r + (orow - min_r)
+            if cam_c <= tc < end_c and cam_r <= tr < end_r:
+                gpx = ox + (tc - cam_c) * ts
+                gpy = oy + (tr - cam_r) * ts
+                ghost_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                ghost_s.fill((120, 180, 220, pulse_a))
+                screen.blit(ghost_s, (gpx, gpy))
+
+    # Cursor
     if cam_c <= cur_c < end_c and cam_r <= cur_r < end_r:
         elapsed = pygame.time.get_ticks() / 1000.0
         pulse = int(80 + 40 * math.sin(elapsed * 4))
@@ -359,6 +463,14 @@ def _draw_sparse_grid(renderer, data: Dict):
                             screen.blit(sprite, (px, py))
                             drawn = True
                 if not drawn:
+                    # Try unified sprite cache (works for all tile types)
+                    base_spr = renderer._get_tile_sprite(tid)
+                    if base_spr:
+                        scaled = pygame.transform.scale(
+                            base_spr, (ts, ts))
+                        screen.blit(scaled, (px, py))
+                        drawn = True
+                if not drawn:
                     col = TILE_DEFS.get(tid, {}).get("color", (80, 80, 80))
                     pygame.draw.rect(screen, col,
                                      pygame.Rect(px, py, ts, ts))
@@ -383,8 +495,30 @@ def _draw_sparse_grid(renderer, data: Dict):
             pygame.draw.rect(screen, (40, 35, 30),
                              pygame.Rect(px, py, ts, ts), 1)
 
-    # Cursor
+    # Object stamp preview (ghost outline)
+    brushes = data.get("brushes", [])
+    bidx = data.get("brush_idx", 0)
+    cur_brush = brushes[bidx] if bidx < len(brushes) else None
     cx, cy = data["cursor_col"], data["cursor_row"]
+    if (cur_brush and getattr(cur_brush, 'is_object', False)
+            and cur_brush.object_data):
+        elapsed = pygame.time.get_ticks() / 1000.0
+        pulse_a = int(40 + 20 * math.sin(elapsed * 3))
+        min_c, min_r = _object_origin(cur_brush.object_data)
+        ghost = pygame.Surface((tw * ts, th * ts), pygame.SRCALPHA)
+        for pos_key in cur_brush.object_data:
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            oc, orow = int(parts[0]), int(parts[1])
+            tc = cx + (oc - min_c)
+            tr = cy + (orow - min_r)
+            if 0 <= tc < tw and 0 <= tr < th:
+                ghost.fill((120, 180, 220, pulse_a),
+                           pygame.Rect(tc * ts, tr * ts, ts, ts))
+        screen.blit(ghost, (gx, gy))
+
+    # Cursor
     if cx >= 0 and cy >= 0:
         elapsed = pygame.time.get_ticks() / 1000.0
         pulse = int(80 + 40 * math.sin(elapsed * 4))
@@ -549,9 +683,16 @@ def _draw_replace_overlay(renderer, data: Dict):
                                              src_y + qr * (sw // 2),
                                              sw // 2, sw // 2))
     else:
-        tdef = TILE_DEFS.get(src_tile, {})
-        tc = tdef.get("color", (80, 80, 80))
-        pygame.draw.rect(screen, tc, pygame.Rect(ox + 70, src_y, 18, 18))
+        src_drawn = False
+        src_spr = renderer._get_tile_sprite(src_tile)
+        if src_spr:
+            scaled = pygame.transform.scale(src_spr, (18, 18))
+            screen.blit(scaled, (ox + 70, src_y))
+            src_drawn = True
+        if not src_drawn:
+            tdef = TILE_DEFS.get(src_tile, {})
+            tc = tdef.get("color", (80, 80, 80))
+            pygame.draw.rect(screen, tc, pygame.Rect(ox + 70, src_y, 18, 18))
     renderer._u3_text(src_name, ox + 95, src_y + 2, (255, 255, 200), fs)
 
     # Destination list
@@ -572,10 +713,17 @@ def _draw_replace_overlay(renderer, data: Dict):
 
         b = brushes[i]
         if b.tile_id is not None:
-            tdef = TILE_DEFS.get(b.tile_id, {})
-            tc = tdef.get("color", (80, 80, 80))
-            pygame.draw.rect(screen, tc,
-                             pygame.Rect(ox + 14, ly + 2, 16, 16))
+            dst_drawn = False
+            dst_spr = renderer._get_tile_sprite(b.tile_id)
+            if dst_spr:
+                scaled = pygame.transform.scale(dst_spr, (16, 16))
+                screen.blit(scaled, (ox + 14, ly + 2))
+                dst_drawn = True
+            if not dst_drawn:
+                tdef = TILE_DEFS.get(b.tile_id, {})
+                tc = tdef.get("color", (80, 80, 80))
+                pygame.draw.rect(screen, tc,
+                                 pygame.Rect(ox + 14, ly + 2, 16, 16))
         else:
             pygame.draw.rect(screen, (40, 35, 50),
                              pygame.Rect(ox + 14, ly + 2, 16, 16))

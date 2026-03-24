@@ -32,14 +32,29 @@ from src.settings import (
 
 @dataclass
 class Brush:
-    """A single entry in the editor palette."""
+    """A single entry in the editor palette.
+
+    Regular brushes paint a single tile.  Object brushes (``object_data``
+    is not None) stamp a multi-tile pattern from an Object Template.
+    Folder-header brushes (``is_folder_header`` is True) are non-paintable
+    separators that toggle group collapse in the palette.
+    """
     name: str
-    tile_id: Optional[int]    # None for eraser
+    tile_id: Optional[int]    # None for eraser / folder headers
     path: Optional[str] = None  # sprite asset path (interior brushes)
+    group: Optional[str] = None  # folder/category this brush belongs to
+    is_folder_header: bool = False  # True → this entry is a collapsible header
+    object_data: Optional[Dict] = None  # sparse tiles dict for object stamps
+    object_w: int = 0  # object template width (cells)
+    object_h: int = 0  # object template height (cells)
 
     @property
     def is_eraser(self) -> bool:
-        return self.tile_id is None
+        return self.tile_id is None and not self.is_folder_header and self.object_data is None
+
+    @property
+    def is_object(self) -> bool:
+        return self.object_data is not None
 
 
 # ─── Configuration ────────────────────────────────────────────────────
@@ -144,6 +159,13 @@ class MapEditorState:
         # Save flash timer (seconds remaining, counts down each frame)
         self.save_flash: float = 0.0
 
+        # Brush folder collapse state (group name → is_open)
+        # All folders start open by default
+        self.brush_folders: Dict[str, bool] = {}
+        for b in config.brushes:
+            if b.is_folder_header and b.name not in self.brush_folders:
+                self.brush_folders[b.name] = True
+
         # Overlay states
         self.int_picking: bool = False       # overview map interior picker
         self.int_pick_cursor: int = 0
@@ -185,6 +207,24 @@ class MapEditorState:
 
     # -- Brush helpers --
 
+    def _visible_indices(self) -> List[int]:
+        """Return indices of brushes currently visible (not hidden by
+        collapsed folders)."""
+        brushes = self.config.brushes
+        visible = []
+        cur_group: Optional[str] = None
+        collapsed = False
+        for i, b in enumerate(brushes):
+            if b.is_folder_header:
+                cur_group = b.name
+                collapsed = not self.brush_folders.get(b.name, True)
+                visible.append(i)  # headers are always visible
+            elif collapsed and b.group == cur_group:
+                continue  # hidden by collapsed folder
+            else:
+                visible.append(i)
+        return visible
+
     @property
     def current_brush(self) -> Brush:
         brushes = self.config.brushes
@@ -192,11 +232,27 @@ class MapEditorState:
             return Brush(name="(none)", tile_id=None)
         return brushes[self.brush_idx % len(brushes)]
 
+    def toggle_folder(self):
+        """If the current brush is a folder header, toggle it."""
+        brush = self.current_brush
+        if brush.is_folder_header:
+            self.brush_folders[brush.name] = not self.brush_folders.get(
+                brush.name, True)
+
     def cycle_brush(self, delta: int = 1):
         n = len(self.config.brushes)
         if n == 0:
             return
-        self.brush_idx = (self.brush_idx + delta) % n
+        vis = self._visible_indices()
+        if not vis:
+            return
+        # Find current position in visible list
+        try:
+            pos = vis.index(self.brush_idx)
+        except ValueError:
+            pos = 0
+        pos = (pos + delta) % len(vis)
+        self.brush_idx = vis[pos]
 
     # -- Cursor movement --
 
@@ -261,9 +317,21 @@ class MapEditorState:
     # -- Paint action (applies current brush at cursor) --
 
     def paint(self):
-        """Apply the current brush at the cursor position."""
+        """Apply the current brush at the cursor position.
+
+        Regular brushes paint a single tile.  Object brushes stamp the
+        full object template pattern relative to the cursor origin.
+        Folder headers do nothing.
+        """
         brush = self.current_brush
+        if brush.is_folder_header:
+            return
         col, row = self.cursor_col, self.cursor_row
+
+        # ── Object stamp (multi-tile) ──
+        if brush.is_object:
+            self._paint_object(brush, col, row)
+            return
 
         if self.config.storage == STORAGE_DENSE:
             if brush.is_eraser:
@@ -286,6 +354,50 @@ class MapEditorState:
                         if lk in old:
                             td[lk] = old[lk]
                 self.set_tile(col, row, td)
+
+    def _paint_object(self, brush: 'Brush', origin_c: int, origin_r: int):
+        """Stamp an object template onto the canvas at *origin_c, origin_r*.
+
+        Tile positions are normalised so the top-left occupied cell of the
+        object aligns with the cursor.  Works with both dense and sparse
+        storage.
+        """
+        obj = brush.object_data  # sparse dict "c,r" -> tile dict
+        if not obj:
+            return
+
+        # Find the top-left corner of actual content
+        min_c, min_r = _object_origin(obj)
+
+        for pos_key, td_src in obj.items():
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            oc, orow = int(parts[0]), int(parts[1])
+            tc = origin_c + (oc - min_c)
+            tr = origin_r + (orow - min_r)
+            if tc < 0 or tr < 0:
+                continue
+            if tc >= self.config.width or tr >= self.config.height:
+                continue
+
+            if self.config.storage == STORAGE_DENSE:
+                tid = td_src.get("tile_id") if isinstance(td_src, dict) else td_src
+                if tid is not None:
+                    self.set_tile(tc, tr, tid)
+            else:
+                # Copy the tile dict so we don't mutate the brush
+                if isinstance(td_src, dict):
+                    td = dict(td_src)
+                else:
+                    td = {"tile_id": td_src}
+                # Preserve existing link fields
+                old = self.tiles.get(f"{tc},{tr}", {})
+                if isinstance(old, dict):
+                    for lk in ("interior", "to_overworld"):
+                        if lk in old:
+                            td[lk] = old[lk]
+                self.set_tile(tc, tr, td)
 
     # -- Link helpers (overview map) --
 
@@ -405,6 +517,7 @@ class MapEditorState:
             "brushes": cfg.brushes,
             "brush_idx": self.brush_idx,
             "brush_name": self.current_brush.name,
+            "brush_folders": self.brush_folders,
             "dirty": self.dirty,
             "save_flash": self.save_flash,
             "tile_links": self.tile_links,
@@ -507,9 +620,12 @@ class MapEditorInputHandler:
             st.cycle_brush(1)
             return None
 
-        # ── Paint ──
+        # ── Paint / toggle folder ──
         if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            st.paint()
+            if st.current_brush.is_folder_header:
+                st.toggle_folder()
+            else:
+                st.paint()
             return None
 
         # ── Link interior (I key) — overview map ──
@@ -670,40 +786,29 @@ class MapEditorInputHandler:
         return None
 
 
+def _object_origin(obj: Dict) -> Tuple[int, int]:
+    """Return (min_col, min_row) of occupied cells in a sparse object dict."""
+    min_c = min_r = 999999
+    for pos_key in obj:
+        parts = pos_key.split(",")
+        if len(parts) == 2:
+            c, r = int(parts[0]), int(parts[1])
+            if c < min_c:
+                min_c = c
+            if r < min_r:
+                min_r = r
+    if min_c == 999999:
+        return (0, 0)
+    return (min_c, min_r)
+
+
 # ─── Builder helpers ──────────────────────────────────────────────────
 
-def build_overworld_brushes(tile_context_map: Dict[int, str]) -> List[Brush]:
-    """Build brush list for the overview map editor.
-
-    Filters TILE_DEFS by tile_context == "overworld", appends eraser.
-    """
-    ow_ids = sorted(
-        tid for tid, ctx in tile_context_map.items()
-        if ctx == "overworld" and tid in TILE_DEFS
-    )
-    brushes = [Brush(name=TILE_DEFS[tid]["name"], tile_id=tid)
-               for tid in ow_ids]
-    brushes.append(Brush(name="Eraser", tile_id=None))
-    return brushes
-
-
-def build_interior_brushes(tile_context_map: Dict[int, str],
-                           feat_tiles_path: str = "",
-                           manifest: Optional[Dict] = None,
-                           feat_tile_list: Optional[List] = None,
-                           ) -> List[Brush]:
-    """Build brush list for overview interior editors.
-
-    Filters by tile_context == "dungeon", resolves sprite paths.
-    """
-    brushes = [Brush(name="Eraser", tile_id=None, path=None)]
-
-    dungeon_ids = sorted(
-        tid for tid, ctx in tile_context_map.items()
-        if ctx == "dungeon"
-    )
-
-    # Load saved tile defs for sprite key resolution
+def _make_sprite_resolver(feat_tiles_path: str = "",
+                          manifest: Optional[Dict] = None,
+                          feat_tile_list: Optional[List] = None):
+    """Return a callable ``resolve(tile_id) -> Optional[str]`` for sprite
+    asset paths.  Shared by all brush builders."""
     saved_tile_defs: Dict = {}
     if feat_tiles_path:
         try:
@@ -711,11 +816,10 @@ def build_interior_brushes(tile_context_map: Dict[int, str],
                 saved_tile_defs = json.load(f)
         except (OSError, ValueError):
             pass
-
     if manifest is None:
         manifest = {}
 
-    def _resolve_sprite_path(tid: int) -> Optional[str]:
+    def _resolve(tid: int) -> Optional[str]:
         saved = saved_tile_defs.get(str(tid), {})
         sprite_key = saved.get("sprite", "")
         if sprite_key and "/" in sprite_key:
@@ -728,7 +832,6 @@ def build_interior_brushes(tile_context_map: Dict[int, str],
                     if p.startswith("src/assets/"):
                         p = p[len("src/assets/"):]
                     return p
-        # Check feature tile list
         if feat_tile_list:
             for tile in feat_tile_list:
                 if tile.get("_tile_id") == tid:
@@ -744,7 +847,6 @@ def build_interior_brushes(tile_context_map: Dict[int, str],
                                     p = p[len("src/assets/"):]
                                 return p
                     break
-        # Manifest fallback
         for cat in manifest:
             if cat.startswith("_"):
                 continue
@@ -760,15 +862,148 @@ def build_interior_brushes(tile_context_map: Dict[int, str],
                         p = p[len("src/assets/"):]
                     return p
         return None
+    return _resolve
 
-    for tid in dungeon_ids:
+
+def _build_tile_brushes(tile_ids: List[int], group: str,
+                        resolve_path) -> List[Brush]:
+    """Build Brush entries for a list of tile IDs, all tagged with *group*."""
+    brushes = []
+    for tid in tile_ids:
         td = TILE_DEFS.get(tid)
         if not td:
             continue
         brushes.append(Brush(
             name=td.get("name", f"Tile {tid}"),
             tile_id=tid,
-            path=_resolve_sprite_path(tid),
+            path=resolve_path(tid),
+            group=group,
         ))
+    return brushes
+
+
+def build_overworld_brushes(tile_context_map: Dict[int, str],
+                            object_templates: Optional[List] = None,
+                            ) -> List[Brush]:
+    """Build brush list for the overview map editor.
+
+    Includes folder headers for Tiles and (optionally) Objects.
+    """
+    ow_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "overworld" and tid in TILE_DEFS
+    )
+
+    brushes: List[Brush] = []
+
+    # ── Eraser (always at top, outside any folder) ──
+    brushes.append(Brush(name="Eraser", tile_id=None))
+
+    # ── Tiles folder ──
+    grp = "Tiles"
+    brushes.append(Brush(name=grp, tile_id=None, is_folder_header=True))
+    for tid in ow_ids:
+        brushes.append(Brush(
+            name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp))
+
+    # ── Objects folder ──
+    if object_templates:
+        _append_object_brushes(brushes, object_templates)
 
     return brushes
+
+
+def build_interior_brushes(tile_context_map: Dict[int, str],
+                           feat_tiles_path: str = "",
+                           manifest: Optional[Dict] = None,
+                           feat_tile_list: Optional[List] = None,
+                           object_templates: Optional[List] = None,
+                           ) -> List[Brush]:
+    """Build brush list for interior editors.
+
+    Includes folder headers for Tiles and (optionally) Objects.
+    """
+    resolve = _make_sprite_resolver(feat_tiles_path, manifest, feat_tile_list)
+
+    dungeon_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "dungeon"
+    )
+
+    brushes: List[Brush] = []
+    brushes.append(Brush(name="Eraser", tile_id=None, path=None))
+
+    grp = "Tiles"
+    brushes.append(Brush(name=grp, tile_id=None, is_folder_header=True))
+    brushes.extend(_build_tile_brushes(dungeon_ids, grp, resolve))
+
+    if object_templates:
+        _append_object_brushes(brushes, object_templates)
+
+    return brushes
+
+
+def build_all_brushes(tile_context_map: Dict[int, str],
+                      feat_tiles_path: str = "",
+                      manifest: Optional[Dict] = None,
+                      feat_tile_list: Optional[List] = None,
+                      object_templates: Optional[List] = None,
+                      ) -> List[Brush]:
+    """Build brush list containing *all* tile types (every context).
+
+    Used by Object Templates so reusable map pieces can mix any tile.
+    Grouped into Overworld, Interior, and Objects folders.
+    """
+    resolve = _make_sprite_resolver(feat_tiles_path, manifest, feat_tile_list)
+
+    ow_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "overworld" and tid in TILE_DEFS
+    )
+    other_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx != "overworld" and tid in TILE_DEFS
+    )
+
+    brushes: List[Brush] = []
+    brushes.append(Brush(name="Eraser", tile_id=None, path=None))
+
+    # ── Overworld folder ──
+    grp_ow = "Overworld"
+    brushes.append(Brush(name=grp_ow, tile_id=None, is_folder_header=True))
+    for tid in ow_ids:
+        brushes.append(Brush(
+            name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp_ow))
+
+    # ── Interior folder ──
+    grp_int = "Interior"
+    brushes.append(Brush(name=grp_int, tile_id=None, is_folder_header=True))
+    brushes.extend(_build_tile_brushes(other_ids, grp_int, resolve))
+
+    # ── Objects folder ──
+    if object_templates:
+        _append_object_brushes(brushes, object_templates)
+
+    return brushes
+
+
+def _append_object_brushes(brushes: List[Brush],
+                           object_templates: List[Dict]):
+    """Append an "Objects" folder header followed by one brush per saved
+    object template.  Each brush carries the sparse tiles dict so
+    ``paint()`` can stamp it."""
+    grp = "Objects"
+    brushes.append(Brush(name=grp, tile_id=None, is_folder_header=True))
+    for tmpl in object_templates:
+        mc = tmpl.get("map_config", {})
+        tiles = tmpl.get("tiles")
+        if not tiles or not isinstance(tiles, dict):
+            continue  # skip empty / non-sparse objects
+        brushes.append(Brush(
+            name=tmpl.get("label", "Object"),
+            tile_id=None,
+            group=grp,
+            object_data=tiles,
+            object_w=mc.get("width", 8),
+            object_h=mc.get("height", 8),
+        ))

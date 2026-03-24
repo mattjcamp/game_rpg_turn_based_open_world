@@ -6859,9 +6859,9 @@ class Renderer(CombatEffectRendererMixin):
         footer_y = SCREEN_HEIGHT - 36
         if nav_depth > 0:
             hint = ("[Up/Dn] Browse  [Enter] Open  [^N] New  "
-                    "[^D] Delete  [F2] Rename  [^S] Save  [Esc] Back")
+                    "[^D] Delete  [Esc] Back")
         else:
-            hint = "[Up/Dn] Browse  [Enter] Open  [^S] Save  [Esc] Back"
+            hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
         hw = fs.size(hint)[0]
         self._u3_text(hint,
                       SCREEN_WIDTH // 2 - hw // 2,
