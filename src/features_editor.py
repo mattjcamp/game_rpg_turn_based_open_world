@@ -52,6 +52,8 @@ class FeaturesEditor:
         self.meh_naming = False             # True when typing a template name
         self.meh_name_buf = ""              # text buffer for naming/renaming
         self.meh_naming_is_new = False      # True if naming a new template, False if renaming
+        self.meh_save_flash = 0.0           # countdown for "Saved!" flash in hub
+        self._meh_settings_target = None    # template dict being edited in settings
 
         # Default map_config per folder type (used when adding new templates).
         # Values are plain dicts; the actual STORAGE_*/GRID_* constants are
@@ -1801,6 +1803,102 @@ class FeaturesEditor:
     # ── Map Editor Hub Methods ────────────────────────────────
     # ══════════════════════════════════════════════════════════
 
+    def map_templates_path(self):
+        """Return path to map_templates.json."""
+        if self.game.active_module_path:
+            mod_path = os.path.join(
+                self.game.active_module_path, "map_templates.json")
+            if os.path.isfile(mod_path):
+                return mod_path
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "map_templates.json")
+
+    def save_map_templates(self):
+        """Persist all map template data to map_templates.json.
+
+        Walks the top-level sections, collecting every template folder
+        (skipping the Tiles folder and editor redirects) into a flat
+        list grouped by category folder key.
+        """
+        from src.map_editor import STORAGE_DENSE, STORAGE_SPARSE
+        top_sections = self._meh_top_sections()
+        data = {}
+        for sec in top_sections:
+            folder_key = sec.get("folder", "")
+            if folder_key == "me_tiles":
+                continue  # Tiles folder is not a template container
+            children = sec.get("children", [])
+            templates = []
+            for child in children:
+                # Each child is now a template folder
+                if child.get("folder") != "template":
+                    continue
+                mc = child.get("map_config")
+                if not mc:
+                    continue
+                entry = {
+                    "label": child.get("label", ""),
+                    "subtitle": child.get("subtitle", ""),
+                    "description": child.get("description", ""),
+                    "canvas_type": child.get("canvas_type", "blank"),
+                    "map_config": {
+                        "storage": ("dense" if mc.get("storage") == STORAGE_DENSE
+                                    else "sparse"),
+                        "grid_type": str(mc.get("grid_type", "fixed")),
+                        "tile_context": mc.get("tile_context", "dungeon"),
+                        "width": mc.get("width", 12),
+                        "height": mc.get("height", 10),
+                    },
+                }
+                # Persist tile data if present
+                tiles = child.get("tiles")
+                if tiles is not None:
+                    entry["tiles"] = tiles
+                templates.append(entry)
+            data[folder_key] = templates
+
+        path = self.map_templates_path()
+        # Ensure parent directory exists (for module paths)
+        parent = os.path.dirname(path)
+        if not os.path.isdir(parent):
+            try:
+                os.makedirs(parent, exist_ok=True)
+            except OSError:
+                pass
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            return False
+        return True
+
+    def load_map_templates(self):
+        """Load saved map template data from map_templates.json.
+
+        Returns a dict keyed by folder_key (e.g. 'me_overview') with
+        lists of template dicts, or an empty dict if no file exists.
+        """
+        path = self.map_templates_path()
+        if not os.path.isfile(path):
+            return {}
+        try:
+            with open(path, "r") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def _meh_top_sections(self):
+        """Return the top-level sections list.
+
+        If we're inside a folder, walk back through the nav stack
+        to get the root list. Otherwise return meh_sections directly.
+        """
+        if not self.meh_nav_stack:
+            return self.meh_sections
+        # The first entry on the stack is the top-level sections
+        return self.meh_nav_stack[0][0]
+
     def _meh_current_folder_key(self):
         """Return the folder key (e.g. 'me_overview') of the folder we're
         currently browsing inside, or None if at the top level."""
@@ -1838,13 +1936,54 @@ class FeaturesEditor:
             "height": defaults["h"],
         }
 
+    def _meh_get_parent_template(self):
+        """Return the parent template folder dict from the nav stack.
+
+        When inside a template folder (Settings / Edit Map), the parent
+        is the template folder itself — stored one level up on the nav stack.
+        """
+        if not self.meh_nav_stack:
+            return None
+        parent_secs, parent_cur, _, _ = self.meh_nav_stack[-1]
+        if parent_cur < len(parent_secs):
+            sec = parent_secs[parent_cur]
+            if sec.get("folder") == "template":
+                return sec
+        return None
+
+    def _meh_open_template_settings(self, tmpl):
+        """Open the field editor for a template's settings."""
+        mc = tmpl.get("map_config", {})
+        canvas_type = tmpl.get("canvas_type", "blank")
+        # Build field entries: (label, key, value, type, editable)
+        self.meh_fields = [
+            ["Name", "label", tmpl.get("label", ""), "text", True],
+            ["Description", "description",
+             tmpl.get("description", ""), "text", True],
+            ["", "", "", "section", False],
+            ["Width", "width", str(mc.get("width", 12)), "text", True],
+            ["Height", "height", str(mc.get("height", 10)), "text", True],
+            ["Canvas", "canvas_type", canvas_type, "cycle", True],
+            ["", "", "", "section", False],
+            ["Generate Map", "generate", "Press Enter to generate",
+             "action", True],
+        ]
+        self.meh_field = 0
+        self.meh_buffer = str(self.meh_fields[0][2])
+        self.meh_level = 1
+        # Store reference to the template being edited
+        self._meh_settings_target = tmpl
+
     def meh_add_template(self, name):
         """Add a new map template with *name* to the current folder."""
-        new_sec = {
+        mc = self._meh_folder_default_config()
+        new_sec = self._meh_wrap_template({
             "label": name,
-            "subtitle": "",
-            "map_config": self._meh_folder_default_config(),
-        }
+            "subtitle": f"{mc['width']}x{mc['height']}",
+            "description": "",
+            "canvas_type": "blank",
+            "map_config": mc,
+        })
         self.meh_sections.append(new_sec)
         self.meh_cursor = len(self.meh_sections) - 1
         self._meh_update_parent_subtitle()
@@ -1855,8 +1994,8 @@ class FeaturesEditor:
         if n == 0:
             return
         sec = self.meh_sections[self.meh_cursor]
-        # Don't allow deleting folders or redirect entries
-        if sec.get("folder") or sec.get("_editor_redirect"):
+        # Only allow deleting template folders
+        if sec.get("folder") != "template":
             return
         self.meh_sections.pop(self.meh_cursor)
         n -= 1
@@ -1872,7 +2011,7 @@ class FeaturesEditor:
         if n == 0:
             return
         sec = self.meh_sections[self.meh_cursor]
-        if sec.get("folder") or sec.get("_editor_redirect"):
+        if sec.get("folder") != "template":
             return
         sec["label"] = new_name
 
@@ -1890,129 +2029,151 @@ class FeaturesEditor:
                     f"{count} template{'s' if count != 1 else ''}")
 
     def _meh_is_template_item(self):
-        """Return True if the currently selected item is an editable template
-        (not a folder or an editor redirect)."""
+        """Return True if the currently selected item is a template folder
+        (not a category folder, editor redirect, or settings/edit-map child)."""
         n = len(self.meh_sections)
         if n == 0:
             return False
         sec = self.meh_sections[self.meh_cursor]
-        return not sec.get("folder") and not sec.get("_editor_redirect")
+        return bool(sec.get("folder") == "template")
+
+    def _meh_wrap_template(self, data):
+        """Wrap a template data dict as a navigable folder.
+
+        The returned dict acts as a folder with two children:
+          - Settings  (opens field editor for name/desc/size/canvas)
+          - Edit Map  (launches fullscreen map editor)
+
+        The template's map_config, tiles, description, and canvas_type
+        live on the folder dict itself so save/load can find them.
+        """
+        mc = data.get("map_config", {})
+        w = mc.get("width", 12)
+        h = mc.get("height", 10)
+        folder = {
+            "label": data.get("label", "Unnamed"),
+            "subtitle": data.get("subtitle", f"{w}x{h}"),
+            "description": data.get("description", ""),
+            "canvas_type": data.get("canvas_type", "blank"),
+            "folder": "template",
+            "map_config": mc,
+            "children": [
+                {"label": "Settings",
+                 "subtitle": "Name, size, and canvas options",
+                 "_template_settings": True},
+                {"label": "Edit Map",
+                 "subtitle": f"{w}x{h} tile canvas",
+                 "_template_edit_map": True},
+            ],
+        }
+        tiles = data.get("tiles")
+        if tiles is not None:
+            folder["tiles"] = tiles
+        return folder
+
+    def _meh_children_from_saved(self, folder_key, saved_data):
+        """Convert saved JSON template list back into section children dicts
+        with live map_config constants, each wrapped as a template folder."""
+        from src.map_editor import (
+            STORAGE_DENSE, STORAGE_SPARSE, GRID_SCROLLABLE, GRID_FIXED,
+        )
+        storage_map = {"dense": STORAGE_DENSE, "sparse": STORAGE_SPARSE}
+        grid_map = {"fixed": GRID_FIXED, "scrollable": GRID_SCROLLABLE}
+        children = []
+        for entry in saved_data:
+            mc_raw = entry.get("map_config", {})
+            data = {
+                "label": entry.get("label", "Unnamed"),
+                "subtitle": entry.get("subtitle", ""),
+                "description": entry.get("description", ""),
+                "canvas_type": entry.get("canvas_type", "blank"),
+                "map_config": {
+                    "storage": storage_map.get(
+                        mc_raw.get("storage", "sparse"), STORAGE_SPARSE),
+                    "grid_type": grid_map.get(
+                        mc_raw.get("grid_type", "fixed"), GRID_FIXED),
+                    "tile_context": mc_raw.get("tile_context", "dungeon"),
+                    "width": mc_raw.get("width", 12),
+                    "height": mc_raw.get("height", 10),
+                },
+            }
+            tiles = entry.get("tiles")
+            if tiles is not None:
+                data["tiles"] = tiles
+            children.append(self._meh_wrap_template(data))
+        return children
 
     def build_map_editor_hub_sections(self):
         """Build the section list for the top-level Map Editor hub.
 
-        Returns 5 sub-folders — one per map type — each containing a
-        placeholder example that launches the actual map editor.
+        Loads templates from map_templates.json if it exists, otherwise
+        uses built-in defaults. Returns folder sections for each map
+        type plus the Tiles folder.
         """
         from src.map_editor import (
             STORAGE_DENSE, STORAGE_SPARSE, GRID_SCROLLABLE, GRID_FIXED,
         )
 
-        # Each child stores its editor config so we can launch it
-        # ── 1) Overview ──
-        overview_children = [
-            {
-                "label": "Overworld Template",
-                "subtitle": "A base layout for the overworld map",
-                "map_config": {
-                    "storage": STORAGE_DENSE,
-                    "grid_type": GRID_FIXED,
-                    "tile_context": "overworld",
-                    "width": 16, "height": 12,
-                },
-            },
-        ]
-        overview_sec = {
-            "label": "Overview Templates",
-            "folder": "me_overview",
-            "children": overview_children,
-            "subtitle": f"{len(overview_children)} template"
-                        f"{'s' if len(overview_children) != 1 else ''}",
-        }
+        saved = self.load_map_templates()
 
-        # ── 2) Dungeon ──
-        dungeon_children = [
-            {
-                "label": "Goblin Cavern Floor 1",
-                "subtitle": "A winding cave system",
-                "map_config": {
-                    "storage": STORAGE_DENSE,
-                    "grid_type": GRID_SCROLLABLE,
-                    "tile_context": "dungeon",
-                    "width": 32, "height": 32,
-                },
-            },
+        # Define folder metadata: (folder_key, label, default_children)
+        folder_defs = [
+            ("me_overview", "Overview Templates", [
+                {"label": "Overworld Template",
+                 "subtitle": "A base layout for the overworld map",
+                 "map_config": {"storage": STORAGE_DENSE,
+                                "grid_type": GRID_FIXED,
+                                "tile_context": "overworld",
+                                "width": 16, "height": 12}},
+            ]),
+            ("me_dungeon", "Dungeon Templates", [
+                {"label": "Goblin Cavern Floor 1",
+                 "subtitle": "A winding cave system",
+                 "map_config": {"storage": STORAGE_DENSE,
+                                "grid_type": GRID_SCROLLABLE,
+                                "tile_context": "dungeon",
+                                "width": 32, "height": 32}},
+            ]),
+            ("me_examine", "Examine Templates", [
+                {"label": "Ancient Shrine",
+                 "subtitle": "Vignette for examining a tile",
+                 "map_config": {"storage": STORAGE_SPARSE,
+                                "grid_type": GRID_FIXED,
+                                "tile_context": "dungeon",
+                                "width": 12, "height": 10}},
+            ]),
+            ("me_enclosure", "Enclosure Templates", [
+                {"label": "Blacksmith Shop",
+                 "subtitle": "Interior space for a town building",
+                 "map_config": {"storage": STORAGE_SPARSE,
+                                "grid_type": GRID_FIXED,
+                                "tile_context": "dungeon",
+                                "width": 16, "height": 14}},
+            ]),
+            ("me_battle", "Battle Templates", [
+                {"label": "Forest Clearing",
+                 "subtitle": "Battle arena with trees and obstacles",
+                 "map_config": {"storage": STORAGE_SPARSE,
+                                "grid_type": GRID_FIXED,
+                                "tile_context": "dungeon",
+                                "width": 20, "height": 16}},
+            ]),
         ]
-        dungeon_sec = {
-            "label": "Dungeon Templates",
-            "folder": "me_dungeon",
-            "children": dungeon_children,
-            "subtitle": f"{len(dungeon_children)} template"
-                        f"{'s' if len(dungeon_children) != 1 else ''}",
-        }
 
-        # ── 3) Examine Screen ──
-        examine_children = [
-            {
-                "label": "Ancient Shrine",
-                "subtitle": "Vignette for examining a tile",
-                "map_config": {
-                    "storage": STORAGE_SPARSE,
-                    "grid_type": GRID_FIXED,
-                    "tile_context": "dungeon",
-                    "width": 12, "height": 10,
-                },
-            },
-        ]
-        examine_sec = {
-            "label": "Examine Templates",
-            "folder": "me_examine",
-            "children": examine_children,
-            "subtitle": f"{len(examine_children)} template"
-                        f"{'s' if len(examine_children) != 1 else ''}",
-        }
-
-        # ── 4) Enclosure ──
-        enclosure_children = [
-            {
-                "label": "Blacksmith Shop",
-                "subtitle": "Interior space for a town building",
-                "map_config": {
-                    "storage": STORAGE_SPARSE,
-                    "grid_type": GRID_FIXED,
-                    "tile_context": "dungeon",
-                    "width": 16, "height": 14,
-                },
-            },
-        ]
-        enclosure_sec = {
-            "label": "Enclosure Templates",
-            "folder": "me_enclosure",
-            "children": enclosure_children,
-            "subtitle": f"{len(enclosure_children)} template"
-                        f"{'s' if len(enclosure_children) != 1 else ''}",
-        }
-
-        # ── 5) Battle Screen ──
-        battle_children = [
-            {
-                "label": "Forest Clearing",
-                "subtitle": "Battle arena with trees and obstacles",
-                "map_config": {
-                    "storage": STORAGE_SPARSE,
-                    "grid_type": GRID_FIXED,
-                    "tile_context": "dungeon",
-                    "width": 20, "height": 16,
-                },
-            },
-        ]
-        battle_sec = {
-            "label": "Battle Templates",
-            "folder": "me_battle",
-            "children": battle_children,
-            "subtitle": f"{len(battle_children)} template"
-                        f"{'s' if len(battle_children) != 1 else ''}",
-        }
+        sections = []
+        for folder_key, label, defaults in folder_defs:
+            if folder_key in saved:
+                children = self._meh_children_from_saved(
+                    folder_key, saved[folder_key])
+            else:
+                children = [self._meh_wrap_template(d) for d in defaults]
+            n = len(children)
+            sections.append({
+                "label": label,
+                "folder": folder_key,
+                "children": children,
+                "subtitle": f"{n} template{'s' if n != 1 else ''}",
+            })
 
         # ── 6) Tiles folder (Tile Types + Tile Gallery) ──
         tiles_sec = {
@@ -2033,8 +2194,8 @@ class FeaturesEditor:
             "subtitle": "Tile types and gallery",
         }
 
-        return [overview_sec, dungeon_sec, examine_sec,
-                enclosure_sec, battle_sec, tiles_sec]
+        sections.append(tiles_sec)
+        return sections
 
     def _meh_launch_editor(self, sec):
         """Launch the unified map editor for a Map Editor hub template."""
@@ -2071,12 +2232,22 @@ class FeaturesEditor:
                 feat_tile_list=getattr(self, "tile_list", None),
             )
 
-        # Build initial tile data
+        # Build initial tile data — reuse saved tiles when available
+        canvas_type = sec.get("canvas_type", "blank")
         if storage == STORAGE_DENSE:
-            # Fill with grass (tile 0) for overworld or
-            # stone floor for dungeons
-            default_tile = 0 if ctx == "overworld" else 10
-            tiles = [[default_tile] * w for _ in range(h)]
+            existing = sec.get("tiles")
+            if (existing is not None
+                    and len(existing) == h
+                    and all(len(row) == w for row in existing)):
+                tiles = existing
+            elif canvas_type == "procedural":
+                tiles = self._meh_generate_procedural(ctx, w, h)
+                sec["tiles"] = tiles
+            else:
+                # Fresh grid: grass for overworld, stone floor for dungeons
+                default_tile = 0 if ctx == "overworld" else 10
+                tiles = [[default_tile] * w for _ in range(h)]
+                sec["tiles"] = tiles
         else:
             # Sparse: start with empty dict; store in the section
             tiles = sec.setdefault("tiles", {})
@@ -2087,6 +2258,8 @@ class FeaturesEditor:
                 sec["tiles"] = st.tiles
             # Sparse tiles are already the same dict reference
             st.dirty = False
+            # Persist all templates to disk
+            self.save_map_templates()
 
         def _on_exit(st):
             self.meh_editor_active = False
@@ -2116,6 +2289,60 @@ class FeaturesEditor:
         self.game._map_editor_state = state
         self._meh_input_handler = MapEditorInputHandler(state)
 
+    def _meh_generate_procedural(self, ctx, w, h):
+        """Generate a simple procedural tile map.
+
+        For overworld: scatter water, forest, mountain, sand, path over grass.
+        For dungeon: scatter floor patterns over stone.
+        """
+        import random
+        from src.settings import (
+            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
+            TILE_SAND, TILE_PATH,
+        )
+        rng = random.Random()
+        if ctx == "overworld":
+            tiles = [[TILE_GRASS] * w for _ in range(h)]
+            # Scatter some water (lakes)
+            lake_count = max(1, (w * h) // 40)
+            for _ in range(lake_count):
+                cx, cy = rng.randint(1, w - 2), rng.randint(1, h - 2)
+                radius = rng.randint(1, min(3, w // 4, h // 4))
+                for dy in range(-radius, radius + 1):
+                    for dx in range(-radius, radius + 1):
+                        nx, ny = cx + dx, cy + dy
+                        if (0 <= nx < w and 0 <= ny < h
+                                and dx * dx + dy * dy <= radius * radius):
+                            tiles[ny][nx] = TILE_WATER
+            # Scatter forests
+            for _ in range((w * h) // 8):
+                x, y = rng.randint(0, w - 1), rng.randint(0, h - 1)
+                if tiles[y][x] == TILE_GRASS:
+                    tiles[y][x] = TILE_FOREST
+            # Scatter mountains along edges
+            for _ in range((w * h) // 20):
+                x, y = rng.randint(0, w - 1), rng.randint(0, h - 1)
+                if tiles[y][x] == TILE_GRASS:
+                    tiles[y][x] = TILE_MOUNTAIN
+            # A path through the middle
+            mid_y = h // 2
+            for x in range(w):
+                py = mid_y + rng.randint(-1, 1)
+                if 0 <= py < h and tiles[py][x] == TILE_GRASS:
+                    tiles[py][x] = TILE_PATH
+            return tiles
+        else:
+            # Dungeon — stone floor (10) with some variety
+            tiles = [[10] * w for _ in range(h)]
+            # Walls around edges
+            for x in range(w):
+                tiles[0][x] = 0
+                tiles[h - 1][x] = 0
+            for y in range(h):
+                tiles[y][0] = 0
+                tiles[y][w - 1] = 0
+            return tiles
+
     def _meh_next_editable(self, start, direction=1):
         """Find next editable field index."""
         fields = self.meh_fields
@@ -2131,10 +2358,17 @@ class FeaturesEditor:
             idx = (idx + direction) % n
         return start % n
 
+    _CANVAS_TYPE_OPTIONS = ["blank", "procedural"]
+
     def handle_meh_field_input(self, event):
         """Handle input in the Map Editor hub field editor."""
         if event.key == pygame.K_ESCAPE:
+            # Apply pending text edits before leaving
+            self._meh_commit_field_edit()
+            # Write field values back to the template target
+            self._meh_apply_settings()
             self.meh_level = 0
+            self._meh_settings_target = None
             return
 
         fields = self.meh_fields
@@ -2148,19 +2382,124 @@ class FeaturesEditor:
         editable = fields[fi][4] if len(fields[fi]) > 4 else True
 
         if event.key == pygame.K_UP:
+            self._meh_commit_field_edit()
             self.meh_field = self._meh_next_editable(fi - 1, -1)
             self.meh_buffer = str(fields[self.meh_field][2])
         elif event.key == pygame.K_DOWN:
+            self._meh_commit_field_edit()
             self.meh_field = self._meh_next_editable(fi + 1, 1)
             self.meh_buffer = str(fields[self.meh_field][2])
         elif event.key == pygame.K_RETURN:
+            if ftype == "action" and editable:
+                key = fields[fi][1]
+                if key == "generate":
+                    self._meh_commit_field_edit()
+                    self._meh_apply_settings()
+                    self._meh_generate_from_settings()
+                return
             if editable and ftype == "text":
                 fields[fi][2] = self.meh_buffer
+        elif ftype == "cycle" and editable:
+            # Left/Right or Enter cycles through options
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT,
+                             pygame.K_RETURN, pygame.K_SPACE):
+                cur = fields[fi][2]
+                opts = self._CANVAS_TYPE_OPTIONS
+                try:
+                    idx = opts.index(cur)
+                except ValueError:
+                    idx = 0
+                direction = -1 if event.key == pygame.K_LEFT else 1
+                idx = (idx + direction) % len(opts)
+                fields[fi][2] = opts[idx]
+                self.meh_buffer = opts[idx]
         elif event.key == pygame.K_BACKSPACE:
             if editable and ftype == "text":
                 self.meh_buffer = self.meh_buffer[:-1]
         elif event.unicode and editable and ftype == "text":
             self.meh_buffer += event.unicode
+
+    def _meh_commit_field_edit(self):
+        """Commit the current buffer to the active field."""
+        if not self.meh_fields:
+            return
+        fi = self.meh_field
+        if fi < len(self.meh_fields):
+            ftype = (self.meh_fields[fi][3]
+                     if len(self.meh_fields[fi]) > 3 else "text")
+            if ftype == "text":
+                self.meh_fields[fi][2] = self.meh_buffer
+
+    def _meh_apply_settings(self):
+        """Write field editor values back to the template target dict."""
+        tmpl = getattr(self, '_meh_settings_target', None)
+        if not tmpl:
+            return
+        fields = self.meh_fields
+        mc = tmpl.get("map_config", {})
+        old_w, old_h = mc.get("width", 12), mc.get("height", 10)
+        for f in fields:
+            key = f[1]
+            val = f[2]
+            if key == "label":
+                tmpl["label"] = val
+            elif key == "description":
+                tmpl["description"] = val
+            elif key == "width":
+                try:
+                    mc["width"] = max(4, min(128, int(val)))
+                except (ValueError, TypeError):
+                    pass
+            elif key == "height":
+                try:
+                    mc["height"] = max(4, min(128, int(val)))
+                except (ValueError, TypeError):
+                    pass
+            elif key == "canvas_type":
+                tmpl["canvas_type"] = val
+        # Update subtitle on the template folder
+        w, h = mc.get("width", 12), mc.get("height", 10)
+        tmpl["subtitle"] = f"{w}x{h}"
+        # Update the Edit Map child's subtitle too
+        for child in tmpl.get("children", []):
+            if child.get("_template_edit_map"):
+                child["subtitle"] = f"{w}x{h} tile canvas"
+        # If dimensions changed, invalidate existing tile data
+        if (w != old_w or h != old_h) and "tiles" in tmpl:
+            del tmpl["tiles"]
+
+    def _meh_generate_from_settings(self):
+        """Generate (or regenerate) tile data for the current template
+        based on its settings, then update the action field label."""
+        from src.map_editor import STORAGE_DENSE, STORAGE_SPARSE
+        tmpl = getattr(self, '_meh_settings_target', None)
+        if not tmpl:
+            return
+        mc = tmpl.get("map_config", {})
+        ctx = mc.get("tile_context", "dungeon")
+        w = mc.get("width", 12)
+        h = mc.get("height", 10)
+        storage = mc.get("storage", STORAGE_SPARSE)
+        canvas_type = tmpl.get("canvas_type", "blank")
+
+        if storage == STORAGE_DENSE:
+            if canvas_type == "procedural":
+                tmpl["tiles"] = self._meh_generate_procedural(ctx, w, h)
+            else:
+                default_tile = 0 if ctx == "overworld" else 10
+                tmpl["tiles"] = [[default_tile] * w for _ in range(h)]
+        else:
+            # Sparse: reset to empty
+            tmpl["tiles"] = {}
+
+        # Update the action field to show confirmation
+        for f in self.meh_fields:
+            if f[1] == "generate":
+                f[2] = f"Generated {w}x{h} ({canvas_type})"
+
+        # Auto-save
+        self.save_map_templates()
+        self.meh_save_flash = 1.5
 
     def return_to_maps_hub(self):
         """Return to the Maps hub from a sub-editor (tiles/gallery).
@@ -2922,6 +3261,11 @@ class FeaturesEditor:
             self._meh_input_handler.handle(event)
             return
 
+        # ── Field editor (Settings screen) ──
+        if self.meh_level == 1:
+            self.handle_meh_field_input(event)
+            return
+
         # ── Naming/renaming overlay ──
         if self.meh_naming:
             self._handle_meh_naming_input(event)
@@ -2940,7 +3284,8 @@ class FeaturesEditor:
                 self.meh_scroll = prev_scroll
                 self.meh_folder_label = prev_label
             else:
-                # Return to features category list
+                # Auto-save templates, then return to categories
+                self.save_map_templates()
                 self.level = 0
                 self.active_editor = None
             return
@@ -2967,6 +3312,12 @@ class FeaturesEditor:
             self.meh_name_buf = sec.get("label", "")
             return
 
+        # ── Save all templates (Ctrl+S) ──
+        if self._is_save_shortcut(event):
+            self.save_map_templates()
+            self.meh_save_flash = 1.5
+            return
+
         if event.key == pygame.K_UP and n > 0:
             self.meh_cursor = (self.meh_cursor - 1) % n
         elif event.key == pygame.K_DOWN and n > 0:
@@ -2987,6 +3338,16 @@ class FeaturesEditor:
                     self.game.renderer.reload_sprites()
                     self.load_gallery()
                     self.level = 1
+            elif sec.get("_template_settings"):
+                # Open settings field editor for the parent template
+                tmpl = self._meh_get_parent_template()
+                if tmpl:
+                    self._meh_open_template_settings(tmpl)
+            elif sec.get("_template_edit_map"):
+                # Launch map editor for the parent template
+                tmpl = self._meh_get_parent_template()
+                if tmpl:
+                    self._meh_launch_editor(tmpl)
             elif sec.get("folder"):
                 # Enter folder
                 self.meh_nav_stack.append((
@@ -2999,9 +3360,6 @@ class FeaturesEditor:
                 self.meh_cursor = 0
                 self.meh_scroll = 0
                 self.meh_folder_label = sec.get("label", "")
-            elif sec.get("map_config"):
-                # Launch the actual map editor
-                self._meh_launch_editor(sec)
         elif event.key == pygame.K_LEFT:
             if self.meh_nav_stack:
                 (prev_secs, prev_cur, prev_scroll,
@@ -3291,6 +3649,13 @@ class FeaturesEditor:
 
     def get_render_state(self):
         """Build a FeaturesRenderState for the renderer."""
+        # Tick down the save flash on the fullscreen map editor state
+        mes = getattr(self.game, '_map_editor_state', None)
+        if mes and mes.save_flash > 0:
+            mes.save_flash = max(0, mes.save_flash - 1.0 / 60)
+        # Tick down the hub save flash
+        if self.meh_save_flash > 0:
+            self.meh_save_flash = max(0, self.meh_save_flash - 1.0 / 60)
         return FeaturesRenderState(
             categories=self.categories,
             cat_cursor=self.cursor,
@@ -3395,6 +3760,7 @@ class FeaturesEditor:
                 naming=self.meh_naming,
                 name_buf=self.meh_name_buf,
                 naming_is_new=self.meh_naming_is_new,
+                save_flash=self.meh_save_flash,
             ),
         )
 

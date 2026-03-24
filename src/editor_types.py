@@ -149,6 +149,7 @@ class MapEditorHubRS:
     naming: bool = False
     name_buf: str = ""
     naming_is_new: bool = False
+    save_flash: float = 0.0
 
 
 # ─── Top-level render state ──────────────────────────────────────────

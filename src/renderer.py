@@ -2429,6 +2429,17 @@ class Renderer(CombatEffectRendererMixin):
         # Try sprite sheet first
         sprite = self._get_tile_sprite(tile_id)
         if sprite:
+            sw, sh = sprite.get_size()
+            if sw != ts or sh != ts:
+                cache = getattr(self, '_scaled_tile_cache', None)
+                if cache is None:
+                    cache = self._scaled_tile_cache = {}
+                key = (tile_id, ts)
+                scaled = cache.get(key)
+                if scaled is None:
+                    scaled = pygame.transform.scale(sprite, (ts, ts))
+                    cache[key] = scaled
+                sprite = scaled
             self.screen.blit(sprite, (px, py))
             # Cleared dungeons get a dark tint overlay + "X" mark
             if tile_id == TILE_DUNGEON_CLEARED:
@@ -6848,14 +6859,27 @@ class Renderer(CombatEffectRendererMixin):
         footer_y = SCREEN_HEIGHT - 36
         if nav_depth > 0:
             hint = ("[Up/Dn] Browse  [Enter] Open  [^N] New  "
-                    "[^D] Delete  [F2] Rename  [Esc] Back")
+                    "[^D] Delete  [F2] Rename  [^S] Save  [Esc] Back")
         else:
-            hint = "[Up/Dn] Browse  [Enter] Open  [Esc] Back"
+            hint = "[Up/Dn] Browse  [Enter] Open  [^S] Save  [Esc] Back"
         hw = fs.size(hint)[0]
         self._u3_text(hint,
                       SCREEN_WIDTH // 2 - hw // 2,
                       footer_y,
                       self._U3_HINT, fs)
+
+        # ── Save flash ──
+        save_flash = data.get("save_flash", 0)
+        if save_flash > 0:
+            alpha = min(255, int(save_flash * 255))
+            msg = "Saved!"
+            tw = fm.size(msg)[0]
+            sx = SCREEN_WIDTH // 2 - tw // 2
+            sy = header_h + 4
+            surf = pygame.Surface((tw + 20, 28), pygame.SRCALPHA)
+            surf.fill((40, 120, 40, alpha))
+            self.screen.blit(surf, (sx - 10, sy - 4))
+            self._u3_text(msg, sx, sy, (180, 255, 180), fm)
 
         # ── Naming overlay ──
         naming = data.get("naming", False)
@@ -6919,14 +6943,52 @@ class Renderer(CombatEffectRendererMixin):
                               (120, 120, 160), fm)
                 continue
 
+            if ftype == "action":
+                # Action button
+                btn_w = 280
+                btn_h = row_h - 8
+                btn_x = field_x
+                btn_y = y
+                if is_sel:
+                    # Highlighted button
+                    pygame.draw.rect(self.screen, (200, 160, 60),
+                                     (btn_x, btn_y, btn_w, btn_h))
+                    self._u3_text(label, btn_x + 12, btn_y + 4,
+                                  (20, 16, 30), fm)
+                else:
+                    pygame.draw.rect(self.screen, (60, 50, 70),
+                                     (btn_x, btn_y, btn_w, btn_h))
+                    pygame.draw.rect(self.screen, (120, 100, 60),
+                                     (btn_x, btn_y, btn_w, btn_h), 1)
+                    self._u3_text(label, btn_x + 12, btn_y + 4,
+                                  (200, 200, 220), fm)
+                # Status text to the right
+                if value:
+                    self._u3_text(str(value), btn_x + btn_w + 16,
+                                  btn_y + 6, (140, 180, 140), fs)
+                continue
+
             # Label
             lc = (200, 200, 220) if editable else (100, 100, 120)
             self._u3_text(label, field_x, y + 2, lc, fs)
 
             # Value
             val_x = field_x + 200
-            if is_sel and editable:
-                # Editing indicator
+            if ftype == "cycle":
+                # Cycle field: show value with arrows
+                if is_sel and editable:
+                    display = f"< {value} >"
+                    self._u3_text(display, val_x, y + 2,
+                                  (255, 200, 60), fm)
+                    pygame.draw.rect(self.screen, (200, 160, 60),
+                                     (field_x - 4, y - 2,
+                                      SCREEN_WIDTH - field_x - 56,
+                                      row_h - 4), 1)
+                else:
+                    vc = (180, 180, 200) if editable else (80, 80, 100)
+                    self._u3_text(str(value), val_x, y + 2, vc, fs)
+            elif is_sel and editable:
+                # Text editing indicator
                 display = buf + "_"
                 self._u3_text(display, val_x, y + 2,
                               (255, 200, 60), fm)
@@ -6938,9 +7000,17 @@ class Renderer(CombatEffectRendererMixin):
                 vc = (180, 180, 200) if editable else (80, 80, 100)
                 self._u3_text(str(value), val_x, y + 2, vc, fs)
 
-        # Footer
+        # Footer — adapt hint based on selected field type
         footer_y = SCREEN_HEIGHT - 36
-        hint = "[Up/Dn] Navigate  [Type] Edit  [Enter] Save  [Esc] Back"
+        sel_ftype = ""
+        if fields and fi < len(fields):
+            sel_ftype = fields[fi][3] if len(fields[fi]) > 3 else "text"
+        if sel_ftype == "cycle":
+            hint = "[Up/Dn] Navigate  [Left/Right] Change  [Esc] Back"
+        elif sel_ftype == "action":
+            hint = "[Up/Dn] Navigate  [Enter] Execute  [Esc] Back"
+        else:
+            hint = "[Up/Dn] Navigate  [Type] Edit  [Enter] Confirm  [Esc] Back"
         hw = fs.size(hint)[0]
         self._u3_text(hint,
                       SCREEN_WIDTH // 2 - hw // 2,
@@ -7297,6 +7367,7 @@ class Renderer(CombatEffectRendererMixin):
                         "naming": mh.naming,
                         "name_buf": mh.name_buf,
                         "naming_is_new": mh.naming_is_new,
+                        "save_flash": mh.save_flash,
                     }
                     self.draw_map_editor_hub(hub_data)
 

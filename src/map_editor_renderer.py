@@ -115,6 +115,20 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     if data.get("replacing"):
         _draw_replace_overlay(renderer, data)
 
+    # ── Save flash ──
+    save_flash = data.get("save_flash", 0)
+    if save_flash > 0:
+        alpha = min(255, int(save_flash * 255))
+        msg = "Saved!"
+        tw = fm.size(msg)[0]
+        sx = SCREEN_WIDTH // 2 - tw // 2
+        sy = HEADER_H + 10
+        surf = pygame.Surface((tw + 20, 28), pygame.SRCALPHA)
+        surf.fill((40, 120, 40, alpha))
+        screen.blit(surf, (sx - 10, sy - 4))
+        c = (180, 255, 180) if alpha > 128 else (180, 255, 180, alpha)
+        renderer._u3_text(msg, sx, sy, (180, 255, 180), fm)
+
     # ── Footer ──
     _draw_footer(renderer, data)
 
@@ -587,11 +601,12 @@ def _draw_footer(renderer, data: Dict):
         hint = "[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel"
     elif data["storage"] == STORAGE_DENSE:
         hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                "[Tab] Brush  [I] Link Interior  [X] Unlink  [Esc] Back")
+                "[Tab] Brush  [I] Link  [X] Unlink  "
+                "[Ctrl+S] Save  [Esc] Save & Exit")
     else:
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "
                 "[I] Link  [R] Replace  [X] Unlink  "
-                "[Tab] Brush  [Esc] Back")
+                "[Tab] Brush  [Ctrl+S] Save  [Esc] Save & Exit")
 
     hw = fs.size(hint)[0]
     renderer._u3_text(hint,

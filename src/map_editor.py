@@ -141,6 +141,9 @@ class MapEditorState:
         # Dirty flag
         self.dirty: bool = False
 
+        # Save flash timer (seconds remaining, counts down each frame)
+        self.save_flash: float = 0.0
+
         # Overlay states
         self.int_picking: bool = False       # overview map interior picker
         self.int_pick_cursor: int = 0
@@ -403,6 +406,7 @@ class MapEditorState:
             "brush_idx": self.brush_idx,
             "brush_name": self.current_brush.name,
             "dirty": self.dirty,
+            "save_flash": self.save_flash,
             "tile_links": self.tile_links,
             "tile_context": cfg.tile_context,
             # Overlay states
@@ -538,6 +542,7 @@ class MapEditorInputHandler:
             if cfg.on_save:
                 cfg.on_save(st)
             st.dirty = False
+            st.save_flash = 1.5  # show "Saved!" for ~1.5 seconds
             return "save"
 
         return None
