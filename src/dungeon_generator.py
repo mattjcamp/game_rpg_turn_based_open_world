@@ -19,7 +19,7 @@ from src.settings import (
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
     TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
-from src.monster import create_random_monster, create_encounter, create_monster
+from src.monster import create_encounter, create_monster
 
 
 class Room:

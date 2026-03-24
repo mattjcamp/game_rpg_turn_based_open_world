@@ -9,9 +9,7 @@ party member and attacks when adjacent.
 """
 
 import random
-import math
 import json
-import os
 import pygame
 
 from src.states.base_state import BaseState

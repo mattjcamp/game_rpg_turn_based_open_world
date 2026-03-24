@@ -9,6 +9,13 @@ import os
 import random
 import pygame
 
+from src.editor_types import (
+    FieldEntry,
+    FeaturesRenderState, SpellEditorRS, ItemEditorRS,
+    MonsterEditorRS, TileEditorRS, GalleryEditorRS,
+    PixelEditorRS, MapEditorHubRS,
+)
+
 from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TITLE, COLOR_BLACK
 from src.tile_map import create_test_map
 from src.party import (create_default_party, _load_party_config,
@@ -655,7 +662,6 @@ class Game:
     @staticmethod
     def _generate_window_icon():
         """Create a 32×32 procedural window icon — dark-fantasy crystal."""
-        import math
         sz = 32
         icon = pygame.Surface((sz, sz), pygame.SRCALPHA)
         icon.fill((0, 0, 0, 0))
@@ -2085,15 +2091,27 @@ class Game:
         from src import data_registry as DR
         return DR.classes_for_casting_type(casting_type)
 
+    @staticmethod
+    def _feat_finalize_fields(fields, start=0):
+        """Advance to the first editable field and return (idx, buffer).
+
+        Shared by all build_fields methods to eliminate the duplicated
+        7-line init block.
+        """
+        n = len(fields)
+        if n == 0:
+            return 0, ""
+        idx = start % n
+        for _ in range(n):
+            if fields[idx].editable:
+                return idx, fields[idx].value
+            idx = (idx + 1) % n
+        return 0, ""
+
     def _feat_build_spell_fields(self, spell):
         """Build the editable field list for a single spell."""
-        # Choice lists for spell fields
         from src import data_registry as DR
-        casting_types = DR.all_casting_types()
-        effect_types = DR.all_effect_types()
-        targeting_types = DR.all_targeting_types()
-        usable_in_opts = DR.all_usable_locations()
-        all_classes = DR.caster_class_names()
+        FE = FieldEntry
 
         ev = spell.get("effect_value", {})
         dice = ev.get("dice", "")
@@ -2105,56 +2123,51 @@ class Game:
 
         fields = [
             # -- Identity --
-            ["-- Identity --", "_hdr1", "", "section", False],
-            ["Name", "name", spell.get("name", ""), "text", True],
-            ["ID", "id", spell.get("id", ""), "text", True],
-            ["Description", "description",
-             spell.get("description", ""), "text", True],
+            FE("-- Identity --", "_hdr1", "", "section", False),
+            FE("Name", "name", spell.get("name", "")),
+            FE("ID", "id", spell.get("id", "")),
+            FE("Description", "description",
+               spell.get("description", "")),
             # -- Class & Level --
-            ["-- Class & Level --", "_hdr2", "", "section", False],
-            ["Casting Type", "casting_type",
-             spell.get("casting_type", "sorcerer"), "choice", True],
-            ["Min Level", "min_level",
-             str(spell.get("min_level", 1)), "int", True],
-            ["Classes", "allowable_classes",
-             ", ".join(spell.get("allowable_classes", [])), "text", True],
+            FE("-- Class & Level --", "_hdr2", "", "section", False),
+            FE("Casting Type", "casting_type",
+               spell.get("casting_type", "sorcerer"), "choice"),
+            FE("Min Level", "min_level",
+               str(spell.get("min_level", 1)), "int"),
+            FE("Classes", "allowable_classes",
+               ", ".join(spell.get("allowable_classes", []))),
             # -- Cost & Effect --
-            ["-- Cost & Effect --", "_hdr3", "", "section", False],
-            ["MP Cost", "mp_cost",
-             str(spell.get("mp_cost", 3)), "int", True],
-            ["Effect Type", "effect_type",
-             spell.get("effect_type", "damage"), "choice", True],
-            ["Dice", "dice", dice, "text", True],
-            ["Duration", "duration",
-             str(spell.get("duration", "instant")), "text", True],
+            FE("-- Cost & Effect --", "_hdr3", "", "section", False),
+            FE("MP Cost", "mp_cost",
+               str(spell.get("mp_cost", 3)), "int"),
+            FE("Effect Type", "effect_type",
+               spell.get("effect_type", "damage"), "choice"),
+            FE("Dice", "dice", dice),
+            FE("Duration", "duration",
+               str(spell.get("duration", "instant"))),
             # -- Targeting --
-            ["-- Targeting --", "_hdr4", "", "section", False],
-            ["Targeting", "targeting",
-             spell.get("targeting", "select_enemy"), "choice", True],
-            ["Range", "range",
-             str(spell.get("range", 99)), "int", True],
-            ["Usable In", "usable_in",
-             ", ".join(spell.get("usable_in", ["battle"])), "text", True],
+            FE("-- Targeting --", "_hdr4", "", "section", False),
+            FE("Targeting", "targeting",
+               spell.get("targeting", "select_enemy"), "choice"),
+            FE("Range", "range",
+               str(spell.get("range", 99)), "int"),
+            FE("Usable In", "usable_in",
+               ", ".join(spell.get("usable_in", ["battle"]))),
             # -- Visual --
-            ["-- Visual --", "_hdr5", "", "section", False],
-            ["Icon", "icon",
-             spell.get("icon", ""), "sprite", True],
+            FE("-- Visual --", "_hdr5", "", "section", False),
+            FE("Icon", "icon",
+               spell.get("icon", ""), "sprite"),
             # -- Audio --
-            ["-- Audio --", "_hdr6", "", "section", False],
-            ["SFX", "sfx", spell.get("sfx", ""), "text", True],
-            ["Hit SFX", "hit_sfx",
-             spell.get("hit_sfx", "") or "", "text", True],
+            FE("-- Audio --", "_hdr6", "", "section", False),
+            FE("SFX", "sfx", spell.get("sfx", "")),
+            FE("Hit SFX", "hit_sfx",
+               spell.get("hit_sfx", "") or ""),
         ]
         self._feat_spell_fields = fields
-        self._feat_spell_field = 0
+        idx, buf = self._feat_finalize_fields(fields)
+        self._feat_spell_field = idx
         self._feat_spell_scroll_f = 0
-        self._feat_spell_buffer = ""
-        # Advance to first editable field
-        self._feat_spell_field = self._feat_next_editable_generic(
-            self._feat_spell_fields, 0)
-        if self._feat_spell_fields:
-            self._feat_spell_buffer = \
-                self._feat_spell_fields[self._feat_spell_field][2]
+        self._feat_spell_buffer = buf
 
     def _feat_resort_spells(self):
         """Re-sort spell list and update cursor to follow the
@@ -2187,11 +2200,11 @@ class Game:
         # Commit current buffer
         if self._feat_spell_fields:
             entry = self._feat_spell_fields[self._feat_spell_field]
-            entry[2] = self._feat_spell_buffer
+            entry.value = self._feat_spell_buffer
 
         for entry in self._feat_spell_fields:
-            key = entry[1]
-            val = entry[2]
+            key = entry.key
+            val = entry.value
             if key.startswith("_"):
                 continue
             if key == "allowable_classes":
@@ -2235,6 +2248,39 @@ class Game:
             # All sprites tagged with the "spells" category
             return DR.sprites_for_category("spells")
         return []
+
+    def _feat_spell_on_choice_change(self, entry, new_val):
+        """Hook: when a spell choice field changes value."""
+        if entry.key == "casting_type":
+            new_cls = ", ".join(self._feat_default_classes(new_val))
+            for fe in self._feat_spell_fields:
+                if fe.key == "allowable_classes":
+                    fe.value = new_cls
+                    break
+
+    def _feat_spell_on_save_exit(self):
+        """Hook: save-and-exit for spell editor."""
+        self._feat_resort_spells()
+        self._feat_save_spells()
+        self._feat_spell_filter(
+            self._feat_spell_sel_ctype,
+            self._feat_spell_sel_level)
+
+    def _feat_spell_on_discard_exit(self):
+        """Hook: discard-and-exit for spell editor."""
+        saved_ct = self._feat_spell_sel_ctype
+        saved_lv = self._feat_spell_sel_level
+        self._feat_load_spells()
+        self._feat_spell_sel_ctype = saved_ct
+        self._feat_spell_sel_level = saved_lv
+        self._feat_spell_nav = 2
+        self._feat_spell_filter(saved_ct, saved_lv)
+
+    def _feat_spell_on_clean_exit(self):
+        """Hook: clean exit (no unsaved changes) for spell editor."""
+        self._feat_spell_filter(
+            self._feat_spell_sel_ctype,
+            self._feat_spell_sel_level)
 
     def _feat_add_spell(self):
         """Add a new blank spell to the list."""
@@ -2324,72 +2370,69 @@ class Game:
 
     def _feat_build_item_fields(self, item):
         """Build editable field list for a single item."""
+        FE = FieldEntry
         section = item.get("_section", "general")
         fields = [
-            ["-- Identity --", "_hdr1", "", "section", False],
-            ["Name", "_name", item.get("_name", ""), "text", True],
-            ["Section", "_section", section, "choice", True],
-            ["Description", "description",
-             item.get("description", ""), "text", True],
-            ["Icon", "icon", item.get("icon", ""), "sprite", True],
-            ["Item Type", "item_type",
-             item.get("item_type", ""), "text", True],
+            FE("-- Identity --", "_hdr1", "", "section", False),
+            FE("Name", "_name", item.get("_name", "")),
+            FE("Section", "_section", section, "choice"),
+            FE("Description", "description",
+               item.get("description", "")),
+            FE("Icon", "icon", item.get("icon", ""), "sprite"),
+            FE("Item Type", "item_type",
+               item.get("item_type", "")),
         ]
         if section == "weapons":
             fields += [
-                ["-- Weapon Stats --", "_hdr2", "", "section", False],
-                ["Power", "power",
-                 str(item.get("power", 0)), "int", True],
-                ["Ranged", "ranged",
-                 str(item.get("ranged", False)), "choice", True],
-                ["Melee", "melee",
-                 str(item.get("melee", False)), "choice", True],
-                ["Throwable", "throwable",
-                 str(item.get("throwable", False)), "choice", True],
-                ["Slots", "_slots",
-                 ", ".join(item.get("slots", [])), "text", True],
+                FE("-- Weapon Stats --", "_hdr2", "", "section", False),
+                FE("Power", "power",
+                   str(item.get("power", 0)), "int"),
+                FE("Ranged", "ranged",
+                   str(item.get("ranged", False)), "choice"),
+                FE("Melee", "melee",
+                   str(item.get("melee", False)), "choice"),
+                FE("Throwable", "throwable",
+                   str(item.get("throwable", False)), "choice"),
+                FE("Slots", "_slots",
+                   ", ".join(item.get("slots", []))),
             ]
         elif section == "armors":
             fields += [
-                ["-- Armor Stats --", "_hdr2", "", "section", False],
-                ["Evasion", "evasion",
-                 str(item.get("evasion", 50)), "int", True],
-                ["Slots", "_slots",
-                 ", ".join(item.get("slots", [])), "text", True],
+                FE("-- Armor Stats --", "_hdr2", "", "section", False),
+                FE("Evasion", "evasion",
+                   str(item.get("evasion", 50)), "int"),
+                FE("Slots", "_slots",
+                   ", ".join(item.get("slots", []))),
             ]
         else:
             fields += [
-                ["-- General --", "_hdr2", "", "section", False],
-                ["Usable", "usable",
-                 str(item.get("usable", False)), "choice", True],
-                ["Effect", "effect",
-                 item.get("effect", ""), "text", True],
-                ["Power", "power",
-                 str(item.get("power", 0)), "int", True],
-                ["Stackable", "stackable",
-                 str(item.get("stackable", False)), "choice", True],
+                FE("-- General --", "_hdr2", "", "section", False),
+                FE("Usable", "usable",
+                   str(item.get("usable", False)), "choice"),
+                FE("Effect", "effect",
+                   item.get("effect", "")),
+                FE("Power", "power",
+                   str(item.get("power", 0)), "int"),
+                FE("Stackable", "stackable",
+                   str(item.get("stackable", False)), "choice"),
             ]
         fields += [
-            ["-- Shop --", "_hdr3", "", "section", False],
-            ["Buy Price", "buy",
-             str(item.get("buy", 0)), "int", True],
-            ["Sell Price", "sell",
-             str(item.get("sell", 0)), "int", True],
-            ["-- Equip --", "_hdr4", "", "section", False],
-            ["Party Equip", "party_can_equip",
-             str(item.get("party_can_equip", False)), "choice", True],
-            ["Char Equip", "character_can_equip",
-             str(item.get("character_can_equip", False)), "choice", True],
+            FE("-- Shop --", "_hdr3", "", "section", False),
+            FE("Buy Price", "buy",
+               str(item.get("buy", 0)), "int"),
+            FE("Sell Price", "sell",
+               str(item.get("sell", 0)), "int"),
+            FE("-- Equip --", "_hdr4", "", "section", False),
+            FE("Party Equip", "party_can_equip",
+               str(item.get("party_can_equip", False)), "choice"),
+            FE("Char Equip", "character_can_equip",
+               str(item.get("character_can_equip", False)), "choice"),
         ]
         self._feat_item_fields = fields
-        self._feat_item_field = 0
+        idx, buf = self._feat_finalize_fields(fields)
+        self._feat_item_field = idx
         self._feat_item_scroll_f = 0
-        self._feat_item_buffer = ""
-        self._feat_item_field = self._feat_next_editable_generic(
-            self._feat_item_fields, 0)
-        if self._feat_item_fields:
-            self._feat_item_buffer = \
-                self._feat_item_fields[self._feat_item_field][2]
+        self._feat_item_buffer = buf
 
     def _feat_save_item_fields(self):
         """Apply edited fields back to the item dict in memory."""
@@ -2398,9 +2441,9 @@ class Game:
         item = self._feat_item_list[self._feat_item_cursor]
         if self._feat_item_fields:
             entry = self._feat_item_fields[self._feat_item_field]
-            entry[2] = self._feat_item_buffer
+            entry.value = self._feat_item_buffer
         for entry in self._feat_item_fields:
-            key, val = entry[1], entry[2]
+            key, val = entry.key, entry.value
             if key.startswith("_") and key not in ("_name", "_section",
                                                     "_slots"):
                 continue
@@ -2523,53 +2566,50 @@ class Game:
 
     def _feat_build_mon_fields(self, mon):
         """Build editable field list for a single monster."""
+        FE = FieldEntry
         color = mon.get("color", [200, 50, 50])
         color_str = f"{color[0]}, {color[1]}, {color[2]}" \
             if isinstance(color, (list, tuple)) else str(color)
         fields = [
-            ["-- Identity --", "_hdr1", "", "section", False],
-            ["Name", "_name", mon.get("_name", ""), "text", True],
-            ["Description", "description",
-             mon.get("description", ""), "text", True],
-            ["Tile", "tile", mon.get("tile", ""), "sprite", True],
-            ["Color (R,G,B)", "_color", color_str, "text", True],
-            ["-- Combat Stats --", "_hdr2", "", "section", False],
-            ["HP", "hp", str(mon.get("hp", 10)), "int", True],
-            ["AC", "ac", str(mon.get("ac", 10)), "int", True],
-            ["Attack Bonus", "attack_bonus",
-             str(mon.get("attack_bonus", 1)), "int", True],
-            ["Damage Dice", "damage_dice",
-             str(mon.get("damage_dice", 1)), "int", True],
-            ["Damage Sides", "damage_sides",
-             str(mon.get("damage_sides", 4)), "int", True],
-            ["Damage Bonus", "damage_bonus",
-             str(mon.get("damage_bonus", 0)), "int", True],
-            ["-- Rewards --", "_hdr3", "", "section", False],
-            ["XP Reward", "xp_reward",
-             str(mon.get("xp_reward", 25)), "int", True],
-            ["Gold Min", "gold_min",
-             str(mon.get("gold_min", 5)), "int", True],
-            ["Gold Max", "gold_max",
-             str(mon.get("gold_max", 15)), "int", True],
-            ["Spawn Weight", "spawn_weight",
-             str(mon.get("spawn_weight", 20)), "int", True],
-            ["-- Flags --", "_hdr4", "", "section", False],
-            ["Undead", "undead",
-             str(mon.get("undead", False)), "choice", True],
-            ["Humanoid", "humanoid",
-             str(mon.get("humanoid", False)), "choice", True],
-            ["Terrain", "terrain",
-             mon.get("terrain", "land"), "choice", True],
+            FE("-- Identity --", "_hdr1", "", "section", False),
+            FE("Name", "_name", mon.get("_name", "")),
+            FE("Description", "description",
+               mon.get("description", "")),
+            FE("Tile", "tile", mon.get("tile", ""), "sprite"),
+            FE("Color (R,G,B)", "_color", color_str),
+            FE("-- Combat Stats --", "_hdr2", "", "section", False),
+            FE("HP", "hp", str(mon.get("hp", 10)), "int"),
+            FE("AC", "ac", str(mon.get("ac", 10)), "int"),
+            FE("Attack Bonus", "attack_bonus",
+               str(mon.get("attack_bonus", 1)), "int"),
+            FE("Damage Dice", "damage_dice",
+               str(mon.get("damage_dice", 1)), "int"),
+            FE("Damage Sides", "damage_sides",
+               str(mon.get("damage_sides", 4)), "int"),
+            FE("Damage Bonus", "damage_bonus",
+               str(mon.get("damage_bonus", 0)), "int"),
+            FE("-- Rewards --", "_hdr3", "", "section", False),
+            FE("XP Reward", "xp_reward",
+               str(mon.get("xp_reward", 25)), "int"),
+            FE("Gold Min", "gold_min",
+               str(mon.get("gold_min", 5)), "int"),
+            FE("Gold Max", "gold_max",
+               str(mon.get("gold_max", 15)), "int"),
+            FE("Spawn Weight", "spawn_weight",
+               str(mon.get("spawn_weight", 20)), "int"),
+            FE("-- Flags --", "_hdr4", "", "section", False),
+            FE("Undead", "undead",
+               str(mon.get("undead", False)), "choice"),
+            FE("Humanoid", "humanoid",
+               str(mon.get("humanoid", False)), "choice"),
+            FE("Terrain", "terrain",
+               mon.get("terrain", "land"), "choice"),
         ]
         self._feat_mon_fields = fields
-        self._feat_mon_field = 0
+        idx, buf = self._feat_finalize_fields(fields)
+        self._feat_mon_field = idx
         self._feat_mon_scroll_f = 0
-        self._feat_mon_buffer = ""
-        self._feat_mon_field = self._feat_next_editable_generic(
-            self._feat_mon_fields, 0)
-        if self._feat_mon_fields:
-            self._feat_mon_buffer = \
-                self._feat_mon_fields[self._feat_mon_field][2]
+        self._feat_mon_buffer = buf
 
     def _feat_save_mon_fields(self):
         """Apply edited fields back to the monster dict."""
@@ -2578,9 +2618,9 @@ class Game:
         mon = self._feat_mon_list[self._feat_mon_cursor]
         if self._feat_mon_fields:
             entry = self._feat_mon_fields[self._feat_mon_field]
-            entry[2] = self._feat_mon_buffer
+            entry.value = self._feat_mon_buffer
         for entry in self._feat_mon_fields:
-            key, val = entry[1], entry[2]
+            key, val = entry.key, entry.value
             if key.startswith("_") and key not in ("_name", "_color"):
                 continue
             if key == "_color":
@@ -2946,6 +2986,7 @@ class Game:
 
     def _feat_build_tile_fields(self, tile):
         """Build editable field list for a single tile type."""
+        FE = FieldEntry
         color = tile.get("color", [128, 128, 128])
         color_str = f"{color[0]}, {color[1]}, {color[2]}" \
             if isinstance(color, (list, tuple)) else str(color)
@@ -2958,36 +2999,32 @@ class Game:
         interact = tile.get("interaction_type", "none")
         interact_data = tile.get("interaction_data", "")
         fields = [
-            ["-- Tile Type --", "_hdr1", "", "section", False],
-            ["ID", "_tile_id",
-             str(tile.get("_tile_id", 0)), "int", False],
-            ["Name", "name", tile.get("name", ""), "text", True],
-            ["Sprite", "_sprite", sprite_key, "sprite", True],
-            ["Walkable", "walkable",
-             str(tile.get("walkable", True)), "choice", True],
-            ["Color (R,G,B)", "_color", color_str, "text", True],
-            ["-- Interaction --", "_hdr2", "", "section", False],
-            ["Interaction", "interaction_type", interact, "choice", True],
+            FE("-- Tile Type --", "_hdr1", "", "section", False),
+            FE("ID", "_tile_id",
+               str(tile.get("_tile_id", 0)), "int", False),
+            FE("Name", "name", tile.get("name", "")),
+            FE("Sprite", "_sprite", sprite_key, "sprite"),
+            FE("Walkable", "walkable",
+               str(tile.get("walkable", True)), "choice"),
+            FE("Color (R,G,B)", "_color", color_str),
+            FE("-- Interaction --", "_hdr2", "", "section", False),
+            FE("Interaction", "interaction_type", interact, "choice"),
         ]
         # Conditionally show the data field based on interaction type
         if interact == "shop":
             fields.append(
-                ["Shop Type", "interaction_data", interact_data, "choice", True])
+                FE("Shop Type", "interaction_data", interact_data, "choice"))
         elif interact == "sign":
             fields.append(
-                ["Sign Text", "interaction_data", interact_data, "text", True])
+                FE("Sign Text", "interaction_data", interact_data))
         elif interact != "none":
             fields.append(
-                ["Data", "interaction_data", interact_data, "text", True])
+                FE("Data", "interaction_data", interact_data))
         self._feat_tile_fields = fields
-        self._feat_tile_field = 0
+        idx, buf = self._feat_finalize_fields(fields)
+        self._feat_tile_field = idx
         self._feat_tile_scroll_f = 0
-        self._feat_tile_buffer = ""
-        self._feat_tile_field = self._feat_next_editable_generic(
-            self._feat_tile_fields, 0)
-        if self._feat_tile_fields:
-            self._feat_tile_buffer = \
-                self._feat_tile_fields[self._feat_tile_field][2]
+        self._feat_tile_buffer = buf
 
     def _feat_tile_real_index(self):
         """Resolve the folder-relative cursor to a real _feat_tile_list index."""
@@ -3005,9 +3042,9 @@ class Game:
         tile = self._feat_tile_list[real_idx]
         if self._feat_tile_fields:
             entry = self._feat_tile_fields[self._feat_tile_field]
-            entry[2] = self._feat_tile_buffer
+            entry.value = self._feat_tile_buffer
         for entry in self._feat_tile_fields:
-            key, val = entry[1], entry[2]
+            key, val = entry.key, entry.value
             if key.startswith("_") and key not in ("_color", "_sprite"):
                 continue
             if key == "_sprite":
@@ -3034,7 +3071,7 @@ class Game:
                     self._feat_build_tile_fields(tile)
                     # Re-position cursor on the interaction_type field
                     for fi, fe in enumerate(self._feat_tile_fields):
-                        if fe[1] == "interaction_type":
+                        if fe.key == "interaction_type":
                             self._feat_tile_field = fi
                             self._feat_tile_buffer = val
                             break
@@ -3803,15 +3840,24 @@ class Game:
 
     @staticmethod
     def _feat_next_editable_generic(fields, start):
-        """Find next editable field index from start in any field list."""
+        """Find next editable field index from start in any field list.
+
+        Supports both FieldEntry dataclass instances and legacy
+        positional lists (used by the module editor).
+        """
         n = len(fields)
         if n == 0:
             return 0
         idx = start % n
         for _ in range(n):
             entry = fields[idx]
-            if len(entry) > 4 and entry[4] and entry[3] != "section":
-                return idx
+            if isinstance(entry, FieldEntry):
+                if entry.editable and entry.field_type != "section":
+                    return idx
+            else:
+                # Legacy list format: [label, key, value, type, editable]
+                if len(entry) > 4 and entry[4] and entry[3] != "section":
+                    return idx
             idx = (idx + 1) % n
         return start % n
 
@@ -4129,7 +4175,7 @@ class Game:
         """
         import json, os
         from src.map_editor import (
-            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            MapEditorConfig, MapEditorState,
             build_overworld_brushes, build_interior_brushes,
             STORAGE_DENSE, STORAGE_SPARSE,
         )
@@ -4181,7 +4227,6 @@ class Game:
         def _on_exit(st):
             self._meh_editor_active = False
             self._map_editor_state = None
-            self._map_editor_input_handler = None
 
         config = MapEditorConfig(
             title=sec.get("label", "MAP EDITOR"),
@@ -4205,10 +4250,6 @@ class Game:
 
         self._meh_editor_active = True
         self._map_editor_state = state
-        self._map_editor_input_handler = MapEditorInputHandler(
-            state,
-            is_save_shortcut=self._is_save_shortcut,
-        )
 
     def _next_editable_field(self, direction):
         """Move to the next editable field in the given direction (+1/-1).
@@ -4742,14 +4783,21 @@ class Game:
         """
         # Editors that need live-sync (save_fields on every change)
         # to support conditional fields or live list-preview updates.
-        needs_live_sync = (ed == "tiles")
+        needs_live_sync = ctx.get("needs_live_sync", False)
+
+        # Editor-specific hooks (may be None for editors that don't need them)
+        on_choice_change = ctx.get("on_choice_change")
+        on_save_exit = ctx.get("on_save_exit")
+        on_discard_exit = ctx.get("on_discard_exit")
+        on_clean_exit = ctx.get("on_clean_exit")
 
         # ── Save shortcut (Ctrl+S) ──
         if self._is_save_shortcut(event):
             ctx["save_fields"]()
-            if ed == "spells":
-                self._feat_resort_spells()
-            ctx["save_disk"]()
+            if on_save_exit:
+                on_save_exit()
+            else:
+                ctx["save_disk"]()
             self._feat_dirty = False
             return
 
@@ -4758,34 +4806,23 @@ class Game:
             if self._feat_dirty:
                 def _save_and_exit():
                     ctx["save_fields"]()
-                    if ed == "spells":
-                        self._feat_resort_spells()
-                        self._feat_save_spells()
-                        self._feat_spell_filter(
-                            self._feat_spell_sel_ctype,
-                            self._feat_spell_sel_level)
-                    ctx["save_disk"]()
+                    if on_save_exit:
+                        on_save_exit()
+                    else:
+                        ctx["save_disk"]()
                     ctx["set_editing"](False)
                     self._feat_level = exit_level
                     self._feat_dirty = False
                 def _discard_and_exit():
-                    if ed == "spells":
-                        saved_ct = self._feat_spell_sel_ctype
-                        saved_lv = self._feat_spell_sel_level
-                        self._feat_load_spells()
-                        self._feat_spell_sel_ctype = saved_ct
-                        self._feat_spell_sel_level = saved_lv
-                        self._feat_spell_nav = 2
-                        self._feat_spell_filter(saved_ct, saved_lv)
+                    if on_discard_exit:
+                        on_discard_exit()
                     ctx["set_editing"](False)
                     self._feat_level = exit_level
                     self._feat_dirty = False
                 self._show_unsaved_dialog(_save_and_exit, _discard_and_exit)
             else:
-                if ed == "spells":
-                    self._feat_spell_filter(
-                        self._feat_spell_sel_ctype,
-                        self._feat_spell_sel_level)
+                if on_clean_exit:
+                    on_clean_exit()
                 ctx["set_editing"](False)
                 self._feat_level = exit_level
             return
@@ -4797,12 +4834,12 @@ class Game:
             return
         field_idx = ctx["field_idx"]()
         entry = fields[field_idx]
-        ftype = entry[3] if len(entry) > 3 else "text"
+        ftype = entry.field_type
         buf = ctx["buffer"]()
 
         # ── UP / DOWN navigation ──
         if event.key in (pygame.K_UP, pygame.K_DOWN):
-            entry[2] = buf
+            entry.value = buf
             self._feat_dirty = True
             if needs_live_sync:
                 ctx["save_fields"]()
@@ -4814,13 +4851,13 @@ class Game:
             idx = (field_idx + direction) % n
             idx = self._feat_next_editable_generic(fields, idx)
             ctx["set_field_idx"](idx)
-            ctx["set_buffer"](fields[idx][2])
+            ctx["set_buffer"](fields[idx].value)
             ctx["adjust_field_scroll"]()
 
         # ── Choice / Sprite cycling (LEFT / RIGHT) ──
         elif ftype in ("choice", "sprite"):
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                choices = ctx["get_choices"](entry[1])
+                choices = ctx["get_choices"](entry.key)
                 if choices:
                     try:
                         ci = choices.index(buf)
@@ -4831,18 +4868,12 @@ class Game:
                     else:
                         ci = (ci - 1) % len(choices)
                     ctx["set_buffer"](choices[ci])
-                    entry[2] = choices[ci]
+                    entry.value = choices[ci]
                     self._feat_dirty = True
                     if needs_live_sync:
                         ctx["save_fields"]()
-                    # Spell-specific: casting_type → allowable_classes sync
-                    if ed == "spells" and entry[1] == "casting_type":
-                        new_cls = ", ".join(
-                            self._feat_default_classes(choices[ci]))
-                        for fe in self._feat_spell_fields:
-                            if fe[1] == "allowable_classes":
-                                fe[2] = new_cls
-                                break
+                    if on_choice_change:
+                        on_choice_change(entry, choices[ci])
 
         # ── Int field editing ──
         elif ftype == "int":
@@ -5535,6 +5566,11 @@ class Game:
                 "add": self._feat_add_spell,
                 "remove": self._feat_remove_spell,
                 "get_choices": self._feat_get_spell_choices,
+                "needs_live_sync": False,
+                "on_choice_change": self._feat_spell_on_choice_change,
+                "on_save_exit": self._feat_spell_on_save_exit,
+                "on_discard_exit": self._feat_spell_on_discard_exit,
+                "on_clean_exit": self._feat_spell_on_clean_exit,
             }
         elif ed == "items":
             return {
@@ -5561,6 +5597,11 @@ class Game:
                 "add": self._feat_add_item,
                 "remove": self._feat_remove_item,
                 "get_choices": self._feat_get_item_choices,
+                "needs_live_sync": False,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
             }
         elif ed == "monsters":
             return {
@@ -5587,6 +5628,11 @@ class Game:
                 "add": self._feat_add_monster,
                 "remove": self._feat_remove_monster,
                 "get_choices": self._feat_get_mon_choices,
+                "needs_live_sync": False,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
             }
         elif ed == "tiles":
             return {
@@ -5613,116 +5659,125 @@ class Game:
                 "add": self._feat_add_tile,
                 "remove": self._feat_remove_tile,
                 "get_choices": self._feat_get_tile_choices,
+                "needs_live_sync": True,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
             }
         return None
 
     def _feat_render_state(self):
-        """Build and return the full keyword-arg dict for draw_features_screen.
+        """Build a :class:`FeaturesRenderState` for the renderer.
 
-        Organises all editor state into a single dict so the caller
-        is a one-liner instead of 80+ keyword arguments.  The renderer
-        signature is unchanged — it still receives these as kwargs.
-        New editors only need to add their block here.
+        All editor state is grouped into typed sub-dataclasses so the
+        renderer accepts a single ``state`` argument instead of 60+
+        keyword arguments.  New editors add a sub-dataclass — the
+        renderer signature never needs to grow.
         """
-        ed = self._feat_active_editor
-        state = {
-            # ── Core ──
-            "categories": self._feat_categories,
-            "cat_cursor": self._feat_cursor,
-            "level": self._feat_level,
-            "active_editor": ed,
-            # ── Spells ──
-            "spell_list": self._feat_spell_list,
-            "spell_cursor": self._feat_spell_cursor,
-            "spell_scroll": self._feat_spell_scroll,
-            "spell_editing": self._feat_spell_editing,
-            "spell_fields": self._feat_spell_fields,
-            "spell_field": self._feat_spell_field,
-            "spell_buffer": self._feat_spell_buffer,
-            "spell_field_scroll": self._feat_spell_scroll_f,
-            "spell_nav": self._feat_spell_nav,
-            "spell_ctype_cursor": self._feat_spell_ctype_cursor,
-            "spell_level_cursor": self._feat_spell_level_cursor,
-            "spell_level_scroll": self._feat_spell_level_scroll,
-            "spell_sel_ctype": self._feat_spell_sel_ctype,
-            "spell_sel_level": self._feat_spell_sel_level,
-            "spell_filtered": self._feat_spell_filtered,
-            # ── Items ──
-            "item_list": self._feat_item_list,
-            "item_cursor": self._feat_item_cursor,
-            "item_scroll": self._feat_item_scroll,
-            "item_editing": self._feat_item_editing,
-            "item_fields": self._feat_item_fields,
-            "item_field": self._feat_item_field,
-            "item_buffer": self._feat_item_buffer,
-            "item_field_scroll": self._feat_item_scroll_f,
-            # ── Monsters ──
-            "mon_list": self._feat_mon_list,
-            "mon_cursor": self._feat_mon_cursor,
-            "mon_scroll": self._feat_mon_scroll,
-            "mon_editing": self._feat_mon_editing,
-            "mon_fields": self._feat_mon_fields,
-            "mon_field": self._feat_mon_field,
-            "mon_buffer": self._feat_mon_buffer,
-            "mon_field_scroll": self._feat_mon_scroll_f,
-            # ── Tiles ──
-            "tile_list": self._feat_tile_list,
-            "tile_folders": self._feat_tile_folders,
-            "tile_folder_cursor": self._feat_tile_folder_cursor,
-            "tile_folder_scroll": self._feat_tile_folder_scroll,
-            "tile_folder_tiles": self._feat_tile_folder_tiles,
-            "tile_cursor": self._feat_tile_cursor,
-            "tile_scroll": self._feat_tile_scroll,
-            "tile_editing": self._feat_tile_editing,
-            "tile_fields": self._feat_tile_fields,
-            "tile_field": self._feat_tile_field,
-            "tile_buffer": self._feat_tile_buffer,
-            "tile_field_scroll": self._feat_tile_scroll_f,
-            # ── Gallery ──
-            "gallery_list": self._feat_gallery_list,
-            "gallery_cat_list": self._feat_gallery_cat_list,
-            "gallery_cat_cursor": self._feat_gallery_cat_cursor,
-            "gallery_cat_scroll": self._feat_gallery_cat_scroll,
-            "gallery_sprites": self._feat_gallery_sprites,
-            "gallery_spr_cursor": self._feat_gallery_spr_cursor,
-            "gallery_spr_scroll": self._feat_gallery_spr_scroll,
-            "gallery_tag_cursor": self._feat_gallery_tag_cursor,
-            "gallery_all_cats": self._feat_gallery_all_cats,
-            "gallery_naming": self._feat_gallery_naming,
-            "gallery_name_buf": self._feat_gallery_name_buf,
-            "gallery_detail_cursor": self._feat_gallery_detail_cursor,
-            # ── Pixel editor ──
-            "pxedit_pixels": self._feat_pxedit_pixels,
-            "pxedit_cx": self._feat_pxedit_cx,
-            "pxedit_cy": self._feat_pxedit_cy,
-            "pxedit_w": self._feat_pxedit_w,
-            "pxedit_h": self._feat_pxedit_h,
-            "pxedit_color_idx": self._feat_pxedit_color_idx,
-            "pxedit_palette": self._feat_pxedit_palette,
-            "pxedit_focus": self._feat_pxedit_focus,
-            "pxedit_replacing": self._feat_pxedit_replacing,
-            "pxedit_replace_src_color": self._feat_pxedit_replace_src_color,
-            "pxedit_replace_dst": self._feat_pxedit_replace_dst,
-            "pxedit_replace_sel": self._feat_pxedit_replace_sel,
-            # ── Map Editor hub ──
-            "meh_editor_active": self._meh_editor_active,
-            "meh_editor_data": (
-                self._map_editor_state.to_data_dict()
-                if self._meh_editor_active
-                and self._map_editor_state is not None
-                else None),
-            "meh_sections": self._meh_sections,
-            "meh_cursor": self._meh_cursor,
-            "meh_scroll": self._meh_scroll,
-            "meh_nav_depth": len(self._meh_nav_stack),
-            "meh_folder_label": self._meh_folder_label,
-            "meh_level": self._meh_level,
-            "meh_fields": self._meh_fields,
-            "meh_field_cursor": self._meh_field,
-            "meh_field_buffer": self._meh_buffer,
-            "meh_field_scroll": self._meh_field_scroll,
-        }
-        return state
+        return FeaturesRenderState(
+            categories=self._feat_categories,
+            cat_cursor=self._feat_cursor,
+            level=self._feat_level,
+            active_editor=self._feat_active_editor,
+            spells=SpellEditorRS(
+                list=self._feat_spell_list,
+                cursor=self._feat_spell_cursor,
+                scroll=self._feat_spell_scroll,
+                editing=self._feat_spell_editing,
+                fields=self._feat_spell_fields,
+                field=self._feat_spell_field,
+                buffer=self._feat_spell_buffer,
+                field_scroll=self._feat_spell_scroll_f,
+                nav=self._feat_spell_nav,
+                ctype_cursor=self._feat_spell_ctype_cursor,
+                level_cursor=self._feat_spell_level_cursor,
+                level_scroll=self._feat_spell_level_scroll,
+                sel_ctype=self._feat_spell_sel_ctype,
+                sel_level=self._feat_spell_sel_level,
+                filtered=self._feat_spell_filtered,
+            ),
+            items=ItemEditorRS(
+                list=self._feat_item_list,
+                cursor=self._feat_item_cursor,
+                scroll=self._feat_item_scroll,
+                editing=self._feat_item_editing,
+                fields=self._feat_item_fields,
+                field=self._feat_item_field,
+                buffer=self._feat_item_buffer,
+                field_scroll=self._feat_item_scroll_f,
+            ),
+            monsters=MonsterEditorRS(
+                list=self._feat_mon_list,
+                cursor=self._feat_mon_cursor,
+                scroll=self._feat_mon_scroll,
+                editing=self._feat_mon_editing,
+                fields=self._feat_mon_fields,
+                field=self._feat_mon_field,
+                buffer=self._feat_mon_buffer,
+                field_scroll=self._feat_mon_scroll_f,
+            ),
+            tiles=TileEditorRS(
+                list=self._feat_tile_list,
+                folders=self._feat_tile_folders,
+                folder_cursor=self._feat_tile_folder_cursor,
+                folder_scroll=self._feat_tile_folder_scroll,
+                folder_tiles=self._feat_tile_folder_tiles,
+                cursor=self._feat_tile_cursor,
+                scroll=self._feat_tile_scroll,
+                editing=self._feat_tile_editing,
+                fields=self._feat_tile_fields,
+                field=self._feat_tile_field,
+                buffer=self._feat_tile_buffer,
+                field_scroll=self._feat_tile_scroll_f,
+            ),
+            gallery=GalleryEditorRS(
+                list=self._feat_gallery_list,
+                cat_list=self._feat_gallery_cat_list,
+                cat_cursor=self._feat_gallery_cat_cursor,
+                cat_scroll=self._feat_gallery_cat_scroll,
+                sprites=self._feat_gallery_sprites,
+                spr_cursor=self._feat_gallery_spr_cursor,
+                spr_scroll=self._feat_gallery_spr_scroll,
+                tag_cursor=self._feat_gallery_tag_cursor,
+                all_cats=self._feat_gallery_all_cats,
+                naming=self._feat_gallery_naming,
+                name_buf=self._feat_gallery_name_buf,
+                detail_cursor=self._feat_gallery_detail_cursor,
+            ),
+            pxedit=PixelEditorRS(
+                pixels=self._feat_pxedit_pixels,
+                cx=self._feat_pxedit_cx,
+                cy=self._feat_pxedit_cy,
+                w=self._feat_pxedit_w,
+                h=self._feat_pxedit_h,
+                color_idx=self._feat_pxedit_color_idx,
+                palette=self._feat_pxedit_palette,
+                focus=self._feat_pxedit_focus,
+                replacing=self._feat_pxedit_replacing,
+                replace_src_color=self._feat_pxedit_replace_src_color,
+                replace_dst=self._feat_pxedit_replace_dst,
+                replace_sel=self._feat_pxedit_replace_sel,
+            ),
+            meh=MapEditorHubRS(
+                editor_active=self._meh_editor_active,
+                editor_data=(
+                    self._map_editor_state.to_data_dict()
+                    if self._meh_editor_active
+                    and self._map_editor_state is not None
+                    else None),
+                sections=self._meh_sections,
+                cursor=self._meh_cursor,
+                scroll=self._meh_scroll,
+                nav_depth=len(self._meh_nav_stack),
+                folder_label=self._meh_folder_label,
+                level=self._meh_level,
+                fields=self._meh_fields,
+                field_cursor=self._meh_field,
+                field_buffer=self._meh_buffer,
+                field_scroll=self._meh_field_scroll,
+            ),
+        )
 
     def _handle_settings_input(self, event):
         """Handle input while the settings screen is open."""
@@ -5978,7 +6033,7 @@ class Game:
                 self.renderer.draw_form_party_screen(self)
             elif self.showing_features:
                 self.renderer.draw_features_screen(
-                    **self._feat_render_state())
+                    self._feat_render_state())
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
             elif self.showing_modules:

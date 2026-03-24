@@ -6,7 +6,6 @@ towns, dungeons, and random encounters. It's the "hub" state of
 the game.
 """
 
-import math
 import random
 
 import pygame
@@ -18,7 +17,7 @@ from src.settings import (
     TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED,
 )
 from src.dungeon_generator import generate_dungeon, generate_house_dungeon
-from src.monster import create_random_monster, create_encounter, create_monster
+from src.monster import create_encounter, create_monster
 
 
 # How many monsters roam the overworld at a time

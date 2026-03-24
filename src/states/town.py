@@ -5,7 +5,6 @@ The party walks around inside a town, talks to NPCs by bumping into them,
 and can leave through the exit gate to return to the overworld.
 """
 
-import math
 import random
 
 import pygame
@@ -17,8 +16,7 @@ from src.settings import (
     TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
     TILE_TOWN, TILE_MACHINE,
 )
-from src.dungeon_generator import (generate_quest_dungeon,
-                                   generate_innkeeper_quest_dungeon)
+from src.dungeon_generator import generate_innkeeper_quest_dungeon
 
 
 class QuestCompleteEffect:

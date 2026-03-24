@@ -24,7 +24,7 @@ from src.settings import (
     TILE_SIZE,
     TILE_DEFS,
 )
-from src.map_editor import STORAGE_DENSE, STORAGE_SPARSE, GRID_SCROLLABLE
+from src.map_editor import STORAGE_DENSE, STORAGE_SPARSE
 
 if TYPE_CHECKING:
     from src.map_editor import Brush

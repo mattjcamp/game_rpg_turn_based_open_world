@@ -98,7 +98,6 @@ class Renderer(CombatEffectRendererMixin):
             TILE_FLOOR: TILE_FLOOR, TILE_WALL: TILE_WALL,
             TILE_CHEST: TILE_CHEST, TILE_EXIT: TILE_EXIT,
         }
-        self._dungeon_tile_map = {}
 
         m = self._manifest
 
@@ -482,37 +481,6 @@ class Renderer(CombatEffectRendererMixin):
         # Shield (left hand)
         pygame.draw.rect(self.screen, BLU,
                          pygame.Rect(cx - 10, cy - 5, 4, 7))
-
-    def draw_hud(self, party, tile_map):
-        """Draw a simple HUD at the bottom of the screen."""
-        hud_height = 80
-        hud_y = SCREEN_HEIGHT - hud_height
-        hud_rect = pygame.Rect(0, hud_y, SCREEN_WIDTH, hud_height)
-        pygame.draw.rect(self.screen, COLOR_HUD_BG, hud_rect)
-        pygame.draw.line(self.screen, COLOR_WHITE, (0, hud_y), (SCREEN_WIDTH, hud_y), 1)
-
-        # Show terrain info
-        tile_name = tile_map.get_tile_name(party.col, party.row)
-        pos_text = f"Position: ({party.col}, {party.row})  Terrain: {tile_name}"
-        text_surface = self.font.render(pos_text, True, COLOR_HUD_TEXT)
-        self.screen.blit(text_surface, (10, hud_y + 8))
-
-        # Show party summary
-        x_offset = 10
-        for i, member in enumerate(party.members):
-            status = f"{member.name} ({member.char_class}) HP:{member.hp}/{member.max_hp}"
-            color = COLOR_HUD_TEXT if member.is_alive() else (150, 50, 50)
-            text_surface = self.font_small.render(status, True, color)
-            self.screen.blit(text_surface, (x_offset, hud_y + 30 + i * 14))
-
-    def draw_npcs(self, npcs, camera):
-        """Draw NPC sprites on the map using per-type VGA tile sprites."""
-        for npc in npcs:
-            screen_col, screen_row = camera.world_to_screen(npc.col, npc.row)
-            if 0 <= screen_col < VIEWPORT_COLS and 0 <= screen_row < VIEWPORT_ROWS:
-                cx = screen_col * TILE_SIZE + TILE_SIZE // 2
-                cy = screen_row * TILE_SIZE + TILE_SIZE // 2
-                self._u3_draw_npc_sprite(npc, cx, cy)
 
     # ========================================================
     # TOWN  –  Ultima III retro style (sprite tiles)
@@ -1657,115 +1625,6 @@ class Renderer(CombatEffectRendererMixin):
             self.screen.blit(ex_surf, (name_rect.right + 2, name_rect.y))
         self.screen.blit(name_surf, name_rect)
 
-    def draw_hud_town(self, party, town_data):
-        """Draw HUD for the town view."""
-        hud_height = 80
-        hud_y = SCREEN_HEIGHT - hud_height
-        hud_rect = pygame.Rect(0, hud_y, SCREEN_WIDTH, hud_height)
-        pygame.draw.rect(self.screen, COLOR_HUD_BG, hud_rect)
-        pygame.draw.line(self.screen, COLOR_WHITE, (0, hud_y), (SCREEN_WIDTH, hud_y), 1)
-
-        # Town name and position
-        tile_name = town_data.tile_map.get_tile_name(party.col, party.row)
-        info_text = f"{town_data.name}  |  ({party.col}, {party.row})  {tile_name}"
-        text_surface = self.font.render(info_text, True, COLOR_HUD_TEXT)
-        self.screen.blit(text_surface, (10, hud_y + 8))
-
-        # Controls hint
-        hint = "Arrow keys: Move  |  Bump NPC: Talk  |  ESC: Leave town"
-        hint_surface = self.font_small.render(hint, True, self._U3_HINT)
-        self.screen.blit(hint_surface, (10, hud_y + 28))
-
-        # Party summary (compact)
-        x_offset = 10
-        for i, member in enumerate(party.members):
-            status = f"{member.name} HP:{member.hp}/{member.max_hp}"
-            color = COLOR_HUD_TEXT if member.is_alive() else (150, 50, 50)
-            text_surface = self.font_small.render(status, True, color)
-            self.screen.blit(text_surface, (x_offset + i * 180, hud_y + 50))
-
-    def draw_fog_of_war(self, party, camera, light_radius=4):
-        """
-        Draw a darkness overlay that limits visibility to a radius
-        around the party. Uses Euclidean distance for a circular light
-        with a smooth gradient at the edges.
-        """
-        import math
-
-        # Create an alpha surface (starts fully transparent)
-        fog = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-
-        # Party position in screen tile coords
-        party_scol, party_srow = camera.world_to_screen(party.col, party.row)
-
-        # The gradient zone extends 1.5 tiles beyond the hard radius
-        fade_start = light_radius
-        fade_end = light_radius + 1.5
-
-        for screen_row in range(VIEWPORT_ROWS + 1):
-            for screen_col in range(VIEWPORT_COLS + 1):
-                # Euclidean distance from party (tile centers)
-                dx = screen_col - party_scol
-                dy = screen_row - party_srow
-                dist = math.sqrt(dx * dx + dy * dy)
-
-                if dist <= fade_start:
-                    # Fully lit — no fog
-                    continue
-                elif dist >= fade_end:
-                    alpha = 255
-                else:
-                    # Smooth gradient in the fade zone
-                    t = (dist - fade_start) / (fade_end - fade_start)
-                    alpha = int(255 * t)
-
-                rect = pygame.Rect(
-                    screen_col * TILE_SIZE,
-                    screen_row * TILE_SIZE,
-                    TILE_SIZE,
-                    TILE_SIZE,
-                )
-                fog.fill((0, 0, 0, alpha), rect)
-
-        self.screen.blit(fog, (0, 0))
-
-    def draw_hud_dungeon(self, party, dungeon_data):
-        """Draw HUD for the dungeon view."""
-        hud_height = 80
-        hud_y = SCREEN_HEIGHT - hud_height
-        hud_rect = pygame.Rect(0, hud_y, SCREEN_WIDTH, hud_height)
-        pygame.draw.rect(self.screen, (10, 8, 15), hud_rect)
-        pygame.draw.line(self.screen, (80, 40, 40), (0, hud_y), (SCREEN_WIDTH, hud_y), 1)
-
-        # Dungeon name and position
-        tile_name = dungeon_data.tile_map.get_tile_name(party.col, party.row)
-        info_text = f"{dungeon_data.name}  |  ({party.col}, {party.row})  {tile_name}"
-        text_surface = self.font.render(info_text, True, (180, 140, 140))
-        self.screen.blit(text_surface, (10, hud_y + 8))
-
-        # Controls hint
-        hint = "Arrow keys: Move  |  ESC on stairs: Leave dungeon"
-        hint_surface = self.font_small.render(hint, True, self._U3_HINT)
-        self.screen.blit(hint_surface, (10, hud_y + 28))
-
-        # Party summary with gold
-        x_offset = 10
-        for i, member in enumerate(party.members):
-            status = f"{member.name} HP:{member.hp}/{member.max_hp}"
-            color = (180, 160, 160) if member.is_alive() else (150, 50, 50)
-            text_surface = self.font_small.render(status, True, color)
-            self.screen.blit(text_surface, (x_offset + i * 170, hud_y + 50))
-
-        # Gold display
-        gold_text = f"Gold: {party.gold}"
-        gold_surface = self.font.render(gold_text, True, COLOR_YELLOW)
-        self.screen.blit(gold_surface, (SCREEN_WIDTH - 140, hud_y + 8))
-
-        # Chests found
-        chests_text = f"Chests: {len(dungeon_data.opened_chests)}"
-        chests_surface = self.font_small.render(chests_text, True, (180, 140, 80))
-        self.screen.blit(chests_surface, (SCREEN_WIDTH - 140, hud_y + 30))
-
     def draw_dialogue_box(self, message):
         """Draw an NPC dialogue box at the top of the screen with word wrap."""
         if not message:
@@ -2310,51 +2169,6 @@ class Renderer(CombatEffectRendererMixin):
             prefix = "> " if i == cursor else "  "
             text_surf = self.font.render(f"{prefix}{choice}", True, color)
             self.screen.blit(text_surf, (box_x + 16, box_y + 6 + i * 20))
-
-    def draw_monsters(self, monsters, camera):
-        """Draw monster sprites on the dungeon map (Ultima III style)."""
-        W = (255, 255, 255)
-        for monster in monsters:
-            if not monster.is_alive():
-                continue
-            screen_col, screen_row = camera.world_to_screen(monster.col, monster.row)
-            if 0 <= screen_col < VIEWPORT_COLS and 0 <= screen_row < VIEWPORT_ROWS:
-                cx = screen_col * TILE_SIZE + TILE_SIZE // 2
-                cy = screen_row * TILE_SIZE + TILE_SIZE // 2
-                mc = monster.color
-
-                # Same blocky monster as combat: body + head + eyes
-                # Body
-                body = pygame.Rect(cx - 8, cy - 6, 16, 14)
-                pygame.draw.rect(self.screen, mc, body)
-                # Head
-                pygame.draw.rect(self.screen, mc,
-                                 pygame.Rect(cx - 5, cy - 12, 10, 7))
-                # Eyes — white with red pupils
-                pygame.draw.rect(self.screen, W,
-                                 pygame.Rect(cx - 4, cy - 10, 3, 3))
-                pygame.draw.rect(self.screen, W,
-                                 pygame.Rect(cx + 1, cy - 10, 3, 3))
-                pygame.draw.rect(self.screen, (255, 0, 0),
-                                 pygame.Rect(cx - 3, cy - 9, 1, 1))
-                pygame.draw.rect(self.screen, (255, 0, 0),
-                                 pygame.Rect(cx + 2, cy - 9, 1, 1))
-                # Name tag (uppercase)
-                name_surf = self.font_small.render(monster.name, True, (255, 100, 100))
-                name_rect = name_surf.get_rect(center=(cx, cy - 16))
-                bg = name_rect.inflate(4, 2)
-                pygame.draw.rect(self.screen, (0, 0, 0), bg)
-                self.screen.blit(name_surf, name_rect)
-
-    def draw_message(self, message, y_offset=0):
-        """Draw a temporary message on screen (e.g., 'Blocked!' or 'Entering town...')."""
-        if message:
-            text_surface = self.font.render(message, True, COLOR_YELLOW)
-            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 20 + y_offset))
-            # Dark background for readability
-            bg_rect = text_rect.inflate(20, 8)
-            pygame.draw.rect(self.screen, COLOR_HUD_BG, bg_rect)
-            self.screen.blit(text_surface, text_rect)
 
     # ========================================================
     # OVERWORLD  –  Ultima III retro style
@@ -5808,14 +5622,6 @@ class Renderer(CombatEffectRendererMixin):
             iy += 20
 
     # ── Unique-tile examine preview / editor (module editor) ───
-    @staticmethod
-    def _brush_friendly_name(brush):
-        """Convert a brush path to a short display name."""
-        if brush == "eraser":
-            return "Eraser"
-        import os
-        base = os.path.splitext(os.path.basename(brush))[0]
-        return base.replace("_", " ").title()
 
     def _draw_examine_floor_tile(self, px, py, ts, tile_type, col, row):
         """Draw an interior floor tile themed by overworld tile type."""
@@ -7112,68 +6918,89 @@ class Renderer(CombatEffectRendererMixin):
 
     # ── Game Features editor screen ──────────────────────────────
 
-    def draw_features_screen(self, categories, cat_cursor, level,
-                              active_editor=None,
-                              spell_list=None, spell_cursor=0,
-                              spell_scroll=0, spell_editing=False,
-                              spell_fields=None, spell_field=0,
-                              spell_buffer="", spell_field_scroll=0,
-                              spell_nav=0, spell_ctype_cursor=0,
-                              spell_level_cursor=0, spell_level_scroll=0,
-                              spell_sel_ctype=None, spell_sel_level=None,
-                              spell_filtered=None,
-                              item_list=None, item_cursor=0,
-                              item_scroll=0, item_editing=False,
-                              item_fields=None, item_field=0,
-                              item_buffer="", item_field_scroll=0,
-                              mon_list=None, mon_cursor=0,
-                              mon_scroll=0, mon_editing=False,
-                              mon_fields=None, mon_field=0,
-                              mon_buffer="", mon_field_scroll=0,
-                              tile_list=None,
-                              tile_folders=None,
-                              tile_folder_cursor=0,
-                              tile_folder_scroll=0,
-                              tile_folder_tiles=None,
-                              tile_cursor=0,
-                              tile_scroll=0, tile_editing=False,
-                              tile_fields=None, tile_field=0,
-                              tile_buffer="", tile_field_scroll=0,
-                              gallery_list=None,
-                              gallery_cat_list=None,
-                              gallery_cat_cursor=0,
-                              gallery_cat_scroll=0,
-                              gallery_sprites=None,
-                              gallery_spr_cursor=0,
-                              gallery_spr_scroll=0,
-                              gallery_tag_cursor=0,
-                              gallery_all_cats=None,
-                              gallery_naming=False,
-                              gallery_name_buf="",
-                              gallery_detail_cursor=0,
-                              pxedit_pixels=None,
-                              pxedit_cx=0, pxedit_cy=0,
-                              pxedit_w=32, pxedit_h=32,
-                              pxedit_color_idx=0,
-                              pxedit_palette=None,
-                              pxedit_focus="canvas",
-                              pxedit_replacing=False,
-                              pxedit_replace_src_color=(0, 0, 0, 255),
-                              pxedit_replace_dst=0,
-                              pxedit_replace_sel="src",
-                              meh_editor_active=False,
-                              meh_editor_data=None,
-                              meh_sections=None,
-                              meh_cursor=0,
-                              meh_scroll=0,
-                              meh_nav_depth=0,
-                              meh_folder_label="",
-                              meh_level=0,
-                              meh_fields=None,
-                              meh_field_cursor=0,
-                              meh_field_buffer="",
-                              meh_field_scroll=0):
-        """Draw the Game Features editor screen."""
+    def draw_features_screen(self, state):
+        """Draw the Game Features editor screen.
+
+        ``state`` is a :class:`FeaturesRenderState` instance built by
+        ``Game._feat_render_state()``.  Locals are unpacked once at the
+        top so the rest of the drawing code stays unchanged.
+        """
+        # ── Unpack top-level ──
+        categories = state.categories
+        cat_cursor = state.cat_cursor
+        level = state.level
+        active_editor = state.active_editor
+
+        # ── Spells ──
+        sp = state.spells
+        spell_list = sp.list; spell_cursor = sp.cursor
+        spell_scroll = sp.scroll; spell_editing = sp.editing
+        spell_fields = sp.fields; spell_field = sp.field
+        spell_buffer = sp.buffer; spell_field_scroll = sp.field_scroll
+        spell_nav = sp.nav; spell_ctype_cursor = sp.ctype_cursor
+        spell_level_cursor = sp.level_cursor
+        spell_level_scroll = sp.level_scroll
+        spell_sel_ctype = sp.sel_ctype; spell_sel_level = sp.sel_level
+        spell_filtered = sp.filtered
+
+        # ── Items ──
+        it = state.items
+        item_list = it.list; item_cursor = it.cursor
+        item_scroll = it.scroll; item_editing = it.editing
+        item_fields = it.fields; item_field = it.field
+        item_buffer = it.buffer; item_field_scroll = it.field_scroll
+
+        # ── Monsters ──
+        mn = state.monsters
+        mon_list = mn.list; mon_cursor = mn.cursor
+        mon_scroll = mn.scroll; mon_editing = mn.editing
+        mon_fields = mn.fields; mon_field = mn.field
+        mon_buffer = mn.buffer; mon_field_scroll = mn.field_scroll
+
+        # ── Tiles ──
+        tl = state.tiles
+        tile_list = tl.list; tile_folders = tl.folders
+        tile_folder_cursor = tl.folder_cursor
+        tile_folder_scroll = tl.folder_scroll
+        tile_folder_tiles = tl.folder_tiles
+        tile_cursor = tl.cursor; tile_scroll = tl.scroll
+        tile_editing = tl.editing; tile_fields = tl.fields
+        tile_field = tl.field; tile_buffer = tl.buffer
+        tile_field_scroll = tl.field_scroll
+
+        # ── Gallery ──
+        gl = state.gallery
+        gallery_list = gl.list; gallery_cat_list = gl.cat_list
+        gallery_cat_cursor = gl.cat_cursor
+        gallery_cat_scroll = gl.cat_scroll
+        gallery_sprites = gl.sprites
+        gallery_spr_cursor = gl.spr_cursor
+        gallery_spr_scroll = gl.spr_scroll
+        gallery_tag_cursor = gl.tag_cursor
+        gallery_all_cats = gl.all_cats
+        gallery_naming = gl.naming; gallery_name_buf = gl.name_buf
+        gallery_detail_cursor = gl.detail_cursor
+
+        # ── Pixel editor ──
+        px = state.pxedit
+        pxedit_pixels = px.pixels; pxedit_cx = px.cx; pxedit_cy = px.cy
+        pxedit_w = px.w; pxedit_h = px.h
+        pxedit_color_idx = px.color_idx; pxedit_palette = px.palette
+        pxedit_focus = px.focus; pxedit_replacing = px.replacing
+        pxedit_replace_src_color = px.replace_src_color
+        pxedit_replace_dst = px.replace_dst
+        pxedit_replace_sel = px.replace_sel
+
+        # ── Map Editor hub ──
+        mh = state.meh
+        meh_editor_active = mh.editor_active
+        meh_editor_data = mh.editor_data
+        meh_sections = mh.sections; meh_cursor = mh.cursor
+        meh_scroll = mh.scroll; meh_nav_depth = mh.nav_depth
+        meh_folder_label = mh.folder_label; meh_level = mh.level
+        meh_fields = mh.fields; meh_field_cursor = mh.field_cursor
+        meh_field_buffer = mh.field_buffer
+        meh_field_scroll = mh.field_scroll
         self.screen.fill((0, 0, 0))
         fm = self.font_med
         f = self.font
@@ -7796,8 +7623,10 @@ class Renderer(CombatEffectRendererMixin):
         # Title — check both "name" and "_name" keys for generality
         entry_name = ""
         for entry in fields:
-            if entry[1] in ("name", "_name"):
-                entry_name = entry[2]
+            key = entry.key if hasattr(entry, "key") else entry[1]
+            val = entry.value if hasattr(entry, "value") else entry[2]
+            if key in ("name", "_name"):
+                entry_name = val
                 break
         title = f"Edit: {entry_name}" if entry_name else "Edit Entry"
         self._u3_text(title, rx + 16, ry + 10, self._U3_ORANGE, f)
@@ -7813,9 +7642,13 @@ class Renderer(CombatEffectRendererMixin):
         dy = content_top - scroll * 38
 
         for i, entry in enumerate(fields):
-            label, key, value = entry[0], entry[1], entry[2]
-            field_type = entry[3] if len(entry) > 3 else "text"
-            editable = entry[4] if len(entry) > 4 else True
+            if hasattr(entry, "label"):
+                label, key, value = entry.label, entry.key, entry.value
+                field_type, editable = entry.field_type, entry.editable
+            else:
+                label, key, value = entry[0], entry[1], entry[2]
+                field_type = entry[3] if len(entry) > 3 else "text"
+                editable = entry[4] if len(entry) > 4 else True
             selected = (i == active_idx)
 
             # Section header
