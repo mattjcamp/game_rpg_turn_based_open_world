@@ -11,7 +11,7 @@ from collections import Counter
 from src.editor_types import (
     FieldEntry, FeaturesRenderState, SpellEditorRS, ItemEditorRS,
     MonsterEditorRS, TileEditorRS, GalleryEditorRS, PixelEditorRS,
-    MapEditorHubRS,
+    MapEditorHubRS, TownEditorRS,
 )
 
 
@@ -235,6 +235,39 @@ class FeaturesEditor:
             "layouts": [], "features": [], "interiors": [],
         }
 
+        # --- Town editor state ---
+        self.town_cursor = 0                # which town layout is highlighted
+        self.town_scroll = 0                # scroll offset in town list
+        self.town_sub_cursor = 0            # 0=Settings, 1=Townspeople, 2=Edit Map
+        self.town_sub_items = ["Settings", "Townspeople", "Edit Map"]
+        # Settings fields
+        self.town_fields = []               # list of field entries for settings
+        self.town_field = 0                 # field cursor
+        self.town_buffer = ""               # field edit buffer
+        self.town_field_scroll = 0          # field scroll offset
+        # Townspeople (NPC list)
+        self.town_npc_list = []             # list of NPC dicts for current town
+        self.town_npc_cursor = 0            # NPC cursor
+        self.town_npc_scroll = 0            # NPC list scroll
+        # NPC field editor
+        self.town_npc_fields = []           # field entries for selected NPC
+        self.town_npc_field = 0             # NPC field cursor
+        self.town_npc_buffer = ""           # NPC field edit buffer
+        self.town_npc_field_scroll = 0      # NPC field scroll
+        # Map editor
+        self.town_editor_active = False     # True when map editor launched
+        self._town_map_editor_state = None  # MapEditorState instance
+        self._town_map_editor_handler = None  # MapEditorInputHandler instance
+        # Naming overlay
+        self.town_naming = False
+        self.town_name_buf = ""
+        self.town_naming_is_new = False
+        # Save flash
+        self.town_save_flash = 0.0
+        # NPC type/shop type options
+        self._NPC_TYPES = ["villager", "shopkeep", "innkeeper", "priest", "elder", "gnome"]
+        self._SHOP_TYPES = ["general", "weapons", "armor", "reagent", "potion", "book", "map"]
+
         # Gallery render modes
         self._GALLERY_RENDER_MODE = {
             # Overworld: all sprites used directly
@@ -312,10 +345,278 @@ class FeaturesEditor:
                 }
                 if sub_key == "layouts":
                     item["description"] = tl.get("description", "")
+                    item["town_style"] = tl.get("town_style", "medieval")
+                    item["entry_col"] = tl.get("entry_col", 0)
+                    item["entry_row"] = tl.get("entry_row", 0)
+                    item["npcs"] = list(tl.get("npcs", []))
                 if sub_key == "interiors":
                     item["parent_town"] = tl.get("parent_town", "")
                 items.append(item)
             self.town_lists[sub_key] = items
+
+    # ══════════════════════════════════════════════════════════
+    # ── Town Editor Methods ──────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def load_towns(self):
+        """Load town layouts from town_templates.json for the town editor."""
+        self.load_townlayouts()
+        self.town_cursor = 0
+        self.town_scroll = 0
+
+    def save_towns(self):
+        """Save town layouts back to town_templates.json."""
+        path = self.town_templates_path()
+        data = {}
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            pass
+        # Write back layouts with npcs attached
+        out_layouts = []
+        for town in self.town_lists.get("layouts", []):
+            entry = {
+                "name": town.get("name", "Unnamed"),
+                "width": town.get("width", 18),
+                "height": town.get("height", 19),
+                "tiles": town.get("tiles", {}),
+                "description": town.get("description", ""),
+                "town_style": town.get("town_style", "medieval"),
+                "entry_col": town.get("entry_col", 0),
+                "entry_row": town.get("entry_row", 0),
+                "npcs": town.get("npcs", []),
+            }
+            out_layouts.append(entry)
+        data["layouts"] = out_layouts
+        # Preserve features and interiors as-is
+        if "features" not in data:
+            data["features"] = []
+        if "interiors" not in data:
+            data["interiors"] = []
+        for sub_key in ("features", "interiors"):
+            if self.town_lists.get(sub_key):
+                data[sub_key] = self.town_lists[sub_key]
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def _town_get_current(self):
+        """Return the currently selected town layout dict, or None."""
+        layouts = self.town_lists.get("layouts", [])
+        if 0 <= self.town_cursor < len(layouts):
+            return layouts[self.town_cursor]
+        return None
+
+    def _town_build_settings_fields(self):
+        """Build FieldEntry list for the current town's settings."""
+        town = self._town_get_current()
+        if not town:
+            self.town_fields = []
+            return
+        self.town_fields = [
+            FieldEntry("Name", "name", town.get("name", ""), "text", True),
+            FieldEntry("Description", "description",
+                       town.get("description", ""), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Width", "width",
+                       str(town.get("width", 18)), "int", True),
+            FieldEntry("Height", "height",
+                       str(town.get("height", 19)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Style", "town_style",
+                       town.get("town_style", "medieval"), "text", True),
+            FieldEntry("Entry Col", "entry_col",
+                       str(town.get("entry_col", 0)), "int", True),
+            FieldEntry("Entry Row", "entry_row",
+                       str(town.get("entry_row", 0)), "int", True),
+        ]
+        self.town_field = self._next_editable_generic(self.town_fields, 0)
+        self.town_buffer = self.town_fields[self.town_field].value
+        self.town_field_scroll = 0
+
+    def _town_save_settings_fields(self):
+        """Write settings fields back into the current town dict."""
+        town = self._town_get_current()
+        if not town:
+            return
+        for fe in self.town_fields:
+            if not fe.editable or fe.field_type == "section":
+                continue
+            key = fe.key
+            val = fe.value
+            if fe.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            town[key] = val
+
+    def _town_load_npcs(self):
+        """Load NPC list from the current town layout."""
+        town = self._town_get_current()
+        if not town:
+            self.town_npc_list = []
+            return
+        self.town_npc_list = list(town.get("npcs", []))
+        self.town_npc_cursor = 0
+        self.town_npc_scroll = 0
+
+    def _town_save_npcs(self):
+        """Write NPC list back into the current town dict."""
+        town = self._town_get_current()
+        if not town:
+            return
+        town["npcs"] = list(self.town_npc_list)
+
+    def _town_build_npc_fields(self):
+        """Build FieldEntry list for the selected NPC."""
+        if not (0 <= self.town_npc_cursor < len(self.town_npc_list)):
+            self.town_npc_fields = []
+            return
+        npc = self.town_npc_list[self.town_npc_cursor]
+        npc_type = npc.get("npc_type", "villager")
+        self.town_npc_fields = [
+            FieldEntry("Name", "name", npc.get("name", ""), "text", True),
+            FieldEntry("Type", "npc_type", npc_type, "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Col", "col", str(npc.get("col", 0)), "int", True),
+            FieldEntry("Row", "row", str(npc.get("row", 0)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Dialogue", "dialogue",
+                       ", ".join(npc.get("dialogue", ["Hello."])), "text", True),
+            FieldEntry("Shop Type", "shop_type",
+                       npc.get("shop_type", "general"), "text", True),
+            FieldEntry("God Name", "god_name",
+                       npc.get("god_name", "The Divine"), "text", True),
+            FieldEntry("Wander Range", "wander_range",
+                       str(npc.get("wander_range", 4)), "int", True),
+        ]
+        self.town_npc_field = self._next_editable_generic(
+            self.town_npc_fields, 0)
+        self.town_npc_buffer = self.town_npc_fields[self.town_npc_field].value
+        self.town_npc_field_scroll = 0
+
+    def _town_save_npc_fields(self):
+        """Write NPC fields back into the NPC dict."""
+        if not (0 <= self.town_npc_cursor < len(self.town_npc_list)):
+            return
+        npc = self.town_npc_list[self.town_npc_cursor]
+        for fe in self.town_npc_fields:
+            if not fe.editable or fe.field_type == "section":
+                continue
+            key = fe.key
+            val = fe.value
+            if fe.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            if key == "dialogue":
+                # Parse comma-separated dialogue lines
+                val = [s.strip() for s in val.split(",") if s.strip()]
+                if not val:
+                    val = ["Hello."]
+            npc[key] = val
+
+    def _town_add_new(self, name):
+        """Add a new blank town layout."""
+        new_town = {
+            "name": name,
+            "width": 18,
+            "height": 19,
+            "tiles": {},
+            "description": "",
+            "town_style": "medieval",
+            "entry_col": 0,
+            "entry_row": 0,
+            "npcs": [],
+        }
+        self.town_lists["layouts"].append(new_town)
+        self.town_cursor = len(self.town_lists["layouts"]) - 1
+        self.save_towns()
+
+    def _town_add_npc(self):
+        """Add a new default NPC to the current town."""
+        new_npc = {
+            "name": "New NPC",
+            "npc_type": "villager",
+            "col": 1,
+            "row": 1,
+            "dialogue": ["Hello there!"],
+            "shop_type": "general",
+            "god_name": "The Divine",
+            "wander_range": 4,
+        }
+        self.town_npc_list.append(new_npc)
+        self.town_npc_cursor = len(self.town_npc_list) - 1
+        self._town_save_npcs()
+
+    def _town_delete_npc(self):
+        """Delete the currently selected NPC."""
+        n = len(self.town_npc_list)
+        if n == 0:
+            return
+        self.town_npc_list.pop(self.town_npc_cursor)
+        n -= 1
+        if n == 0:
+            self.town_npc_cursor = 0
+        elif self.town_npc_cursor >= n:
+            self.town_npc_cursor = n - 1
+        self._town_save_npcs()
+
+    def _town_launch_map_editor(self):
+        """Launch the map editor for the current town's tile grid."""
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_town_brushes,
+            STORAGE_SPARSE, GRID_FIXED,
+        )
+        town = self._town_get_current()
+        if not town:
+            return
+        w = town.get("width", 18)
+        h = town.get("height", 19)
+
+        brushes = build_town_brushes(self.TILE_CONTEXT)
+
+        def on_save(state):
+            # Sparse tiles are already the same dict reference,
+            # but reassign to be safe
+            town["tiles"] = state.tiles
+            town["width"] = state.config.width
+            town["height"] = state.config.height
+            state.dirty = False
+            self.save_towns()
+            self.town_save_flash = 1.5
+
+        def on_exit(st):
+            # Save tiles on exit
+            town["tiles"] = st.tiles
+            self.save_towns()
+            self.town_editor_active = False
+            self._town_map_editor_state = None
+            self._town_map_editor_handler = None
+
+        config = MapEditorConfig(
+            title=f"Town: {town.get('name', 'Unnamed')}",
+            storage=STORAGE_SPARSE,
+            grid_type=GRID_FIXED,
+            width=w,
+            height=h,
+            tile_context="town",
+            brushes=brushes,
+            supports_interior_links=True,
+            supports_replace=True,
+            on_save=on_save,
+            on_exit=on_exit,
+        )
+        # Pass existing tiles directly — sparse storage uses a dict
+        existing_tiles = dict(town.get("tiles", {}))
+        state = MapEditorState(config, tiles=existing_tiles)
+        handler = MapEditorInputHandler(state)
+        self._town_map_editor_state = state
+        self._town_map_editor_handler = handler
+        self.town_editor_active = True
 
     # ══════════════════════════════════════════════════════════
     # ── Tile Editor Methods ────────────────────────────────────
@@ -2671,6 +2972,17 @@ class FeaturesEditor:
                     self.level = 0
             return
 
+        # Module town map editor (shared map editor instance)
+        if self.active_editor == "mod_town_map":
+            game = self.game
+            if (hasattr(game, '_mod_town_map_editor_state')
+                    and game._mod_town_map_editor_state is not None):
+                result = game._mod_town_map_editor_handler.handle(event)
+                if result == "exit":
+                    self.active_editor = None
+                    self.level = 0
+            return
+
         # ── Resolve active editor data pointers ──
         ed = self.active_editor
         # Build a context dict so the level-1 and level-2 code
@@ -3298,6 +3610,299 @@ class FeaturesEditor:
         if event.unicode and event.unicode.isprintable():
             self.meh_name_buf += event.unicode
 
+    # ══════════════════════════════════════════════════════════
+    # ── Town Editor Input ────────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def handle_town_input(self, event):
+        """Handle input for the Town Editor.
+
+        Navigation levels:
+        - level 1: Town list (browse all towns)
+        - level 2: Sub-screen selector (Settings / Townspeople / Edit Map)
+        - level 3: Settings field editor OR Townspeople list
+        - level 4: NPC field editor (when editing a single NPC)
+        """
+        if event.type != pygame.KEYDOWN:
+            return
+
+        # ── Fullscreen map editor active ──
+        if self.town_editor_active:
+            if self._town_map_editor_handler:
+                result = self._town_map_editor_handler.handle(event)
+                if result == "exit":
+                    self.town_editor_active = False
+                    self._town_map_editor_state = None
+                    self._town_map_editor_handler = None
+            return
+
+        # ── NPC field editor (level 4) ──
+        if self.level == 4:
+            self._handle_town_npc_field_input(event)
+            return
+
+        # ── Settings fields or Townspeople list (level 3) ──
+        if self.level == 3:
+            if self.town_sub_cursor == 0:
+                # Settings field editor
+                self._handle_town_settings_field_input(event)
+            elif self.town_sub_cursor == 1:
+                # Townspeople list
+                self._handle_town_npc_list_input(event)
+            return
+
+        # ── Sub-screen selector (level 2) ──
+        if self.level == 2:
+            self._handle_town_sub_input(event)
+            return
+
+        # ── Town naming overlay ──
+        if self.town_naming:
+            self._handle_town_naming_input(event)
+            return
+
+        # ── Town list (level 1) ──
+        layouts = self.town_lists.get("layouts", [])
+        n = len(layouts)
+
+        if event.key == pygame.K_ESCAPE:
+            self.save_towns()
+            self.level = 0
+            self.active_editor = None
+            return
+
+        # Add new town (Ctrl+N)
+        if self._is_new_shortcut(event):
+            self.town_naming = True
+            self.town_naming_is_new = True
+            self.town_name_buf = ""
+            return
+
+        # Delete town (Ctrl+D)
+        if self._is_delete_shortcut(event) and n > 0:
+            layouts.pop(self.town_cursor)
+            n -= 1
+            if n == 0:
+                self.town_cursor = 0
+            elif self.town_cursor >= n:
+                self.town_cursor = n - 1
+            self.save_towns()
+            return
+
+        # Save (Ctrl+S)
+        if self._is_save_shortcut(event):
+            self.save_towns()
+            self.town_save_flash = 1.5
+            return
+
+        # Rename (F2)
+        if event.key == pygame.K_F2 and n > 0:
+            town = self._town_get_current()
+            if town:
+                self.town_naming = True
+                self.town_naming_is_new = False
+                self.town_name_buf = town.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self.town_cursor = (self.town_cursor - 1) % n
+            self.town_scroll = self._adjust_scroll_generic(
+                self.town_cursor, self.town_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self.town_cursor = (self.town_cursor + 1) % n
+            self.town_scroll = self._adjust_scroll_generic(
+                self.town_cursor, self.town_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            # Enter sub-screen selector
+            self.town_sub_cursor = 0
+            self.level = 2
+
+    def _handle_town_naming_input(self, event):
+        """Handle text input while naming/renaming a town."""
+        if event.key == pygame.K_ESCAPE:
+            self.town_naming = False
+            return
+        if event.key == pygame.K_RETURN:
+            name = self.town_name_buf.strip()
+            if name:
+                if self.town_naming_is_new:
+                    self._town_add_new(name)
+                else:
+                    town = self._town_get_current()
+                    if town:
+                        town["name"] = name
+                        self.save_towns()
+            self.town_naming = False
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self.town_name_buf = self.town_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self.town_name_buf += event.unicode
+
+    def _handle_town_sub_input(self, event):
+        """Handle input on the sub-screen selector (Settings/Townspeople/Edit Map)."""
+        n = len(self.town_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.level = 1
+            return
+        if event.key == pygame.K_UP:
+            self.town_sub_cursor = (self.town_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self.town_sub_cursor = (self.town_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self.town_sub_cursor == 0:
+                # Settings
+                self._town_build_settings_fields()
+                self.level = 3
+            elif self.town_sub_cursor == 1:
+                # Townspeople
+                self._town_load_npcs()
+                self.level = 3
+            elif self.town_sub_cursor == 2:
+                # Edit Map
+                self._town_launch_map_editor()
+
+    def _handle_town_settings_field_input(self, event):
+        """Handle input for town settings field editing."""
+        fields = self.town_fields
+        n = len(fields)
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.level = 2
+            return
+
+        if self._is_save_shortcut(event):
+            # Commit current buffer and save
+            fe = fields[self.town_field]
+            if fe.editable:
+                fe.value = self.town_buffer
+            self._town_save_settings_fields()
+            self.save_towns()
+            self.town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            # Commit and go back to sub-screen
+            fe = fields[self.town_field]
+            if fe.editable:
+                fe.value = self.town_buffer
+            self._town_save_settings_fields()
+            self.level = 2
+            return
+
+        if event.key == pygame.K_UP:
+            fe = fields[self.town_field]
+            if fe.editable:
+                fe.value = self.town_buffer
+            self.town_field = self._next_editable_generic(
+                fields, (self.town_field - 1) % n)
+            self.town_buffer = fields[self.town_field].value
+            self.town_field_scroll = self._adjust_field_scroll_generic(
+                self.town_field, self.town_field_scroll)
+        elif event.key == pygame.K_DOWN:
+            fe = fields[self.town_field]
+            if fe.editable:
+                fe.value = self.town_buffer
+            self.town_field = self._next_editable_generic(
+                fields, (self.town_field + 1) % n)
+            self.town_buffer = fields[self.town_field].value
+            self.town_field_scroll = self._adjust_field_scroll_generic(
+                self.town_field, self.town_field_scroll)
+        elif event.key == pygame.K_BACKSPACE:
+            self.town_buffer = self.town_buffer[:-1]
+        elif event.unicode and event.unicode.isprintable():
+            self.town_buffer += event.unicode
+
+    def _handle_town_npc_list_input(self, event):
+        """Handle input for the townspeople NPC list."""
+        n = len(self.town_npc_list)
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._town_save_npcs()
+            self.level = 2
+            return
+
+        # Add NPC (Ctrl+N)
+        if self._is_new_shortcut(event):
+            self._town_add_npc()
+            return
+
+        # Delete NPC (Ctrl+D)
+        if self._is_delete_shortcut(event) and n > 0:
+            self._town_delete_npc()
+            return
+
+        # Save (Ctrl+S)
+        if self._is_save_shortcut(event):
+            self._town_save_npcs()
+            self.save_towns()
+            self.town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self.town_npc_cursor = (self.town_npc_cursor - 1) % n
+            self.town_npc_scroll = self._adjust_scroll_generic(
+                self.town_npc_cursor, self.town_npc_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self.town_npc_cursor = (self.town_npc_cursor + 1) % n
+            self.town_npc_scroll = self._adjust_scroll_generic(
+                self.town_npc_cursor, self.town_npc_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._town_build_npc_fields()
+            self.level = 4
+
+    def _handle_town_npc_field_input(self, event):
+        """Handle input for NPC field editing."""
+        fields = self.town_npc_fields
+        n = len(fields)
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.level = 3
+            return
+
+        if self._is_save_shortcut(event):
+            fe = fields[self.town_npc_field]
+            if fe.editable:
+                fe.value = self.town_npc_buffer
+            self._town_save_npc_fields()
+            self._town_save_npcs()
+            self.save_towns()
+            self.town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            fe = fields[self.town_npc_field]
+            if fe.editable:
+                fe.value = self.town_npc_buffer
+            self._town_save_npc_fields()
+            self._town_save_npcs()
+            self.level = 3
+            return
+
+        if event.key == pygame.K_UP:
+            fe = fields[self.town_npc_field]
+            if fe.editable:
+                fe.value = self.town_npc_buffer
+            self.town_npc_field = self._next_editable_generic(
+                fields, (self.town_npc_field - 1) % n)
+            self.town_npc_buffer = fields[self.town_npc_field].value
+            self.town_npc_field_scroll = self._adjust_field_scroll_generic(
+                self.town_npc_field, self.town_npc_field_scroll)
+        elif event.key == pygame.K_DOWN:
+            fe = fields[self.town_npc_field]
+            if fe.editable:
+                fe.value = self.town_npc_buffer
+            self.town_npc_field = self._next_editable_generic(
+                fields, (self.town_npc_field + 1) % n)
+            self.town_npc_buffer = fields[self.town_npc_field].value
+            self.town_npc_field_scroll = self._adjust_field_scroll_generic(
+                self.town_npc_field, self.town_npc_field_scroll)
+        elif event.key == pygame.K_BACKSPACE:
+            self.town_npc_buffer = self.town_npc_buffer[:-1]
+        elif event.unicode and event.unicode.isprintable():
+            self.town_npc_buffer += event.unicode
+
     def handle_mapeditor_input(self, event):
         """Handle input for the Map Editor inside the features screen.
 
@@ -3713,6 +4318,9 @@ class FeaturesEditor:
         # Tick down the hub save flash
         if self.meh_save_flash > 0:
             self.meh_save_flash = max(0, self.meh_save_flash - 1.0 / 60)
+        # Tick down the town save flash
+        if self.town_save_flash > 0:
+            self.town_save_flash = max(0, self.town_save_flash - 1.0 / 60)
         return FeaturesRenderState(
             categories=self.categories,
             cat_cursor=self.cursor,
@@ -3819,9 +4427,41 @@ class FeaturesEditor:
                 naming_is_new=self.meh_naming_is_new,
                 save_flash=self.meh_save_flash,
             ),
+            towns=TownEditorRS(
+                towns=self.town_lists.get("layouts", []),
+                cursor=self.town_cursor,
+                scroll=self.town_scroll,
+                sub_cursor=self.town_sub_cursor,
+                sub_items=self.town_sub_items,
+                fields=self.town_fields,
+                field_cursor=self.town_field,
+                field_buffer=self.town_buffer,
+                field_scroll=self.town_field_scroll,
+                npc_list=self.town_npc_list,
+                npc_cursor=self.town_npc_cursor,
+                npc_scroll=self.town_npc_scroll,
+                npc_fields=self.town_npc_fields,
+                npc_field_cursor=self.town_npc_field,
+                npc_field_buffer=self.town_npc_buffer,
+                npc_field_scroll=self.town_npc_field_scroll,
+                editor_active=self.town_editor_active,
+                editor_data=(
+                    self._town_map_editor_state.to_data_dict()
+                    if self.town_editor_active
+                    and self._town_map_editor_state is not None
+                    else None),
+                naming=self.town_naming,
+                name_buf=self.town_name_buf,
+                naming_is_new=self.town_naming_is_new,
+                save_flash=self.town_save_flash,
+            ),
             overview_editor_data=(
                 self.game._mod_map_editor_state.to_data_dict()
                 if getattr(self.game, '_mod_map_editor_state', None) is not None
+                else None),
+            town_map_editor_data=(
+                self.game._mod_town_map_editor_state.to_data_dict()
+                if getattr(self.game, '_mod_town_map_editor_state', None) is not None
                 else None),
         )
 

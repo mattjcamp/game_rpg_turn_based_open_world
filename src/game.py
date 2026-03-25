@@ -186,6 +186,63 @@ class Game:
         self.active_module_version = "0.0.0"
         self.module_manifest = None  # populated on new game start
 
+        # ── Town Editor (within module) ──
+        self._mod_town_list = []          # list of town dicts for current module
+        self._mod_town_cursor = 0
+        self._mod_town_scroll = 0
+        self._mod_town_sub_cursor = 0     # 0=Settings, 1=Townspeople, 2=Edit Map
+        self._mod_town_sub_items = ["Settings", "Townspeople", "Enclosures",
+                                    "Edit Map"]
+        # Settings fields
+        self._mod_town_fields = []        # list of FieldEntry for settings
+        self._mod_town_field = 0
+        self._mod_town_buffer = ""
+        self._mod_town_field_scroll = 0
+        # Townspeople (NPC list)
+        self._mod_town_npc_list = []
+        self._mod_town_npc_cursor = 0
+        self._mod_town_npc_scroll = 0
+        # NPC field editor
+        self._mod_town_npc_fields = []
+        self._mod_town_npc_field = 0
+        self._mod_town_npc_buffer = ""
+        self._mod_town_npc_field_scroll = 0
+        # Town map generation overlays
+        self._mod_town_gen_mode = None        # None, "pick_template", "generate"
+        self._mod_town_gen_pick_list = []     # list of layout templates
+        self._mod_town_gen_pick_cursor = 0
+        self._mod_town_gen_pick_scroll = 0
+        # Generate form
+        self._mod_town_gen_field = 0          # active field in generate form
+        self._mod_town_gen_size_idx = 1       # 0=small, 1=medium, 2=large
+        self._mod_town_gen_style_idx = 0      # index into styles
+        self._MOD_TOWN_SIZES = ["small", "medium", "large"]
+        self._MOD_TOWN_STYLES = ["medieval", "desert", "coastal",
+                                  "forest", "mountain"]
+        # Enclosures (interior instances for this town)
+        self._mod_town_enclosures = []        # list of interior dicts
+        self._mod_town_enc_cursor = 0
+        self._mod_town_enc_scroll = 0
+        # Enclosure import picker
+        self._mod_town_enc_picking = False     # True when picker overlay shown
+        self._mod_town_enc_pick_list = []      # list of me_enclosure templates
+        self._mod_town_enc_pick_cursor = 0
+        self._mod_town_enc_pick_scroll = 0
+        # Enclosure naming overlay (for generate)
+        self._mod_town_enc_naming = False
+        self._mod_town_enc_name_buf = ""
+        self._mod_town_enc_template = None     # template being instantiated
+        # Map editor
+        self._mod_town_editor_active = False
+        self._mod_town_map_editor_state = None
+        self._mod_town_map_editor_handler = None
+        # Naming overlay
+        self._mod_town_naming = False
+        self._mod_town_name_buf = ""
+        self._mod_town_naming_is_new = False
+        # Save flash
+        self._mod_town_save_flash = 0.0
+
         # Restore last-used module from config (if it still exists)
         saved_mod_path = self._config.get("active_module_path")
         if saved_mod_path and os.path.isdir(saved_mod_path):
@@ -1930,6 +1987,12 @@ class Game:
                 "subtitle": overview_sub,
                 "_overview_map": True,
             },
+            {
+                "label": "Towns",
+                "icon": "T",
+                "subtitle": "",
+                "_towns": True,
+            },
         ]
 
         self.module_edit_sections = sections
@@ -2018,6 +2081,11 @@ class Game:
             self._handle_overview_settings_input(event)
             return
 
+        # ── Levels 4-7: Town editor ──
+        if self.module_edit_level in (4, 5, 6, 7):
+            self._handle_town_edit_input(event)
+            return
+
         # ── Level 1: field editor within a section ──
         if event.key == pygame.K_ESCAPE:
             if self._module_dirty:
@@ -2081,6 +2149,11 @@ class Game:
         # ── Overview Map section: special handling ──
         if sec.get("_overview_map"):
             self._enter_overview_map_section()
+            return
+
+        # ── Towns section: special handling ──
+        if sec.get("_towns"):
+            self._enter_towns_section()
             return
 
         if not sec.get("fields"):
@@ -2639,6 +2712,1012 @@ class Game:
                     pass
         self._save_module_overview_map()
 
+    # ── Town Editor (within Module) ─────────────────────────────
+
+    def _enter_towns_section(self):
+        """Enter the Towns section from the module section browser.
+
+        Loads the town list for the current module and switches to
+        level 4 (town list browser).
+        """
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        self._load_module_towns(mod["path"])
+        # Update section subtitle
+        for sec in self.module_edit_sections:
+            if sec.get("_towns"):
+                n = len(self._mod_town_list)
+                sec["subtitle"] = f"{n} town{'s' if n != 1 else ''}"
+                break
+        self.module_edit_level = 4
+
+    def _load_module_towns(self, mod_path):
+        """Load towns.json from a module directory."""
+        import json, os
+        self._mod_town_list = []
+        self._mod_town_cursor = 0
+        self._mod_town_scroll = 0
+        p = os.path.join(mod_path, "towns.json")
+        if not os.path.isfile(p):
+            return
+        try:
+            with open(p, "r") as f:
+                data = json.load(f)
+            self._mod_town_list = data if isinstance(data, list) else []
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def _save_module_towns(self):
+        """Persist the current town list to the active module."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        p = os.path.join(mod["path"], "towns.json")
+        try:
+            with open(p, "w") as f:
+                json.dump(self._mod_town_list, f, indent=2)
+        except OSError:
+            pass
+
+    def _mod_town_get_current(self):
+        """Return the currently selected town dict, or None."""
+        if 0 <= self._mod_town_cursor < len(self._mod_town_list):
+            return self._mod_town_list[self._mod_town_cursor]
+        return None
+
+    def _mod_town_build_settings_fields(self):
+        """Build FieldEntry list for the current town's settings."""
+        from src.editor_types import FieldEntry
+        town = self._mod_town_get_current()
+        if not town:
+            self._mod_town_fields = []
+            return
+        has_tiles = bool(town.get("tiles"))
+        map_status = "Map assigned" if has_tiles else "No map"
+        self._mod_town_fields = [
+            FieldEntry("Name", "name", town.get("name", ""), "text", True),
+            FieldEntry("Description", "description",
+                       town.get("description", ""), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Width", "width",
+                       str(town.get("width", 18)), "int", True),
+            FieldEntry("Height", "height",
+                       str(town.get("height", 19)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Style", "town_style",
+                       town.get("town_style", "medieval"), "text", True),
+            FieldEntry("Entry Col", "entry_col",
+                       str(town.get("entry_col", 0)), "int", True),
+            FieldEntry("Entry Row", "entry_row",
+                       str(town.get("entry_row", 0)), "int", True),
+            FieldEntry("Map Generation", "", "", "section", False),
+            FieldEntry("Import Town Template",
+                       "_action_import", map_status, "action", True),
+            FieldEntry("Generate Town Map",
+                       "_action_generate", map_status, "action", True),
+        ]
+        fe = self.features_editor
+        self._mod_town_field = fe._next_editable_generic(
+            self._mod_town_fields, 0)
+        self._mod_town_buffer = self._mod_town_fields[
+            self._mod_town_field].value
+        self._mod_town_field_scroll = 0
+
+    def _mod_town_save_settings_fields(self):
+        """Write settings fields back into the current town dict."""
+        town = self._mod_town_get_current()
+        if not town:
+            return
+        for fe_entry in self._mod_town_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            town[key] = val
+
+    def _mod_town_load_npcs(self):
+        """Load NPC list from the current town."""
+        town = self._mod_town_get_current()
+        if not town:
+            self._mod_town_npc_list = []
+            return
+        self._mod_town_npc_list = list(town.get("npcs", []))
+        self._mod_town_npc_cursor = 0
+        self._mod_town_npc_scroll = 0
+
+    def _mod_town_save_npcs(self):
+        """Write NPC list back into the current town dict."""
+        town = self._mod_town_get_current()
+        if not town:
+            return
+        town["npcs"] = list(self._mod_town_npc_list)
+
+    def _mod_town_build_npc_fields(self):
+        """Build FieldEntry list for the selected NPC."""
+        from src.editor_types import FieldEntry
+        if not (0 <= self._mod_town_npc_cursor < len(
+                self._mod_town_npc_list)):
+            self._mod_town_npc_fields = []
+            return
+        npc = self._mod_town_npc_list[self._mod_town_npc_cursor]
+        self._mod_town_npc_fields = [
+            FieldEntry("Name", "name", npc.get("name", ""), "text", True),
+            FieldEntry("Type", "npc_type",
+                       npc.get("npc_type", "villager"), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Col", "col", str(npc.get("col", 0)), "int", True),
+            FieldEntry("Row", "row", str(npc.get("row", 0)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Dialogue", "dialogue",
+                       ", ".join(npc.get("dialogue", ["Hello."])),
+                       "text", True),
+            FieldEntry("Shop Type", "shop_type",
+                       npc.get("shop_type", "general"), "text", True),
+            FieldEntry("God Name", "god_name",
+                       npc.get("god_name", "The Divine"), "text", True),
+            FieldEntry("Wander Range", "wander_range",
+                       str(npc.get("wander_range", 4)), "int", True),
+        ]
+        fe = self.features_editor
+        self._mod_town_npc_field = fe._next_editable_generic(
+            self._mod_town_npc_fields, 0)
+        self._mod_town_npc_buffer = self._mod_town_npc_fields[
+            self._mod_town_npc_field].value
+        self._mod_town_npc_field_scroll = 0
+
+    def _mod_town_save_npc_fields(self):
+        """Write NPC fields back into the NPC dict."""
+        if not (0 <= self._mod_town_npc_cursor < len(
+                self._mod_town_npc_list)):
+            return
+        npc = self._mod_town_npc_list[self._mod_town_npc_cursor]
+        for fe_entry in self._mod_town_npc_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            if key == "dialogue":
+                val = [s.strip() for s in val.split(",") if s.strip()]
+                if not val:
+                    val = ["Hello."]
+            npc[key] = val
+
+    def _mod_town_add_new(self, name):
+        """Add a new blank town to the module."""
+        new_town = {
+            "name": name,
+            "width": 18,
+            "height": 19,
+            "tiles": {},
+            "description": "",
+            "town_style": "medieval",
+            "entry_col": 0,
+            "entry_row": 0,
+            "npcs": [],
+        }
+        self._mod_town_list.append(new_town)
+        self._mod_town_cursor = len(self._mod_town_list) - 1
+        self._save_module_towns()
+
+    def _mod_town_add_npc(self):
+        """Add a new default NPC to the current town."""
+        new_npc = {
+            "name": "New NPC",
+            "npc_type": "villager",
+            "col": 1,
+            "row": 1,
+            "dialogue": ["Hello there!"],
+            "shop_type": "general",
+            "god_name": "The Divine",
+            "wander_range": 4,
+        }
+        self._mod_town_npc_list.append(new_npc)
+        self._mod_town_npc_cursor = len(self._mod_town_npc_list) - 1
+        self._mod_town_save_npcs()
+
+    def _mod_town_delete_npc(self):
+        """Delete the currently selected NPC."""
+        n = len(self._mod_town_npc_list)
+        if n == 0:
+            return
+        self._mod_town_npc_list.pop(self._mod_town_npc_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_town_npc_cursor = 0
+        elif self._mod_town_npc_cursor >= n:
+            self._mod_town_npc_cursor = n - 1
+        self._mod_town_save_npcs()
+
+    def _mod_town_launch_map_editor(self):
+        """Launch the map editor for the current town's tile grid."""
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_town_brushes,
+            STORAGE_SPARSE, GRID_FIXED,
+        )
+        town = self._mod_town_get_current()
+        if not town:
+            return
+        w = town.get("width", 18)
+        h = town.get("height", 19)
+
+        fe = self.features_editor
+        brushes = build_town_brushes(fe.TILE_CONTEXT)
+
+        def on_save(state):
+            town["tiles"] = state.tiles
+            town["width"] = state.config.width
+            town["height"] = state.config.height
+            state.dirty = False
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+
+        def on_exit(st):
+            town["tiles"] = st.tiles
+            self._save_module_towns()
+            # Return to module screen, town sub-selector
+            self.showing_features = False
+            self.showing_modules = True
+            self.module_edit_mode = True
+            self._mod_town_editor_active = False
+            self._mod_town_map_editor_state = None
+            self._mod_town_map_editor_handler = None
+
+        config = MapEditorConfig(
+            title=f"Town: {town.get('name', 'Unnamed')}",
+            storage=STORAGE_SPARSE,
+            grid_type=GRID_FIXED,
+            width=w,
+            height=h,
+            tile_context="town",
+            brushes=brushes,
+            supports_interior_links=True,
+            supports_replace=True,
+            on_save=on_save,
+            on_exit=on_exit,
+        )
+        existing_tiles = dict(town.get("tiles", {}))
+        state = MapEditorState(config, tiles=existing_tiles)
+        handler = MapEditorInputHandler(
+            state, is_save_shortcut=self._is_save_shortcut)
+        self._mod_town_map_editor_state = state
+        self._mod_town_map_editor_handler = handler
+        # Switch to features screen for the map editor
+        self._mod_town_editor_active = True
+        self.module_edit_mode = False
+        self.showing_modules = False
+        self.showing_features = True
+        fe = self.features_editor
+        fe.active_editor = "mod_town_map"
+        fe.level = 1
+
+    # ── Town input handlers ──
+
+    def _handle_town_edit_input(self, event):
+        """Dispatch town editor input based on module_edit_level.
+
+        Levels:
+        4 = town list browser
+        5 = sub-screen selector (Settings/Townspeople/Edit Map)
+        6 = settings fields OR townspeople NPC list
+        7 = NPC field editor
+        """
+        import pygame
+
+        # ── Map editor active ──
+        if self._mod_town_editor_active:
+            if self._mod_town_map_editor_handler:
+                result = self._mod_town_map_editor_handler.handle(event)
+                if result == "exit":
+                    self._mod_town_editor_active = False
+                    self._mod_town_map_editor_state = None
+                    self._mod_town_map_editor_handler = None
+            return
+
+        if self.module_edit_level == 7:
+            self._handle_mod_town_npc_field_input(event)
+            return
+        if self.module_edit_level == 6:
+            if self._mod_town_sub_cursor == 0:
+                self._handle_mod_town_settings_field_input(event)
+            elif self._mod_town_sub_cursor == 1:
+                self._handle_mod_town_npc_list_input(event)
+            elif self._mod_town_sub_cursor == 2:
+                self._handle_mod_town_enc_list_input(event)
+            return
+        if self.module_edit_level == 5:
+            self._handle_mod_town_sub_input(event)
+            return
+
+        # ── Level 4: Town list ──
+        if self._mod_town_naming:
+            self._handle_mod_town_naming_input(event)
+            return
+
+        layouts = self._mod_town_list
+        n = len(layouts)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._save_module_towns()
+            self.module_edit_level = 0
+            return
+        if self._is_new_shortcut(event):
+            self._mod_town_naming = True
+            self._mod_town_naming_is_new = True
+            self._mod_town_name_buf = ""
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            layouts.pop(self._mod_town_cursor)
+            n -= 1
+            if n == 0:
+                self._mod_town_cursor = 0
+            elif self._mod_town_cursor >= n:
+                self._mod_town_cursor = n - 1
+            self._save_module_towns()
+            return
+        if self._is_save_shortcut(event):
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+        if event.key == pygame.K_F2 and n > 0:
+            town = self._mod_town_get_current()
+            if town:
+                self._mod_town_naming = True
+                self._mod_town_naming_is_new = False
+                self._mod_town_name_buf = town.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_town_cursor = (self._mod_town_cursor - 1) % n
+            self._mod_town_scroll = fe._adjust_scroll_generic(
+                self._mod_town_cursor, self._mod_town_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_town_cursor = (self._mod_town_cursor + 1) % n
+            self._mod_town_scroll = fe._adjust_scroll_generic(
+                self._mod_town_cursor, self._mod_town_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_town_sub_cursor = 0
+            self.module_edit_level = 5
+
+    def _handle_mod_town_naming_input(self, event):
+        """Handle text input while naming/renaming a town."""
+        import pygame
+        if event.key == pygame.K_ESCAPE:
+            self._mod_town_naming = False
+            return
+        if event.key == pygame.K_RETURN:
+            name = self._mod_town_name_buf.strip()
+            if name:
+                if self._mod_town_naming_is_new:
+                    self._mod_town_add_new(name)
+                else:
+                    town = self._mod_town_get_current()
+                    if town:
+                        town["name"] = name
+                        self._save_module_towns()
+            self._mod_town_naming = False
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self._mod_town_name_buf = self._mod_town_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self._mod_town_name_buf += event.unicode
+
+    def _handle_mod_town_sub_input(self, event):
+        """Handle input on the sub-screen selector (level 5)."""
+        import pygame
+        n = len(self._mod_town_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.module_edit_level = 4
+            return
+        if event.key == pygame.K_UP:
+            self._mod_town_sub_cursor = (self._mod_town_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_town_sub_cursor = (self._mod_town_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_town_sub_cursor == 0:
+                self._mod_town_build_settings_fields()
+                self.module_edit_level = 6
+            elif self._mod_town_sub_cursor == 1:
+                self._mod_town_load_npcs()
+                self.module_edit_level = 6
+            elif self._mod_town_sub_cursor == 2:
+                self._mod_town_load_enclosures()
+                self.module_edit_level = 6
+            elif self._mod_town_sub_cursor == 3:
+                self._mod_town_launch_map_editor()
+
+    def _handle_mod_town_settings_field_input(self, event):
+        """Handle input for town settings field editing (level 6)."""
+        import pygame
+
+        # ── Overlay: template picker ──
+        if self._mod_town_gen_mode == "pick_template":
+            self._handle_mod_town_template_picker(event)
+            return
+        # ── Overlay: generate form ──
+        if self._mod_town_gen_mode == "generate":
+            self._handle_mod_town_generate_form(event)
+            return
+
+        fields = self._mod_town_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 5
+            return
+
+        current_field = fields[self._mod_town_field]
+
+        if self._is_save_shortcut(event):
+            if current_field.editable and current_field.field_type != "action":
+                current_field.value = self._mod_town_buffer
+            self._mod_town_save_settings_fields()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            if current_field.editable and current_field.field_type != "action":
+                current_field.value = self._mod_town_buffer
+            self._mod_town_save_settings_fields()
+            self.module_edit_level = 5
+            return
+
+        # ── Enter on action fields ──
+        if event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if current_field.field_type == "action":
+                if current_field.key == "_action_import":
+                    self._open_town_template_picker()
+                elif current_field.key == "_action_generate":
+                    self._open_town_generate_form()
+                return
+
+        if event.key == pygame.K_UP:
+            if current_field.editable and current_field.field_type != "action":
+                current_field.value = self._mod_town_buffer
+            self._mod_town_field = fe._next_editable_generic(
+                fields, (self._mod_town_field - 1) % n)
+            nf = fields[self._mod_town_field]
+            self._mod_town_buffer = nf.value if nf.field_type != "action" else ""
+            self._mod_town_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_town_field, self._mod_town_field_scroll)
+        elif event.key == pygame.K_DOWN:
+            if current_field.editable and current_field.field_type != "action":
+                current_field.value = self._mod_town_buffer
+            self._mod_town_field = fe._next_editable_generic(
+                fields, (self._mod_town_field + 1) % n)
+            nf = fields[self._mod_town_field]
+            self._mod_town_buffer = nf.value if nf.field_type != "action" else ""
+            self._mod_town_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_town_field, self._mod_town_field_scroll)
+        elif current_field.field_type == "action":
+            # Don't allow typing on action fields
+            pass
+        elif event.key == pygame.K_BACKSPACE:
+            self._mod_town_buffer = self._mod_town_buffer[:-1]
+        elif event.unicode and event.unicode.isprintable():
+            self._mod_town_buffer += event.unicode
+
+    def _handle_mod_town_npc_list_input(self, event):
+        """Handle input for the townspeople NPC list (level 6)."""
+        import pygame
+        n = len(self._mod_town_npc_list)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._mod_town_save_npcs()
+            self.module_edit_level = 5
+            return
+        if self._is_new_shortcut(event):
+            self._mod_town_add_npc()
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_town_delete_npc()
+            return
+        if self._is_save_shortcut(event):
+            self._mod_town_save_npcs()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_town_npc_cursor = (
+                self._mod_town_npc_cursor - 1) % n
+            self._mod_town_npc_scroll = fe._adjust_scroll_generic(
+                self._mod_town_npc_cursor, self._mod_town_npc_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_town_npc_cursor = (
+                self._mod_town_npc_cursor + 1) % n
+            self._mod_town_npc_scroll = fe._adjust_scroll_generic(
+                self._mod_town_npc_cursor, self._mod_town_npc_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_town_build_npc_fields()
+            self.module_edit_level = 7
+
+    def _handle_mod_town_npc_field_input(self, event):
+        """Handle input for NPC field editing (level 7)."""
+        import pygame
+        fields = self._mod_town_npc_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 6
+            return
+
+        if self._is_save_shortcut(event):
+            f = fields[self._mod_town_npc_field]
+            if f.editable:
+                f.value = self._mod_town_npc_buffer
+            self._mod_town_save_npc_fields()
+            self._mod_town_save_npcs()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            f = fields[self._mod_town_npc_field]
+            if f.editable:
+                f.value = self._mod_town_npc_buffer
+            self._mod_town_save_npc_fields()
+            self._mod_town_save_npcs()
+            self.module_edit_level = 6
+            return
+
+        if event.key == pygame.K_UP:
+            f = fields[self._mod_town_npc_field]
+            if f.editable:
+                f.value = self._mod_town_npc_buffer
+            self._mod_town_npc_field = fe._next_editable_generic(
+                fields, (self._mod_town_npc_field - 1) % n)
+            self._mod_town_npc_buffer = fields[
+                self._mod_town_npc_field].value
+            self._mod_town_npc_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_town_npc_field,
+                    self._mod_town_npc_field_scroll))
+        elif event.key == pygame.K_DOWN:
+            f = fields[self._mod_town_npc_field]
+            if f.editable:
+                f.value = self._mod_town_npc_buffer
+            self._mod_town_npc_field = fe._next_editable_generic(
+                fields, (self._mod_town_npc_field + 1) % n)
+            self._mod_town_npc_buffer = fields[
+                self._mod_town_npc_field].value
+            self._mod_town_npc_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_town_npc_field,
+                    self._mod_town_npc_field_scroll))
+        elif event.key == pygame.K_BACKSPACE:
+            self._mod_town_npc_buffer = self._mod_town_npc_buffer[:-1]
+        elif event.unicode and event.unicode.isprintable():
+            self._mod_town_npc_buffer += event.unicode
+
+    # ── Town map generation ──
+
+    def _open_town_template_picker(self):
+        """Open the template picker showing layouts from town_templates.json."""
+        fe = self.features_editor
+        fe.load_townlayouts()
+        raw = fe.town_lists.get("layouts", [])
+        self._mod_town_gen_pick_list = raw
+        self._mod_town_gen_pick_cursor = 0
+        self._mod_town_gen_pick_scroll = 0
+        self._mod_town_gen_mode = "pick_template"
+
+    def _open_town_generate_form(self):
+        """Open the procedural generation parameter form."""
+        self._mod_town_gen_field = 0
+        self._mod_town_gen_size_idx = 1  # medium
+        self._mod_town_gen_style_idx = 0  # medieval
+        self._mod_town_gen_mode = "generate"
+
+    def _handle_mod_town_template_picker(self, event):
+        """Handle input for the town template import picker overlay."""
+        import pygame
+        templates = self._mod_town_gen_pick_list
+        n = len(templates)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_town_gen_mode = None
+            return
+        if not n:
+            return
+        if event.key == pygame.K_UP:
+            self._mod_town_gen_pick_cursor = (
+                self._mod_town_gen_pick_cursor - 1) % n
+            self._mod_town_gen_pick_scroll = fe._adjust_scroll_generic(
+                self._mod_town_gen_pick_cursor,
+                self._mod_town_gen_pick_scroll)
+        elif event.key == pygame.K_DOWN:
+            self._mod_town_gen_pick_cursor = (
+                self._mod_town_gen_pick_cursor + 1) % n
+            self._mod_town_gen_pick_scroll = fe._adjust_scroll_generic(
+                self._mod_town_gen_pick_cursor,
+                self._mod_town_gen_pick_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._apply_town_template(
+                templates[self._mod_town_gen_pick_cursor])
+            self._mod_town_gen_mode = None
+
+    def _handle_mod_town_generate_form(self, event):
+        """Handle input for the procedural town generation form."""
+        import pygame
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_town_gen_mode = None
+            return
+
+        n_fields = 3  # Size, Style, [Generate]
+        if event.key == pygame.K_UP:
+            self._mod_town_gen_field = (
+                self._mod_town_gen_field - 1) % n_fields
+        elif event.key == pygame.K_DOWN:
+            self._mod_town_gen_field = (
+                self._mod_town_gen_field + 1) % n_fields
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            delta = 1 if event.key == pygame.K_RIGHT else -1
+            if self._mod_town_gen_field == 0:
+                self._mod_town_gen_size_idx = (
+                    self._mod_town_gen_size_idx + delta
+                ) % len(self._MOD_TOWN_SIZES)
+            elif self._mod_town_gen_field == 1:
+                self._mod_town_gen_style_idx = (
+                    self._mod_town_gen_style_idx + delta
+                ) % len(self._MOD_TOWN_STYLES)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self._mod_town_gen_field == 2:
+                # Generate!
+                self._do_procedural_town_generate()
+                self._mod_town_gen_mode = None
+            elif self._mod_town_gen_field == 0:
+                self._mod_town_gen_size_idx = (
+                    self._mod_town_gen_size_idx + 1
+                ) % len(self._MOD_TOWN_SIZES)
+            elif self._mod_town_gen_field == 1:
+                self._mod_town_gen_style_idx = (
+                    self._mod_town_gen_style_idx + 1
+                ) % len(self._MOD_TOWN_STYLES)
+
+    def _apply_town_template(self, template):
+        """Apply a town layout template to the current town."""
+        import copy
+        town = self._mod_town_get_current()
+        if not town:
+            return
+        town["tiles"] = copy.deepcopy(template.get("tiles", {}))
+        town["width"] = template.get("width", 18)
+        town["height"] = template.get("height", 19)
+        town["entry_col"] = template.get("entry_col", 0)
+        town["entry_row"] = template.get("entry_row", 0)
+        town["town_style"] = template.get("town_style",
+                                           town.get("town_style", "medieval"))
+        # Import NPCs if present
+        if template.get("npcs"):
+            import copy as cp
+            town["npcs"] = cp.deepcopy(template["npcs"])
+        self._save_module_towns()
+        self._mod_town_save_flash = 1.5
+        # Refresh the settings fields to show updated values
+        self._mod_town_build_settings_fields()
+
+    def _do_procedural_town_generate(self):
+        """Procedurally generate a town map and apply it."""
+        from src.town_generator import generate_town
+        from src.settings import TILE_DEFS
+        import random
+
+        town = self._mod_town_get_current()
+        if not town:
+            return
+
+        size = self._MOD_TOWN_SIZES[self._mod_town_gen_size_idx]
+        style = self._MOD_TOWN_STYLES[self._mod_town_gen_style_idx]
+        name = town.get("name", "Town")
+        seed = random.randint(0, 2 ** 31)
+
+        town_config = {"size": size, "style": style}
+        td = generate_town(
+            name=name, seed=seed, town_config=town_config,
+            layout_index=self._mod_town_cursor)
+
+        # Convert dense TileMap to sparse editor format
+        sparse_tiles = {}
+        tmap = td.tile_map
+        for row in range(tmap.height):
+            for col in range(tmap.width):
+                tile_id = tmap.get_tile(col, row)
+                if tile_id is not None and tile_id != 0:
+                    tdef = TILE_DEFS.get(tile_id, {})
+                    key = f"{col},{row}"
+                    entry = {
+                        "tile_id": tile_id,
+                        "name": tdef.get("name", f"Tile {tile_id}"),
+                    }
+                    # Check for sprite overrides
+                    if (col, row) in tmap.sprite_overrides:
+                        entry["path"] = tmap.sprite_overrides[(col, row)]
+                    sparse_tiles[key] = entry
+
+        # Convert NPCs to editor format
+        npc_list = []
+        for npc in td.npcs:
+            npc_dict = {
+                "name": npc.name,
+                "npc_type": npc.npc_type,
+                "col": npc.col,
+                "row": npc.row,
+                "dialogue": list(npc.dialogue),
+                "shop_type": getattr(npc, "shop_type", "general"),
+                "god_name": getattr(npc, "god_name", "The Divine"),
+                "wander_range": getattr(npc, "wander_range", 4),
+            }
+            npc_list.append(npc_dict)
+
+        # Apply to current town
+        town["tiles"] = sparse_tiles
+        town["width"] = tmap.width
+        town["height"] = tmap.height
+        town["entry_col"] = td.entry_col
+        town["entry_row"] = td.entry_row
+        town["town_style"] = td.town_style
+        town["npcs"] = npc_list
+
+        self._save_module_towns()
+        self._mod_town_save_flash = 1.5
+        # Refresh the settings fields to show updated values
+        self._mod_town_build_settings_fields()
+
+    # ── Enclosure methods ──
+
+    def _mod_town_load_enclosures(self):
+        """Load enclosure instances from the current town dict."""
+        town = self._mod_town_get_current()
+        if not town:
+            self._mod_town_enclosures = []
+            return
+        self._mod_town_enclosures = list(town.get("interiors", []))
+        self._mod_town_enc_cursor = 0
+        self._mod_town_enc_scroll = 0
+
+    def _mod_town_save_enclosures(self):
+        """Write enclosure instances back into the current town dict."""
+        town = self._mod_town_get_current()
+        if not town:
+            return
+        town["interiors"] = list(self._mod_town_enclosures)
+
+    def _mod_town_open_enc_picker(self):
+        """Open the import picker showing me_enclosure templates."""
+        fe = self.features_editor
+        saved = fe.load_map_templates()
+        raw = saved.get("me_enclosure", [])
+        self._mod_town_enc_pick_list = raw
+        self._mod_town_enc_pick_cursor = 0
+        self._mod_town_enc_pick_scroll = 0
+        self._mod_town_enc_picking = True
+
+    def _mod_town_generate_enclosure(self, name, template):
+        """Create a new enclosure instance from a template."""
+        import copy
+        mc = template.get("map_config", {})
+        instance = {
+            "name": name,
+            "width": mc.get("width", 16),
+            "height": mc.get("height", 14),
+            "tiles": copy.deepcopy(template.get("tiles", {})),
+            "template_label": template.get("label", "Unknown"),
+        }
+        self._mod_town_enclosures.append(instance)
+        self._mod_town_enc_cursor = len(self._mod_town_enclosures) - 1
+        self._mod_town_save_enclosures()
+        self._save_module_towns()
+        self._mod_town_save_flash = 1.5
+
+    def _mod_town_delete_enclosure(self):
+        """Delete the currently selected enclosure instance."""
+        n = len(self._mod_town_enclosures)
+        if n == 0:
+            return
+        self._mod_town_enclosures.pop(self._mod_town_enc_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_town_enc_cursor = 0
+        elif self._mod_town_enc_cursor >= n:
+            self._mod_town_enc_cursor = n - 1
+        self._mod_town_save_enclosures()
+        self._save_module_towns()
+
+    def _mod_town_launch_enc_editor(self):
+        """Launch the map editor for the selected enclosure instance."""
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_interior_brushes,
+            STORAGE_SPARSE, GRID_FIXED,
+        )
+        if not (0 <= self._mod_town_enc_cursor < len(
+                self._mod_town_enclosures)):
+            return
+        enc = self._mod_town_enclosures[self._mod_town_enc_cursor]
+        w = enc.get("width", 16)
+        h = enc.get("height", 14)
+
+        fe = self.features_editor
+        brushes = build_interior_brushes(fe.TILE_CONTEXT)
+
+        def on_save(state):
+            enc["tiles"] = state.tiles
+            enc["width"] = state.config.width
+            enc["height"] = state.config.height
+            state.dirty = False
+            self._mod_town_save_enclosures()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+
+        def on_exit(st):
+            enc["tiles"] = st.tiles
+            self._mod_town_save_enclosures()
+            self._save_module_towns()
+            self.showing_features = False
+            self.showing_modules = True
+            self.module_edit_mode = True
+            self._mod_town_editor_active = False
+            self._mod_town_map_editor_state = None
+            self._mod_town_map_editor_handler = None
+
+        config = MapEditorConfig(
+            title=f"Enclosure: {enc.get('name', 'Unnamed')}",
+            storage=STORAGE_SPARSE,
+            grid_type=GRID_FIXED,
+            width=w,
+            height=h,
+            tile_context="dungeon",
+            brushes=brushes,
+            supports_interior_links=True,
+            supports_replace=True,
+            on_save=on_save,
+            on_exit=on_exit,
+        )
+        existing_tiles = dict(enc.get("tiles", {}))
+        state = MapEditorState(config, tiles=existing_tiles)
+        handler = MapEditorInputHandler(
+            state, is_save_shortcut=self._is_save_shortcut)
+        self._mod_town_map_editor_state = state
+        self._mod_town_map_editor_handler = handler
+        self._mod_town_editor_active = True
+        self.module_edit_mode = False
+        self.showing_modules = False
+        self.showing_features = True
+        fe = self.features_editor
+        fe.active_editor = "mod_town_map"
+        fe.level = 1
+
+    # ── Enclosure input handlers ──
+
+    def _handle_mod_town_enc_list_input(self, event):
+        """Handle input for the enclosure list (level 6, sub_cursor 2)."""
+        import pygame
+
+        # ── Import picker overlay ──
+        if self._mod_town_enc_picking:
+            self._handle_mod_town_enc_picker_input(event)
+            return
+
+        # ── Naming overlay (after picking template) ──
+        if self._mod_town_enc_naming:
+            self._handle_mod_town_enc_naming_input(event)
+            return
+
+        n = len(self._mod_town_enclosures)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._mod_town_save_enclosures()
+            self.module_edit_level = 5
+            return
+
+        # Import from template (Ctrl+N)
+        if self._is_new_shortcut(event):
+            self._mod_town_open_enc_picker()
+            return
+
+        # Delete enclosure (Ctrl+D)
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_town_delete_enclosure()
+            return
+
+        # Save (Ctrl+S)
+        if self._is_save_shortcut(event):
+            self._mod_town_save_enclosures()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_town_enc_cursor = (
+                self._mod_town_enc_cursor - 1) % n
+            self._mod_town_enc_scroll = fe._adjust_scroll_generic(
+                self._mod_town_enc_cursor, self._mod_town_enc_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_town_enc_cursor = (
+                self._mod_town_enc_cursor + 1) % n
+            self._mod_town_enc_scroll = fe._adjust_scroll_generic(
+                self._mod_town_enc_cursor, self._mod_town_enc_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            # Edit the selected enclosure in the map editor
+            self._mod_town_launch_enc_editor()
+
+    def _handle_mod_town_enc_picker_input(self, event):
+        """Handle input for the enclosure template import picker."""
+        import pygame
+        templates = self._mod_town_enc_pick_list
+        n = len(templates)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_town_enc_picking = False
+            return
+
+        if not n:
+            return
+
+        if event.key == pygame.K_UP:
+            self._mod_town_enc_pick_cursor = (
+                self._mod_town_enc_pick_cursor - 1) % n
+            self._mod_town_enc_pick_scroll = fe._adjust_scroll_generic(
+                self._mod_town_enc_pick_cursor,
+                self._mod_town_enc_pick_scroll)
+        elif event.key == pygame.K_DOWN:
+            self._mod_town_enc_pick_cursor = (
+                self._mod_town_enc_pick_cursor + 1) % n
+            self._mod_town_enc_pick_scroll = fe._adjust_scroll_generic(
+                self._mod_town_enc_pick_cursor,
+                self._mod_town_enc_pick_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Select template → show naming overlay to generate instance
+            template = templates[self._mod_town_enc_pick_cursor]
+            self._mod_town_enc_template = template
+            self._mod_town_enc_naming = True
+            self._mod_town_enc_name_buf = template.get("label", "Interior")
+            self._mod_town_enc_picking = False
+
+    def _handle_mod_town_enc_naming_input(self, event):
+        """Handle naming input after selecting a template to generate."""
+        import pygame
+        if event.key == pygame.K_ESCAPE:
+            self._mod_town_enc_naming = False
+            self._mod_town_enc_template = None
+            return
+        if event.key == pygame.K_RETURN:
+            name = self._mod_town_enc_name_buf.strip()
+            if name and self._mod_town_enc_template:
+                self._mod_town_generate_enclosure(
+                    name, self._mod_town_enc_template)
+            self._mod_town_enc_naming = False
+            self._mod_town_enc_template = None
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self._mod_town_enc_name_buf = self._mod_town_enc_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self._mod_town_enc_name_buf += event.unicode
+
     # ── Module / settings helpers ────────────────────────────────
 
     def _set_active_module(self, path, name, version):
@@ -3024,6 +4103,11 @@ class Game:
                     self.module_msg_timer -= dt
                     if self.module_msg_timer <= 0:
                         self.module_message = None
+                # Tick town save flash
+                if self._mod_town_save_flash > 0:
+                    self._mod_town_save_flash -= dt
+                    if self._mod_town_save_flash < 0:
+                        self._mod_town_save_flash = 0
             elif self.showing_game_over:
                 for event in events:
                     self._handle_game_over_input(event)
@@ -3145,7 +4229,50 @@ class Game:
                     overview_gen_buffer=getattr(self, '_mod_overview_gen_buffer', ""),
                     overview_children=getattr(self, '_mod_overview_children', []),
                     overview_child_cursor=getattr(self, '_mod_overview_child_cursor', 0),
-                    overview_editor_state=getattr(self, '_mod_map_editor_state', None))
+                    overview_editor_state=getattr(self, '_mod_map_editor_state', None),
+                    town_data={
+                        "towns": self._mod_town_list,
+                        "cursor": self._mod_town_cursor,
+                        "scroll": self._mod_town_scroll,
+                        "sub_cursor": self._mod_town_sub_cursor,
+                        "sub_items": self._mod_town_sub_items,
+                        "fields": self._mod_town_fields,
+                        "field_cursor": self._mod_town_field,
+                        "field_buffer": self._mod_town_buffer,
+                        "field_scroll": self._mod_town_field_scroll,
+                        "npc_list": self._mod_town_npc_list,
+                        "npc_cursor": self._mod_town_npc_cursor,
+                        "npc_scroll": self._mod_town_npc_scroll,
+                        "npc_fields": self._mod_town_npc_fields,
+                        "npc_field_cursor": self._mod_town_npc_field,
+                        "npc_field_buffer": self._mod_town_npc_buffer,
+                        "npc_field_scroll": self._mod_town_npc_field_scroll,
+                        "editor_active": self._mod_town_editor_active,
+                        "editor_data": self._mod_town_map_editor_state,
+                        "naming": self._mod_town_naming,
+                        "name_buf": self._mod_town_name_buf,
+                        "naming_is_new": self._mod_town_naming_is_new,
+                        "save_flash": self._mod_town_save_flash,
+                        "level": max(0, self.module_edit_level - 4),
+                        "enclosures": self._mod_town_enclosures,
+                        "enc_cursor": self._mod_town_enc_cursor,
+                        "enc_scroll": self._mod_town_enc_scroll,
+                        "enc_picking": self._mod_town_enc_picking,
+                        "enc_pick_list": self._mod_town_enc_pick_list,
+                        "enc_pick_cursor": self._mod_town_enc_pick_cursor,
+                        "enc_pick_scroll": self._mod_town_enc_pick_scroll,
+                        "enc_naming": self._mod_town_enc_naming,
+                        "enc_name_buf": self._mod_town_enc_name_buf,
+                        "gen_mode": self._mod_town_gen_mode,
+                        "gen_pick_list": self._mod_town_gen_pick_list,
+                        "gen_pick_cursor": self._mod_town_gen_pick_cursor,
+                        "gen_pick_scroll": self._mod_town_gen_pick_scroll,
+                        "gen_field": self._mod_town_gen_field,
+                        "gen_size_idx": self._mod_town_gen_size_idx,
+                        "gen_style_idx": self._mod_town_gen_style_idx,
+                        "gen_sizes": self._MOD_TOWN_SIZES,
+                        "gen_styles": self._MOD_TOWN_STYLES,
+                    })
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
             elif self.showing_game_over:

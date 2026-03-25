@@ -1,0 +1,1798 @@
+[
+  {
+    "name": "Yardley",
+    "width": 46,
+    "height": 39,
+    "tiles": {
+      "13,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "15,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "22,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "23,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "24,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "25,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "29,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "32,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,10": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,10": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "29,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "18,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "19,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "20,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "28,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "29,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,15": {
+        "tile_id": 13,
+        "name": "Door"
+      },
+      "19,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,15": {
+        "tile_id": 13,
+        "name": "Door"
+      },
+      "29,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,16": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,16": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,17": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,17": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,18": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,18": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,19": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,19": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,20": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,20": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,21": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,21": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,23": {
+        "tile_id": 37,
+        "name": "Brick"
+      },
+      "27,23": {
+        "tile_id": 37,
+        "name": "Brick"
+      },
+      "28,23": {
+        "tile_id": 37,
+        "name": "Brick"
+      },
+      "29,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,24": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,24": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,24": {
+        "tile_id": 35,
+        "name": "Altar"
+      },
+      "18,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,24": {
+        "tile_id": 13,
+        "name": "Door"
+      },
+      "21,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,24": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,27": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,27": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,28": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,28": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "15,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "22,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "23,29": {
+        "tile_id": 14,
+        "name": "Exit"
+      },
+      "24,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "25,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "29,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "32,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      }
+    },
+    "description": "Riverside town",
+    "town_style": "medieval",
+    "entry_col": 23,
+    "entry_row": 28,
+    "npcs": [
+      {
+        "name": "Sister Vesper",
+        "npc_type": "priest",
+        "col": 18,
+        "row": 24,
+        "dialogue": [
+          "Welcome to the Shrine of Noxara, child.",
+          "The light of Noxara heals all wounds.",
+          "We offer healing and resurrection for those in need.",
+          "May Noxara's radiance guide your path."
+        ],
+        "shop_type": "general",
+        "god_name": "Noxara",
+        "wander_range": 4
+      },
+      {
+        "name": "Lira",
+        "npc_type": "shopkeep",
+        "col": 18,
+        "row": 14,
+        "dialogue": [
+          "Ah",
+          "customers! Welcome to Lira's Trading Post.",
+          "You won't find better quality anywhere else.",
+          "Every item here has been tested in the field.",
+          "Gold well spent is gold well earned!"
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Doric",
+        "npc_type": "innkeeper",
+        "col": 28,
+        "row": 14,
+        "dialogue": [
+          "Come in, come in! The Hearthstone is the warmest spot in town.",
+          "Hot stew and a soft bed -- what more could you want?",
+          "Travelers bring all sorts of stories through here.",
+          "Stay as long as you like!"
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Elder Rowan",
+        "npc_type": "elder",
+        "col": 23,
+        "row": 19,
+        "dialogue": [
+          "You carry the look of adventurers. Good -- we need heroes.",
+          "Our scouts report growing dangers in every direction.",
+          "The ancient wards are failing. Something must be done.",
+          "I pray you have the courage to see this through."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Calla",
+        "npc_type": "villager",
+        "col": 19,
+        "row": 25,
+        "dialogue": [
+          "Have you heard about the old ruins?",
+          "They say treasure lies within."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Finn",
+        "npc_type": "villager",
+        "col": 27,
+        "row": 26,
+        "dialogue": [
+          "The road north has been dangerous lately.",
+          "Stick to the main paths."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Hanna",
+        "npc_type": "villager",
+        "col": 24,
+        "row": 17,
+        "dialogue": [
+          "Beautiful day, isn't it?",
+          "Watch out for wolves in the forest."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      }
+    ],
+    "_action_import": "Map assigned",
+    "_action_generate": "Map assigned",
+    "interiors": []
+  }
+]

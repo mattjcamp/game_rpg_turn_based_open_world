@@ -7368,6 +7368,10 @@ class Renderer(CombatEffectRendererMixin):
                 # Module overview map — uses the shared map editor
                 if state.overview_editor_data is not None:
                     self._draw_map_editor_fullscreen(state.overview_editor_data)
+            elif ed == "mod_town_map":
+                # Module town map — uses the shared map editor
+                if state.town_map_editor_data is not None:
+                    self._draw_map_editor_fullscreen(state.town_map_editor_data)
             elif ed == "mapeditor":
                 if meh_editor_active and meh_editor_data:
                     # Fullscreen map editor (launched from a template)
@@ -7391,6 +7395,589 @@ class Renderer(CombatEffectRendererMixin):
                         "save_flash": mh.save_flash,
                     }
                     self.draw_map_editor_hub(hub_data)
+
+    def draw_town_editor_panel(self, rx, ry, rw, rh, tw):
+        """Draw the town editor panel inside the module editor right panel.
+
+        ``tw`` is a dict with keys mirroring TownEditorRS fields:
+        towns, cursor, scroll, sub_cursor, sub_items, fields,
+        field_cursor, field_buffer, field_scroll, npc_list, npc_cursor,
+        npc_scroll, npc_fields, npc_field_cursor, npc_field_buffer,
+        npc_field_scroll, editor_active, editor_data, naming, name_buf,
+        naming_is_new, save_flash, level.
+        """
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        towns = tw.get("towns") or []
+        cursor = tw.get("cursor", 0)
+        scroll = tw.get("scroll", 0)
+        level = tw.get("level", 0)
+        row_h = 36
+
+        # ── Map editor fullscreen ──
+        if tw.get("editor_active") and tw.get("editor_data"):
+            self._draw_map_editor_fullscreen(tw["editor_data"])
+            return
+
+        # Semi-transparent overlay (like the section browser)
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        # ── Level 0: Town list ──
+        if level == 0:
+            self._u3_text("TOWNS", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            ly = ry + 44
+            content_h = rh - 80
+            max_vis = content_h // row_h
+
+            if len(towns) == 0:
+                self._u3_text("No towns yet. Press Ctrl+N to add.",
+                              rx + 20, ly + 10, (140, 140, 160), fm)
+            else:
+                for vi in range(max_vis):
+                    i = scroll + vi
+                    if i >= len(towns):
+                        break
+                    town = towns[i]
+                    selected = (i == cursor)
+                    y = ly + vi * row_h
+                    if selected:
+                        bar = pygame.Surface((rw - 4, row_h - 2),
+                                             pygame.SRCALPHA)
+                        bar.fill((255, 200, 60, 30))
+                        self.screen.blit(bar, (rx + 2, y - 1))
+                    prefix = "> " if selected else "  "
+                    color = self._U3_WHITE if selected else (180, 180, 180)
+                    name = town.get("name", "Unnamed")
+                    tw_w = town.get("width", 0)
+                    tw_h = town.get("height", 0)
+                    n_npcs = len(town.get("npcs", []))
+                    self._u3_text(f"{prefix}{name}",
+                                  rx + 10, y, color, fm)
+                    self._u3_text(f"  {tw_w}x{tw_h}  {n_npcs} NPCs",
+                                  rx + 10, y + 18, (140, 140, 160), fs)
+
+            # Naming overlay
+            if tw.get("naming"):
+                self._draw_naming_overlay(
+                    tw.get("name_buf", ""),
+                    "New Town Name:" if tw.get("naming_is_new") else "Rename Town:",
+                    fm, f)
+
+            # Save flash
+            sf = tw.get("save_flash", 0)
+            if sf > 0:
+                alpha = min(255, int(sf * 255))
+                self._u3_text("Saved!", rx + rw // 2 - 30,
+                              ry + rh - 36,
+                              (100, 255, 100, alpha), f)
+
+            # Hint
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] New  [Ctrl+D] Del  [Esc] Back",
+                rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Level 1: Sub-screen selector ──
+        elif level == 1:
+            town = towns[cursor] if 0 <= cursor < len(towns) else {}
+            town_name = town.get("name", "Unnamed")
+            self._u3_text(f"TOWN: {town_name}", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            ly = ry + 50
+            sub_items = tw.get("sub_items") or ["Settings", "Townspeople", "Edit Map"]
+            sub_cursor = tw.get("sub_cursor", 0)
+            for i, item in enumerate(sub_items):
+                selected = (i == sub_cursor)
+                y = ly + i * 40
+                if selected:
+                    bar = pygame.Surface((rw - 4, 38),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{item}",
+                              rx + 16, y + 8, color, fm)
+
+            # Hint
+            self._u3_text("[Enter] Open  [Esc] Back",
+                          rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Level 2: Settings fields OR Townspeople list OR Enclosures ──
+        elif level == 2:
+            sub_cursor = tw.get("sub_cursor", 0)
+            if sub_cursor == 0:
+                self._draw_town_settings(
+                    tw, rx, ry, rw, rh, fm, fs, f)
+            elif sub_cursor == 1:
+                self._draw_town_npc_list(
+                    tw, rx, ry, rw, rh, fm, fs, f)
+            elif sub_cursor == 2:
+                self._draw_town_enc_list(
+                    tw, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Level 3: NPC field editor ──
+        elif level == 3:
+            self._draw_town_npc_editor(
+                tw, rx, ry, rw, rh, fm, fs, f)
+
+    def _draw_town_settings(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the town settings field editor."""
+        fields = tw.get("fields") or []
+        field_cursor = tw.get("field_cursor", 0)
+        field_buffer = tw.get("field_buffer", "")
+        field_scroll = tw.get("field_scroll", 0)
+        row_h = 38
+        max_visible = rh // row_h
+
+        self._u3_text("Town Settings", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+
+        for vi in range(max_visible):
+            i = field_scroll + vi
+            if i >= len(fields):
+                break
+            fe = fields[i]
+            y = ly + vi * row_h
+            selected = (i == field_cursor)
+
+            if fe.field_type == "section":
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 10, y + 10),
+                                 (rx + rw - 10, y + 10), 1)
+                if fe.label:
+                    self._u3_text(fe.label, rx + 14, y + 14,
+                                  (180, 140, 60), fs)
+                continue
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, row_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 25))
+                self.screen.blit(bar, (rx + 2, y))
+
+            # ── Action field (button-like) ──
+            if fe.field_type == "action":
+                label_color = (100, 200, 255) if selected else (80, 150, 200)
+                prefix = "> " if selected else "  "
+                self._u3_text(f"{prefix}{fe.label}",
+                              rx + 14, y + 4, label_color, fm)
+                # Status text
+                self._u3_text(fe.value,
+                              rx + 14, y + 20, (140, 140, 160), fs)
+                continue
+
+            label_color = self._U3_WHITE if selected else (160, 160, 180)
+            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+
+            val_x = rx + 140
+            if selected and fe.editable:
+                val_text = field_buffer + "_"
+                val_color = (255, 220, 100)
+            else:
+                val_text = fe.value
+                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+            self._u3_text(val_text, val_x, y + 4, val_color, fm)
+
+        sf = tw.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36, (100, 255, 100, alpha), f)
+
+        self._u3_text(
+            "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Template picker overlay ──
+        if tw.get("gen_mode") == "pick_template":
+            self._draw_town_template_picker(tw, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Generate form overlay ──
+        if tw.get("gen_mode") == "generate":
+            self._draw_town_generate_form(tw, rx, ry, rw, rh, fm, fs, f)
+
+    def _draw_town_template_picker(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the town layout template picker overlay."""
+        templates = tw.get("gen_pick_list") or []
+        cursor = tw.get("gen_pick_cursor", 0)
+        scroll = tw.get("gen_pick_scroll", 0)
+        row_h = 40
+
+        pad = 12
+        ox = rx + pad
+        oy = ry + pad
+        ow = rw - pad * 2
+        oh = rh - pad * 2
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((20, 12, 30, 240))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (180, 140, 60),
+                         (ox, oy, ow, oh), 2)
+
+        self._u3_text("IMPORT TOWN TEMPLATE", ox + 16, oy + 10,
+                      self._U3_ORANGE, f)
+        ly = oy + 42
+        content_h = oh - 80
+        max_vis = content_h // row_h
+
+        if len(templates) == 0:
+            self._u3_text("No town templates found.",
+                          ox + 20, ly + 10, (140, 140, 160), fm)
+            self._u3_text("Create layouts in the global Town editor.",
+                          ox + 20, ly + 30, (100, 160, 200), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(templates):
+                    break
+                tmpl = templates[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((ow - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (ox + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                label = tmpl.get("name", "Unnamed")
+                tw_val = tmpl.get("width", "?")
+                th_val = tmpl.get("height", "?")
+                n_npcs = len(tmpl.get("npcs", []))
+                self._u3_text(f"{prefix}{label}",
+                              ox + 10, y, color, fm)
+                self._u3_text(
+                    f"  {tw_val}x{th_val}  {n_npcs} NPCs",
+                    ox + 10, y + 18, (140, 140, 160), fs)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Import  [Esc] Cancel",
+            ox + 16, oy + oh - 28, self._U3_HINT, fs)
+
+    def _draw_town_generate_form(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the procedural town generation parameter form."""
+        gen_field = tw.get("gen_field", 0)
+        size_idx = tw.get("gen_size_idx", 1)
+        style_idx = tw.get("gen_style_idx", 0)
+        sizes = tw.get("gen_sizes") or ["small", "medium", "large"]
+        styles = tw.get("gen_styles") or ["medieval"]
+
+        pad = 12
+        ox = rx + pad
+        oy = ry + pad
+        ow = rw - pad * 2
+        oh = rh - pad * 2
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((20, 12, 30, 240))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (180, 140, 60),
+                         (ox, oy, ow, oh), 2)
+
+        self._u3_text("GENERATE TOWN MAP", ox + 16, oy + 10,
+                      self._U3_ORANGE, f)
+
+        # Size field
+        y = oy + 52
+        sel = (gen_field == 0)
+        lbl_c = self._U3_WHITE if sel else (160, 160, 180)
+        val_c = (255, 220, 100) if sel else (200, 200, 200)
+        if sel:
+            bar = pygame.Surface((ow - 4, 34), pygame.SRCALPHA)
+            bar.fill((255, 200, 60, 25))
+            self.screen.blit(bar, (ox + 2, y - 2))
+        self._u3_text("Size:", ox + 16, y + 4, lbl_c, fm)
+        size_text = f"< {sizes[size_idx].capitalize()} >"
+        self._u3_text(size_text, ox + 140, y + 4, val_c, fm)
+        # Show dimensions
+        _dims = {"small": "14x15", "medium": "18x19", "large": "24x26"}
+        self._u3_text(_dims.get(sizes[size_idx], ""),
+                      ox + 280, y + 4, (140, 140, 160), fs)
+
+        # Style field
+        y += 44
+        sel = (gen_field == 1)
+        lbl_c = self._U3_WHITE if sel else (160, 160, 180)
+        val_c = (255, 220, 100) if sel else (200, 200, 200)
+        if sel:
+            bar = pygame.Surface((ow - 4, 34), pygame.SRCALPHA)
+            bar.fill((255, 200, 60, 25))
+            self.screen.blit(bar, (ox + 2, y - 2))
+        self._u3_text("Style:", ox + 16, y + 4, lbl_c, fm)
+        style_text = f"< {styles[style_idx].capitalize()} >"
+        self._u3_text(style_text, ox + 140, y + 4, val_c, fm)
+
+        # Generate button
+        y += 60
+        sel = (gen_field == 2)
+        btn_color = (100, 255, 100) if sel else (80, 180, 80)
+        if sel:
+            bar = pygame.Surface((ow - 4, 34), pygame.SRCALPHA)
+            bar.fill((60, 200, 60, 30))
+            self.screen.blit(bar, (ox + 2, y - 2))
+        self._u3_text("> Generate", ox + 16, y + 4, btn_color, f)
+
+        self._u3_text(
+            "[Up/Dn] Field  [Lt/Rt] Change  [Enter] Select  [Esc] Cancel",
+            ox + 16, oy + oh - 28, self._U3_HINT, fs)
+
+    def _draw_town_npc_list(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the townspeople NPC list."""
+        npcs = tw.get("npc_list") or []
+        cursor = tw.get("npc_cursor", 0)
+        scroll = tw.get("npc_scroll", 0)
+        row_h = 36
+
+        self._u3_text("TOWNSPEOPLE", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        content_h = rh - 80
+        max_vis = content_h // row_h
+
+        if len(npcs) == 0:
+            self._u3_text("No NPCs yet. Press Ctrl+N to add.",
+                          rx + 20, ly + 10, (140, 140, 160), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(npcs):
+                    break
+                npc = npcs[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                name = npc.get("name", "Unnamed")
+                npc_type = npc.get("npc_type", "villager")
+                self._u3_text(f"{prefix}{name}  ({npc_type})",
+                              rx + 10, y + 4, color, fm)
+                self._u3_text(
+                    f"  pos: ({npc.get('col', 0)},{npc.get('row', 0)})",
+                    rx + 10, y + 20, (140, 140, 160), fs)
+
+        sf = tw.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36, (100, 255, 100, alpha), f)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_town_npc_editor(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the NPC field editor."""
+        fields = tw.get("npc_fields") or []
+        field_cursor = tw.get("npc_field_cursor", 0)
+        field_buffer = tw.get("npc_field_buffer", "")
+        field_scroll = tw.get("npc_field_scroll", 0)
+        row_h = 38
+        max_visible = rh // row_h
+
+        npc_name = ""
+        if fields:
+            for fe in fields:
+                if fe.key == "name":
+                    npc_name = fe.value
+                    break
+        self._u3_text(f"EDIT NPC: {npc_name}", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+
+        for vi in range(max_visible):
+            i = field_scroll + vi
+            if i >= len(fields):
+                break
+            fe = fields[i]
+            y = ly + vi * row_h
+            selected = (i == field_cursor)
+
+            if fe.field_type == "section":
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 10, y + 10),
+                                 (rx + rw - 10, y + 10), 1)
+                continue
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, row_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 25))
+                self.screen.blit(bar, (rx + 2, y))
+
+            label_color = self._U3_WHITE if selected else (160, 160, 180)
+            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+
+            val_x = rx + 140
+            if selected and fe.editable:
+                val_text = field_buffer + "_"
+                val_color = (255, 220, 100)
+            else:
+                val_text = fe.value
+                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+            self._u3_text(val_text, val_x, y + 4, val_color, fm)
+
+        sf = tw.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36, (100, 255, 100, alpha), f)
+
+        self._u3_text(
+            "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_town_enc_list(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the enclosure instance list with import picker overlay."""
+        enclosures = tw.get("enclosures") or []
+        cursor = tw.get("enc_cursor", 0)
+        scroll = tw.get("enc_scroll", 0)
+        row_h = 36
+
+        self._u3_text("ENCLOSURES", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        content_h = rh - 80
+        max_vis = content_h // row_h
+
+        if len(enclosures) == 0:
+            self._u3_text("No enclosures yet.",
+                          rx + 20, ly + 10, (140, 140, 160), fm)
+            self._u3_text("Press Ctrl+N to import a template.",
+                          rx + 20, ly + 30, (100, 160, 200), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(enclosures):
+                    break
+                enc = enclosures[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                name = enc.get("name", "Unnamed")
+                ew = enc.get("width", 0)
+                eh = enc.get("height", 0)
+                tmpl = enc.get("template_label", "")
+                self._u3_text(f"{prefix}{name}",
+                              rx + 10, y, color, fm)
+                sub_text = f"  {ew}x{eh}"
+                if tmpl:
+                    sub_text += f"  ({tmpl})"
+                self._u3_text(sub_text,
+                              rx + 10, y + 18, (140, 140, 160), fs)
+
+        sf = tw.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36, (100, 255, 100, alpha), f)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Import  [Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Import picker overlay ──
+        if tw.get("enc_picking"):
+            self._draw_town_enc_picker(tw, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Naming overlay (Generate) ──
+        if tw.get("enc_naming"):
+            self._draw_naming_overlay(
+                tw.get("enc_name_buf", ""),
+                "Generate Enclosure — Name:",
+                fm, f)
+
+    def _draw_town_enc_picker(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the enclosure template import picker overlay."""
+        templates = tw.get("enc_pick_list") or []
+        cursor = tw.get("enc_pick_cursor", 0)
+        scroll = tw.get("enc_pick_scroll", 0)
+        row_h = 40
+
+        # Overlay background
+        pad = 12
+        ox = rx + pad
+        oy = ry + pad
+        ow = rw - pad * 2
+        oh = rh - pad * 2
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((20, 12, 30, 240))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (180, 140, 60),
+                         (ox, oy, ow, oh), 2)
+
+        self._u3_text("IMPORT ENCLOSURE TEMPLATE", ox + 16, oy + 10,
+                      self._U3_ORANGE, f)
+        ly = oy + 42
+        content_h = oh - 80
+        max_vis = content_h // row_h
+
+        if len(templates) == 0:
+            self._u3_text("No enclosure templates found.",
+                          ox + 20, ly + 10, (140, 140, 160), fm)
+            self._u3_text("Create templates in the Map Editor hub.",
+                          ox + 20, ly + 30, (100, 160, 200), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(templates):
+                    break
+                tmpl = templates[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((ow - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (ox + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                label = tmpl.get("label", "Unnamed")
+                mc = tmpl.get("map_config", {})
+                dims = f"{mc.get('width', '?')}x{mc.get('height', '?')}"
+                sub = tmpl.get("subtitle", dims)
+                self._u3_text(f"{prefix}{label}",
+                              ox + 10, y, color, fm)
+                self._u3_text(f"  {sub}",
+                              ox + 10, y + 18, (140, 140, 160), fs)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Generate  [Esc] Cancel",
+            ox + 16, oy + oh - 28, self._U3_HINT, fs)
+
+    def _draw_naming_overlay(self, name_buf, title, fm, f):
+        """Draw a centered naming/renaming overlay."""
+        ow, oh = 360, 100
+        ox = (SCREEN_WIDTH - ow) // 2
+        oy = (SCREEN_HEIGHT - oh) // 2
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((30, 20, 40, 230))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (120, 90, 50),
+                         (ox, oy, ow, oh), 2)
+        self._u3_text(title, ox + 16, oy + 12,
+                      self._U3_ORANGE, fm)
+        self._u3_text(name_buf + "_", ox + 16, oy + 44,
+                      self._U3_WHITE, f)
+        self._u3_text("[Enter] Confirm  [Esc] Cancel",
+                      ox + 16, oy + 74, self._U3_HINT, self.font_small)
 
     def _draw_features_spell_nav(self, left_x, left_w, right_x,
                                   right_w, panel_y, panel_h,
@@ -9190,7 +9777,8 @@ class Renderer(CombatEffectRendererMixin):
                            overview_gen_buffer="",
                            overview_children=None,
                            overview_child_cursor=0,
-                           overview_editor_state=None):
+                           overview_editor_state=None,
+                           town_data=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -9441,6 +10029,10 @@ class Renderer(CombatEffectRendererMixin):
                     edit_scroll,
                     children=overview_children,
                     child_cursor=overview_child_cursor)
+            elif edit_level in (4, 5, 6, 7) and town_data:
+                # Town editor panel
+                self.draw_town_editor_panel(
+                    right_x, panel_y, right_w, panel_h, town_data)
 
         # ── Template picker overlay ──
         if overview_picking:
@@ -9479,6 +10071,9 @@ class Renderer(CombatEffectRendererMixin):
         elif edit_mode and edit_level == 3:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[CTRL+S] Save  [ESC] Back")
+        elif edit_mode and edit_level in (4, 5, 6, 7):
+            # Town editor has its own hints inside draw_town_editor_panel
+            hint = ""
         else:
             hint = ("[UP/DN] Browse  [S] Select  "
                     "[ENTER] Edit  [Ctrl+N] New  [Ctrl+D] Delete  [ESC] Back")

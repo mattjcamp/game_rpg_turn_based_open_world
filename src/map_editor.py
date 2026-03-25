@@ -905,6 +905,62 @@ def _build_tile_brushes(tile_ids: List[int], group: str,
     return brushes
 
 
+def build_town_brushes(tile_context_map: Dict[int, str],
+                       feat_tiles_path: str = "",
+                       manifest: Optional[Dict] = None,
+                       feat_tile_list: Optional[List] = None,
+                       object_templates: Optional[List] = None,
+                       ) -> List[Brush]:
+    """Build brush list for town map editors.
+
+    Includes Town tiles, Dungeon/Interior tiles (for buildings,
+    altars, doors), and optionally Objects.
+    """
+    resolve = _make_sprite_resolver(feat_tiles_path, manifest, feat_tile_list)
+
+    town_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "town" and tid in TILE_DEFS
+    )
+    dungeon_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "dungeon" and tid in TILE_DEFS
+    )
+    overworld_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "overworld" and tid in TILE_DEFS
+    )
+
+    brushes: List[Brush] = []
+    brushes.append(Brush(name="Eraser", tile_id=None, path=None))
+
+    # ── Town tiles folder ──
+    grp_town = "Town"
+    brushes.append(Brush(name=grp_town, tile_id=None,
+                         is_folder_header=True))
+    brushes.extend(_build_tile_brushes(town_ids, grp_town, resolve))
+
+    # ── Dungeon / Interior tiles folder ──
+    grp_int = "Interior"
+    brushes.append(Brush(name=grp_int, tile_id=None,
+                         is_folder_header=True))
+    brushes.extend(_build_tile_brushes(dungeon_ids, grp_int, resolve))
+
+    # ── Overworld tiles folder ──
+    grp_ow = "Overworld"
+    brushes.append(Brush(name=grp_ow, tile_id=None,
+                         is_folder_header=True))
+    for tid in overworld_ids:
+        brushes.append(Brush(
+            name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp_ow))
+
+    # ── Objects folder ──
+    if object_templates:
+        _append_object_brushes(brushes, object_templates)
+
+    return brushes
+
+
 def build_overworld_brushes(tile_context_map: Dict[int, str],
                             object_templates: Optional[List] = None,
                             ) -> List[Brush]:

@@ -1718,7 +1718,11 @@
           "name": "Floor"
         }
       },
-      "description": ""
+      "description": "",
+      "town_style": "medieval",
+      "entry_col": 0,
+      "entry_row": 0,
+      "npcs": []
     }
   ],
   "features": [],

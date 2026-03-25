@@ -152,6 +152,49 @@ class MapEditorHubRS:
     save_flash: float = 0.0
 
 
+@dataclass
+class TownEditorRS:
+    """Render-state for the Town Editor.
+
+    Supports three sub-screens per town:
+    - Settings   (edit name, size, style, entry point)
+    - Townspeople (manage NPC list)
+    - Edit Map    (launch tile editor for the town layout)
+    """
+    # Town list (level 1)
+    towns: Optional[List[dict]] = None
+    cursor: int = 0
+    scroll: int = 0
+    # Sub-screen navigation (level 2): 0=Settings, 1=Townspeople, 2=Edit Map
+    sub_cursor: int = 0
+    sub_items: Optional[list] = field(default_factory=lambda: [
+        "Settings", "Townspeople", "Edit Map",
+    ])
+    # Settings fields (level 3 - settings)
+    fields: Optional[List[FieldEntry]] = None
+    field_cursor: int = 0
+    field_buffer: str = ""
+    field_scroll: int = 0
+    # Townspeople list (level 3 - townspeople)
+    npc_list: Optional[List[dict]] = None
+    npc_cursor: int = 0
+    npc_scroll: int = 0
+    # NPC field editor (level 4 - editing an NPC)
+    npc_fields: Optional[List[FieldEntry]] = None
+    npc_field_cursor: int = 0
+    npc_field_buffer: str = ""
+    npc_field_scroll: int = 0
+    # Map editor active flag
+    editor_active: bool = False
+    editor_data: Optional[dict] = None
+    # Naming overlay
+    naming: bool = False
+    name_buf: str = ""
+    naming_is_new: bool = False
+    # Save flash
+    save_flash: float = 0.0
+
+
 # ─── Top-level render state ──────────────────────────────────────────
 
 @dataclass
@@ -174,4 +217,6 @@ class FeaturesRenderState:
     gallery: GalleryEditorRS = field(default_factory=GalleryEditorRS)
     pxedit: PixelEditorRS = field(default_factory=PixelEditorRS)
     meh: MapEditorHubRS = field(default_factory=MapEditorHubRS)
+    towns: TownEditorRS = field(default_factory=TownEditorRS)
     overview_editor_data: Optional[dict] = None
+    town_map_editor_data: Optional[dict] = None
