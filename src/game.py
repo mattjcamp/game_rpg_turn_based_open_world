@@ -3500,11 +3500,29 @@ class Game:
     # ── Town map generation ──
 
     def _open_town_template_picker(self):
-        """Open the template picker showing layouts from town_templates.json."""
+        """Open the template picker showing town layouts and enclosures.
+
+        Combines town templates from town_templates.json with enclosure
+        templates from map_templates.json so the user can import either
+        type as a town map.  Each entry is tagged with ``_source`` so
+        ``_apply_town_template`` knows how to read its fields.
+        """
         fe = self.features_editor
+        combined = []
+
+        # ── Town layouts ──
         fe.load_townlayouts()
-        raw = fe.town_lists.get("layouts", [])
-        self._mod_town_gen_pick_list = raw
+        for tmpl in fe.town_lists.get("layouts", []):
+            tmpl["_source"] = "town"
+            combined.append(tmpl)
+
+        # ── Enclosure templates ──
+        saved_all = fe.load_map_templates()
+        for tmpl in saved_all.get("me_enclosure", []):
+            tmpl["_source"] = "enclosure"
+            combined.append(tmpl)
+
+        self._mod_town_gen_pick_list = combined
         self._mod_town_gen_pick_cursor = 0
         self._mod_town_gen_pick_scroll = 0
         self._mod_town_gen_mode = "pick_template"
@@ -3585,22 +3603,32 @@ class Game:
                 ) % len(self._MOD_TOWN_STYLES)
 
     def _apply_town_template(self, template):
-        """Apply a town layout template to the current town."""
+        """Apply a town or enclosure template to the current town."""
         import copy
         town = self._mod_town_get_current()
         if not town:
             return
         town["tiles"] = copy.deepcopy(template.get("tiles", {}))
-        town["width"] = template.get("width", 18)
-        town["height"] = template.get("height", 19)
-        town["entry_col"] = template.get("entry_col", 0)
-        town["entry_row"] = template.get("entry_row", 0)
-        town["town_style"] = template.get("town_style",
-                                           town.get("town_style", "medieval"))
-        # Import NPCs if present
-        if template.get("npcs"):
-            import copy as cp
-            town["npcs"] = cp.deepcopy(template["npcs"])
+
+        source = template.get("_source", "town")
+        if source == "enclosure":
+            # Enclosure templates store dimensions inside map_config
+            mc = template.get("map_config", {})
+            town["width"] = mc.get("width", 16)
+            town["height"] = mc.get("height", 14)
+            # Enclosures have no entry point — default to centre
+            town["entry_col"] = town["width"] // 2
+            town["entry_row"] = town["height"] // 2
+        else:
+            town["width"] = template.get("width", 18)
+            town["height"] = template.get("height", 19)
+            town["entry_col"] = template.get("entry_col", 0)
+            town["entry_row"] = template.get("entry_row", 0)
+            town["town_style"] = template.get(
+                "town_style", town.get("town_style", "medieval"))
+            # Import NPCs if present
+            if template.get("npcs"):
+                town["npcs"] = copy.deepcopy(template["npcs"])
         self._save_module_towns()
         self._mod_town_save_flash = 1.5
         # Refresh the settings fields to show updated values

@@ -1271,10 +1271,10 @@
   ],
   "tile_links": {
     "10,14": {
-      "interior": "Newtown"
+      "interior": "Testie"
     },
     "33,22": {
-      "interior": "Newtown"
+      "interior": "Testie"
     }
   }
 }

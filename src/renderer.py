@@ -7622,16 +7622,16 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (180, 140, 60),
                          (ox, oy, ow, oh), 2)
 
-        self._u3_text("IMPORT TOWN TEMPLATE", ox + 16, oy + 10,
+        self._u3_text("IMPORT TEMPLATE", ox + 16, oy + 10,
                       self._U3_ORANGE, f)
         ly = oy + 42
         content_h = oh - 80
         max_vis = content_h // row_h
 
         if len(templates) == 0:
-            self._u3_text("No town templates found.",
+            self._u3_text("No templates found.",
                           ox + 20, ly + 10, (140, 140, 160), fm)
-            self._u3_text("Create layouts in the global Town editor.",
+            self._u3_text("Create layouts in the Town or Enclosure editor.",
                           ox + 20, ly + 30, (100, 160, 200), fm)
         else:
             for vi in range(max_vis):
@@ -7648,14 +7648,26 @@ class Renderer(CombatEffectRendererMixin):
                     self.screen.blit(bar, (ox + 2, y - 1))
                 prefix = "> " if selected else "  "
                 color = self._U3_WHITE if selected else (180, 180, 180)
-                label = tmpl.get("name", "Unnamed")
-                tw_val = tmpl.get("width", "?")
-                th_val = tmpl.get("height", "?")
+                source = tmpl.get("_source", "town")
+                if source == "enclosure":
+                    label = tmpl.get("label", "Unnamed")
+                    mc = tmpl.get("map_config", {})
+                    tw_val = mc.get("width", "?")
+                    th_val = mc.get("height", "?")
+                    tag = "Enclosure"
+                else:
+                    label = tmpl.get("name", "Unnamed")
+                    tw_val = tmpl.get("width", "?")
+                    th_val = tmpl.get("height", "?")
+                    tag = "Town"
                 n_npcs = len(tmpl.get("npcs", []))
                 self._u3_text(f"{prefix}{label}",
                               ox + 10, y, color, fm)
-                self._u3_text(
-                    f"  {tw_val}x{th_val}  {n_npcs} NPCs",
+                sub = f"  {tw_val}x{th_val}"
+                if n_npcs:
+                    sub += f"  {n_npcs} NPCs"
+                sub += f"  [{tag}]"
+                self._u3_text(sub,
                     ox + 10, y + 18, (140, 140, 160), fs)
 
         self._u3_text(
