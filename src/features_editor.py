@@ -1989,6 +1989,7 @@ class FeaturesEditor:
         self.meh_sections.append(new_sec)
         self.meh_cursor = len(self.meh_sections) - 1
         self._meh_update_parent_subtitle()
+        self.save_map_templates()
 
     def meh_delete_template(self):
         """Delete the currently selected template from the current folder."""
@@ -2006,6 +2007,7 @@ class FeaturesEditor:
         elif self.meh_cursor >= n:
             self.meh_cursor = n - 1
         self._meh_update_parent_subtitle()
+        self.save_map_templates()
 
     def meh_rename_template(self, new_name):
         """Rename the currently selected template."""
@@ -2016,6 +2018,7 @@ class FeaturesEditor:
         if sec.get("folder") != "template":
             return
         sec["label"] = new_name
+        self.save_map_templates()
 
     def _meh_update_parent_subtitle(self):
         """Update the parent folder's subtitle to reflect current child count."""
@@ -2290,6 +2293,10 @@ class FeaturesEditor:
             self.save_map_templates()
 
         def _on_exit(st):
+            # Save tiles on exit (same as on_save)
+            if storage == STORAGE_DENSE:
+                sec["tiles"] = st.tiles
+            self.save_map_templates()
             self.meh_editor_active = False
             self.game._map_editor_state = None
 
@@ -2395,6 +2402,7 @@ class FeaturesEditor:
             self._meh_commit_field_edit()
             # Write field values back to the template target
             self._meh_apply_settings()
+            self.save_map_templates()  # persist changes to disk
             self.meh_level = 0
             self._meh_settings_target = None
             return
@@ -2548,7 +2556,11 @@ class FeaturesEditor:
                     0,
                     "",
                 )]
-                self.meh_sections = list(sec.get("children", []))
+                children = sec.get("children")
+                if children is None:
+                    children = []
+                    sec["children"] = children
+                self.meh_sections = children
                 self.meh_cursor = 0
                 self.meh_scroll = 0
                 self.meh_folder_label = sec.get("label", "Tiles")
@@ -3315,13 +3327,14 @@ class FeaturesEditor:
 
         if event.key == pygame.K_ESCAPE:
             if self.meh_nav_stack:
-                # Pop up one folder level
+                # Pop up one folder level, auto-saving along the way
                 (prev_secs, prev_cur, prev_scroll,
                  prev_label) = self.meh_nav_stack.pop()
                 self.meh_sections = prev_secs
                 self.meh_cursor = prev_cur
                 self.meh_scroll = prev_scroll
                 self.meh_folder_label = prev_label
+                self.save_map_templates()
             else:
                 # Auto-save templates, then return to categories
                 self.save_map_templates()
@@ -3388,14 +3401,19 @@ class FeaturesEditor:
                 if tmpl:
                     self._meh_launch_editor(tmpl)
             elif sec.get("folder"):
-                # Enter folder
+                # Enter folder — use the actual children list (not a copy)
+                # so that additions/deletions are reflected in the parent.
+                children = sec.get("children")
+                if children is None:
+                    children = []
+                    sec["children"] = children
                 self.meh_nav_stack.append((
                     self.meh_sections,
                     self.meh_cursor,
                     self.meh_scroll,
                     self.meh_folder_label,
                 ))
-                self.meh_sections = list(sec.get("children", []))
+                self.meh_sections = children
                 self.meh_cursor = 0
                 self.meh_scroll = 0
                 self.meh_folder_label = sec.get("label", "")

@@ -9167,6 +9167,10 @@ class Renderer(CombatEffectRendererMixin):
                            overview_pick_list=None,
                            overview_pick_cursor=0,
                            overview_pick_scroll=0,
+                           overview_generate_mode=False,
+                           overview_gen_fields=None,
+                           overview_gen_field=0,
+                           overview_gen_buffer="",
                            overview_children=None,
                            overview_child_cursor=0,
                            overview_editor_state=None):
@@ -9427,7 +9431,11 @@ class Renderer(CombatEffectRendererMixin):
                 right_x, panel_y, right_w, panel_h,
                 overview_pick_list or [],
                 overview_pick_cursor,
-                overview_pick_scroll)
+                overview_pick_scroll,
+                generate_mode=overview_generate_mode,
+                gen_fields=overview_gen_fields,
+                gen_field=overview_gen_field,
+                gen_buffer=overview_gen_buffer)
 
         # ── Feedback / confirmation message ──
         if message:
@@ -9855,13 +9863,11 @@ class Renderer(CombatEffectRendererMixin):
                          (rx, ry, rw, rh), 1)
 
         if edit_level == 3 and fields:
-            # Settings field editor
-            self._u3_text("OVERVIEW MAP SETTINGS",
-                          rx + 16, ry + 12, self._U3_ORANGE, f)
+            # Settings field editor — overlay draws its own background
             self._draw_module_edit_overlay(
                 rx, ry, rw, rh,
                 fields, field_idx, field_buffer, False,
-                field_scroll, section_title="Settings")
+                field_scroll, section_title="Overview Map Settings")
             return
 
         # Level 2: children browser
@@ -9896,9 +9902,13 @@ class Renderer(CombatEffectRendererMixin):
                       self._U3_HINT, fs)
 
     def _draw_overview_template_picker(self, rx, ry, rw, rh,
-                                        templates, cursor, scroll):
+                                        templates, cursor, scroll,
+                                        generate_mode=False,
+                                        gen_fields=None,
+                                        gen_field=0,
+                                        gen_buffer=""):
         """Draw the template selection overlay for choosing an overview
-        template to copy into the module."""
+        template to copy into the module, or the generate-map form."""
         fm = self.font_med
         fs = self.font_small
         f = self.font
@@ -9909,9 +9919,68 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (140, 120, 60),
                          (rx, ry, rw, rh), 1)
 
+        # ── Generate mode: show dimension fields ──
+        if generate_mode:
+            self._u3_text("GENERATE MAP", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            self._u3_text("Set dimensions for the procedural map:",
+                          rx + 16, ry + 36, (180, 180, 200), fs)
+
+            field_labels = ["Width", "Height"]
+            field_y = ry + 70
+            field_h = 36
+            for i, label in enumerate(field_labels):
+                selected = (i == gen_field)
+                # Highlight
+                if selected:
+                    bar = pygame.Surface((rw - 4, field_h - 4),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, field_y))
+
+                label_color = self._U3_ORANGE if selected \
+                    else (180, 180, 180)
+                self._u3_text(label, rx + 24, field_y + 6,
+                              label_color, fm)
+
+                # Value box
+                val = gen_buffer if selected else (
+                    gen_fields[i] if gen_fields and i < len(gen_fields)
+                    else "")
+                box_x = rx + 140
+                box_w = rw - 170
+                box_rect = pygame.Rect(box_x, field_y + 2,
+                                       box_w, field_h - 8)
+                box_bg = (30, 25, 40) if not selected else (40, 35, 55)
+                pygame.draw.rect(self.screen, box_bg, box_rect)
+                border_c = self._U3_ORANGE if selected \
+                    else (80, 70, 60)
+                pygame.draw.rect(self.screen, border_c, box_rect, 1)
+
+                val_color = self._U3_WHITE if selected \
+                    else (160, 160, 180)
+                display = val
+                if selected:
+                    display = val + "_"
+                self._u3_text(display, box_x + 6, field_y + 6,
+                              val_color, fm)
+
+                field_y += field_h
+
+            # Range hint
+            self._u3_text("Range: 10 - 200 tiles",
+                          rx + 24, field_y + 8, (120, 120, 140), fs)
+
+            # Hint bar
+            self._u3_text("[Enter] Generate  [Esc] Back",
+                          rx + 16, ry + rh - 24,
+                          self._U3_HINT, fs)
+            return
+
+        # ── Template list mode ──
         self._u3_text("CHOOSE TEMPLATE", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
-        self._u3_text("Select an overview template to use as your map:",
+        self._u3_text("Select a template or generate a new map:",
                       rx + 16, ry + 36, (180, 180, 200), fs)
 
         if not templates:
@@ -9935,6 +10004,7 @@ class Renderer(CombatEffectRendererMixin):
         for vi in range(scroll, min(scroll + max_visible, len(templates))):
             tmpl = templates[vi]
             selected = (vi == cursor)
+            is_generate = tmpl.get("_generate", False)
 
             if selected:
                 bar = pygame.Surface((rw - 4, row_h - 4),
@@ -9944,9 +10014,16 @@ class Renderer(CombatEffectRendererMixin):
 
             label = tmpl.get("label", "Unnamed")
             mc = tmpl.get("map_config", {})
-            sub = tmpl.get("subtitle", f"{mc.get('width', '?')}x{mc.get('height', '?')}")
+            sub = tmpl.get("subtitle",
+                           f"{mc.get('width', '?')}x"
+                           f"{mc.get('height', '?')}")
 
-            label_color = self._U3_WHITE if selected else (180, 180, 180)
+            if is_generate:
+                label_color = (100, 200, 255) if selected \
+                    else (80, 160, 200)
+            else:
+                label_color = self._U3_WHITE if selected \
+                    else (180, 180, 180)
             self._u3_text(label, rx + 24, dy + 4, label_color, fm)
             self._u3_text(sub, rx + 24, dy + 22, (160, 160, 180), fs)
 

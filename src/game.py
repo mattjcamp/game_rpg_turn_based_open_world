@@ -173,6 +173,10 @@ class Game:
         self._mod_overview_pick_list = []   # list of overview template dicts
         self._mod_overview_pick_cursor = 0
         self._mod_overview_pick_scroll = 0
+        self._mod_overview_generate_mode = False   # True when editing dims
+        self._mod_overview_gen_fields = []          # [width_str, height_str]
+        self._mod_overview_gen_field = 0            # 0=width, 1=height
+        self._mod_overview_gen_buffer = ""          # current field buffer
         self._mod_overview_children = []    # [Settings, Edit Map]
         self._mod_overview_child_cursor = 0
         self._mod_overview_level = 0        # 0=children, 1=settings fields
@@ -2268,11 +2272,19 @@ class Game:
             self._mod_overview_picking = True
             self._mod_overview_pick_cursor = 0
             self._mod_overview_pick_scroll = 0
+            self._mod_overview_generate_mode = False
+            self.module_edit_level = 2  # route input to overview handler
             # Load overview templates from map_templates.json
             fe = self.features_editor
             saved = fe.load_map_templates()
             raw = saved.get("me_overview", [])
-            self._mod_overview_pick_list = raw
+            # Append a special "Generate Map" entry
+            generate_entry = {
+                "_generate": True,
+                "label": "Generate Map",
+                "subtitle": "Procedurally generate a new map",
+            }
+            self._mod_overview_pick_list = raw + [generate_entry]
         else:
             # ── Show children: Settings / Edit Map ──
             self._open_overview_map_children()
@@ -2285,6 +2297,7 @@ class Game:
         self._mod_overview_children = [
             {"label": "Settings", "_overview_settings": True},
             {"label": "Edit Map", "_overview_edit_map": True},
+            {"label": "Change Template", "_overview_change": True},
         ]
         self._mod_overview_child_cursor = 0
         self._mod_overview_level = 0
@@ -2432,12 +2445,32 @@ class Game:
                 self.module_edit_level = 3  # settings field editing
             elif child.get("_overview_edit_map"):
                 self._launch_module_overview_editor()
+            elif child.get("_overview_change"):
+                # Re-open the template picker (replaces current map)
+                self._mod_overview_picking = True
+                self._mod_overview_pick_cursor = 0
+                self._mod_overview_pick_scroll = 0
+                self._mod_overview_generate_mode = False
+                fe = self.features_editor
+                saved = fe.load_map_templates()
+                raw = saved.get("me_overview", [])
+                generate_entry = {
+                    "_generate": True,
+                    "label": "Generate Map",
+                    "subtitle": "Procedurally generate a new map",
+                }
+                self._mod_overview_pick_list = raw + [generate_entry]
 
     def _handle_overview_template_picker(self, event):
         """Handle input for the template picker overlay."""
         import pygame
         templates = self._mod_overview_pick_list
         n = len(templates)
+
+        # ── Generate mode: editing width/height fields ──
+        if self._mod_overview_generate_mode:
+            self._handle_generate_fields_input(event)
+            return
 
         if event.key == pygame.K_ESCAPE:
             self._mod_overview_picking = False
@@ -2452,7 +2485,97 @@ class Game:
             self._mod_overview_pick_cursor = (
                 (self._mod_overview_pick_cursor + 1) % n)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            self._pick_overview_template(self._mod_overview_pick_cursor)
+            selected = templates[self._mod_overview_pick_cursor]
+            if selected.get("_generate"):
+                # Enter generate mode with default dimensions
+                self._mod_overview_generate_mode = True
+                self._mod_overview_gen_fields = ["40", "30"]
+                self._mod_overview_gen_field = 0
+                self._mod_overview_gen_buffer = "40"
+            else:
+                self._pick_overview_template(self._mod_overview_pick_cursor)
+
+    def _handle_generate_fields_input(self, event):
+        """Handle input when editing generate-map dimension fields."""
+        import pygame
+
+        if event.key == pygame.K_ESCAPE:
+            # Leave generate mode, return to picker list
+            self._mod_overview_generate_mode = False
+            return
+
+        if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
+            # Save buffer, switch field
+            self._mod_overview_gen_fields[
+                self._mod_overview_gen_field] = self._mod_overview_gen_buffer
+            self._mod_overview_gen_field = (
+                1 - self._mod_overview_gen_field)
+            self._mod_overview_gen_buffer = self._mod_overview_gen_fields[
+                self._mod_overview_gen_field]
+            return
+
+        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Commit buffer and generate
+            self._mod_overview_gen_fields[
+                self._mod_overview_gen_field] = self._mod_overview_gen_buffer
+            self._generate_overview_map()
+            return
+
+        # Text editing for dimension values
+        if event.key == pygame.K_BACKSPACE:
+            self._mod_overview_gen_buffer = \
+                self._mod_overview_gen_buffer[:-1]
+        elif event.unicode and event.unicode.isdigit():
+            if len(self._mod_overview_gen_buffer) < 4:
+                self._mod_overview_gen_buffer += event.unicode
+
+    def _generate_overview_map(self):
+        """Procedurally generate an overview map and save to module."""
+        from src.tile_map import create_test_map
+        import random
+
+        # Parse dimensions with sensible defaults and bounds
+        try:
+            w = max(10, min(200, int(self._mod_overview_gen_fields[0])))
+        except (ValueError, IndexError):
+            w = 40
+        try:
+            h = max(10, min(200, int(self._mod_overview_gen_fields[1])))
+        except (ValueError, IndexError):
+            h = 30
+
+        # Build a minimal overworld config with the requested dimensions
+        overworld_cfg = {"size": {"width": w, "height": h}}
+
+        # Generate the map
+        seed = random.randint(0, 2 ** 31)
+        tmap = create_test_map(seed=seed, overworld_cfg=overworld_cfg)
+
+        # Build overview map dict matching the template format
+        from src.map_editor import STORAGE_DENSE, GRID_FIXED
+        self._mod_overview_map = {
+            "label": "Generated Overworld",
+            "map_config": {
+                "storage": STORAGE_DENSE,
+                "grid_type": GRID_FIXED,
+                "tile_context": "overworld",
+                "width": tmap.width,
+                "height": tmap.height,
+            },
+            "tiles": tmap.tiles,
+        }
+        self._save_module_overview_map()
+
+        # Update section subtitle
+        for sec in self.module_edit_sections:
+            if sec.get("_overview_map"):
+                sec["subtitle"] = "Map assigned"
+                break
+
+        # Close picker and open children
+        self._mod_overview_picking = False
+        self._mod_overview_generate_mode = False
+        self._open_overview_map_children()
 
     def _handle_overview_settings_input(self, event):
         """Handle input when editing overview map settings (level 3)."""
@@ -2991,6 +3114,10 @@ class Game:
                     overview_pick_list=getattr(self, '_mod_overview_pick_list', []),
                     overview_pick_cursor=getattr(self, '_mod_overview_pick_cursor', 0),
                     overview_pick_scroll=getattr(self, '_mod_overview_pick_scroll', 0),
+                    overview_generate_mode=getattr(self, '_mod_overview_generate_mode', False),
+                    overview_gen_fields=getattr(self, '_mod_overview_gen_fields', []),
+                    overview_gen_field=getattr(self, '_mod_overview_gen_field', 0),
+                    overview_gen_buffer=getattr(self, '_mod_overview_gen_buffer', ""),
                     overview_children=getattr(self, '_mod_overview_children', []),
                     overview_child_cursor=getattr(self, '_mod_overview_child_cursor', 0),
                     overview_editor_state=getattr(self, '_mod_map_editor_state', None))
