@@ -167,6 +167,15 @@ class Game:
         self.module_edit_section_cursor = 0  # highlighted section
         self.module_edit_section_scroll = 0  # scroll for section list
         self.module_edit_nav_stack = []
+        # ── Overview Map in module ──
+        self._mod_overview_map = None  # dict: map_config + tiles (or None)
+        self._mod_overview_picking = False  # True when showing template picker
+        self._mod_overview_pick_list = []   # list of overview template dicts
+        self._mod_overview_pick_cursor = 0
+        self._mod_overview_pick_scroll = 0
+        self._mod_overview_children = []    # [Settings, Edit Map]
+        self._mod_overview_child_cursor = 0
+        self._mod_overview_level = 0        # 0=children, 1=settings fields
         from src.module_loader import get_default_module_path, scan_modules
         self.active_module_path = None
         self.active_module_name = "No Module"
@@ -1868,7 +1877,14 @@ class Game:
         self.module_edit_mode = True
         self.module_edit_is_new = False
 
-        # ── Build section list — Module Details only ──
+        # ── Load overview map for this module (if it exists) ──
+        self._mod_overview_map = self._load_module_overview_map(
+            mod["path"])
+
+        # ── Build section list ──
+        has_map = self._mod_overview_map is not None
+        overview_sub = ("Map assigned" if has_map
+                        else "No map — choose a template")
         sections = [
             {
                 "label": "Module Details",
@@ -1879,6 +1895,12 @@ class Game:
                     ["Description", "description",
                      mod.get("description", ""), "text", True],
                 ],
+            },
+            {
+                "label": "Overview Map",
+                "icon": "M",
+                "subtitle": overview_sub,
+                "_overview_map": True,
             },
         ]
 
@@ -1958,6 +1980,16 @@ class Game:
             self._handle_section_browser_input(event)
             return
 
+        # ── Level 2: overview map children browser ──
+        if self.module_edit_level == 2:
+            self._handle_overview_map_input(event)
+            return
+
+        # ── Level 3: overview map settings fields ──
+        if self.module_edit_level == 3:
+            self._handle_overview_settings_input(event)
+            return
+
         # ── Level 1: field editor within a section ──
         if event.key == pygame.K_ESCAPE:
             if self._module_dirty:
@@ -2017,6 +2049,12 @@ class Game:
     def _enter_section_fields(self):
         """Enter field editing for the currently selected section."""
         sec = self.module_edit_sections[self.module_edit_section_cursor]
+
+        # ── Overview Map section: special handling ──
+        if sec.get("_overview_map"):
+            self._enter_overview_map_section()
+            return
+
         if not sec.get("fields"):
             return
         self.module_edit_fields = sec["fields"]
@@ -2190,6 +2228,268 @@ class Game:
             else:
                 self.module_message = "Update failed!"
                 self.module_msg_timer = 2.0
+
+    # ── Overview Map in Module ─────────────────────────────────
+
+    def _load_module_overview_map(self, mod_path):
+        """Load overview_map.json from a module directory, or None."""
+        import json, os
+        p = os.path.join(mod_path, "overview_map.json")
+        if not os.path.isfile(p):
+            return None
+        try:
+            with open(p, "r") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _save_module_overview_map(self):
+        """Persist the current overview map data to the active module."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        p = os.path.join(mod["path"], "overview_map.json")
+        try:
+            with open(p, "w") as f:
+                json.dump(self._mod_overview_map, f, indent=2)
+        except OSError:
+            pass
+
+    def _enter_overview_map_section(self):
+        """Handle entering the Overview Map section.
+
+        If no map has been assigned yet, show a template picker so the
+        player can choose a starting template.  Otherwise, show the
+        two children: Settings and Edit Map.
+        """
+        if self._mod_overview_map is None:
+            # ── Show template picker ──
+            self._mod_overview_picking = True
+            self._mod_overview_pick_cursor = 0
+            self._mod_overview_pick_scroll = 0
+            # Load overview templates from map_templates.json
+            fe = self.features_editor
+            saved = fe.load_map_templates()
+            raw = saved.get("me_overview", [])
+            self._mod_overview_pick_list = raw
+        else:
+            # ── Show children: Settings / Edit Map ──
+            self._open_overview_map_children()
+
+    def _open_overview_map_children(self):
+        """Set up the children view for an assigned overview map."""
+        mc = self._mod_overview_map.get("map_config", {})
+        w = mc.get("width", 16)
+        h = mc.get("height", 12)
+        self._mod_overview_children = [
+            {"label": "Settings", "_overview_settings": True},
+            {"label": "Edit Map", "_overview_edit_map": True},
+        ]
+        self._mod_overview_child_cursor = 0
+        self._mod_overview_level = 0
+        self.module_edit_level = 2  # special level for overview map
+
+    def _pick_overview_template(self, idx):
+        """Copy the selected template into the module as its overview map."""
+        import copy
+        if idx < 0 or idx >= len(self._mod_overview_pick_list):
+            return
+        tmpl = self._mod_overview_pick_list[idx]
+        # Deep copy so the module's map is independent
+        self._mod_overview_map = copy.deepcopy(tmpl)
+        self._save_module_overview_map()
+
+        # Update the section subtitle
+        for sec in self.module_edit_sections:
+            if sec.get("_overview_map"):
+                sec["subtitle"] = "Map assigned"
+                break
+
+        # Close picker and open children
+        self._mod_overview_picking = False
+        self._open_overview_map_children()
+
+    def _launch_module_overview_editor(self):
+        """Launch the shared map editor for the module's overview map."""
+        if self._mod_overview_map is None:
+            return
+
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_overworld_brushes,
+            STORAGE_DENSE, GRID_FIXED,
+        )
+
+        mc = self._mod_overview_map.get("map_config", {})
+        w = mc.get("width", 16)
+        h = mc.get("height", 12)
+        tiles = self._mod_overview_map.get("tiles")
+
+        fe = self.features_editor
+
+        # Load object templates for the Objects brush folder
+        saved_all = fe.load_map_templates()
+        obj_templates = saved_all.get("me_object", [])
+
+        brushes = build_overworld_brushes(
+            fe.TILE_CONTEXT,
+            object_templates=obj_templates,
+        )
+
+        # If tiles are missing, create a default grid
+        if (tiles is None or len(tiles) != h
+                or not all(len(row) == w for row in tiles)):
+            tiles = [[0] * w for _ in range(h)]
+            self._mod_overview_map["tiles"] = tiles
+
+        def _on_save(st):
+            self._mod_overview_map["tiles"] = st.tiles
+            self._save_module_overview_map()
+
+        def _on_exit(st):
+            self._mod_overview_map["tiles"] = st.tiles
+            self._save_module_overview_map()
+            self.showing_features = False
+            self.showing_modules = True
+            self.module_edit_mode = True
+            self._mod_map_editor_state = None
+
+        config = MapEditorConfig(
+            title=self._mod_overview_map.get("label", "Overview Map"),
+            storage=STORAGE_DENSE,
+            grid_type=GRID_FIXED,
+            width=w,
+            height=h,
+            brushes=brushes,
+            tile_context="overworld",
+            supports_tile_links=True,
+            supports_replace=False,
+            on_save=_on_save,
+            on_exit=_on_exit,
+        )
+
+        state = MapEditorState(config, tiles=tiles)
+        handler = MapEditorInputHandler(
+            state, is_save_shortcut=self._is_save_shortcut)
+
+        self._mod_map_editor_state = state
+        self._mod_map_editor_handler = handler
+        # Switch to showing the map editor
+        self.module_edit_mode = False
+        self.showing_modules = False
+        self.showing_features = True
+        fe.active_editor = "mod_overview_map"
+
+    def _handle_overview_map_input(self, event):
+        """Handle input for the Overview Map section (level 2).
+
+        Dispatches between: template picker overlay, children browser
+        (Settings / Edit Map), and settings field editor.
+        """
+        import pygame
+
+        # ── Template picker overlay ──
+        if self._mod_overview_picking:
+            self._handle_overview_template_picker(event)
+            return
+
+        # ── Children browser ──
+        children = self._mod_overview_children
+        n = len(children)
+        if not n:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 0
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            self.module_edit_level = 0
+            return
+        if event.key == pygame.K_UP:
+            self._mod_overview_child_cursor = (
+                (self._mod_overview_child_cursor - 1) % n)
+        elif event.key == pygame.K_DOWN:
+            self._mod_overview_child_cursor = (
+                (self._mod_overview_child_cursor + 1) % n)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            child = children[self._mod_overview_child_cursor]
+            if child.get("_overview_settings"):
+                # Build settings fields for the overview map
+                mc = self._mod_overview_map.get("map_config", {})
+                self.module_edit_fields = [
+                    ["Label", "label",
+                     self._mod_overview_map.get("label", ""),
+                     "text", True],
+                    ["Width", "width",
+                     str(mc.get("width", 16)), "text", True],
+                    ["Height", "height",
+                     str(mc.get("height", 12)), "text", True],
+                ]
+                self.module_edit_field = 0
+                self.module_edit_scroll = 0
+                self.module_edit_buffer = self.module_edit_fields[0][2]
+                self._mod_overview_level = 1
+                self.module_edit_level = 3  # settings field editing
+            elif child.get("_overview_edit_map"):
+                self._launch_module_overview_editor()
+
+    def _handle_overview_template_picker(self, event):
+        """Handle input for the template picker overlay."""
+        import pygame
+        templates = self._mod_overview_pick_list
+        n = len(templates)
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_overview_picking = False
+            self.module_edit_level = 0
+            return
+        if not n:
+            return
+        if event.key == pygame.K_UP:
+            self._mod_overview_pick_cursor = (
+                (self._mod_overview_pick_cursor - 1) % n)
+        elif event.key == pygame.K_DOWN:
+            self._mod_overview_pick_cursor = (
+                (self._mod_overview_pick_cursor + 1) % n)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._pick_overview_template(self._mod_overview_pick_cursor)
+
+    def _handle_overview_settings_input(self, event):
+        """Handle input when editing overview map settings (level 3)."""
+        import pygame
+
+        if event.key == pygame.K_ESCAPE:
+            # Commit buffer and apply settings
+            if self.module_edit_fields:
+                entry = self.module_edit_fields[self.module_edit_field]
+                entry[2] = self.module_edit_buffer
+            self._apply_overview_settings()
+            self.module_edit_level = 2
+            self.module_edit_fields = []
+            return
+        if self._is_save_shortcut(event):
+            if self.module_edit_fields:
+                entry = self.module_edit_fields[self.module_edit_field]
+                entry[2] = self.module_edit_buffer
+            self._apply_overview_settings()
+            return
+        self._handle_field_editor_input(event)
+
+    def _apply_overview_settings(self):
+        """Apply edited settings back to the overview map data."""
+        if self._mod_overview_map is None:
+            return
+        for entry in self.module_edit_fields:
+            key, val = entry[1], entry[2]
+            if key == "label":
+                self._mod_overview_map["label"] = val
+            elif key in ("width", "height"):
+                try:
+                    self._mod_overview_map.setdefault(
+                        "map_config", {})[key] = int(val)
+                except ValueError:
+                    pass
+        self._save_module_overview_map()
 
     # ── Module / settings helpers ────────────────────────────────
 
@@ -2686,7 +2986,14 @@ class Game:
                     edit_level=self.module_edit_level,
                     edit_sections=self.module_edit_sections,
                     edit_section_cursor=self.module_edit_section_cursor,
-                    edit_section_scroll=self.module_edit_section_scroll)
+                    edit_section_scroll=self.module_edit_section_scroll,
+                    overview_picking=getattr(self, '_mod_overview_picking', False),
+                    overview_pick_list=getattr(self, '_mod_overview_pick_list', []),
+                    overview_pick_cursor=getattr(self, '_mod_overview_pick_cursor', 0),
+                    overview_pick_scroll=getattr(self, '_mod_overview_pick_scroll', 0),
+                    overview_children=getattr(self, '_mod_overview_children', []),
+                    overview_child_cursor=getattr(self, '_mod_overview_child_cursor', 0),
+                    overview_editor_state=getattr(self, '_mod_map_editor_state', None))
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
             elif self.showing_game_over:

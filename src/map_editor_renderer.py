@@ -94,6 +94,11 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
         title += " *"
     renderer._u3_text(title, 16, 6, _COL_ORANGE, fm)
 
+    # Painting mode indicator
+    if data.get("painting"):
+        tw_title = fm.size(title)[0]
+        renderer._u3_text("PAINTING", tw_title + 30, 6, (120, 255, 120), fm)
+
     # Coordinates + tile info
     cc, cr = data["cursor_col"], data["cursor_row"]
     tile_name = _get_cursor_tile_name(data, cc, cr)

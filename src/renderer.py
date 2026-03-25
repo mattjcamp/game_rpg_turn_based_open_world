@@ -7347,6 +7347,10 @@ class Renderer(CombatEffectRendererMixin):
                         gallery_naming=gallery_naming,
                         gallery_name_buf=gallery_name_buf,
                         gallery_detail_cursor=gallery_detail_cursor)
+            elif ed == "mod_overview_map":
+                # Module overview map — uses the shared map editor
+                if state.overview_editor_data is not None:
+                    self._draw_map_editor_fullscreen(state.overview_editor_data)
             elif ed == "mapeditor":
                 if meh_editor_active and meh_editor_data:
                     # Fullscreen map editor (launched from a template)
@@ -9158,7 +9162,14 @@ class Renderer(CombatEffectRendererMixin):
                            edit_scroll=0,
                            edit_level=0, edit_sections=None,
                            edit_section_cursor=0,
-                           edit_section_scroll=0):
+                           edit_section_scroll=0,
+                           overview_picking=False,
+                           overview_pick_list=None,
+                           overview_pick_cursor=0,
+                           overview_pick_scroll=0,
+                           overview_children=None,
+                           overview_child_cursor=0,
+                           overview_editor_state=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -9401,6 +9412,22 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text("Press [CTRL+A] to add an item.",
                                   right_x + 24, panel_y + 72,
                                   (100, 160, 200), fs)
+            elif edit_level in (2, 3):
+                # Overview Map children or settings
+                self._draw_overview_map_panel(
+                    right_x, panel_y, right_w, panel_h,
+                    edit_level, edit_fields, edit_field, edit_buffer,
+                    edit_scroll,
+                    children=overview_children,
+                    child_cursor=overview_child_cursor)
+
+        # ── Template picker overlay ──
+        if overview_picking:
+            self._draw_overview_template_picker(
+                right_x, panel_y, right_w, panel_h,
+                overview_pick_list or [],
+                overview_pick_cursor,
+                overview_pick_scroll)
 
         # ── Feedback / confirmation message ──
         if message:
@@ -9420,6 +9447,11 @@ class Renderer(CombatEffectRendererMixin):
             hint = ("[UP/DN] Browse  [ENTER] Open  "
                     "[CTRL+S] Save  [ESC] Back")
         elif edit_mode and edit_level == 1:
+            hint = ("[UP/DN] Field  [TYPE] Edit  "
+                    "[CTRL+S] Save  [ESC] Back")
+        elif edit_mode and edit_level == 2:
+            hint = ("[UP/DN] Browse  [ENTER] Open  [ESC] Back")
+        elif edit_mode and edit_level == 3:
             hint = ("[UP/DN] Field  [TYPE] Edit  "
                     "[CTRL+S] Save  [ESC] Back")
         else:
@@ -9805,6 +9837,128 @@ class Renderer(CombatEffectRendererMixin):
         if scroll + max_visible < len(sections):
             self._u3_text("vvv", rx + rw // 2 - 12,
                           content_bottom - 14, (180, 140, 60), fs)
+
+    def _draw_overview_map_panel(self, rx, ry, rw, rh,
+                                  edit_level, fields, field_idx,
+                                  field_buffer, field_scroll,
+                                  children=None, child_cursor=0):
+        """Draw the Overview Map children browser (level 2) or
+        settings editor (level 3)."""
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        if edit_level == 3 and fields:
+            # Settings field editor
+            self._u3_text("OVERVIEW MAP SETTINGS",
+                          rx + 16, ry + 12, self._U3_ORANGE, f)
+            self._draw_module_edit_overlay(
+                rx, ry, rw, rh,
+                fields, field_idx, field_buffer, False,
+                field_scroll, section_title="Settings")
+            return
+
+        # Level 2: children browser
+        self._u3_text("OVERVIEW MAP", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+
+        children = children or []
+        cursor = child_cursor
+        row_h = 40
+        dy = ry + 50
+
+        for i, child in enumerate(children):
+            selected = (i == cursor)
+            if selected:
+                bar = pygame.Surface((rw - 4, row_h - 4),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (rx + 2, dy))
+
+            label_color = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(child["label"], rx + 46, dy + 8,
+                          label_color, fm)
+
+            if selected:
+                self._u3_text(">", rx + rw - 28, dy + 8,
+                              self._U3_ORANGE, fm)
+            dy += row_h
+
+        # Hint
+        self._u3_text("[Enter] Open  [Esc] Back",
+                      rx + 16, ry + rh - 24,
+                      self._U3_HINT, fs)
+
+    def _draw_overview_template_picker(self, rx, ry, rw, rh,
+                                        templates, cursor, scroll):
+        """Draw the template selection overlay for choosing an overview
+        template to copy into the module."""
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 240))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        self._u3_text("CHOOSE TEMPLATE", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        self._u3_text("Select an overview template to use as your map:",
+                      rx + 16, ry + 36, (180, 180, 200), fs)
+
+        if not templates:
+            self._u3_text("No overview templates found.",
+                          rx + 24, ry + 70, (160, 140, 140), fs)
+            self._u3_text("Create one in Maps > Overview Templates first.",
+                          rx + 24, ry + 90, (100, 160, 200), fs)
+            return
+
+        row_h = 40
+        list_y0 = ry + 56
+        max_visible = (rh - 90) // row_h
+
+        # Adjust scroll
+        if cursor < scroll:
+            scroll = cursor
+        elif cursor >= scroll + max_visible:
+            scroll = cursor - max_visible + 1
+
+        dy = list_y0
+        for vi in range(scroll, min(scroll + max_visible, len(templates))):
+            tmpl = templates[vi]
+            selected = (vi == cursor)
+
+            if selected:
+                bar = pygame.Surface((rw - 4, row_h - 4),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (rx + 2, dy))
+
+            label = tmpl.get("label", "Unnamed")
+            mc = tmpl.get("map_config", {})
+            sub = tmpl.get("subtitle", f"{mc.get('width', '?')}x{mc.get('height', '?')}")
+
+            label_color = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(label, rx + 24, dy + 4, label_color, fm)
+            self._u3_text(sub, rx + 24, dy + 22, (160, 160, 180), fs)
+
+            if selected:
+                self._u3_text(">", rx + rw - 28, dy + 8,
+                              self._U3_ORANGE, fm)
+            dy += row_h
+
+        # Hint
+        self._u3_text("[Enter] Select  [Esc] Cancel",
+                      rx + 16, ry + rh - 24,
+                      self._U3_HINT, fs)
 
     def draw_game_over_screen(self, options, cursor, elapsed):
         """Draw a grim game-over screen with skull art and menu options.

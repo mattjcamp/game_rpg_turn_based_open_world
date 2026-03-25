@@ -159,6 +159,9 @@ class MapEditorState:
         # Save flash timer (seconds remaining, counts down each frame)
         self.save_flash: float = 0.0
 
+        # Continuous paint mode — when True, moving the cursor also paints
+        self.painting: bool = False
+
         # Brush folder collapse state (group name → is_open)
         # All folders start open by default
         self.brush_folders: Dict[str, bool] = {}
@@ -518,6 +521,7 @@ class MapEditorState:
             "brush_idx": self.brush_idx,
             "brush_name": self.current_brush.name,
             "brush_folders": self.brush_folders,
+            "painting": self.painting,
             "dirty": self.dirty,
             "save_flash": self.save_flash,
             "tile_links": self.tile_links,
@@ -606,22 +610,41 @@ class MapEditorInputHandler:
 
         if dc or dr:
             st.move_cursor(dc, dr)
+            # Continuous paint: auto-paint after each move
+            if st.painting:
+                st.paint()
             return None
 
-        # ── Brush cycling ──
+        # ── Brush cycling (cancels painting mode) ──
         if event.key == pygame.K_TAB:
+            st.painting = False
             mods = getattr(event, 'mod', 0) or pygame.key.get_mods()
             st.cycle_brush(-1 if (mods & pygame.KMOD_SHIFT) else 1)
             return None
         if event.key in (pygame.K_LEFTBRACKET, pygame.K_COMMA):
+            st.painting = False
             st.cycle_brush(-1)
             return None
         if event.key in (pygame.K_RIGHTBRACKET, pygame.K_PERIOD):
+            st.painting = False
             st.cycle_brush(1)
             return None
 
-        # ── Paint / toggle folder ──
-        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+        # ── Enter: toggle continuous paint mode ──
+        if event.key == pygame.K_RETURN:
+            if st.current_brush.is_folder_header:
+                st.toggle_folder()
+            elif st.painting:
+                # Already painting → stop
+                st.painting = False
+            else:
+                # Start painting mode and paint current cell
+                st.painting = True
+                st.paint()
+            return None
+
+        # ── Space: single paint (does not toggle mode) ──
+        if event.key == pygame.K_SPACE:
             if st.current_brush.is_folder_header:
                 st.toggle_folder()
             else:

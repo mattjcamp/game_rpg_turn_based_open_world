@@ -2648,6 +2648,17 @@ class FeaturesEditor:
             self.handle_mapeditor_input(event)
             return
 
+        # Module overview map editor (shared map editor instance)
+        if self.active_editor == "mod_overview_map":
+            game = self.game
+            if (hasattr(game, '_mod_map_editor_state')
+                    and game._mod_map_editor_state is not None):
+                result = game._mod_map_editor_handler.handle(event)
+                if result == "exit":
+                    self.active_editor = None
+                    self.level = 0
+            return
+
         # ── Resolve active editor data pointers ──
         ed = self.active_editor
         # Build a context dict so the level-1 and level-2 code
@@ -3790,6 +3801,10 @@ class FeaturesEditor:
                 naming_is_new=self.meh_naming_is_new,
                 save_flash=self.meh_save_flash,
             ),
+            overview_editor_data=(
+                self.game._mod_map_editor_state.to_data_dict()
+                if getattr(self.game, '_mod_map_editor_state', None) is not None
+                else None),
         )
 
     # ══════════════════════════════════════════════════════════

@@ -174,3 +174,4 @@ class FeaturesRenderState:
     gallery: GalleryEditorRS = field(default_factory=GalleryEditorRS)
     pxedit: PixelEditorRS = field(default_factory=PixelEditorRS)
     meh: MapEditorHubRS = field(default_factory=MapEditorHubRS)
+    overview_editor_data: Optional[dict] = None
