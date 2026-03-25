@@ -108,43 +108,64 @@ class TileMap:
 def load_static_overworld(module_path):
     """Load a pre-generated static overworld map from a module.
 
-    Looks for ``static_overworld.json`` in *module_path*.  If the file
-    exists and is valid, returns a fully-populated :class:`TileMap`.
-    Otherwise returns ``None`` so the caller can fall back to procedural
-    generation.
+    Checks two sources in order:
+      1. ``static_overworld.json`` — a full static overworld with unique
+         tiles, tile links, and interiors.
+      2. ``overview_map.json`` — the module editor's overview map, which
+         stores tiles inside a ``map_config`` wrapper.
+
+    Returns a fully-populated :class:`TileMap`, or ``None`` so the caller
+    can fall back to procedural generation.
     """
+    # ── 1. Try static_overworld.json (full format) ──
     static_path = os.path.join(module_path, "static_overworld.json")
-    if not os.path.isfile(static_path):
-        return None
-    try:
-        with open(static_path, "r") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return None
+    if os.path.isfile(static_path):
+        try:
+            with open(static_path, "r") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            data = None
+        if data:
+            w = data.get("width", 0)
+            h = data.get("height", 0)
+            tiles = data.get("tiles")
+            if w > 0 and h > 0 and tiles and len(tiles) == h:
+                tmap = TileMap(w, h, default_tile=TILE_GRASS)
+                tmap.tiles = tiles
+                tmap.seed = data.get("seed", 0)
 
-    w = data.get("width", 0)
-    h = data.get("height", 0)
-    tiles = data.get("tiles")
-    if not (w > 0 and h > 0 and tiles and len(tiles) == h):
-        return None
+                for ut in data.get("unique_tile_placements", []):
+                    c, r = ut.get("col", 0), ut.get("row", 0)
+                    uid = ut.get("id", "")
+                    udef = ut.get("def", {})
+                    if uid:
+                        tmap.place_unique(c, r, uid, udef)
 
-    tmap = TileMap(w, h, default_tile=TILE_GRASS)
-    tmap.tiles = tiles
-    tmap.seed = data.get("seed", 0)
+                tmap.tile_links = data.get("tile_links", {})
+                tmap.overworld_interiors = data.get("interiors", [])
+                return tmap
 
-    # Restore unique tile placements
-    for ut in data.get("unique_tile_placements", []):
-        c, r = ut.get("col", 0), ut.get("row", 0)
-        uid = ut.get("id", "")
-        udef = ut.get("def", {})
-        if uid:
-            tmap.place_unique(c, r, uid, udef)
+    # ── 2. Try overview_map.json (module editor format) ──
+    overview_path = os.path.join(module_path, "overview_map.json")
+    if os.path.isfile(overview_path):
+        try:
+            with open(overview_path, "r") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            data = None
+        if data:
+            mc = data.get("map_config", {})
+            w = mc.get("width", 0)
+            h = mc.get("height", 0)
+            tiles = data.get("tiles")
+            if w > 0 and h > 0 and tiles and len(tiles) == h:
+                tmap = TileMap(w, h, default_tile=TILE_GRASS)
+                tmap.tiles = tiles
+                tmap.tile_links = data.get("tile_links", {})
+                tmap.overworld_interiors = data.get("interiors", [])
+                return tmap
 
-    # Attach overworld interior data for runtime use
-    tmap.tile_links = data.get("tile_links", {})
-    tmap.overworld_interiors = data.get("interiors", [])
-
-    return tmap
+    return None
 
 
 # ── Unique tile loader ──────────────────────────────────────────

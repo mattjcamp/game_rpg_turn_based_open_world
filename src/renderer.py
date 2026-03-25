@@ -2210,6 +2210,16 @@ class Renderer(CombatEffectRendererMixin):
         off_c = max(0, min(off_c, tile_map.width - cols))
         off_r = max(0, min(off_r, tile_map.height - rows))
 
+        # ── pixel offset to center small maps ──
+        # When the map is smaller than the viewport, center it on screen
+        # and leave the surrounding area black (transparent).
+        pad_x = 0
+        pad_y = 0
+        if tile_map.width < cols:
+            pad_x = (cols - tile_map.width) * ts // 2
+        if tile_map.height < rows:
+            pad_y = (rows - tile_map.height) * ts // 2
+
         # ── 1. draw map tiles ──
         from src.settings import (
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
@@ -2220,9 +2230,12 @@ class Renderer(CombatEffectRendererMixin):
             for sc in range(cols):
                 wc = sc + off_c
                 wr = sr + off_r
+                # Skip out-of-bounds tiles — leave as black background
+                if not (0 <= wc < tile_map.width and 0 <= wr < tile_map.height):
+                    continue
                 tid = tile_map.get_tile(wc, wr)
-                px = sc * ts
-                py = sr * ts
+                px = sc * ts + pad_x
+                py = sr * ts + pad_y
                 self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr,
                                             tile_map=tile_map)
 
@@ -2235,14 +2248,15 @@ class Renderer(CombatEffectRendererMixin):
             if 0 <= usc < cols and 0 <= usr < rows:
                 sprite = self._get_unique_tile_sprite(utile["tile"], ts)
                 if sprite:
-                    px = usc * ts
-                    py = usr * ts
+                    px = usc * ts + pad_x
+                    py = usr * ts + pad_y
                     self.screen.blit(sprite, (px, py))
 
         # ── 1c. seasonal snow overlay (winter months) ──
         clock = party.clock
         if clock.month_index in (0, 1, 11):  # Jan, Feb, Dec
-            self._draw_snow_overlay(tile_map, ts, cols, rows, off_c, off_r, clock)
+            self._draw_snow_overlay(tile_map, ts, cols, rows, off_c, off_r, clock,
+                                    pad_x=pad_x, pad_y=pad_y)
 
         # ── 2. overworld monster sprites ──
         if overworld_monsters:
@@ -2252,8 +2266,8 @@ class Renderer(CombatEffectRendererMixin):
                 msc = mon.col - off_c
                 msr = mon.row - off_r
                 if 0 <= msc < cols and 0 <= msr < rows:
-                    mx = msc * ts + ts // 2
-                    my = msr * ts + ts // 2
+                    mx = msc * ts + ts // 2 + pad_x
+                    my = msr * ts + ts // 2 + pad_y
                     mon_sprite = self._get_monster_sprite(mon)
                     if mon_sprite:
                         sx = mx - mon_sprite.get_width() // 2
@@ -2264,8 +2278,8 @@ class Renderer(CombatEffectRendererMixin):
         psc = party.col - off_c
         psr = party.row - off_r
         if 0 <= psc < cols and 0 <= psr < rows:
-            cx = psc * ts + ts // 2
-            cy = psr * ts + ts // 2
+            cx = psc * ts + ts // 2 + pad_x
+            cy = psr * ts + ts // 2 + pad_y
             self._u3_draw_overworld_party(cx, cy, party)
 
         # ── 3b. Push spell expanding-wave animation ──
@@ -2298,8 +2312,11 @@ class Renderer(CombatEffectRendererMixin):
                                       subtle=True)
 
         # ── 4. blue border around map ──
+        # If the map is smaller than the viewport, border only the map area
+        map_px_w = min(tile_map.width, cols) * ts
+        map_px_h = min(tile_map.height, rows) * ts
         pygame.draw.rect(self.screen, (68, 68, 255),
-                         pygame.Rect(0, 0, self._U3_OW_MAP_W, self._U3_OW_MAP_H), 2)
+                         pygame.Rect(pad_x, pad_y, map_px_w, map_px_h), 2)
 
         # ── 5. bottom info bar ──
         bar_y = self._U3_OW_MAP_H
@@ -12570,7 +12587,8 @@ class Renderer(CombatEffectRendererMixin):
     # Tile types that receive snow coverage
     _SNOW_TILES = None  # lazily populated from settings on first call
 
-    def _draw_snow_overlay(self, tile_map, ts, cols, rows, off_c, off_r, clock):
+    def _draw_snow_overlay(self, tile_map, ts, cols, rows, off_c, off_r, clock,
+                           pad_x=0, pad_y=0):
         """Scatter subtle white pixel flecks over eligible overworld tiles.
 
         Called during winter months (December, January, February).
@@ -12630,7 +12648,7 @@ class Renderer(CombatEffectRendererMixin):
                     a = 220 + (h >> 20) % 36  # alpha 220-255
                     snow.fill((255, 255, 255, a), (px + dx, py + dy, sz, sz))
 
-        self.screen.blit(snow, (0, 0))
+        self.screen.blit(snow, (pad_x, pad_y))
 
     def _draw_overworld_darkness(self, clock, party_sc, party_sr, ts, cols, rows,
                                  has_light=False, force_night=False,

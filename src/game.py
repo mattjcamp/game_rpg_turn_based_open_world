@@ -421,6 +421,30 @@ class Game:
                     self.party.col = mod_start.get("col", self.party.col)
                     self.party.row = mod_start.get("row", self.party.row)
 
+        # ── Clamp start position to map bounds & find walkable tile ──
+        from src.settings import TILE_WATER, TILE_MOUNTAIN
+        mw, mh = self.tile_map.width, self.tile_map.height
+        self.party.col = max(0, min(mw - 1, self.party.col))
+        self.party.row = max(0, min(mh - 1, self.party.row))
+        # If the clamped position is not walkable, search outward
+        NON_WALKABLE = {TILE_WATER, TILE_MOUNTAIN}
+        if self.tile_map.get_tile(self.party.col, self.party.row) in NON_WALKABLE:
+            found = False
+            for radius in range(1, max(mw, mh)):
+                if found:
+                    break
+                for dr in range(-radius, radius + 1):
+                    for dc in range(-radius, radius + 1):
+                        c, r = self.party.col + dc, self.party.row + dr
+                        if (0 <= c < mw and 0 <= r < mh
+                                and self.tile_map.get_tile(c, r)
+                                not in NON_WALKABLE):
+                            self.party.col, self.party.row = c, r
+                            found = True
+                            break
+                    if found:
+                        break
+
         # ── Set starting time from module config ──
         if self.module_manifest:
             start_time = self.module_manifest.get("settings", {}).get("start_time")
