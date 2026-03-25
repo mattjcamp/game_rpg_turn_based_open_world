@@ -667,16 +667,27 @@ class OverworldState(InventoryMixin, BaseState):
                 return
             return  # no other tile events inside interiors
 
-        # ── Overworld interior link check (highest priority) ──
-        # An explicit tile_link to an interior overrides any tile-type
-        # behaviour (town, dungeon, etc.) so the designer can place an
-        # interior entrance on any tile graphic they like.
+        # ── Overworld tile_link check (highest priority) ──
+        # An explicit tile_link overrides any tile-type behaviour so the
+        # designer can place an interior/town entrance on any tile graphic.
         pcol, prow = party.col, party.row
         tmap = self.game.tile_map
         link = tmap.tile_links.get(f"{pcol},{prow}")
         if link and link.get("interior"):
+            link_name = link["interior"]
+            # Check if the link target is a town rather than a
+            # dungeon-style overworld interior.  Towns live in
+            # town_data_map and use the dedicated town state.
+            town_match = self._find_town_by_name(link_name)
+            if town_match is not None:
+                # Ensure the town is registered at this tile position
+                # so get_town_at() finds it during _show_town_action.
+                if (pcol, prow) not in self.game.town_data_map:
+                    self.game.town_data_map[(pcol, prow)] = town_match
+                self._show_town_action()
+                return
             self._enter_overworld_interior(
-                link["interior"], pcol, prow)
+                link_name, pcol, prow)
             return
 
         tile_id = tmap.get_tile(pcol, prow)
@@ -974,6 +985,18 @@ class OverworldState(InventoryMixin, BaseState):
         "Thornwall": "A sturdy frontier town nestled against the hills. Merchants, healers, and townsfolk go about their daily lives within its wooden walls.",
         "Duskhollow": "A shadowed settlement cloaked in perpetual twilight. Strange lights flicker in the windows and whispered rumors fill the streets.",
     }
+
+    def _find_town_by_name(self, name):
+        """Return the TownData whose name matches *name*, or None."""
+        for td in self.game.town_data_map.values():
+            if getattr(td, "name", None) == name:
+                return td
+        # Also check the default town_data (hub town)
+        if (hasattr(self.game, "town_data")
+                and self.game.town_data
+                and getattr(self.game.town_data, "name", None) == name):
+            return self.game.town_data
+        return None
 
     def _show_town_action(self):
         """Show the town entry action screen."""

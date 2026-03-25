@@ -867,6 +867,88 @@ class Game:
             if first_town is None:
                 first_town = td
 
+        # ── Register towns at tile_link positions ──
+        # The overview map editor lets the designer link any tile to a
+        # town by name.  If that town wasn't already placed by a landmark
+        # we still need to generate it and register it in town_data_map
+        # so the overworld state can find it at runtime.
+        known_town_names = {
+            getattr(td, "name", ""): td
+            for td in self.town_data_map.values()
+        }
+        # Index module manifest town definitions
+        towns_by_name = {t.get("name", ""): t for t in manifest_towns}
+        # Also load towns.json which may have user-created towns with
+        # custom layouts that aren't referenced in the manifest.
+        if self.active_module_path:
+            self._load_module_towns(self.active_module_path)
+        towns_json_by_name = {
+            t.get("name", ""): t
+            for t in getattr(self, "_mod_town_list", [])
+            if t.get("name")
+        }
+        tile_links = getattr(self.tile_map, "tile_links", {})
+        for pos_key, link_val in tile_links.items():
+            if not isinstance(link_val, dict):
+                continue
+            link_name = link_val.get("interior", "")
+            if not link_name:
+                continue
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            lcol, lrow = int(parts[0]), int(parts[1])
+            if (lcol, lrow) in self.town_data_map:
+                continue
+            # If a town with this name was already generated from a
+            # landmark, register the same TownData at this position too.
+            if link_name in known_town_names:
+                self.town_data_map[(lcol, lrow)] = known_town_names[link_name]
+                if first_town is None:
+                    first_town = known_town_names[link_name]
+                continue
+            # Try building from the module's towns.json (user-created
+            # towns with custom tile layouts and NPCs).
+            if link_name in towns_json_by_name:
+                td = self._build_town_from_towns_json(
+                    towns_json_by_name[link_name])
+                if td is not None:
+                    self.town_data_map[(lcol, lrow)] = td
+                    known_town_names[link_name] = td
+                    if first_town is None:
+                        first_town = td
+                    continue
+            # If the name matches a manifest town definition, generate
+            # procedurally.
+            if link_name in towns_by_name:
+                tdef = towns_by_name[link_name]
+                tc = tdef.get("town_config", {})
+                town_seed = hash((link_name, lcol, lrow)) & 0xFFFFFFFF
+                custom_layout = tc.get("layout", "")
+                if custom_layout:
+                    td = self._build_town_from_layout(
+                        custom_layout, link_name,
+                        town_style=tc.get("style", "medieval"))
+                    if td is None:
+                        td = generate_town(
+                            link_name, seed=town_seed,
+                            layout_index=town_ordinal,
+                            has_key_dungeons=bool(self.key_dungeons),
+                            innkeeper_quests=inn_quests,
+                            town_config=tc)
+                else:
+                    td = generate_town(
+                        link_name, seed=town_seed,
+                        layout_index=town_ordinal,
+                        has_key_dungeons=bool(self.key_dungeons),
+                        innkeeper_quests=inn_quests,
+                        town_config=tc)
+                town_ordinal += 1
+                self.town_data_map[(lcol, lrow)] = td
+                known_town_names[link_name] = td
+                if first_town is None:
+                    first_town = td
+
         # Set the default town_data to the first town (hub)
         if first_town:
             self.town_data = first_town
@@ -1017,6 +1099,78 @@ class Game:
             entry_col=entry_col,
             entry_row=entry_row,
             town_style=town_style,
+            interior_links=interior_links,
+            overworld_exits=overworld_exits,
+        )
+
+    def _build_town_from_towns_json(self, town_def):
+        """Build a TownData from a towns.json entry (user-created town).
+
+        The town_def dict comes from the module's towns.json and contains
+        a sparse tile grid, NPC definitions, entry position, and style.
+        Returns a TownData, or *None* on failure.
+        """
+        from src.tile_map import TileMap
+        from src.town_generator import TownData, NPC
+        from src.settings import TILE_VOID, TILE_EXIT
+
+        name = town_def.get("name", "Town")
+        w = town_def.get("width", 20)
+        h = town_def.get("height", 20)
+        tiles_dict = town_def.get("tiles", {})
+        if not tiles_dict:
+            return None
+
+        tm = TileMap(w, h, default_tile=TILE_VOID, oob_tile=TILE_VOID)
+        interior_links = {}
+        overworld_exits = set()
+        entry_col = town_def.get("entry_col", w // 2)
+        entry_row = town_def.get("entry_row", h - 1)
+
+        for key, td in tiles_dict.items():
+            try:
+                parts = key.split(",")
+                col, row = int(parts[0]), int(parts[1])
+            except (ValueError, IndexError):
+                continue
+            tile_id = td.get("tile_id", 10)
+            tm.set_tile(col, row, tile_id)
+            path = td.get("path")
+            if path:
+                tm.sprite_overrides[(col, row)] = path
+            if td.get("interior"):
+                interior_links[(col, row)] = td["interior"]
+            if td.get("to_overworld"):
+                overworld_exits.add((col, row))
+            if tile_id == TILE_EXIT:
+                overworld_exits.add((col, row))
+
+        # Build NPC objects from the town definition
+        npcs = []
+        for nd in town_def.get("npcs", []):
+            npc_name = nd.get("name", "Villager")
+            dialogue = nd.get("dialogue", ["..."])
+            if not dialogue:
+                dialogue = ["..."]
+            npc = NPC(
+                col=nd.get("col", 0),
+                row=nd.get("row", 0),
+                name=npc_name,
+                dialogue=dialogue,
+                npc_type=nd.get("npc_type", "villager"),
+                god_name=nd.get("god_name"),
+                shop_type=nd.get("shop_type", "general"),
+            )
+            npc.wander_range = nd.get("wander_range", 4)
+            npcs.append(npc)
+
+        return TownData(
+            tile_map=tm,
+            npcs=npcs,
+            name=name,
+            entry_col=entry_col,
+            entry_row=entry_row,
+            town_style=town_def.get("town_style", "medieval"),
             interior_links=interior_links,
             overworld_exits=overworld_exits,
         )
@@ -2453,12 +2607,31 @@ class Game:
             tiles = [[0] * w for _ in range(h)]
             self._mod_overview_map["tiles"] = tiles
 
+        # ── Build interior list from module towns (and future types) ──
+        # Each entry is {"name": str, "type": str} so the picker can
+        # display available link targets.
+        interior_list = []
+        mod = self.module_list[self.module_cursor]
+        self._load_module_towns(mod["path"])
+        for town in self._mod_town_list:
+            tname = town.get("name", "")
+            if tname:
+                interior_list.append({
+                    "name": tname,
+                    "type": "town",
+                })
+
+        # ── Load existing tile links ──
+        tile_links = self._mod_overview_map.get("tile_links", {})
+
         def _on_save(st):
             self._mod_overview_map["tiles"] = st.tiles
+            self._mod_overview_map["tile_links"] = st.tile_links
             self._save_module_overview_map()
 
         def _on_exit(st):
             self._mod_overview_map["tiles"] = st.tiles
+            self._mod_overview_map["tile_links"] = st.tile_links
             self._save_module_overview_map()
             self.showing_features = False
             self.showing_modules = True
@@ -2479,7 +2652,9 @@ class Game:
             on_exit=_on_exit,
         )
 
-        state = MapEditorState(config, tiles=tiles)
+        state = MapEditorState(config, tiles=tiles,
+                               tile_links=tile_links,
+                               interior_list=interior_list)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
 

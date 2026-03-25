@@ -1,8 +1,8 @@
 [
   {
-    "name": "Yardley",
-    "width": 46,
-    "height": 39,
+    "name": "Newtown",
+    "width": 42,
+    "height": 35,
     "tiles": {
       "13,9": {
         "tile_id": 11,
@@ -68,22 +68,6 @@
         "tile_id": 11,
         "name": "Wall"
       },
-      "29,9": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "30,9": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "31,9": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "32,9": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
       "13,10": {
         "tile_id": 11,
         "name": "Wall"
@@ -145,22 +129,6 @@
         "name": "Floor"
       },
       "28,10": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,10": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,10": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,10": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,10": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -197,20 +165,20 @@
         "name": "Wall"
       },
       "21,11": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "22,11": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "23,11": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "24,11": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "25,11": {
         "tile_id": 11,
@@ -221,26 +189,10 @@
         "name": "Wall"
       },
       "27,11": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "28,11": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "29,11": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "30,11": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "31,11": {
         "tile_id": 10,
         "name": "Floor"
       },
-      "32,11": {
+      "28,11": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -277,50 +229,34 @@
         "name": "Wall"
       },
       "21,12": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "22,12": {
         "tile_id": 10,
         "name": "Floor"
       },
       "23,12": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 12,
+        "name": "Counter"
       },
       "24,12": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 12,
+        "name": "Counter"
       },
       "25,12": {
-        "tile_id": 11,
-        "name": "Wall"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "26,12": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "27,12": {
-        "tile_id": 12,
-        "name": "Counter"
-      },
-      "28,12": {
-        "tile_id": 12,
-        "name": "Counter"
-      },
-      "29,12": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,12": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "31,12": {
+      "27,12": {
         "tile_id": 10,
         "name": "Floor"
       },
-      "32,12": {
+      "28,12": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -357,8 +293,8 @@
         "name": "Wall"
       },
       "21,13": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "22,13": {
         "tile_id": 10,
@@ -373,34 +309,18 @@
         "name": "Floor"
       },
       "25,13": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "26,13": {
         "tile_id": 10,
         "name": "Floor"
+      },
+      "26,13": {
+        "tile_id": 11,
+        "name": "Wall"
       },
       "27,13": {
         "tile_id": 10,
         "name": "Floor"
       },
       "28,13": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,13": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,13": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "31,13": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,13": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -437,8 +357,8 @@
         "name": "Wall"
       },
       "21,14": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "22,14": {
         "tile_id": 10,
@@ -453,34 +373,18 @@
         "name": "Floor"
       },
       "25,14": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "26,14": {
         "tile_id": 10,
         "name": "Floor"
+      },
+      "26,14": {
+        "tile_id": 11,
+        "name": "Wall"
       },
       "27,14": {
         "tile_id": 10,
         "name": "Floor"
       },
       "28,14": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,14": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,14": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "31,14": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,14": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -517,20 +421,20 @@
         "name": "Wall"
       },
       "21,15": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "22,15": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "23,15": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "24,15": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 13,
+        "name": "Door"
       },
       "25,15": {
         "tile_id": 11,
@@ -541,26 +445,10 @@
         "name": "Wall"
       },
       "27,15": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "28,15": {
-        "tile_id": 13,
-        "name": "Door"
-      },
-      "29,15": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "30,15": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "31,15": {
         "tile_id": 10,
         "name": "Floor"
       },
-      "32,15": {
+      "28,15": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -625,22 +513,6 @@
         "name": "Floor"
       },
       "28,16": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,16": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,16": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,16": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,16": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -705,22 +577,6 @@
         "name": "Floor"
       },
       "28,17": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,17": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,17": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,17": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,17": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -785,22 +641,6 @@
         "name": "Floor"
       },
       "28,18": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,18": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,18": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,18": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,18": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -813,28 +653,28 @@
         "name": "Floor"
       },
       "15,19": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "16,19": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "17,19": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "18,19": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "19,19": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "20,19": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "21,19": {
         "tile_id": 10,
@@ -865,22 +705,6 @@
         "name": "Floor"
       },
       "28,19": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,19": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,19": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,19": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,19": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -893,8 +717,8 @@
         "name": "Floor"
       },
       "15,20": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "16,20": {
         "tile_id": 10,
@@ -913,8 +737,8 @@
         "name": "Floor"
       },
       "20,20": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "21,20": {
         "tile_id": 10,
@@ -945,22 +769,6 @@
         "name": "Floor"
       },
       "28,20": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,20": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,20": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,20": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,20": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -973,16 +781,16 @@
         "name": "Floor"
       },
       "15,21": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "16,21": {
         "tile_id": 10,
         "name": "Floor"
       },
       "17,21": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 35,
+        "name": "Altar"
       },
       "18,21": {
         "tile_id": 10,
@@ -993,8 +801,8 @@
         "name": "Floor"
       },
       "20,21": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 13,
+        "name": "Door"
       },
       "21,21": {
         "tile_id": 10,
@@ -1025,22 +833,6 @@
         "name": "Floor"
       },
       "28,21": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,21": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,21": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,21": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,21": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -1057,20 +849,20 @@
         "name": "Wall"
       },
       "16,22": {
-        "tile_id": 11,
-        "name": "Wall"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "17,22": {
-        "tile_id": 11,
-        "name": "Wall"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "18,22": {
-        "tile_id": 11,
-        "name": "Wall"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "19,22": {
-        "tile_id": 11,
-        "name": "Wall"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "20,22": {
         "tile_id": 11,
@@ -1105,22 +897,6 @@
         "name": "Floor"
       },
       "28,22": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,22": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,22": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,22": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,22": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -1137,20 +913,20 @@
         "name": "Wall"
       },
       "16,23": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "17,23": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "18,23": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "19,23": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "20,23": {
         "tile_id": 11,
@@ -1177,30 +953,14 @@
         "name": "Floor"
       },
       "26,23": {
-        "tile_id": 37,
-        "name": "Brick"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "27,23": {
-        "tile_id": 37,
-        "name": "Brick"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "28,23": {
-        "tile_id": 37,
-        "name": "Brick"
-      },
-      "29,23": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,23": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,23": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,23": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -1213,16 +973,16 @@
         "name": "Floor"
       },
       "15,24": {
-        "tile_id": 11,
-        "name": "Wall"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "16,24": {
         "tile_id": 10,
         "name": "Floor"
       },
       "17,24": {
-        "tile_id": 35,
-        "name": "Altar"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "18,24": {
         "tile_id": 10,
@@ -1233,8 +993,8 @@
         "name": "Floor"
       },
       "20,24": {
-        "tile_id": 13,
-        "name": "Door"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "21,24": {
         "tile_id": 10,
@@ -1265,22 +1025,6 @@
         "name": "Floor"
       },
       "28,24": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,24": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,24": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,24": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,24": {
         "tile_id": 11,
         "name": "Wall"
       },
@@ -1289,430 +1033,93 @@
         "name": "Wall"
       },
       "14,25": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "15,25": {
         "tile_id": 11,
         "name": "Wall"
       },
       "16,25": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "17,25": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "18,25": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "19,25": {
-        "tile_id": 10,
-        "name": "Floor"
+        "tile_id": 11,
+        "name": "Wall"
       },
       "20,25": {
         "tile_id": 11,
         "name": "Wall"
       },
       "21,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "22,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "23,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "24,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "25,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "26,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "27,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "28,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,25": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,25": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "13,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "14,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "15,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "16,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "17,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "18,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "19,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "20,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "21,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "22,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "23,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "24,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "25,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "26,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "27,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "28,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,26": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,26": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "13,27": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "14,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "15,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "16,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "17,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "18,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "19,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "20,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "21,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "22,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "23,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "24,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "25,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "26,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "27,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "28,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,27": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,27": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "13,28": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "14,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "15,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "16,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "17,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "18,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "19,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "20,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "21,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "22,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "23,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "24,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "25,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "26,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "27,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "28,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "29,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "30,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "31,28": {
-        "tile_id": 10,
-        "name": "Floor"
-      },
-      "32,28": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "13,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "14,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "15,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "16,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "17,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "18,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "19,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "20,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "21,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "22,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "23,29": {
         "tile_id": 14,
         "name": "Exit"
       },
-      "24,29": {
+      "22,25": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "25,29": {
+      "23,25": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "26,29": {
+      "24,25": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "27,29": {
+      "25,25": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "28,29": {
+      "26,25": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "29,29": {
+      "27,25": {
         "tile_id": 11,
         "name": "Wall"
       },
-      "30,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "31,29": {
-        "tile_id": 11,
-        "name": "Wall"
-      },
-      "32,29": {
+      "28,25": {
         "tile_id": 11,
         "name": "Wall"
       }
     },
-    "description": "Riverside town",
-    "town_style": "medieval",
-    "entry_col": 23,
-    "entry_row": 28,
+    "description": "",
+    "town_style": "coastal",
+    "entry_col": 21,
+    "entry_row": 24,
     "npcs": [
       {
-        "name": "Sister Vesper",
+        "name": "Brother Cedric",
         "npc_type": "priest",
         "col": 18,
-        "row": 24,
+        "row": 21,
         "dialogue": [
-          "Welcome to the Shrine of Noxara, child.",
-          "The light of Noxara heals all wounds.",
-          "We offer healing and resurrection for those in need.",
-          "May Noxara's radiance guide your path."
+          "Peace be upon you, wanderer.",
+          "In Solarius's name, we mend body and soul.",
+          "Even the gravest wounds yield to Solarius's power.",
+          "Walk always in the light."
         ],
         "shop_type": "general",
-        "god_name": "Noxara",
+        "god_name": "Solarius",
         "wander_range": 4
       },
       {
-        "name": "Lira",
+        "name": "Bram",
         "npc_type": "shopkeep",
         "col": 18,
         "row": 14,
         "dialogue": [
-          "Ah",
-          "customers! Welcome to Lira's Trading Post.",
+          "Ah, customers! Welcome to Bram's Forge.",
           "You won't find better quality anywhere else.",
           "Every item here has been tested in the field.",
           "Gold well spent is gold well earned!"
@@ -1722,12 +1129,12 @@
         "wander_range": 4
       },
       {
-        "name": "Doric",
+        "name": "Bertram",
         "npc_type": "innkeeper",
-        "col": 28,
+        "col": 24,
         "row": 14,
         "dialogue": [
-          "Come in, come in! The Hearthstone is the warmest spot in town.",
+          "Come in, come in! The Sleeping Griffin is the warmest spot in town.",
           "Hot stew and a soft bed -- what more could you want?",
           "Travelers bring all sorts of stories through here.",
           "Stay as long as you like!"
@@ -1737,38 +1144,25 @@
         "wander_range": 4
       },
       {
-        "name": "Elder Rowan",
+        "name": "Elder Morath",
         "npc_type": "elder",
-        "col": 23,
-        "row": 19,
+        "col": 21,
+        "row": 17,
         "dialogue": [
-          "You carry the look of adventurers. Good -- we need heroes.",
-          "Our scouts report growing dangers in every direction.",
-          "The ancient wards are failing. Something must be done.",
-          "I pray you have the courage to see this through."
+          "Ah, brave adventurers! Newtown faces dark times.",
+          "Ancient evils stir in the dungeons beneath the land.",
+          "Seek out the hidden dangers before they find us.",
+          "I sense great potential in you. Do not lose hope."
         ],
         "shop_type": "general",
         "god_name": "The Divine",
         "wander_range": 4
       },
       {
-        "name": "Calla",
+        "name": "Maren",
         "npc_type": "villager",
-        "col": 19,
-        "row": 25,
-        "dialogue": [
-          "Have you heard about the old ruins?",
-          "They say treasure lies within."
-        ],
-        "shop_type": "general",
-        "god_name": "The Divine",
-        "wander_range": 4
-      },
-      {
-        "name": "Finn",
-        "npc_type": "villager",
-        "col": 27,
-        "row": 26,
+        "col": 18,
+        "row": 20,
         "dialogue": [
           "The road north has been dangerous lately.",
           "Stick to the main paths."
@@ -1778,13 +1172,26 @@
         "wander_range": 4
       },
       {
-        "name": "Hanna",
+        "name": "Dorin",
         "npc_type": "villager",
         "col": 24,
-        "row": 17,
+        "row": 20,
         "dialogue": [
-          "Beautiful day, isn't it?",
-          "Watch out for wolves in the forest."
+          "The inn serves the best stew in the region!",
+          "You should try it."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Hanna",
+        "npc_type": "villager",
+        "col": 20,
+        "row": 16,
+        "dialogue": [
+          "Have you heard about the old ruins?",
+          "They say treasure lies within."
         ],
         "shop_type": "general",
         "god_name": "The Divine",
