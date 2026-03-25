@@ -1182,6 +1182,7 @@ class Game:
             interior_links=interior_links,
             overworld_exits=overworld_exits,
             custom=True,
+            interiors=town_def.get("interiors", []),
         )
 
     def discover_single_key_dungeon(self, dungeon_key_str):
@@ -3178,7 +3179,12 @@ class Game:
             on_exit=on_exit,
         )
         existing_tiles = dict(town.get("tiles", {}))
-        state = MapEditorState(config, tiles=existing_tiles)
+        # Build interior_list from the town's enclosures so the "I" key
+        # picker can offer them as link targets.
+        enc_list = [{"name": e.get("name", "?")}
+                    for e in town.get("interiors", [])]
+        state = MapEditorState(config, tiles=existing_tiles,
+                               interior_list=enc_list)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
         self._mod_town_map_editor_state = state
@@ -3804,7 +3810,7 @@ class Game:
             grid_type=GRID_FIXED,
             width=w,
             height=h,
-            tile_context="dungeon",
+            tile_context="town",
             brushes=brushes,
             supports_interior_links=True,
             supports_replace=True,
@@ -3812,7 +3818,15 @@ class Game:
             on_exit=on_exit,
         )
         existing_tiles = dict(enc.get("tiles", {}))
-        state = MapEditorState(config, tiles=existing_tiles)
+        # Build interior_list from sibling enclosures (excluding current)
+        # so the "I" key picker lets this enclosure link to siblings or
+        # back to the parent town.
+        enc_name = enc.get("name", "")
+        sibling_list = [{"name": e.get("name", "?")}
+                        for e in self._mod_town_enclosures
+                        if e.get("name", "") != enc_name]
+        state = MapEditorState(config, tiles=existing_tiles,
+                               interior_list=sibling_list)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
         self._mod_town_map_editor_state = state

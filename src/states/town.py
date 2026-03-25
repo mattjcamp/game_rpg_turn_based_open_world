@@ -709,23 +709,30 @@ class TownState(InventoryMixin, BaseState):
                     f"Returning to {interior_name}...", 1000)
                 return
 
-        # Load the interior grid from town_templates.json
-        import json, os
-        path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "data", "town_templates.json")
-        try:
-            with open(path, "r") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            self.show_message("The door is locked.", 1500)
-            return
-        interiors = data.get("interiors", [])
+        # First check custom interiors stored on the TownData (from the
+        # module's towns.json enclosures).  Fall back to the global
+        # town_templates.json for procedurally generated towns.
         interior = None
-        for entry in interiors:
+        custom_interiors = getattr(self.town_data, "interiors", [])
+        for entry in custom_interiors:
             if entry.get("name") == interior_name:
                 interior = entry
                 break
+        if interior is None:
+            import json, os
+            path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "data", "town_templates.json")
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+            except (OSError, ValueError):
+                self.show_message("The door is locked.", 1500)
+                return
+            for entry in data.get("interiors", []):
+                if entry.get("name") == interior_name:
+                    interior = entry
+                    break
         if not interior or not interior.get("tiles"):
             self.show_message("The door is locked.", 1500)
             return

@@ -69,7 +69,7 @@ class TownData:
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
                  keyslot_positions=None, town_style="medieval",
                  building_signs=None, interior_links=None,
-                 overworld_exits=None, custom=False):
+                 overworld_exits=None, custom=False, interiors=None):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -86,11 +86,15 @@ class TownData:
         # Interior links: {(col, row): interior_name}
         # When the player steps on a linked tile, the game transitions
         # to that interior space.  The interior data (tile grid, NPCs)
-        # is stored separately in town_templates.json.
+        # is stored separately in town_templates.json or in self.interiors.
         self.interior_links = interior_links or {}
         # Overworld exit positions: set of (col, row)
         # When the player steps on one, they return to the overworld.
         self.overworld_exits = overworld_exits or set()
+        # Custom enclosure definitions — list of dicts with name, width,
+        # height, tiles.  Used by _enter_interior to load editor-created
+        # interiors without falling back to town_templates.json.
+        self.interiors = interiors or []
         # Custom flag — True for user-created towns (from towns.json).
         # These towns have hand-placed NPCs and should not receive
         # auto-injected quest givers or other procedural content.

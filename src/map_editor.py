@@ -353,7 +353,7 @@ class MapEditorState:
                 # Preserve existing link fields
                 old = self.tiles.get(f"{col},{row}", {})
                 if isinstance(old, dict):
-                    for lk in ("interior", "to_overworld"):
+                    for lk in ("interior", "to_overworld", "to_town"):
                         if lk in old:
                             td[lk] = old[lk]
                 self.set_tile(col, row, td)
@@ -397,7 +397,7 @@ class MapEditorState:
                 # Preserve existing link fields
                 old = self.tiles.get(f"{tc},{tr}", {})
                 if isinstance(old, dict):
-                    for lk in ("interior", "to_overworld"):
+                    for lk in ("interior", "to_overworld", "to_town"):
                         if lk in old:
                             td[lk] = old[lk]
                 self.set_tile(tc, tr, td)
@@ -422,18 +422,28 @@ class MapEditorState:
     def set_interior_link(self, col: int, row: int,
                           link_type: Optional[str],
                           link_value: Any = None):
-        """Set/clear an interior or to_overworld link on a sparse tile."""
+        """Set/clear an interior or to_overworld/to_town link on a sparse tile.
+
+        When tile_context is "town", the exit link uses ``to_town`` so the
+        town gameplay code recognises it as a "return to town" marker.
+        Otherwise it stores ``to_overworld`` for dungeon-style interiors.
+        """
         pos_key = f"{col},{row}"
         td = self.tiles.get(pos_key)
         if td is None or not isinstance(td, dict):
             return  # need a tile to attach link to
 
-        # Clear existing link types
-        for lk in ("interior", "to_overworld"):
+        # Clear existing link types (both variants)
+        for lk in ("interior", "to_overworld", "to_town"):
             td.pop(lk, None)
 
         if link_type == "to_overworld":
-            td["to_overworld"] = True
+            # Context-aware: town enclosures exit back to the town,
+            # not the overworld.
+            if self.config.tile_context == "town":
+                td["to_town"] = True
+            else:
+                td["to_overworld"] = True
             self.dirty = True
         elif link_type == "interior" and link_value:
             td["interior"] = link_value
@@ -448,7 +458,7 @@ class MapEditorState:
         if td is None or not isinstance(td, dict):
             return
         changed = False
-        for lk in ("interior", "to_overworld"):
+        for lk in ("interior", "to_overworld", "to_town"):
             if lk in td:
                 del td[lk]
                 changed = True
@@ -729,7 +739,7 @@ class MapEditorInputHandler:
         # Pre-select based on current tile's link
         td = st.get_tile(st.cursor_col, st.cursor_row)
         if isinstance(td, dict):
-            if td.get("to_overworld"):
+            if td.get("to_overworld") or td.get("to_town"):
                 st.int_link_pick_cursor = 1
             elif td.get("interior"):
                 iname = td["interior"]

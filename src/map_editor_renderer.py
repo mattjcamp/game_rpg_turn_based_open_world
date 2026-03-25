@@ -537,10 +537,10 @@ def _draw_sparse_link_badge(screen, renderer, td: Dict,
     badge_char = None
     badge_border = None
     badge_bg = None
-    if td.get("to_overworld"):
+    if td.get("to_overworld") or td.get("to_town"):
         badge_border = _COL_LINK_OW
         badge_bg = _COL_LINK_OW_BG
-        badge_char = "O"
+        badge_char = "T" if td.get("to_town") else "O"
     elif td.get("interior"):
         badge_border = _COL_LINK_INT
         badge_bg = _COL_LINK_INT_BG
@@ -627,7 +627,10 @@ def _draw_int_link_picker_overlay(renderer, data: Dict):
 
     row_h = 28
     ly = oy + 32
-    options = ([u"(none)", u"\u2190 Return to Overworld"]
+    tile_ctx = data.get("tile_context", "dungeon")
+    exit_label = (u"\u2190 Return to Town" if tile_ctx == "town"
+                  else u"\u2190 Return to Overworld")
+    options = ([u"(none)", exit_label]
                + [i.get("name", "?") for i in pick_list])
 
     for i, label in enumerate(options):
