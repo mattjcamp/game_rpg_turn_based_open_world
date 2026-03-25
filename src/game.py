@@ -2393,6 +2393,7 @@ class Game:
         self.showing_modules = False
         self.showing_features = True
         fe.active_editor = "mod_overview_map"
+        fe.level = 1  # renderer requires level >= 1 for editor views
 
     def _handle_overview_map_input(self, event):
         """Handle input for the Overview Map section (level 2).
