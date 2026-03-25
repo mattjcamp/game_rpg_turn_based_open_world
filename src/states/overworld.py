@@ -682,8 +682,13 @@ class OverworldState(InventoryMixin, BaseState):
         tile_id = tmap.get_tile(pcol, prow)
 
         if tile_id == TILE_TOWN:
-            self._show_town_action()
-            return
+            # Only trigger town entry if the module actually defines a
+            # town at this position.  Placing a town *graphic* on the
+            # overworld map is purely cosmetic until the designer
+            # registers the town in the module editor.
+            if (pcol, prow) in self.game.town_data_map:
+                self._show_town_action()
+                return
 
         elif tile_id == TILE_DUNGEON:
             self._show_dungeon_action(pcol, prow)
