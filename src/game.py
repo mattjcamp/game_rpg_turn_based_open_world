@@ -977,8 +977,16 @@ class Game:
             self.quest_npc_assignments = {}
             return
 
-        # Get list of town names / keys for round-robin assignment
-        town_keys = list(self.town_data_map.keys())  # (col, row) list
+        # Only assign quest NPCs to procedurally generated towns.
+        # User-created towns (custom=True, loaded from towns.json) have
+        # hand-placed NPCs and should not receive auto-injected content.
+        town_keys = [
+            k for k, td in self.town_data_map.items()
+            if not getattr(td, "custom", False)
+        ]
+        if not town_keys:
+            self.quest_npc_assignments = {}
+            return
 
         # Use a deterministic RNG seeded from the module for reproducibility
         mod_id = ""
@@ -1173,6 +1181,7 @@ class Game:
             town_style=town_def.get("town_style", "medieval"),
             interior_links=interior_links,
             overworld_exits=overworld_exits,
+            custom=True,
         )
 
     def discover_single_key_dungeon(self, dungeon_key_str):
@@ -3088,11 +3097,16 @@ class Game:
 
     def _mod_town_add_npc(self):
         """Add a new default NPC to the current town."""
+        # Place at the town's entry point so the NPC spawns in the
+        # walkable area instead of the void at (1,1).
+        town = self._mod_town_get_current()
+        ec = town.get("entry_col", 1) if town else 1
+        er = town.get("entry_row", 1) if town else 1
         new_npc = {
             "name": "New NPC",
             "npc_type": "villager",
-            "col": 1,
-            "row": 1,
+            "col": ec,
+            "row": er,
             "dialogue": ["Hello there!"],
             "shop_type": "general",
             "god_name": "The Divine",

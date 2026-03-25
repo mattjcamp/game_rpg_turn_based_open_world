@@ -69,7 +69,7 @@ class TownData:
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
                  keyslot_positions=None, town_style="medieval",
                  building_signs=None, interior_links=None,
-                 overworld_exits=None):
+                 overworld_exits=None, custom=False):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -91,6 +91,10 @@ class TownData:
         # Overworld exit positions: set of (col, row)
         # When the player steps on one, they return to the overworld.
         self.overworld_exits = overworld_exits or set()
+        # Custom flag — True for user-created towns (from towns.json).
+        # These towns have hand-placed NPCs and should not receive
+        # auto-injected quest givers or other procedural content.
+        self.custom = custom
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""

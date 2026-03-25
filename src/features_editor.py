@@ -537,11 +537,16 @@ class FeaturesEditor:
 
     def _town_add_npc(self):
         """Add a new default NPC to the current town."""
+        # Place at the town's entry point so the NPC spawns in the
+        # walkable area instead of the void at (1,1).
+        town = self._town_get_current()
+        ec = town.get("entry_col", 1) if town else 1
+        er = town.get("entry_row", 1) if town else 1
         new_npc = {
             "name": "New NPC",
             "npc_type": "villager",
-            "col": 1,
-            "row": 1,
+            "col": ec,
+            "row": er,
             "dialogue": ["Hello there!"],
             "shop_type": "general",
             "god_name": "The Divine",

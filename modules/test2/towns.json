@@ -1114,84 +1114,12 @@
         "wander_range": 4
       },
       {
-        "name": "Bram",
-        "npc_type": "shopkeep",
-        "col": 18,
-        "row": 14,
-        "dialogue": [
-          "Ah, customers! Welcome to Bram's Forge.",
-          "You won't find better quality anywhere else.",
-          "Every item here has been tested in the field.",
-          "Gold well spent is gold well earned!"
-        ],
-        "shop_type": "general",
-        "god_name": "The Divine",
-        "wander_range": 4
-      },
-      {
-        "name": "Bertram",
-        "npc_type": "innkeeper",
-        "col": 24,
-        "row": 14,
-        "dialogue": [
-          "Come in, come in! The Sleeping Griffin is the warmest spot in town.",
-          "Hot stew and a soft bed -- what more could you want?",
-          "Travelers bring all sorts of stories through here.",
-          "Stay as long as you like!"
-        ],
-        "shop_type": "general",
-        "god_name": "The Divine",
-        "wander_range": 4
-      },
-      {
-        "name": "Elder Morath",
-        "npc_type": "elder",
-        "col": 21,
-        "row": 17,
-        "dialogue": [
-          "Ah, brave adventurers! Newtown faces dark times.",
-          "Ancient evils stir in the dungeons beneath the land.",
-          "Seek out the hidden dangers before they find us.",
-          "I sense great potential in you. Do not lose hope."
-        ],
-        "shop_type": "general",
-        "god_name": "The Divine",
-        "wander_range": 4
-      },
-      {
-        "name": "Maren",
+        "name": "Same",
         "npc_type": "villager",
-        "col": 18,
+        "col": 17,
         "row": 20,
         "dialogue": [
-          "The road north has been dangerous lately.",
-          "Stick to the main paths."
-        ],
-        "shop_type": "general",
-        "god_name": "The Divine",
-        "wander_range": 4
-      },
-      {
-        "name": "Dorin",
-        "npc_type": "villager",
-        "col": 24,
-        "row": 20,
-        "dialogue": [
-          "The inn serves the best stew in the region!",
-          "You should try it."
-        ],
-        "shop_type": "general",
-        "god_name": "The Divine",
-        "wander_range": 4
-      },
-      {
-        "name": "Hanna",
-        "npc_type": "villager",
-        "col": 20,
-        "row": 16,
-        "dialogue": [
-          "Have you heard about the old ruins?",
-          "They say treasure lies within."
+          "How Fares Thee?"
         ],
         "shop_type": "general",
         "god_name": "The Divine",
