@@ -3558,6 +3558,83 @@ class Renderer(CombatEffectRendererMixin):
         hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
 
+    def draw_building_action_screen(self, info, cursor):
+        """Draw the building entry confirmation panel over the overworld."""
+        name = info.get("name", "Building")
+        desc = info.get("description", "")
+
+        panel_w = 440
+        pad = 16
+        content_w = panel_w - pad * 2
+        line_h = 24
+        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
+        body_font = self.font
+        hint_font = self.font_small
+
+        # ── Word-wrap the description ──
+        desc_lines = []
+        for word in desc.split():
+            if desc_lines and body_font.size(desc_lines[-1] + " " + word)[0] <= content_w:
+                desc_lines[-1] += " " + word
+            else:
+                desc_lines.append(word)
+
+        # ── Calculate panel height ──
+        h = pad
+        h += 28           # title
+        h += 12           # gap
+        h += len(desc_lines) * line_h  # description
+        h += 16           # gap
+        h += line_h * 2   # two options
+        h += 12           # gap
+        h += 18           # hint
+        h += pad
+
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
+
+        # ── Dim overlay ──
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.screen.blit(dim, (0, 0))
+
+        # ── Panel ──
+        self._u3_panel(panel_x, panel_y, panel_w, h)
+
+        y = panel_y + pad
+
+        # ── Title ──
+        title_surf = title_font.render(name, True, (180, 200, 255))
+        self.screen.blit(title_surf, (panel_x + pad, y))
+        y += 28 + 12
+
+        # ── Description ──
+        for line in desc_lines:
+            line_surf = body_font.render(line, True, (220, 220, 240))
+            self.screen.blit(line_surf, (panel_x + pad, y))
+            y += line_h
+        y += 16
+
+        # ── Options ──
+        options = [f"Enter {name}", "Leave"]
+        for i, label in enumerate(options):
+            is_sel = (i == cursor)
+            if is_sel:
+                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
+                pygame.draw.rect(self.screen, (40, 40, 80), hl)
+                arrow_surf = body_font.render(">", True, (255, 220, 100))
+                self.screen.blit(arrow_surf, (panel_x + pad, y))
+
+            color = (255, 255, 255) if is_sel else (180, 180, 200)
+            opt_surf = body_font.render(label, True, color)
+            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
+            y += line_h
+        y += 12
+
+        # ── Hint ──
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
+        self.screen.blit(hint_surf, (panel_x + pad, y))
+
     def draw_dungeon_action_screen(self, info, cursor):
         """Draw the dungeon entry confirmation panel over the overworld."""
         name = info.get("name", "Unknown")
@@ -7385,6 +7462,10 @@ class Renderer(CombatEffectRendererMixin):
                 # Module dungeon map — uses the shared map editor
                 if state.dungeon_map_editor_data is not None:
                     self._draw_map_editor_fullscreen(state.dungeon_map_editor_data)
+            elif ed == "mod_building_map":
+                # Module building map — uses the shared map editor
+                if state.building_map_editor_data is not None:
+                    self._draw_map_editor_fullscreen(state.building_map_editor_data)
             elif ed == "mapeditor":
                 if meh_editor_active and meh_editor_data:
                     # Fullscreen map editor (launched from a template)
@@ -8378,6 +8459,394 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text(val_text, val_x, y + 4, val_color, fm)
 
         self._draw_dungeon_flash(dg, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Building Editor Panel ─────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def draw_building_editor_panel(self, rx, ry, rw, rh, bg):
+        """Draw the building editor panel inside the module editor."""
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        buildings = bg.get("buildings") or []
+        cursor = bg.get("cursor", 0)
+        scroll = bg.get("scroll", 0)
+        level = bg.get("level", 0)
+        row_h = 36
+
+        # ── Map editor fullscreen ──
+        if bg.get("editor_active") and bg.get("editor_data"):
+            self._draw_map_editor_fullscreen(bg["editor_data"])
+            return
+
+        # Semi-transparent overlay
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 230))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (80, 120, 160),
+                         (rx, ry, rw, rh), 1)
+
+        # ── Level 0: Building list ──
+        if level == 0:
+            self._u3_text("BUILDINGS", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            ly = ry + 44
+            content_h = rh - 80
+            max_vis = content_h // row_h
+
+            if len(buildings) == 0:
+                self._u3_text("No buildings yet. Press Ctrl+N to add.",
+                              rx + 20, ly + 10, (140, 140, 160), fm)
+            else:
+                for vi in range(max_vis):
+                    i = scroll + vi
+                    if i >= len(buildings):
+                        break
+                    building = buildings[i]
+                    selected = (i == cursor)
+                    y = ly + vi * row_h
+                    if selected:
+                        bar = pygame.Surface((rw - 4, row_h - 2),
+                                             pygame.SRCALPHA)
+                        bar.fill((255, 200, 60, 30))
+                        self.screen.blit(bar, (rx + 2, y - 1))
+                    prefix = "> " if selected else "  "
+                    color = self._U3_WHITE if selected else (180, 180, 180)
+                    name = building.get("name", "Unnamed")
+                    spaces_arr = building.get("spaces", [])
+                    n_spaces = len(spaces_arr)
+                    n_enc = sum(len(sp.get("encounters", []))
+                                for sp in spaces_arr)
+                    self._u3_text(f"{prefix}{name}",
+                                  rx + 10, y, color, fm)
+                    self._u3_text(
+                        f"  {n_spaces} space{'s' if n_spaces != 1 else ''}"
+                        f"  {n_enc} encounters",
+                        rx + 10, y + 18, (140, 140, 160), fs)
+
+            # Naming overlay (buildings)
+            if bg.get("naming") and bg.get("naming_target") == "building":
+                self._draw_naming_overlay(
+                    bg.get("name_buf", ""),
+                    "New Building Name:" if bg.get("naming_is_new")
+                    else "Rename Building:",
+                    fm, f)
+
+            self._draw_building_flash(bg, rx, ry, rw, rh, f)
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] New  [Ctrl+D] Del  [Esc] Back",
+                rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Level 1: Building sub-screen (Settings | Spaces) ──
+        elif level == 1:
+            building = buildings[cursor] if 0 <= cursor < len(buildings) else {}
+            building_name = building.get("name", "Unnamed")
+            self._u3_text(f"BUILDING: {building_name}", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            ly = ry + 50
+            sub_items = bg.get("sub_items") or ["Settings", "Spaces"]
+            sub_cursor = bg.get("sub_cursor", 0)
+            for i, item in enumerate(sub_items):
+                selected = (i == sub_cursor)
+                y = ly + i * 40
+                if selected:
+                    bar = pygame.Surface((rw - 4, 38), pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{item}",
+                              rx + 16, y + 8, color, fm)
+
+            self._u3_text("[Enter] Open  [Esc] Back",
+                          rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Level 2: Settings fields OR Space list ──
+        elif level == 2:
+            sub_cursor = bg.get("sub_cursor", 0)
+            if sub_cursor == 0:
+                self._draw_building_settings(
+                    bg, rx, ry, rw, rh, fm, fs, f)
+            elif sub_cursor == 1:
+                self._draw_building_space_list(
+                    bg, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Level 3: Space sub-screen (Edit Map | Encounters) ──
+        elif level == 3:
+            self._draw_building_space_sub(
+                bg, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Level 4: Encounter list ──
+        elif level == 4:
+            self._draw_building_encounter_list(
+                bg, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Level 5: Encounter field editor ──
+        elif level == 5:
+            self._draw_building_encounter_editor(
+                bg, rx, ry, rw, rh, fm, fs, f)
+
+    def _draw_building_flash(self, bg, rx, ry, rw, rh, f):
+        """Draw save flash if active."""
+        sf = bg.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36,
+                          (100, 255, 100, alpha), f)
+
+    def _draw_building_settings(self, bg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the building settings field editor."""
+        fields = bg.get("fields") or []
+        field_cursor = bg.get("field_cursor", 0)
+        field_buffer = bg.get("field_buffer", "")
+        field_scroll = bg.get("field_scroll", 0)
+        row_h = 38
+        max_visible = rh // row_h
+
+        self._u3_text("Building Settings", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+
+        for vi in range(max_visible):
+            i = field_scroll + vi
+            if i >= len(fields):
+                break
+            fe = fields[i]
+            y = ly + vi * row_h
+            selected = (i == field_cursor)
+
+            if fe.field_type == "section":
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 10, y + 10),
+                                 (rx + rw - 10, y + 10), 1)
+                if fe.label:
+                    self._u3_text(fe.label, rx + 14, y + 14,
+                                  (180, 140, 60), fs)
+                continue
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, row_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 25))
+                self.screen.blit(bar, (rx + 2, y))
+
+            label_color = self._U3_WHITE if selected else (160, 160, 180)
+            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+
+            val_x = rx + 140
+            if fe.field_type == "choice":
+                arrow_color = (255, 220, 100) if selected else (120, 120, 140)
+                text_color = (255, 220, 100) if selected else (200, 200, 200)
+                self._u3_text("<", val_x, y + 4, arrow_color, fm)
+                disp = fe.value or "(none)"
+                self._u3_text(disp, val_x + 14, y + 4, text_color, fm)
+                vw = fm.size(disp)[0]
+                self._u3_text(">", val_x + 18 + vw, y + 4,
+                              arrow_color, fm)
+            elif selected and fe.editable:
+                val_text = field_buffer + "_"
+                val_color = (255, 220, 100)
+                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+            else:
+                val_text = fe.value
+                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+
+        self._draw_building_flash(bg, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Navigate  [L/R] Choice  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_building_space_list(self, bg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the space list within a building."""
+        spaces = bg.get("space_list") or []
+        cursor = bg.get("space_cursor", 0)
+        scroll = bg.get("space_scroll", 0)
+        row_h = 36
+
+        buildings = bg.get("buildings") or []
+        bc = bg.get("cursor", 0)
+        building = buildings[bc] if 0 <= bc < len(buildings) else {}
+        building_name = building.get("name", "Building")
+
+        self._u3_text(f"SPACES — {building_name}", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        content_h = rh - 80
+        max_vis = content_h // row_h
+
+        if len(spaces) == 0:
+            self._u3_text("No spaces yet. Press Ctrl+N to add.",
+                          rx + 20, ly + 10, (140, 140, 160), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(spaces):
+                    break
+                sp = spaces[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                name = sp.get("name", "Unnamed")
+                sw = sp.get("width", 0)
+                sh = sp.get("height", 0)
+                n_enc = len(sp.get("encounters", []))
+                has_map = bool(sp.get("tiles"))
+                map_tag = "map" if has_map else "no map"
+                self._u3_text(f"{prefix}{name}",
+                              rx + 10, y, color, fm)
+                self._u3_text(
+                    f"  {sw}x{sh}  {n_enc} enc  ({map_tag})",
+                    rx + 10, y + 18, (140, 140, 160), fs)
+
+        # Naming overlay (spaces)
+        if bg.get("naming") and bg.get("naming_target") == "space":
+            self._draw_naming_overlay(
+                bg.get("name_buf", ""),
+                "New Space Name:" if bg.get("naming_is_new")
+                else "Rename Space:",
+                fm, f)
+
+        self._draw_building_flash(bg, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] New  [Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_building_space_sub(self, bg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the space sub-screen selector (Edit Map | Encounters)."""
+        spaces = bg.get("space_list") or []
+        sc = bg.get("space_cursor", 0)
+        space = spaces[sc] if 0 <= sc < len(spaces) else {}
+        space_name = space.get("name", "Unnamed")
+
+        self._u3_text(f"SPACE: {space_name}", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 50
+        sub_items = bg.get("space_sub_items") or ["Edit Map", "Encounters"]
+        sub_cursor = bg.get("space_sub_cursor", 0)
+        for i, item in enumerate(sub_items):
+            selected = (i == sub_cursor)
+            y = ly + i * 40
+            if selected:
+                bar = pygame.Surface((rw - 4, 38), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (rx + 2, y))
+            prefix = "> " if selected else "  "
+            color = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(f"{prefix}{item}",
+                          rx + 16, y + 8, color, fm)
+
+        self._u3_text("[Enter] Open  [Esc] Back",
+                      rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_building_encounter_list(self, bg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the encounters list within a space."""
+        encounters = bg.get("encounter_list") or []
+        cursor = bg.get("encounter_cursor", 0)
+        scroll = bg.get("encounter_scroll", 0)
+        row_h = 36
+
+        self._u3_text("ENCOUNTERS", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        content_h = rh - 80
+        max_vis = content_h // row_h
+
+        if len(encounters) == 0:
+            self._u3_text("No encounters yet. Press Ctrl+N to add.",
+                          rx + 20, ly + 10, (140, 140, 160), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(encounters):
+                    break
+                enc = encounters[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                name = enc.get("name", "Unnamed")
+                enc_type = enc.get("encounter_type", "npc")
+                self._u3_text(f"{prefix}{name}  ({enc_type})",
+                              rx + 10, y + 4, color, fm)
+                self._u3_text(
+                    f"  pos: ({enc.get('col', 0)},{enc.get('row', 0)})",
+                    rx + 10, y + 20, (140, 140, 160), fs)
+
+        self._draw_building_flash(bg, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_building_encounter_editor(self, bg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the encounter field editor."""
+        fields = bg.get("encounter_fields") or []
+        field_cursor = bg.get("encounter_field_cursor", 0)
+        field_buffer = bg.get("encounter_field_buffer", "")
+        field_scroll = bg.get("encounter_field_scroll", 0)
+        row_h = 38
+        max_visible = rh // row_h
+
+        enc_name = ""
+        if fields:
+            for fe in fields:
+                if fe.key == "name":
+                    enc_name = fe.value
+                    break
+        self._u3_text(f"EDIT ENCOUNTER: {enc_name}", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+
+        for vi in range(max_visible):
+            i = field_scroll + vi
+            if i >= len(fields):
+                break
+            fe = fields[i]
+            y = ly + vi * row_h
+            selected = (i == field_cursor)
+
+            if fe.field_type == "section":
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 10, y + 10),
+                                 (rx + rw - 10, y + 10), 1)
+                continue
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, row_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 25))
+                self.screen.blit(bar, (rx + 2, y))
+
+            label_color = self._U3_WHITE if selected else (160, 160, 180)
+            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+
+            val_x = rx + 140
+            if selected and fe.editable:
+                val_text = field_buffer + "_"
+                val_color = (255, 220, 100)
+            else:
+                val_text = fe.value
+                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+            self._u3_text(val_text, val_x, y + 4, val_color, fm)
+
+        self._draw_building_flash(bg, rx, ry, rw, rh, f)
         self._u3_text(
             "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
@@ -10199,7 +10668,8 @@ class Renderer(CombatEffectRendererMixin):
                            overview_child_cursor=0,
                            overview_editor_state=None,
                            town_data=None,
-                           dungeon_data=None):
+                           dungeon_data=None,
+                           building_data=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -10458,6 +10928,10 @@ class Renderer(CombatEffectRendererMixin):
                 # Dungeon editor panel
                 self.draw_dungeon_editor_panel(
                     right_x, panel_y, right_w, panel_h, dungeon_data)
+            elif edit_level in (14, 15, 16, 17, 18, 19) and building_data:
+                # Building editor panel
+                self.draw_building_editor_panel(
+                    right_x, panel_y, right_w, panel_h, building_data)
 
         # ── Template picker overlay ──
         if overview_picking:
@@ -10501,6 +10975,9 @@ class Renderer(CombatEffectRendererMixin):
             hint = ""
         elif edit_mode and edit_level in (8, 9, 10, 11, 12, 13):
             # Dungeon editor has its own hints inside draw_dungeon_editor_panel
+            hint = ""
+        elif edit_mode and edit_level in (14, 15, 16, 17, 18, 19):
+            # Building editor has its own hints inside draw_building_editor_panel
             hint = ""
         else:
             hint = ("[UP/DN] Browse  [S] Select  "

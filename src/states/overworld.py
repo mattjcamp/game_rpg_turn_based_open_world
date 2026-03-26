@@ -74,6 +74,12 @@ class OverworldState(InventoryMixin, BaseState):
         self.town_action_cursor = 0           # 0=Enter, 1=Leave
         self.town_action_info = {}            # {name, description}
 
+        # Building entry action screen
+        self.building_action_active = False
+        self.building_action_cursor = 0       # 0=Enter, 1=Leave
+        self.building_action_info = {}        # {name, description}
+        self.building_action_entry_args = None
+
         # Grace flag: skip one tile-event check after returning from a
         # town/dungeon so the player isn't immediately prompted to re-enter
         # the location they just left.
@@ -293,6 +299,11 @@ class OverworldState(InventoryMixin, BaseState):
                 # ── Dungeon action screen input ──
                 if self.dungeon_action_active:
                     self._handle_dungeon_action_input(event)
+                    return
+
+                # ── Building action screen input ──
+                if self.building_action_active:
+                    self._handle_building_action_input(event)
                     return
 
                 # ── Party inventory screen input ──
@@ -677,6 +688,26 @@ class OverworldState(InventoryMixin, BaseState):
             link_name = link["interior"]
             link_type = link.get("type", "")
 
+            # ── Building link — show action screen ──
+            if link_type == "building":
+                building_def = self._find_module_building_by_name(link_name)
+                if building_def is not None:
+                    spaces = building_def.get("spaces", [])
+                    if spaces:
+                        self.building_action_info = {
+                            "name": building_def.get("name", link_name),
+                            "description": building_def.get("description",
+                                "A structure stands before you."),
+                        }
+                        self.building_action_entry_args = {
+                            "building_def": building_def,
+                            "col": pcol,
+                            "row": prow,
+                        }
+                        self.building_action_cursor = 0
+                        self.building_action_active = True
+                        return
+
             # ── Dungeon link ──
             if link_type == "dungeon":
                 dungeon_def = self._find_module_dungeon_by_name(link_name)
@@ -725,12 +756,35 @@ class OverworldState(InventoryMixin, BaseState):
                 self._show_town_action()
                 return
 
-        elif tile_id == TILE_DUNGEON:
-            self._show_dungeon_action(pcol, prow)
-            return
-
-        elif tile_id == TILE_DUNGEON_CLEARED:
-            self._show_dungeon_action(pcol, prow)
+        elif tile_id in (TILE_DUNGEON, TILE_DUNGEON_CLEARED):
+            # Check if a tile_link points to a module dungeon
+            # (handles links without the "type" field set)
+            link = tmap.tile_links.get(f"{pcol},{prow}")
+            if link and link.get("interior"):
+                ddef = self._find_module_dungeon_by_name(link["interior"])
+                if ddef is not None:
+                    visited = self.game.is_dungeon_visited(pcol, prow)
+                    self.dungeon_action_info = {
+                        "name": ddef.get("name", link["interior"]),
+                        "description": ddef.get("description",
+                            "A dark entrance leads underground."),
+                        "visited": visited,
+                        "cleared": (tile_id == TILE_DUNGEON_CLEARED),
+                        "quest_name": None,
+                    }
+                    self.dungeon_action_entry_args = {
+                        "type": "module_dungeon",
+                        "col": pcol,
+                        "row": prow,
+                        "dungeon_def": ddef,
+                    }
+                    self.dungeon_action_cursor = 0
+                    self.dungeon_action_active = True
+                    return
+            # In custom modules, only linked dungeons should trigger entry.
+            # Unlinked dungeon tiles are treated as scenery.
+            if not self.game.module_manifest:
+                self._show_dungeon_action(pcol, prow)
             return
 
         elif tile_id == TILE_MACHINE:
@@ -1039,6 +1093,27 @@ class OverworldState(InventoryMixin, BaseState):
             for d in dungeons:
                 if d.get("name") == name:
                     return d
+        except (OSError, json.JSONDecodeError):
+            pass
+        return None
+
+    def _find_module_building_by_name(self, name):
+        """Return the building dict from buildings.json whose name matches, or None."""
+        import json, os
+        mod_path = getattr(self.game, "active_module_path", "")
+        if not mod_path:
+            return None
+        p = os.path.join(mod_path, "buildings.json")
+        if not os.path.isfile(p):
+            return None
+        try:
+            with open(p, "r") as f:
+                buildings = json.load(f)
+            if not isinstance(buildings, list):
+                return None
+            for b in buildings:
+                if b.get("name") == name:
+                    return b
         except (OSError, json.JSONDecodeError):
             pass
         return None
@@ -1373,6 +1448,55 @@ class OverworldState(InventoryMixin, BaseState):
         self.dungeon_action_active = False
         self.game.change_state("dungeon")
 
+    # ── Building action screen ─────────────────────────────────
+
+    def _handle_building_action_input(self, event):
+        """Handle input for the building entry action screen."""
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.building_action_cursor = (self.building_action_cursor - 1) % 2
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.building_action_cursor = (self.building_action_cursor + 1) % 2
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self.building_action_cursor == 0:
+                self._enter_building_confirmed()
+            else:
+                self.building_action_active = False
+        elif event.key == pygame.K_ESCAPE:
+            self.building_action_active = False
+
+    def _enter_building_confirmed(self):
+        """Execute the actual building entry after the player confirms."""
+        self.building_action_active = False
+        args = self.building_action_entry_args
+        if not args:
+            return
+
+        building_def = args["building_def"]
+        pcol, prow = args["col"], args["row"]
+        spaces = building_def.get("spaces", [])
+        if not spaces:
+            return
+
+        tmap = self.game.tile_map
+        src_tmap = self._stashed_overworld_tile_map or tmap
+        interiors = getattr(src_tmap, "overworld_interiors", [])
+        existing_names = {e.get("name") for e in interiors}
+        for sp in spaces:
+            sp_name = sp.get("name", "")
+            if sp_name and sp_name not in existing_names:
+                interiors.append({
+                    "name": sp_name,
+                    "width": sp.get("width", 20),
+                    "height": sp.get("height", 20),
+                    "entry_col": sp.get("entry_col", 0),
+                    "entry_row": sp.get("entry_row", 0),
+                    "tiles": sp.get("tiles", {}),
+                })
+                existing_names.add(sp_name)
+        src_tmap.overworld_interiors = interiors
+        entrance_name = spaces[0].get("name", building_def.get("name", ""))
+        self._enter_overworld_interior(entrance_name, pcol, prow)
+
     def _activate_house_quest(self):
         """Activate the house quest when the party speaks to Elara."""
         hq = self.game.get_house_quest()
@@ -1560,6 +1684,9 @@ class OverworldState(InventoryMixin, BaseState):
         if self.dungeon_action_active:
             renderer.draw_dungeon_action_screen(
                 self.dungeon_action_info, self.dungeon_action_cursor)
+        if self.building_action_active:
+            renderer.draw_building_action_screen(
+                self.building_action_info, self.building_action_cursor)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:

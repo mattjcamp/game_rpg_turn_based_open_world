@@ -284,6 +284,47 @@ class Game:
         # Save flash
         self._mod_dungeon_save_flash = 0.0
 
+        # ── Building Editor (within module) ──
+        self._mod_building_list = []          # list of building dicts
+        self._mod_building_cursor = 0
+        self._mod_building_scroll = 0
+        # Building sub-screen: 0=Settings, 1=Spaces
+        self._mod_building_sub_cursor = 0
+        self._mod_building_sub_items = ["Settings", "Spaces"]
+        # Settings fields
+        self._mod_building_fields = []
+        self._mod_building_field = 0
+        self._mod_building_buffer = ""
+        self._mod_building_field_scroll = 0
+        self._mod_building_choice_map = {}
+        # Space list (within a building)
+        self._mod_building_space_list = []
+        self._mod_building_space_cursor = 0
+        self._mod_building_space_scroll = 0
+        # Space sub-screen: 0=Edit Map, 1=Encounters
+        self._mod_building_space_sub_cursor = 0
+        self._mod_building_space_sub_items = ["Edit Map", "Encounters"]
+        # Encounters list (within a space)
+        self._mod_building_encounter_list = []
+        self._mod_building_encounter_cursor = 0
+        self._mod_building_encounter_scroll = 0
+        # Encounter field editor
+        self._mod_building_encounter_fields = []
+        self._mod_building_encounter_field = 0
+        self._mod_building_encounter_buffer = ""
+        self._mod_building_encounter_field_scroll = 0
+        # Map editor
+        self._mod_building_editor_active = False
+        self._mod_building_map_editor_state = None
+        self._mod_building_map_editor_handler = None
+        # Naming overlay (shared for building + space naming)
+        self._mod_building_naming = False
+        self._mod_building_name_buf = ""
+        self._mod_building_naming_is_new = False
+        self._mod_building_naming_target = ""   # "building" or "space"
+        # Save flash
+        self._mod_building_save_flash = 0.0
+
         # Restore last-used module from config (if it still exists)
         saved_mod_path = self._config.get("active_module_path")
         if saved_mod_path and os.path.isdir(saved_mod_path):
@@ -2260,6 +2301,12 @@ class Game:
                 "subtitle": "",
                 "_dungeons": True,
             },
+            {
+                "label": "Buildings",
+                "icon": "B",
+                "subtitle": "",
+                "_buildings": True,
+            },
         ]
 
         self.module_edit_sections = sections
@@ -2358,6 +2405,11 @@ class Game:
             self._handle_dungeon_edit_input(event)
             return
 
+        # ── Levels 14-19: Building editor ──
+        if self.module_edit_level in (14, 15, 16, 17, 18, 19):
+            self._handle_building_edit_input(event)
+            return
+
         # ── Level 1: field editor within a section ──
         if event.key == pygame.K_ESCAPE:
             if self._module_dirty:
@@ -2431,6 +2483,11 @@ class Game:
         # ── Dungeons section: special handling ──
         if sec.get("_dungeons"):
             self._enter_dungeons_section()
+            return
+
+        # ── Buildings section: special handling ──
+        if sec.get("_buildings"):
+            self._enter_buildings_section()
             return
 
         if not sec.get("fields"):
@@ -2750,6 +2807,14 @@ class Game:
                 interior_list.append({
                     "name": dname,
                     "type": "dungeon",
+                })
+        self._load_module_buildings(mod["path"])
+        for bldg in self._mod_building_list:
+            bname = bldg.get("name", "")
+            if bname:
+                interior_list.append({
+                    "name": bname,
+                    "type": "building",
                 })
 
         # ── Load existing tile links ──
@@ -4930,6 +4995,745 @@ class Game:
         elif event.key and event.unicode and event.unicode.isprintable():
             self._mod_dungeon_encounter_buffer += event.unicode
 
+    # ══════════════════════════════════════════════════════════
+    # ── Building Editor Methods ────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def _enter_buildings_section(self):
+        """Enter the Buildings section from the module section browser."""
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        self._load_module_buildings(mod["path"])
+        for sec in self.module_edit_sections:
+            if sec.get("_buildings"):
+                n = len(self._mod_building_list)
+                sec["subtitle"] = f"{n} building{'s' if n != 1 else ''}"
+                break
+        self.module_edit_level = 14
+
+    # ── Load / save ──
+
+    def _load_module_buildings(self, mod_path):
+        """Load buildings.json from a module directory."""
+        import json, os
+        self._mod_building_list = []
+        self._mod_building_cursor = 0
+        self._mod_building_scroll = 0
+        p = os.path.join(mod_path, "buildings.json")
+        if not os.path.isfile(p):
+            return
+        try:
+            with open(p, "r") as f:
+                data = json.load(f)
+            self._mod_building_list = data if isinstance(data, list) else []
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def _save_module_buildings(self):
+        """Persist the current building list to the active module."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        p = os.path.join(mod["path"], "buildings.json")
+        try:
+            with open(p, "w") as f:
+                json.dump(self._mod_building_list, f, indent=2)
+        except OSError:
+            pass
+
+    # ── Building-level helpers ──
+
+    def _mod_building_get_current(self):
+        """Return the currently selected building dict, or None."""
+        if 0 <= self._mod_building_cursor < len(self._mod_building_list):
+            return self._mod_building_list[self._mod_building_cursor]
+        return None
+
+    # Valid options for choice fields
+    def _mod_building_add_new(self, name):
+        """Add a new blank building with one default space."""
+        new_building = {
+            "name": name,
+            "description": "",
+            "spaces": [
+                {
+                    "name": "Main Hall",
+                    "width": 20,
+                    "height": 20,
+                    "entry_col": 0,
+                    "entry_row": 0,
+                    "tiles": {},
+                    "encounters": [],
+                },
+            ],
+        }
+        self._mod_building_list.append(new_building)
+        self._mod_building_cursor = len(self._mod_building_list) - 1
+        self._save_module_buildings()
+
+    def _mod_building_build_settings_fields(self):
+        """Build FieldEntry list for the current building's settings."""
+        from src.editor_types import FieldEntry
+        building = self._mod_building_get_current()
+        if not building:
+            self._mod_building_fields = []
+            return
+
+        fields = [
+            FieldEntry("Name", "name",
+                       building.get("name", ""), "text", True),
+            FieldEntry("Description", "description",
+                       building.get("description", ""), "text", True),
+        ]
+
+        self._mod_building_choice_map = {}
+
+        self._mod_building_fields = fields
+        fe = self.features_editor
+        self._mod_building_field = fe._next_editable_generic(
+            self._mod_building_fields, 0)
+        self._mod_building_buffer = self._mod_building_fields[
+            self._mod_building_field].value
+        self._mod_building_field_scroll = 0
+
+    def _mod_building_cycle_choice(self, direction):
+        """Cycle the current choice field left (-1) or right (+1)."""
+        field = self._mod_building_fields[self._mod_building_field]
+        options = self._mod_building_choice_map.get(field.key, [])
+        if not options:
+            return
+        try:
+            idx = options.index(field.value)
+        except ValueError:
+            idx = 0
+        idx = (idx + direction) % len(options)
+        field.value = options[idx]
+        self._mod_building_buffer = field.value
+
+    def _mod_building_save_settings_fields(self):
+        """Write settings fields back into the current building dict."""
+        building = self._mod_building_get_current()
+        if not building:
+            return
+        for fe_entry in self._mod_building_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            building[key] = val
+
+    # ── Space helpers (inside a building) ──
+
+    def _mod_building_load_spaces(self):
+        """Load space list from the current building."""
+        building = self._mod_building_get_current()
+        if not building:
+            self._mod_building_space_list = []
+            return
+        self._mod_building_space_list = building.get("spaces", [])
+        self._mod_building_space_cursor = 0
+        self._mod_building_space_scroll = 0
+
+    def _mod_building_get_current_space(self):
+        """Return the currently selected space dict, or None."""
+        if 0 <= self._mod_building_space_cursor < len(
+                self._mod_building_space_list):
+            return self._mod_building_space_list[
+                self._mod_building_space_cursor]
+        return None
+
+    def _mod_building_add_space(self, name):
+        """Add a new blank space to the current building."""
+        new_space = {
+            "name": name,
+            "width": 20,
+            "height": 20,
+            "entry_col": 0,
+            "entry_row": 0,
+            "tiles": {},
+            "encounters": [],
+        }
+        self._mod_building_space_list.append(new_space)
+        self._mod_building_space_cursor = len(
+            self._mod_building_space_list) - 1
+        self._save_module_buildings()
+
+    def _mod_building_delete_space(self):
+        """Delete the currently selected space."""
+        n = len(self._mod_building_space_list)
+        if n == 0:
+            return
+        self._mod_building_space_list.pop(self._mod_building_space_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_building_space_cursor = 0
+        elif self._mod_building_space_cursor >= n:
+            self._mod_building_space_cursor = n - 1
+        self._save_module_buildings()
+
+    # ── Encounter helpers (inside a space) ──
+
+    def _mod_building_load_encounters(self):
+        """Load encounter list from the current space."""
+        space = self._mod_building_get_current_space()
+        if not space:
+            self._mod_building_encounter_list = []
+            return
+        self._mod_building_encounter_list = space.get("encounters", [])
+        self._mod_building_encounter_cursor = 0
+        self._mod_building_encounter_scroll = 0
+
+    def _mod_building_save_encounters(self):
+        """Write encounter list back into the current space dict."""
+        space = self._mod_building_get_current_space()
+        if not space:
+            return
+        space["encounters"] = list(self._mod_building_encounter_list)
+
+    def _mod_building_add_encounter(self):
+        """Add a new default encounter to the current space."""
+        space = self._mod_building_get_current_space()
+        ec = space.get("entry_col", 1) if space else 1
+        er = space.get("entry_row", 1) if space else 1
+        new_encounter = {
+            "name": "New Encounter",
+            "encounter_type": "npc",
+            "col": ec,
+            "row": er,
+            "description": "",
+        }
+        self._mod_building_encounter_list.append(new_encounter)
+        self._mod_building_encounter_cursor = len(
+            self._mod_building_encounter_list) - 1
+        self._mod_building_save_encounters()
+
+    def _mod_building_delete_encounter(self):
+        """Delete the currently selected encounter."""
+        n = len(self._mod_building_encounter_list)
+        if n == 0:
+            return
+        self._mod_building_encounter_list.pop(
+            self._mod_building_encounter_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_building_encounter_cursor = 0
+        elif self._mod_building_encounter_cursor >= n:
+            self._mod_building_encounter_cursor = n - 1
+        self._mod_building_save_encounters()
+
+    def _mod_building_build_encounter_fields(self):
+        """Build FieldEntry list for the selected encounter."""
+        from src.editor_types import FieldEntry
+        if not (0 <= self._mod_building_encounter_cursor < len(
+                self._mod_building_encounter_list)):
+            self._mod_building_encounter_fields = []
+            return
+        enc = self._mod_building_encounter_list[
+            self._mod_building_encounter_cursor]
+        self._mod_building_encounter_fields = [
+            FieldEntry("Name", "name", enc.get("name", ""), "text", True),
+            FieldEntry("Type", "encounter_type",
+                       enc.get("encounter_type", "npc"), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Col", "col", str(enc.get("col", 0)), "int", True),
+            FieldEntry("Row", "row", str(enc.get("row", 0)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Description", "description",
+                       enc.get("description", ""), "text", True),
+        ]
+        fe = self.features_editor
+        self._mod_building_encounter_field = fe._next_editable_generic(
+            self._mod_building_encounter_fields, 0)
+        self._mod_building_encounter_buffer = (
+            self._mod_building_encounter_fields[
+                self._mod_building_encounter_field].value)
+        self._mod_building_encounter_field_scroll = 0
+
+    def _mod_building_save_encounter_fields(self):
+        """Write encounter fields back into the encounter dict."""
+        if not (0 <= self._mod_building_encounter_cursor < len(
+                self._mod_building_encounter_list)):
+            return
+        enc = self._mod_building_encounter_list[
+            self._mod_building_encounter_cursor]
+        for fe_entry in self._mod_building_encounter_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            enc[key] = val
+
+    # ── Map editor for a building space ──
+
+    def _mod_building_launch_map_editor(self):
+        """Launch the map editor for the current building space."""
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_town_brushes,
+            STORAGE_SPARSE, GRID_FIXED,
+        )
+        space = self._mod_building_get_current_space()
+        if not space:
+            return
+        w = space.get("width", 20)
+        h = space.get("height", 20)
+
+        fe = self.features_editor
+        brushes = build_town_brushes(fe.TILE_CONTEXT)
+        building = self._mod_building_get_current()
+        building_name = building.get("name", "Building") if building else "Building"
+        space_name = space.get("name", "Unnamed")
+
+        # Build interior list from sibling spaces so they can link
+        space_list = [
+            {"name": sp.get("name", "?")}
+            for sp in self._mod_building_space_list
+        ]
+
+        def on_save(state):
+            space["tiles"] = state.tiles
+            space["width"] = state.config.width
+            space["height"] = state.config.height
+            state.dirty = False
+            self._save_module_buildings()
+            self._mod_building_save_flash = 1.5
+
+        def on_exit(st):
+            space["tiles"] = st.tiles
+            self._save_module_buildings()
+            self.showing_features = False
+            self.showing_modules = True
+            self.module_edit_mode = True
+            self._mod_building_editor_active = False
+            self._mod_building_map_editor_state = None
+            self._mod_building_map_editor_handler = None
+
+        config = MapEditorConfig(
+            title=f"{building_name}: {space_name}",
+            storage=STORAGE_SPARSE,
+            grid_type=GRID_FIXED,
+            width=w,
+            height=h,
+            tile_context="town",
+            brushes=brushes,
+            supports_interior_links=True,
+            supports_replace=True,
+            on_save=on_save,
+            on_exit=on_exit,
+            interior_exit_types=[
+                {"label": u"\u2190 Return to Overworld",
+                 "link_type": "to_overworld"},
+            ],
+        )
+        existing_tiles = dict(space.get("tiles", {}))
+        state = MapEditorState(config, tiles=existing_tiles,
+                               interior_list=space_list)
+        handler = MapEditorInputHandler(
+            state, is_save_shortcut=self._is_save_shortcut)
+        self._mod_building_map_editor_state = state
+        self._mod_building_map_editor_handler = handler
+        self._mod_building_editor_active = True
+        self.module_edit_mode = False
+        self.showing_modules = False
+        self.showing_features = True
+        fe = self.features_editor
+        fe.active_editor = "mod_building_map"
+        fe.level = 1
+
+    # ── Building input handlers ──
+
+    def _handle_building_edit_input(self, event):
+        """Dispatch building editor input based on module_edit_level.
+
+        Levels:
+        14 = building list browser
+        15 = building sub-screen (Settings / Spaces)
+        16 = settings fields OR space list
+        17 = space sub-screen (Edit Map / Encounters)
+        18 = encounter list
+        19 = encounter field editor
+        """
+        import pygame
+
+        # ── Map editor active (takes over everything) ──
+        if self._mod_building_editor_active:
+            if self._mod_building_map_editor_handler:
+                result = self._mod_building_map_editor_handler.handle(event)
+                if result == "exit":
+                    self._mod_building_editor_active = False
+                    self._mod_building_map_editor_state = None
+                    self._mod_building_map_editor_handler = None
+            return
+
+        if self.module_edit_level == 19:
+            self._handle_mod_building_encounter_field_input(event)
+            return
+        if self.module_edit_level == 18:
+            self._handle_mod_building_encounter_list_input(event)
+            return
+        if self.module_edit_level == 17:
+            self._handle_mod_building_space_sub_input(event)
+            return
+        if self.module_edit_level == 16:
+            if self._mod_building_sub_cursor == 0:
+                self._handle_mod_building_settings_field_input(event)
+            elif self._mod_building_sub_cursor == 1:
+                self._handle_mod_building_space_list_input(event)
+            return
+        if self.module_edit_level == 15:
+            self._handle_mod_building_sub_input(event)
+            return
+
+        # ── Level 14: Building list ──
+        if self._mod_building_naming:
+            self._handle_mod_building_naming_input(event)
+            return
+
+        layouts = self._mod_building_list
+        n = len(layouts)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._save_module_buildings()
+            self.module_edit_level = 0
+            return
+        if self._is_new_shortcut(event):
+            self._mod_building_naming = True
+            self._mod_building_naming_is_new = True
+            self._mod_building_naming_target = "building"
+            self._mod_building_name_buf = ""
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            layouts.pop(self._mod_building_cursor)
+            n -= 1
+            if n == 0:
+                self._mod_building_cursor = 0
+            elif self._mod_building_cursor >= n:
+                self._mod_building_cursor = n - 1
+            self._save_module_buildings()
+            return
+        if self._is_save_shortcut(event):
+            self._save_module_buildings()
+            self._mod_building_save_flash = 1.5
+            return
+        if event.key == pygame.K_F2 and n > 0:
+            building = self._mod_building_get_current()
+            if building:
+                self._mod_building_naming = True
+                self._mod_building_naming_is_new = False
+                self._mod_building_naming_target = "building"
+                self._mod_building_name_buf = building.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_building_cursor = (self._mod_building_cursor - 1) % n
+            self._mod_building_scroll = fe._adjust_scroll_generic(
+                self._mod_building_cursor, self._mod_building_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_building_cursor = (self._mod_building_cursor + 1) % n
+            self._mod_building_scroll = fe._adjust_scroll_generic(
+                self._mod_building_cursor, self._mod_building_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_building_sub_cursor = 0
+            self.module_edit_level = 15
+
+    def _handle_mod_building_naming_input(self, event):
+        """Handle text input while naming/renaming a building or space."""
+        import pygame
+        if event.key == pygame.K_ESCAPE:
+            self._mod_building_naming = False
+            return
+        if event.key == pygame.K_RETURN:
+            name = self._mod_building_name_buf.strip()
+            if name:
+                target = self._mod_building_naming_target
+                if target == "building":
+                    if self._mod_building_naming_is_new:
+                        self._mod_building_add_new(name)
+                    else:
+                        building = self._mod_building_get_current()
+                        if building:
+                            building["name"] = name
+                            self._save_module_buildings()
+                elif target == "space":
+                    if self._mod_building_naming_is_new:
+                        self._mod_building_add_space(name)
+                    else:
+                        space = self._mod_building_get_current_space()
+                        if space:
+                            space["name"] = name
+                            self._save_module_buildings()
+            self._mod_building_naming = False
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self._mod_building_name_buf = self._mod_building_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self._mod_building_name_buf += event.unicode
+
+    def _handle_mod_building_sub_input(self, event):
+        """Handle building sub-screen (level 15): Settings | Spaces."""
+        import pygame
+        n = len(self._mod_building_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.module_edit_level = 14
+            return
+        if event.key == pygame.K_UP:
+            self._mod_building_sub_cursor = (
+                self._mod_building_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_building_sub_cursor = (
+                self._mod_building_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_building_sub_cursor == 0:
+                self._mod_building_build_settings_fields()
+                self.module_edit_level = 16
+            elif self._mod_building_sub_cursor == 1:
+                self._mod_building_load_spaces()
+                self.module_edit_level = 16
+
+    def _handle_mod_building_settings_field_input(self, event):
+        """Handle building settings field editing (level 16, sub 0)."""
+        import pygame
+        fields = self._mod_building_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 15
+            return
+
+        current_field = fields[self._mod_building_field]
+        is_choice = current_field.field_type == "choice"
+
+        def _commit_text():
+            if current_field.editable and not is_choice:
+                current_field.value = self._mod_building_buffer
+
+        if self._is_save_shortcut(event):
+            _commit_text()
+            self._mod_building_save_settings_fields()
+            self._save_module_buildings()
+            self._mod_building_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            _commit_text()
+            self._mod_building_save_settings_fields()
+            self.module_edit_level = 15
+            return
+
+        if is_choice and event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            direction = -1 if event.key == pygame.K_LEFT else 1
+            self._mod_building_cycle_choice(direction)
+            return
+
+        if event.key == pygame.K_UP:
+            _commit_text()
+            self._mod_building_field = fe._next_editable_generic(
+                fields, (self._mod_building_field - 1) % n)
+            nf = fields[self._mod_building_field]
+            self._mod_building_buffer = nf.value
+            self._mod_building_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_building_field, self._mod_building_field_scroll)
+        elif event.key == pygame.K_DOWN:
+            _commit_text()
+            self._mod_building_field = fe._next_editable_generic(
+                fields, (self._mod_building_field + 1) % n)
+            nf = fields[self._mod_building_field]
+            self._mod_building_buffer = nf.value
+            self._mod_building_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_building_field, self._mod_building_field_scroll)
+        elif not is_choice:
+            if event.key == pygame.K_BACKSPACE:
+                self._mod_building_buffer = self._mod_building_buffer[:-1]
+            elif event.unicode and event.unicode.isprintable():
+                self._mod_building_buffer += event.unicode
+
+    def _handle_mod_building_space_list_input(self, event):
+        """Handle space list browsing (level 16, sub 1)."""
+        import pygame
+
+        if self._mod_building_naming:
+            self._handle_mod_building_naming_input(event)
+            return
+
+        n = len(self._mod_building_space_list)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._save_module_buildings()
+            self.module_edit_level = 15
+            return
+        if self._is_new_shortcut(event):
+            self._mod_building_naming = True
+            self._mod_building_naming_is_new = True
+            self._mod_building_naming_target = "space"
+            idx = len(self._mod_building_space_list) + 1
+            self._mod_building_name_buf = f"Room {idx}"
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_building_delete_space()
+            return
+        if self._is_save_shortcut(event):
+            self._save_module_buildings()
+            self._mod_building_save_flash = 1.5
+            return
+        if event.key == pygame.K_F2 and n > 0:
+            space = self._mod_building_get_current_space()
+            if space:
+                self._mod_building_naming = True
+                self._mod_building_naming_is_new = False
+                self._mod_building_naming_target = "space"
+                self._mod_building_name_buf = space.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_building_space_cursor = (
+                self._mod_building_space_cursor - 1) % n
+            self._mod_building_space_scroll = fe._adjust_scroll_generic(
+                self._mod_building_space_cursor,
+                self._mod_building_space_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_building_space_cursor = (
+                self._mod_building_space_cursor + 1) % n
+            self._mod_building_space_scroll = fe._adjust_scroll_generic(
+                self._mod_building_space_cursor,
+                self._mod_building_space_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_building_space_sub_cursor = 0
+            self.module_edit_level = 17
+
+    def _handle_mod_building_space_sub_input(self, event):
+        """Handle space sub-screen (level 17): Edit Map | Encounters."""
+        import pygame
+        n = len(self._mod_building_space_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.module_edit_level = 16
+            return
+        if event.key == pygame.K_UP:
+            self._mod_building_space_sub_cursor = (
+                self._mod_building_space_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_building_space_sub_cursor = (
+                self._mod_building_space_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_building_space_sub_cursor == 0:
+                self._mod_building_launch_map_editor()
+            elif self._mod_building_space_sub_cursor == 1:
+                self._mod_building_load_encounters()
+                self.module_edit_level = 18
+
+    def _handle_mod_building_encounter_list_input(self, event):
+        """Handle encounter list (level 18)."""
+        import pygame
+        n = len(self._mod_building_encounter_list)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._mod_building_save_encounters()
+            self.module_edit_level = 17
+            return
+        if self._is_new_shortcut(event):
+            self._mod_building_add_encounter()
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_building_delete_encounter()
+            return
+        if self._is_save_shortcut(event):
+            self._mod_building_save_encounters()
+            self._save_module_buildings()
+            self._mod_building_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_building_encounter_cursor = (
+                self._mod_building_encounter_cursor - 1) % n
+            self._mod_building_encounter_scroll = fe._adjust_scroll_generic(
+                self._mod_building_encounter_cursor,
+                self._mod_building_encounter_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_building_encounter_cursor = (
+                self._mod_building_encounter_cursor + 1) % n
+            self._mod_building_encounter_scroll = fe._adjust_scroll_generic(
+                self._mod_building_encounter_cursor,
+                self._mod_building_encounter_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_building_build_encounter_fields()
+            self.module_edit_level = 19
+
+    def _handle_mod_building_encounter_field_input(self, event):
+        """Handle encounter field editing (level 19)."""
+        import pygame
+        fields = self._mod_building_encounter_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 18
+            return
+
+        if self._is_save_shortcut(event):
+            f = fields[self._mod_building_encounter_field]
+            if f.editable:
+                f.value = self._mod_building_encounter_buffer
+            self._mod_building_save_encounter_fields()
+            self._mod_building_save_encounters()
+            self._save_module_buildings()
+            self._mod_building_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            f = fields[self._mod_building_encounter_field]
+            if f.editable:
+                f.value = self._mod_building_encounter_buffer
+            self._mod_building_save_encounter_fields()
+            self._mod_building_save_encounters()
+            self.module_edit_level = 18
+            return
+
+        if event.key == pygame.K_UP:
+            f = fields[self._mod_building_encounter_field]
+            if f.editable:
+                f.value = self._mod_building_encounter_buffer
+            self._mod_building_encounter_field = fe._next_editable_generic(
+                fields, (self._mod_building_encounter_field - 1) % n)
+            self._mod_building_encounter_buffer = fields[
+                self._mod_building_encounter_field].value
+            self._mod_building_encounter_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_building_encounter_field,
+                    self._mod_building_encounter_field_scroll))
+        elif event.key == pygame.K_DOWN:
+            f = fields[self._mod_building_encounter_field]
+            if f.editable:
+                f.value = self._mod_building_encounter_buffer
+            self._mod_building_encounter_field = fe._next_editable_generic(
+                fields, (self._mod_building_encounter_field + 1) % n)
+            self._mod_building_encounter_buffer = fields[
+                self._mod_building_encounter_field].value
+            self._mod_building_encounter_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_building_encounter_field,
+                    self._mod_building_encounter_field_scroll))
+        elif event.key == pygame.K_BACKSPACE:
+            self._mod_building_encounter_buffer = (
+                self._mod_building_encounter_buffer[:-1])
+        elif event.key and event.unicode and event.unicode.isprintable():
+            self._mod_building_encounter_buffer += event.unicode
+
     # ── Module / settings helpers ────────────────────────────────
 
     def _set_active_module(self, path, name, version):
@@ -5325,6 +6129,11 @@ class Game:
                     self._mod_dungeon_save_flash -= dt
                     if self._mod_dungeon_save_flash < 0:
                         self._mod_dungeon_save_flash = 0
+                # Tick building save flash
+                if self._mod_building_save_flash > 0:
+                    self._mod_building_save_flash -= dt
+                    if self._mod_building_save_flash < 0:
+                        self._mod_building_save_flash = 0
             elif self.showing_game_over:
                 for event in events:
                     self._handle_game_over_input(event)
@@ -5520,6 +6329,37 @@ class Game:
                         "naming_target": self._mod_dungeon_naming_target,
                         "save_flash": self._mod_dungeon_save_flash,
                         "level": max(0, self.module_edit_level - 8),
+                    },
+                    building_data={
+                        "buildings": self._mod_building_list,
+                        "cursor": self._mod_building_cursor,
+                        "scroll": self._mod_building_scroll,
+                        "sub_cursor": self._mod_building_sub_cursor,
+                        "sub_items": self._mod_building_sub_items,
+                        "fields": self._mod_building_fields,
+                        "field_cursor": self._mod_building_field,
+                        "field_buffer": self._mod_building_buffer,
+                        "field_scroll": self._mod_building_field_scroll,
+                        "space_list": self._mod_building_space_list,
+                        "space_cursor": self._mod_building_space_cursor,
+                        "space_scroll": self._mod_building_space_scroll,
+                        "space_sub_cursor": self._mod_building_space_sub_cursor,
+                        "space_sub_items": self._mod_building_space_sub_items,
+                        "encounter_list": self._mod_building_encounter_list,
+                        "encounter_cursor": self._mod_building_encounter_cursor,
+                        "encounter_scroll": self._mod_building_encounter_scroll,
+                        "encounter_fields": self._mod_building_encounter_fields,
+                        "encounter_field_cursor": self._mod_building_encounter_field,
+                        "encounter_field_buffer": self._mod_building_encounter_buffer,
+                        "encounter_field_scroll": self._mod_building_encounter_field_scroll,
+                        "editor_active": self._mod_building_editor_active,
+                        "editor_data": self._mod_building_map_editor_state,
+                        "naming": self._mod_building_naming,
+                        "name_buf": self._mod_building_name_buf,
+                        "naming_is_new": self._mod_building_naming_is_new,
+                        "naming_target": self._mod_building_naming_target,
+                        "save_flash": self._mod_building_save_flash,
+                        "level": max(0, self.module_edit_level - 14),
                     })
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()

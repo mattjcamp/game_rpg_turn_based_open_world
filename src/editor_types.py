@@ -251,6 +251,62 @@ class DungeonEditorRS:
     save_flash: float = 0.0
 
 
+@dataclass
+class BuildingEditorRS:
+    """Render-state for the Building Editor.
+
+    Hierarchy:
+    - Building list          (level 0 / edit_level 14)
+    - Building sub-screen    (level 1 / edit_level 15)  Settings | Spaces
+    - Settings fields OR     (level 2 / edit_level 16) Space list
+    - Space sub-screen       (level 3 / edit_level 17) Edit Map | Encounters
+    - Encounter list         (level 4 / edit_level 18)
+    - Encounter field editor (level 5 / edit_level 19)
+    """
+    # Building list (level 0)
+    buildings: Optional[List[dict]] = None
+    cursor: int = 0
+    scroll: int = 0
+    # Building sub-screen (level 1): 0=Settings, 1=Spaces
+    sub_cursor: int = 0
+    sub_items: Optional[list] = field(default_factory=lambda: [
+        "Settings", "Spaces",
+    ])
+    # Settings fields (level 2 / sub 0)
+    fields: Optional[List[FieldEntry]] = None
+    field_cursor: int = 0
+    field_buffer: str = ""
+    field_scroll: int = 0
+    # Space list (level 2 / sub 1)
+    space_list: Optional[List[dict]] = None
+    space_cursor: int = 0
+    space_scroll: int = 0
+    # Space sub-screen (level 3): 0=Edit Map, 1=Encounters
+    space_sub_cursor: int = 0
+    space_sub_items: Optional[list] = field(default_factory=lambda: [
+        "Edit Map", "Encounters",
+    ])
+    # Encounters list (level 4)
+    encounter_list: Optional[List[dict]] = None
+    encounter_cursor: int = 0
+    encounter_scroll: int = 0
+    # Encounter field editor (level 5)
+    encounter_fields: Optional[List[FieldEntry]] = None
+    encounter_field_cursor: int = 0
+    encounter_field_buffer: str = ""
+    encounter_field_scroll: int = 0
+    # Map editor active flag
+    editor_active: bool = False
+    editor_data: Optional[dict] = None
+    # Naming overlays
+    naming: bool = False
+    name_buf: str = ""
+    naming_is_new: bool = False
+    naming_target: str = ""  # "building" or "space"
+    # Save flash
+    save_flash: float = 0.0
+
+
 # ─── Top-level render state ──────────────────────────────────────────
 
 @dataclass
@@ -275,6 +331,8 @@ class FeaturesRenderState:
     meh: MapEditorHubRS = field(default_factory=MapEditorHubRS)
     towns: TownEditorRS = field(default_factory=TownEditorRS)
     dungeons: DungeonEditorRS = field(default_factory=DungeonEditorRS)
+    buildings: BuildingEditorRS = field(default_factory=BuildingEditorRS)
     overview_editor_data: Optional[dict] = None
     town_map_editor_data: Optional[dict] = None
     dungeon_map_editor_data: Optional[dict] = None
+    building_map_editor_data: Optional[dict] = None
