@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "test",
-    "name": "test",
+    "id": "new_module",
+    "name": "New Module",
     "author": "",
-    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Fernmoor to break the spell.",
+    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Ravenglen.",
     "version": "0.1.0"
   },
   "settings": {
@@ -39,8 +39,8 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "fernmoor",
-        "name": "Fernmoor",
+        "id": "ravenglen",
+        "name": "Ravenglen",
         "description": "A sleepy village surrounded by ancient oaks and whispering meadows."
       }
     ],
@@ -50,22 +50,22 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_shrine"
+      "deliver_to": "town_vault"
     },
     "starting_quests": [
-      "awaken"
+      "reclaim"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Ruined Grotto",
-        "key_name": "Bronze Key",
+        "name": "Crumbling Mines",
+        "key_name": "Crystal Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The entrance to Ruined Grotto gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
+        "description": "A spiral staircase carved from bedrock descends into Crumbling Mines. The temperature drops with every step.",
         "quest_type": "retrieve",
-        "quest_objective": "Brave the depths of Ruined Grotto for the Bronze Key",
-        "quest_hint": "Few who enter these halls return unchanged.",
+        "quest_objective": "Venture into Crumbling Mines and liberate the Crystal Key",
+        "quest_hint": "The artifact pulses with ancient energy.",
         "kill_target": "",
         "kill_count": 0
       }

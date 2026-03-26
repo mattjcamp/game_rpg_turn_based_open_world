@@ -3829,7 +3829,7 @@ class Game:
         """Launch the map editor for the selected enclosure instance."""
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
-            build_interior_brushes,
+            build_town_brushes,
             STORAGE_SPARSE, GRID_FIXED,
         )
         if not (0 <= self._mod_town_enc_cursor < len(
@@ -3840,7 +3840,7 @@ class Game:
         h = enc.get("height", 14)
 
         fe = self.features_editor
-        brushes = build_interior_brushes(fe.TILE_CONTEXT)
+        brushes = build_town_brushes(fe.TILE_CONTEXT)
 
         def on_save(state):
             enc["tiles"] = state.tiles

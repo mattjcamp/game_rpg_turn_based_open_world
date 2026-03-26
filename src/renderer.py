@@ -105,9 +105,12 @@ class Renderer(CombatEffectRendererMixin):
         for name in m.names_in("overworld"):
             entry = m.get_entry_by_name("overworld", name)
             if entry and "tile_id" in entry:
-                sprite = m.get_sprite(entry["tile_id"], dst_ts)
+                tid = entry["tile_id"]
+                sprite = m.get_sprite(tid, dst_ts)
                 if sprite:
-                    self._tile_sprites[entry["tile_id"]] = sprite
+                    self._tile_sprites[tid] = sprite
+                    if tid not in self._overworld_tile_map:
+                        self._overworld_tile_map[tid] = tid
 
         # ── Load town interior tiles from manifest ──
         for name in m.names_in("town"):

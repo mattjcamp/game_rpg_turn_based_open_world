@@ -66,7 +66,7 @@ class FeaturesEditor:
             "me_examine":   {"storage": "sparse", "grid": "fixed",
                              "ctx": "dungeon",   "w": 12, "h": 10},
             "me_enclosure": {"storage": "sparse", "grid": "fixed",
-                             "ctx": "dungeon",   "w": 16, "h": 14},
+                             "ctx": "town",      "w": 16, "h": 14},
             "me_battle":    {"storage": "sparse", "grid": "fixed",
                              "ctx": "dungeon",   "w": 20, "h": 16},
             "me_object":    {"storage": "sparse", "grid": "fixed",
@@ -2521,7 +2521,7 @@ class FeaturesEditor:
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_overworld_brushes, build_interior_brushes,
-            build_all_brushes,
+            build_town_brushes, build_all_brushes,
             STORAGE_DENSE, STORAGE_SPARSE,
         )
 
@@ -2552,16 +2552,10 @@ class FeaturesEditor:
                 self.TILE_CONTEXT,
                 object_templates=obj_templates,
             )
-        elif ctx == "all":
-            brushes = build_all_brushes(
-                self.TILE_CONTEXT,
-                feat_tiles_path=self.tiles_path(),
-                manifest=manifest,
-                feat_tile_list=getattr(self, "tile_list", None),
-                object_templates=obj_templates,
-            )
         else:
-            brushes = build_interior_brushes(
+            # All non-overworld editors get every tile type,
+            # organised into Town / Interior / Overworld folders.
+            brushes = build_town_brushes(
                 self.TILE_CONTEXT,
                 feat_tiles_path=self.tiles_path(),
                 manifest=manifest,
