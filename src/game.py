@@ -207,6 +207,7 @@ class Game:
         self._mod_town_npc_field = 0
         self._mod_town_npc_buffer = ""
         self._mod_town_npc_field_scroll = 0
+        self._mod_town_npc_choice_map = {}
         # Town map generation overlays
         self._mod_town_gen_mode = None        # None, "pick_template", "generate"
         self._mod_town_gen_pick_list = []     # list of layout templates
@@ -1305,6 +1306,7 @@ class Game:
                 npc_type=nd.get("npc_type", "villager"),
                 god_name=nd.get("god_name"),
                 shop_type=nd.get("shop_type", "general"),
+                sprite=nd.get("sprite") or None,
             )
             npc.wander_range = nd.get("wander_range", 4)
             npcs.append(npc)
@@ -3218,10 +3220,24 @@ class Game:
             self._mod_town_npc_fields = []
             return
         npc = self._mod_town_npc_list[self._mod_town_npc_cursor]
+
+        # Build sprite choice options from people tile manifest
+        if not hasattr(self, "_cc_tiles") or not self._cc_tiles:
+            self._cc_load_tiles()
+        sprite_names = [t["name"] for t in self._cc_tiles]
+        sprite_name_to_file = {t["name"]: t["file"] for t in self._cc_tiles}
+        # Reverse lookup: file path -> display name
+        sprite_file_to_name = {t["file"]: t["name"] for t in self._cc_tiles}
+        current_sprite_file = npc.get("sprite", "")
+        current_sprite_name = sprite_file_to_name.get(
+            current_sprite_file, sprite_names[0] if sprite_names else "Default")
+
         self._mod_town_npc_fields = [
             FieldEntry("Name", "name", npc.get("name", ""), "text", True),
             FieldEntry("Type", "npc_type",
                        npc.get("npc_type", "villager"), "text", True),
+            FieldEntry("Sprite", "sprite", current_sprite_name,
+                       "choice", True),
             FieldEntry("", "", "", "section", False),
             FieldEntry("Col", "col", str(npc.get("col", 0)), "int", True),
             FieldEntry("Row", "row", str(npc.get("row", 0)), "int", True),
@@ -3229,13 +3245,15 @@ class Game:
             FieldEntry("Dialogue", "dialogue",
                        ", ".join(npc.get("dialogue", ["Hello."])),
                        "text", True),
-            FieldEntry("Shop Type", "shop_type",
-                       npc.get("shop_type", "general"), "text", True),
             FieldEntry("God Name", "god_name",
                        npc.get("god_name", "The Divine"), "text", True),
             FieldEntry("Wander Range", "wander_range",
                        str(npc.get("wander_range", 4)), "int", True),
         ]
+        self._mod_town_npc_choice_map = {
+            "sprite": sprite_names,
+        }
+        self._mod_town_npc_sprite_name_to_file = sprite_name_to_file
         fe = self.features_editor
         self._mod_town_npc_field = fe._next_editable_generic(
             self._mod_town_npc_fields, 0)
@@ -3263,6 +3281,10 @@ class Game:
                 val = [s.strip() for s in val.split(",") if s.strip()]
                 if not val:
                     val = ["Hello."]
+            # Convert sprite display name to file path for storage
+            if key == "sprite":
+                name_to_file = getattr(self, "_mod_town_npc_sprite_name_to_file", {})
+                val = name_to_file.get(val, val)
             npc[key] = val
 
     def _mod_town_add_new(self, name):
@@ -3292,10 +3314,10 @@ class Game:
         new_npc = {
             "name": "New NPC",
             "npc_type": "villager",
+            "sprite": "",
             "col": ec,
             "row": er,
             "dialogue": ["Hello there!"],
-            "shop_type": "general",
             "god_name": "The Divine",
             "wander_range": 4,
         }
@@ -3637,6 +3659,20 @@ class Game:
             self._mod_town_build_npc_fields()
             self.module_edit_level = 7
 
+    def _mod_town_npc_cycle_choice(self, direction):
+        """Cycle the current NPC choice field left (-1) or right (+1)."""
+        field = self._mod_town_npc_fields[self._mod_town_npc_field]
+        options = self._mod_town_npc_choice_map.get(field.key, [])
+        if not options:
+            return
+        try:
+            idx = options.index(field.value)
+        except ValueError:
+            idx = 0
+        idx = (idx + direction) % len(options)
+        field.value = options[idx]
+        self._mod_town_npc_buffer = field.value
+
     def _handle_mod_town_npc_field_input(self, event):
         """Handle input for NPC field editing (level 7)."""
         import pygame
@@ -3691,10 +3727,19 @@ class Game:
                 fe._adjust_field_scroll_generic(
                     self._mod_town_npc_field,
                     self._mod_town_npc_field_scroll))
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            f = fields[self._mod_town_npc_field]
+            if f.field_type == "choice":
+                direction = -1 if event.key == pygame.K_LEFT else 1
+                self._mod_town_npc_cycle_choice(direction)
         elif event.key == pygame.K_BACKSPACE:
-            self._mod_town_npc_buffer = self._mod_town_npc_buffer[:-1]
+            f = fields[self._mod_town_npc_field]
+            if f.field_type != "choice":
+                self._mod_town_npc_buffer = self._mod_town_npc_buffer[:-1]
         elif event.unicode and event.unicode.isprintable():
-            self._mod_town_npc_buffer += event.unicode
+            f = fields[self._mod_town_npc_field]
+            if f.field_type != "choice":
+                self._mod_town_npc_buffer += event.unicode
 
     # ── Town map generation ──
 
@@ -6273,6 +6318,7 @@ class Game:
                         "npc_field_cursor": self._mod_town_npc_field,
                         "npc_field_buffer": self._mod_town_npc_buffer,
                         "npc_field_scroll": self._mod_town_npc_field_scroll,
+                        "npc_sprite_map": getattr(self, "_mod_town_npc_sprite_name_to_file", {}),
                         "editor_active": self._mod_town_editor_active,
                         "editor_data": self._mod_town_map_editor_state,
                         "naming": self._mod_town_naming,

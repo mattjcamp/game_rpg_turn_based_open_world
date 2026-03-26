@@ -1497,7 +1497,15 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_gnome_sprite(npc, cx, cy)
             return
 
-        sprite = self._npc_sprites.get(npc.npc_type)
+        # Custom sprite path from module NPC definition
+        sprite = None
+        custom_path = getattr(npc, "sprite", None)
+        if custom_path:
+            sprite = self._load_npc_custom_sprite(custom_path, 32)
+
+        # Fall back to type-based sprite lookup
+        if sprite is None:
+            sprite = self._npc_sprites.get(npc.npc_type)
         # Villagers rotate among several sprites based on name hash
         if sprite is None and self._villager_sprites:
             idx = hash(npc.name) % len(self._villager_sprites)
@@ -4178,6 +4186,20 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.rect(self.screen, BLACK, rect)
 
     # ── unique tile sprite ─────────────────────────────────
+
+    def _load_npc_custom_sprite(self, sprite_path, size=32):
+        """Load and cache a custom NPC sprite from a project-relative path."""
+        key = ("npc_custom", sprite_path, size)
+        if key not in self._unique_tile_sprites:
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            path = os.path.join(project_root, sprite_path)
+            if os.path.exists(path):
+                raw = pygame.image.load(path).convert_alpha()
+                self._unique_tile_sprites[key] = pygame.transform.scale(
+                    raw, (size, size))
+            else:
+                self._unique_tile_sprites[key] = None
+        return self._unique_tile_sprites[key]
 
     def _get_unique_tile_sprite(self, filename, size=32):
         """Load and cache a unique tile sprite from assets."""
@@ -7889,17 +7911,34 @@ class Renderer(CombatEffectRendererMixin):
         field_cursor = tw.get("npc_field_cursor", 0)
         field_buffer = tw.get("npc_field_buffer", "")
         field_scroll = tw.get("npc_field_scroll", 0)
+        sprite_map = tw.get("npc_sprite_map", {})
         row_h = 38
         max_visible = rh // row_h
 
         npc_name = ""
+        sprite_display_name = ""
         if fields:
             for fe in fields:
                 if fe.key == "name":
                     npc_name = fe.value
-                    break
+                if fe.key == "sprite":
+                    sprite_display_name = fe.value
         self._u3_text(f"EDIT NPC: {npc_name}", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
+
+        # ── Sprite preview (top-right corner) ──
+        sprite_path = sprite_map.get(sprite_display_name, "")
+        if sprite_path:
+            preview = self._load_npc_custom_sprite(sprite_path, 64)
+            if preview:
+                px = rx + rw - 80
+                py = ry + 8
+                # Dark background behind preview
+                bg_rect = pygame.Rect(px - 4, py - 4, 72, 72)
+                pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
+                pygame.draw.rect(self.screen, (80, 80, 100), bg_rect, 1)
+                self.screen.blit(preview, (px, py))
+
         ly = ry + 44
 
         for vi in range(max_visible):
@@ -7926,13 +7965,21 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
 
             val_x = rx + 140
-            if selected and fe.editable:
+            if fe.field_type == "choice":
+                arrow_color = (255, 220, 100) if selected else (120, 120, 140)
+                val_color = (255, 220, 100) if selected else (200, 200, 200)
+                self._u3_text("<", val_x, y + 4, arrow_color, fm)
+                self._u3_text(fe.value, val_x + 18, y + 4, val_color, fm)
+                vw = fm.size(fe.value)[0] if hasattr(fm, 'size') else len(fe.value) * 9
+                self._u3_text(">", val_x + 18 + vw + 8, y + 4, arrow_color, fm)
+            elif selected and fe.editable:
                 val_text = field_buffer + "_"
                 val_color = (255, 220, 100)
+                self._u3_text(val_text, val_x, y + 4, val_color, fm)
             else:
                 val_text = fe.value
                 val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
-            self._u3_text(val_text, val_x, y + 4, val_color, fm)
+                self._u3_text(val_text, val_x, y + 4, val_color, fm)
 
         sf = tw.get("save_flash", 0)
         if sf > 0:
@@ -7941,7 +7988,7 @@ class Renderer(CombatEffectRendererMixin):
                           ry + rh - 36, (100, 255, 100, alpha), f)
 
         self._u3_text(
-            "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            "[Up/Dn] Navigate  [L/R] Choose  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
 
     def _draw_town_enc_list(self, tw, rx, ry, rw, rh, fm, fs, f):

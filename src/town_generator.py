@@ -26,13 +26,15 @@ class NPC:
                  quest_dialogue=None, quest_choices=None, god_name=None,
                  quest_name=None, artifact_name=None,
                  hint_active=None, text_complete=None,
-                 innkeeper_quests=False, shop_type="general"):
+                 innkeeper_quests=False, shop_type="general",
+                 sprite=None):
         self.col = col
         self.row = row
         self.name = name
         self.dialogue = dialogue  # list of strings, cycles through on each talk
         self.npc_type = npc_type  # villager, shopkeep, innkeeper, elder, priest
         self.shop_type = shop_type  # general, weapons, armor, reagent, potion, book, map
+        self.sprite = sprite  # custom sprite path (overrides npc_type-based sprite)
         self._talk_index = 0
         # Quest support — only used for quest-giving NPCs
         self.quest_dialogue = quest_dialogue  # list of strings for quest offer
