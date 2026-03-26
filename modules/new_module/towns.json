@@ -3132,11 +3132,24 @@
         "path": "game/dungeon/stone_floor.png"
       }
     },
-    "description": "",
+    "description": "The city that never sleeps",
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
-    "npcs": [],
+    "npcs": [
+      {
+        "name": "Syd Barret",
+        "npc_type": "villager",
+        "col": 12,
+        "row": 12,
+        "dialogue": [
+          "Hello there!"
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      }
+    ],
     "_action_import": "Map assigned",
     "_action_generate": "Map assigned",
     "interiors": [

@@ -69,7 +69,8 @@ class TownData:
     def __init__(self, tile_map, npcs, name, entry_col, entry_row,
                  keyslot_positions=None, town_style="medieval",
                  building_signs=None, interior_links=None,
-                 overworld_exits=None, custom=False, interiors=None):
+                 overworld_exits=None, custom=False, interiors=None,
+                 description=""):
         self.tile_map = tile_map
         self.npcs = npcs
         self.name = name
@@ -95,6 +96,8 @@ class TownData:
         # height, tiles.  Used by _enter_interior to load editor-created
         # interiors without falling back to town_templates.json.
         self.interiors = interiors or []
+        # User-provided description shown on the overworld entry popup.
+        self.description = description or ""
         # Custom flag — True for user-created towns (from towns.json).
         # These towns have hand-placed NPCs and should not receive
         # auto-injected quest givers or other procedural content.

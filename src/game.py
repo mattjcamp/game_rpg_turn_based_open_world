@@ -1179,6 +1179,7 @@ class Game:
         overworld_exits = set()
         entry_col = town_def.get("entry_col", w // 2)
         entry_row = town_def.get("entry_row", h - 1)
+        overworld_door = None  # first to_overworld tile found
 
         for key, td in tiles_dict.items():
             try:
@@ -1195,8 +1196,17 @@ class Game:
                 interior_links[(col, row)] = td["interior"]
             if td.get("to_overworld"):
                 overworld_exits.add((col, row))
+                if overworld_door is None:
+                    overworld_door = (col, row)
             if tile_id == TILE_EXIT:
                 overworld_exits.add((col, row))
+                if overworld_door is None:
+                    overworld_door = (col, row)
+
+        # Spawn the party at the overworld exit door if one exists,
+        # since that's the door they enter through from the overview map.
+        if overworld_door is not None:
+            entry_col, entry_row = overworld_door
 
         # Build NPC objects from the town definition
         npcs = []
@@ -1228,6 +1238,7 @@ class Game:
             overworld_exits=overworld_exits,
             custom=True,
             interiors=town_def.get("interiors", []),
+            description=town_def.get("description", ""),
         )
 
     def discover_single_key_dungeon(self, dungeon_key_str):

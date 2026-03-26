@@ -1003,9 +1003,15 @@ class OverworldState(InventoryMixin, BaseState):
         pcol, prow = self.game.party.col, self.game.party.row
         town_data = self.game.get_town_at(pcol, prow)
         name = town_data.name if town_data else "Town"
-        desc = self._TOWN_DESCRIPTIONS.get(name,
-            f"The town of {name} rises from the landscape. "
-            "Smoke drifts from chimneys and voices carry on the wind.")
+        # Use the user-defined description from TownData if available,
+        # then fall back to hardcoded descriptions, then generic text.
+        custom_desc = getattr(town_data, "description", "") if town_data else ""
+        if custom_desc:
+            desc = custom_desc
+        else:
+            desc = self._TOWN_DESCRIPTIONS.get(name,
+                f"The town of {name} rises from the landscape. "
+                "Smoke drifts from chimneys and voices carry on the wind.")
 
         # After a gnome machine quest is complete, darkness lifts
         has_gnome_machine = any(

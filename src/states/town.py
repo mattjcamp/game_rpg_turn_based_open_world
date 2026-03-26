@@ -622,10 +622,10 @@ class TownState(InventoryMixin, BaseState):
                     self._in_interior = False
                     self._exit_town()
                     return
-                # "to_town" exits return to the parent town/interior
+                # "to_town" exits return all the way to the town level
                 exit_positions = getattr(self, "_interior_exit_positions", set())
                 if (party.col, party.row) in exit_positions:
-                    self._exit_interior()
+                    self._exit_to_town()
                     return
             # Check for interior-to-interior links while inside
             links = getattr(self.town_data, "interior_links", {})
@@ -1805,6 +1805,31 @@ class TownState(InventoryMixin, BaseState):
         self.game.party.col = self.overworld_col
         self.game.party.row = self.overworld_row
         self.game.change_state("overworld")
+
+    def _exit_to_town(self):
+        """Unwind the entire interior stack, returning to the town level."""
+        stack = getattr(self, "_interior_stack", [])
+        if not stack:
+            self._in_interior = False
+            return
+        # The bottom of the stack is the town level — restore it.
+        bottom = stack[0]
+        stack.clear()
+        self.town_data.tile_map = bottom["tile_map"]
+        self.town_data.npcs = bottom["npcs"]
+        self.town_data.interior_links = bottom["interior_links"]
+        self.town_data.overworld_exits = bottom.get("overworld_exits", set())
+        self.game.party.col = bottom["col"]
+        self.game.party.row = bottom["row"]
+        self._interior_exit_positions = bottom.get("exit_positions", set())
+        self._interior_overworld_exits = bottom.get(
+            "overworld_exit_positions", set())
+        self._interior_name = ""
+        self._in_interior = False
+        self.game.camera.map_width = self.town_data.tile_map.width
+        self.game.camera.map_height = self.town_data.tile_map.height
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self.show_message("Returning to town...", 1000)
 
     def _exit_interior(self):
         """Return from a building interior to the previous level (town or parent interior)."""
