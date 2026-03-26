@@ -586,7 +586,13 @@ def _draw_int_picker_overlay(renderer, data: Dict):
 
     row_h = 28
     ly = oy + 32
-    options = ["(none)"] + [i.get("name", "?") for i in interiors]
+    def _fmt_interior(entry):
+        name = entry.get("name", "?")
+        itype = entry.get("type", "")
+        if itype:
+            return f"[{itype.capitalize()}] {name}"
+        return name
+    options = ["(none)"] + [_fmt_interior(i) for i in interiors]
     for i, label in enumerate(options):
         y = ly + i * row_h
         if y + row_h > oy + oh:

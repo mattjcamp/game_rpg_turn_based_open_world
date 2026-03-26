@@ -675,9 +675,33 @@ class OverworldState(InventoryMixin, BaseState):
         link = tmap.tile_links.get(f"{pcol},{prow}")
         if link and link.get("interior"):
             link_name = link["interior"]
-            # Check if the link target is a town rather than a
-            # dungeon-style overworld interior.  Towns live in
-            # town_data_map and use the dedicated town state.
+            link_type = link.get("type", "")
+
+            # ── Dungeon link ──
+            if link_type == "dungeon":
+                dungeon_def = self._find_module_dungeon_by_name(link_name)
+                if dungeon_def is not None:
+                    # Show dungeon action screen with module dungeon info
+                    visited = self.game.is_dungeon_visited(pcol, prow)
+                    self.dungeon_action_info = {
+                        "name": dungeon_def.get("name", link_name),
+                        "description": dungeon_def.get("description",
+                            "A dark entrance leads underground."),
+                        "visited": visited,
+                        "cleared": False,
+                        "quest_name": None,
+                    }
+                    self.dungeon_action_entry_args = {
+                        "type": "module_dungeon",
+                        "col": pcol,
+                        "row": prow,
+                        "dungeon_def": dungeon_def,
+                    }
+                    self.dungeon_action_cursor = 0
+                    self.dungeon_action_active = True
+                    return
+
+            # ── Town link ──
             town_match = self._find_town_by_name(link_name)
             if town_match is not None:
                 # Ensure the town is registered at this tile position
@@ -998,6 +1022,130 @@ class OverworldState(InventoryMixin, BaseState):
             return self.game.town_data
         return None
 
+    def _find_module_dungeon_by_name(self, name):
+        """Return the dungeon dict from dungeons.json whose name matches, or None."""
+        import json, os
+        mod_path = getattr(self.game, "active_module_path", "")
+        if not mod_path:
+            return None
+        p = os.path.join(mod_path, "dungeons.json")
+        if not os.path.isfile(p):
+            return None
+        try:
+            with open(p, "r") as f:
+                dungeons = json.load(f)
+            if not isinstance(dungeons, list):
+                return None
+            for d in dungeons:
+                if d.get("name") == name:
+                    return d
+        except (OSError, json.JSONDecodeError):
+            pass
+        return None
+
+    def _enter_module_dungeon(self, dungeon_def, pcol, prow):
+        """Enter a module-defined dungeon (procedural or custom).
+
+        For procedural mode: generates levels using generate_dungeon().
+        For custom mode: converts the module's level data to DungeonData.
+        """
+        from src.dungeon_generator import generate_dungeon, DungeonData
+        from src.tile_map import TileMap
+
+        name = dungeon_def.get("name", "Dungeon")
+        mode = dungeon_def.get("mode", "procedural")
+        style = dungeon_def.get("dungeon_style", "cave")
+        levels_data = dungeon_def.get("levels", [])
+
+        dungeon_state = self.game.states["dungeon"]
+        cache = self.game.dungeon_cache
+
+        # Check cache first
+        cached = cache.get((pcol, prow))
+        if cached:
+            if isinstance(cached, list) and len(cached) > 1:
+                dungeon_state.enter_quest_dungeon(cached, pcol, prow)
+            elif isinstance(cached, list) and len(cached) == 1:
+                dungeon_state.enter_dungeon(cached[0], pcol, prow)
+            else:
+                dungeon_state.enter_dungeon(cached, pcol, prow)
+            self.game.mark_dungeon_visited(pcol, prow)
+            self.game.change_state("dungeon")
+            return
+
+        if mode == "procedural":
+            # Map dungeon settings to generate_dungeon parameters
+            size_map = {"small": (30, 20), "medium": (40, 30),
+                        "large": (60, 40)}
+            diff_rooms = {"easy": (4, 6), "normal": (6, 10),
+                          "hard": (8, 14), "deadly": (10, 18)}
+            torch_map = {"none": "none", "sparse": "sparse",
+                         "moderate": "medium", "abundant": "dense"}
+            sz = size_map.get(
+                dungeon_def.get("level_size", "medium"), (40, 30))
+            rm = diff_rooms.get(
+                dungeon_def.get("difficulty", "normal"), (6, 10))
+            td = torch_map.get(
+                dungeon_def.get("torch_density", "moderate"), "medium")
+            num_levels = max(1, int(dungeon_def.get("num_levels", 1)))
+
+            gen_levels = []
+            seed_base = hash((name, pcol, prow)) & 0xFFFFFFFF
+            for li in range(num_levels):
+                lname = f"{name} - Floor {li + 1}" if num_levels > 1 else name
+                dd = generate_dungeon(
+                    name=lname, width=sz[0], height=sz[1],
+                    min_rooms=rm[0], max_rooms=rm[1],
+                    seed=seed_base + li,
+                    place_stairs_down=(li < num_levels - 1),
+                    torch_density=td)
+                gen_levels.append(dd)
+
+            cache[(pcol, prow)] = gen_levels
+            if len(gen_levels) > 1:
+                dungeon_state.enter_quest_dungeon(gen_levels, pcol, prow)
+            else:
+                dungeon_state.enter_dungeon(gen_levels[0], pcol, prow)
+        else:
+            # Custom mode: convert module level data to DungeonData
+            if not levels_data:
+                # No levels defined yet — generate a placeholder
+                dd = generate_dungeon(name=name)
+                cache[(pcol, prow)] = [dd]
+                dungeon_state.enter_dungeon(dd, pcol, prow)
+            else:
+                gen_levels = []
+                for lv in levels_data:
+                    lname = lv.get("name", name)
+                    lw = lv.get("width", 20)
+                    lh = lv.get("height", 20)
+                    ecol = lv.get("entry_col", 0)
+                    erow = lv.get("entry_row", 0)
+                    # Build a TileMap from sparse tile data
+                    tmap = TileMap(lw, lh)
+                    for pos_key, td in lv.get("tiles", {}).items():
+                        parts = pos_key.split(",")
+                        if len(parts) == 2:
+                            c, r = int(parts[0]), int(parts[1])
+                            tile_id = td.get("tile_id", 0) if isinstance(td, dict) else td
+                            if 0 <= c < lw and 0 <= r < lh:
+                                tmap.set_tile(c, r, tile_id)
+                    dd = DungeonData(
+                        tile_map=tmap, rooms=[],
+                        entry_col=ecol, entry_row=erow,
+                        name=lname)
+                    gen_levels.append(dd)
+                cache[(pcol, prow)] = gen_levels
+                if len(gen_levels) > 1:
+                    dungeon_state.enter_quest_dungeon(
+                        gen_levels, pcol, prow)
+                else:
+                    dungeon_state.enter_dungeon(
+                        gen_levels[0], pcol, prow)
+
+        self.game.mark_dungeon_visited(pcol, prow)
+        self.game.change_state("dungeon")
+
     def _show_town_action(self):
         """Show the town entry action screen."""
         pcol, prow = self.game.party.col, self.game.party.row
@@ -1207,6 +1355,11 @@ class OverworldState(InventoryMixin, BaseState):
             hq = self.game.get_house_quest()
             if hq:
                 dungeon_state.enter_quest_dungeon(hq["levels"], pcol, prow)
+        elif entry_type == "module_dungeon":
+            dungeon_def = args.get("dungeon_def")
+            if dungeon_def:
+                self._enter_module_dungeon(dungeon_def, pcol, prow)
+                return  # _enter_module_dungeon handles state change
         else:
             # Random / cleared dungeon — use cached version if available
             cached = cache.get((pcol, prow))

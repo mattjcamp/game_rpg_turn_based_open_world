@@ -243,6 +243,47 @@ class Game:
         # Save flash
         self._mod_town_save_flash = 0.0
 
+        # ── Dungeon Editor (within module) ──
+        self._mod_dungeon_list = []          # list of dungeon dicts
+        self._mod_dungeon_cursor = 0
+        self._mod_dungeon_scroll = 0
+        # Dungeon sub-screen: 0=Settings, 1=Levels
+        self._mod_dungeon_sub_cursor = 0
+        self._mod_dungeon_sub_items = ["Settings", "Levels"]
+        # Settings fields
+        self._mod_dungeon_fields = []
+        self._mod_dungeon_field = 0
+        self._mod_dungeon_buffer = ""
+        self._mod_dungeon_field_scroll = 0
+        self._mod_dungeon_choice_map = {}  # populated by _mod_dungeon_build_settings_fields
+        # Level list (within a dungeon)
+        self._mod_dungeon_level_list = []
+        self._mod_dungeon_level_cursor = 0
+        self._mod_dungeon_level_scroll = 0
+        # Level sub-screen: 0=Edit Map, 1=Encounters
+        self._mod_dungeon_level_sub_cursor = 0
+        self._mod_dungeon_level_sub_items = ["Edit Map", "Encounters"]
+        # Encounters list (within a level)
+        self._mod_dungeon_encounter_list = []
+        self._mod_dungeon_encounter_cursor = 0
+        self._mod_dungeon_encounter_scroll = 0
+        # Encounter field editor
+        self._mod_dungeon_encounter_fields = []
+        self._mod_dungeon_encounter_field = 0
+        self._mod_dungeon_encounter_buffer = ""
+        self._mod_dungeon_encounter_field_scroll = 0
+        # Map editor
+        self._mod_dungeon_editor_active = False
+        self._mod_dungeon_map_editor_state = None
+        self._mod_dungeon_map_editor_handler = None
+        # Naming overlay (shared for dungeon + level naming)
+        self._mod_dungeon_naming = False
+        self._mod_dungeon_name_buf = ""
+        self._mod_dungeon_naming_is_new = False
+        self._mod_dungeon_naming_target = ""   # "dungeon" or "level"
+        # Save flash
+        self._mod_dungeon_save_flash = 0.0
+
         # Restore last-used module from config (if it still exists)
         saved_mod_path = self._config.get("active_module_path")
         if saved_mod_path and os.path.isdir(saved_mod_path):
@@ -2213,6 +2254,12 @@ class Game:
                 "subtitle": "",
                 "_towns": True,
             },
+            {
+                "label": "Dungeons",
+                "icon": "D",
+                "subtitle": "",
+                "_dungeons": True,
+            },
         ]
 
         self.module_edit_sections = sections
@@ -2306,6 +2353,11 @@ class Game:
             self._handle_town_edit_input(event)
             return
 
+        # ── Levels 8-13: Dungeon editor ──
+        if self.module_edit_level in (8, 9, 10, 11, 12, 13):
+            self._handle_dungeon_edit_input(event)
+            return
+
         # ── Level 1: field editor within a section ──
         if event.key == pygame.K_ESCAPE:
             if self._module_dirty:
@@ -2374,6 +2426,11 @@ class Game:
         # ── Towns section: special handling ──
         if sec.get("_towns"):
             self._enter_towns_section()
+            return
+
+        # ── Dungeons section: special handling ──
+        if sec.get("_dungeons"):
+            self._enter_dungeons_section()
             return
 
         if not sec.get("fields"):
@@ -2673,7 +2730,7 @@ class Game:
             tiles = [[0] * w for _ in range(h)]
             self._mod_overview_map["tiles"] = tiles
 
-        # ── Build interior list from module towns (and future types) ──
+        # ── Build interior list from module towns, dungeons, etc. ──
         # Each entry is {"name": str, "type": str} so the picker can
         # display available link targets.
         interior_list = []
@@ -2685,6 +2742,14 @@ class Game:
                 interior_list.append({
                     "name": tname,
                     "type": "town",
+                })
+        self._load_module_dungeons(mod["path"])
+        for dng in self._mod_dungeon_list:
+            dname = dng.get("name", "")
+            if dname:
+                interior_list.append({
+                    "name": dname,
+                    "type": "dungeon",
                 })
 
         # ── Load existing tile links ──
@@ -4027,6 +4092,844 @@ class Game:
         if event.unicode and event.unicode.isprintable():
             self._mod_town_enc_name_buf += event.unicode
 
+    # ── Dungeon editor ─────────────────────────────────────────
+    #
+    # Navigation hierarchy:
+    #   Level 8  – Dungeon list browser
+    #   Level 9  – Dungeon sub-screen   (Settings | Levels)
+    #   Level 10 – Settings fields  OR  Level list
+    #   Level 11 – Level sub-screen     (Edit Map | Encounters)
+    #   Level 12 – Encounter list
+    #   Level 13 – Encounter field editor
+    #
+
+    def _enter_dungeons_section(self):
+        """Enter the Dungeons section from the module section browser."""
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        self._load_module_dungeons(mod["path"])
+        for sec in self.module_edit_sections:
+            if sec.get("_dungeons"):
+                n = len(self._mod_dungeon_list)
+                sec["subtitle"] = f"{n} dungeon{'s' if n != 1 else ''}"
+                break
+        self.module_edit_level = 8
+
+    # ── Load / save ──
+
+    def _load_module_dungeons(self, mod_path):
+        """Load dungeons.json from a module directory."""
+        import json, os
+        self._mod_dungeon_list = []
+        self._mod_dungeon_cursor = 0
+        self._mod_dungeon_scroll = 0
+        p = os.path.join(mod_path, "dungeons.json")
+        if not os.path.isfile(p):
+            return
+        try:
+            with open(p, "r") as f:
+                data = json.load(f)
+            self._mod_dungeon_list = data if isinstance(data, list) else []
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def _save_module_dungeons(self):
+        """Persist the current dungeon list to the active module."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        p = os.path.join(mod["path"], "dungeons.json")
+        try:
+            with open(p, "w") as f:
+                json.dump(self._mod_dungeon_list, f, indent=2)
+        except OSError:
+            pass
+
+    # ── Dungeon-level helpers ──
+
+    def _mod_dungeon_get_current(self):
+        """Return the currently selected dungeon dict, or None."""
+        if 0 <= self._mod_dungeon_cursor < len(self._mod_dungeon_list):
+            return self._mod_dungeon_list[self._mod_dungeon_cursor]
+        return None
+
+    # Valid options for choice fields
+    _DUNGEON_MODE_OPTIONS = ["procedural", "custom"]
+    _DUNGEON_STYLE_OPTIONS = ["cave", "crypt", "sewer", "mine", "ruins",
+                              "temple", "fortress"]
+    _DUNGEON_SIZE_OPTIONS = ["small", "medium", "large"]
+    _DUNGEON_DIFFICULTY_OPTIONS = ["easy", "normal", "hard", "deadly"]
+    _DUNGEON_TORCH_OPTIONS = ["none", "sparse", "moderate", "abundant"]
+
+    def _mod_dungeon_add_new(self, name):
+        """Add a new blank dungeon with one default level."""
+        new_dungeon = {
+            "name": name,
+            "description": "",
+            "mode": "procedural",
+            "dungeon_style": "cave",
+            # Procedural parameters
+            "num_levels": 3,
+            "difficulty": "normal",
+            "level_size": "medium",
+            "torch_density": "moderate",
+            # Custom dungeons use levels array
+            "levels": [
+                {
+                    "name": "Level 1",
+                    "width": 20,
+                    "height": 20,
+                    "entry_col": 0,
+                    "entry_row": 0,
+                    "tiles": {},
+                    "encounters": [],
+                },
+            ],
+        }
+        self._mod_dungeon_list.append(new_dungeon)
+        self._mod_dungeon_cursor = len(self._mod_dungeon_list) - 1
+        self._save_module_dungeons()
+
+    def _mod_dungeon_build_settings_fields(self):
+        """Build FieldEntry list for the current dungeon's top-level settings.
+
+        The field list changes based on the dungeon mode:
+        - 'procedural': shows generation parameters (# Levels, Difficulty,
+          Level Size, Torch Density)
+        - 'custom': shows only Name, Description, Style (levels are edited
+          via the Levels sub-screen)
+        """
+        from src.editor_types import FieldEntry
+        dungeon = self._mod_dungeon_get_current()
+        if not dungeon:
+            self._mod_dungeon_fields = []
+            return
+
+        mode = dungeon.get("mode", "procedural")
+
+        # Common fields
+        fields = [
+            FieldEntry("Name", "name",
+                       dungeon.get("name", ""), "text", True),
+            FieldEntry("Description", "description",
+                       dungeon.get("description", ""), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Mode", "mode", mode, "choice", True),
+            FieldEntry("Style", "dungeon_style",
+                       dungeon.get("dungeon_style", "cave"), "choice", True),
+        ]
+
+        if mode == "procedural":
+            fields.extend([
+                FieldEntry("", "", "", "section", False),
+                FieldEntry("# Levels", "num_levels",
+                           str(dungeon.get("num_levels", 3)), "int", True),
+                FieldEntry("Difficulty", "difficulty",
+                           dungeon.get("difficulty", "normal"),
+                           "choice", True),
+                FieldEntry("Level Size", "level_size",
+                           dungeon.get("level_size", "medium"),
+                           "choice", True),
+                FieldEntry("Torch Density", "torch_density",
+                           dungeon.get("torch_density", "moderate"),
+                           "choice", True),
+            ])
+
+        # Map field keys to their valid options for choice cycling
+        self._mod_dungeon_choice_map = {
+            "mode": self._DUNGEON_MODE_OPTIONS,
+            "dungeon_style": self._DUNGEON_STYLE_OPTIONS,
+            "difficulty": self._DUNGEON_DIFFICULTY_OPTIONS,
+            "level_size": self._DUNGEON_SIZE_OPTIONS,
+            "torch_density": self._DUNGEON_TORCH_OPTIONS,
+        }
+
+        self._mod_dungeon_fields = fields
+        fe = self.features_editor
+        self._mod_dungeon_field = fe._next_editable_generic(
+            self._mod_dungeon_fields, 0)
+        self._mod_dungeon_buffer = self._mod_dungeon_fields[
+            self._mod_dungeon_field].value
+        self._mod_dungeon_field_scroll = 0
+
+    def _mod_dungeon_cycle_choice(self, direction):
+        """Cycle the current choice field left (-1) or right (+1)."""
+        field = self._mod_dungeon_fields[self._mod_dungeon_field]
+        options = self._mod_dungeon_choice_map.get(field.key, [])
+        if not options:
+            return
+        try:
+            idx = options.index(field.value)
+        except ValueError:
+            idx = 0
+        idx = (idx + direction) % len(options)
+        field.value = options[idx]
+        self._mod_dungeon_buffer = field.value
+
+        # If "mode" changed, rebuild the field list to show/hide
+        # procedural parameters
+        if field.key == "mode":
+            self._mod_dungeon_save_settings_fields()
+            self._mod_dungeon_build_settings_fields()
+
+    def _mod_dungeon_save_settings_fields(self):
+        """Write settings fields back into the current dungeon dict."""
+        dungeon = self._mod_dungeon_get_current()
+        if not dungeon:
+            return
+        for fe_entry in self._mod_dungeon_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            dungeon[key] = val
+
+    # ── Level helpers (inside a dungeon) ──
+
+    def _mod_dungeon_load_levels(self):
+        """Load level list from the current dungeon."""
+        dungeon = self._mod_dungeon_get_current()
+        if not dungeon:
+            self._mod_dungeon_level_list = []
+            return
+        self._mod_dungeon_level_list = dungeon.get("levels", [])
+        self._mod_dungeon_level_cursor = 0
+        self._mod_dungeon_level_scroll = 0
+
+    def _mod_dungeon_get_current_level(self):
+        """Return the currently selected level dict, or None."""
+        if 0 <= self._mod_dungeon_level_cursor < len(
+                self._mod_dungeon_level_list):
+            return self._mod_dungeon_level_list[
+                self._mod_dungeon_level_cursor]
+        return None
+
+    def _mod_dungeon_add_level(self, name):
+        """Add a new blank level to the current dungeon."""
+        new_level = {
+            "name": name,
+            "width": 20,
+            "height": 20,
+            "entry_col": 0,
+            "entry_row": 0,
+            "tiles": {},
+            "encounters": [],
+        }
+        self._mod_dungeon_level_list.append(new_level)
+        self._mod_dungeon_level_cursor = len(
+            self._mod_dungeon_level_list) - 1
+        self._save_module_dungeons()
+
+    def _mod_dungeon_delete_level(self):
+        """Delete the currently selected level."""
+        n = len(self._mod_dungeon_level_list)
+        if n == 0:
+            return
+        self._mod_dungeon_level_list.pop(self._mod_dungeon_level_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_dungeon_level_cursor = 0
+        elif self._mod_dungeon_level_cursor >= n:
+            self._mod_dungeon_level_cursor = n - 1
+        self._save_module_dungeons()
+
+    # ── Encounter helpers (inside a level) ──
+
+    def _mod_dungeon_load_encounters(self):
+        """Load encounter list from the current level."""
+        level = self._mod_dungeon_get_current_level()
+        if not level:
+            self._mod_dungeon_encounter_list = []
+            return
+        self._mod_dungeon_encounter_list = level.get("encounters", [])
+        self._mod_dungeon_encounter_cursor = 0
+        self._mod_dungeon_encounter_scroll = 0
+
+    def _mod_dungeon_save_encounters(self):
+        """Write encounter list back into the current level dict."""
+        level = self._mod_dungeon_get_current_level()
+        if not level:
+            return
+        level["encounters"] = list(self._mod_dungeon_encounter_list)
+
+    def _mod_dungeon_add_encounter(self):
+        """Add a new default encounter to the current level."""
+        level = self._mod_dungeon_get_current_level()
+        ec = level.get("entry_col", 1) if level else 1
+        er = level.get("entry_row", 1) if level else 1
+        new_encounter = {
+            "name": "New Encounter",
+            "encounter_type": "monster",
+            "col": ec,
+            "row": er,
+            "monster_id": "",
+            "count": 1,
+            "level": 1,
+            "patrol_range": 3,
+        }
+        self._mod_dungeon_encounter_list.append(new_encounter)
+        self._mod_dungeon_encounter_cursor = len(
+            self._mod_dungeon_encounter_list) - 1
+        self._mod_dungeon_save_encounters()
+
+    def _mod_dungeon_delete_encounter(self):
+        """Delete the currently selected encounter."""
+        n = len(self._mod_dungeon_encounter_list)
+        if n == 0:
+            return
+        self._mod_dungeon_encounter_list.pop(
+            self._mod_dungeon_encounter_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_dungeon_encounter_cursor = 0
+        elif self._mod_dungeon_encounter_cursor >= n:
+            self._mod_dungeon_encounter_cursor = n - 1
+        self._mod_dungeon_save_encounters()
+
+    def _mod_dungeon_build_encounter_fields(self):
+        """Build FieldEntry list for the selected encounter."""
+        from src.editor_types import FieldEntry
+        if not (0 <= self._mod_dungeon_encounter_cursor < len(
+                self._mod_dungeon_encounter_list)):
+            self._mod_dungeon_encounter_fields = []
+            return
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        self._mod_dungeon_encounter_fields = [
+            FieldEntry("Name", "name", enc.get("name", ""), "text", True),
+            FieldEntry("Type", "encounter_type",
+                       enc.get("encounter_type", "monster"), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Col", "col", str(enc.get("col", 0)), "int", True),
+            FieldEntry("Row", "row", str(enc.get("row", 0)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Monster ID", "monster_id",
+                       enc.get("monster_id", ""), "text", True),
+            FieldEntry("Count", "count",
+                       str(enc.get("count", 1)), "int", True),
+            FieldEntry("Level", "level",
+                       str(enc.get("level", 1)), "int", True),
+            FieldEntry("Patrol Range", "patrol_range",
+                       str(enc.get("patrol_range", 3)), "int", True),
+        ]
+        fe = self.features_editor
+        self._mod_dungeon_encounter_field = fe._next_editable_generic(
+            self._mod_dungeon_encounter_fields, 0)
+        self._mod_dungeon_encounter_buffer = (
+            self._mod_dungeon_encounter_fields[
+                self._mod_dungeon_encounter_field].value)
+        self._mod_dungeon_encounter_field_scroll = 0
+
+    def _mod_dungeon_save_encounter_fields(self):
+        """Write encounter fields back into the encounter dict."""
+        if not (0 <= self._mod_dungeon_encounter_cursor < len(
+                self._mod_dungeon_encounter_list)):
+            return
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        for fe_entry in self._mod_dungeon_encounter_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            enc[key] = val
+
+    # ── Map editor for a dungeon level ──
+
+    def _mod_dungeon_launch_map_editor(self):
+        """Launch the map editor for the current dungeon level."""
+        from src.map_editor import (
+            MapEditorConfig, MapEditorState, MapEditorInputHandler,
+            build_town_brushes,
+            STORAGE_SPARSE, GRID_FIXED,
+        )
+        level = self._mod_dungeon_get_current_level()
+        if not level:
+            return
+        w = level.get("width", 20)
+        h = level.get("height", 20)
+
+        fe = self.features_editor
+        brushes = build_town_brushes(fe.TILE_CONTEXT)
+        dungeon = self._mod_dungeon_get_current()
+        dungeon_name = dungeon.get("name", "Dungeon") if dungeon else "Dungeon"
+        level_name = level.get("name", "Unnamed")
+
+        # Build interior list from sibling levels so they can link
+        level_list = [
+            {"name": lv.get("name", "?")}
+            for lv in self._mod_dungeon_level_list
+        ]
+
+        def on_save(state):
+            level["tiles"] = state.tiles
+            level["width"] = state.config.width
+            level["height"] = state.config.height
+            state.dirty = False
+            self._save_module_dungeons()
+            self._mod_dungeon_save_flash = 1.5
+
+        def on_exit(st):
+            level["tiles"] = st.tiles
+            self._save_module_dungeons()
+            self.showing_features = False
+            self.showing_modules = True
+            self.module_edit_mode = True
+            self._mod_dungeon_editor_active = False
+            self._mod_dungeon_map_editor_state = None
+            self._mod_dungeon_map_editor_handler = None
+
+        config = MapEditorConfig(
+            title=f"{dungeon_name}: {level_name}",
+            storage=STORAGE_SPARSE,
+            grid_type=GRID_FIXED,
+            width=w,
+            height=h,
+            tile_context="town",
+            brushes=brushes,
+            supports_interior_links=True,
+            supports_replace=True,
+            on_save=on_save,
+            on_exit=on_exit,
+            interior_exit_types=[
+                {"label": u"\u2190 Return to Overworld",
+                 "link_type": "to_overworld"},
+            ],
+        )
+        existing_tiles = dict(level.get("tiles", {}))
+        state = MapEditorState(config, tiles=existing_tiles,
+                               interior_list=level_list)
+        handler = MapEditorInputHandler(
+            state, is_save_shortcut=self._is_save_shortcut)
+        self._mod_dungeon_map_editor_state = state
+        self._mod_dungeon_map_editor_handler = handler
+        self._mod_dungeon_editor_active = True
+        self.module_edit_mode = False
+        self.showing_modules = False
+        self.showing_features = True
+        fe = self.features_editor
+        fe.active_editor = "mod_dungeon_map"
+        fe.level = 1
+
+    # ── Dungeon input handlers ──
+
+    def _handle_dungeon_edit_input(self, event):
+        """Dispatch dungeon editor input based on module_edit_level.
+
+        Levels:
+        8  = dungeon list browser
+        9  = dungeon sub-screen (Settings / Levels)
+        10 = settings fields OR level list
+        11 = level sub-screen (Edit Map / Encounters)
+        12 = encounter list
+        13 = encounter field editor
+        """
+        import pygame
+
+        # ── Map editor active (takes over everything) ──
+        if self._mod_dungeon_editor_active:
+            if self._mod_dungeon_map_editor_handler:
+                result = self._mod_dungeon_map_editor_handler.handle(event)
+                if result == "exit":
+                    self._mod_dungeon_editor_active = False
+                    self._mod_dungeon_map_editor_state = None
+                    self._mod_dungeon_map_editor_handler = None
+            return
+
+        if self.module_edit_level == 13:
+            self._handle_mod_dungeon_encounter_field_input(event)
+            return
+        if self.module_edit_level == 12:
+            self._handle_mod_dungeon_encounter_list_input(event)
+            return
+        if self.module_edit_level == 11:
+            self._handle_mod_dungeon_level_sub_input(event)
+            return
+        if self.module_edit_level == 10:
+            if self._mod_dungeon_sub_cursor == 0:
+                self._handle_mod_dungeon_settings_field_input(event)
+            elif self._mod_dungeon_sub_cursor == 1:
+                self._handle_mod_dungeon_level_list_input(event)
+            return
+        if self.module_edit_level == 9:
+            self._handle_mod_dungeon_sub_input(event)
+            return
+
+        # ── Level 8: Dungeon list ──
+        if self._mod_dungeon_naming:
+            self._handle_mod_dungeon_naming_input(event)
+            return
+
+        layouts = self._mod_dungeon_list
+        n = len(layouts)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._save_module_dungeons()
+            self.module_edit_level = 0
+            return
+        if self._is_new_shortcut(event):
+            self._mod_dungeon_naming = True
+            self._mod_dungeon_naming_is_new = True
+            self._mod_dungeon_naming_target = "dungeon"
+            self._mod_dungeon_name_buf = ""
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            layouts.pop(self._mod_dungeon_cursor)
+            n -= 1
+            if n == 0:
+                self._mod_dungeon_cursor = 0
+            elif self._mod_dungeon_cursor >= n:
+                self._mod_dungeon_cursor = n - 1
+            self._save_module_dungeons()
+            return
+        if self._is_save_shortcut(event):
+            self._save_module_dungeons()
+            self._mod_dungeon_save_flash = 1.5
+            return
+        if event.key == pygame.K_F2 and n > 0:
+            dungeon = self._mod_dungeon_get_current()
+            if dungeon:
+                self._mod_dungeon_naming = True
+                self._mod_dungeon_naming_is_new = False
+                self._mod_dungeon_naming_target = "dungeon"
+                self._mod_dungeon_name_buf = dungeon.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_dungeon_cursor = (self._mod_dungeon_cursor - 1) % n
+            self._mod_dungeon_scroll = fe._adjust_scroll_generic(
+                self._mod_dungeon_cursor, self._mod_dungeon_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_dungeon_cursor = (self._mod_dungeon_cursor + 1) % n
+            self._mod_dungeon_scroll = fe._adjust_scroll_generic(
+                self._mod_dungeon_cursor, self._mod_dungeon_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_dungeon_sub_cursor = 0
+            self.module_edit_level = 9
+
+    def _handle_mod_dungeon_naming_input(self, event):
+        """Handle text input while naming/renaming a dungeon or level."""
+        import pygame
+        if event.key == pygame.K_ESCAPE:
+            self._mod_dungeon_naming = False
+            return
+        if event.key == pygame.K_RETURN:
+            name = self._mod_dungeon_name_buf.strip()
+            if name:
+                target = self._mod_dungeon_naming_target
+                if target == "dungeon":
+                    if self._mod_dungeon_naming_is_new:
+                        self._mod_dungeon_add_new(name)
+                    else:
+                        dungeon = self._mod_dungeon_get_current()
+                        if dungeon:
+                            dungeon["name"] = name
+                            self._save_module_dungeons()
+                elif target == "level":
+                    if self._mod_dungeon_naming_is_new:
+                        self._mod_dungeon_add_level(name)
+                    else:
+                        level = self._mod_dungeon_get_current_level()
+                        if level:
+                            level["name"] = name
+                            self._save_module_dungeons()
+            self._mod_dungeon_naming = False
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self._mod_dungeon_name_buf = self._mod_dungeon_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self._mod_dungeon_name_buf += event.unicode
+
+    def _mod_dungeon_refresh_sub_items(self):
+        """Rebuild the sub-screen item list based on dungeon mode.
+
+        Procedural dungeons show only Settings.
+        Custom dungeons show Settings + Levels.
+        """
+        dungeon = self._mod_dungeon_get_current()
+        mode = dungeon.get("mode", "procedural") if dungeon else "procedural"
+        if mode == "custom":
+            self._mod_dungeon_sub_items = ["Settings", "Levels"]
+        else:
+            self._mod_dungeon_sub_items = ["Settings"]
+        if self._mod_dungeon_sub_cursor >= len(self._mod_dungeon_sub_items):
+            self._mod_dungeon_sub_cursor = 0
+
+    def _handle_mod_dungeon_sub_input(self, event):
+        """Handle dungeon sub-screen (level 9): Settings | [Levels]."""
+        import pygame
+        self._mod_dungeon_refresh_sub_items()
+        n = len(self._mod_dungeon_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.module_edit_level = 8
+            return
+        if event.key == pygame.K_UP:
+            self._mod_dungeon_sub_cursor = (
+                self._mod_dungeon_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_dungeon_sub_cursor = (
+                self._mod_dungeon_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_dungeon_sub_cursor == 0:
+                self._mod_dungeon_build_settings_fields()
+                self.module_edit_level = 10
+            elif self._mod_dungeon_sub_cursor == 1:
+                self._mod_dungeon_load_levels()
+                self.module_edit_level = 10
+
+    def _handle_mod_dungeon_settings_field_input(self, event):
+        """Handle dungeon settings field editing (level 10, sub 0).
+
+        Supports text, int, and choice field types.  Choice fields
+        cycle with Left/Right arrows instead of accepting typed text.
+        """
+        import pygame
+        fields = self._mod_dungeon_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 9
+            return
+
+        current_field = fields[self._mod_dungeon_field]
+        is_choice = current_field.field_type == "choice"
+
+        # ── Save text before leaving the field ──
+        def _commit_text():
+            if current_field.editable and not is_choice:
+                current_field.value = self._mod_dungeon_buffer
+
+        if self._is_save_shortcut(event):
+            _commit_text()
+            self._mod_dungeon_save_settings_fields()
+            self._save_module_dungeons()
+            self._mod_dungeon_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            _commit_text()
+            self._mod_dungeon_save_settings_fields()
+            self.module_edit_level = 9
+            return
+
+        # ── Left/Right: cycle choice fields ──
+        if is_choice and event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            direction = -1 if event.key == pygame.K_LEFT else 1
+            self._mod_dungeon_cycle_choice(direction)
+            return
+
+        # ── Up/Down: navigate between fields ──
+        if event.key == pygame.K_UP:
+            _commit_text()
+            self._mod_dungeon_field = fe._next_editable_generic(
+                fields, (self._mod_dungeon_field - 1) % n)
+            nf = fields[self._mod_dungeon_field]
+            self._mod_dungeon_buffer = nf.value
+            self._mod_dungeon_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_dungeon_field, self._mod_dungeon_field_scroll)
+        elif event.key == pygame.K_DOWN:
+            _commit_text()
+            self._mod_dungeon_field = fe._next_editable_generic(
+                fields, (self._mod_dungeon_field + 1) % n)
+            nf = fields[self._mod_dungeon_field]
+            self._mod_dungeon_buffer = nf.value
+            self._mod_dungeon_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_dungeon_field, self._mod_dungeon_field_scroll)
+        elif not is_choice:
+            # Text/int typing
+            if event.key == pygame.K_BACKSPACE:
+                self._mod_dungeon_buffer = self._mod_dungeon_buffer[:-1]
+            elif event.unicode and event.unicode.isprintable():
+                self._mod_dungeon_buffer += event.unicode
+
+    def _handle_mod_dungeon_level_list_input(self, event):
+        """Handle level list browsing (level 10, sub 1)."""
+        import pygame
+
+        # Naming overlay for levels
+        if self._mod_dungeon_naming:
+            self._handle_mod_dungeon_naming_input(event)
+            return
+
+        n = len(self._mod_dungeon_level_list)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._save_module_dungeons()
+            self.module_edit_level = 9
+            return
+        if self._is_new_shortcut(event):
+            self._mod_dungeon_naming = True
+            self._mod_dungeon_naming_is_new = True
+            self._mod_dungeon_naming_target = "level"
+            idx = len(self._mod_dungeon_level_list) + 1
+            self._mod_dungeon_name_buf = f"Level {idx}"
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_dungeon_delete_level()
+            return
+        if self._is_save_shortcut(event):
+            self._save_module_dungeons()
+            self._mod_dungeon_save_flash = 1.5
+            return
+        if event.key == pygame.K_F2 and n > 0:
+            level = self._mod_dungeon_get_current_level()
+            if level:
+                self._mod_dungeon_naming = True
+                self._mod_dungeon_naming_is_new = False
+                self._mod_dungeon_naming_target = "level"
+                self._mod_dungeon_name_buf = level.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_dungeon_level_cursor = (
+                self._mod_dungeon_level_cursor - 1) % n
+            self._mod_dungeon_level_scroll = fe._adjust_scroll_generic(
+                self._mod_dungeon_level_cursor,
+                self._mod_dungeon_level_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_dungeon_level_cursor = (
+                self._mod_dungeon_level_cursor + 1) % n
+            self._mod_dungeon_level_scroll = fe._adjust_scroll_generic(
+                self._mod_dungeon_level_cursor,
+                self._mod_dungeon_level_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_dungeon_level_sub_cursor = 0
+            self.module_edit_level = 11
+
+    def _handle_mod_dungeon_level_sub_input(self, event):
+        """Handle level sub-screen (level 11): Edit Map | Encounters."""
+        import pygame
+        n = len(self._mod_dungeon_level_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.module_edit_level = 10
+            return
+        if event.key == pygame.K_UP:
+            self._mod_dungeon_level_sub_cursor = (
+                self._mod_dungeon_level_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_dungeon_level_sub_cursor = (
+                self._mod_dungeon_level_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_dungeon_level_sub_cursor == 0:
+                self._mod_dungeon_launch_map_editor()
+            elif self._mod_dungeon_level_sub_cursor == 1:
+                self._mod_dungeon_load_encounters()
+                self.module_edit_level = 12
+
+    def _handle_mod_dungeon_encounter_list_input(self, event):
+        """Handle encounter list (level 12)."""
+        import pygame
+        n = len(self._mod_dungeon_encounter_list)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._mod_dungeon_save_encounters()
+            self.module_edit_level = 11
+            return
+        if self._is_new_shortcut(event):
+            self._mod_dungeon_add_encounter()
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_dungeon_delete_encounter()
+            return
+        if self._is_save_shortcut(event):
+            self._mod_dungeon_save_encounters()
+            self._save_module_dungeons()
+            self._mod_dungeon_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_dungeon_encounter_cursor = (
+                self._mod_dungeon_encounter_cursor - 1) % n
+            self._mod_dungeon_encounter_scroll = fe._adjust_scroll_generic(
+                self._mod_dungeon_encounter_cursor,
+                self._mod_dungeon_encounter_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_dungeon_encounter_cursor = (
+                self._mod_dungeon_encounter_cursor + 1) % n
+            self._mod_dungeon_encounter_scroll = fe._adjust_scroll_generic(
+                self._mod_dungeon_encounter_cursor,
+                self._mod_dungeon_encounter_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_dungeon_build_encounter_fields()
+            self.module_edit_level = 13
+
+    def _handle_mod_dungeon_encounter_field_input(self, event):
+        """Handle encounter field editing (level 13)."""
+        import pygame
+        fields = self._mod_dungeon_encounter_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 12
+            return
+
+        if self._is_save_shortcut(event):
+            f = fields[self._mod_dungeon_encounter_field]
+            if f.editable:
+                f.value = self._mod_dungeon_encounter_buffer
+            self._mod_dungeon_save_encounter_fields()
+            self._mod_dungeon_save_encounters()
+            self._save_module_dungeons()
+            self._mod_dungeon_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            f = fields[self._mod_dungeon_encounter_field]
+            if f.editable:
+                f.value = self._mod_dungeon_encounter_buffer
+            self._mod_dungeon_save_encounter_fields()
+            self._mod_dungeon_save_encounters()
+            self.module_edit_level = 12
+            return
+
+        if event.key == pygame.K_UP:
+            f = fields[self._mod_dungeon_encounter_field]
+            if f.editable:
+                f.value = self._mod_dungeon_encounter_buffer
+            self._mod_dungeon_encounter_field = fe._next_editable_generic(
+                fields, (self._mod_dungeon_encounter_field - 1) % n)
+            self._mod_dungeon_encounter_buffer = fields[
+                self._mod_dungeon_encounter_field].value
+            self._mod_dungeon_encounter_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_dungeon_encounter_field,
+                    self._mod_dungeon_encounter_field_scroll))
+        elif event.key == pygame.K_DOWN:
+            f = fields[self._mod_dungeon_encounter_field]
+            if f.editable:
+                f.value = self._mod_dungeon_encounter_buffer
+            self._mod_dungeon_encounter_field = fe._next_editable_generic(
+                fields, (self._mod_dungeon_encounter_field + 1) % n)
+            self._mod_dungeon_encounter_buffer = fields[
+                self._mod_dungeon_encounter_field].value
+            self._mod_dungeon_encounter_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_dungeon_encounter_field,
+                    self._mod_dungeon_encounter_field_scroll))
+        elif event.key == pygame.K_BACKSPACE:
+            self._mod_dungeon_encounter_buffer = (
+                self._mod_dungeon_encounter_buffer[:-1])
+        elif event.key and event.unicode and event.unicode.isprintable():
+            self._mod_dungeon_encounter_buffer += event.unicode
+
     # ── Module / settings helpers ────────────────────────────────
 
     def _set_active_module(self, path, name, version):
@@ -4417,6 +5320,11 @@ class Game:
                     self._mod_town_save_flash -= dt
                     if self._mod_town_save_flash < 0:
                         self._mod_town_save_flash = 0
+                # Tick dungeon save flash
+                if self._mod_dungeon_save_flash > 0:
+                    self._mod_dungeon_save_flash -= dt
+                    if self._mod_dungeon_save_flash < 0:
+                        self._mod_dungeon_save_flash = 0
             elif self.showing_game_over:
                 for event in events:
                     self._handle_game_over_input(event)
@@ -4581,6 +5489,37 @@ class Game:
                         "gen_style_idx": self._mod_town_gen_style_idx,
                         "gen_sizes": self._MOD_TOWN_SIZES,
                         "gen_styles": self._MOD_TOWN_STYLES,
+                    },
+                    dungeon_data={
+                        "dungeons": self._mod_dungeon_list,
+                        "cursor": self._mod_dungeon_cursor,
+                        "scroll": self._mod_dungeon_scroll,
+                        "sub_cursor": self._mod_dungeon_sub_cursor,
+                        "sub_items": self._mod_dungeon_sub_items,
+                        "fields": self._mod_dungeon_fields,
+                        "field_cursor": self._mod_dungeon_field,
+                        "field_buffer": self._mod_dungeon_buffer,
+                        "field_scroll": self._mod_dungeon_field_scroll,
+                        "level_list": self._mod_dungeon_level_list,
+                        "level_cursor": self._mod_dungeon_level_cursor,
+                        "level_scroll": self._mod_dungeon_level_scroll,
+                        "level_sub_cursor": self._mod_dungeon_level_sub_cursor,
+                        "level_sub_items": self._mod_dungeon_level_sub_items,
+                        "encounter_list": self._mod_dungeon_encounter_list,
+                        "encounter_cursor": self._mod_dungeon_encounter_cursor,
+                        "encounter_scroll": self._mod_dungeon_encounter_scroll,
+                        "encounter_fields": self._mod_dungeon_encounter_fields,
+                        "encounter_field_cursor": self._mod_dungeon_encounter_field,
+                        "encounter_field_buffer": self._mod_dungeon_encounter_buffer,
+                        "encounter_field_scroll": self._mod_dungeon_encounter_field_scroll,
+                        "editor_active": self._mod_dungeon_editor_active,
+                        "editor_data": self._mod_dungeon_map_editor_state,
+                        "naming": self._mod_dungeon_naming,
+                        "name_buf": self._mod_dungeon_name_buf,
+                        "naming_is_new": self._mod_dungeon_naming_is_new,
+                        "naming_target": self._mod_dungeon_naming_target,
+                        "save_flash": self._mod_dungeon_save_flash,
+                        "level": max(0, self.module_edit_level - 8),
                     })
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()

@@ -668,8 +668,19 @@ class MapEditorInputHandler:
         # ── Link interior (I key) — overview map ──
         if event.key == pygame.K_i and cfg.supports_tile_links:
             st.int_picking = True
-            st.int_pick_cursor = 0
             st.int_pick_scroll = 0
+            # Pre-select existing link if present
+            existing = st.get_tile_link(st.cursor_col, st.cursor_row)
+            if existing and existing.get("interior"):
+                link_name = existing["interior"]
+                for pi, intr in enumerate(st.interior_list):
+                    if intr.get("name") == link_name:
+                        st.int_pick_cursor = 1 + pi
+                        break
+                else:
+                    st.int_pick_cursor = 0
+            else:
+                st.int_pick_cursor = 0
             return None
 
         # ── Link interior (I key) — interior editor ──
@@ -725,6 +736,7 @@ class MapEditorInputHandler:
                     st.set_tile_link(col, row, {
                         "interior": interiors[idx].get("name",
                                                        f"Interior {idx}"),
+                        "type": interiors[idx].get("type", "town"),
                     })
             st.int_picking = False
         return None

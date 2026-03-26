@@ -195,6 +195,62 @@ class TownEditorRS:
     save_flash: float = 0.0
 
 
+@dataclass
+class DungeonEditorRS:
+    """Render-state for the Dungeon Editor.
+
+    Hierarchy:
+    - Dungeon list          (level 0 / edit_level 8)
+    - Dungeon sub-screen    (level 1 / edit_level 9)  Settings | Levels
+    - Settings fields OR    (level 2 / edit_level 10) Level list
+    - Level sub-screen      (level 3 / edit_level 11) Edit Map | Encounters
+    - Encounter list        (level 4 / edit_level 12)
+    - Encounter field editor(level 5 / edit_level 13)
+    """
+    # Dungeon list (level 0)
+    dungeons: Optional[List[dict]] = None
+    cursor: int = 0
+    scroll: int = 0
+    # Dungeon sub-screen (level 1): 0=Settings, 1=Levels
+    sub_cursor: int = 0
+    sub_items: Optional[list] = field(default_factory=lambda: [
+        "Settings", "Levels",
+    ])
+    # Settings fields (level 2 / sub 0)
+    fields: Optional[List[FieldEntry]] = None
+    field_cursor: int = 0
+    field_buffer: str = ""
+    field_scroll: int = 0
+    # Level list (level 2 / sub 1)
+    level_list: Optional[List[dict]] = None
+    level_cursor: int = 0
+    level_scroll: int = 0
+    # Level sub-screen (level 3): 0=Edit Map, 1=Encounters
+    level_sub_cursor: int = 0
+    level_sub_items: Optional[list] = field(default_factory=lambda: [
+        "Edit Map", "Encounters",
+    ])
+    # Encounters list (level 4)
+    encounter_list: Optional[List[dict]] = None
+    encounter_cursor: int = 0
+    encounter_scroll: int = 0
+    # Encounter field editor (level 5)
+    encounter_fields: Optional[List[FieldEntry]] = None
+    encounter_field_cursor: int = 0
+    encounter_field_buffer: str = ""
+    encounter_field_scroll: int = 0
+    # Map editor active flag
+    editor_active: bool = False
+    editor_data: Optional[dict] = None
+    # Naming overlays
+    naming: bool = False
+    name_buf: str = ""
+    naming_is_new: bool = False
+    naming_target: str = ""  # "dungeon" or "level"
+    # Save flash
+    save_flash: float = 0.0
+
+
 # ─── Top-level render state ──────────────────────────────────────────
 
 @dataclass
@@ -218,5 +274,7 @@ class FeaturesRenderState:
     pxedit: PixelEditorRS = field(default_factory=PixelEditorRS)
     meh: MapEditorHubRS = field(default_factory=MapEditorHubRS)
     towns: TownEditorRS = field(default_factory=TownEditorRS)
+    dungeons: DungeonEditorRS = field(default_factory=DungeonEditorRS)
     overview_editor_data: Optional[dict] = None
     town_map_editor_data: Optional[dict] = None
+    dungeon_map_editor_data: Optional[dict] = None

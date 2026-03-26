@@ -2981,6 +2981,17 @@ class FeaturesEditor:
                     self.level = 0
             return
 
+        # Module dungeon map editor (shared map editor instance)
+        if self.active_editor == "mod_dungeon_map":
+            game = self.game
+            if (hasattr(game, '_mod_dungeon_map_editor_state')
+                    and game._mod_dungeon_map_editor_state is not None):
+                result = game._mod_dungeon_map_editor_handler.handle(event)
+                if result == "exit":
+                    self.active_editor = None
+                    self.level = 0
+            return
+
         # ── Resolve active editor data pointers ──
         ed = self.active_editor
         # Build a context dict so the level-1 and level-2 code
@@ -4460,6 +4471,10 @@ class FeaturesEditor:
             town_map_editor_data=(
                 self.game._mod_town_map_editor_state.to_data_dict()
                 if getattr(self.game, '_mod_town_map_editor_state', None) is not None
+                else None),
+            dungeon_map_editor_data=(
+                self.game._mod_dungeon_map_editor_state.to_data_dict()
+                if getattr(self.game, '_mod_dungeon_map_editor_state', None) is not None
                 else None),
         )
 
