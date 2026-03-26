@@ -403,7 +403,7 @@
       0,
       0,
       0,
-      0,
+      4,
       3,
       3,
       2,
@@ -687,6 +687,9 @@
   "tile_links": {
     "10,14": {
       "interior": "New York"
+    },
+    "16,14": {
+      "interior": "Rando Town"
     }
   }
 }

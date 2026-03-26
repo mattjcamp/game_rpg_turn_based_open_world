@@ -994,9 +994,7 @@ def build_town_brushes(tile_context_map: Dict[int, str],
     grp_ow = "Overworld"
     brushes.append(Brush(name=grp_ow, tile_id=None,
                          is_folder_header=True))
-    for tid in overworld_ids:
-        brushes.append(Brush(
-            name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp_ow))
+    brushes.extend(_build_tile_brushes(overworld_ids, grp_ow, resolve))
 
     # ── Objects folder ──
     if object_templates:
@@ -1035,79 +1033,6 @@ def build_overworld_brushes(tile_context_map: Dict[int, str],
 
     return brushes
 
-
-def build_interior_brushes(tile_context_map: Dict[int, str],
-                           feat_tiles_path: str = "",
-                           manifest: Optional[Dict] = None,
-                           feat_tile_list: Optional[List] = None,
-                           object_templates: Optional[List] = None,
-                           ) -> List[Brush]:
-    """Build brush list for interior editors.
-
-    Includes folder headers for Tiles and (optionally) Objects.
-    """
-    resolve = _make_sprite_resolver(feat_tiles_path, manifest, feat_tile_list)
-
-    dungeon_ids = sorted(
-        tid for tid, ctx in tile_context_map.items()
-        if ctx == "dungeon"
-    )
-
-    brushes: List[Brush] = []
-    brushes.append(Brush(name="Eraser", tile_id=None, path=None))
-
-    grp = "Tiles"
-    brushes.append(Brush(name=grp, tile_id=None, is_folder_header=True))
-    brushes.extend(_build_tile_brushes(dungeon_ids, grp, resolve))
-
-    if object_templates:
-        _append_object_brushes(brushes, object_templates)
-
-    return brushes
-
-
-def build_all_brushes(tile_context_map: Dict[int, str],
-                      feat_tiles_path: str = "",
-                      manifest: Optional[Dict] = None,
-                      feat_tile_list: Optional[List] = None,
-                      object_templates: Optional[List] = None,
-                      ) -> List[Brush]:
-    """Build brush list containing *all* tile types (every context).
-
-    Used by Object Templates so reusable map pieces can mix any tile.
-    Grouped into Overworld, Interior, and Objects folders.
-    """
-    resolve = _make_sprite_resolver(feat_tiles_path, manifest, feat_tile_list)
-
-    ow_ids = sorted(
-        tid for tid, ctx in tile_context_map.items()
-        if ctx == "overworld" and tid in TILE_DEFS
-    )
-    other_ids = sorted(
-        tid for tid, ctx in tile_context_map.items()
-        if ctx != "overworld" and tid in TILE_DEFS
-    )
-
-    brushes: List[Brush] = []
-    brushes.append(Brush(name="Eraser", tile_id=None, path=None))
-
-    # ── Overworld folder ──
-    grp_ow = "Overworld"
-    brushes.append(Brush(name=grp_ow, tile_id=None, is_folder_header=True))
-    for tid in ow_ids:
-        brushes.append(Brush(
-            name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp_ow))
-
-    # ── Interior folder ──
-    grp_int = "Interior"
-    brushes.append(Brush(name=grp_int, tile_id=None, is_folder_header=True))
-    brushes.extend(_build_tile_brushes(other_ids, grp_int, resolve))
-
-    # ── Objects folder ──
-    if object_templates:
-        _append_object_brushes(brushes, object_templates)
-
-    return brushes
 
 
 def _append_object_brushes(brushes: List[Brush],

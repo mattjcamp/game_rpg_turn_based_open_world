@@ -70,7 +70,7 @@ class FeaturesEditor:
             "me_battle":    {"storage": "sparse", "grid": "fixed",
                              "ctx": "dungeon",   "w": 20, "h": 16},
             "me_object":    {"storage": "sparse", "grid": "fixed",
-                             "ctx": "all",       "w": 8,  "h": 8},
+                             "ctx": "town",      "w": 8,  "h": 8},
         }
 
         # --- Spell editor state ---
@@ -138,7 +138,7 @@ class FeaturesEditor:
             6: "overworld", 7: "overworld", 8: "overworld",
             9: "overworld",
             10: "town", 11: "town", 12: "town", 13: "town",
-            14: "town", 35: "town",
+            14: "town", 35: "town", 36: "town",
             30: "town", 31: "town",
             20: "dungeon", 21: "dungeon", 22: "dungeon",
             23: "dungeon", 24: "dungeon", 25: "dungeon",
@@ -2520,8 +2520,7 @@ class FeaturesEditor:
         """Launch the unified map editor for a Map Editor hub template."""
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
-            build_overworld_brushes, build_interior_brushes,
-            build_town_brushes, build_all_brushes,
+            build_overworld_brushes, build_town_brushes,
             STORAGE_DENSE, STORAGE_SPARSE,
         )
 
