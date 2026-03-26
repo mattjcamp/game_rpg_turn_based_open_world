@@ -610,10 +610,12 @@ def _draw_int_link_picker_overlay(renderer, data: Dict):
     f = renderer.font
 
     pick_list = data.get("int_link_pick_list", [])
+    exit_opts = data.get("int_link_exit_options", [])
     cursor = data.get("int_link_pick_cursor", 0)
 
+    n_exits = len(exit_opts)
     ow = min(GRID_W - 40, 320)
-    n_opts = 2 + len(pick_list)
+    n_opts = 1 + n_exits + len(pick_list)
     oh = min(GRID_H - 40, 40 + n_opts * 28)
     ox = GRID_X + (GRID_W - ow) // 2
     oy = GRID_Y + (GRID_H - oh) // 2
@@ -627,11 +629,12 @@ def _draw_int_link_picker_overlay(renderer, data: Dict):
 
     row_h = 28
     ly = oy + 32
-    tile_ctx = data.get("tile_context", "dungeon")
-    exit_label = (u"\u2190 Return to Town" if tile_ctx == "town"
-                  else u"\u2190 Return to Overworld")
-    options = ([u"(none)", exit_label]
-               + [i.get("name", "?") for i in pick_list])
+    # Build display options: (none), then exit options, then siblings
+    options = [u"(none)"]
+    for eo in exit_opts:
+        options.append(eo.get("label", "?"))
+    for intr in pick_list:
+        options.append(intr.get("name", "?"))
 
     for i, label in enumerate(options):
         y = ly + i * row_h
@@ -644,9 +647,9 @@ def _draw_int_link_picker_overlay(renderer, data: Dict):
                       _COL_LINK_INT[2], 40))
             screen.blit(bar, (ox + 4, y))
         if i == 0:
-            nc = (255, 100, 100)
-        elif i == 1:
-            nc = (100, 255, 100)
+            nc = (255, 100, 100)       # (none) in red
+        elif i <= n_exits:
+            nc = (100, 255, 100)       # exit options in green
         else:
             nc = _COL_LABEL_SEL if is_sel else _COL_LABEL_NORMAL
         prefix = "> " if is_sel else "  "

@@ -1,0 +1,3317 @@
+[
+  {
+    "name": "testtown",
+    "width": 46,
+    "height": 39,
+    "tiles": {
+      "13,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "15,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "22,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "23,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "24,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "25,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "29,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "32,9": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,10": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,10": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,10": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "29,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,11": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,11": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "18,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "19,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "20,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "28,12": {
+        "tile_id": 12,
+        "name": "Counter"
+      },
+      "29,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,12": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,12": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,13": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,13": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,14": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,14": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,15": {
+        "tile_id": 13,
+        "name": "Door"
+      },
+      "19,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,15": {
+        "tile_id": 13,
+        "name": "Door"
+      },
+      "29,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,15": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,15": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,16": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,16": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,16": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,17": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,17": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,17": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,18": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,18": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,18": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,19": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,19": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,19": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,20": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,20": {
+        "tile_id": 30,
+        "name": "Machine",
+        "interior": "Blacksmith Shop11"
+      },
+      "24,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,20": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,20": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,21": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,21": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,21": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,22": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,22": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,23": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,23": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,24": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,24": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,24": {
+        "tile_id": 35,
+        "name": "Altar"
+      },
+      "18,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,24": {
+        "tile_id": 13,
+        "name": "Door"
+      },
+      "21,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,24": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,24": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,25": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,25": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,26": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,26": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,27": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,27": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,27": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,28": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "15,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "16,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "17,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "18,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "19,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "20,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "21,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "22,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "23,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "24,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "25,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "26,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "27,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "28,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "29,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "30,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "31,28": {
+        "tile_id": 10,
+        "name": "Floor"
+      },
+      "32,28": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "13,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "14,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "15,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "16,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "17,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "18,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "19,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "20,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "21,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "22,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "23,29": {
+        "tile_id": 14,
+        "name": "Exit"
+      },
+      "24,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "25,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "26,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "27,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "28,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "29,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "30,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "31,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      },
+      "32,29": {
+        "tile_id": 11,
+        "name": "Wall"
+      }
+    },
+    "description": "",
+    "town_style": "medieval",
+    "entry_col": 23,
+    "entry_row": 28,
+    "npcs": [
+      {
+        "name": "Mother Elara",
+        "npc_type": "priest",
+        "col": 18,
+        "row": 24,
+        "dialogue": [
+          "Peace be upon you, wanderer.",
+          "In Verdantis's name, we mend body and soul.",
+          "Even the gravest wounds yield to Verdantis's power.",
+          "Walk always in the light."
+        ],
+        "shop_type": "general",
+        "god_name": "Verdantis",
+        "wander_range": 4
+      },
+      {
+        "name": "Bram",
+        "npc_type": "shopkeep",
+        "col": 18,
+        "row": 14,
+        "dialogue": [
+          "Ah, customers! Welcome to Bram's Forge.",
+          "You won't find better quality anywhere else.",
+          "Every item here has been tested in the field.",
+          "Gold well spent is gold well earned!"
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Pella",
+        "npc_type": "innkeeper",
+        "col": 28,
+        "row": 14,
+        "dialogue": [
+          "Ah, adventurers! The Rusty Anchor welcomes you.",
+          "You look like you could use a good meal.",
+          "The roads have been dangerous lately, I hear.",
+          "Rest well -- you'll need your strength."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Elder Cato",
+        "npc_type": "elder",
+        "col": 23,
+        "row": 19,
+        "dialogue": [
+          "Ah, brave adventurers! testtown faces dark times.",
+          "Ancient evils stir in the dungeons beneath the land.",
+          "Seek out the hidden dangers before they find us.",
+          "I sense great potential in you. Do not lose hope."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Elena",
+        "npc_type": "villager",
+        "col": 20,
+        "row": 25,
+        "dialogue": [
+          "Have you heard about the old ruins?",
+          "They say treasure lies within."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Finn",
+        "npc_type": "villager",
+        "col": 27,
+        "row": 26,
+        "dialogue": [
+          "I used to be an adventurer, you know.",
+          "Then I took an arrow to the knee."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Calla",
+        "npc_type": "villager",
+        "col": 24,
+        "row": 16,
+        "dialogue": [
+          "The blacksmith makes fine blades.",
+          "But they don't come cheap."
+        ],
+        "shop_type": "general",
+        "god_name": "The Divine",
+        "wander_range": 4
+      }
+    ],
+    "_action_import": "Map assigned",
+    "_action_generate": "Map assigned",
+    "interiors": [
+      {
+        "name": "Blacksmith Shop11",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "1,1": {
+            "tile_id": 26,
+            "name": "Door",
+            "interior": "Tunnel"
+          },
+          "2,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "1,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "1,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "0,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "2,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,4": {
+            "tile_id": 26,
+            "name": "Door",
+            "path": "game/dungeon/dungeon_door.png",
+            "to_town": true
+          },
+          "2,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "0,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "0,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "0,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "0,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          }
+        },
+        "template_label": "Blacksmith Shop11"
+      },
+      {
+        "name": "Tunnel",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "1,4": {
+            "tile_id": 26,
+            "name": "Door",
+            "interior": "Blacksmith Shop11"
+          },
+          "2,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "3,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "4,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "5,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "6,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "7,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "8,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "9,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "10,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "11,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "12,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "13,4": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "14,4": {
+            "tile_id": 26,
+            "name": "Door",
+            "to_overworld": true
+          },
+          "14,3": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "14,5": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "1,3": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "1,5": {
+            "tile_id": 20,
+            "name": "Stone Floor"
+          },
+          "1,2": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "0,2": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "0,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "0,4": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "0,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "0,6": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "1,6": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "2,6": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "2,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "3,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "4,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "5,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "6,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "7,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "8,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "9,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "10,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "11,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "12,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "13,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "13,6": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "14,6": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "15,6": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "15,5": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "15,4": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "15,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "15,2": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "14,2": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "13,2": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "13,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "12,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "11,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "10,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "9,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "8,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "7,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "6,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "5,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "4,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "3,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "2,3": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          },
+          "2,2": {
+            "tile_id": 21,
+            "name": "Stone Wall"
+          }
+        },
+        "template_label": "Create Blank Enclosure"
+      }
+    ]
+  },
+  {
+    "name": "Different Town",
+    "width": 16,
+    "height": 14,
+    "tiles": {
+      "0,1": {
+        "tile_id": 37,
+        "name": "Brick",
+        "path": "unassigned/brick_wall_red.png"
+      },
+      "2,1": {
+        "tile_id": 37,
+        "name": "Brick",
+        "path": "unassigned/brick_wall_red.png"
+      },
+      "1,1": {
+        "tile_id": 13,
+        "name": "Door",
+        "path": "game/terrain/town_door.png"
+      },
+      "0,0": {
+        "tile_id": 37,
+        "name": "Brick",
+        "path": "unassigned/brick_wall_red.png"
+      },
+      "1,0": {
+        "tile_id": 37,
+        "name": "Brick",
+        "path": "unassigned/brick_wall_red.png"
+      },
+      "2,0": {
+        "tile_id": 37,
+        "name": "Brick",
+        "path": "unassigned/brick_wall_red.png"
+      },
+      "0,4": {
+        "tile_id": 26,
+        "name": "Door",
+        "path": "game/dungeon/dungeon_door.png"
+      },
+      "3,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,0": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,1": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,2": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,3": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,4": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,5": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,6": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,7": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,8": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,9": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,10": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,11": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,12": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "0,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "1,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "2,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "3,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "4,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "5,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "6,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "7,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "8,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "9,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "10,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "11,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "12,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "13,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "14,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      },
+      "15,13": {
+        "tile_id": 20,
+        "name": "Stone Floor",
+        "path": "game/dungeon/stone_floor.png"
+      }
+    },
+    "description": "",
+    "town_style": "medieval",
+    "entry_col": 8,
+    "entry_row": 7,
+    "npcs": [],
+    "_action_import": "Map assigned",
+    "_action_generate": "Map assigned"
+  }
+]

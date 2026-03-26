@@ -607,13 +607,22 @@ class TownState(InventoryMixin, BaseState):
         """Check if the party stepped on a special tile."""
         party = self.game.party
 
-        # If inside an interior, check for "to_town" / "back" exit positions
+        # If inside an interior, check for "to_town" / "to_overworld" exits
         if getattr(self, "_in_interior", False):
             # Skip exit check on the first move after entering so the player
             # isn't immediately ejected when spawning on an exit tile.
             if getattr(self, "_interior_entry_grace", False):
                 self._interior_entry_grace = False
             else:
+                # "to_overworld" exits leave the town entirely
+                ow_exits = getattr(self, "_interior_overworld_exits", set())
+                if (party.col, party.row) in ow_exits:
+                    # Unwind the interior stack and exit the town
+                    self._interior_stack = []
+                    self._in_interior = False
+                    self._exit_town()
+                    return
+                # "to_town" exits return to the parent town/interior
                 exit_positions = getattr(self, "_interior_exit_positions", set())
                 if (party.col, party.row) in exit_positions:
                     self._exit_interior()
@@ -624,6 +633,15 @@ class TownState(InventoryMixin, BaseState):
             if interior_name:
                 self._enter_interior(interior_name, party.col, party.row)
                 return
+
+        # Check for interior links first (editor-defined door → interior).
+        # This must happen before tile-type checks because the linked tile
+        # could be any tile type (Machine, Door, etc.).
+        links = getattr(self.town_data, "interior_links", {})
+        interior_name = links.get((party.col, party.row))
+        if interior_name:
+            self._enter_interior(interior_name, party.col, party.row)
+            return
 
         tile_id = self.town_data.tile_map.get_tile(
             party.col, party.row
@@ -640,12 +658,6 @@ class TownState(InventoryMixin, BaseState):
         if (party.col, party.row) in ow_exits:
             self._exit_town()
             return
-
-        # Check for interior links (editor-defined door → interior)
-        links = getattr(self.town_data, "interior_links", {})
-        interior_name = links.get((party.col, party.row))
-        if interior_name:
-            self._enter_interior(interior_name, party.col, party.row)
 
     def _try_tile_interaction(self, col, row):
         """Check if a non-walkable tile has an interaction defined in TILE_DEFS.
@@ -698,6 +710,8 @@ class TownState(InventoryMixin, BaseState):
                 self.game.party.row = prev["row"]
                 self._interior_exit_positions = prev.get(
                     "exit_positions", set())
+                self._interior_overworld_exits = prev.get(
+                    "overworld_exit_positions", set())
                 self._interior_name = prev.get("name", "")
                 if not stack:
                     self._in_interior = False
@@ -737,6 +751,10 @@ class TownState(InventoryMixin, BaseState):
             self.show_message("The door is locked.", 1500)
             return
 
+        # Remember the name of the interior we're leaving so we can find
+        # the back-link tile in the destination and spawn near it.
+        source_interior_name = getattr(self, "_interior_name", "")
+
         # Push current state onto the interior stack so we can return
         if not hasattr(self, "_interior_stack"):
             self._interior_stack = []
@@ -748,6 +766,7 @@ class TownState(InventoryMixin, BaseState):
             "interior_links": getattr(self.town_data, "interior_links", {}),
             "overworld_exits": getattr(self.town_data, "overworld_exits", set()),
             "exit_positions": getattr(self, "_interior_exit_positions", set()),
+            "overworld_exit_positions": getattr(self, "_interior_overworld_exits", set()),
             "name": getattr(self, "_interior_name", ""),
         })
         self._interior_name = interior_name
@@ -775,20 +794,32 @@ class TownState(InventoryMixin, BaseState):
         self.town_data.tile_map = imap
         self.town_data.npcs = []  # interiors have no NPCs (for now)
 
-        # Collect exit positions and interior-to-interior links from tiles
+        # Collect exit positions and interior-to-interior links from tiles.
+        # Also track which tile links back to the source interior so we can
+        # spawn the party near the correct door.
         self._interior_exit_positions = set()
+        self._interior_overworld_exits = set()
         interior_links = {}
         entry_placed = False
         first_walkable = None
         exit_positions = []
+        back_link_pos = None  # tile that links back to source interior
+        source_name = source_interior_name
         for pos_key, td in interior.get("tiles", {}).items():
             parts = pos_key.split(",")
             c, r = int(parts[0]), int(parts[1])
             if td.get("to_town"):
                 self._interior_exit_positions.add((c, r))
                 exit_positions.append((c, r))
+            if td.get("to_overworld"):
+                self._interior_overworld_exits.add((c, r))
+                exit_positions.append((c, r))
             if td.get("interior"):
                 interior_links[(c, r)] = td["interior"]
+                # If this tile links back to the source interior we came
+                # from, prefer spawning near it.
+                if source_name and td["interior"] == source_name:
+                    back_link_pos = (c, r)
             # Track any walkable tile as fallback spawn point
             tid = td.get("tile_id")
             if first_walkable is None and tid is not None:
@@ -796,59 +827,24 @@ class TownState(InventoryMixin, BaseState):
                 tdef = TILE_DEFS.get(tid, {})
                 if tdef.get("walkable", False):
                     first_walkable = (c, r)
-        # Place party on a walkable tile near the exit door, searching
-        # outward in a BFS so the player doesn't spawn trapped in a wall.
-        if exit_positions and not entry_placed:
-            from src.settings import TILE_DEFS as _TD
-            ec, er = exit_positions[0]
-            # BFS from the exit tile, find nearest walkable that isn't an exit
-            visited = set()
-            queue = [(ec, er)]
-            visited.add((ec, er))
-            while queue and not entry_placed:
-                cx, cy = queue.pop(0)
-                for dc, dr in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
-                    nc, nr = cx + dc, cy + dr
-                    if (nc, nr) in visited:
-                        continue
-                    visited.add((nc, nr))
-                    if not (0 <= nc < iw and 0 <= nr < ih):
-                        continue
-                    ntid = imap.get_tile(nc, nr)
-                    if _TD.get(ntid, {}).get("walkable", False):
-                        if (nc, nr) not in self._interior_exit_positions:
-                            self.game.party.col = nc
-                            self.game.party.row = nr
-                            entry_placed = True
-                            break
-                    queue.append((nc, nr))
-            # Last resort: place on the exit tile itself
-            if not entry_placed:
-                self.game.party.col = ec
-                self.game.party.row = er
-                entry_placed = True
+
+        # Place the party directly on the entry door tile.
+        # Priority:
+        #   1. The tile linking back to the source interior we came from
+        #   2. The first to_town exit (coming from town level)
+        #   3. Any exit position
+        #   4. First walkable tile
+        #   5. Center of grid
+        # The entry grace flag prevents immediate ejection.
+        spawn = (back_link_pos
+                 or (exit_positions[0] if exit_positions else None)
+                 or first_walkable
+                 or (iw // 2, ih // 2))
+        self.game.party.col = spawn[0]
+        self.game.party.row = spawn[1]
+
         self.town_data.interior_links = interior_links
         self.town_data.overworld_exits = set()
-        if not entry_placed:
-            # Fallback 1: door tile (tile_id 13) as common entry point
-            for pos_key, td in interior.get("tiles", {}).items():
-                tid = td.get("tile_id")
-                if tid == 13:  # Door tile
-                    parts = pos_key.split(",")
-                    self.game.party.col = int(parts[0])
-                    self.game.party.row = int(parts[1])
-                    entry_placed = True
-                    break
-        if not entry_placed:
-            # Fallback 2: any walkable tile we found
-            if first_walkable:
-                self.game.party.col = first_walkable[0]
-                self.game.party.row = first_walkable[1]
-                entry_placed = True
-        if not entry_placed:
-            # Fallback 3: center of grid
-            self.game.party.col = iw // 2
-            self.game.party.row = ih // 2
 
         # Update camera
         self.game.camera.map_width = iw
@@ -1827,6 +1823,7 @@ class TownState(InventoryMixin, BaseState):
         self.game.party.row = prev["row"]
         # Restore exit positions and interior name from the level we're returning to
         self._interior_exit_positions = prev.get("exit_positions", set())
+        self._interior_overworld_exits = prev.get("overworld_exit_positions", set())
         leaving_name = getattr(self, "_interior_name", "building")
         self._interior_name = prev.get("name", "")
         # If the stack is now empty, we're back at the town level

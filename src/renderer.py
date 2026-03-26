@@ -1084,6 +1084,12 @@ class Renderer(CombatEffectRendererMixin):
         elif tile_id == TILE_ALTAR:
             self._draw_altar_tile(px, py, ts)
 
+        elif tile_id in (TILE_DFLOOR, TILE_DWALL, TILE_DDOOR, TILE_STAIRS,
+                         TILE_STAIRS_DOWN, TILE_TRAP):
+            # Interior/dungeon tiles — delegate to the dungeon renderer
+            # so they get proper textured rendering instead of flat color.
+            self._u3_draw_dungeon_tile(tile_id, px, py, ts, wc, wr)
+
         else:
             # Unknown tile — use TILE_DEFS color if available
             tile_def = TILE_DEFS.get(tile_id)
@@ -7935,7 +7941,7 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (180, 140, 60),
                          (ox, oy, ow, oh), 2)
 
-        self._u3_text("IMPORT ENCLOSURE TEMPLATE", ox + 16, oy + 10,
+        self._u3_text("ADD ENCLOSURE", ox + 16, oy + 10,
                       self._U3_ORANGE, f)
         ly = oy + 42
         content_h = oh - 80
@@ -7960,18 +7966,22 @@ class Renderer(CombatEffectRendererMixin):
                     bar.fill((255, 200, 60, 30))
                     self.screen.blit(bar, (ox + 2, y - 1))
                 prefix = "> " if selected else "  "
-                color = self._U3_WHITE if selected else (180, 180, 180)
+                is_blank = tmpl.get("_blank", False)
+                if is_blank:
+                    color = (100, 255, 130) if selected else (80, 200, 110)
+                else:
+                    color = self._U3_WHITE if selected else (180, 180, 180)
                 label = tmpl.get("label", "Unnamed")
                 mc = tmpl.get("map_config", {})
                 dims = f"{mc.get('width', '?')}x{mc.get('height', '?')}"
-                sub = tmpl.get("subtitle", dims)
+                sub = tmpl.get("subtitle", dims) if not is_blank else dims
                 self._u3_text(f"{prefix}{label}",
                               ox + 10, y, color, fm)
                 self._u3_text(f"  {sub}",
                               ox + 10, y + 18, (140, 140, 160), fs)
 
         self._u3_text(
-            "[Up/Dn] Browse  [Enter] Generate  [Esc] Cancel",
+            "[Up/Dn] Browse  [Enter] Select  [Esc] Cancel",
             ox + 16, oy + oh - 28, self._U3_HINT, fs)
 
     def _draw_naming_overlay(self, name_buf, title, fm, f):

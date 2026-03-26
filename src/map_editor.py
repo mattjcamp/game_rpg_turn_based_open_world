@@ -95,6 +95,10 @@ class MapEditorConfig:
     supports_tile_links: bool = False    # I key: interior link picker (overview map)
     supports_interior_links: bool = False  # I key: interior/overworld link (interior)
     supports_replace: bool = False       # R key: replace all of tile type
+    # Exit link types for the interior link picker.  Each entry is a dict
+    # with "label" and "link_type" keys.  When empty (default), the picker
+    # auto-generates options based on tile_context.
+    interior_exit_types: List = field(default_factory=list)
 
     # -- Eraser behaviour --
     eraser_tile_id: int = TILE_GRASS  # dense: what eraser paints
@@ -177,6 +181,7 @@ class MapEditorState:
         self.int_link_picking: bool = False  # interior link picker
         self.int_link_pick_list: List = []
         self.int_link_pick_cursor: int = 0
+        self.int_link_exit_options: List = []  # exit option dicts
 
         self.replacing: bool = False         # replace tile overlay
         self.replace_src_tile: Optional[int] = None
@@ -438,12 +443,10 @@ class MapEditorState:
             td.pop(lk, None)
 
         if link_type == "to_overworld":
-            # Context-aware: town enclosures exit back to the town,
-            # not the overworld.
-            if self.config.tile_context == "town":
-                td["to_town"] = True
-            else:
-                td["to_overworld"] = True
+            td["to_overworld"] = True
+            self.dirty = True
+        elif link_type == "to_town":
+            td["to_town"] = True
             self.dirty = True
         elif link_type == "interior" and link_value:
             td["interior"] = link_value
@@ -543,6 +546,7 @@ class MapEditorState:
             "int_link_picking": self.int_link_picking,
             "int_link_pick_list": self.int_link_pick_list,
             "int_link_pick_cursor": self.int_link_pick_cursor,
+            "int_link_exit_options": self.int_link_exit_options,
             "replacing": self.replacing,
             "replace_src_tile": self.replace_src_tile,
             "replace_src_name": self.replace_src_name,
@@ -735,17 +739,40 @@ class MapEditorInputHandler:
             intr for intr in st.interior_list
             if intr.get("name", "") != current_name
         ]
+
+        # Build exit options.  If the config provides explicit exit types,
+        # use those; otherwise fall back to a default based on tile_context.
+        if st.config.interior_exit_types:
+            st.int_link_exit_options = list(st.config.interior_exit_types)
+        else:
+            st.int_link_exit_options = [{
+                "label": u"\u2190 Return to Overworld",
+                "link_type": "to_overworld",
+            }]
+
         st.int_link_picking = True
         # Pre-select based on current tile's link
+        n_exits = len(st.int_link_exit_options)
         td = st.get_tile(st.cursor_col, st.cursor_row)
         if isinstance(td, dict):
-            if td.get("to_overworld") or td.get("to_town"):
-                st.int_link_pick_cursor = 1
+            if td.get("to_town"):
+                # Find the "to_town" exit option
+                for ei, eo in enumerate(st.int_link_exit_options):
+                    if eo["link_type"] == "to_town":
+                        st.int_link_pick_cursor = 1 + ei
+                        return
+                st.int_link_pick_cursor = 0
+            elif td.get("to_overworld"):
+                for ei, eo in enumerate(st.int_link_exit_options):
+                    if eo["link_type"] == "to_overworld":
+                        st.int_link_pick_cursor = 1 + ei
+                        return
+                st.int_link_pick_cursor = 0
             elif td.get("interior"):
                 iname = td["interior"]
                 for pi, intr in enumerate(st.int_link_pick_list):
                     if intr.get("name") == iname:
-                        st.int_link_pick_cursor = pi + 2
+                        st.int_link_pick_cursor = 1 + n_exits + pi
                         return
                 st.int_link_pick_cursor = 0
             else:
@@ -756,7 +783,10 @@ class MapEditorInputHandler:
     def _handle_int_link_picker(self, event) -> Optional[str]:
         st = self.state
         pick_list = st.int_link_pick_list
-        n_options = 2 + len(pick_list)
+        exit_opts = getattr(st, "int_link_exit_options", [])
+        n_exits = len(exit_opts)
+        # Options: (none) + exit_opts + sibling interiors
+        n_options = 1 + n_exits + len(pick_list)
 
         if event.key == pygame.K_ESCAPE:
             st.int_link_picking = False
@@ -770,11 +800,15 @@ class MapEditorInputHandler:
             idx = st.int_link_pick_cursor
             col, row = st.cursor_col, st.cursor_row
             if idx == 0:
+                # (none) — clear link
                 st.set_interior_link(col, row, None)
-            elif idx == 1:
-                st.set_interior_link(col, row, "to_overworld")
+            elif idx <= n_exits:
+                # One of the exit options
+                eo = exit_opts[idx - 1]
+                st.set_interior_link(col, row, eo["link_type"])
             else:
-                pi = idx - 2
+                # Sibling interior
+                pi = idx - 1 - n_exits
                 if pi < len(pick_list):
                     st.set_interior_link(col, row, "interior",
                                          pick_list[pi]["name"])

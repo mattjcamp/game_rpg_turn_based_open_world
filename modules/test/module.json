@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "test2",
-    "name": "test2",
+    "id": "test",
+    "name": "test",
     "author": "",
-    "description": "The royal treasury was plundered and its relics hidden in dungeons across the realm. Reclaim them and return them to the vault in Ashvale.",
+    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Fernmoor to break the spell.",
     "version": "0.1.0"
   },
   "settings": {
@@ -39,9 +39,9 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ashvale",
-        "name": "Ashvale",
-        "description": "A crossroads town where adventurers gather to share rumours and ale."
+        "id": "fernmoor",
+        "name": "Fernmoor",
+        "description": "A sleepy village surrounded by ancient oaks and whispering meadows."
       }
     ],
     "dungeons": []
@@ -50,21 +50,21 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_vault"
+      "deliver_to": "town_shrine"
     },
     "starting_quests": [
-      "reclaim"
+      "awaken"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Forsaken Grotto",
-        "key_name": "Diamond Key",
+        "name": "Ruined Grotto",
+        "key_name": "Bronze Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "Moss-covered statues flank the entrance to Forsaken Grotto. Their blank eyes seem to follow you.",
+        "description": "The entrance to Ruined Grotto gapes like a wound in the hillside. A cold draught carries the scent of damp stone.",
         "quest_type": "retrieve",
-        "quest_objective": "Brave the depths of Forsaken Grotto for the Diamond Key",
+        "quest_objective": "Brave the depths of Ruined Grotto for the Bronze Key",
         "quest_hint": "Few who enter these halls return unchanged.",
         "kill_target": "",
         "kill_count": 0

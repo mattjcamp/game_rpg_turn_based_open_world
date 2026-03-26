@@ -949,6 +949,51 @@ class Game:
                 if first_town is None:
                     first_town = td
 
+        # ── Overlay custom data from towns.json ──
+        # If the user added enclosures or interior tile links to a town
+        # via the editor, overlay those onto the matching TownData.
+        # This handles cases where a town was generated procedurally
+        # from a landmark but the user later added custom content.
+        for town_def in getattr(self, "_mod_town_list", []):
+            tname = town_def.get("name", "")
+            if not tname:
+                continue
+            custom_interiors = town_def.get("interiors", [])
+            # Scan the town's tiles for interior links added in the editor
+            custom_int_links = {}
+            custom_ow_exits = set()
+            for key, td in town_def.get("tiles", {}).items():
+                if td.get("interior"):
+                    try:
+                        parts = key.split(",")
+                        c, r = int(parts[0]), int(parts[1])
+                        custom_int_links[(c, r)] = td["interior"]
+                    except (ValueError, IndexError):
+                        pass
+                if td.get("to_overworld"):
+                    try:
+                        parts = key.split(",")
+                        c, r = int(parts[0]), int(parts[1])
+                        custom_ow_exits.add((c, r))
+                    except (ValueError, IndexError):
+                        pass
+            if not custom_interiors and not custom_int_links:
+                continue
+            # Apply to every TownData with matching name
+            for td_obj in self.town_data_map.values():
+                if getattr(td_obj, "name", "") != tname:
+                    continue
+                if custom_interiors:
+                    td_obj.interiors = custom_interiors
+                if custom_int_links:
+                    existing = getattr(td_obj, "interior_links", {})
+                    existing.update(custom_int_links)
+                    td_obj.interior_links = existing
+                if custom_ow_exits:
+                    existing_ow = getattr(td_obj, "overworld_exits", set())
+                    existing_ow.update(custom_ow_exits)
+                    td_obj.overworld_exits = existing_ow
+
         # Set the default town_data to the first town (hub)
         if first_town:
             self.town_data = first_town
@@ -3177,12 +3222,18 @@ class Game:
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
+            interior_exit_types=[
+                {"label": u"\u2190 Return to Overworld",
+                 "link_type": "to_overworld"},
+            ],
         )
         existing_tiles = dict(town.get("tiles", {}))
-        # Build interior_list from the town's enclosures so the "I" key
-        # picker can offer them as link targets.
+        # Build interior_list from the live enclosure list so the "I" key
+        # picker can offer them as link targets.  Use _mod_town_enclosures
+        # (the in-memory copy) rather than town["interiors"] which may
+        # not have been synced yet.
         enc_list = [{"name": e.get("name", "?")}
-                    for e in town.get("interiors", [])]
+                    for e in self._mod_town_enclosures]
         state = MapEditorState(config, tiles=existing_tiles,
                                interior_list=enc_list)
         handler = MapEditorInputHandler(
@@ -3333,6 +3384,7 @@ class Game:
                 self._mod_town_load_enclosures()
                 self.module_edit_level = 6
             elif self._mod_town_sub_cursor == 3:
+                self._mod_town_load_enclosures()
                 self._mod_town_launch_map_editor()
 
     def _handle_mod_town_settings_field_input(self, event):
@@ -3727,11 +3779,17 @@ class Game:
         town["interiors"] = list(self._mod_town_enclosures)
 
     def _mod_town_open_enc_picker(self):
-        """Open the import picker showing me_enclosure templates."""
+        """Open the import picker showing me_enclosure templates.
+
+        A sentinel ``_blank`` entry is prepended so the user can create
+        a fresh empty enclosure without choosing a template.
+        """
         fe = self.features_editor
         saved = fe.load_map_templates()
         raw = saved.get("me_enclosure", [])
-        self._mod_town_enc_pick_list = raw
+        blank = {"_blank": True, "label": "Create Blank Enclosure",
+                 "map_config": {"width": 16, "height": 14}}
+        self._mod_town_enc_pick_list = [blank] + list(raw)
         self._mod_town_enc_pick_cursor = 0
         self._mod_town_enc_pick_scroll = 0
         self._mod_town_enc_picking = True
@@ -3816,6 +3874,12 @@ class Game:
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
+            interior_exit_types=[
+                {"label": u"\u2190 Return to Town",
+                 "link_type": "to_town"},
+                {"label": u"\u2190 Return to Overworld",
+                 "link_type": "to_overworld"},
+            ],
         )
         existing_tiles = dict(enc.get("tiles", {}))
         # Build interior_list from sibling enclosures (excluding current)
@@ -3925,7 +3989,10 @@ class Game:
             template = templates[self._mod_town_enc_pick_cursor]
             self._mod_town_enc_template = template
             self._mod_town_enc_naming = True
-            self._mod_town_enc_name_buf = template.get("label", "Interior")
+            if template.get("_blank"):
+                self._mod_town_enc_name_buf = "New Enclosure"
+            else:
+                self._mod_town_enc_name_buf = template.get("label", "Interior")
             self._mod_town_enc_picking = False
 
     def _handle_mod_town_enc_naming_input(self, event):

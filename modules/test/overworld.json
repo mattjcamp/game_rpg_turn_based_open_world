@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "ashvale",
+      "id": "fernmoor",
       "type": "town",
       "col": 32,
       "row": 16,
@@ -17,7 +17,7 @@
       "clear_radius": 3
     },
     {
-      "id": "town_vault",
+      "id": "town_shrine",
       "type": "machine",
       "col": 34,
       "row": 16,
