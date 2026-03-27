@@ -1163,6 +1163,48 @@ class TownState(InventoryMixin, BaseState):
             # Fall through to normal cycling dialogue
             pass
 
+        # Module quest giver — user-created quests from the module editor
+        if npc.npc_type == "module_quest_giver":
+            mqname = getattr(npc, "_module_quest_name", "")
+            mq_states = getattr(self.game, "module_quest_states", {})
+            mq_state = mq_states.get(mqname, {})
+            status = mq_state.get("status", "available")
+
+            if status == "available":
+                # Offer the quest
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self.quest_dialogue_lines = list(npc.quest_dialogue or [])
+                self.quest_dialogue_index = 0
+                if self.quest_dialogue_lines:
+                    self._set_dialogue(
+                        f"{npc.name}: {self.quest_dialogue_lines[0]}")
+                else:
+                    self._set_dialogue(
+                        f"{npc.name}: I have a quest for you!")
+                return
+
+            elif status == "active":
+                # Quest in progress — show hint
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                progress = mq_state.get("step_progress", [])
+                done_count = sum(1 for p in progress if p)
+                total = len(progress)
+                self._set_dialogue(
+                    f"{npc.name}: How's the quest going? "
+                    f"({done_count}/{total} steps completed)")
+                return
+
+            elif status == "completed":
+                # Quest done — thank player
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                self._set_dialogue(
+                    f"{npc.name}: Thank you for completing the quest! "
+                    f"You truly are a hero.")
+                return
+
         # Quest giver — offers a single specific quest
         if npc.npc_type == "quest_giver":
             dk_str = getattr(npc, "dungeon_key_str", "")
@@ -1360,6 +1402,8 @@ class TownState(InventoryMixin, BaseState):
             # Accepted
             if npc and npc.npc_type == "gnome":
                 self._accept_gnome_quest()
+            elif npc and npc.npc_type == "module_quest_giver":
+                self._accept_module_quest()
             elif npc and npc.npc_type == "quest_giver":
                 self._accept_quest_giver_quest()
             elif npc and npc.npc_type == "elder":
@@ -1390,6 +1434,40 @@ class TownState(InventoryMixin, BaseState):
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
         self._refresh_quest_highlights()
+
+    def _accept_module_quest(self):
+        """Accept a module quest giver's quest."""
+        npc = self.npc_speaking
+        mqname = getattr(npc, "_module_quest_name", "")
+        mq_states = getattr(self.game, "module_quest_states", {})
+        if mqname in mq_states:
+            mq_states[mqname]["status"] = "active"
+
+        # Spawn quest monsters for any 'kill' steps
+        if hasattr(self.game, "_spawn_quest_monsters"):
+            self.game._spawn_quest_monsters(mqname)
+
+        # Find quest definition for reward info
+        quest_defs = getattr(self.game, "_module_quest_defs", [])
+        qdef = None
+        for q in quest_defs:
+            if q.get("name") == mqname:
+                qdef = q
+                break
+
+        reward_xp = 0
+        reward_gold = 0
+        if qdef:
+            reward_xp = qdef.get("reward_xp", 0)
+            reward_gold = qdef.get("reward_gold", 0)
+
+        self._set_dialogue(
+            f"{npc.name}: Wonderful! I'm counting on you. "
+            f"Good luck out there!")
+        self.quest_choice_active = False
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
 
     def _accept_gnome_quest(self):
         """Accept the gnome's machine quest (Keys of Shadow or custom)."""

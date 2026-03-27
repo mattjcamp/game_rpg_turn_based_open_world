@@ -96,12 +96,25 @@ class OverworldState(InventoryMixin, BaseState):
         self._stashed_overworld_tile_map = None
         self._stashed_overworld_monsters = None
 
+        # ── Overworld NPC dialogue (module quest givers) ──
+        self.ow_npc_dialogue_active = False
+        self.ow_npc_speaking = None
+        self.ow_quest_dialogue_lines = []
+        self.ow_quest_dialogue_index = 0
+        self.ow_quest_choice_active = False
+        self.ow_quest_choice_cursor = 0
+        self.ow_quest_choices = []
+
     def enter(self):
         self._apply_pending_combat_rewards()
+        # Check quest kill progress (sets message if a step completed)
+        quest_msg = self._check_quest_monster_kills()
         # Skip the first tile-event check so we don't immediately re-enter
         # the town/dungeon we just left.
         self._exit_grace = True
-        if self.pending_combat_message:
+        if quest_msg:
+            self.show_message(quest_msg, 4000)
+        elif self.pending_combat_message:
             self.show_message(self.pending_combat_message, 2500)
             self.pending_combat_message = None
         elif not self.overworld_monsters:
@@ -306,6 +319,11 @@ class OverworldState(InventoryMixin, BaseState):
                     self._handle_building_action_input(event)
                     return
 
+                # ── Overworld NPC dialogue input ──
+                if self.ow_npc_dialogue_active:
+                    self._handle_ow_npc_dialogue_input(event)
+                    return
+
                 # ── Party inventory screen input ──
                 if self.showing_party_inv:
                     self._handle_party_inv_input(event)
@@ -403,8 +421,9 @@ class OverworldState(InventoryMixin, BaseState):
                         self.party_inv_member = 0
                         return
 
-        # If showing party, character detail, or party inventory, block all other input
-        if self.showing_party or self.showing_char_detail is not None or self.showing_party_inv:
+        # If showing party, character detail, party inventory, or NPC dialogue, block all other input
+        if (self.showing_party or self.showing_char_detail is not None
+                or self.showing_party_inv or self.ow_npc_dialogue_active):
             return
 
         # Movement only if cooldown has elapsed
@@ -428,6 +447,13 @@ class OverworldState(InventoryMixin, BaseState):
             target_col = party.col + dcol
             target_row = party.row + drow
 
+            # Bump-to-talk: check if a quest NPC is on the target tile
+            ow_npc = self._get_ow_npc_at(target_col, target_row)
+            if ow_npc:
+                self._start_ow_npc_dialogue(ow_npc)
+                self.move_cooldown = MOVE_REPEAT_DELAY
+                return
+
             # Bump-to-fight: check if an orc is on the target tile
             orc = self._get_monster_at(target_col, target_row)
             if orc:
@@ -445,6 +471,7 @@ class OverworldState(InventoryMixin, BaseState):
                 # Move orcs after party moves (not inside interiors)
                 if not self._in_overworld_interior:
                     self._move_monsters()
+                    self._move_overworld_npcs()
                     self._check_monster_contact()
                     # Occasionally respawn orcs that were killed
                     if random.random() < 0.08:
@@ -471,6 +498,253 @@ class OverworldState(InventoryMixin, BaseState):
                     party.set_effect(slot_key, None)
                     break
             self.show_message("Galadriel's Light fades away...", 3000)
+
+    # ── Overworld NPC helpers (module quest givers) ──────────────
+
+    def _get_ow_npc_at(self, col, row):
+        """Return the overworld quest NPC at (col, row), or None."""
+        for npc in getattr(self.game, "overworld_quest_npcs", []):
+            if npc.col == col and npc.row == row:
+                return npc
+        return None
+
+    def _start_ow_npc_dialogue(self, npc):
+        """Begin talking to an overworld quest NPC."""
+        mqname = getattr(npc, "_module_quest_name", "")
+        mq_states = getattr(self.game, "module_quest_states", {})
+        mq_state = mq_states.get(mqname, {})
+        status = mq_state.get("status", "available")
+
+        self.ow_npc_dialogue_active = True
+        self.ow_npc_speaking = npc
+
+        if status == "available":
+            # Offer the quest
+            self.ow_quest_dialogue_lines = list(
+                npc.quest_dialogue or [])
+            self.ow_quest_dialogue_index = 0
+            if self.ow_quest_dialogue_lines:
+                remaining = len(self.ow_quest_dialogue_lines) - 1
+                hint = "  [ENTER] >" if remaining > 0 else "  [ENTER]"
+                self.show_message(
+                    f"{npc.name}: "
+                    f"{self.ow_quest_dialogue_lines[0]}{hint}",
+                    999999)
+            else:
+                self.show_message(
+                    f"{npc.name}: I have a quest for you!  [ENTER]",
+                    999999)
+        elif status == "active":
+            progress = mq_state.get("step_progress", [])
+            done = sum(1 for p in progress if p)
+            total = len(progress)
+            self.show_message(
+                f"{npc.name}: How's the quest going? "
+                f"({done}/{total} steps done)  [ENTER]", 999999)
+            self.ow_quest_dialogue_lines = []
+        elif status == "completed":
+            self.show_message(
+                f"{npc.name}: Thank you for completing the quest!"
+                f"  [ENTER]", 999999)
+            self.ow_quest_dialogue_lines = []
+
+    def _handle_ow_npc_dialogue_input(self, event):
+        """Handle input while overworld NPC dialogue is active."""
+        import pygame
+
+        # Quest choice screen (accept / decline)
+        if self.ow_quest_choice_active:
+            if event.key in (pygame.K_UP, pygame.K_LEFT):
+                self.ow_quest_choice_cursor = 0
+            elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+                self.ow_quest_choice_cursor = 1
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                self._handle_ow_quest_choice()
+            elif event.key == pygame.K_ESCAPE:
+                # Decline on escape
+                self.ow_quest_choice_cursor = 1
+                self._handle_ow_quest_choice()
+            return
+
+        # Advancing dialogue lines — accept ANY key press
+        if self.ow_quest_dialogue_lines:
+            self.ow_quest_dialogue_index += 1
+            if (self.ow_quest_dialogue_index
+                    < len(self.ow_quest_dialogue_lines)):
+                npc = self.ow_npc_speaking
+                line = self.ow_quest_dialogue_lines[
+                    self.ow_quest_dialogue_index]
+                remaining = (len(self.ow_quest_dialogue_lines)
+                             - self.ow_quest_dialogue_index - 1)
+                hint = "  [ENTER] >" if remaining > 0 else "  [ENTER]"
+                self.show_message(
+                    f"{npc.name}: {line}{hint}", 999999)
+                return
+            else:
+                # All dialogue shown — present choices if available
+                npc = self.ow_npc_speaking
+                if npc and npc.quest_choices:
+                    self.ow_quest_choice_active = True
+                    self.ow_quest_choices = list(npc.quest_choices)
+                    self.ow_quest_choice_cursor = 0
+                    return
+        # No more lines / no choices — dismiss
+        self._dismiss_ow_npc_dialogue()
+
+    def _handle_ow_quest_choice(self):
+        """Handle accept/decline on overworld quest offer."""
+        npc = self.ow_npc_speaking
+        if self.ow_quest_choice_cursor == 0:
+            # Accept
+            mqname = getattr(npc, "_module_quest_name", "")
+            mq_states = getattr(self.game, "module_quest_states", {})
+            if mqname in mq_states:
+                mq_states[mqname]["status"] = "active"
+            # Spawn quest monsters for any 'kill' steps
+            if hasattr(self.game, "_spawn_quest_monsters"):
+                self.game._spawn_quest_monsters(mqname)
+            self.show_message(
+                f"{npc.name}: Wonderful! I'm counting on you. "
+                f"Good luck!", 3000)
+        else:
+            # Decline
+            self.show_message(
+                f"{npc.name}: No worries. Come back if you change "
+                f"your mind.", 3000)
+        self.ow_quest_choice_active = False
+        self.ow_quest_choices = []
+        self.ow_quest_dialogue_lines = []
+        self.ow_quest_dialogue_index = 0
+        self.ow_npc_dialogue_active = False
+        self.ow_npc_speaking = None
+
+    def _dismiss_ow_npc_dialogue(self):
+        """Close the overworld NPC dialogue."""
+        self.ow_npc_dialogue_active = False
+        self.ow_npc_speaking = None
+        self.ow_quest_dialogue_lines = []
+        self.ow_quest_dialogue_index = 0
+        self.ow_quest_choice_active = False
+        self.ow_quest_choices = []
+        self.message = ""
+        self.message_timer = 0
+
+    def _check_quest_monster_kills(self):
+        """After returning from combat, check if any killed monsters
+        were quest targets and update step progress accordingly.
+
+        Returns a message string if a step or quest was completed,
+        otherwise None.
+        """
+        killed = getattr(self.game, "pending_killed_monsters", [])
+        if not killed:
+            return None
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        quest_defs = getattr(self.game, "_module_quest_defs", [])
+
+        # Build a count of killed monster names (both raw and display)
+        from collections import Counter
+        killed_counts = Counter()
+        for name in killed:
+            display = name.replace("_", " ").title()
+            killed_counts[display] += 1
+            killed_counts[name] += 1
+
+        result_msg = None
+
+        for qdef in quest_defs:
+            qname = qdef.get("name", "")
+            if not qname:
+                continue
+            state = mq_states.get(qname, {})
+            if state.get("status") != "active":
+                continue
+
+            steps = qdef.get("steps", [])
+            progress = state.get("step_progress", [])
+
+            for i, step in enumerate(steps):
+                if i >= len(progress) or progress[i]:
+                    continue
+                if step.get("step_type") != "kill":
+                    continue
+                monster_display = step.get("monster", "")
+                if not monster_display:
+                    continue
+                target_count = max(1, step.get("target_count", 1))
+
+                monster_key = monster_display.lower().replace(" ", "_")
+                match_count = max(
+                    killed_counts.get(monster_display, 0),
+                    killed_counts.get(monster_key, 0))
+
+                if match_count <= 0:
+                    continue
+
+                kills_so_far = state.get(
+                    f"step_{i}_kills", 0) + match_count
+                state[f"step_{i}_kills"] = kills_so_far
+
+                if kills_so_far >= target_count:
+                    progress[i] = True
+                    result_msg = (
+                        f"Quest '{qname}': "
+                        f"{step.get('description', 'Kill step')} "
+                        f"- Complete!")
+
+            # Check if ALL steps are done
+            if all(progress) and progress:
+                state["status"] = "completed"
+                reward_xp = qdef.get("reward_xp", 0)
+                reward_gold = qdef.get("reward_gold", 0)
+                if reward_xp or reward_gold:
+                    for m in self.game.party.members:
+                        if m.is_alive():
+                            m.exp += reward_xp
+                    self.game.party.gold += reward_gold
+                    result_msg = (
+                        f"Quest '{qname}' complete! "
+                        f"+{reward_xp} XP, +{reward_gold} Gold")
+                else:
+                    result_msg = f"Quest '{qname}' complete!"
+
+        # Clean up killed list so it's not processed twice
+        self.game.pending_killed_monsters = []
+        return result_msg
+
+    def _move_overworld_npcs(self):
+        """Randomly wander overworld quest NPCs one step."""
+        from src.settings import TILE_GRASS, TILE_PATH
+        tmap = self.game.tile_map
+        party = self.game.party
+        npcs = getattr(self.game, "overworld_quest_npcs", [])
+        if not npcs:
+            return
+        # Only move ~30% of the time so they don't zip around
+        if random.random() > 0.3:
+            return
+        occupied = {(party.col, party.row)}
+        for n in npcs:
+            occupied.add((n.col, n.row))
+        for mon in self.overworld_monsters:
+            if mon.is_alive():
+                occupied.add((mon.col, mon.row))
+        for npc in npcs:
+            dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+            random.shuffle(dirs)
+            for dc, dr in dirs:
+                nc, nr = npc.col + dc, npc.row + dr
+                if ((nc, nr) not in occupied
+                        and 0 <= nc < tmap.width
+                        and 0 <= nr < tmap.height
+                        and tmap.get_tile(nc, nr) in (
+                            TILE_GRASS, TILE_PATH)):
+                    occupied.discard((npc.col, npc.row))
+                    npc.col = nc
+                    npc.row = nr
+                    occupied.add((nc, nr))
+                    break
 
     # ── Monster helpers ───────────────────────────────────────────
 
@@ -1677,7 +1951,12 @@ class OverworldState(InventoryMixin, BaseState):
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
             darkness_active=getattr(self.game, "darkness_active", False),
+            overworld_npcs=getattr(self.game, "overworld_quest_npcs", []),
         )
+        # ── Overworld NPC quest choice overlay ──
+        if self.ow_quest_choice_active:
+            renderer.draw_ow_quest_choice(
+                self.ow_quest_choices, self.ow_quest_choice_cursor)
         if self.town_action_active:
             renderer.draw_town_action_screen(
                 self.town_action_info, self.town_action_cursor)

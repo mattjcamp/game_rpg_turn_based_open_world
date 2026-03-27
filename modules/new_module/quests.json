@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Rat Patrol",
+    "description": "Kill 1 Wolf",
+    "giver_npc": "GGG",
+    "giver_sprite": "src/assets/game/characters/alchemist.png",
+    "giver_location": "overview",
+    "giver_dialogue": "Kill a wolf",
+    "reward_xp": 0,
+    "reward_gold": 0,
+    "steps": [
+      {
+        "description": "New Step",
+        "step_type": "kill",
+        "monster": "Wolf",
+        "target": "",
+        "target_count": 1,
+        "optional": "no",
+        "spawn_location": "overview"
+      }
+    ]
+  }
+]

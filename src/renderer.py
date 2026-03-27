@@ -2201,7 +2201,7 @@ class Renderer(CombatEffectRendererMixin):
     def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None,
                           unique_text="", unique_flash=0.0, unique_pos=None,
                           push_anim=None, repel_effect=None,
-                          darkness_active=False):
+                          darkness_active=False, overworld_npcs=None):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -2290,6 +2290,37 @@ class Renderer(CombatEffectRendererMixin):
                         sx = mx - mon_sprite.get_width() // 2
                         sy = my - mon_sprite.get_height() // 2
                         self.screen.blit(mon_sprite, (sx, sy))
+
+        # ── 2b. overworld quest NPC sprites ──
+        if overworld_npcs:
+            for npc in overworld_npcs:
+                nsc = npc.col - off_c
+                nsr = npc.row - off_r
+                if 0 <= nsc < cols and 0 <= nsr < rows:
+                    nx = nsc * ts + ts // 2 + pad_x
+                    ny = nsr * ts + ts // 2 + pad_y
+                    npc_sprite = None
+                    if npc.sprite:
+                        npc_sprite = self._load_npc_custom_sprite(
+                            npc.sprite, ts)
+                    if npc_sprite:
+                        sx = nx - npc_sprite.get_width() // 2
+                        sy = ny - npc_sprite.get_height() // 2
+                        self.screen.blit(npc_sprite, (sx, sy))
+                    else:
+                        # Fallback: draw a colored circle with "?"
+                        pygame.draw.circle(
+                            self.screen, (100, 200, 255),
+                            (nx, ny), ts // 2 - 2)
+                        pygame.draw.circle(
+                            self.screen, (60, 120, 180),
+                            (nx, ny), ts // 2 - 2, 2)
+                        q_surf = self._font_sm.render(
+                            "?", True, (255, 255, 255))
+                        self.screen.blit(
+                            q_surf,
+                            (nx - q_surf.get_width() // 2,
+                             ny - q_surf.get_height() // 2))
 
         # ── 3. party sprite ──
         psc = party.col - off_c
@@ -3494,6 +3525,31 @@ class Renderer(CombatEffectRendererMixin):
         self.screen.blit(glow_surf, (door_px, door_py))
 
     # ── Dungeon entry action screen ──────────────────────────────
+
+    def draw_ow_quest_choice(self, choices, cursor):
+        """Draw the accept/decline quest choice overlay on the overworld."""
+        if not choices:
+            return
+        panel_w = 280
+        line_h = 32
+        pad = 16
+        panel_h = pad * 2 + len(choices) * line_h + 24
+        ox = (SCREEN_WIDTH - panel_w) // 2
+        oy = SCREEN_HEIGHT // 2 - panel_h - 20
+        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        bg.fill((20, 15, 30, 230))
+        self.screen.blit(bg, (ox, oy))
+        pygame.draw.rect(self.screen, (120, 100, 60),
+                         (ox, oy, panel_w, panel_h), 2)
+        self._u3_text("Quest Offer", ox + pad, oy + 8,
+                      self._U3_ORANGE, self.font)
+        for i, label in enumerate(choices):
+            y = oy + 32 + i * line_h
+            sel = (i == cursor)
+            color = (255, 220, 100) if sel else (160, 160, 160)
+            prefix = "> " if sel else "  "
+            self._u3_text(f"{prefix}{label}", ox + pad, y,
+                          color, self.font)
 
     def draw_town_action_screen(self, info, cursor):
         """Draw the town/location entry confirmation panel over the overworld."""
@@ -8904,6 +8960,447 @@ class Renderer(CombatEffectRendererMixin):
             "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
 
+    # ── Quest Editor Panel ──────────────────────────────────────
+
+    def draw_quest_editor_panel(self, rx, ry, rw, rh, qd):
+        """Draw the quest editor panel inside the module editor right panel.
+
+        ``qd`` is a dict with keys mirroring QuestEditorRS fields.
+        """
+        fm = self.font_med
+        fs = self.font_small
+        f = self.font
+
+        quests = qd.get("quests") or []
+        cursor = qd.get("cursor", 0)
+        scroll = qd.get("scroll", 0)
+        level = qd.get("level", 0)
+        row_h = 36
+
+        # Solid opaque background to prevent text bleed-through
+        pygame.draw.rect(self.screen, (10, 8, 20),
+                         (rx, ry, rw, rh))
+        pygame.draw.rect(self.screen, (140, 120, 60),
+                         (rx, ry, rw, rh), 1)
+
+        # ── Level 0: Quest list ──
+        if level == 0:
+            self._u3_text("QUESTS", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            ly = ry + 44
+            max_visible = (rh - 80) // row_h
+            for vi in range(max_visible):
+                i = scroll + vi
+                if i >= len(quests):
+                    break
+                quest = quests[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                name = quest.get("name", "Unnamed")
+                qtype = quest.get("quest_type", "main")
+                n_steps = len(quest.get("steps", []))
+                self._u3_text(f"{prefix}{name}",
+                              rx + 10, y, color, fm)
+                self._u3_text(f"  {qtype}  {n_steps} step{'s' if n_steps != 1 else ''}",
+                              rx + 10, y + 18, (140, 140, 160), fs)
+
+            # Naming overlay
+            if qd.get("naming"):
+                target = qd.get("naming_target", "quest")
+                if qd.get("naming_is_new"):
+                    title = "New Quest Name:"
+                else:
+                    title = "Rename Quest:"
+                self._draw_naming_overlay(
+                    qd.get("name_buf", ""), title, fm, f)
+
+            # Save flash
+            sf = qd.get("save_flash", 0)
+            if sf > 0:
+                alpha = min(255, int(sf * 255))
+                self._u3_text("Saved!", rx + rw // 2 - 30,
+                              ry + rh - 36,
+                              (100, 255, 100, alpha), f)
+
+            # Hint
+            self._u3_text(
+                "[Up/Dn] Browse  [Enter] Open  [Ctrl+N] New  [Ctrl+D] Del  [Esc] Back",
+                rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Level 1: Sub-screen selector ──
+        elif level == 1:
+            quest = quests[cursor] if 0 <= cursor < len(quests) else {}
+            quest_name = quest.get("name", "Unnamed")
+            self._u3_text(f"QUEST: {quest_name}", rx + 16, ry + 12,
+                          self._U3_ORANGE, f)
+            ly = ry + 50
+            sub_items = qd.get("sub_items") or ["Settings", "Quest Steps"]
+            sub_cursor = qd.get("sub_cursor", 0)
+            for i, item in enumerate(sub_items):
+                selected = (i == sub_cursor)
+                y = ly + i * 40
+                if selected:
+                    bar = pygame.Surface((rw - 4, 38),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{item}",
+                              rx + 16, y + 8, color, fm)
+
+            # Hint
+            self._u3_text("[Enter] Open  [Esc] Back",
+                          rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # ── Level 2: Settings fields OR Step list ──
+        elif level == 2:
+            sub_cursor = qd.get("sub_cursor", 0)
+            if sub_cursor == 0:
+                self._draw_quest_settings(
+                    qd, rx, ry, rw, rh, fm, fs, f)
+            elif sub_cursor == 1:
+                self._draw_quest_step_list(
+                    qd, rx, ry, rw, rh, fm, fs, f)
+
+        # ── Level 3: Step field editor ──
+        elif level == 3:
+            self._draw_quest_step_editor(
+                qd, rx, ry, rw, rh, fm, fs, f)
+
+    def _draw_quest_flash(self, qd, rx, ry, rw, rh, f):
+        """Draw save flash for quest editor."""
+        sf = qd.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36,
+                          (100, 255, 100, alpha), f)
+
+    def _quest_wrap_text(self, text, font, max_width):
+        """Word-wrap *text* into lines that fit within *max_width* pixels."""
+        if not text:
+            return [""]
+        words = text.split(" ")
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip() if current else word
+            tw = font.size(test)[0] if hasattr(font, 'size') else len(test) * 9
+            if tw > max_width and current:
+                lines.append(current)
+                current = word
+            else:
+                current = test
+        if current:
+            lines.append(current)
+        return lines or [""]
+
+    def _draw_quest_settings(self, qd, rx, ry, rw, rh, fm, fs, f):
+        """Draw the quest settings field editor with sprite preview
+        and wrapped dialogue text."""
+        fields = qd.get("fields") or []
+        field_cursor = qd.get("field_cursor", 0)
+        field_buffer = qd.get("field_buffer", "")
+        field_scroll = qd.get("field_scroll", 0)
+        sprite_map = qd.get("sprite_map", {})
+        row_h = 38
+
+        self._u3_text("Quest Settings", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+
+        # ── Sprite preview (top-right corner) ──
+        sprite_display_name = ""
+        for fe in fields:
+            if fe.key == "giver_sprite":
+                sprite_display_name = fe.value
+                break
+        sprite_path = sprite_map.get(sprite_display_name, "")
+        preview_size = 64
+        preview_drawn = False
+        if sprite_path:
+            preview = self._load_npc_custom_sprite(sprite_path, preview_size)
+            if preview:
+                px = rx + rw - preview_size - 16
+                py_pos = ry + 8
+                bg_rect = pygame.Rect(px - 4, py_pos - 4,
+                                      preview_size + 8, preview_size + 8)
+                pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
+                pygame.draw.rect(self.screen, (80, 80, 100), bg_rect, 1)
+                self.screen.blit(preview, (px, py_pos))
+                preview_drawn = True
+
+        ly = ry + 44
+        max_bottom = ry + rh - 30   # leave room for hint
+        val_x = rx + 160
+        val_max_w = rw - 160 - 16   # max pixel width for values
+        # Shrink val area when sprite preview occupies top-right
+        val_max_w_top = val_max_w - (preview_size + 24 if preview_drawn else 0)
+        cur_y = ly
+
+        for idx in range(len(fields)):
+            i = field_scroll + idx
+            if i >= len(fields):
+                break
+            if cur_y >= max_bottom:
+                break
+            fe = fields[i]
+            selected = (i == field_cursor)
+
+            # Are we in the top area where the sprite sits?
+            in_sprite_zone = preview_drawn and cur_y < (ry + 8 + preview_size + 8)
+            effective_val_max_w = val_max_w_top if in_sprite_zone else val_max_w
+
+            if fe.field_type == "section":
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 10, cur_y + 10),
+                                 (rx + rw - 10, cur_y + 10), 1)
+                if fe.label:
+                    self._u3_text(fe.label, rx + 14, cur_y + 14,
+                                  (180, 140, 60), fs)
+                cur_y += row_h
+                continue
+
+            # Determine how much vertical space this field needs
+            is_dialogue = (fe.key == "giver_dialogue")
+            if is_dialogue:
+                # Wrap the dialogue text
+                if selected and fe.editable:
+                    disp_text = field_buffer + "_"
+                else:
+                    disp_text = fe.value or ""
+                wrapped = self._quest_wrap_text(
+                    disp_text, fm, effective_val_max_w)
+                field_h = max(row_h, 22 + len(wrapped) * 18)
+            else:
+                field_h = row_h
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, field_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 25))
+                self.screen.blit(bar, (rx + 2, cur_y))
+
+            label_color = self._U3_WHITE if selected else (160, 160, 160)
+            self._u3_text(fe.label, rx + 14, cur_y + 4, label_color, fs)
+
+            if fe.field_type == "choice":
+                arrow_color = (255, 220, 100) if selected else (120, 120, 140)
+                text_color = (255, 220, 100) if selected else (200, 200, 200)
+                self._u3_text("<", val_x, cur_y + 4, arrow_color, fm)
+                disp = fe.value or "(none)"
+                # Truncate if too wide
+                while (len(disp) > 2
+                       and fm.size(disp)[0] > effective_val_max_w - 30):
+                    disp = disp[:-1]
+                self._u3_text(disp, val_x + 14, cur_y + 4, text_color, fm)
+                vw = fm.size(disp)[0]
+                self._u3_text(">", val_x + 18 + vw, cur_y + 4,
+                              arrow_color, fm)
+            elif is_dialogue:
+                # Render wrapped lines
+                val_color = (255, 220, 100) if selected else (
+                    (200, 200, 200) if fe.editable else (120, 120, 140))
+                for li, line in enumerate(wrapped):
+                    self._u3_text(line, val_x, cur_y + 4 + li * 18,
+                                  val_color, fm)
+            elif selected and fe.editable:
+                val_text = field_buffer + "_"
+                # Truncate display if too wide
+                while (len(val_text) > 2
+                       and fm.size(val_text)[0] > effective_val_max_w):
+                    val_text = val_text[1:]
+                self._u3_text(val_text, val_x, cur_y + 4,
+                              (255, 220, 100), fm)
+            else:
+                val_text = fe.value
+                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+                # Truncate display if too wide
+                while (len(val_text) > 2
+                       and fm.size(val_text)[0] > effective_val_max_w):
+                    val_text = val_text[:-1]
+                self._u3_text(val_text, val_x, cur_y + 4, val_color, fm)
+
+            cur_y += field_h
+
+        self._draw_quest_flash(qd, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Navigate  [Lt/Rt] Choice  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_quest_step_list(self, qd, rx, ry, rw, rh, fm, fs, f):
+        """Draw the quest step list."""
+        step_list = qd.get("step_list") or []
+        cursor = qd.get("step_cursor", 0)
+        scroll = qd.get("step_scroll", 0)
+        row_h = 36
+
+        self._u3_text("Quest Steps", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        max_visible = (rh - 80) // row_h
+
+        if not step_list:
+            self._u3_text("No steps defined.",
+                          rx + 24, ly + 10, (140, 140, 140), fm)
+            self._u3_text("[Ctrl+N] to add a step",
+                          rx + 24, ly + 34, (100, 160, 200), fs)
+        else:
+            for vi in range(max_visible):
+                i = scroll + vi
+                if i >= len(step_list):
+                    break
+                step = step_list[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                desc = step.get("description", "Unnamed Step")
+                stype = step.get("step_type", "talk")
+                self._u3_text(f"{prefix}Step {i + 1}: {desc}",
+                              rx + 10, y, color, fm)
+                self._u3_text(f"  type: {stype}",
+                              rx + 10, y + 18, (140, 140, 160), fs)
+
+        self._draw_quest_flash(qd, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] New  [Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _load_monster_tile_preview(self, tile_file, size=64):
+        """Load and cache a monster tile sprite at the given size."""
+        if not tile_file:
+            return None
+        key = ("monster_preview", tile_file, size)
+        if key not in self._unique_tile_sprites:
+            # Check if we already have it at 32px in _monster_tiles
+            base = self._monster_tiles.get(tile_file)
+            if base:
+                self._unique_tile_sprites[key] = (
+                    pygame.transform.scale(base, (size, size)))
+            else:
+                # Try loading via manifest
+                m = self._manifest
+                sprite = None
+                for mname in m.names_in("monsters"):
+                    entry = m.get_entry_by_name("monsters", mname)
+                    if entry and entry["path"].endswith(tile_file):
+                        sprite = m.get_sprite_by_name(
+                            "monsters", mname, size)
+                        break
+                self._unique_tile_sprites[key] = sprite
+        return self._unique_tile_sprites[key]
+
+    def _draw_quest_step_editor(self, qd, rx, ry, rw, rh, fm, fs, f):
+        """Draw the quest step field editor with choice support."""
+        fields = qd.get("step_fields") or []
+        field_cursor = qd.get("step_field_cursor", 0)
+        field_buffer = qd.get("step_field_buffer", "")
+        field_scroll = qd.get("step_field_scroll", 0)
+        monster_tile_map = qd.get("monster_tile_map", {})
+        row_h = 38
+        max_visible = (rh - 70) // row_h
+
+        self._u3_text("Edit Step", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+
+        # ── Monster sprite preview (top-right corner) ──
+        monster_display = ""
+        for fe in fields:
+            if fe.key == "monster":
+                monster_display = fe.value
+                break
+        monster_tile = monster_tile_map.get(monster_display, "")
+        preview_size = 64
+        preview_drawn = False
+        if monster_tile:
+            preview = self._load_monster_tile_preview(
+                monster_tile, preview_size)
+            if preview:
+                px = rx + rw - preview_size - 16
+                py_pos = ry + 8
+                bg_rect = pygame.Rect(px - 4, py_pos - 4,
+                                      preview_size + 8, preview_size + 8)
+                pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
+                pygame.draw.rect(self.screen, (80, 80, 100),
+                                 bg_rect, 1)
+                self.screen.blit(preview, (px, py_pos))
+                preview_drawn = True
+
+        ly = ry + 44
+
+        for vi in range(max_visible):
+            i = field_scroll + vi
+            if i >= len(fields):
+                break
+            fe = fields[i]
+            y = ly + vi * row_h
+            selected = (i == field_cursor)
+
+            if fe.field_type == "section":
+                pygame.draw.line(self.screen, (60, 50, 40),
+                                 (rx + 10, y + 10),
+                                 (rx + rw - 10, y + 10), 1)
+                if fe.label:
+                    self._u3_text(fe.label, rx + 14, y + 14,
+                                  (180, 140, 60), fs)
+                continue
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, row_h - 4), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 25))
+                self.screen.blit(bar, (rx + 2, y))
+
+            label_color = self._U3_WHITE if selected else (160, 160, 160)
+            self._u3_text(fe.label, rx + 14, y + 4, label_color, fs)
+
+            # Shrink value width when near the sprite preview zone
+            val_x = rx + 160
+            max_val_w = rw - 170
+            if preview_drawn and y < ry + 8 + preview_size + 8:
+                max_val_w = rw - 170 - preview_size - 20
+
+            if fe.field_type == "choice":
+                arrow_color = (255, 220, 100) if selected else (120, 120, 140)
+                text_color = (255, 220, 100) if selected else (200, 200, 200)
+                self._u3_text("<", val_x, y + 4, arrow_color, fm)
+                disp = fe.value or "(none)"
+                # Truncate if too wide for available space
+                while (len(disp) > 3
+                       and hasattr(fm, 'size')
+                       and fm.size(disp)[0] > max_val_w - 32):
+                    disp = disp[:-1]
+                self._u3_text(disp, val_x + 14, y + 4, text_color, fm)
+                vw = fm.size(disp)[0] if hasattr(fm, 'size') else len(disp) * 9
+                self._u3_text(">", val_x + 18 + vw, y + 4,
+                              arrow_color, fm)
+            elif selected and fe.editable:
+                val_text = field_buffer + "_"
+                val_color = (255, 220, 100)
+                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+            else:
+                val_text = fe.value
+                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+
+        self._draw_quest_flash(qd, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Up/Dn] Navigate  [Lt/Rt] Choice  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
     def _draw_naming_overlay(self, name_buf, title, fm, f):
         """Draw a centered naming/renaming overlay."""
         ow, oh = 360, 100
@@ -10722,7 +11219,8 @@ class Renderer(CombatEffectRendererMixin):
                            overview_editor_state=None,
                            town_data=None,
                            dungeon_data=None,
-                           building_data=None):
+                           building_data=None,
+                           quest_data=None):
         """Draw the module selection / browser screen.
 
         Parameters
@@ -10985,6 +11483,10 @@ class Renderer(CombatEffectRendererMixin):
                 # Building editor panel
                 self.draw_building_editor_panel(
                     right_x, panel_y, right_w, panel_h, building_data)
+            elif edit_level in (20, 21, 22, 23) and quest_data:
+                # Quest editor panel
+                self.draw_quest_editor_panel(
+                    right_x, panel_y, right_w, panel_h, quest_data)
 
         # ── Template picker overlay ──
         if overview_picking:
@@ -11031,6 +11533,9 @@ class Renderer(CombatEffectRendererMixin):
             hint = ""
         elif edit_mode and edit_level in (14, 15, 16, 17, 18, 19):
             # Building editor has its own hints inside draw_building_editor_panel
+            hint = ""
+        elif edit_mode and edit_level in (20, 21, 22, 23):
+            # Quest editor has its own hints inside draw_quest_editor_panel
             hint = ""
         else:
             hint = ("[UP/DN] Browse  [S] Select  "

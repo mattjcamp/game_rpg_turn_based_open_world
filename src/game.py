@@ -92,6 +92,10 @@ class Game:
         self.key_dungeons = {}
         self.keys_inserted = 0
         self.visited_dungeons = set()
+        # Module quest system — user-created quests from quests.json
+        self.module_quest_states = {}  # {quest_name: {status, step_progress}}
+        self.overworld_quest_npcs = []  # NPC objects placed on the overview map
+        self.quest_spawned_monsters = {}  # {quest_name: [monster_obj, ...]}
         self.dungeon_cache = {}
         self.machine_col = None
         self.machine_row = None
@@ -326,6 +330,38 @@ class Game:
         # Save flash
         self._mod_building_save_flash = 0.0
 
+        # ── Quest Editor (within module) ──
+        self._mod_quest_list = []             # list of quest dicts
+        self._mod_quest_cursor = 0
+        self._mod_quest_scroll = 0
+        # Quest sub-screen: 0=Settings, 1=Quest Steps
+        self._mod_quest_sub_cursor = 0
+        self._mod_quest_sub_items = ["Settings", "Quest Steps"]
+        # Settings fields
+        self._mod_quest_fields = []
+        self._mod_quest_field = 0
+        self._mod_quest_buffer = ""
+        self._mod_quest_field_scroll = 0
+        self._mod_quest_choice_map = {}        # populated by build_settings_fields
+        self._mod_quest_sprite_name_to_file = {}  # display name -> file path
+        self._mod_quest_step_choice_map = {}   # populated by build_step_fields
+        # Step list (within a quest)
+        self._mod_quest_step_list = []
+        self._mod_quest_step_cursor = 0
+        self._mod_quest_step_scroll = 0
+        # Step field editor
+        self._mod_quest_step_fields = []
+        self._mod_quest_step_field = 0
+        self._mod_quest_step_buffer = ""
+        self._mod_quest_step_field_scroll = 0
+        # Naming overlay (shared for quest + step naming)
+        self._mod_quest_naming = False
+        self._mod_quest_name_buf = ""
+        self._mod_quest_naming_is_new = False
+        self._mod_quest_naming_target = ""   # "quest" or "step"
+        # Save flash
+        self._mod_quest_save_flash = 0.0
+
         # Restore last-used module from config (if it still exists)
         saved_mod_path = self._config.get("active_module_path")
         if saved_mod_path and os.path.isdir(saved_mod_path):
@@ -468,6 +504,9 @@ class Game:
         self.town_data = generate_town("Thornwall")  # safe default
         self.town_data_map = {}
         self._gnome_quest_accepted = False
+        self.module_quest_states = {}
+        self.overworld_quest_npcs = []
+        self.quest_spawned_monsters = {}
         self.game_log = []
         self.dungeon_cache = {}  # clear persisted dungeon layouts
 
@@ -655,6 +694,9 @@ class Game:
             else:
                 # Generate all towns from the manifest
                 self._init_module_towns()
+
+        # Inject module quest giver NPCs into towns
+        self._inject_module_quest_npcs()
 
         self._game_started = True
         self.showing_title = False
@@ -1172,6 +1214,335 @@ class Game:
                 seed=seed,
             )
 
+    def _inject_module_quest_npcs(self):
+        """Load quests.json and inject quest-giver NPCs into runtime maps.
+
+        For each quest that has a ``giver_location`` set, creates an NPC
+        of type ``module_quest_giver`` in the matching town.  Also
+        initialises ``module_quest_states`` for quests that haven't been
+        tracked yet.
+        """
+        import json
+        import os
+        from src.town_generator import NPC
+
+        if not self.active_module_path:
+            return
+        p = os.path.join(self.active_module_path, "quests.json")
+        if not os.path.isfile(p):
+            return
+        try:
+            with open(p, "r") as f:
+                quest_list = json.load(f)
+            if not isinstance(quest_list, list):
+                return
+        except (OSError, json.JSONDecodeError):
+            return
+
+        # Store the raw definitions for dialogue / step lookups
+        self._module_quest_defs = quest_list
+        # Overworld quest NPCs (placed on the overview map)
+        if not hasattr(self, "overworld_quest_npcs"):
+            self.overworld_quest_npcs = []
+
+        # Build town lookup by name (for matching giver_location)
+        town_by_name = {}
+        for _tk, td in self.town_data_map.items():
+            town_by_name[getattr(td, "name", "")] = td
+
+        for qdef in quest_list:
+            qname = qdef.get("name", "")
+            if not qname:
+                continue
+            loc = qdef.get("giver_location", "")
+            sprite = qdef.get("giver_sprite", "") or None
+            dialogue_text = qdef.get("giver_dialogue", "")
+            npc_label = qdef.get("giver_npc", "") or qname
+
+            # Initialise quest state if new
+            if qname not in self.module_quest_states:
+                steps = qdef.get("steps", [])
+                self.module_quest_states[qname] = {
+                    "status": "available",  # available → active → completed
+                    "step_progress": [False] * len(steps),
+                }
+
+            # Build dialogue lines (shared by both town and overworld)
+            if dialogue_text:
+                lines = [s.strip() for s in dialogue_text.split("\n")
+                         if s.strip()]
+                if not lines:
+                    lines = [dialogue_text]
+            else:
+                lines = [f"I have a quest for you: {qname}"]
+
+            # Parse location to find the target TownData or overworld
+            target_td = None
+            is_overworld = False
+            if loc.startswith("town:"):
+                town_name = loc[5:]
+                target_td = town_by_name.get(town_name)
+            elif loc.startswith("building:") or loc.startswith("space:"):
+                # For building/space locations we'd need interior map
+                # injection — skip for now, only towns supported
+                pass
+            elif loc.startswith("dungeon:"):
+                # Dungeon interior — skip for now
+                pass
+            elif loc == "Overview Map" or loc == "overview":
+                is_overworld = True
+
+            if is_overworld:
+                # ── Place NPC on the overworld map ──
+                already = any(
+                    getattr(n, "_module_quest_name", "") == qname
+                    for n in self.overworld_quest_npcs
+                )
+                if already:
+                    continue
+                # Find a walkable grass tile near the party start
+                from src.settings import TILE_GRASS, TILE_PATH
+                tmap = self.tile_map
+                party_col = self.party.col
+                party_row = self.party.row
+                occupied = {(n.col, n.row)
+                            for n in self.overworld_quest_npcs}
+                occupied.add((party_col, party_row))
+                placed = None
+                _r = __import__("random").Random(
+                    hash(qname) & 0xFFFFFFFF)
+                for ring in range(3, 20):
+                    candidates = []
+                    for dc in range(-ring, ring + 1):
+                        for dr in range(-ring, ring + 1):
+                            if max(abs(dc), abs(dr)) != ring:
+                                continue
+                            c, r = party_col + dc, party_row + dr
+                            if (0 <= c < tmap.width
+                                    and 0 <= r < tmap.height
+                                    and tmap.get_tile(c, r) in (
+                                        TILE_GRASS, TILE_PATH)
+                                    and (c, r) not in occupied):
+                                candidates.append((c, r))
+                    if candidates:
+                        placed = _r.choice(candidates)
+                        break
+                if placed is None:
+                    placed = (party_col + 4, party_row + 4)
+                col, row = placed
+                npc = NPC(
+                    col=col, row=row,
+                    name=npc_label,
+                    dialogue=[
+                        "Thank you for your help!",
+                        "The quest awaits...",
+                    ],
+                    npc_type="module_quest_giver",
+                    quest_dialogue=lines,
+                    quest_choices=["Accept quest", "Not right now"],
+                    sprite=sprite,
+                )
+                npc._module_quest_name = qname
+                self.overworld_quest_npcs.append(npc)
+                continue
+
+            if target_td is None:
+                continue
+
+            # ── Place NPC inside a town ──
+            # Check if this NPC was already injected (avoid duplicates on
+            # repeated calls, e.g. after loading a save)
+            already = any(
+                getattr(n, "_module_quest_name", "") == qname
+                for n in target_td.npcs
+            )
+            if already:
+                continue
+
+            # Find an open floor tile to place the NPC
+            tmap = target_td.tile_map
+            from src.settings import TILE_FLOOR
+            occupied = {(n.col, n.row) for n in target_td.npcs}
+            occupied.add((target_td.entry_col, target_td.entry_row))
+            cx, cy = tmap.width // 2, tmap.height // 2
+            placed = None
+            for ring in range(0, 12):
+                candidates = []
+                for dc in range(-ring, ring + 1):
+                    for dr in range(-ring, ring + 1):
+                        if ring > 0 and max(abs(dc), abs(dr)) != ring:
+                            continue
+                        c, r = cx + dc, cy + dr
+                        if (0 <= c < tmap.width and 0 <= r < tmap.height
+                                and tmap.get_tile(c, r) == TILE_FLOOR
+                                and (c, r) not in occupied):
+                            candidates.append((c, r))
+                if candidates:
+                    import random as _rng
+                    _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
+                    placed = _r.choice(candidates)
+                    break
+            if placed is None:
+                placed = (cx, cy)
+
+            col, row = placed
+
+            npc = NPC(
+                col=col, row=row,
+                name=npc_label,
+                dialogue=[
+                    "Thank you for your help!",
+                    "The quest awaits...",
+                ],
+                npc_type="module_quest_giver",
+                quest_dialogue=lines,
+                quest_choices=["Accept quest", "Not right now"],
+                sprite=sprite,
+            )
+            npc._module_quest_name = qname
+            npc.wander_range = 0  # stationary quest giver
+            target_td.npcs.append(npc)
+
+    # ── Quest monster spawning ─────────────────────────────────────
+
+    def _spawn_quest_monsters(self, quest_name):
+        """Spawn monsters for 'kill' type quest steps when quest is accepted.
+
+        For each step with step_type == 'kill' and a valid monster + spawn
+        location, creates Monster objects on the overworld or in the
+        specified town.  Stores references in
+        ``self.quest_spawned_monsters[quest_name]`` so they can be tracked
+        for kill completion.
+        """
+        import random as _rng
+        from src.monster import create_monster, MONSTERS
+        from src.settings import TILE_GRASS, TILE_PATH, TILE_FLOOR
+
+        if not hasattr(self, "quest_spawned_monsters"):
+            self.quest_spawned_monsters = {}  # {quest_name: [monster_obj, ...]}
+
+        quest_defs = getattr(self, "_module_quest_defs", [])
+        qdef = None
+        for q in quest_defs:
+            if q.get("name") == quest_name:
+                qdef = q
+                break
+        if not qdef:
+            return
+
+        steps = qdef.get("steps", [])
+        spawned = []
+
+        for step_idx, step in enumerate(steps):
+            if step.get("step_type") != "kill":
+                continue
+            monster_display = step.get("monster", "")
+            if not monster_display or monster_display == "(none)":
+                continue
+            spawn_loc = step.get("spawn_location", "")
+            if not spawn_loc:
+                # Default to overview map if no location set
+                spawn_loc = "overview"
+
+            # Convert display name (e.g. "Fire Wolf") back to MONSTERS key
+            monster_key = monster_display.lower().replace(" ", "_")
+            if monster_key not in MONSTERS:
+                # Try exact match
+                for k in MONSTERS:
+                    if k.replace("_", " ").title() == monster_display:
+                        monster_key = k
+                        break
+            if monster_key not in MONSTERS:
+                continue
+
+            target_count = max(1, step.get("target_count", 1))
+
+            if spawn_loc in ("overview", "Overview Map"):
+                self._spawn_quest_monsters_overworld(
+                    quest_name, step_idx, monster_key,
+                    target_count, spawned)
+            elif spawn_loc.startswith("town:"):
+                town_name = spawn_loc[5:]
+                self._spawn_quest_monsters_town(
+                    quest_name, step_idx, monster_key,
+                    target_count, town_name, spawned)
+
+        self.quest_spawned_monsters[quest_name] = spawned
+
+    def _spawn_quest_monsters_overworld(self, quest_name, step_idx,
+                                         monster_key, count, spawned):
+        """Place quest monsters on the overworld near the party."""
+        import random as _rng
+        from src.monster import create_monster
+        from src.settings import TILE_GRASS, TILE_PATH
+
+        tmap = self.tile_map
+        party = self.party
+        ow_state = self.states.get("overworld")
+        if not ow_state:
+            return
+
+        occupied = {(m.col, m.row) for m in ow_state.overworld_monsters}
+        occupied.add((party.col, party.row))
+
+        rng = _rng.Random(hash((quest_name, step_idx)) & 0xFFFFFFFF)
+
+        for i in range(count):
+            mon = create_monster(monster_key)
+            # Tag monster for quest tracking
+            mon._quest_name = quest_name
+            mon._quest_step_idx = step_idx
+
+            # Find a walkable tile 5-15 tiles from party
+            placed = False
+            for ring in range(5, 25):
+                candidates = []
+                for dc in range(-ring, ring + 1):
+                    for dr in range(-ring, ring + 1):
+                        if max(abs(dc), abs(dr)) != ring:
+                            continue
+                        c, r = party.col + dc, party.row + dr
+                        if (0 <= c < tmap.width
+                                and 0 <= r < tmap.height
+                                and tmap.get_tile(c, r) in (
+                                    TILE_GRASS, TILE_PATH)
+                                and (c, r) not in occupied):
+                            candidates.append((c, r))
+                if candidates:
+                    col, row = rng.choice(candidates)
+                    mon.col = col
+                    mon.row = row
+                    # Set encounter template so combat works
+                    mon.encounter_template = {
+                        "name": f"Quest: {mon.name}",
+                        "monster_names": [monster_key],
+                        "monster_party_tile": monster_key,
+                    }
+                    ow_state.overworld_monsters.append(mon)
+                    occupied.add((col, row))
+                    spawned.append(mon)
+                    placed = True
+                    break
+            if not placed:
+                # Fallback: place near party
+                mon.col = party.col + 5 + i
+                mon.row = party.row + 5
+                mon.encounter_template = {
+                    "name": f"Quest: {mon.name}",
+                    "monster_names": [monster_key],
+                    "monster_party_tile": monster_key,
+                }
+                ow_state.overworld_monsters.append(mon)
+                spawned.append(mon)
+
+    def _spawn_quest_monsters_town(self, quest_name, step_idx,
+                                    monster_key, count, town_name,
+                                    spawned):
+        """Place quest monsters in a specific town."""
+        # Town monster spawning not yet implemented — overworld only
+        # for now.  Could be extended to place monsters in town maps.
+        pass
+
     def _build_town_from_layout(self, layout_name, town_name,
                                  town_style="medieval"):
         """Build a TownData from a custom layout in town_templates.json.
@@ -1578,6 +1949,33 @@ class Game:
                          "done": all_done},
                     ],
                 })
+
+        # ── Module quests (user-created via the quest editor) ──
+        for qdef in getattr(self, "_module_quest_defs", []):
+            qname = qdef.get("name", "")
+            if not qname:
+                continue
+            mq_state = self.module_quest_states.get(qname, {})
+            status = mq_state.get("status", "available")
+            if status == "available":
+                continue  # don't show unaccepted quests
+            step_progress = mq_state.get("step_progress", [])
+            steps = []
+            for i, sdef in enumerate(qdef.get("steps", [])):
+                done = step_progress[i] if i < len(step_progress) else False
+                desc = sdef.get("description", f"Step {i + 1}")
+                stype = sdef.get("step_type", "")
+                if stype:
+                    desc = f"[{stype.title()}] {desc}"
+                steps.append({"description": desc, "done": done})
+            if not steps:
+                steps = [{"description": qdef.get("description", qname),
+                           "done": status == "completed"}]
+            quests.append({
+                "name": qname,
+                "status": status,
+                "steps": steps,
+            })
 
         if not quests:
             quests.append({
@@ -2309,6 +2707,12 @@ class Game:
                 "subtitle": "",
                 "_buildings": True,
             },
+            {
+                "label": "Quests",
+                "icon": "Q",
+                "subtitle": "",
+                "_quests": True,
+            },
         ]
 
         self.module_edit_sections = sections
@@ -2412,6 +2816,11 @@ class Game:
             self._handle_building_edit_input(event)
             return
 
+        # ── Levels 20-23: Quest editor ──
+        if self.module_edit_level in (20, 21, 22, 23):
+            self._handle_quest_edit_input(event)
+            return
+
         # ── Level 1: field editor within a section ──
         if event.key == pygame.K_ESCAPE:
             if self._module_dirty:
@@ -2490,6 +2899,11 @@ class Game:
         # ── Buildings section: special handling ──
         if sec.get("_buildings"):
             self._enter_buildings_section()
+            return
+
+        # ── Quests section: special handling ──
+        if sec.get("_quests"):
+            self._enter_quests_section()
             return
 
         if not sec.get("fields"):
@@ -5779,6 +6193,731 @@ class Game:
         elif event.key and event.unicode and event.unicode.isprintable():
             self._mod_building_encounter_buffer += event.unicode
 
+    # ── Quest Editor ─────────────────────────────────────────────
+
+    def _enter_quests_section(self):
+        """Enter the Quests section from the module section browser.
+
+        Also pre-loads towns, dungeons, and buildings so the location
+        picker can reference all available maps.
+        """
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        self._load_module_quests(mod["path"])
+        # Pre-load other module data for location picker
+        self._load_module_towns(mod["path"])
+        self._load_module_dungeons(mod["path"])
+        self._load_module_buildings(mod["path"])
+        # Reset cached monster names so they reload fresh
+        self._mod_quest_monster_names = None
+        # Update section subtitle
+        for sec in self.module_edit_sections:
+            if sec.get("_quests"):
+                n = len(self._mod_quest_list)
+                sec["subtitle"] = f"{n} quest{'s' if n != 1 else ''}"
+                break
+        self.module_edit_level = 20
+
+    def _load_module_quests(self, mod_path):
+        """Load quests.json from a module directory."""
+        import json, os
+        self._mod_quest_list = []
+        self._mod_quest_cursor = 0
+        self._mod_quest_scroll = 0
+        p = os.path.join(mod_path, "quests.json")
+        if not os.path.isfile(p):
+            return
+        try:
+            with open(p, "r") as f:
+                data = json.load(f)
+            self._mod_quest_list = data if isinstance(data, list) else []
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def _save_module_quests(self):
+        """Persist the current quest list to the active module."""
+        import json, os
+        if not self.module_list:
+            return
+        mod = self.module_list[self.module_cursor]
+        p = os.path.join(mod["path"], "quests.json")
+        try:
+            with open(p, "w") as f:
+                json.dump(self._mod_quest_list, f, indent=2)
+        except OSError:
+            pass
+
+    def _mod_quest_get_current(self):
+        """Return the currently selected quest dict, or None."""
+        if 0 <= self._mod_quest_cursor < len(self._mod_quest_list):
+            return self._mod_quest_list[self._mod_quest_cursor]
+        return None
+
+    def _mod_quest_build_location_options(self):
+        """Build the list of location options from the current module.
+
+        Includes overview map, all towns (and their interiors),
+        all dungeons, and all buildings (and their spaces).
+        Returns (options_list, option_to_value_dict).
+        """
+        options = ["(none)"]
+        option_to_value = {"(none)": ""}
+
+        # Overview map
+        options.append("Overview Map")
+        option_to_value["Overview Map"] = "overview"
+
+        # Towns and their interiors
+        for town in self._mod_town_list:
+            name = town.get("name", "Unnamed")
+            label = f"Town: {name}"
+            options.append(label)
+            option_to_value[label] = f"town:{name}"
+
+            for enc in town.get("interiors", []):
+                enc_name = enc.get("name", "Unnamed")
+                int_label = f"  Interior: {enc_name} ({name})"
+                options.append(int_label)
+                option_to_value[int_label] = f"interior:{name}/{enc_name}"
+
+        # Dungeons
+        for dungeon in self._mod_dungeon_list:
+            name = dungeon.get("name", "Unnamed")
+            label = f"Dungeon: {name}"
+            options.append(label)
+            option_to_value[label] = f"dungeon:{name}"
+
+        # Buildings and their spaces
+        for building in self._mod_building_list:
+            name = building.get("name", "Unnamed")
+            label = f"Building: {name}"
+            options.append(label)
+            option_to_value[label] = f"building:{name}"
+
+            for space in building.get("spaces", []):
+                space_name = space.get("name", "Unnamed")
+                sp_label = f"  Space: {space_name} ({name})"
+                options.append(sp_label)
+                option_to_value[sp_label] = f"space:{name}/{space_name}"
+
+        return options, option_to_value
+
+    def _mod_quest_location_display(self, stored_value):
+        """Convert a stored location value back to a display string."""
+        if not stored_value:
+            return "(none)"
+        if stored_value == "overview":
+            return "Overview Map"
+        if stored_value.startswith("town:"):
+            return f"Town: {stored_value[5:]}"
+        if stored_value.startswith("interior:"):
+            parts = stored_value[9:]
+            if "/" in parts:
+                town_name, enc_name = parts.split("/", 1)
+                return f"  Interior: {enc_name} ({town_name})"
+            return f"  Interior: {parts}"
+        if stored_value.startswith("dungeon:"):
+            return f"Dungeon: {stored_value[8:]}"
+        if stored_value.startswith("building:"):
+            return f"Building: {stored_value[9:]}"
+        if stored_value.startswith("space:"):
+            parts = stored_value[6:]
+            if "/" in parts:
+                bldg_name, space_name = parts.split("/", 1)
+                return f"  Space: {space_name} ({bldg_name})"
+            return f"  Space: {parts}"
+        return stored_value
+
+    def _mod_quest_build_settings_fields(self):
+        """Build FieldEntry list for the current quest's settings."""
+        from src.editor_types import FieldEntry
+        quest = self._mod_quest_get_current()
+        if not quest:
+            self._mod_quest_fields = []
+            return
+
+        # ── Sprite choices ──
+        if not hasattr(self, "_cc_tiles") or not self._cc_tiles:
+            self._cc_load_tiles()
+        sprite_names = [t["name"] for t in self._cc_tiles]
+        sprite_name_to_file = {t["name"]: t["file"] for t in self._cc_tiles}
+        sprite_file_to_name = {t["file"]: t["name"] for t in self._cc_tiles}
+        current_sprite_file = quest.get("giver_sprite", "")
+        current_sprite_name = sprite_file_to_name.get(
+            current_sprite_file,
+            sprite_names[0] if sprite_names else "Default")
+        self._mod_quest_sprite_name_to_file = sprite_name_to_file
+
+        # ── Location choices ──
+        loc_options, loc_map = self._mod_quest_build_location_options()
+        self._mod_quest_location_map = loc_map
+        stored_loc = quest.get("giver_location", "")
+        current_loc_display = self._mod_quest_location_display(stored_loc)
+        # Ensure the current display value is in the options list
+        if current_loc_display not in loc_options:
+            loc_options.append(current_loc_display)
+
+        self._mod_quest_fields = [
+            FieldEntry("Name", "name", quest.get("name", ""), "text", True),
+            FieldEntry("Description", "description",
+                       quest.get("description", ""), "text", True),
+            FieldEntry("Quest Giver", "", "", "section", False),
+            FieldEntry("Giver NPC", "giver_npc",
+                       quest.get("giver_npc", ""), "text", True),
+            FieldEntry("Giver Sprite", "giver_sprite",
+                       current_sprite_name, "choice", True),
+            FieldEntry("Location", "giver_location",
+                       current_loc_display, "choice", True),
+            FieldEntry("Dialogue", "giver_dialogue",
+                       quest.get("giver_dialogue", ""), "text", True),
+            FieldEntry("Rewards", "", "", "section", False),
+            FieldEntry("Reward XP", "reward_xp",
+                       str(quest.get("reward_xp", 0)), "int", True),
+            FieldEntry("Reward Gold", "reward_gold",
+                       str(quest.get("reward_gold", 0)), "int", True),
+        ]
+
+        self._mod_quest_choice_map = {
+            "giver_sprite": sprite_names,
+            "giver_location": loc_options,
+        }
+
+        fe = self.features_editor
+        self._mod_quest_field = fe._next_editable_generic(
+            self._mod_quest_fields, 0)
+        self._mod_quest_buffer = self._mod_quest_fields[
+            self._mod_quest_field].value
+        self._mod_quest_field_scroll = 0
+
+    def _mod_quest_save_settings_fields(self):
+        """Write settings fields back into the current quest dict."""
+        quest = self._mod_quest_get_current()
+        if not quest:
+            return
+        for fe_entry in self._mod_quest_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            # Convert sprite display name back to file path
+            if key == "giver_sprite":
+                name_to_file = getattr(
+                    self, "_mod_quest_sprite_name_to_file", {})
+                val = name_to_file.get(val, val)
+            # Convert location display name back to stored value
+            if key == "giver_location":
+                loc_map = getattr(self, "_mod_quest_location_map", {})
+                val = loc_map.get(val, val)
+            quest[key] = val
+
+    def _mod_quest_load_steps(self):
+        """Load step list from the current quest."""
+        quest = self._mod_quest_get_current()
+        if not quest:
+            self._mod_quest_step_list = []
+            return
+        self._mod_quest_step_list = list(quest.get("steps", []))
+        self._mod_quest_step_cursor = 0
+        self._mod_quest_step_scroll = 0
+
+    def _mod_quest_save_steps(self):
+        """Write step list back into the current quest dict."""
+        quest = self._mod_quest_get_current()
+        if not quest:
+            return
+        quest["steps"] = list(self._mod_quest_step_list)
+
+    _QUEST_STEP_TYPES = [
+        "talk", "kill", "fetch", "escort", "explore",
+        "bounty", "deliver", "defend", "collect", "use_item",
+    ]
+
+    def _mod_quest_load_monster_names(self):
+        """Load monster names from the module's monsters.json for the
+        quest step editor's monster picker."""
+        import json, os
+        if getattr(self, "_mod_quest_monster_names", None) is not None:
+            return
+        self._mod_quest_monster_names = ["(none)"]
+        self._mod_quest_monster_tiles = {}  # name -> tile filename
+        mod_path = None
+        if self.module_list:
+            mod = self.module_list[self.module_cursor]
+            mod_path = mod.get("path")
+        # Try module monsters.json first, then default
+        paths_to_try = []
+        if mod_path:
+            paths_to_try.append(
+                os.path.join(mod_path, "monsters.json"))
+        paths_to_try.append(os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "monsters.json"))
+        for p in paths_to_try:
+            if not os.path.isfile(p):
+                continue
+            try:
+                with open(p, "r") as f:
+                    data = json.load(f)
+                for name, entry in sorted(
+                        data.get("monsters", {}).items()):
+                    display = name.replace("_", " ").title()
+                    self._mod_quest_monster_names.append(display)
+                    tile = entry.get("tile", "")
+                    if tile:
+                        self._mod_quest_monster_tiles[display] = tile
+                break  # use first found
+            except (OSError, json.JSONDecodeError):
+                continue
+
+    def _mod_quest_build_step_fields(self):
+        """Build FieldEntry list for the selected quest step."""
+        from src.editor_types import FieldEntry
+        if not (0 <= self._mod_quest_step_cursor < len(
+                self._mod_quest_step_list)):
+            self._mod_quest_step_fields = []
+            return
+        step = self._mod_quest_step_list[self._mod_quest_step_cursor]
+
+        # Ensure monster names are loaded
+        self._mod_quest_load_monster_names()
+
+        # Resolve monster display name from stored value
+        current_monster = step.get("monster", "")
+        if not current_monster:
+            current_monster = "(none)"
+
+        # Resolve spawn location display
+        current_spawn_loc = step.get("spawn_location", "")
+        spawn_loc_display = self._mod_quest_location_display(
+            current_spawn_loc)
+
+        # Build location options for spawn location picker
+        loc_options, self._mod_quest_step_loc_map = (
+            self._mod_quest_build_location_options())
+
+        self._mod_quest_step_fields = [
+            FieldEntry("Description", "description",
+                       step.get("description", ""), "text", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Type", "step_type",
+                       step.get("step_type", "talk"), "choice", True),
+            FieldEntry("Monster", "monster",
+                       current_monster, "choice", True),
+            FieldEntry("Spawn Location", "spawn_location",
+                       spawn_loc_display, "choice", True),
+            FieldEntry("Target", "target",
+                       step.get("target", ""), "text", True),
+            FieldEntry("Target Count", "target_count",
+                       str(step.get("target_count", 1)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Optional", "optional",
+                       step.get("optional", "no"), "choice", True),
+        ]
+        self._mod_quest_step_choice_map = {
+            "step_type": self._QUEST_STEP_TYPES,
+            "monster": getattr(self, "_mod_quest_monster_names",
+                               ["(none)"]),
+            "spawn_location": loc_options,
+            "optional": ["no", "yes"],
+        }
+        fe = self.features_editor
+        self._mod_quest_step_field = fe._next_editable_generic(
+            self._mod_quest_step_fields, 0)
+        self._mod_quest_step_buffer = self._mod_quest_step_fields[
+            self._mod_quest_step_field].value
+        self._mod_quest_step_field_scroll = 0
+
+    def _mod_quest_save_step_fields(self):
+        """Write step fields back into the step dict."""
+        if not (0 <= self._mod_quest_step_cursor < len(
+                self._mod_quest_step_list)):
+            return
+        step = self._mod_quest_step_list[self._mod_quest_step_cursor]
+        loc_map = getattr(self, "_mod_quest_step_loc_map", {})
+        for fe_entry in self._mod_quest_step_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            # Store "(none)" as empty string for monster field
+            if key == "monster" and val == "(none)":
+                val = ""
+            # Convert spawn location display name to stored value
+            if key == "spawn_location":
+                val = loc_map.get(val, "")
+            step[key] = val
+
+    def _mod_quest_add_new(self, name):
+        """Add a new blank quest to the module."""
+        new_quest = {
+            "name": name,
+            "description": "",
+            "giver_npc": "",
+            "giver_sprite": "",
+            "giver_location": "",
+            "giver_dialogue": "",
+            "reward_xp": 0,
+            "reward_gold": 0,
+            "steps": [],
+        }
+        self._mod_quest_list.append(new_quest)
+        self._mod_quest_cursor = len(self._mod_quest_list) - 1
+        self._save_module_quests()
+
+    def _mod_quest_add_step(self):
+        """Add a new default step to the current quest."""
+        new_step = {
+            "description": "New Step",
+            "step_type": "talk",
+            "monster": "",
+            "spawn_location": "",
+            "target": "",
+            "target_count": 1,
+            "optional": "no",
+        }
+        self._mod_quest_step_list.append(new_step)
+        self._mod_quest_step_cursor = len(self._mod_quest_step_list) - 1
+        self._mod_quest_save_steps()
+
+    def _mod_quest_delete_step(self):
+        """Delete the currently selected step."""
+        n = len(self._mod_quest_step_list)
+        if n == 0:
+            return
+        self._mod_quest_step_list.pop(self._mod_quest_step_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_quest_step_cursor = 0
+        elif self._mod_quest_step_cursor >= n:
+            self._mod_quest_step_cursor = n - 1
+        self._mod_quest_save_steps()
+
+    # ── Quest input handlers ──
+
+    def _handle_quest_edit_input(self, event):
+        """Dispatch quest editor input based on module_edit_level.
+
+        Levels:
+        20 = quest list browser
+        21 = sub-screen selector (Settings/Quest Steps)
+        22 = settings fields OR step list
+        23 = step field editor
+        """
+        import pygame
+
+        if self.module_edit_level == 23:
+            self._handle_mod_quest_step_field_input(event)
+            return
+        if self.module_edit_level == 22:
+            if self._mod_quest_sub_cursor == 0:
+                self._handle_mod_quest_settings_field_input(event)
+            elif self._mod_quest_sub_cursor == 1:
+                self._handle_mod_quest_step_list_input(event)
+            return
+        if self.module_edit_level == 21:
+            self._handle_mod_quest_sub_input(event)
+            return
+
+        # ── Level 20: Quest list ──
+        if self._mod_quest_naming:
+            self._handle_mod_quest_naming_input(event)
+            return
+
+        quests = self._mod_quest_list
+        n = len(quests)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._save_module_quests()
+            self.module_edit_level = 0
+            return
+        if self._is_new_shortcut(event):
+            self._mod_quest_naming = True
+            self._mod_quest_naming_is_new = True
+            self._mod_quest_naming_target = "quest"
+            self._mod_quest_name_buf = ""
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            quests.pop(self._mod_quest_cursor)
+            n -= 1
+            if n == 0:
+                self._mod_quest_cursor = 0
+            elif self._mod_quest_cursor >= n:
+                self._mod_quest_cursor = n - 1
+            self._save_module_quests()
+            return
+        if self._is_save_shortcut(event):
+            self._save_module_quests()
+            self._mod_quest_save_flash = 1.5
+            return
+        if event.key == pygame.K_F2 and n > 0:
+            quest = self._mod_quest_get_current()
+            if quest:
+                self._mod_quest_naming = True
+                self._mod_quest_naming_is_new = False
+                self._mod_quest_naming_target = "quest"
+                self._mod_quest_name_buf = quest.get("name", "")
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_quest_cursor = (self._mod_quest_cursor - 1) % n
+            self._mod_quest_scroll = fe._adjust_scroll_generic(
+                self._mod_quest_cursor, self._mod_quest_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_quest_cursor = (self._mod_quest_cursor + 1) % n
+            self._mod_quest_scroll = fe._adjust_scroll_generic(
+                self._mod_quest_cursor, self._mod_quest_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_quest_sub_cursor = 0
+            self.module_edit_level = 21
+
+    def _handle_mod_quest_naming_input(self, event):
+        """Handle text input while naming/renaming a quest."""
+        import pygame
+        if event.key == pygame.K_ESCAPE:
+            self._mod_quest_naming = False
+            return
+        if event.key == pygame.K_RETURN:
+            name = self._mod_quest_name_buf.strip()
+            if name:
+                if self._mod_quest_naming_is_new:
+                    self._mod_quest_add_new(name)
+                else:
+                    quest = self._mod_quest_get_current()
+                    if quest:
+                        quest["name"] = name
+                        self._save_module_quests()
+            self._mod_quest_naming = False
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self._mod_quest_name_buf = self._mod_quest_name_buf[:-1]
+            return
+        if event.unicode and event.unicode.isprintable():
+            self._mod_quest_name_buf += event.unicode
+
+    def _handle_mod_quest_sub_input(self, event):
+        """Handle input on the sub-screen selector (level 21)."""
+        import pygame
+        n = len(self._mod_quest_sub_items)
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self.module_edit_level = 20
+            return
+        if event.key == pygame.K_UP:
+            self._mod_quest_sub_cursor = (self._mod_quest_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_quest_sub_cursor = (self._mod_quest_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_quest_sub_cursor == 0:
+                self._mod_quest_build_settings_fields()
+                self.module_edit_level = 22
+            elif self._mod_quest_sub_cursor == 1:
+                self._mod_quest_load_steps()
+                self.module_edit_level = 22
+
+    def _mod_quest_cycle_choice(self, direction):
+        """Cycle the current quest choice field left (-1) or right (+1)."""
+        field = self._mod_quest_fields[self._mod_quest_field]
+        options = self._mod_quest_choice_map.get(field.key, [])
+        if not options:
+            return
+        try:
+            idx = options.index(field.value)
+        except ValueError:
+            idx = 0
+        idx = (idx + direction) % len(options)
+        field.value = options[idx]
+        self._mod_quest_buffer = field.value
+
+    def _handle_mod_quest_settings_field_input(self, event):
+        """Handle input for quest settings field editing (level 22)."""
+        import pygame
+        fields = self._mod_quest_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 21
+            return
+
+        current_field = fields[self._mod_quest_field]
+
+        if self._is_save_shortcut(event):
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_buffer
+            self._mod_quest_save_settings_fields()
+            self._save_module_quests()
+            self._mod_quest_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_buffer
+            self._mod_quest_save_settings_fields()
+            self.module_edit_level = 21
+            return
+
+        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            if current_field.field_type == "choice":
+                direction = -1 if event.key == pygame.K_LEFT else 1
+                self._mod_quest_cycle_choice(direction)
+                return
+
+        if event.key == pygame.K_UP:
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_buffer
+            self._mod_quest_field = fe._next_editable_generic(
+                fields, (self._mod_quest_field - 1) % n)
+            nf = fields[self._mod_quest_field]
+            self._mod_quest_buffer = nf.value if nf.field_type != "choice" else ""
+            self._mod_quest_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_quest_field, self._mod_quest_field_scroll)
+        elif event.key == pygame.K_DOWN:
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_buffer
+            self._mod_quest_field = fe._next_editable_generic(
+                fields, (self._mod_quest_field + 1) % n)
+            nf = fields[self._mod_quest_field]
+            self._mod_quest_buffer = nf.value if nf.field_type != "choice" else ""
+            self._mod_quest_field_scroll = fe._adjust_field_scroll_generic(
+                self._mod_quest_field, self._mod_quest_field_scroll)
+        elif current_field.field_type == "choice":
+            # Don't allow typing on choice fields
+            pass
+        elif event.key == pygame.K_BACKSPACE:
+            self._mod_quest_buffer = self._mod_quest_buffer[:-1]
+        elif event.unicode and event.unicode.isprintable():
+            self._mod_quest_buffer += event.unicode
+
+    def _handle_mod_quest_step_list_input(self, event):
+        """Handle input for the quest step list (level 22)."""
+        import pygame
+        n = len(self._mod_quest_step_list)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._mod_quest_save_steps()
+            self.module_edit_level = 21
+            return
+        if self._is_new_shortcut(event):
+            self._mod_quest_add_step()
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_quest_delete_step()
+            return
+        if self._is_save_shortcut(event):
+            self._mod_quest_save_steps()
+            self._save_module_quests()
+            self._mod_quest_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_quest_step_cursor = (
+                self._mod_quest_step_cursor - 1) % n
+            self._mod_quest_step_scroll = fe._adjust_scroll_generic(
+                self._mod_quest_step_cursor, self._mod_quest_step_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_quest_step_cursor = (
+                self._mod_quest_step_cursor + 1) % n
+            self._mod_quest_step_scroll = fe._adjust_scroll_generic(
+                self._mod_quest_step_cursor, self._mod_quest_step_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_quest_build_step_fields()
+            self.module_edit_level = 23
+
+    def _mod_quest_step_cycle_choice(self, direction):
+        """Cycle the current step choice field left (-1) or right (+1)."""
+        field = self._mod_quest_step_fields[self._mod_quest_step_field]
+        options = self._mod_quest_step_choice_map.get(field.key, [])
+        if not options:
+            return
+        try:
+            idx = options.index(field.value)
+        except ValueError:
+            idx = 0
+        idx = (idx + direction) % len(options)
+        field.value = options[idx]
+        self._mod_quest_step_buffer = field.value
+
+    def _handle_mod_quest_step_field_input(self, event):
+        """Handle input for step field editing (level 23)."""
+        import pygame
+        fields = self._mod_quest_step_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 22
+            return
+
+        current_field = fields[self._mod_quest_step_field]
+
+        if self._is_save_shortcut(event):
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_step_buffer
+            self._mod_quest_save_step_fields()
+            self._mod_quest_save_steps()
+            self._save_module_quests()
+            self._mod_quest_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_step_buffer
+            self._mod_quest_save_step_fields()
+            self._mod_quest_save_steps()
+            self.module_edit_level = 22
+            return
+
+        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            if current_field.field_type == "choice":
+                direction = -1 if event.key == pygame.K_LEFT else 1
+                self._mod_quest_step_cycle_choice(direction)
+                return
+
+        if event.key == pygame.K_UP:
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_step_buffer
+            self._mod_quest_step_field = fe._next_editable_generic(
+                fields, (self._mod_quest_step_field - 1) % n)
+            nf = fields[self._mod_quest_step_field]
+            self._mod_quest_step_buffer = (
+                nf.value if nf.field_type != "choice" else "")
+            self._mod_quest_step_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_quest_step_field,
+                    self._mod_quest_step_field_scroll))
+        elif event.key == pygame.K_DOWN:
+            if current_field.editable and current_field.field_type != "choice":
+                current_field.value = self._mod_quest_step_buffer
+            self._mod_quest_step_field = fe._next_editable_generic(
+                fields, (self._mod_quest_step_field + 1) % n)
+            nf = fields[self._mod_quest_step_field]
+            self._mod_quest_step_buffer = (
+                nf.value if nf.field_type != "choice" else "")
+            self._mod_quest_step_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_quest_step_field,
+                    self._mod_quest_step_field_scroll))
+        elif current_field.field_type == "choice":
+            # Don't allow typing on choice fields
+            pass
+        elif event.key == pygame.K_BACKSPACE:
+            self._mod_quest_step_buffer = (
+                self._mod_quest_step_buffer[:-1])
+        elif event.key and event.unicode and event.unicode.isprintable():
+            self._mod_quest_step_buffer += event.unicode
+
     # ── Module / settings helpers ────────────────────────────────
 
     def _set_active_module(self, path, name, version):
@@ -6179,6 +7318,11 @@ class Game:
                     self._mod_building_save_flash -= dt
                     if self._mod_building_save_flash < 0:
                         self._mod_building_save_flash = 0
+                # Tick quest save flash
+                if self._mod_quest_save_flash > 0:
+                    self._mod_quest_save_flash -= dt
+                    if self._mod_quest_save_flash < 0:
+                        self._mod_quest_save_flash = 0
             elif self.showing_game_over:
                 for event in events:
                     self._handle_game_over_input(event)
@@ -6406,6 +7550,32 @@ class Game:
                         "naming_target": self._mod_building_naming_target,
                         "save_flash": self._mod_building_save_flash,
                         "level": max(0, self.module_edit_level - 14),
+                    },
+                    quest_data={
+                        "quests": self._mod_quest_list,
+                        "cursor": self._mod_quest_cursor,
+                        "scroll": self._mod_quest_scroll,
+                        "sub_cursor": self._mod_quest_sub_cursor,
+                        "sub_items": self._mod_quest_sub_items,
+                        "fields": self._mod_quest_fields,
+                        "field_cursor": self._mod_quest_field,
+                        "field_buffer": self._mod_quest_buffer,
+                        "field_scroll": self._mod_quest_field_scroll,
+                        "step_list": self._mod_quest_step_list,
+                        "step_cursor": self._mod_quest_step_cursor,
+                        "step_scroll": self._mod_quest_step_scroll,
+                        "step_fields": self._mod_quest_step_fields,
+                        "step_field_cursor": self._mod_quest_step_field,
+                        "step_field_buffer": self._mod_quest_step_buffer,
+                        "step_field_scroll": self._mod_quest_step_field_scroll,
+                        "naming": self._mod_quest_naming,
+                        "name_buf": self._mod_quest_name_buf,
+                        "naming_is_new": self._mod_quest_naming_is_new,
+                        "naming_target": self._mod_quest_naming_target,
+                        "save_flash": self._mod_quest_save_flash,
+                        "level": max(0, self.module_edit_level - 20),
+                        "sprite_map": getattr(self, "_mod_quest_sprite_name_to_file", {}),
+                        "monster_tile_map": getattr(self, "_mod_quest_monster_tiles", {}),
                     })
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()

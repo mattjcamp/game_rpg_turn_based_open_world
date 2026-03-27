@@ -307,6 +307,48 @@ class BuildingEditorRS:
     save_flash: float = 0.0
 
 
+@dataclass
+class QuestEditorRS:
+    """Render-state for the Quest Editor.
+
+    Hierarchy:
+    - Quest list           (level 0 / edit_level 20)
+    - Quest sub-screen     (level 1 / edit_level 21)  Settings | Steps
+    - Settings fields OR   (level 2 / edit_level 22)  Step list
+    - Step field editor    (level 3 / edit_level 23)
+    """
+    # Quest list (level 0)
+    quests: Optional[List[dict]] = None
+    cursor: int = 0
+    scroll: int = 0
+    # Quest sub-screen (level 1): 0=Settings, 1=Steps
+    sub_cursor: int = 0
+    sub_items: Optional[list] = field(default_factory=lambda: [
+        "Settings", "Quest Steps",
+    ])
+    # Settings fields (level 2 / sub 0)
+    fields: Optional[List[FieldEntry]] = None
+    field_cursor: int = 0
+    field_buffer: str = ""
+    field_scroll: int = 0
+    # Step list (level 2 / sub 1)
+    step_list: Optional[List[dict]] = None
+    step_cursor: int = 0
+    step_scroll: int = 0
+    # Step field editor (level 3)
+    step_fields: Optional[List[FieldEntry]] = None
+    step_field_cursor: int = 0
+    step_field_buffer: str = ""
+    step_field_scroll: int = 0
+    # Naming overlays
+    naming: bool = False
+    name_buf: str = ""
+    naming_is_new: bool = False
+    naming_target: str = ""  # "quest" or "step"
+    # Save flash
+    save_flash: float = 0.0
+
+
 # ─── Top-level render state ──────────────────────────────────────────
 
 @dataclass
@@ -336,3 +378,4 @@ class FeaturesRenderState:
     town_map_editor_data: Optional[dict] = None
     dungeon_map_editor_data: Optional[dict] = None
     building_map_editor_data: Optional[dict] = None
+    quests: 'QuestEditorRS' = field(default_factory=lambda: QuestEditorRS())
