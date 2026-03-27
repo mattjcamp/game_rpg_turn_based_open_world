@@ -2309,23 +2309,29 @@ class Renderer(CombatEffectRendererMixin):
         has_infravision = party.has_effect("Infravision")
         has_galadriels = (party.has_effect("Galadriel's Light")
                           and party.galadriels_light_steps > 0)
+        # When the map is smaller than the viewport, tiles are drawn with
+        # pad_x/pad_y centering offsets.  Shift the light-source position
+        # in the darkness overlay by the same amount so the lit circle
+        # stays centred on the party sprite.
+        psc_dark = psc + pad_x / ts
+        psr_dark = psr + pad_y / ts
         if not clock.is_day or darkness_active:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
-            self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
+            self._draw_overworld_darkness(clock, psc_dark, psr_dark, ts, cols, rows,
                                           has_light=has_light,
                                           force_night=darkness_active)
             # Apply infravision red tint when it's the active light source
             if has_infravision and party.get_equipped_name("light") is None:
-                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
+                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
             # Apply Galadriel's Light blue tint (when no torch or infravision)
             elif (has_galadriels
                   and party.get_equipped_name("light") is None
                   and not has_infravision):
-                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr)
+                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
         # Galadriel's Light blue tint also applies during day (subtle)
         if has_galadriels and not has_infravision:
-            self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr,
+            self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark,
                                       subtle=True)
 
         # ── 4. blue border around map ──

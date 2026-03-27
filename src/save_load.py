@@ -462,19 +462,30 @@ def load_game(slot, game):
         else:
             game.module_manifest = None
 
-        # ── Regenerate the overworld map from module config ─────
-        from src.tile_map import create_test_map
+        # ── Restore the overworld map ─────────────────────────
+        # If the module has a static (custom) map, use it directly —
+        # this matches the New Game path and avoids regenerating a
+        # different procedural map when the saved seed is missing.
+        from src.tile_map import create_test_map, load_static_overworld
         from src.camera import Camera
 
         overworld_cfg = None
         if game.module_manifest:
             overworld_cfg = game.module_manifest.get("_overworld_cfg")
 
-        saved_seed = save_data.get("map_seed")
-        game.tile_map = create_test_map(
-            seed=saved_seed,
-            overworld_cfg=overworld_cfg,
-            data_dir=game.active_module_path if game.module_manifest else None)
+        static_map = None
+        if game.active_module_path:
+            static_map = load_static_overworld(game.active_module_path)
+
+        if static_map is not None:
+            game.tile_map = static_map
+        else:
+            saved_seed = save_data.get("map_seed")
+            game.tile_map = create_test_map(
+                seed=saved_seed,
+                overworld_cfg=overworld_cfg,
+                data_dir=game.active_module_path
+                if game.module_manifest else None)
         game.camera = Camera(game.tile_map.width, game.tile_map.height)
 
         # ── Restore the party ───────────────────────────────────

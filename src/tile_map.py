@@ -161,6 +161,11 @@ def load_static_overworld(module_path):
             if w > 0 and h > 0 and tiles and len(tiles) == h:
                 tmap = TileMap(w, h, default_tile=TILE_GRASS)
                 tmap.tiles = tiles
+                # Store a seed so save/load can identify this map.
+                # Static editor maps use seed 0 by convention; the
+                # load path will prefer the static file over
+                # procedural regeneration regardless of seed.
+                tmap.seed = data.get("seed", mc.get("seed", 0))
                 tmap.tile_links = data.get("tile_links", {})
                 tmap.overworld_interiors = data.get("interiors", [])
                 return tmap
