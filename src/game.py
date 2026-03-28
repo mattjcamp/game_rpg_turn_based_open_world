@@ -1682,6 +1682,37 @@ class Game:
             npc.wander_range = nd.get("wander_range", 4)
             npcs.append(npc)
 
+        # Distribute NPCs so none share a tile.  Collect all walkable
+        # floor positions, then assign each NPC a unique random spot.
+        import random as _rng
+        walkable = set()
+        for wy in range(h):
+            for wx in range(w):
+                if tm.is_walkable(wx, wy):
+                    walkable.add((wx, wy))
+        # Remove the entry tile and interior-link tiles
+        walkable.discard((entry_col, entry_row))
+        for pos in interior_links:
+            walkable.discard(pos)
+        for pos in overworld_exits:
+            walkable.discard(pos)
+
+        occupied = set()
+        rng = _rng.Random(hash(name) & 0xFFFFFFFF)
+        for npc in npcs:
+            # If the NPC's current position is free, keep it
+            pos = (npc.col, npc.row)
+            if pos in walkable and pos not in occupied:
+                occupied.add(pos)
+                continue
+            # Otherwise pick a random free walkable tile
+            free = list(walkable - occupied)
+            if free:
+                nc, nr = rng.choice(free)
+                npc.col = nc
+                npc.row = nr
+                occupied.add((nc, nr))
+
         return TownData(
             tile_map=tm,
             npcs=npcs,
@@ -1968,12 +1999,21 @@ class Game:
                 if stype:
                     desc = f"[{stype.title()}] {desc}"
                 steps.append({"description": desc, "done": done})
+            # Add a final "return to quest giver" step
+            giver = qdef.get("giver_npc", "") or qname
+            steps.append({
+                "description": f"Return to {giver} for reward",
+                "done": status == "turned_in",
+            })
             if not steps:
                 steps = [{"description": qdef.get("description", qname),
-                           "done": status == "completed"}]
+                           "done": status in ("completed", "turned_in")}]
+            display_status = status
+            if status == "turned_in":
+                display_status = "completed"
             quests.append({
                 "name": qname,
-                "status": status,
+                "status": display_status,
                 "steps": steps,
             })
 

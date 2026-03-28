@@ -4,7 +4,7 @@
     "description": "Kill 1 Wolf",
     "giver_npc": "GGG",
     "giver_sprite": "src/assets/game/characters/alchemist.png",
-    "giver_location": "overview",
+    "giver_location": "town:New York",
     "giver_dialogue": "Kill a wolf",
     "reward_xp": 0,
     "reward_gold": 0,

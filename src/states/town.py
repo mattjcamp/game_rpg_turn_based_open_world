@@ -337,6 +337,16 @@ class TownState(InventoryMixin, BaseState):
                                 "undiscovered", "active", "artifact_found"):
                             npc.quest_highlight = True
 
+            elif npc.npc_type == "module_quest_giver":
+                # Highlight when quest is available, active, or completed
+                # (waiting for turn-in). Stop highlighting after turned in.
+                mqname = getattr(npc, "_module_quest_name", "")
+                mq_states = getattr(self.game, "module_quest_states", {})
+                mq_status = mq_states.get(mqname, {}).get(
+                    "status", "available")
+                if mq_status in ("available", "active", "completed"):
+                    npc.quest_highlight = True
+
             elif npc.npc_type == "elder":
                 # Highlight only when the elder has something actionable:
                 # quest turn-ins or active quests to give hints about.
@@ -1199,12 +1209,66 @@ class TownState(InventoryMixin, BaseState):
                 return
 
             elif status == "completed":
-                # Quest done — thank player
+                # Turn in quest — award rewards and play celebration
+                self.npc_dialogue_active = True
+                self.npc_speaking = npc
+                quest_defs = getattr(self.game, "_module_quest_defs", [])
+                qdef = None
+                for q in quest_defs:
+                    if q.get("name") == mqname:
+                        qdef = q
+                        break
+                reward_xp = qdef.get("reward_xp", 0) if qdef else 0
+                reward_gold = qdef.get("reward_gold", 0) if qdef else 0
+
+                # Grant rewards
+                if reward_xp:
+                    for m in self.game.party.members:
+                        if m.is_alive():
+                            m.exp += reward_xp
+                            m.check_level_up()
+                if reward_gold:
+                    self.game.party.gold += reward_gold
+
+                # Build reward text
+                parts = []
+                if reward_xp:
+                    parts.append(f"+{reward_xp} XP")
+                if reward_gold:
+                    parts.append(f"+{reward_gold} Gold")
+                reward_str = ", ".join(parts)
+                if reward_str:
+                    self._set_dialogue(
+                        f"{npc.name}: Thank you, hero! "
+                        f"Here is your reward: {reward_str}")
+                else:
+                    self._set_dialogue(
+                        f"{npc.name}: Thank you for completing "
+                        f"the quest! You truly are a hero.")
+
+                # Quest complete visual effect
+                self.quest_effects.append({
+                    "type": "quest_complete",
+                    "timer": 3000,
+                    "duration": 3000,
+                    "quest_name": mqname,
+                    "reward_xp": reward_xp,
+                    "reward_gold": reward_gold,
+                })
+                self.game.sfx.play("quest_complete")
+
+                # Mark as turned in so rewards aren't given again
+                mq_state["status"] = "turned_in"
+                self._refresh_quest_highlights()
+                return
+
+            elif status == "turned_in":
+                # Already turned in — friendly message
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
                 self._set_dialogue(
-                    f"{npc.name}: Thank you for completing the quest! "
-                    f"You truly are a hero.")
+                    f"{npc.name}: Thank you again, hero! "
+                    f"Your deeds will be remembered.")
                 return
 
         # Quest giver — offers a single specific quest

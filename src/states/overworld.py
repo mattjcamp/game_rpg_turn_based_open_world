@@ -547,9 +547,61 @@ class OverworldState(InventoryMixin, BaseState):
                 f"({done}/{total} steps done)  [ENTER]", 999999)
             self.ow_quest_dialogue_lines = []
         elif status == "completed":
+            # Turn in quest — award rewards and play celebration
+            quest_defs = getattr(self.game, "_module_quest_defs", [])
+            qdef = None
+            for q in quest_defs:
+                if q.get("name") == mqname:
+                    qdef = q
+                    break
+            reward_xp = qdef.get("reward_xp", 0) if qdef else 0
+            reward_gold = qdef.get("reward_gold", 0) if qdef else 0
+
+            # Grant rewards
+            if reward_xp:
+                for m in self.game.party.members:
+                    if m.is_alive():
+                        m.exp += reward_xp
+                        m.check_level_up()
+            if reward_gold:
+                self.game.party.gold += reward_gold
+
+            # Build reward text for dialogue
+            parts = []
+            if reward_xp:
+                parts.append(f"+{reward_xp} XP")
+            if reward_gold:
+                parts.append(f"+{reward_gold} Gold")
+            reward_str = ", ".join(parts)
+            if reward_str:
+                self.show_message(
+                    f"{npc.name}: Thank you, hero! "
+                    f"Here is your reward: {reward_str}  [ENTER]",
+                    999999)
+            else:
+                self.show_message(
+                    f"{npc.name}: Thank you for completing the quest!"
+                    f"  [ENTER]", 999999)
+
+            # Quest complete visual effect
+            self.quest_effects.append({
+                "type": "quest_complete",
+                "timer": 3000,
+                "duration": 3000,
+                "quest_name": mqname,
+                "reward_xp": reward_xp,
+                "reward_gold": reward_gold,
+            })
+            self.game.sfx.play("quest_complete")
+
+            # Mark as turned in so rewards aren't given again
+            mq_state["status"] = "turned_in"
+            self.ow_quest_dialogue_lines = []
+
+        elif status == "turned_in":
             self.show_message(
-                f"{npc.name}: Thank you for completing the quest!"
-                f"  [ENTER]", 999999)
+                f"{npc.name}: Thank you again, hero! "
+                f"Your deeds will be remembered.  [ENTER]", 999999)
             self.ow_quest_dialogue_lines = []
 
     def _handle_ow_npc_dialogue_input(self, event):
@@ -714,31 +766,14 @@ class OverworldState(InventoryMixin, BaseState):
                     })
                     self.game.sfx.play("treasure")
 
-            # Check if ALL steps are done
+            # Check if ALL steps are done — mark completed but
+            # rewards are given when the player returns to the quest giver
             if all(progress) and progress:
-                state["status"] = "completed"
-                reward_xp = qdef.get("reward_xp", 0)
-                reward_gold = qdef.get("reward_gold", 0)
-                if reward_xp or reward_gold:
-                    for m in self.game.party.members:
-                        if m.is_alive():
-                            m.exp += reward_xp
-                    self.game.party.gold += reward_gold
+                if state["status"] != "completed":
+                    state["status"] = "completed"
                     result_msg = (
-                        f"Quest '{qname}' complete! "
-                        f"+{reward_xp} XP, +{reward_gold} Gold")
-                else:
-                    result_msg = f"Quest '{qname}' complete!"
-                # Quest completed visual effect
-                self.quest_effects.append({
-                    "type": "quest_complete",
-                    "timer": 3000,
-                    "duration": 3000,
-                    "quest_name": qname,
-                    "reward_xp": reward_xp,
-                    "reward_gold": reward_gold,
-                })
-                self.game.sfx.play("quest_complete")
+                        f"All steps done! Return to the quest "
+                        f"giver for your reward.")
 
         # Clean up killed list so it's not processed twice
         self.game.pending_killed_monsters = []

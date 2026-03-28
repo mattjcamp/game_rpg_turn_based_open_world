@@ -2324,29 +2324,37 @@ class Renderer(CombatEffectRendererMixin):
                             (nx - q_surf.get_width() // 2,
                              ny - q_surf.get_height() // 2))
 
-                    # ── Gold name tag above quest giver ──
-                    pulse = 0.7 + 0.3 * _m.sin(_t.time() * 3.0)
-                    gold = (255, int(200 * pulse + 55), 0)
+                    # ── Name tag above quest giver ──
+                    q_status = getattr(npc, "_quest_status", "available")
+                    if q_status == "turned_in":
+                        # Plain white name, no glow or marker
+                        name_color = (200, 200, 200)
+                        border_color = None
+                    else:
+                        # Pulsing gold name
+                        pulse = 0.7 + 0.3 * _m.sin(_t.time() * 3.0)
+                        name_color = (255, int(200 * pulse + 55), 0)
+                        border_color = (180, 140, 0)
+
                     name_surf = self.font_small.render(
-                        npc.name, True, gold)
+                        npc.name, True, name_color)
                     name_rect = name_surf.get_rect(
                         center=(nx, ny - ts // 2 - 10))
                     bg = name_rect.inflate(6, 2)
-                    # Gold border glow
-                    glow_rect = bg.inflate(4, 4)
-                    pygame.draw.rect(
-                        self.screen, (180, 140, 0), glow_rect, 1)
+                    if border_color:
+                        glow_rect = bg.inflate(4, 4)
+                        pygame.draw.rect(
+                            self.screen, border_color, glow_rect, 1)
                     pygame.draw.rect(
                         self.screen, (10, 10, 20), bg)
                     self.screen.blit(name_surf, name_rect)
                     # Status marker: ! for available, ? for active
-                    q_status = getattr(npc, "_quest_status", "available")
                     if q_status == "available":
                         ex = self.font_small.render(
                             "!", True, (255, 220, 0))
                         self.screen.blit(
                             ex, (name_rect.right + 2, name_rect.y))
-                    elif q_status == "active":
+                    elif q_status == "active" or q_status == "completed":
                         ex = self.font_small.render(
                             "?", True, (200, 200, 200))
                         self.screen.blit(
