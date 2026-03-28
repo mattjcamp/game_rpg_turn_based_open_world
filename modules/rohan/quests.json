@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Laric the Old",
+    "description": "A wolf is running around town",
+    "giver_npc": "",
+    "giver_sprite": "src/assets/game/characters/druid.png",
+    "giver_location": "overview",
+    "giver_dialogue": "We gotta get rid of that wolf in town",
+    "reward_xp": 0,
+    "reward_gold": 0,
+    "steps": [
+      {
+        "description": "Kill Wolf",
+        "step_type": "kill",
+        "monster": "Wolf",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "town:Aseroth",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ]
+  }
+]

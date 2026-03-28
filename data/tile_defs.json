@@ -418,5 +418,49 @@
     ],
     "context": "overworld",
     "sprite": "overworld/shrine_church"
+  },
+  "46": {
+    "name": "Path Floor",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "overworld/path"
+  },
+  "47": {
+    "name": "Sand Floor",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "overworld/sand"
+  },
+  "48": {
+    "name": "Brown Floor",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/floor_gray"
+  },
+  "49": {
+    "name": "Brown Brick Wall",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/brick_wall_brown"
   }
 }

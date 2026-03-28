@@ -5,14 +5,16 @@
     "grass": {
       "path": "src/assets/game/terrain/grass.png",
       "usable_in": [
-        "overworld"
+        "overworld",
+        "town"
       ],
       "tile_id": 0
     },
     "water": {
       "path": "src/assets/game/terrain/water.png",
       "usable_in": [
-        "overworld"
+        "overworld",
+        "town"
       ],
       "tile_id": 1
     },
@@ -47,14 +49,16 @@
     "path": {
       "path": "src/assets/game/terrain/path.png",
       "usable_in": [
-        "overworld"
+        "overworld",
+        "town"
       ],
       "tile_id": 6
     },
     "sand": {
       "path": "src/assets/game/terrain/sand.png",
       "usable_in": [
-        "overworld"
+        "overworld",
+        "town"
       ],
       "tile_id": 7
     },
@@ -220,7 +224,8 @@
       "path": "src/assets/unassigned/brick_wall_brown.png",
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 49
     },
     "brick_wall_red": {
       "path": "src/assets/unassigned/brick_wall_red.png",
@@ -233,7 +238,8 @@
       "path": "src/assets/game/terrain/floor_gray.png",
       "usable_in": [
         "town"
-      ]
+      ],
+      "tile_id": 48
     },
     "shop_sign": {
       "path": "src/assets/game/terrain/shop_sign.png",

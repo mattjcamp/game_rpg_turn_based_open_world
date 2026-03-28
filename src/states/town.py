@@ -306,6 +306,8 @@ class TownState(InventoryMixin, BaseState):
             self.game.camera.map_height = self.town_data.tile_map.height
             self.game.camera.update(self.game.party.col, self.game.party.row)
             self._refresh_quest_highlights()
+            # Spawn quest monsters registered for this town
+            self._spawn_town_quest_monsters()
 
     def _check_quest_monster_kills(self):
         """After returning from combat in an interior, check if the killed
@@ -977,6 +979,75 @@ class TownState(InventoryMixin, BaseState):
         self.game.camera.map_height = ih
         self.game.camera.update(self.game.party.col, self.game.party.row)
         self.show_message(f"Entering {interior_name}...", 1500)
+
+    def _spawn_town_quest_monsters(self):
+        """Place quest monster NPCs in the town when the player enters.
+
+        Reads ``game.quest_interior_monsters`` for entries registered
+        under the ``"town:<town_name>"`` key and creates NPC objects
+        with ``npc_type='quest_monster'`` on walkable tiles.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+        from src.monster import MONSTERS
+
+        town_name = self.town_data.name
+        monsters_dict = getattr(self.game, "quest_interior_monsters", {})
+        key = f"town:{town_name}"
+        entries = monsters_dict.get(key, [])
+        if not entries:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        tmap = self.town_data.tile_map
+
+        # Collect walkable tiles
+        walkable = []
+        for wy in range(tmap.height):
+            for wx in range(tmap.width):
+                if tmap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        occupied = {(n.col, n.row) for n in self.town_data.npcs}
+        rng = _rng.Random(hash(town_name) & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            monster_key = entry["monster_key"]
+            count = entry.get("count", 1)
+
+            # Skip if quest is no longer active
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            # Skip if this step is already complete
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            monster_info = MONSTERS.get(monster_key, {})
+            display_name = monster_info.get(
+                "name", monster_key.replace("_", " ").title())
+
+            for i in range(count):
+                free = [p for p in walkable if p not in occupied]
+                if not free:
+                    break
+                col, row = rng.choice(free)
+                occupied.add((col, row))
+
+                npc = NPC(
+                    col=col, row=row,
+                    name=display_name,
+                    dialogue=["*growls menacingly*"],
+                    npc_type="quest_monster",
+                )
+                npc._quest_name = qname
+                npc._quest_step_idx = step_idx
+                npc._monster_key = monster_key
+                npc.wander_range = 3
+                self.town_data.npcs.append(npc)
 
     def _spawn_interior_quest_monsters(self, interior_name, imap):
         """Place quest monster NPCs inside an interior when entered.
