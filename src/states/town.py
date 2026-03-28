@@ -689,6 +689,10 @@ class TownState(InventoryMixin, BaseState):
                 self._start_quest_monster_combat(npc)
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
+            if npc.npc_type == "quest_item":
+                self._collect_quest_item(npc)
+                self.move_cooldown = MOVE_REPEAT_DELAY
+                return
             self._start_dialogue(npc)
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
@@ -912,7 +916,8 @@ class TownState(InventoryMixin, BaseState):
         self.town_data.tile_map = imap
         self.town_data.npcs = []  # interiors start with no NPCs
 
-        # ── Spawn quest monsters registered for this interior ──
+        # ── Spawn quest collect items first so guardians can anchor to them ──
+        self._spawn_interior_quest_collect_items(interior_name, imap)
         self._spawn_interior_quest_monsters(interior_name, imap)
 
         # Collect exit positions and interior-to-interior links from tiles.
@@ -1008,6 +1013,7 @@ class TownState(InventoryMixin, BaseState):
             step_idx = entry["step_idx"]
             monster_key = entry["monster_key"]
             count = entry.get("count", 1)
+            is_guardian = entry.get("is_guardian", False)
 
             # Skip if quest is no longer active
             qstate = mq_states.get(qname, {})
@@ -1022,11 +1028,39 @@ class TownState(InventoryMixin, BaseState):
             display_name = monster_info.get(
                 "name", monster_key.replace("_", " ").title())
 
+            # If this is a guardian, find the quest_item NPC it protects
+            # so we can place it nearby.
+            anchor_pos = None
+            if is_guardian:
+                for existing_npc in self.town_data.npcs:
+                    if (getattr(existing_npc, "npc_type", "") == "quest_item"
+                            and getattr(existing_npc, "_quest_name", "") == qname
+                            and getattr(existing_npc, "_quest_step_idx", -1) == step_idx):
+                        anchor_pos = (existing_npc.col, existing_npc.row)
+                        break
+
             for i in range(count):
-                free = [p for p in walkable if p not in occupied]
-                if not free:
-                    break
-                col, row = rng.choice(free)
+                if anchor_pos:
+                    # Place guardian near the item it protects
+                    ax, ay = anchor_pos
+                    nearby = [(ax + dc, ay + dr)
+                              for dc in range(-2, 3)
+                              for dr in range(-2, 3)
+                              if (dc, dr) != (0, 0)
+                              and (ax + dc, ay + dr) in walkable
+                              and (ax + dc, ay + dr) not in occupied]
+                    if nearby:
+                        col, row = rng.choice(nearby)
+                    else:
+                        free = [p for p in walkable if p not in occupied]
+                        if not free:
+                            break
+                        col, row = rng.choice(free)
+                else:
+                    free = [p for p in walkable if p not in occupied]
+                    if not free:
+                        break
+                    col, row = rng.choice(free)
                 occupied.add((col, row))
 
                 npc = NPC(
@@ -1039,7 +1073,73 @@ class TownState(InventoryMixin, BaseState):
                 npc._quest_step_idx = step_idx
                 npc._monster_key = monster_key
                 npc.wander_range = 3
+                if is_guardian and anchor_pos:
+                    npc._guardian_anchor = anchor_pos
+                    npc._guardian_leash = 4
                 self.town_data.npcs.append(npc)
+
+    def _spawn_interior_quest_collect_items(self, interior_name, imap):
+        """Place collectible quest items inside an interior when entered.
+
+        Reads ``game.quest_collect_items`` for pending items registered
+        to this interior and creates NPC objects with
+        ``npc_type='quest_item'`` on walkable tiles.  The player can
+        walk into them to pick them up.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+
+        items_dict = getattr(self.game, "quest_collect_items", {})
+        key = f"interior:{interior_name}"
+        entries = items_dict.get(key, [])
+        if not entries:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+
+        # Collect walkable tiles
+        walkable = []
+        for wy in range(imap.height):
+            for wx in range(imap.width):
+                if imap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        # Exclude tiles already occupied by NPCs
+        occupied = {(n.col, n.row) for n in self.town_data.npcs}
+        rng = _rng.Random(hash(interior_name) & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            item_name = entry["item_name"]
+            item_sprite = entry.get("item_sprite", "")
+
+            # Skip if quest is no longer active
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            # Skip if this step is already complete
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            free = [p for p in walkable if p not in occupied]
+            if not free:
+                break
+            col, row = rng.choice(free)
+            occupied.add((col, row))
+
+            npc = NPC(
+                col=col, row=row,
+                name=item_name,
+                dialogue=[f"You found {item_name}!"],
+                npc_type="quest_item",
+            )
+            npc._quest_name = qname
+            npc._quest_step_idx = step_idx
+            npc._item_sprite = item_sprite
+            npc.quest_highlight = True
+            self.town_data.npcs.append(npc)
 
     # ── Machine interaction (Keys of Shadow) ──────────────────
 
@@ -1197,6 +1297,43 @@ class TownState(InventoryMixin, BaseState):
             map_monster_refs=[npc],
             terrain_tile=terrain_tile)
         self.game.change_state("combat")
+
+    def _collect_quest_item(self, npc):
+        """Pick up a quest collectible item NPC.
+
+        Marks the quest step as complete, removes the item NPC from the
+        map, and shows a pickup message.
+        """
+        qname = getattr(npc, "_quest_name", "")
+        step_idx = getattr(npc, "_quest_step_idx", -1)
+        item_name = npc.name
+
+        # Remove the item NPC from the map
+        if npc in self.town_data.npcs:
+            self.town_data.npcs.remove(npc)
+
+        # Mark the quest step as complete
+        mq_states = getattr(self.game, "module_quest_states", {})
+        if qname and qname in mq_states:
+            qstate = mq_states[qname]
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress):
+                progress[step_idx] = True
+                # Check if all steps are now complete
+                if all(progress):
+                    qstate["status"] = "completed"
+                    self.show_message(
+                        f"Collected {item_name}! Quest complete!", 3000)
+                else:
+                    self.show_message(
+                        f"Collected {item_name}!", 2500)
+            else:
+                self.show_message(
+                    f"Collected {item_name}!", 2500)
+        else:
+            self.show_message(f"Found {item_name}!", 2500)
+
+        self.game.sfx.play("treasure")
 
     def _start_dialogue(self, npc):
         """Begin talking to an NPC, or open the shop for shopkeepers."""
@@ -2330,7 +2467,63 @@ class TownState(InventoryMixin, BaseState):
                 continue
 
             # Reset timer for next move (randomised pace)
-            npc.wander_timer = random.uniform(1.5, 4.0)
+            anchor = getattr(npc, "_guardian_anchor", None)
+            if anchor:
+                # Guardians move faster to intercept
+                npc.wander_timer = random.uniform(0.4, 1.0)
+            else:
+                npc.wander_timer = random.uniform(1.5, 4.0)
+
+            # ── Guardian interception behaviour ──
+            if anchor:
+                ax, ay = anchor
+                leash = getattr(npc, "_guardian_leash", 4)
+                dist_party = (abs(party.col - ax) + abs(party.row - ay))
+                # Intercept when party is within 6 tiles of the artifact
+                if dist_party <= 6:
+                    best = None
+                    best_dist = (abs(npc.col - party.col)
+                                 + abs(npc.row - party.row))
+                    for dc, dr in directions:
+                        nc, nr = npc.col + dc, npc.row + dr
+                        # Must stay within leash of anchor
+                        if (abs(nc - ax) + abs(nr - ay)) > leash:
+                            continue
+                        if not tmap.is_walkable(nc, nr):
+                            continue
+                        if (nc, nr) in occupied:
+                            continue
+                        d = abs(nc - party.col) + abs(nr - party.row)
+                        if d < best_dist:
+                            best_dist = d
+                            best = (nc, nr)
+                    if best:
+                        occupied.discard((npc.col, npc.row))
+                        npc.col, npc.row = best
+                        occupied.add(best)
+                else:
+                    # Drift back toward anchor if too far away
+                    dist_to_anchor = (abs(npc.col - ax)
+                                      + abs(npc.row - ay))
+                    if dist_to_anchor > leash:
+                        best = None
+                        best_dist = dist_to_anchor
+                        for dc, dr in directions:
+                            nc, nr = npc.col + dc, npc.row + dr
+                            if not tmap.is_walkable(nc, nr):
+                                continue
+                            if (nc, nr) in occupied:
+                                continue
+                            d = abs(nc - ax) + abs(nr - ay)
+                            if d < best_dist:
+                                best_dist = d
+                                best = (nc, nr)
+                        if best:
+                            occupied.discard((npc.col, npc.row))
+                            npc.col, npc.row = best
+                            occupied.add(best)
+                    # Otherwise stay put — guardians don't wander randomly
+                continue
 
             # Pick a random direction
             random.shuffle(directions)

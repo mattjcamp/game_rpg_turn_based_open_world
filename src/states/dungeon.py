@@ -313,6 +313,171 @@ class DungeonState(InventoryMixin, BaseState):
                 self.dungeon_data.monsters.append(mon)
                 occupied.add((col, row))
 
+    def _inject_quest_dungeon_collect_items(self):
+        """Place quest collect items on the current dungeon floor.
+
+        Items only spawn on the **lowest** floor of a multi-level dungeon.
+        Guardian monsters are also placed near the item and anchored to it.
+        """
+        import random as _rng
+        import re
+        from src.monster import create_monster, MONSTERS
+        from src.town_generator import NPC
+
+        # Only place items on the lowest floor
+        if self.quest_levels:
+            if self.current_level < len(self.quest_levels) - 1:
+                return  # not the lowest floor yet
+
+        dname = getattr(self.dungeon_data, "name", "")
+        items_dict = getattr(self.game, "quest_collect_items", {})
+
+        # Match both exact floor name and base dungeon name
+        key = f"dungeon:{dname}"
+        entries = items_dict.get(key, [])
+        if not entries:
+            base_name = re.sub(r"\s*-\s*Floor\s+\d+$", "", dname)
+            if base_name != dname:
+                entries = items_dict.get(f"dungeon:{base_name}", [])
+        if not entries:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        tmap = self.dungeon_data.tile_map
+
+        # Ensure quest_items list exists on dungeon data
+        if not hasattr(self.dungeon_data, "quest_items"):
+            self.dungeon_data.quest_items = []
+
+        # Skip if items are already placed on this floor
+        if self.dungeon_data.quest_items:
+            return
+
+        # Collect walkable floor tiles
+        walkable = set()
+        for wy in range(tmap.height):
+            for wx in range(tmap.width):
+                if tmap.is_walkable(wx, wy):
+                    walkable.add((wx, wy))
+
+        occupied = {(m.col, m.row) for m in self.dungeon_data.monsters
+                    if m.is_alive()}
+        occupied.add((self.dungeon_data.entry_col,
+                       self.dungeon_data.entry_row))
+
+        rng = _rng.Random(hash(("collect", dname)) & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            item_name = entry["item_name"]
+            item_sprite = entry.get("item_sprite", "")
+            has_guardian = entry.get("has_guardian", False)
+            guardian_key = entry.get("guardian_key")
+
+            # Skip if quest is no longer active
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            # Skip if this step is already complete
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            # Place the collect item
+            free = [p for p in walkable if p not in occupied]
+            if not free:
+                continue
+            col, row = rng.choice(free)
+            occupied.add((col, row))
+
+            item_obj = {
+                "col": col,
+                "row": row,
+                "quest_name": qname,
+                "step_idx": step_idx,
+                "item_name": item_name,
+                "item_sprite": item_sprite,
+            }
+            self.dungeon_data.quest_items.append(item_obj)
+
+            # Place guardian monster near the item
+            if has_guardian and guardian_key:
+                # Find a free tile adjacent to the item
+                nearby = [(col + dc, row + dr)
+                          for dc in range(-2, 3)
+                          for dr in range(-2, 3)
+                          if (dc, dr) != (0, 0)
+                          and (col + dc, row + dr) in walkable
+                          and (col + dc, row + dr) not in occupied]
+                if nearby:
+                    gc, gr = rng.choice(nearby)
+                else:
+                    gfree = [p for p in walkable if p not in occupied]
+                    if gfree:
+                        gc, gr = rng.choice(gfree)
+                    else:
+                        continue
+
+                mon = create_monster(guardian_key)
+                mon._quest_name = qname
+                mon._quest_step_idx = step_idx
+                mon._guardian_anchor = (col, row)
+                mon._guardian_leash = 4
+                mon.col = gc
+                mon.row = gr
+                mon.encounter_template = {
+                    "name": f"Quest: {mon.name}",
+                    "monster_names": [guardian_key],
+                    "monster_party_tile": guardian_key,
+                }
+                self.dungeon_data.monsters.append(mon)
+                occupied.add((gc, gr))
+
+    def _get_quest_item_at(self, col, row):
+        """Return the quest collect item dict at (col, row), or None."""
+        if not hasattr(self.dungeon_data, "quest_items"):
+            return None
+        for item in self.dungeon_data.quest_items:
+            if item["col"] == col and item["row"] == row:
+                return item
+        return None
+
+    def _collect_dungeon_quest_item(self, item_obj):
+        """Pick up a quest collectible item in the dungeon."""
+        qname = item_obj["quest_name"]
+        step_idx = item_obj["step_idx"]
+        item_name = item_obj["item_name"]
+
+        # Remove the item from the dungeon
+        if hasattr(self.dungeon_data, "quest_items"):
+            if item_obj in self.dungeon_data.quest_items:
+                self.dungeon_data.quest_items.remove(item_obj)
+
+        # Mark the quest step as complete
+        mq_states = getattr(self.game, "module_quest_states", {})
+        if qname and qname in mq_states:
+            qstate = mq_states[qname]
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress):
+                progress[step_idx] = True
+                if all(progress):
+                    qstate["status"] = "completed"
+                    self.show_message(
+                        f"Collected {item_name}! Quest complete!", 3000)
+                else:
+                    self.show_message(
+                        f"Collected {item_name}!", 2500)
+            else:
+                self.show_message(f"Collected {item_name}!", 2500)
+        else:
+            self.show_message(f"Found {item_name}!", 2500)
+
+        # Play treasure sound
+        sfx = getattr(self.game, "sfx", None)
+        if sfx:
+            sfx.play("treasure")
+
     def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
         """
         Set up a multi-level quest dungeon.
@@ -345,8 +510,9 @@ class DungeonState(InventoryMixin, BaseState):
         # First entry into dungeon
         if self.dungeon_data:
             self._entered = True
-            # Inject quest monsters registered for this dungeon
+            # Inject quest monsters and collect items for this dungeon
             self._inject_quest_dungeon_monsters()
+            self._inject_quest_dungeon_collect_items()
             # Try to light the equipped torch automatically
             if self._activate_torch():
                 self.show_message(
@@ -531,6 +697,13 @@ class DungeonState(InventoryMixin, BaseState):
         party = self.game.party
         target_col = party.col + dcol
         target_row = party.row + drow
+
+        # Check for quest collect item at target (bump-to-collect)
+        quest_item = self._get_quest_item_at(target_col, target_row)
+        if quest_item:
+            self._collect_dungeon_quest_item(quest_item)
+            self.move_cooldown = MOVE_REPEAT_DELAY
+            return
 
         # Check for monster at target position (bump-to-fight)
         monster = self._get_monster_at(target_col, target_row)
@@ -852,12 +1025,39 @@ class DungeonState(InventoryMixin, BaseState):
             return
         party = self.game.party
         alive = [m for m in self.dungeon_data.monsters if m.is_alive()]
-        # Build set of occupied positions (other monsters) to prevent stacking
+        # Build set of occupied positions (other monsters + party)
         occupied = {(m.col, m.row) for m in alive}
+        occupied.add((party.col, party.row))
         for monster in alive:
             # Remove self from occupied so it can move
             occupied.discard((monster.col, monster.row))
-            if self._has_line_of_sight(monster.col, monster.row,
+
+            anchor = getattr(monster, "_guardian_anchor", None)
+            if anchor:
+                # ── Guardian: stay near artifact, intercept when party close ──
+                ax, ay = anchor
+                leash = getattr(monster, "_guardian_leash", 4)
+                dist_party_to_anchor = (abs(party.col - ax)
+                                        + abs(party.row - ay))
+                if (dist_party_to_anchor <= 6
+                        and self._has_line_of_sight(
+                            monster.col, monster.row,
+                            party.col, party.row)):
+                    # Intercept but stay within leash
+                    self._guardian_move_toward_dungeon(
+                        monster, party.col, party.row,
+                        ax, ay, leash, occupied)
+                else:
+                    # Drift back toward anchor if too far
+                    dist = (abs(monster.col - ax)
+                            + abs(monster.row - ay))
+                    if dist > leash:
+                        monster.try_move_toward(
+                            ax, ay,
+                            self.dungeon_data.tile_map,
+                            occupied)
+                    # Otherwise stay put
+            elif self._has_line_of_sight(monster.col, monster.row,
                                        party.col, party.row):
                 # Monster can see the player — pursue
                 monster.try_move_toward(
@@ -876,8 +1076,33 @@ class DungeonState(InventoryMixin, BaseState):
             # Add new position back
             occupied.add((monster.col, monster.row))
 
+    def _guardian_move_toward_dungeon(self, mon, target_col, target_row,
+                                      anchor_col, anchor_row, leash,
+                                      occupied):
+        """Move a dungeon guardian toward *target* within leash of anchor."""
+        tmap = self.dungeon_data.tile_map
+        dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+        best = None
+        best_dist = abs(mon.col - target_col) + abs(mon.row - target_row)
+        for dc, dr in dirs:
+            nc, nr = mon.col + dc, mon.row + dr
+            if (abs(nc - anchor_col) + abs(nr - anchor_row)) > leash:
+                continue
+            if (nc, nr) in occupied:
+                continue
+            if not (0 <= nc < tmap.width and 0 <= nr < tmap.height):
+                continue
+            if not tmap.is_walkable(nc, nr):
+                continue
+            d = abs(nc - target_col) + abs(nr - target_row)
+            if d < best_dist:
+                best_dist = d
+                best = (nc, nr)
+        if best:
+            mon.col, mon.row = best
+
     def _check_monster_contact(self):
-        """If a monster moved adjacent to the party, start combat."""
+        """If a monster moved adjacent to (or onto) the party, start combat."""
         if not self.dungeon_data:
             return
         party = self.game.party
@@ -886,7 +1111,7 @@ class DungeonState(InventoryMixin, BaseState):
                 continue
             dc = abs(monster.col - party.col)
             dr = abs(monster.row - party.row)
-            if dc + dr == 1:  # Cardinal-adjacent
+            if dc + dr <= 1:  # Same tile or cardinal-adjacent
                 self._start_combat(monster)
                 return
 
@@ -1270,6 +1495,8 @@ class DungeonState(InventoryMixin, BaseState):
                 total = len(self.quest_levels)
                 self.show_message(
                     f"You descend deeper... (Floor {depth}/{total})", 2000)
+                # Inject quest collect items on the lowest floor
+                self._inject_quest_dungeon_collect_items()
                 active_q = self._get_active_quest()
                 if active_q:
                     active_q["current_level"] = self.current_level

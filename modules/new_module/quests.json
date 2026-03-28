@@ -1,64 +1,25 @@
 [
   {
-    "name": "Rat Patrol",
-    "description": "Kills a bunch of  monsters",
-    "giver_npc": "GGG",
-    "giver_sprite": "src/assets/game/characters/alchemist.png",
-    "giver_location": "town:Rando Town",
-    "giver_dialogue": "Kill wolf, will skeleton",
+    "name": "Retrieve Artifact",
+    "description": "Get that crystal back ",
+    "giver_npc": "Gandalf the Gay",
+    "giver_sprite": "src/assets/game/characters/ranger.png",
+    "giver_location": "town:New York",
+    "giver_dialogue": "Please find my butt plug!",
     "reward_xp": 0,
     "reward_gold": 0,
     "steps": [
       {
-        "description": "Kill Wolf",
-        "step_type": "kill",
-        "monster": "Wolf",
-        "target": "",
-        "target_count": 1,
-        "optional": "no",
-        "spawn_location": "overview"
-      },
-      {
-        "description": "Kill Skeleton",
-        "step_type": "kill",
-        "monster": "Skeleton Archer",
-        "spawn_location": "interior:New York/Tunnel",
-        "target": "",
-        "target_count": 1,
-        "optional": "no"
-      }
-    ]
-  },
-  {
-    "name": "Dungeon",
-    "description": "Kill something in a dungeon",
-    "giver_npc": "Elrond",
-    "giver_sprite": "src/assets/game/characters/illusionist.png",
-    "giver_location": "overview",
-    "giver_dialogue": "Kill the Orc in the Dank Dungeon and retrieve The King's Sword",
-    "reward_xp": 100,
-    "reward_gold": 100,
-    "steps": [
-      {
-        "description": "Kill Orc",
-        "step_type": "kill",
-        "monster": "Orc",
+        "description": "Retrieve Plug",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "Crystal",
+        "has_guardian": "yes",
+        "guardian_monster": "Dark Mage",
         "spawn_location": "dungeon:Dank Place",
         "target": "",
         "target_count": 1,
         "optional": "no"
-      },
-      {
-        "description": "The King's Sword",
-        "step_type": "collect",
-        "monster": "",
-        "spawn_location": "interior:New York/General Shop",
-        "target": "",
-        "target_count": 1,
-        "optional": "no",
-        "collect_item": "King's Sword",
-        "has_guardian": "yes",
-        "guardian_monster": "Dark Mage"
       }
     ]
   }

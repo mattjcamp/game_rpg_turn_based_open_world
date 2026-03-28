@@ -457,7 +457,10 @@ class OverworldState(InventoryMixin, BaseState):
             # Bump-to-talk: check if a quest NPC is on the target tile
             ow_npc = self._get_ow_npc_at(target_col, target_row)
             if ow_npc:
-                self._start_ow_npc_dialogue(ow_npc)
+                if getattr(ow_npc, "npc_type", "") == "quest_item":
+                    self._collect_overworld_quest_item(ow_npc)
+                else:
+                    self._start_ow_npc_dialogue(ow_npc)
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
 
@@ -514,6 +517,38 @@ class OverworldState(InventoryMixin, BaseState):
             if npc.col == col and npc.row == row:
                 return npc
         return None
+
+    def _collect_overworld_quest_item(self, npc):
+        """Pick up a quest collectible item on the overworld."""
+        qname = getattr(npc, "_quest_name", "")
+        step_idx = getattr(npc, "_quest_step_idx", -1)
+        item_name = npc.name
+
+        # Remove the item NPC from the overworld
+        ow_npcs = getattr(self.game, "overworld_quest_npcs", [])
+        if npc in ow_npcs:
+            ow_npcs.remove(npc)
+
+        # Mark the quest step as complete
+        mq_states = getattr(self.game, "module_quest_states", {})
+        if qname and qname in mq_states:
+            qstate = mq_states[qname]
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress):
+                progress[step_idx] = True
+                if all(progress):
+                    qstate["status"] = "completed"
+                    self.show_message(
+                        f"Collected {item_name}! Quest complete!", 3000)
+                else:
+                    self.show_message(
+                        f"Collected {item_name}!", 2500)
+            else:
+                self.show_message(f"Collected {item_name}!", 2500)
+        else:
+            self.show_message(f"Found {item_name}!", 2500)
+
+        self.game.sfx.play("treasure")
 
     def _start_ow_npc_dialogue(self, npc):
         """Begin talking to an overworld quest NPC."""
@@ -800,6 +835,9 @@ class OverworldState(InventoryMixin, BaseState):
             if mon.is_alive():
                 occupied.add((mon.col, mon.row))
         for npc in npcs:
+            # Quest collectible items never move
+            if getattr(npc, "npc_type", "") == "quest_item":
+                continue
             dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
             random.shuffle(dirs)
             for dc, dr in dirs:
@@ -827,12 +865,17 @@ class OverworldState(InventoryMixin, BaseState):
     def _move_monsters(self):
         """Each alive orc wanders randomly, but pursues if within 6 tiles.
 
+        Guardian monsters (tagged with ``_guardian_anchor``) stay leashed
+        near their artifact and only intercept the party when it gets
+        close to the anchor point.
+
         While a repel effect is active, monsters inside its radius flee
         *away* from the party instead of pursuing.
         """
         party = self.game.party
         alive = [m for m in self.overworld_monsters if m.is_alive()]
         occupied = {(m.col, m.row) for m in alive}
+        occupied.add((party.col, party.row))
 
         repel = self.repel_effect  # may be None
 
@@ -840,9 +883,29 @@ class OverworldState(InventoryMixin, BaseState):
             occupied.discard((mon.col, mon.row))
             cheb = max(abs(mon.col - party.col), abs(mon.row - party.row))
 
-            # If repel effect is active and monster is within radius, flee
-            if repel and cheb <= repel["radius"]:
-                # Move away: target is opposite direction from party
+            anchor = getattr(mon, "_guardian_anchor", None)
+            if anchor:
+                # ── Guardian behaviour: stay near artifact, intercept ──
+                leash = getattr(mon, "_guardian_leash", 4)
+                ax, ay = anchor
+                dist_party_to_anchor = (abs(party.col - ax)
+                                        + abs(party.row - ay))
+                # Intercept: pursue if party is within 8 tiles of artifact
+                if dist_party_to_anchor <= 8 and cheb <= 10:
+                    # Move toward party but don't stray too far from anchor
+                    self._guardian_move_toward(
+                        mon, party.col, party.row,
+                        ax, ay, leash, occupied)
+                else:
+                    # Drift back toward anchor if too far, else idle
+                    dist_to_anchor = (abs(mon.col - ax)
+                                      + abs(mon.row - ay))
+                    if dist_to_anchor > leash:
+                        mon.try_move_toward(
+                            ax, ay, self.game.tile_map, occupied)
+                    # Otherwise stay put — guardians don't wander
+            elif repel and cheb <= repel["radius"]:
+                # If repel effect is active and monster is within radius, flee
                 flee_col = mon.col + (mon.col - party.col)
                 flee_row = mon.row + (mon.row - party.row)
                 mon.try_move_toward(
@@ -871,13 +934,43 @@ class OverworldState(InventoryMixin, BaseState):
             if repel["steps_remaining"] <= 0:
                 self.repel_effect = None
 
+    def _guardian_move_toward(self, mon, target_col, target_row,
+                              anchor_col, anchor_row, leash, occupied):
+        """Move a guardian monster toward *target* without exceeding *leash*
+        distance from the anchor (the artifact it protects).
+        """
+        from src.settings import TILE_GRASS, TILE_PATH
+        tmap = self.game.tile_map
+
+        # Try all four cardinal directions, prefer the one closest to target
+        dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+        best = None
+        best_dist = abs(mon.col - target_col) + abs(mon.row - target_row)
+        for dc, dr in dirs:
+            nc, nr = mon.col + dc, mon.row + dr
+            # Must stay within leash of anchor
+            if (abs(nc - anchor_col) + abs(nr - anchor_row)) > leash:
+                continue
+            if (nc, nr) in occupied:
+                continue
+            if not (0 <= nc < tmap.width and 0 <= nr < tmap.height):
+                continue
+            if tmap.get_tile(nc, nr) not in (TILE_GRASS, TILE_PATH):
+                continue
+            d = abs(nc - target_col) + abs(nr - target_row)
+            if d < best_dist:
+                best_dist = d
+                best = (nc, nr)
+        if best:
+            mon.col, mon.row = best
+
     def _check_monster_contact(self):
-        """If an orc is adjacent to the party, start combat."""
+        """If an orc is adjacent to (or on top of) the party, start combat."""
         party = self.game.party
         for mon in self.overworld_monsters:
             if not mon.is_alive():
                 continue
-            if abs(mon.col - party.col) + abs(mon.row - party.row) == 1:
+            if abs(mon.col - party.col) + abs(mon.row - party.row) <= 1:
                 self._start_orc_combat(mon)
                 return
 

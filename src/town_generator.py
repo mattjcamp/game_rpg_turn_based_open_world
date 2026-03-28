@@ -20,7 +20,8 @@ class NPC:
     """A non-player character inside a town."""
 
     # NPC types that stay in place (inside buildings or at fixed posts)
-    STATIONARY_TYPES = {"shopkeep", "innkeeper", "priest", "gnome"}
+    STATIONARY_TYPES = {"shopkeep", "innkeeper", "priest", "gnome",
+                        "quest_item"}
 
     def __init__(self, col, row, name, dialogue, npc_type="villager",
                  quest_dialogue=None, quest_choices=None, god_name=None,

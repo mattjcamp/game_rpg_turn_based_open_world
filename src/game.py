@@ -98,6 +98,7 @@ class Game:
         self.quest_spawned_monsters = {}  # {quest_name: [monster_obj, ...]}
         self.quest_interior_monsters = {}  # {location_key: [{monster_key, ...}]}
         self.quest_dungeon_monsters = {}   # {dungeon_name: [{monster_key, ...}]}
+        self.quest_collect_items = {}      # {location_key: [{item_info, ...}]}
         self.dungeon_cache = {}
         self.machine_col = None
         self.machine_row = None
@@ -511,6 +512,7 @@ class Game:
         self.quest_spawned_monsters = {}
         self.quest_interior_monsters = {}
         self.quest_dungeon_monsters = {}
+        self.quest_collect_items = {}
         self.game_log = []
         self.dungeon_cache = {}  # clear persisted dungeon layouts
 
@@ -1413,21 +1415,57 @@ class Game:
 
     # ── Quest monster spawning ─────────────────────────────────────
 
-    def _spawn_quest_monsters(self, quest_name):
-        """Spawn monsters for 'kill' type quest steps when quest is accepted.
+    def _resolve_monster_key(self, monster_display):
+        """Convert a display name like 'Fire Wolf' to a MONSTERS dict key."""
+        from src.monster import MONSTERS
+        if not monster_display or monster_display == "(none)":
+            return None
+        monster_key = monster_display.lower().replace(" ", "_")
+        if monster_key not in MONSTERS:
+            for k in MONSTERS:
+                if k.replace("_", " ").title() == monster_display:
+                    monster_key = k
+                    break
+        if monster_key not in MONSTERS:
+            return None
+        return monster_key
 
-        For each step with step_type == 'kill' and a valid monster + spawn
-        location, creates Monster objects on the overworld or in the
-        specified town.  Stores references in
-        ``self.quest_spawned_monsters[quest_name]`` so they can be tracked
-        for kill completion.
+    def _parse_spawn_location(self, spawn_loc):
+        """Parse a spawn_location string into (type, name) tuple.
+
+        Returns e.g. ("overview", ""), ("interior", "General Shop"),
+        ("dungeon", "Dank Place"), ("town", "New York").
+        """
+        if not spawn_loc or spawn_loc in ("overview", "Overview Map"):
+            return ("overview", "")
+        if spawn_loc.startswith("interior:"):
+            rest = spawn_loc[len("interior:"):]
+            if "/" in rest:
+                _town_name, interior_name = rest.split("/", 1)
+            else:
+                interior_name = rest
+            return ("interior", interior_name)
+        if spawn_loc.startswith("dungeon:"):
+            return ("dungeon", spawn_loc[len("dungeon:"):])
+        if spawn_loc.startswith("town:"):
+            return ("town", spawn_loc[5:])
+        return ("overview", "")
+
+    def _spawn_quest_monsters(self, quest_name):
+        """Spawn monsters and collect items for quest steps when quest is accepted.
+
+        For 'kill' steps: creates Monster objects at the specified location.
+        For 'collect' steps: registers the collectible item (and optional
+        guardian monster) to appear at the specified location.
         """
         import random as _rng
         from src.monster import create_monster, MONSTERS
         from src.settings import TILE_GRASS, TILE_PATH, TILE_FLOOR
 
         if not hasattr(self, "quest_spawned_monsters"):
-            self.quest_spawned_monsters = {}  # {quest_name: [monster_obj, ...]}
+            self.quest_spawned_monsters = {}
+        if not hasattr(self, "quest_collect_items"):
+            self.quest_collect_items = {}  # {location_key: [{item info}]}
 
         quest_defs = getattr(self, "_module_quest_defs", [])
         qdef = None
@@ -1442,59 +1480,115 @@ class Game:
         spawned = []
 
         for step_idx, step in enumerate(steps):
-            if step.get("step_type") != "kill":
-                continue
-            monster_display = step.get("monster", "")
-            if not monster_display or monster_display == "(none)":
-                continue
+            step_type = step.get("step_type", "")
             spawn_loc = step.get("spawn_location", "")
-            if not spawn_loc:
-                # Default to overview map if no location set
-                spawn_loc = "overview"
+            loc_type, loc_name = self._parse_spawn_location(spawn_loc)
 
-            # Convert display name (e.g. "Fire Wolf") back to MONSTERS key
-            monster_key = monster_display.lower().replace(" ", "_")
-            if monster_key not in MONSTERS:
-                # Try exact match
-                for k in MONSTERS:
-                    if k.replace("_", " ").title() == monster_display:
-                        monster_key = k
-                        break
-            if monster_key not in MONSTERS:
-                continue
+            if step_type == "kill":
+                monster_key = self._resolve_monster_key(
+                    step.get("monster", ""))
+                if not monster_key:
+                    continue
+                target_count = max(1, step.get("target_count", 1))
 
-            target_count = max(1, step.get("target_count", 1))
+                if loc_type == "overview":
+                    self._spawn_quest_monsters_overworld(
+                        quest_name, step_idx, monster_key,
+                        target_count, spawned)
+                elif loc_type == "town":
+                    self._spawn_quest_monsters_town(
+                        quest_name, step_idx, monster_key,
+                        target_count, loc_name, spawned)
+                elif loc_type == "interior":
+                    self._register_quest_interior_monster(
+                        quest_name, step_idx, monster_key,
+                        target_count, loc_name)
+                elif loc_type == "dungeon":
+                    self._register_quest_dungeon_monster(
+                        quest_name, step_idx, monster_key,
+                        target_count, loc_name)
 
-            if spawn_loc in ("overview", "Overview Map"):
-                self._spawn_quest_monsters_overworld(
-                    quest_name, step_idx, monster_key,
-                    target_count, spawned)
-            elif spawn_loc.startswith("town:"):
-                town_name = spawn_loc[5:]
-                self._spawn_quest_monsters_town(
-                    quest_name, step_idx, monster_key,
-                    target_count, town_name, spawned)
-            elif spawn_loc.startswith("interior:"):
-                # Format: "interior:TownName/InteriorName"
-                rest = spawn_loc[len("interior:"):]
-                if "/" in rest:
-                    _town_name, interior_name = rest.split("/", 1)
+            elif step_type == "collect":
+                collect_item = step.get("collect_item", "")
+                if not collect_item or collect_item == "(none)":
+                    continue
+                has_guardian = step.get("has_guardian", "no") == "yes"
+                guardian_key = None
+                if has_guardian:
+                    guardian_key = self._resolve_monster_key(
+                        step.get("guardian_monster", ""))
+
+                # Look up the artifact tile sprite for this item
+                artifact_sprite = ""
+                self._mod_quest_load_artifact_tiles()
+                artifact_sprites = getattr(
+                    self, "_mod_quest_artifact_sprites", {})
+                artifact_sprite = artifact_sprites.get(collect_item, "")
+
+                # Build the collect item registration
+                item_info = {
+                    "quest_name": quest_name,
+                    "step_idx": step_idx,
+                    "item_name": collect_item,
+                    "item_sprite": artifact_sprite,
+                    "has_guardian": has_guardian,
+                    "guardian_key": guardian_key,
+                    "target_count": max(1, step.get("target_count", 1)),
+                }
+
+                # Register at the appropriate location
+                if loc_type == "interior":
+                    loc_key = f"interior:{loc_name}"
+                elif loc_type == "dungeon":
+                    loc_key = f"dungeon:{loc_name}"
+                elif loc_type == "town":
+                    loc_key = f"town:{loc_name}"
                 else:
-                    interior_name = rest
-                self._register_quest_interior_monster(
-                    quest_name, step_idx, monster_key,
-                    target_count, interior_name)
-            elif spawn_loc.startswith("dungeon:"):
-                dungeon_name = spawn_loc[len("dungeon:"):]
-                self._register_quest_dungeon_monster(
-                    quest_name, step_idx, monster_key,
-                    target_count, dungeon_name)
+                    loc_key = "overview"
+
+                if loc_key not in self.quest_collect_items:
+                    self.quest_collect_items[loc_key] = []
+                self.quest_collect_items[loc_key].append(item_info)
+
+                # Spawn the collect item and guardian at the location.
+                # Guardians are anchored near the item they protect.
+                if loc_type == "overview":
+                    item_pos = self._spawn_quest_collect_overworld(
+                        item_info, spawned)
+                    if guardian_key:
+                        self._spawn_quest_monsters_overworld(
+                            quest_name, step_idx, guardian_key,
+                            1, spawned, guardian_anchor=item_pos)
+                elif loc_type == "town":
+                    self._register_quest_town_collect(
+                        item_info, loc_name)
+                    if guardian_key:
+                        self._spawn_quest_monsters_town(
+                            quest_name, step_idx, guardian_key,
+                            1, loc_name, spawned)
+                elif loc_type == "interior":
+                    # Store guardian anchor info for deferred spawning
+                    if guardian_key:
+                        self._register_quest_interior_monster(
+                            quest_name, step_idx, guardian_key,
+                            1, loc_name, is_guardian=True)
+                elif loc_type == "dungeon":
+                    # Guardian for dungeon collect items is spawned by
+                    # _inject_quest_dungeon_collect_items directly next
+                    # to the artifact, so no separate registration needed.
+                    pass
 
         self.quest_spawned_monsters[quest_name] = spawned
 
     def _spawn_quest_monsters_overworld(self, quest_name, step_idx,
-                                         monster_key, count, spawned):
-        """Place quest monsters on the overworld near the party."""
+                                         monster_key, count, spawned,
+                                         guardian_anchor=None):
+        """Place quest monsters on the overworld near the party.
+
+        If *guardian_anchor* is a ``(col, row)`` tuple the monsters are
+        placed near that position instead of the party and are tagged as
+        guardians so the movement AI keeps them leashed to the artifact.
+        """
         import random as _rng
         from src.monster import create_monster
         from src.settings import TILE_GRASS, TILE_PATH
@@ -1510,21 +1604,32 @@ class Game:
 
         rng = _rng.Random(hash((quest_name, step_idx)) & 0xFFFFFFFF)
 
+        # If this is a guardian, place near the artifact instead of party
+        anchor_col, anchor_row = (
+            guardian_anchor if guardian_anchor else
+            (party.col, party.row))
+
         for i in range(count):
             mon = create_monster(monster_key)
             # Tag monster for quest tracking
             mon._quest_name = quest_name
             mon._quest_step_idx = step_idx
 
-            # Find a walkable tile 5-15 tiles from party
+            # Tag as guardian with anchor position
+            if guardian_anchor:
+                mon._guardian_anchor = guardian_anchor
+                mon._guardian_leash = 4  # max tiles from artifact
+
+            # Place near the anchor point (artifact or party)
             placed = False
-            for ring in range(5, 25):
+            start_ring = 1 if guardian_anchor else 5
+            for ring in range(start_ring, 25):
                 candidates = []
                 for dc in range(-ring, ring + 1):
                     for dr in range(-ring, ring + 1):
                         if max(abs(dc), abs(dr)) != ring:
                             continue
-                        c, r = party.col + dc, party.row + dr
+                        c, r = anchor_col + dc, anchor_row + dr
                         if (0 <= c < tmap.width
                                 and 0 <= r < tmap.height
                                 and tmap.get_tile(c, r) in (
@@ -1547,9 +1652,12 @@ class Game:
                     placed = True
                     break
             if not placed:
-                # Fallback: place near party
-                mon.col = party.col + 5 + i
-                mon.row = party.row + 5
+                # Fallback: place near anchor
+                mon.col = anchor_col + 1 + i
+                mon.row = anchor_row + 1
+                if guardian_anchor:
+                    mon._guardian_anchor = guardian_anchor
+                    mon._guardian_leash = 4
                 mon.encounter_template = {
                     "name": f"Quest: {mon.name}",
                     "monster_names": [monster_key],
@@ -1557,6 +1665,89 @@ class Game:
                 }
                 ow_state.overworld_monsters.append(mon)
                 spawned.append(mon)
+
+    def _spawn_quest_collect_overworld(self, item_info, spawned):
+        """Place a quest collectible item on the overworld near the party.
+
+        Returns ``(col, row)`` of the placed item, or ``None``.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+        from src.settings import TILE_GRASS, TILE_PATH
+
+        tmap = self.tile_map
+        party = self.party
+        ow_npcs = getattr(self, "overworld_quest_npcs", [])
+
+        occupied = set()
+        for npc in ow_npcs:
+            occupied.add((npc.col, npc.row))
+        occupied.add((party.col, party.row))
+
+        quest_name = item_info["quest_name"]
+        step_idx = item_info["step_idx"]
+        item_name = item_info["item_name"]
+        item_sprite = item_info.get("item_sprite", "")
+
+        rng = _rng.Random(
+            hash((quest_name, step_idx, item_name)) & 0xFFFFFFFF)
+
+        placed_pos = None
+        for ring in range(3, 20):
+            candidates = []
+            for dc in range(-ring, ring + 1):
+                for dr in range(-ring, ring + 1):
+                    if max(abs(dc), abs(dr)) != ring:
+                        continue
+                    c, r = party.col + dc, party.row + dr
+                    if (0 <= c < tmap.width
+                            and 0 <= r < tmap.height
+                            and tmap.get_tile(c, r) in (
+                                TILE_GRASS, TILE_PATH)
+                            and (c, r) not in occupied):
+                        candidates.append((c, r))
+            if candidates:
+                col, row = rng.choice(candidates)
+                npc = NPC(
+                    col=col, row=row,
+                    name=item_name,
+                    dialogue=[f"You found {item_name}!"],
+                    npc_type="quest_item",
+                )
+                npc._quest_name = quest_name
+                npc._quest_step_idx = step_idx
+                npc._item_sprite = item_sprite
+                npc.quest_highlight = True
+                ow_npcs.append(npc)
+                occupied.add((col, row))
+                placed_pos = (col, row)
+                break
+        if not placed_pos:
+            # Fallback
+            col, row = party.col + 5, party.row + 3
+            npc = NPC(
+                col=col, row=row,
+                name=item_name,
+                dialogue=[f"You found {item_name}!"],
+                npc_type="quest_item",
+            )
+            npc._quest_name = quest_name
+            npc._quest_step_idx = step_idx
+            npc._item_sprite = item_sprite
+            npc.quest_highlight = True
+            ow_npcs.append(npc)
+            placed_pos = (col, row)
+
+        return placed_pos
+
+    def _register_quest_town_collect(self, item_info, town_name):
+        """Register a collect item to spawn when the player enters a town."""
+        loc_key = f"town:{town_name}"
+        if loc_key not in self.quest_collect_items:
+            self.quest_collect_items[loc_key] = []
+        # Already added in the main loop; this is a no-op placeholder
+        # for future town-level collect spawning.
+        pass
 
     def _spawn_quest_monsters_town(self, quest_name, step_idx,
                                     monster_key, count, town_name,
@@ -1579,7 +1770,8 @@ class Game:
 
     def _register_quest_interior_monster(self, quest_name, step_idx,
                                           monster_key, count,
-                                          interior_name):
+                                          interior_name,
+                                          is_guardian=False):
         """Register quest monsters to spawn when the player enters an interior."""
         if not hasattr(self, "quest_interior_monsters"):
             self.quest_interior_monsters = {}
@@ -1591,11 +1783,13 @@ class Game:
             "quest_name": quest_name,
             "step_idx": step_idx,
             "count": count,
+            "is_guardian": is_guardian,
         })
 
     def _register_quest_dungeon_monster(self, quest_name, step_idx,
                                          monster_key, count,
-                                         dungeon_name):
+                                         dungeon_name,
+                                         is_guardian=False):
         """Register quest monsters to spawn when the player enters a dungeon."""
         if not hasattr(self, "quest_dungeon_monsters"):
             self.quest_dungeon_monsters = {}
@@ -1607,6 +1801,7 @@ class Game:
             "quest_name": quest_name,
             "step_idx": step_idx,
             "count": count,
+            "is_guardian": is_guardian,
         })
 
     def _build_town_from_layout(self, layout_name, town_name,
@@ -6583,20 +6778,48 @@ class Game:
     def _mod_quest_load_artifact_tiles(self):
         """Load artifact tile names for the quest step editor's item picker.
 
-        Pulls from the 'artifacts' tile-type category so that the
-        collect-step Item picker shows only user-defined artifact tiles.
+        Reads directly from tile_defs.json on disk (merged into
+        settings.TILE_DEFS at startup) so artifact tiles are available
+        even when the tile editor hasn't been opened yet.
         """
+        import json, os
+        from src import settings
+
         self._mod_quest_artifact_names = ["(none)"]
         self._mod_quest_artifact_sprites = {}  # display name -> sprite key
+
+        # Read saved tile defs from disk for context + sprite info
+        defs_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "tile_defs.json")
+        saved = {}
+        if os.path.isfile(defs_path):
+            try:
+                with open(defs_path, "r") as f:
+                    saved = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                pass
+
         fe = self.features_editor
-        for tile in fe.tile_list:
-            if tile.get("_context") == "artifacts":
-                name = tile.get("name", "")
+        for tid_str, tdef in saved.items():
+            if tdef.get("context") == "artifacts":
+                name = tdef.get("name", "")
                 if name:
                     self._mod_quest_artifact_names.append(name)
-                    sprite = tile.get("_sprite", "")
+                    sprite = tdef.get("sprite", "")
                     if sprite:
                         self._mod_quest_artifact_sprites[name] = sprite
+
+        # Also check features_editor.tile_list if populated (editor open)
+        if fe.tile_list:
+            for tile in fe.tile_list:
+                if tile.get("_context") == "artifacts":
+                    name = tile.get("name", "")
+                    if name and name not in self._mod_quest_artifact_sprites:
+                        self._mod_quest_artifact_names.append(name)
+                        sprite = tile.get("_sprite", "")
+                        if sprite:
+                            self._mod_quest_artifact_sprites[name] = sprite
 
     def _mod_quest_build_step_fields(self, preserve_cursor=False):
         """Build FieldEntry list for the selected quest step."""

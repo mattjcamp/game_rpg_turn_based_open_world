@@ -1497,6 +1497,25 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_gnome_sprite(npc, cx, cy)
             return
 
+        # Quest collectible item NPCs: draw glow and artifact sprite
+        if npc.npc_type == "quest_item":
+            self._draw_quest_item_glow(cx, cy, 32)
+            item_sprite_key = getattr(npc, "_item_sprite", "")
+            if item_sprite_key:
+                sprite = self._feat_resolve_sprite_field(
+                    "quest_item", item_sprite_key, 32)
+                if sprite:
+                    sx = cx - sprite.get_width() // 2
+                    sy = cy - sprite.get_height() // 2
+                    self.screen.blit(sprite, (sx, sy))
+                    return
+            # Fallback: draw a simple gem icon
+            pygame.draw.polygon(self.screen, (100, 200, 255), [
+                (cx, cy - 10), (cx + 7, cy), (cx, cy + 10), (cx - 7, cy)])
+            pygame.draw.polygon(self.screen, (180, 230, 255), [
+                (cx, cy - 10), (cx + 7, cy), (cx, cy + 10), (cx - 7, cy)], 1)
+            return
+
         # Quest monster NPCs: draw glow and use monster tile sprite
         if npc.npc_type == "quest_monster":
             self._draw_quest_monster_glow(cx, cy, 32)
@@ -2324,6 +2343,27 @@ class Renderer(CombatEffectRendererMixin):
                 if 0 <= nsc < cols and 0 <= nsr < rows:
                     nx = nsc * ts + ts // 2 + pad_x
                     ny = nsr * ts + ts // 2 + pad_y
+
+                    # Quest collectible items: cyan glow + artifact sprite
+                    if getattr(npc, "npc_type", "") == "quest_item":
+                        self._draw_quest_item_glow(nx, ny, ts)
+                        item_sprite_key = getattr(
+                            npc, "_item_sprite", "")
+                        if item_sprite_key:
+                            spr = self._feat_resolve_sprite_field(
+                                "quest_item", item_sprite_key, ts)
+                            if spr:
+                                sx = nx - spr.get_width() // 2
+                                sy = ny - spr.get_height() // 2
+                                self.screen.blit(spr, (sx, sy))
+                                continue
+                        # Fallback: gem shape
+                        pygame.draw.polygon(
+                            self.screen, (100, 200, 255),
+                            [(nx, ny - 10), (nx + 7, ny),
+                             (nx, ny + 10), (nx - 7, ny)])
+                        continue
+
                     npc_sprite = None
                     if npc.sprite:
                         npc_sprite = self._load_npc_custom_sprite(
@@ -3136,6 +3176,35 @@ class Renderer(CombatEffectRendererMixin):
                     mx = msc * ts + ts // 2
                     my = msr * ts + ts // 2
                     self._u3_draw_dungeon_monster(monster, mx, my)
+
+        # ── 2b. quest collect items (cyan glow + artifact sprite) ──
+        quest_items = getattr(dungeon_data, "quest_items", [])
+        for qitem in quest_items:
+            qsc = qitem["col"] - off_c
+            qsr = qitem["row"] - off_r
+            if 0 <= qsc < cols and 0 <= qsr < rows:
+                _vis = visible_tiles and (qitem["col"], qitem["row"]) in visible_tiles
+                _fallback = (not visible_tiles
+                             and abs(qitem["col"] - party.col) <= 1
+                             and abs(qitem["row"] - party.row) <= 1)
+                if _vis or _fallback:
+                    ix = qsc * ts + ts // 2
+                    iy = qsr * ts + ts // 2
+                    self._draw_quest_item_glow(ix, iy, ts)
+                    item_sprite_key = qitem.get("item_sprite", "")
+                    if item_sprite_key:
+                        spr = self._feat_resolve_sprite_field(
+                            "quest_item", item_sprite_key, ts)
+                        if spr:
+                            sx = ix - spr.get_width() // 2
+                            sy = iy - spr.get_height() // 2
+                            self.screen.blit(spr, (sx, sy))
+                            continue
+                    # Fallback: gem shape
+                    pygame.draw.polygon(
+                        self.screen, (100, 200, 255),
+                        [(ix, iy - 10), (ix + 7, iy),
+                         (ix, iy + 10), (ix - 7, iy)])
 
         # ── 3. party sprite ──
         psc = party.col - off_c
@@ -4568,23 +4637,29 @@ class Renderer(CombatEffectRendererMixin):
         return self._skeleton_fallback
 
     def _draw_quest_monster_glow(self, cx, cy, size=32):
-        """Draw a pulsing glow behind a quest-spawned monster."""
+        """Draw a pulsing golden-orange glow behind a quest-spawned monster."""
+        self._draw_pulsing_glow(
+            cx, cy, size, (255, 180, 40), (255, 220, 80))
+
+    def _draw_quest_item_glow(self, cx, cy, size=32):
+        """Draw a pulsing cyan glow behind a quest collectible item."""
+        self._draw_pulsing_glow(
+            cx, cy, size, (40, 180, 255), (80, 220, 255))
+
+    def _draw_pulsing_glow(self, cx, cy, size, outer_rgb, inner_rgb):
+        """Draw a pulsing glow circle at (cx, cy)."""
         import math, time
         t = time.time()
-        # Pulsing alpha: oscillate between 40 and 120
         pulse = (math.sin(t * 3.0) + 1.0) / 2.0  # 0..1
         alpha = int(40 + pulse * 80)
-        # Pulsing radius: oscillate between size*0.6 and size*0.8
         radius = int(size * (0.6 + pulse * 0.2))
         glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        # Golden-orange glow
-        pygame.draw.circle(glow, (255, 180, 40, alpha),
-                           (radius, radius), radius)
-        # Inner brighter core
+        pygame.draw.circle(
+            glow, (*outer_rgb, alpha), (radius, radius), radius)
         inner_r = max(4, radius // 2)
         inner_alpha = int(60 + pulse * 60)
-        pygame.draw.circle(glow, (255, 220, 80, inner_alpha),
-                           (radius, radius), inner_r)
+        pygame.draw.circle(
+            glow, (*inner_rgb, inner_alpha), (radius, radius), inner_r)
         self.screen.blit(glow, (cx - radius, cy - radius))
 
     def _u3_draw_dungeon_monster(self, monster, cx, cy):
