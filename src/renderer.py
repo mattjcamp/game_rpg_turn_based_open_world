@@ -11,7 +11,13 @@ import math
 import os
 import random
 import pygame
+import time
+import logging
+import json
+import numpy as np
+import pygame.surfarray as surfarray
 
+from collections import Counter
 from src.combat_engine import format_modifier
 from src.combat_effect_renderer import CombatEffectRendererMixin
 from src.settings import (
@@ -26,6 +32,12 @@ from src.settings import (
     TILE_DUNGEON_CLEARED,
     TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
+from src.monster import MONSTERS
+from src.party import (
+    ITEM_INFO, SPELLS_DATA, WEAPONS, ARMORS, EFFECTS_DATA,
+    PartyMember, VALID_RACES, RACE_INFO, grouped_index_to_original,
+)
+from src.tile_manifest import TileManifest
 
 
 class Renderer(CombatEffectRendererMixin):
@@ -44,7 +56,6 @@ class Renderer(CombatEffectRendererMixin):
         self._manifest.load()
         missing = self._manifest.validate()
         if missing:
-            import logging
             for cat, name, path in missing:
                 logging.getLogger(__name__).warning(
                     "Manifest asset missing: %s/%s -> %s", cat, name, path)
@@ -62,7 +73,6 @@ class Renderer(CombatEffectRendererMixin):
         rendering code works unchanged — only the loading source changed
         from scattered hardcoded paths to the unified tile manifest.
         """
-        import os
         assets_dir = os.path.join(os.path.dirname(__file__), "assets")
         dst_ts = 32  # destination tile size
 
@@ -571,7 +581,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 2b. Shadow Crystal on innkeeper's counter (quest trophy, no shake) ──
         if quest_complete:
-            import math
             import time as _time
             anim_t = _time.time()
             for npc in town_data.npcs:
@@ -1744,8 +1753,6 @@ class Renderer(CombatEffectRendererMixin):
         3. Light returns — golden light expands, darkness fades away
         4. Victory banner — QUEST COMPLETE with rewards
         """
-        import math
-
         t = effect.timer
         cx = SCREEN_WIDTH // 2
         cy = SCREEN_HEIGHT // 2
@@ -2006,8 +2013,6 @@ class Renderer(CombatEffectRendererMixin):
         2. Crystal shatters into sparks, gold coins rain
         3. QUEST COMPLETE banner with sparkles
         """
-        import math
-
         t = effect.timer
         cx = SCREEN_WIDTH // 2
         cy = SCREEN_HEIGHT // 2
@@ -2781,8 +2786,6 @@ class Renderer(CombatEffectRendererMixin):
 
     def _u3_draw_overworld_party(self, cx, cy, party=None):
         """Party map sprite — white-tinted fighter tile with torch effect."""
-        import math
-
         sprite = self._party_map_sprite
         if sprite:
             sx = cx - sprite.get_width() // 2
@@ -3062,7 +3065,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 1b. red glow on detected traps ──
         if detected_traps:
-            import math
             pulse = 0.55 + 0.45 * math.sin(pygame.time.get_ticks() * 0.005)
             alpha = int(70 * pulse)
             for (tc, tr) in detected_traps:
@@ -3383,8 +3385,6 @@ class Renderer(CombatEffectRendererMixin):
         3. (0.5-0.8) Iron bands crack and fall away with flash
         4. (0.8-1.0) Door swings open — planks lighten to regular door color
         """
-        import math
-
         col, row = anim["col"], anim["row"]
         sc = col - off_c
         sr = row - off_r
@@ -3528,8 +3528,6 @@ class Renderer(CombatEffectRendererMixin):
     def _u3_draw_artifact_pickup(self, anim, off_c, off_r, cols, rows, ts):
         """Draw artifact pickup celebration: expanding rings, rising sparks,
         and a floating artifact name that rises and fades."""
-        import math
-
         col, row = anim["col"], anim["row"]
         sc = col - off_c
         sr = row - off_r
@@ -3671,7 +3669,6 @@ class Renderer(CombatEffectRendererMixin):
         sc = col - off_c
         sr = row - off_r
         ticks = pygame.time.get_ticks()
-        import math
         pulse = 0.5 + 0.5 * math.sin(ticks * 0.005)
         alpha = int(50 + 40 * pulse)
         door_px = sc * ts
@@ -3684,7 +3681,6 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_quest_effects(self, effects):
         """Render quest visual effects (accepted, step complete, quest complete)."""
-        import math
         for fx in effects:
             p = 1.0 - fx["timer"] / fx["duration"]  # 0→1 progress
             kind = fx["type"]
@@ -3701,7 +3697,7 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_quest_accepted_effect(self, p):
         """Golden flash and rising sparkles when a quest is accepted."""
-        import math, random as _rng
+        import random as _rng
         sw, sh = self.screen.get_size()
 
         # Phase 1: golden flash overlay (0.0 - 0.3)
@@ -3756,7 +3752,7 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_step_complete_effect(self, p, text):
         """Rising golden text with sparkle burst for step completion."""
-        import math, random as _rng
+        import random as _rng
         sw, sh = self.screen.get_size()
 
         # Rising text with fade
@@ -3798,7 +3794,7 @@ class Renderer(CombatEffectRendererMixin):
     def _draw_quest_complete_ow_effect(self, p, quest_name,
                                         reward_xp, reward_gold):
         """Full quest completion celebration effect."""
-        import math, random as _rng
+        import random as _rng
         sw, sh = self.screen.get_size()
 
         # Phase 1: bright golden flash (0.0 - 0.2)
@@ -3921,167 +3917,20 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text(f"{prefix}{label}", ox + pad, y,
                           color, self.font)
 
-    def draw_town_action_screen(self, info, cursor):
-        """Draw the town/location entry confirmation panel over the overworld."""
-        name = info.get("name", "Town")
+    def _draw_action_screen(self, info, cursor, default_name, title_color, option_labels, extra_content_fn=None):
+        """
+        Shared helper to draw action screen panels (town, building, dungeon).
+
+        Args:
+            info: dict with 'name' and 'description' keys
+            cursor: selected option index
+            default_name: default name if not in info
+            title_color: RGB tuple for title text
+            option_labels: list of option label strings (typically 2 items)
+            extra_content_fn: optional callable(panel_x, panel_y, y) -> new_y for custom content between description and options
+        """
+        name = info.get("name", default_name)
         desc = info.get("description", "")
-
-        panel_w = 440
-        pad = 16
-        content_w = panel_w - pad * 2
-        line_h = 24
-        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
-        body_font = self.font          # 18px
-        hint_font = self.font_small    # 14px
-
-        # ── Word-wrap the description ──
-        desc_lines = []
-        for word in desc.split():
-            if desc_lines and body_font.size(desc_lines[-1] + " " + word)[0] <= content_w:
-                desc_lines[-1] += " " + word
-            else:
-                desc_lines.append(word)
-
-        # ── Calculate panel height ──
-        h = pad
-        h += 28           # title
-        h += 12           # gap
-        h += len(desc_lines) * line_h  # description
-        h += 16           # gap
-        h += line_h * 2   # two options
-        h += 12           # gap
-        h += 18           # hint
-        h += pad
-
-        panel_x = (SCREEN_WIDTH - panel_w) // 2
-        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
-
-        # ── Dim overlay ──
-        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 120))
-        self.screen.blit(dim, (0, 0))
-
-        # ── Panel ──
-        self._u3_panel(panel_x, panel_y, panel_w, h)
-
-        y = panel_y + pad
-
-        # ── Title ──
-        title_surf = title_font.render(name, True, (200, 180, 255))
-        self.screen.blit(title_surf, (panel_x + pad, y))
-        y += 28 + 12
-
-        # ── Description ──
-        for line in desc_lines:
-            line_surf = body_font.render(line, True, (220, 220, 240))
-            self.screen.blit(line_surf, (panel_x + pad, y))
-            y += line_h
-        y += 16
-
-        # ── Options ──
-        options = [f"Enter {name}", "Leave"]
-        for i, label in enumerate(options):
-            is_sel = (i == cursor)
-            if is_sel:
-                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
-                pygame.draw.rect(self.screen, (40, 40, 80), hl)
-                arrow_surf = body_font.render(">", True, (255, 220, 100))
-                self.screen.blit(arrow_surf, (panel_x + pad, y))
-
-            color = (255, 255, 255) if is_sel else (180, 180, 200)
-            opt_surf = body_font.render(label, True, color)
-            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
-            y += line_h
-        y += 12
-
-        # ── Hint ──
-        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
-        self.screen.blit(hint_surf, (panel_x + pad, y))
-
-    def draw_building_action_screen(self, info, cursor):
-        """Draw the building entry confirmation panel over the overworld."""
-        name = info.get("name", "Building")
-        desc = info.get("description", "")
-
-        panel_w = 440
-        pad = 16
-        content_w = panel_w - pad * 2
-        line_h = 24
-        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
-        body_font = self.font
-        hint_font = self.font_small
-
-        # ── Word-wrap the description ──
-        desc_lines = []
-        for word in desc.split():
-            if desc_lines and body_font.size(desc_lines[-1] + " " + word)[0] <= content_w:
-                desc_lines[-1] += " " + word
-            else:
-                desc_lines.append(word)
-
-        # ── Calculate panel height ──
-        h = pad
-        h += 28           # title
-        h += 12           # gap
-        h += len(desc_lines) * line_h  # description
-        h += 16           # gap
-        h += line_h * 2   # two options
-        h += 12           # gap
-        h += 18           # hint
-        h += pad
-
-        panel_x = (SCREEN_WIDTH - panel_w) // 2
-        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
-
-        # ── Dim overlay ──
-        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 120))
-        self.screen.blit(dim, (0, 0))
-
-        # ── Panel ──
-        self._u3_panel(panel_x, panel_y, panel_w, h)
-
-        y = panel_y + pad
-
-        # ── Title ──
-        title_surf = title_font.render(name, True, (180, 200, 255))
-        self.screen.blit(title_surf, (panel_x + pad, y))
-        y += 28 + 12
-
-        # ── Description ──
-        for line in desc_lines:
-            line_surf = body_font.render(line, True, (220, 220, 240))
-            self.screen.blit(line_surf, (panel_x + pad, y))
-            y += line_h
-        y += 16
-
-        # ── Options ──
-        options = [f"Enter {name}", "Leave"]
-        for i, label in enumerate(options):
-            is_sel = (i == cursor)
-            if is_sel:
-                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
-                pygame.draw.rect(self.screen, (40, 40, 80), hl)
-                arrow_surf = body_font.render(">", True, (255, 220, 100))
-                self.screen.blit(arrow_surf, (panel_x + pad, y))
-
-            color = (255, 255, 255) if is_sel else (180, 180, 200)
-            opt_surf = body_font.render(label, True, color)
-            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
-            y += line_h
-        y += 12
-
-        # ── Hint ──
-        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
-        self.screen.blit(hint_surf, (panel_x + pad, y))
-
-    def draw_dungeon_action_screen(self, info, cursor):
-        """Draw the dungeon entry confirmation panel over the overworld."""
-        name = info.get("name", "Unknown")
-        desc = info.get("description", "")
-        visited = info.get("visited", False)
-        cleared = info.get("cleared", False)
-        quest_name = info.get("quest_name")
 
         panel_w = 440
         pad = 16
@@ -4104,33 +3953,28 @@ class Renderer(CombatEffectRendererMixin):
         # ── Word-wrap the description ──
         desc_lines = _wrap(desc, body_font, content_w)
 
-        # ── Word-wrap the quest line ──
-        quest_lines = []
-        if quest_name:
-            quest_lines = _wrap(f"Quest: {quest_name}", body_font, content_w)
-
-        # ── Word-wrap the title ──
-        title_lines = _wrap(name, title_font, content_w)
-
         # ── Calculate panel height ──
-        h = pad  # top padding
-        h += len(title_lines) * 28  # title
-        h += 12  # gap
+        h = pad
+        h += 28           # title
+        h += 12           # gap
         h += len(desc_lines) * line_h  # description
-        h += 14  # gap
-        h += line_h  # status line
-        if quest_lines:
-            h += len(quest_lines) * line_h  # quest line(s)
-        h += 16  # gap
-        h += line_h * 2  # two options
-        h += 12  # gap
-        h += 18  # hint
-        h += pad  # bottom padding
+        h += 16           # gap
+
+        # Extra content height (if provided)
+        extra_height = 0
+        if extra_content_fn is not None:
+            extra_height = extra_content_fn(0, 0, 0)  # Query height
+            h += extra_height
+
+        h += line_h * 2   # two options
+        h += 12           # gap
+        h += 18           # hint
+        h += pad
 
         panel_x = (SCREEN_WIDTH - panel_w) // 2
         panel_y = (SCREEN_HEIGHT - h) // 2 - 20
 
-        # ── Dim overlay behind panel ──
+        # ── Dim overlay ──
         dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 120))
         self.screen.blit(dim, (0, 0))
@@ -4140,50 +3984,28 @@ class Renderer(CombatEffectRendererMixin):
 
         y = panel_y + pad
 
-        # ── Title (dungeon name in gold, word-wrapped) ──
-        for tline in title_lines:
-            title_surf = title_font.render(tline, True, (255, 200, 80))
-            self.screen.blit(title_surf, (panel_x + pad, y))
-            y += 28
-        y += 12
+        # ── Title ──
+        title_surf = title_font.render(name, True, title_color)
+        self.screen.blit(title_surf, (panel_x + pad, y))
+        y += 28 + 12
 
-        # ── Description (white, word-wrapped) ──
+        # ── Description ──
         for line in desc_lines:
             line_surf = body_font.render(line, True, (220, 220, 240))
             self.screen.blit(line_surf, (panel_x + pad, y))
             y += line_h
-        y += 14
-
-        # ── Status line ──
-        if cleared:
-            status_text = "This dungeon has been cleared."
-            status_color = (180, 180, 140)
-        elif visited:
-            status_text = "You have been here before."
-            status_color = (120, 200, 120)
-        else:
-            status_text = "This place is unexplored."
-            status_color = (120, 140, 200)
-        status_surf = body_font.render(status_text, True, status_color)
-        self.screen.blit(status_surf, (panel_x + pad, y))
-        y += line_h
-
-        # ── Quest line (if applicable, word-wrapped) ──
-        for qline in quest_lines:
-            quest_surf = body_font.render(qline, True, (255, 220, 100))
-            self.screen.blit(quest_surf, (panel_x + pad, y))
-            y += line_h
         y += 16
 
+        # ── Extra content (dungeon status/quest) ──
+        if extra_content_fn is not None:
+            y = extra_content_fn(panel_x, panel_y, y)
+
         # ── Options ──
-        options = ["Enter the Dungeon", "Leave"]
-        for i, label in enumerate(options):
+        for i, label in enumerate(option_labels):
             is_sel = (i == cursor)
             if is_sel:
-                # Highlight bar
                 hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
                 pygame.draw.rect(self.screen, (40, 40, 80), hl)
-                # Arrow
                 arrow_surf = body_font.render(">", True, (255, 220, 100))
                 self.screen.blit(arrow_surf, (panel_x + pad, y))
 
@@ -4194,6 +4016,161 @@ class Renderer(CombatEffectRendererMixin):
         y += 12
 
         # ── Hint ──
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
+        self.screen.blit(hint_surf, (panel_x + pad, y))
+
+    def draw_town_action_screen(self, info, cursor):
+        """Draw the town/location entry confirmation panel over the overworld."""
+        option_labels = [f"Enter {info.get('name', 'Town')}", "Leave"]
+        self._draw_action_screen(
+            info, cursor,
+            default_name="Town",
+            title_color=(200, 180, 255),
+            option_labels=option_labels
+        )
+
+    def draw_building_action_screen(self, info, cursor):
+        """Draw the building entry confirmation panel over the overworld."""
+        option_labels = [f"Enter {info.get('name', 'Building')}", "Leave"]
+        self._draw_action_screen(
+            info, cursor,
+            default_name="Building",
+            title_color=(180, 200, 255),
+            option_labels=option_labels
+        )
+
+    def draw_dungeon_action_screen(self, info, cursor):
+        """Draw the dungeon entry confirmation panel over the overworld."""
+        visited = info.get("visited", False)
+        cleared = info.get("cleared", False)
+        quest_name = info.get("quest_name")
+
+        panel_w = 440
+        pad = 16
+        content_w = panel_w - pad * 2
+        line_h = 24
+        body_font = self.font
+        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
+
+        # ── Helper: word-wrap text to fit content width ──
+        def _wrap(text, font, max_w):
+            lines = []
+            for word in text.split():
+                if lines and font.size(lines[-1] + " " + word)[0] <= max_w:
+                    lines[-1] += " " + word
+                else:
+                    lines.append(word)
+            return lines or [""]
+
+        name = info.get("name", "Unknown")
+        title_lines = _wrap(name, title_font, content_w)
+
+        quest_lines = []
+        if quest_name:
+            quest_lines = _wrap(f"Quest: {quest_name}", body_font, content_w)
+
+        # ── Closure to draw dungeon-specific extra content (status + quest) ──
+        def draw_dungeon_extras(panel_x, panel_y, current_y):
+            """Draw status line and quest lines. Returns new y position."""
+            if panel_x == 0:  # height query mode
+                height = line_h  # status line
+                if quest_lines:
+                    height += len(quest_lines) * line_h
+                height += 16  # gap after quest
+                return height
+
+            y = current_y
+            # ── Status line ──
+            if cleared:
+                status_text = "This dungeon has been cleared."
+                status_color = (180, 180, 140)
+            elif visited:
+                status_text = "You have been here before."
+                status_color = (120, 200, 120)
+            else:
+                status_text = "This place is unexplored."
+                status_color = (120, 140, 200)
+            status_surf = body_font.render(status_text, True, status_color)
+            self.screen.blit(status_surf, (panel_x + pad, y))
+            y += line_h
+
+            # ── Quest lines (if applicable) ──
+            for qline in quest_lines:
+                quest_surf = body_font.render(qline, True, (255, 220, 100))
+                self.screen.blit(quest_surf, (panel_x + pad, y))
+                y += line_h
+            y += 16
+
+            return y
+
+        # Need to account for multi-line title in dungeon
+        # Override height calculation in the helper
+        desc = info.get("description", "")
+        desc_lines = _wrap(desc, body_font, content_w)
+
+        h = pad
+        h += len(title_lines) * 28  # multi-line title
+        h += 12  # gap
+        h += len(desc_lines) * line_h  # description
+        h += 14  # gap
+        h += line_h  # status line
+        if quest_lines:
+            h += len(quest_lines) * line_h
+        h += 16  # gap
+        h += line_h * 2  # two options
+        h += 12  # gap
+        h += 18  # hint
+        h += pad
+
+        panel_w = 440
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
+
+        # ── Dim overlay ──
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.screen.blit(dim, (0, 0))
+
+        # ── Panel ──
+        self._u3_panel(panel_x, panel_y, panel_w, h)
+
+        y = panel_y + pad
+
+        # ── Multi-line Title (dungeon name in gold) ──
+        for tline in title_lines:
+            title_surf = title_font.render(tline, True, (255, 200, 80))
+            self.screen.blit(title_surf, (panel_x + pad, y))
+            y += 28
+        y += 12
+
+        # ── Description ──
+        for line in desc_lines:
+            line_surf = body_font.render(line, True, (220, 220, 240))
+            self.screen.blit(line_surf, (panel_x + pad, y))
+            y += line_h
+        y += 14
+
+        # ── Dungeon-specific content (status + quest) ──
+        y = draw_dungeon_extras(panel_x, panel_y, y)
+
+        # ── Options ──
+        option_labels = ["Enter the Dungeon", "Leave"]
+        for i, label in enumerate(option_labels):
+            is_sel = (i == cursor)
+            if is_sel:
+                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
+                pygame.draw.rect(self.screen, (40, 40, 80), hl)
+                arrow_surf = body_font.render(">", True, (255, 220, 100))
+                self.screen.blit(arrow_surf, (panel_x + pad, y))
+
+            color = (255, 255, 255) if is_sel else (180, 180, 200)
+            opt_surf = body_font.render(label, True, color)
+            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
+            y += line_h
+        y += 12
+
+        # ── Hint ──
+        hint_font = self.font_small
         hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
 
@@ -7183,7 +7160,6 @@ class Renderer(CombatEffectRendererMixin):
         elapsed     : total seconds since title screen appeared (for animations)
         module_info : optional string like "Module: Realm of Shadow v1.0.0"
         """
-        import math
         self.screen.fill((0, 0, 0))
 
         # ── Starfield background ──
@@ -11700,7 +11676,6 @@ class Renderer(CombatEffectRendererMixin):
         edit_section_cursor : which section is highlighted
         edit_section_scroll : scroll offset for section list
         """
-        import math
         self.screen.fill((0, 0, 0))
 
         fm = self.font_med
@@ -12580,7 +12555,6 @@ class Renderer(CombatEffectRendererMixin):
         cursor  : which option is highlighted
         elapsed : total seconds since game over screen appeared
         """
-        import math
         self.screen.fill((0, 0, 0))
 
         # ── Blood-red fog particles ──
@@ -14021,7 +13995,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── Shadow Crystal display case (quest trophy) ──
         if quest_complete:
-            import math
             import time as _time
             anim_t = _time.time()
 
@@ -15702,7 +15675,6 @@ class Renderer(CombatEffectRendererMixin):
                         self._cc_tile_cache[file_path] = sprite
                         return sprite
         # Fallback: direct load for custom/non-manifest sprites
-        import os
         project_root = os.path.dirname(os.path.dirname(__file__))
         abs_path = os.path.join(project_root, file_path)
         if not os.path.isfile(abs_path):
@@ -17294,7 +17266,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # Background: dark with subtle starfield
         self.screen.fill((5, 5, 15))
-        import random
         rng = random.Random(42)
         for _ in range(30):
             sx = rng.randint(0, sw)
@@ -17818,7 +17789,6 @@ class Renderer(CombatEffectRendererMixin):
 
         # Background
         self.screen.fill((5, 5, 15))
-        import random
         rng = random.Random(42)
         for _ in range(30):
             sx = rng.randint(0, sw)

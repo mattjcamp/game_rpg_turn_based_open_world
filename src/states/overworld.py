@@ -15,6 +15,8 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
     TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED,
+    GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_OVERWORLD, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
+    NPC_WANDER_RANGE, ORC_RESPAWN_CHANCE,
 )
 from src.dungeon_generator import generate_dungeon, generate_house_dungeon
 from src.monster import create_encounter, create_monster
@@ -141,8 +143,6 @@ class OverworldState(InventoryMixin, BaseState):
             self.message_timer = 3000
             # Spawn initial orcs
             self._spawn_orcs()
-            # ── TEST: place a spell-casting Dark Mage near the start ──
-            self._spawn_test_spellcaster()
 
     def _interact_machine(self):
         """Handle stepping on the gnome machine tile (Keys of Shadow)."""
@@ -204,30 +204,6 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.game_log.append("Victory! +500 XP, +1000 Gold")
         self.show_message(
             "Quest complete! Peace returns! Victory!", 6000)
-
-    def _spawn_test_spellcaster(self):
-        """Place a spell-casting Dark Mage 4 tiles east of the party start.
-
-        This is for testing the monster spell system — walk into it to
-        trigger a Dark Coven encounter with sleep/curse spells.
-        """
-        party = self.game.party
-        tile_map = self.game.tile_map
-        # Try a few offsets near the player
-        for dc, dr in [(4, 0), (3, 0), (5, 0), (4, 1), (3, -1), (0, 4)]:
-            c, r = party.col + dc, party.row + dr
-            if 0 <= c < tile_map.width and 0 <= r < tile_map.height:
-                if tile_map.is_walkable(c, r):
-                    mage = create_monster("Dark Mage")
-                    mage.encounter_template = {
-                        "name": "Dark Coven",
-                        "monster_names": ["Dark Mage", "Orc Shaman", "Goblin"],
-                        "monster_party_tile": "Dark Mage",
-                    }
-                    mage.col = c
-                    mage.row = r
-                    self.overworld_monsters.append(mage)
-                    return
 
     # ── Equipment management ─────────────────────────────────────
 
@@ -515,7 +491,7 @@ class OverworldState(InventoryMixin, BaseState):
                     self._move_overworld_npcs()
                     self._check_monster_contact()
                     # Occasionally respawn orcs that were killed
-                    if random.random() < 0.08:
+                    if random.random() < ORC_RESPAWN_CHANCE:
                         self._spawn_orcs()
                 else:
                     # Move building interior guardian NPCs
@@ -556,35 +532,16 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _collect_overworld_quest_item(self, npc):
         """Pick up a quest collectible item on the overworld."""
-        qname = getattr(npc, "_quest_name", "")
-        step_idx = getattr(npc, "_quest_step_idx", -1)
-        item_name = npc.name
-
-        # Remove the item NPC from the overworld
+        from src.quest_manager import collect_quest_item
         ow_npcs = getattr(self.game, "overworld_quest_npcs", [])
         if npc in ow_npcs:
             ow_npcs.remove(npc)
-
-        # Mark the quest step as complete
-        mq_states = getattr(self.game, "module_quest_states", {})
-        if qname and qname in mq_states:
-            qstate = mq_states[qname]
-            progress = qstate.get("step_progress", [])
-            if step_idx < len(progress):
-                progress[step_idx] = True
-                if all(progress):
-                    qstate["status"] = "completed"
-                    self.show_message(
-                        f"Collected {item_name}! Quest complete!", 3000)
-                else:
-                    self.show_message(
-                        f"Collected {item_name}!", 2500)
-            else:
-                self.show_message(f"Collected {item_name}!", 2500)
-        else:
-            self.show_message(f"Found {item_name}!", 2500)
-
-        self.game.sfx.play("treasure")
+        msg = collect_quest_item(
+            self.game,
+            getattr(npc, "_quest_name", ""),
+            getattr(npc, "_quest_step_idx", -1),
+            npc.name)
+        self.show_message(msg, 3000 if "complete" in msg.lower() else 2500)
 
     def _start_ow_npc_dialogue(self, npc):
         """Begin talking to an overworld quest NPC."""
@@ -776,81 +733,15 @@ class OverworldState(InventoryMixin, BaseState):
         Returns a message string if a step or quest was completed,
         otherwise None.
         """
-        killed = getattr(self.game, "pending_killed_monsters", [])
-        if not killed:
-            return None
-
-        mq_states = getattr(self.game, "module_quest_states", {})
-        quest_defs = getattr(self.game, "_module_quest_defs", [])
-
-        # Build a count of killed monster names (both raw and display)
-        from collections import Counter
-        killed_counts = Counter()
-        for name in killed:
-            display = name.replace("_", " ").title()
-            killed_counts[display] += 1
-            killed_counts[name] += 1
-
-        result_msg = None
-
-        for qdef in quest_defs:
-            qname = qdef.get("name", "")
-            if not qname:
-                continue
-            state = mq_states.get(qname, {})
-            if state.get("status") != "active":
-                continue
-
-            steps = qdef.get("steps", [])
-            progress = state.get("step_progress", [])
-
-            for i, step in enumerate(steps):
-                if i >= len(progress) or progress[i]:
-                    continue
-                if step.get("step_type") != "kill":
-                    continue
-                monster_display = step.get("monster", "")
-                if not monster_display:
-                    continue
-                target_count = max(1, step.get("target_count", 1))
-
-                monster_key = monster_display.lower().replace(" ", "_")
-                match_count = max(
-                    killed_counts.get(monster_display, 0),
-                    killed_counts.get(monster_key, 0))
-
-                if match_count <= 0:
-                    continue
-
-                kills_so_far = state.get(
-                    f"step_{i}_kills", 0) + match_count
-                state[f"step_{i}_kills"] = kills_so_far
-
-                if kills_so_far >= target_count:
-                    progress[i] = True
-                    desc = step.get('description', 'Kill step')
-                    result_msg = (
-                        f"Quest '{qname}': {desc} - Complete!")
-                    # Step completed visual effect
-                    self.quest_effects.append({
-                        "type": "step_complete",
-                        "timer": 2000,
-                        "duration": 2000,
-                        "text": desc,
-                    })
-                    self.game.sfx.play("treasure")
-
-            # Check if ALL steps are done — mark completed but
-            # rewards are given when the player returns to the quest giver
-            if all(progress) and progress:
-                if state["status"] != "completed":
-                    state["status"] = "completed"
-                    result_msg = (
-                        f"All steps done! Return to the quest "
-                        f"giver for your reward.")
-
-        # Clean up killed list so it's not processed twice
-        self.game.pending_killed_monsters = []
+        from src.quest_manager import check_quest_kills
+        result_msg = check_quest_kills(self.game)
+        if result_msg:
+            self.quest_effects.append({
+                "type": "step_complete",
+                "timer": 2000,
+                "duration": 2000,
+                "text": result_msg,
+            })
         return result_msg
 
     def _move_overworld_npcs(self):
@@ -922,12 +813,12 @@ class OverworldState(InventoryMixin, BaseState):
             anchor = getattr(mon, "_guardian_anchor", None)
             if anchor:
                 # ── Guardian behaviour: stay near artifact, intercept ──
-                leash = getattr(mon, "_guardian_leash", 4)
+                leash = getattr(mon, "_guardian_leash", GUARDIAN_LEASH)
                 ax, ay = anchor
                 dist_party_to_anchor = (abs(party.col - ax)
                                         + abs(party.row - ay))
                 # Intercept: pursue if party is within 8 tiles of artifact
-                if dist_party_to_anchor <= 8 and cheb <= 10:
+                if dist_party_to_anchor <= GUARDIAN_INTERCEPT_RANGE_OVERWORLD and cheb <= 10:
                     # Move toward party but don't stray too far from anchor
                     self._guardian_move_toward(
                         mon, party.col, party.row,
@@ -1617,10 +1508,10 @@ class OverworldState(InventoryMixin, BaseState):
                 npc._quest_name = qname
                 npc._quest_step_idx = step_idx
                 npc._monster_key = monster_key
-                npc.wander_range = 3
+                npc.wander_range = NPC_WANDER_RANGE
                 if is_guardian and anchor_pos:
                     npc._guardian_anchor = anchor_pos
-                    npc._guardian_leash = 4
+                    npc._guardian_leash = GUARDIAN_LEASH
                 self._building_interior_npcs.append(npc)
 
     def _check_building_interior_npc(self):
@@ -1638,31 +1529,15 @@ class OverworldState(InventoryMixin, BaseState):
 
     def _collect_building_quest_item(self, npc):
         """Pick up a quest collectible item inside a building interior."""
-        qname = getattr(npc, "_quest_name", "")
-        step_idx = getattr(npc, "_quest_step_idx", -1)
-        item_name = npc.name
-
+        from src.quest_manager import collect_quest_item
         if npc in self._building_interior_npcs:
             self._building_interior_npcs.remove(npc)
-
-        mq_states = getattr(self.game, "module_quest_states", {})
-        if qname and qname in mq_states:
-            qstate = mq_states[qname]
-            progress = qstate.get("step_progress", [])
-            if step_idx < len(progress):
-                progress[step_idx] = True
-                if all(progress):
-                    qstate["status"] = "completed"
-                    self.show_message(
-                        f"Collected {item_name}! Quest complete!", 3000)
-                else:
-                    self.show_message(f"Collected {item_name}!", 2500)
-            else:
-                self.show_message(f"Collected {item_name}!", 2500)
-        else:
-            self.show_message(f"Found {item_name}!", 2500)
-
-        self.game.sfx.play("treasure")
+        msg = collect_quest_item(
+            self.game,
+            getattr(npc, "_quest_name", ""),
+            getattr(npc, "_quest_step_idx", -1),
+            npc.name)
+        self.show_message(msg, 3000 if "complete" in msg.lower() else 2500)
 
     def _start_building_quest_combat(self, npc):
         """Initiate combat with a quest monster NPC inside a building."""
@@ -1714,13 +1589,13 @@ class OverworldState(InventoryMixin, BaseState):
             if not anchor:
                 continue
 
-            leash = getattr(npc, "_guardian_leash", 4)
+            leash = getattr(npc, "_guardian_leash", GUARDIAN_LEASH)
             ax, ay = anchor
             pcol, prow = party.col, party.row
             dist_party_to_anchor = abs(pcol - ax) + abs(prow - ay)
 
             # Guardian intercepts when party approaches artifact
-            if dist_party_to_anchor <= 6:
+            if dist_party_to_anchor <= GUARDIAN_INTERCEPT_RANGE_INTERIOR:
                 # Move toward party but stay within leash of anchor
                 best = None
                 best_dist = abs(npc.col - pcol) + abs(npc.row - prow)

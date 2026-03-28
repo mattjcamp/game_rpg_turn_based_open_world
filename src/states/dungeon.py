@@ -15,6 +15,7 @@ from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
     TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
+    GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
 )
 
 
@@ -156,72 +157,8 @@ class DungeonState(InventoryMixin, BaseState):
         Works like the overworld / town version but runs inside the
         dungeon state so kills are credited immediately.
         """
-        killed = getattr(self.game, "pending_killed_monsters", [])
-        if not killed:
-            return None
-
-        mq_states = getattr(self.game, "module_quest_states", {})
-        quest_defs = getattr(self.game, "_module_quest_defs", [])
-
-        from collections import Counter
-        killed_counts = Counter()
-        for name in killed:
-            display = name.replace("_", " ").title()
-            killed_counts[display] += 1
-            killed_counts[name] += 1
-
-        result_msg = None
-
-        for qdef in quest_defs:
-            qname = qdef.get("name", "")
-            if not qname:
-                continue
-            state = mq_states.get(qname, {})
-            if state.get("status") != "active":
-                continue
-
-            steps = qdef.get("steps", [])
-            progress = state.get("step_progress", [])
-
-            for i, step in enumerate(steps):
-                if i >= len(progress) or progress[i]:
-                    continue
-                if step.get("step_type") != "kill":
-                    continue
-                monster_display = step.get("monster", "")
-                if not monster_display:
-                    continue
-                target_count = max(1, step.get("target_count", 1))
-
-                monster_key = monster_display.lower().replace(" ", "_")
-                match_count = max(
-                    killed_counts.get(monster_display, 0),
-                    killed_counts.get(monster_key, 0))
-
-                if match_count <= 0:
-                    continue
-
-                kills_so_far = state.get(
-                    f"step_{i}_kills", 0) + match_count
-                state[f"step_{i}_kills"] = kills_so_far
-
-                if kills_so_far >= target_count:
-                    progress[i] = True
-                    desc = step.get("description", "Kill step")
-                    result_msg = (
-                        f"Quest '{qname}': {desc} - Complete!")
-                    self.game.sfx.play("treasure")
-
-            # Check if ALL steps are done
-            if all(progress) and progress:
-                if state["status"] != "completed":
-                    state["status"] = "completed"
-                    result_msg = (
-                        "All steps done! Return to the quest "
-                        "giver for your reward.")
-
-        # Don't clear pending_killed_monsters here — let the existing
-        # _check_kill_quest_progress handle that for key dungeon quests.
+        from src.quest_manager import check_quest_kills
+        result_msg = check_quest_kills(self.game)
         return result_msg
 
     def _inject_quest_dungeon_monsters(self):
@@ -423,7 +360,7 @@ class DungeonState(InventoryMixin, BaseState):
                 mon._quest_name = qname
                 mon._quest_step_idx = step_idx
                 mon._guardian_anchor = (col, row)
-                mon._guardian_leash = 4
+                mon._guardian_leash = GUARDIAN_LEASH
                 mon.col = gc
                 mon.row = gr
                 mon.encounter_template = {
@@ -445,38 +382,18 @@ class DungeonState(InventoryMixin, BaseState):
 
     def _collect_dungeon_quest_item(self, item_obj):
         """Pick up a quest collectible item in the dungeon."""
+        from src.quest_manager import collect_quest_item
         qname = item_obj["quest_name"]
         step_idx = item_obj["step_idx"]
         item_name = item_obj["item_name"]
 
-        # Remove the item from the dungeon
         if hasattr(self.dungeon_data, "quest_items"):
             if item_obj in self.dungeon_data.quest_items:
                 self.dungeon_data.quest_items.remove(item_obj)
 
-        # Mark the quest step as complete
-        mq_states = getattr(self.game, "module_quest_states", {})
-        if qname and qname in mq_states:
-            qstate = mq_states[qname]
-            progress = qstate.get("step_progress", [])
-            if step_idx < len(progress):
-                progress[step_idx] = True
-                if all(progress):
-                    qstate["status"] = "completed"
-                    self.show_message(
-                        f"Collected {item_name}! Quest complete!", 3000)
-                else:
-                    self.show_message(
-                        f"Collected {item_name}!", 2500)
-            else:
-                self.show_message(f"Collected {item_name}!", 2500)
-        else:
-            self.show_message(f"Found {item_name}!", 2500)
-
-        # Play treasure sound
-        sfx = getattr(self.game, "sfx", None)
-        if sfx:
-            sfx.play("treasure")
+        msg = collect_quest_item(
+            self.game, qname, step_idx, item_name)
+        self.show_message(msg, 3000 if "complete" in msg.lower() else 2500)
 
     def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
         """
@@ -1036,10 +953,10 @@ class DungeonState(InventoryMixin, BaseState):
             if anchor:
                 # ── Guardian: stay near artifact, intercept when party close ──
                 ax, ay = anchor
-                leash = getattr(monster, "_guardian_leash", 4)
+                leash = getattr(monster, "_guardian_leash", GUARDIAN_LEASH)
                 dist_party_to_anchor = (abs(party.col - ax)
                                         + abs(party.row - ay))
-                if (dist_party_to_anchor <= 6
+                if (dist_party_to_anchor <= GUARDIAN_INTERCEPT_RANGE_INTERIOR
                         and self._has_line_of_sight(
                             monster.col, monster.row,
                             party.col, party.row)):

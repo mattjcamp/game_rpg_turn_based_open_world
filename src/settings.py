@@ -113,3 +113,16 @@ PARTY_COLOR = (255, 255, 255)
 
 # ----- Graphics manifest -----
 TILE_MANIFEST_PATH = "data/tile_manifest.json"
+
+# ── Quest & NPC Constants ──────────────────────────────────
+GUARDIAN_LEASH = 4
+GUARDIAN_INTERCEPT_RANGE_OVERWORLD = 8
+GUARDIAN_INTERCEPT_RANGE_INTERIOR = 6
+NPC_WANDER_RANGE = 3
+ORC_RESPAWN_CHANCE = 0.08
+
+# ── UI Timer Constants (milliseconds) ─────────────────────
+MSG_TIMER_SHORT = 1500
+MSG_TIMER_MEDIUM = 2500
+MSG_TIMER_LONG = 3000
+MSG_TIMER_QUEST = 4000

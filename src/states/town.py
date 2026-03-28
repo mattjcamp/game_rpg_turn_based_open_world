@@ -15,6 +15,7 @@ from src.settings import (
     MOVE_REPEAT_DELAY, TILE_EXIT, TILE_DUNGEON,
     TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
     TILE_TOWN, TILE_MACHINE,
+    GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR, NPC_WANDER_RANGE,
 )
 from src.dungeon_generator import generate_innkeeper_quest_dungeon
 
@@ -315,77 +316,15 @@ class TownState(InventoryMixin, BaseState):
 
         Returns a message string if a step or quest was completed, else None.
         """
-        killed = getattr(self.game, "pending_killed_monsters", [])
-        if not killed:
-            return None
-
-        mq_states = getattr(self.game, "module_quest_states", {})
-        quest_defs = getattr(self.game, "_module_quest_defs", [])
-
-        from collections import Counter
-        killed_counts = Counter()
-        for name in killed:
-            display = name.replace("_", " ").title()
-            killed_counts[display] += 1
-            killed_counts[name] += 1
-
-        result_msg = None
-
-        for qdef in quest_defs:
-            qname = qdef.get("name", "")
-            if not qname:
-                continue
-            state = mq_states.get(qname, {})
-            if state.get("status") != "active":
-                continue
-
-            steps = qdef.get("steps", [])
-            progress = state.get("step_progress", [])
-
-            for i, step in enumerate(steps):
-                if i >= len(progress) or progress[i]:
-                    continue
-                if step.get("step_type") != "kill":
-                    continue
-                monster_display = step.get("monster", "")
-                if not monster_display:
-                    continue
-                target_count = max(1, step.get("target_count", 1))
-
-                monster_key = monster_display.lower().replace(" ", "_")
-                match_count = max(
-                    killed_counts.get(monster_display, 0),
-                    killed_counts.get(monster_key, 0))
-
-                if match_count <= 0:
-                    continue
-
-                kills_so_far = state.get(
-                    f"step_{i}_kills", 0) + match_count
-                state[f"step_{i}_kills"] = kills_so_far
-
-                if kills_so_far >= target_count:
-                    progress[i] = True
-                    desc = step.get("description", "Kill step")
-                    result_msg = (
-                        f"Quest '{qname}': {desc} - Complete!")
-                    self.quest_effects.append({
-                        "type": "step_complete",
-                        "timer": 2000,
-                        "duration": 2000,
-                        "text": desc,
-                    })
-                    self.game.sfx.play("treasure")
-
-            # Check if ALL steps are done
-            if all(progress) and progress:
-                if state["status"] != "completed":
-                    state["status"] = "completed"
-                    result_msg = (
-                        "All steps done! Return to the quest "
-                        "giver for your reward.")
-
-        self.game.pending_killed_monsters = []
+        from src.quest_manager import check_quest_kills
+        result_msg = check_quest_kills(self.game)
+        if result_msg:
+            self.quest_effects.append({
+                "type": "step_complete",
+                "timer": 2000,
+                "duration": 2000,
+                "text": result_msg,
+            })
         return result_msg
 
     def _refresh_quest_highlights(self):
@@ -1046,7 +985,7 @@ class TownState(InventoryMixin, BaseState):
                 npc._quest_name = qname
                 npc._quest_step_idx = step_idx
                 npc._monster_key = monster_key
-                npc.wander_range = 3
+                npc.wander_range = NPC_WANDER_RANGE
                 self.town_data.npcs.append(npc)
 
     def _spawn_interior_quest_monsters(self, interior_name, imap):
@@ -1143,10 +1082,10 @@ class TownState(InventoryMixin, BaseState):
                 npc._quest_name = qname
                 npc._quest_step_idx = step_idx
                 npc._monster_key = monster_key
-                npc.wander_range = 3
+                npc.wander_range = NPC_WANDER_RANGE
                 if is_guardian and anchor_pos:
                     npc._guardian_anchor = anchor_pos
-                    npc._guardian_leash = 4
+                    npc._guardian_leash = GUARDIAN_LEASH
                 self.town_data.npcs.append(npc)
 
     def _spawn_interior_quest_collect_items(self, interior_name, imap):
@@ -1370,41 +1309,16 @@ class TownState(InventoryMixin, BaseState):
         self.game.change_state("combat")
 
     def _collect_quest_item(self, npc):
-        """Pick up a quest collectible item NPC.
-
-        Marks the quest step as complete, removes the item NPC from the
-        map, and shows a pickup message.
-        """
-        qname = getattr(npc, "_quest_name", "")
-        step_idx = getattr(npc, "_quest_step_idx", -1)
-        item_name = npc.name
-
-        # Remove the item NPC from the map
+        """Pick up a quest collectible item NPC."""
+        from src.quest_manager import collect_quest_item
         if npc in self.town_data.npcs:
             self.town_data.npcs.remove(npc)
-
-        # Mark the quest step as complete
-        mq_states = getattr(self.game, "module_quest_states", {})
-        if qname and qname in mq_states:
-            qstate = mq_states[qname]
-            progress = qstate.get("step_progress", [])
-            if step_idx < len(progress):
-                progress[step_idx] = True
-                # Check if all steps are now complete
-                if all(progress):
-                    qstate["status"] = "completed"
-                    self.show_message(
-                        f"Collected {item_name}! Quest complete!", 3000)
-                else:
-                    self.show_message(
-                        f"Collected {item_name}!", 2500)
-            else:
-                self.show_message(
-                    f"Collected {item_name}!", 2500)
-        else:
-            self.show_message(f"Found {item_name}!", 2500)
-
-        self.game.sfx.play("treasure")
+        msg = collect_quest_item(
+            self.game,
+            getattr(npc, "_quest_name", ""),
+            getattr(npc, "_quest_step_idx", -1),
+            npc.name)
+        self.show_message(msg, 3000 if "complete" in msg.lower() else 2500)
 
     def _start_dialogue(self, npc):
         """Begin talking to an NPC, or open the shop for shopkeepers."""
@@ -2548,10 +2462,10 @@ class TownState(InventoryMixin, BaseState):
             # ── Guardian interception behaviour ──
             if anchor:
                 ax, ay = anchor
-                leash = getattr(npc, "_guardian_leash", 4)
+                leash = getattr(npc, "_guardian_leash", GUARDIAN_LEASH)
                 dist_party = (abs(party.col - ax) + abs(party.row - ay))
                 # Intercept when party is within 6 tiles of the artifact
-                if dist_party <= 6:
+                if dist_party <= GUARDIAN_INTERCEPT_RANGE_INTERIOR:
                     best = None
                     best_dist = (abs(npc.col - party.col)
                                  + abs(npc.row - party.row))
