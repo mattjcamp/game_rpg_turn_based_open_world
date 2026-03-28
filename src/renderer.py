@@ -1507,7 +1507,9 @@ class Renderer(CombatEffectRendererMixin):
         if sprite is None:
             sprite = self._npc_sprites.get(npc.npc_type)
         # Villagers rotate among several sprites based on name hash
-        if sprite is None and self._villager_sprites:
+        # (quest_monster NPCs skip this — they use the colored fallback)
+        if (sprite is None and self._villager_sprites
+                and npc.npc_type != "quest_monster"):
             idx = hash(npc.name) % len(self._villager_sprites)
             sprite = self._villager_sprites[idx]
         if sprite:
@@ -1522,6 +1524,7 @@ class Renderer(CombatEffectRendererMixin):
                 "elder":        (180, 80, 200),
                 "villager":     (100, 180, 100),
                 "quest_giver":  (220, 180, 60),
+                "quest_monster": (200, 40, 40),
             }
             color = npc_colors.get(npc.npc_type, (100, 180, 100))
             pygame.draw.circle(self.screen, color, (cx, cy - 9), 4)

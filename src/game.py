@@ -96,6 +96,7 @@ class Game:
         self.module_quest_states = {}  # {quest_name: {status, step_progress}}
         self.overworld_quest_npcs = []  # NPC objects placed on the overview map
         self.quest_spawned_monsters = {}  # {quest_name: [monster_obj, ...]}
+        self.quest_interior_monsters = {}  # {location_key: [{monster_key, ...}]}
         self.dungeon_cache = {}
         self.machine_col = None
         self.machine_row = None
@@ -507,6 +508,7 @@ class Game:
         self.module_quest_states = {}
         self.overworld_quest_npcs = []
         self.quest_spawned_monsters = {}
+        self.quest_interior_monsters = {}
         self.game_log = []
         self.dungeon_cache = {}  # clear persisted dungeon layouts
 
@@ -944,6 +946,17 @@ class Game:
         self.town_data_map = {}
         first_town = None
         town_ordinal = 0  # guarantees each town gets a different layout
+
+        # Pre-load towns.json so landmark towns can use user-edited tile
+        # data instead of layout templates or procedural generation.
+        if self.active_module_path:
+            self._load_module_towns(self.active_module_path)
+        _towns_json_by_name = {
+            t.get("name", ""): t
+            for t in getattr(self, "_mod_town_list", [])
+            if t.get("name")
+        }
+
         for i, lm in enumerate(overworld_cfg.get("landmarks", [])):
             if lm.get("type") != "town":
                 continue
@@ -962,12 +975,20 @@ class Game:
             else:
                 place_machine = False
             tc = town_configs.get(tid, {})
-            custom_layout = tc.get("layout", "")
-            if custom_layout:
-                # Use a player-created layout from town_templates.json
-                td = self._build_town_from_layout(
-                    custom_layout, tname,
-                    town_style=tc.get("style", "medieval"))
+            # Prefer user-edited town from towns.json over layout
+            # templates or procedural generation — this is the map the
+            # player actually designed in the town editor.
+            td = None
+            if tname in _towns_json_by_name:
+                td = self._build_town_from_towns_json(
+                    _towns_json_by_name[tname])
+            if td is None:
+                custom_layout = tc.get("layout", "")
+                if custom_layout:
+                    # Use a player-created layout from town_templates.json
+                    td = self._build_town_from_layout(
+                        custom_layout, tname,
+                        town_style=tc.get("style", "medieval"))
                 if td is None:
                     # Layout not found — fall back to procedural
                     td = generate_town(
@@ -978,15 +999,6 @@ class Game:
                         gnome_machine=place_machine,
                         keys_needed=gnome_keys_needed,
                         town_config=tc)
-            else:
-                td = generate_town(
-                    tname, seed=town_seed,
-                    layout_index=town_ordinal,
-                    has_key_dungeons=bool(self.key_dungeons),
-                    innkeeper_quests=inn_quests,
-                    gnome_machine=place_machine,
-                    keys_needed=gnome_keys_needed,
-                    town_config=tc)
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
             if first_town is None:
@@ -1003,15 +1015,9 @@ class Game:
         }
         # Index module manifest town definitions
         towns_by_name = {t.get("name", ""): t for t in manifest_towns}
-        # Also load towns.json which may have user-created towns with
-        # custom layouts that aren't referenced in the manifest.
-        if self.active_module_path:
-            self._load_module_towns(self.active_module_path)
-        towns_json_by_name = {
-            t.get("name", ""): t
-            for t in getattr(self, "_mod_town_list", [])
-            if t.get("name")
-        }
+        # Reuse the pre-loaded towns.json data (loaded before the
+        # landmark loop above).
+        towns_json_by_name = _towns_json_by_name
         tile_links = getattr(self.tile_map, "tile_links", {})
         for pos_key, link_val in tile_links.items():
             if not isinstance(link_val, dict):
@@ -1400,7 +1406,7 @@ class Game:
                 sprite=sprite,
             )
             npc._module_quest_name = qname
-            npc.wander_range = 0  # stationary quest giver
+            npc.wander_range = 4  # wander around like other NPCs
             target_td.npcs.append(npc)
 
     # ── Quest monster spawning ─────────────────────────────────────
@@ -1466,6 +1472,16 @@ class Game:
                 self._spawn_quest_monsters_town(
                     quest_name, step_idx, monster_key,
                     target_count, town_name, spawned)
+            elif spawn_loc.startswith("interior:"):
+                # Format: "interior:TownName/InteriorName"
+                rest = spawn_loc[len("interior:"):]
+                if "/" in rest:
+                    _town_name, interior_name = rest.split("/", 1)
+                else:
+                    interior_name = rest
+                self._register_quest_interior_monster(
+                    quest_name, step_idx, monster_key,
+                    target_count, interior_name)
 
         self.quest_spawned_monsters[quest_name] = spawned
 
@@ -1539,9 +1555,36 @@ class Game:
                                     monster_key, count, town_name,
                                     spawned):
         """Place quest monsters in a specific town."""
-        # Town monster spawning not yet implemented — overworld only
-        # for now.  Could be extended to place monsters in town maps.
-        pass
+        # Register them so they appear when the player enters the town.
+        # The town state will read quest_interior_monsters and spawn
+        # monster NPCs at runtime.
+        if not hasattr(self, "quest_interior_monsters"):
+            self.quest_interior_monsters = {}
+        key = f"town:{town_name}"
+        if key not in self.quest_interior_monsters:
+            self.quest_interior_monsters[key] = []
+        self.quest_interior_monsters[key].append({
+            "monster_key": monster_key,
+            "quest_name": quest_name,
+            "step_idx": step_idx,
+            "count": count,
+        })
+
+    def _register_quest_interior_monster(self, quest_name, step_idx,
+                                          monster_key, count,
+                                          interior_name):
+        """Register quest monsters to spawn when the player enters an interior."""
+        if not hasattr(self, "quest_interior_monsters"):
+            self.quest_interior_monsters = {}
+        key = f"interior:{interior_name}"
+        if key not in self.quest_interior_monsters:
+            self.quest_interior_monsters[key] = []
+        self.quest_interior_monsters[key].append({
+            "monster_key": monster_key,
+            "quest_name": quest_name,
+            "step_idx": step_idx,
+            "count": count,
+        })
 
     def _build_town_from_layout(self, layout_name, town_name,
                                  town_style="medieval"):
@@ -7106,12 +7149,20 @@ class Game:
 
     # ── Input handlers ──────────────────────────────────────────
 
+    # Modifier mask: Ctrl and Cmd (GUI/Meta) — the actual "command" keys.
+    # Filter out Caps Lock and Num Lock which can cause false positives.
+    _SAVE_MOD_MASK = (pygame.KMOD_CTRL
+                      | pygame.KMOD_META
+                      | getattr(pygame, "KMOD_GUI", 0))
+
     @staticmethod
     def _is_save_shortcut(event):
         """Return True if the event is Ctrl+S or Cmd+S (universal save)."""
         if event.key != pygame.K_s:
             return False
-        return bool(event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))
+        # Strip out Caps Lock / Num Lock — only test command modifiers
+        mods = event.mod & ~(pygame.KMOD_CAPS | pygame.KMOD_NUM)
+        return bool(mods & Game._SAVE_MOD_MASK)
 
     @staticmethod
     def _is_new_shortcut(event):
@@ -7401,8 +7452,7 @@ class Game:
                         self.music.play("title")
                         break
                     # Ctrl-S / Cmd-S: Quick Save
-                    if (event.key == pygame.K_s
-                            and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))):
+                    if self._is_save_shortcut(event):
                         self._do_quick_save()
                         break
                     # 1-4 opens/switches character sheet if the state supports it

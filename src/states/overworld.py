@@ -443,7 +443,10 @@ class OverworldState(InventoryMixin, BaseState):
             drow = -1
         elif keys_pressed[pygame.K_DOWN] or (
                 keys_pressed[pygame.K_s]
-                and not (pygame.key.get_mods() & (pygame.KMOD_CTRL | pygame.KMOD_META))):
+                and not ((pygame.key.get_mods()
+                          & ~(pygame.KMOD_CAPS | pygame.KMOD_NUM))
+                         & (pygame.KMOD_CTRL | pygame.KMOD_META
+                            | getattr(pygame, "KMOD_GUI", 0)))):
             drow = 1
 
         if dcol != 0 or drow != 0:

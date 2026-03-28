@@ -1,22 +1,52 @@
 [
   {
     "name": "Rat Patrol",
-    "description": "Kill 1 Wolf",
+    "description": "Kills a bunch of  monsters",
     "giver_npc": "GGG",
     "giver_sprite": "src/assets/game/characters/alchemist.png",
-    "giver_location": "town:New York",
-    "giver_dialogue": "Kill a wolf",
+    "giver_location": "town:Rando Town",
+    "giver_dialogue": "Kill wolf, will skeleton",
     "reward_xp": 0,
     "reward_gold": 0,
     "steps": [
       {
-        "description": "New Step",
+        "description": "Kill Wolf",
         "step_type": "kill",
         "monster": "Wolf",
         "target": "",
         "target_count": 1,
         "optional": "no",
         "spawn_location": "overview"
+      },
+      {
+        "description": "Kill Skeleton",
+        "step_type": "kill",
+        "monster": "Skeleton Archer",
+        "spawn_location": "interior:New York/Tunnel",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ]
+  },
+  {
+    "name": "Dungeon",
+    "description": "Kill something in a dungeon",
+    "giver_npc": "Elrond",
+    "giver_sprite": "src/assets/game/characters/illusionist.png",
+    "giver_location": "overview",
+    "giver_dialogue": "",
+    "reward_xp": 0,
+    "reward_gold": 0,
+    "steps": [
+      {
+        "description": "Kill Orc",
+        "step_type": "kill",
+        "monster": "Orc",
+        "spawn_location": "dungeon:Dank Place",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
       }
     ]
   }

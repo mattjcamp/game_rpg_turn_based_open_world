@@ -5136,6 +5136,13 @@ class CombatState(BaseState):
                         if mref in overworld_state.overworld_monsters:
                             overworld_state.overworld_monsters.remove(mref)
 
+            elif self.source_state == "town":
+                # Quest monster killed inside a town interior — the
+                # town state's enter() handles NPC removal and quest
+                # progress via _combat_monster_npc and
+                # pending_killed_monsters (already set by victory flow).
+                pass
+
         # ── Narrative summary for the world game log ──
         if won:
             if len(self.monsters) == 1:

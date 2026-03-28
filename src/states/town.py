@@ -275,6 +275,26 @@ class TownState(InventoryMixin, BaseState):
     def enter(self):
         """Called when this state becomes active."""
         self._apply_pending_combat_rewards()
+
+        # If returning from interior combat, stay in place and check kills
+        if getattr(self, "_returning_from_combat", False):
+            self._returning_from_combat = False
+            # Remove the killed monster NPC
+            dead_npc = getattr(self, "_combat_monster_npc", None)
+            if dead_npc and dead_npc in self.town_data.npcs:
+                self.town_data.npcs.remove(dead_npc)
+            self._combat_monster_npc = None
+            # Check quest kill progress
+            quest_msg = self._check_quest_monster_kills()
+            if quest_msg:
+                self.show_message(quest_msg, 4000)
+            # Update camera (still in the interior)
+            self.game.camera.map_width = self.town_data.tile_map.width
+            self.game.camera.map_height = self.town_data.tile_map.height
+            self.game.camera.update(
+                self.game.party.col, self.game.party.row)
+            return
+
         if self.town_data:
             town_name = self.town_data.name
             self.show_message(f"Welcome to {town_name}!", 2500)
@@ -286,6 +306,85 @@ class TownState(InventoryMixin, BaseState):
             self.game.camera.map_height = self.town_data.tile_map.height
             self.game.camera.update(self.game.party.col, self.game.party.row)
             self._refresh_quest_highlights()
+
+    def _check_quest_monster_kills(self):
+        """After returning from combat in an interior, check if the killed
+        monster was a quest target and update step progress.
+
+        Returns a message string if a step or quest was completed, else None.
+        """
+        killed = getattr(self.game, "pending_killed_monsters", [])
+        if not killed:
+            return None
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        quest_defs = getattr(self.game, "_module_quest_defs", [])
+
+        from collections import Counter
+        killed_counts = Counter()
+        for name in killed:
+            display = name.replace("_", " ").title()
+            killed_counts[display] += 1
+            killed_counts[name] += 1
+
+        result_msg = None
+
+        for qdef in quest_defs:
+            qname = qdef.get("name", "")
+            if not qname:
+                continue
+            state = mq_states.get(qname, {})
+            if state.get("status") != "active":
+                continue
+
+            steps = qdef.get("steps", [])
+            progress = state.get("step_progress", [])
+
+            for i, step in enumerate(steps):
+                if i >= len(progress) or progress[i]:
+                    continue
+                if step.get("step_type") != "kill":
+                    continue
+                monster_display = step.get("monster", "")
+                if not monster_display:
+                    continue
+                target_count = max(1, step.get("target_count", 1))
+
+                monster_key = monster_display.lower().replace(" ", "_")
+                match_count = max(
+                    killed_counts.get(monster_display, 0),
+                    killed_counts.get(monster_key, 0))
+
+                if match_count <= 0:
+                    continue
+
+                kills_so_far = state.get(
+                    f"step_{i}_kills", 0) + match_count
+                state[f"step_{i}_kills"] = kills_so_far
+
+                if kills_so_far >= target_count:
+                    progress[i] = True
+                    desc = step.get("description", "Kill step")
+                    result_msg = (
+                        f"Quest '{qname}': {desc} - Complete!")
+                    self.quest_effects.append({
+                        "type": "step_complete",
+                        "timer": 2000,
+                        "duration": 2000,
+                        "text": desc,
+                    })
+                    self.game.sfx.play("treasure")
+
+            # Check if ALL steps are done
+            if all(progress) and progress:
+                if state["status"] != "completed":
+                    state["status"] = "completed"
+                    result_msg = (
+                        "All steps done! Return to the quest "
+                        "giver for your reward.")
+
+        self.game.pending_killed_monsters = []
+        return result_msg
 
     def _refresh_quest_highlights(self):
         """Update quest_highlight on all NPCs based on current quest state."""
@@ -568,7 +667,10 @@ class TownState(InventoryMixin, BaseState):
             drow = -1
         elif keys_pressed[pygame.K_DOWN] or (
                 keys_pressed[pygame.K_s]
-                and not (pygame.key.get_mods() & (pygame.KMOD_CTRL | pygame.KMOD_META))):
+                and not ((pygame.key.get_mods()
+                          & ~(pygame.KMOD_CAPS | pygame.KMOD_NUM))
+                         & (pygame.KMOD_CTRL | pygame.KMOD_META
+                            | getattr(pygame, "KMOD_GUI", 0)))):
             drow = 1
 
         if dcol != 0 or drow != 0:
@@ -583,6 +685,10 @@ class TownState(InventoryMixin, BaseState):
         # Check for NPC at target
         npc = self.town_data.get_npc_at(target_col, target_row)
         if npc:
+            if npc.npc_type == "quest_monster":
+                self._start_quest_monster_combat(npc)
+                self.move_cooldown = MOVE_REPEAT_DELAY
+                return
             self._start_dialogue(npc)
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
@@ -804,7 +910,10 @@ class TownState(InventoryMixin, BaseState):
                     imap.sprite_overrides[(c, r)] = path
 
         self.town_data.tile_map = imap
-        self.town_data.npcs = []  # interiors have no NPCs (for now)
+        self.town_data.npcs = []  # interiors start with no NPCs
+
+        # ── Spawn quest monsters registered for this interior ──
+        self._spawn_interior_quest_monsters(interior_name, imap)
 
         # Collect exit positions and interior-to-interior links from tiles.
         # Also track which tile links back to the source interior so we can
@@ -863,6 +972,74 @@ class TownState(InventoryMixin, BaseState):
         self.game.camera.map_height = ih
         self.game.camera.update(self.game.party.col, self.game.party.row)
         self.show_message(f"Entering {interior_name}...", 1500)
+
+    def _spawn_interior_quest_monsters(self, interior_name, imap):
+        """Place quest monster NPCs inside an interior when entered.
+
+        Reads ``game.quest_interior_monsters`` for pending monsters
+        registered to this interior and creates NPC objects with
+        ``npc_type='quest_monster'`` on walkable tiles.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+        from src.monster import MONSTERS
+
+        monsters_dict = getattr(self.game, "quest_interior_monsters", {})
+        key = f"interior:{interior_name}"
+        entries = monsters_dict.get(key, [])
+        if not entries:
+            return
+
+        # Check which quests are still active (don't spawn for completed)
+        mq_states = getattr(self.game, "module_quest_states", {})
+
+        # Collect walkable tiles for placement
+        walkable = []
+        for wy in range(imap.height):
+            for wx in range(imap.width):
+                if imap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        occupied = set()
+        rng = _rng.Random(hash(interior_name) & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            monster_key = entry["monster_key"]
+            count = entry.get("count", 1)
+
+            # Skip if quest is no longer active
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            # Skip if this step is already complete
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            monster_info = MONSTERS.get(monster_key, {})
+            display_name = monster_info.get(
+                "name", monster_key.replace("_", " ").title())
+
+            for i in range(count):
+                free = [p for p in walkable if p not in occupied]
+                if not free:
+                    break
+                col, row = rng.choice(free)
+                occupied.add((col, row))
+
+                npc = NPC(
+                    col=col, row=row,
+                    name=display_name,
+                    dialogue=["*growls menacingly*"],
+                    npc_type="quest_monster",
+                )
+                npc._quest_name = qname
+                npc._quest_step_idx = step_idx
+                npc._monster_key = monster_key
+                npc.wander_range = 3
+                self.town_data.npcs.append(npc)
 
     # ── Machine interaction (Keys of Shadow) ──────────────────
 
@@ -984,6 +1161,42 @@ class TownState(InventoryMixin, BaseState):
         self.message_timer = 0
         if text:
             self.game.game_log.append(text)
+
+    def _start_quest_monster_combat(self, npc):
+        """Initiate combat with a quest monster NPC inside an interior."""
+        from src.monster import create_monster
+
+        monster_key = getattr(npc, "_monster_key", "skeleton")
+        combat_state = self.game.states.get("combat")
+        if not combat_state:
+            return
+
+        fighter = None
+        for member in self.game.party.members:
+            if member.is_alive():
+                fighter = member
+                break
+        if not fighter:
+            return
+
+        monsters = [create_monster(monster_key)]
+        enc_name = f"Quest: {npc.name}"
+
+        self.game.sfx.play("encounter")
+        terrain_tile = self.town_data.tile_map.get_tile(
+            self.game.party.col, self.game.party.row)
+        # Tag the NPC so _end_combat can remove it
+        npc._is_quest_monster_npc = True
+        # Store the monster NPC reference so combat can clean it up
+        self._combat_monster_npc = npc
+        self._returning_from_combat = True
+        combat_state.start_combat(
+            fighter, monsters,
+            source_state="town",
+            encounter_name=enc_name,
+            map_monster_refs=[npc],
+            terrain_tile=terrain_tile)
+        self.game.change_state("combat")
 
     def _start_dialogue(self, npc):
         """Begin talking to an NPC, or open the shop for shopkeepers."""
