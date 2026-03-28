@@ -97,6 +97,7 @@ class Game:
         self.overworld_quest_npcs = []  # NPC objects placed on the overview map
         self.quest_spawned_monsters = {}  # {quest_name: [monster_obj, ...]}
         self.quest_interior_monsters = {}  # {location_key: [{monster_key, ...}]}
+        self.quest_dungeon_monsters = {}   # {dungeon_name: [{monster_key, ...}]}
         self.dungeon_cache = {}
         self.machine_col = None
         self.machine_row = None
@@ -509,6 +510,7 @@ class Game:
         self.overworld_quest_npcs = []
         self.quest_spawned_monsters = {}
         self.quest_interior_monsters = {}
+        self.quest_dungeon_monsters = {}
         self.game_log = []
         self.dungeon_cache = {}  # clear persisted dungeon layouts
 
@@ -1482,6 +1484,11 @@ class Game:
                 self._register_quest_interior_monster(
                     quest_name, step_idx, monster_key,
                     target_count, interior_name)
+            elif spawn_loc.startswith("dungeon:"):
+                dungeon_name = spawn_loc[len("dungeon:"):]
+                self._register_quest_dungeon_monster(
+                    quest_name, step_idx, monster_key,
+                    target_count, dungeon_name)
 
         self.quest_spawned_monsters[quest_name] = spawned
 
@@ -1580,6 +1587,22 @@ class Game:
         if key not in self.quest_interior_monsters:
             self.quest_interior_monsters[key] = []
         self.quest_interior_monsters[key].append({
+            "monster_key": monster_key,
+            "quest_name": quest_name,
+            "step_idx": step_idx,
+            "count": count,
+        })
+
+    def _register_quest_dungeon_monster(self, quest_name, step_idx,
+                                         monster_key, count,
+                                         dungeon_name):
+        """Register quest monsters to spawn when the player enters a dungeon."""
+        if not hasattr(self, "quest_dungeon_monsters"):
+            self.quest_dungeon_monsters = {}
+        key = dungeon_name
+        if key not in self.quest_dungeon_monsters:
+            self.quest_dungeon_monsters[key] = []
+        self.quest_dungeon_monsters[key].append({
             "monster_key": monster_key,
             "quest_name": quest_name,
             "step_idx": step_idx,

@@ -100,10 +100,17 @@ class DungeonState(InventoryMixin, BaseState):
         Reads ``game.pending_killed_monsters`` (set by combat victory),
         increments the quest's ``kill_progress``, and spawns a portal
         when the required kill count is reached.
+        Also checks module quest kill steps.
         """
         killed = getattr(self.game, "pending_killed_monsters", [])
         if not killed:
             return
+
+        # Check module quest kills BEFORE consuming the list
+        mod_msg = self._check_module_quest_kills()
+        if mod_msg:
+            self.show_message(mod_msg, 4000)
+
         # Consume the list so it doesn't get counted again
         self.game.pending_killed_monsters = []
 
@@ -142,6 +149,150 @@ class DungeonState(InventoryMixin, BaseState):
             self.show_message(
                 f"{target} defeated! ({progress}/{needed})", 2000)
 
+    def _check_module_quest_kills(self):
+        """After combat in a dungeon, check if killed monsters count
+        toward any active module quest kill steps.
+
+        Works like the overworld / town version but runs inside the
+        dungeon state so kills are credited immediately.
+        """
+        killed = getattr(self.game, "pending_killed_monsters", [])
+        if not killed:
+            return None
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        quest_defs = getattr(self.game, "_module_quest_defs", [])
+
+        from collections import Counter
+        killed_counts = Counter()
+        for name in killed:
+            display = name.replace("_", " ").title()
+            killed_counts[display] += 1
+            killed_counts[name] += 1
+
+        result_msg = None
+
+        for qdef in quest_defs:
+            qname = qdef.get("name", "")
+            if not qname:
+                continue
+            state = mq_states.get(qname, {})
+            if state.get("status") != "active":
+                continue
+
+            steps = qdef.get("steps", [])
+            progress = state.get("step_progress", [])
+
+            for i, step in enumerate(steps):
+                if i >= len(progress) or progress[i]:
+                    continue
+                if step.get("step_type") != "kill":
+                    continue
+                monster_display = step.get("monster", "")
+                if not monster_display:
+                    continue
+                target_count = max(1, step.get("target_count", 1))
+
+                monster_key = monster_display.lower().replace(" ", "_")
+                match_count = max(
+                    killed_counts.get(monster_display, 0),
+                    killed_counts.get(monster_key, 0))
+
+                if match_count <= 0:
+                    continue
+
+                kills_so_far = state.get(
+                    f"step_{i}_kills", 0) + match_count
+                state[f"step_{i}_kills"] = kills_so_far
+
+                if kills_so_far >= target_count:
+                    progress[i] = True
+                    desc = step.get("description", "Kill step")
+                    result_msg = (
+                        f"Quest '{qname}': {desc} - Complete!")
+                    self.game.sfx.play("treasure")
+
+            # Check if ALL steps are done
+            if all(progress) and progress:
+                if state["status"] != "completed":
+                    state["status"] = "completed"
+                    result_msg = (
+                        "All steps done! Return to the quest "
+                        "giver for your reward.")
+
+        # Don't clear pending_killed_monsters here — let the existing
+        # _check_kill_quest_progress handle that for key dungeon quests.
+        return result_msg
+
+    def _inject_quest_dungeon_monsters(self):
+        """Add quest-registered monsters to the dungeon's monster list.
+
+        Reads ``game.quest_dungeon_monsters`` for entries matching this
+        dungeon's name, creates Monster objects and adds them to
+        ``dungeon_data.monsters`` on walkable tiles.
+        """
+        import random as _rng
+        from src.monster import create_monster, MONSTERS
+
+        dname = getattr(self.dungeon_data, "name", "")
+        monsters_dict = getattr(self.game, "quest_dungeon_monsters", {})
+        entries = monsters_dict.get(dname, [])
+        if not entries:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        tmap = self.dungeon_data.tile_map
+
+        # Collect walkable floor tiles
+        walkable = []
+        for wy in range(tmap.height):
+            for wx in range(tmap.width):
+                if tmap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        occupied = {(m.col, m.row) for m in self.dungeon_data.monsters
+                    if m.is_alive()}
+        occupied.add((self.dungeon_data.entry_col,
+                       self.dungeon_data.entry_row))
+
+        rng = _rng.Random(hash(dname) & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            monster_key = entry["monster_key"]
+            count = entry.get("count", 1)
+
+            # Skip if quest is no longer active
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            # Skip if this step is already complete
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            for i in range(count):
+                mon = create_monster(monster_key)
+                mon._quest_name = qname
+                mon._quest_step_idx = step_idx
+
+                free = [p for p in walkable if p not in occupied]
+                if free:
+                    col, row = rng.choice(free)
+                else:
+                    col = self.dungeon_data.entry_col + 3 + i
+                    row = self.dungeon_data.entry_row
+                mon.col = col
+                mon.row = row
+                mon.encounter_template = {
+                    "name": f"Quest: {mon.name}",
+                    "monster_names": [monster_key],
+                    "monster_party_tile": monster_key,
+                }
+                self.dungeon_data.monsters.append(mon)
+                occupied.add((col, row))
+
     def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
         """
         Set up a multi-level quest dungeon.
@@ -174,6 +325,8 @@ class DungeonState(InventoryMixin, BaseState):
         # First entry into dungeon
         if self.dungeon_data:
             self._entered = True
+            # Inject quest monsters registered for this dungeon
+            self._inject_quest_dungeon_monsters()
             # Try to light the equipped torch automatically
             if self._activate_torch():
                 self.show_message(
