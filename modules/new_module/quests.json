@@ -16,7 +16,7 @@
         "collect_item": "Crystal",
         "has_guardian": "yes",
         "guardian_monster": "Dark Mage",
-        "spawn_location": "dungeon:Dank Place",
+        "spawn_location": "building:The Shrine",
         "target": "",
         "target_count": 1,
         "optional": "no"

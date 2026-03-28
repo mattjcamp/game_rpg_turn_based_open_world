@@ -386,39 +386,6 @@
     "context": "overworld",
     "sprite": "overworld/dungeon"
   },
-  "40": {
-    "name": "Grass Copy",
-    "walkable": true,
-    "color": [
-      34,
-      139,
-      34
-    ],
-    "context": "overworld",
-    "sprite": "overworld/grass"
-  },
-  "41": {
-    "name": "Grass Copy",
-    "walkable": true,
-    "color": [
-      34,
-      139,
-      34
-    ],
-    "context": "overworld",
-    "sprite": "overworld/grass"
-  },
-  "42": {
-    "name": "Grass Copy",
-    "walkable": true,
-    "color": [
-      34,
-      139,
-      34
-    ],
-    "context": "overworld",
-    "sprite": "overworld/grass"
-  },
   "43": {
     "name": "Crystal",
     "walkable": true,
@@ -440,5 +407,16 @@
     ],
     "context": "artifacts",
     "sprite": "items/sword"
+  },
+  "45": {
+    "name": "Shrine",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "overworld",
+    "sprite": "overworld/shrine_church"
   }
 }

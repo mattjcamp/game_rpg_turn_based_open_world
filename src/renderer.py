@@ -2364,6 +2364,28 @@ class Renderer(CombatEffectRendererMixin):
                              (nx, ny + 10), (nx - 7, ny)])
                         continue
 
+                    # Quest monster NPCs (guardians): glow + monster sprite
+                    if getattr(npc, "npc_type", "") == "quest_monster":
+                        self._draw_quest_monster_glow(nx, ny, ts)
+                        mkey = getattr(npc, "_monster_key", "")
+                        if mkey:
+                            from src.monster import MONSTERS
+                            minfo = MONSTERS.get(mkey, {})
+                            mtile = minfo.get("tile", "")
+                            if mtile:
+                                mspr = self._load_monster_tile_preview(
+                                    mtile, ts)
+                                if mspr:
+                                    sx = nx - mspr.get_width() // 2
+                                    sy = ny - mspr.get_height() // 2
+                                    self.screen.blit(mspr, (sx, sy))
+                                    continue
+                        # Fallback: red circle
+                        pygame.draw.circle(
+                            self.screen, (200, 40, 40),
+                            (nx, ny), ts // 2 - 2)
+                        continue
+
                     npc_sprite = None
                     if npc.sprite:
                         npc_sprite = self._load_npc_custom_sprite(

@@ -95,6 +95,11 @@ class OverworldState(InventoryMixin, BaseState):
         # Stashed overworld state restored on exit
         self._stashed_overworld_tile_map = None
         self._stashed_overworld_monsters = None
+        # NPCs spawned inside building interiors (quest items + guardians)
+        self._building_interior_npcs = []
+        self._building_combat_npc = None
+        self._building_returning_from_combat = False
+        self._building_name = ""  # the building name (not space name)
 
         # ── Overworld NPC dialogue (module quest givers) ──
         self.ow_npc_dialogue_active = False
@@ -113,6 +118,16 @@ class OverworldState(InventoryMixin, BaseState):
         self._apply_pending_combat_rewards()
         # Check quest kill progress (sets message if a step completed)
         quest_msg = self._check_quest_monster_kills()
+        # Clean up building interior quest monster after combat
+        if self._building_returning_from_combat and self._building_combat_npc:
+            combat_state = self.game.states.get("combat")
+            player_won = getattr(combat_state, "player_won", True)
+            if player_won:
+                npc = self._building_combat_npc
+                if npc in self._building_interior_npcs:
+                    self._building_interior_npcs.remove(npc)
+            self._building_combat_npc = None
+            self._building_returning_from_combat = False
         # Skip the first tile-event check so we don't immediately re-enter
         # the town/dungeon we just left.
         self._exit_grace = True
@@ -121,7 +136,7 @@ class OverworldState(InventoryMixin, BaseState):
         elif self.pending_combat_message:
             self.show_message(self.pending_combat_message, 2500)
             self.pending_combat_message = None
-        elif not self.overworld_monsters:
+        elif not self.overworld_monsters and not self._in_overworld_interior:
             self.message = "Welcome, adventurers! Use arrow keys to explore."
             self.message_timer = 3000
             # Spawn initial orcs
@@ -425,9 +440,12 @@ class OverworldState(InventoryMixin, BaseState):
                         self.party_inv_member = 0
                         return
 
-        # If showing party, character detail, party inventory, or NPC dialogue, block all other input
+        # If showing party, character detail, party inventory, NPC dialogue,
+        # or an action screen, block all other input (including movement).
         if (self.showing_party or self.showing_char_detail is not None
-                or self.showing_party_inv or self.ow_npc_dialogue_active):
+                or self.showing_party_inv or self.ow_npc_dialogue_active
+                or self.town_action_active or self.dungeon_action_active
+                or self.building_action_active):
             return
 
         # Movement only if cooldown has elapsed
@@ -453,6 +471,19 @@ class OverworldState(InventoryMixin, BaseState):
             party = self.game.party
             target_col = party.col + dcol
             target_row = party.row + drow
+
+            # Bump-to-interact: building interior NPCs
+            if self._in_overworld_interior and self._building_interior_npcs:
+                for bnpc in self._building_interior_npcs:
+                    if bnpc.col == target_col and bnpc.row == target_row:
+                        if bnpc.npc_type == "quest_monster":
+                            self._start_building_quest_combat(bnpc)
+                            self.move_cooldown = MOVE_REPEAT_DELAY
+                            return
+                        elif bnpc.npc_type == "quest_item":
+                            self._collect_building_quest_item(bnpc)
+                            self.move_cooldown = MOVE_REPEAT_DELAY
+                            return
 
             # Bump-to-talk: check if a quest NPC is on the target tile
             ow_npc = self._get_ow_npc_at(target_col, target_row)
@@ -486,6 +517,11 @@ class OverworldState(InventoryMixin, BaseState):
                     # Occasionally respawn orcs that were killed
                     if random.random() < 0.08:
                         self._spawn_orcs()
+                else:
+                    # Move building interior guardian NPCs
+                    if self._building_interior_npcs:
+                        self._move_building_interior_npcs()
+                        self._check_building_interior_npc()
                 # Tick Galadriel's Light step counter
                 self._tick_galadriels_light()
             else:
@@ -1240,7 +1276,8 @@ class OverworldState(InventoryMixin, BaseState):
 
     # ── Overworld interior entry / exit ──────────────────────
 
-    def _enter_overworld_interior(self, interior_name, door_col, door_row):
+    def _enter_overworld_interior(self, interior_name, door_col, door_row,
+                                     building_name=""):
         """Transition into an overworld interior (dungeon-style map)."""
         tmap = self.game.tile_map
 
@@ -1393,6 +1430,15 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.camera.map_width = iw
         self.game.camera.map_height = ih
         self.game.camera.update(self.game.party.col, self.game.party.row)
+
+        # Spawn quest items and guardians for this building interior.
+        # Quest data is keyed by building name, not the space/interior name.
+        self._building_interior_npcs = []
+        self._building_name = building_name or interior_name
+        quest_key_name = self._building_name
+        self._spawn_building_quest_collect_items(quest_key_name, imap)
+        self._spawn_building_quest_monsters(quest_key_name, imap)
+
         self.show_message(f"Entering {interior_name}...", 1500)
 
     def _exit_overworld_interior(self):
@@ -1425,8 +1471,295 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.camera.map_width = self.game.tile_map.width
         self.game.camera.map_height = self.game.tile_map.height
         self.game.camera.update(self.game.party.col, self.game.party.row)
+        self._building_interior_npcs = []
+        self._building_name = ""
         self._exit_grace = True  # don't re-trigger the tile link immediately
         self.show_message(f"Leaving {leaving_name}...", 1000)
+
+    # ── Building interior quest spawning & interaction ─────────
+
+    def _spawn_building_quest_collect_items(self, interior_name, imap):
+        """Place collectible quest items inside a building interior."""
+        import random as _rng
+        from src.town_generator import NPC
+
+        items_dict = getattr(self.game, "quest_collect_items", {})
+        key = f"building:{interior_name}"
+        entries = items_dict.get(key, [])
+        if not entries:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+
+        walkable = []
+        for wy in range(imap.height):
+            for wx in range(imap.width):
+                if imap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        occupied = set()
+        # Exclude exit positions
+        occupied.update(self._overworld_interior_exit_positions)
+        rng = _rng.Random(hash(interior_name) & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            item_name = entry["item_name"]
+            item_sprite = entry.get("item_sprite", "")
+
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            free = [p for p in walkable if p not in occupied]
+            if not free:
+                break
+            col, row = rng.choice(free)
+            occupied.add((col, row))
+
+            npc = NPC(
+                col=col, row=row,
+                name=item_name,
+                dialogue=[f"You found {item_name}!"],
+                npc_type="quest_item",
+            )
+            npc._quest_name = qname
+            npc._quest_step_idx = step_idx
+            npc._item_sprite = item_sprite
+            npc.quest_highlight = True
+            self._building_interior_npcs.append(npc)
+
+    def _spawn_building_quest_monsters(self, interior_name, imap):
+        """Place quest monster NPCs inside a building interior."""
+        import random as _rng
+        from src.town_generator import NPC
+        from src.monster import MONSTERS
+
+        monsters_dict = getattr(self.game, "quest_interior_monsters", {})
+        key = f"building:{interior_name}"
+        entries = monsters_dict.get(key, [])
+        if not entries:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+
+        walkable = []
+        for wy in range(imap.height):
+            for wx in range(imap.width):
+                if imap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        occupied = {(n.col, n.row) for n in self._building_interior_npcs}
+        occupied.update(self._overworld_interior_exit_positions)
+        rng = _rng.Random(hash(interior_name + "_mon") & 0xFFFFFFFF)
+
+        for entry in entries:
+            qname = entry["quest_name"]
+            step_idx = entry["step_idx"]
+            monster_key = entry["monster_key"]
+            count = entry.get("count", 1)
+            is_guardian = entry.get("is_guardian", False)
+
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") != "active":
+                continue
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress) and progress[step_idx]:
+                continue
+
+            monster_info = MONSTERS.get(monster_key, {})
+            display_name = monster_info.get(
+                "name", monster_key.replace("_", " ").title())
+
+            # Find the quest_item this guardian protects
+            anchor_pos = None
+            if is_guardian:
+                for existing_npc in self._building_interior_npcs:
+                    if (getattr(existing_npc, "npc_type", "") == "quest_item"
+                            and getattr(existing_npc, "_quest_name", "") == qname
+                            and getattr(existing_npc, "_quest_step_idx", -1) == step_idx):
+                        anchor_pos = (existing_npc.col, existing_npc.row)
+                        break
+
+            for i in range(count):
+                if anchor_pos:
+                    ax, ay = anchor_pos
+                    nearby = [(ax + dc, ay + dr)
+                              for dc in range(-2, 3)
+                              for dr in range(-2, 3)
+                              if (dc, dr) != (0, 0)
+                              and (ax + dc, ay + dr) in walkable
+                              and (ax + dc, ay + dr) not in occupied]
+                    if nearby:
+                        col, row = rng.choice(nearby)
+                    else:
+                        free = [p for p in walkable if p not in occupied]
+                        if not free:
+                            break
+                        col, row = rng.choice(free)
+                else:
+                    free = [p for p in walkable if p not in occupied]
+                    if not free:
+                        break
+                    col, row = rng.choice(free)
+                occupied.add((col, row))
+
+                npc = NPC(
+                    col=col, row=row,
+                    name=display_name,
+                    dialogue=["*growls menacingly*"],
+                    npc_type="quest_monster",
+                )
+                npc._quest_name = qname
+                npc._quest_step_idx = step_idx
+                npc._monster_key = monster_key
+                npc.wander_range = 3
+                if is_guardian and anchor_pos:
+                    npc._guardian_anchor = anchor_pos
+                    npc._guardian_leash = 4
+                self._building_interior_npcs.append(npc)
+
+    def _check_building_interior_npc(self):
+        """Check if the party bumped into a building interior NPC."""
+        party = self.game.party
+        for npc in self._building_interior_npcs:
+            if npc.col == party.col and npc.row == party.row:
+                if npc.npc_type == "quest_monster":
+                    self._start_building_quest_combat(npc)
+                    return True
+                elif npc.npc_type == "quest_item":
+                    self._collect_building_quest_item(npc)
+                    return True
+        return False
+
+    def _collect_building_quest_item(self, npc):
+        """Pick up a quest collectible item inside a building interior."""
+        qname = getattr(npc, "_quest_name", "")
+        step_idx = getattr(npc, "_quest_step_idx", -1)
+        item_name = npc.name
+
+        if npc in self._building_interior_npcs:
+            self._building_interior_npcs.remove(npc)
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+        if qname and qname in mq_states:
+            qstate = mq_states[qname]
+            progress = qstate.get("step_progress", [])
+            if step_idx < len(progress):
+                progress[step_idx] = True
+                if all(progress):
+                    qstate["status"] = "completed"
+                    self.show_message(
+                        f"Collected {item_name}! Quest complete!", 3000)
+                else:
+                    self.show_message(f"Collected {item_name}!", 2500)
+            else:
+                self.show_message(f"Collected {item_name}!", 2500)
+        else:
+            self.show_message(f"Found {item_name}!", 2500)
+
+        self.game.sfx.play("treasure")
+
+    def _start_building_quest_combat(self, npc):
+        """Initiate combat with a quest monster NPC inside a building."""
+        from src.monster import create_monster
+
+        monster_key = getattr(npc, "_monster_key", "skeleton")
+        combat_state = self.game.states.get("combat")
+        if not combat_state:
+            return
+
+        fighter = None
+        for member in self.game.party.members:
+            if member.is_alive():
+                fighter = member
+                break
+        if not fighter:
+            return
+
+        monsters = [create_monster(monster_key)]
+        enc_name = f"Quest: {npc.name}"
+
+        self.game.sfx.play("encounter")
+        terrain_tile = self.game.tile_map.get_tile(
+            self.game.party.col, self.game.party.row)
+        npc._is_quest_monster_npc = True
+        self._building_combat_npc = npc
+        self._building_returning_from_combat = True
+        combat_state.start_combat(
+            fighter, monsters,
+            source_state="overworld",
+            encounter_name=enc_name,
+            terrain_tile=terrain_tile)
+        self.game.change_state("combat")
+
+    def _move_building_interior_npcs(self):
+        """Move guardian monsters inside a building interior."""
+        import random as _rng
+        import time as _t
+
+        party = self.game.party
+        occupied = {(n.col, n.row) for n in self._building_interior_npcs}
+        occupied.add((party.col, party.row))
+
+        for npc in self._building_interior_npcs:
+            if npc.npc_type != "quest_monster":
+                continue
+
+            anchor = getattr(npc, "_guardian_anchor", None)
+            if not anchor:
+                continue
+
+            leash = getattr(npc, "_guardian_leash", 4)
+            ax, ay = anchor
+            pcol, prow = party.col, party.row
+            dist_party_to_anchor = abs(pcol - ax) + abs(prow - ay)
+
+            # Guardian intercepts when party approaches artifact
+            if dist_party_to_anchor <= 6:
+                # Move toward party but stay within leash of anchor
+                best = None
+                best_dist = abs(npc.col - pcol) + abs(npc.row - prow)
+                for dc, dr in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    nc, nr = npc.col + dc, npc.row + dr
+                    if (nc, nr) in occupied and (nc, nr) != (npc.col, npc.row):
+                        continue
+                    if not self.game.tile_map.is_walkable(nc, nr):
+                        continue
+                    if abs(nc - ax) + abs(nr - ay) > leash:
+                        continue
+                    d = abs(nc - pcol) + abs(nr - prow)
+                    if d < best_dist:
+                        best_dist = d
+                        best = (nc, nr)
+                if best:
+                    occupied.discard((npc.col, npc.row))
+                    npc.col, npc.row = best
+                    occupied.add(best)
+            else:
+                # Drift back to anchor if too far
+                dist_to_anchor = abs(npc.col - ax) + abs(npc.row - ay)
+                if dist_to_anchor > leash:
+                    best = None
+                    best_d = dist_to_anchor
+                    for dc, dr in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                        nc, nr = npc.col + dc, npc.row + dr
+                        if (nc, nr) in occupied:
+                            continue
+                        if not self.game.tile_map.is_walkable(nc, nr):
+                            continue
+                        d = abs(nc - ax) + abs(nr - ay)
+                        if d < best_d:
+                            best_d = d
+                            best = (nc, nr)
+                    if best:
+                        occupied.discard((npc.col, npc.row))
+                        npc.col, npc.row = best
+                        occupied.add(best)
 
     # ── Unique tile interaction ────────────────────────────────
 
@@ -1916,22 +2249,36 @@ class OverworldState(InventoryMixin, BaseState):
         tmap = self.game.tile_map
         src_tmap = self._stashed_overworld_tile_map or tmap
         interiors = getattr(src_tmap, "overworld_interiors", [])
-        existing_names = {e.get("name") for e in interiors}
+
+        # Always update building spaces with the latest data from
+        # buildings.json so edits (e.g. adding a door) take effect
+        # without needing a full restart.
         for sp in spaces:
             sp_name = sp.get("name", "")
-            if sp_name and sp_name not in existing_names:
-                interiors.append({
-                    "name": sp_name,
-                    "width": sp.get("width", 20),
-                    "height": sp.get("height", 20),
-                    "entry_col": sp.get("entry_col", 0),
-                    "entry_row": sp.get("entry_row", 0),
-                    "tiles": sp.get("tiles", {}),
-                })
-                existing_names.add(sp_name)
+            if not sp_name:
+                continue
+            new_entry = {
+                "name": sp_name,
+                "width": sp.get("width", 20),
+                "height": sp.get("height", 20),
+                "entry_col": sp.get("entry_col", 0),
+                "entry_row": sp.get("entry_row", 0),
+                "tiles": sp.get("tiles", {}),
+            }
+            # Replace existing entry or append new one
+            replaced = False
+            for i, existing in enumerate(interiors):
+                if existing.get("name") == sp_name:
+                    interiors[i] = new_entry
+                    replaced = True
+                    break
+            if not replaced:
+                interiors.append(new_entry)
         src_tmap.overworld_interiors = interiors
         entrance_name = spaces[0].get("name", building_def.get("name", ""))
-        self._enter_overworld_interior(entrance_name, pcol, prow)
+        bldg_name = building_def.get("name", "")
+        self._enter_overworld_interior(entrance_name, pcol, prow,
+                                       building_name=bldg_name)
 
     def _activate_house_quest(self):
         """Activate the house quest when the party speaks to Elara."""
@@ -2111,6 +2458,9 @@ class OverworldState(InventoryMixin, BaseState):
             return
         # Sync quest status onto NPC objects for renderer
         ow_npcs = getattr(self.game, "overworld_quest_npcs", [])
+        # Include building interior NPCs when inside a building
+        if self._in_overworld_interior and self._building_interior_npcs:
+            ow_npcs = list(ow_npcs) + self._building_interior_npcs
         mq_states = getattr(self.game, "module_quest_states", {})
         for npc in ow_npcs:
             mqn = getattr(npc, "_module_quest_name", "")

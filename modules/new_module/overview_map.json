@@ -125,7 +125,7 @@
       1,
       1,
       1,
-      7,
+      45,
       1,
       1,
       1,
@@ -691,6 +691,10 @@
     "14,15": {
       "interior": "Dank Place",
       "type": "dungeon"
+    },
+    "8,4": {
+      "interior": "The Shrine",
+      "type": "building"
     }
   }
 }

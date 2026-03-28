@@ -89,7 +89,8 @@
       "path": "src/assets/unassigned/shrine_church.png",
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 45
     },
     "town_village": {
       "path": "src/assets/unassigned/town_village.png",

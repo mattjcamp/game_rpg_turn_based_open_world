@@ -1449,6 +1449,8 @@ class Game:
             return ("dungeon", spawn_loc[len("dungeon:"):])
         if spawn_loc.startswith("town:"):
             return ("town", spawn_loc[5:])
+        if spawn_loc.startswith("building:"):
+            return ("building", spawn_loc[len("building:"):])
         return ("overview", "")
 
     def _spawn_quest_monsters(self, quest_name):
@@ -1507,6 +1509,12 @@ class Game:
                     self._register_quest_dungeon_monster(
                         quest_name, step_idx, monster_key,
                         target_count, loc_name)
+                elif loc_type == "building":
+                    # Register under building key for deferred spawning
+                    self._register_quest_interior_monster(
+                        quest_name, step_idx, monster_key,
+                        target_count, loc_name,
+                        key_prefix="building")
 
             elif step_type == "collect":
                 collect_item = step.get("collect_item", "")
@@ -1543,6 +1551,8 @@ class Game:
                     loc_key = f"dungeon:{loc_name}"
                 elif loc_type == "town":
                     loc_key = f"town:{loc_name}"
+                elif loc_type == "building":
+                    loc_key = f"building:{loc_name}"
                 else:
                     loc_key = "overview"
 
@@ -1577,6 +1587,13 @@ class Game:
                     # _inject_quest_dungeon_collect_items directly next
                     # to the artifact, so no separate registration needed.
                     pass
+                elif loc_type == "building":
+                    # Register guardian for deferred spawning in building
+                    if guardian_key:
+                        self._register_quest_interior_monster(
+                            quest_name, step_idx, guardian_key,
+                            1, loc_name, is_guardian=True,
+                            key_prefix="building")
 
         self.quest_spawned_monsters[quest_name] = spawned
 
@@ -1771,11 +1788,12 @@ class Game:
     def _register_quest_interior_monster(self, quest_name, step_idx,
                                           monster_key, count,
                                           interior_name,
-                                          is_guardian=False):
+                                          is_guardian=False,
+                                          key_prefix="interior"):
         """Register quest monsters to spawn when the player enters an interior."""
         if not hasattr(self, "quest_interior_monsters"):
             self.quest_interior_monsters = {}
-        key = f"interior:{interior_name}"
+        key = f"{key_prefix}:{interior_name}"
         if key not in self.quest_interior_monsters:
             self.quest_interior_monsters[key] = []
         self.quest_interior_monsters[key].append({
