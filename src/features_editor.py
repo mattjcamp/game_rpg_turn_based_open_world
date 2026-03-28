@@ -150,6 +150,7 @@ class FeaturesEditor:
             {"name": "overworld", "label": "Overworld"},
             {"name": "town", "label": "Town"},
             {"name": "dungeon", "label": "Dungeon"},
+            {"name": "artifacts", "label": "Artifacts"},
             {"name": "battle", "label": "Battle Screen"},
             {"name": "examine", "label": "Examine Screen"},
         ]
@@ -1056,6 +1057,8 @@ class FeaturesEditor:
             # Map context to gallery categories
             if context in ("overworld", "town", "dungeon"):
                 cats = [context]
+            elif context == "artifacts":
+                cats = ["objects"]
             else:
                 cats = ["overworld", "town", "dungeon"]
             seen = set()
@@ -3352,8 +3355,14 @@ class FeaturesEditor:
                     self.tile_editing = True
                     self.dirty = False
                     self.level = 3
-            elif self._is_new_shortcut(event) or self._is_copy_shortcut(event):
-                # Ctrl+N / Ctrl+C both duplicate the selected tile
+            elif self._is_new_shortcut(event):
+                # Ctrl+N creates a brand-new tile in this folder
+                self.add_tile()
+                self.save_tiles()
+                self._rebuild_tile_folders()
+                self.tile_enter_folder()
+            elif self._is_copy_shortcut(event):
+                # Ctrl+C duplicates the selected tile
                 self.duplicate_tile()
                 self.save_tiles()
                 self._rebuild_tile_folders()

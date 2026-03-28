@@ -385,5 +385,60 @@
     ],
     "context": "overworld",
     "sprite": "overworld/dungeon"
+  },
+  "40": {
+    "name": "Grass Copy",
+    "walkable": true,
+    "color": [
+      34,
+      139,
+      34
+    ],
+    "context": "overworld",
+    "sprite": "overworld/grass"
+  },
+  "41": {
+    "name": "Grass Copy",
+    "walkable": true,
+    "color": [
+      34,
+      139,
+      34
+    ],
+    "context": "overworld",
+    "sprite": "overworld/grass"
+  },
+  "42": {
+    "name": "Grass Copy",
+    "walkable": true,
+    "color": [
+      34,
+      139,
+      34
+    ],
+    "context": "overworld",
+    "sprite": "overworld/grass"
+  },
+  "43": {
+    "name": "Crystal",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "artifacts",
+    "sprite": "dungeon/artifact"
+  },
+  "44": {
+    "name": "King's Sword",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "artifacts",
+    "sprite": "items/sword"
   }
 }

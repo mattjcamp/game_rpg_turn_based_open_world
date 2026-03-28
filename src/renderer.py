@@ -1497,6 +1497,23 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_gnome_sprite(npc, cx, cy)
             return
 
+        # Quest monster NPCs: draw glow and use monster tile sprite
+        if npc.npc_type == "quest_monster":
+            self._draw_quest_monster_glow(cx, cy, 32)
+            # Try to load the monster's tile sprite
+            mkey = getattr(npc, "_monster_key", "")
+            if mkey:
+                from src.monster import MONSTERS
+                minfo = MONSTERS.get(mkey, {})
+                mtile = minfo.get("tile", "")
+                if mtile:
+                    mon_spr = self._load_monster_tile_preview(mtile, 32)
+                    if mon_spr:
+                        sx = cx - mon_spr.get_width() // 2
+                        sy = cy - mon_spr.get_height() // 2
+                        self.screen.blit(mon_spr, (sx, sy))
+                        return
+
         # Custom sprite path from module NPC definition
         sprite = None
         custom_path = getattr(npc, "sprite", None)
@@ -2289,6 +2306,9 @@ class Renderer(CombatEffectRendererMixin):
                 if 0 <= msc < cols and 0 <= msr < rows:
                     mx = msc * ts + ts // 2 + pad_x
                     my = msr * ts + ts // 2 + pad_y
+                    # Quest monster glow effect
+                    if getattr(mon, "_quest_name", None):
+                        self._draw_quest_monster_glow(mx, my, ts)
                     mon_sprite = self._get_monster_sprite(mon)
                     if mon_sprite:
                         sx = mx - mon_sprite.get_width() // 2
@@ -4547,8 +4567,31 @@ class Renderer(CombatEffectRendererMixin):
         # Fallback to skeleton sprite from extracted tile sheet
         return self._skeleton_fallback
 
+    def _draw_quest_monster_glow(self, cx, cy, size=32):
+        """Draw a pulsing glow behind a quest-spawned monster."""
+        import math, time
+        t = time.time()
+        # Pulsing alpha: oscillate between 40 and 120
+        pulse = (math.sin(t * 3.0) + 1.0) / 2.0  # 0..1
+        alpha = int(40 + pulse * 80)
+        # Pulsing radius: oscillate between size*0.6 and size*0.8
+        radius = int(size * (0.6 + pulse * 0.2))
+        glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+        # Golden-orange glow
+        pygame.draw.circle(glow, (255, 180, 40, alpha),
+                           (radius, radius), radius)
+        # Inner brighter core
+        inner_r = max(4, radius // 2)
+        inner_alpha = int(60 + pulse * 60)
+        pygame.draw.circle(glow, (255, 220, 80, inner_alpha),
+                           (radius, radius), inner_r)
+        self.screen.blit(glow, (cx - radius, cy - radius))
+
     def _u3_draw_dungeon_monster(self, monster, cx, cy):
         """Draw a monster in the dungeon using its unique tile sprite."""
+        # Quest monster glow effect
+        if getattr(monster, "_quest_name", None):
+            self._draw_quest_monster_glow(cx, cy)
         sprite = self._get_monster_sprite(monster)
         if sprite:
             sx = cx - sprite.get_width() // 2
@@ -9575,28 +9618,82 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text("Edit Step", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
 
-        # ── Monster sprite preview (top-right corner) ──
-        monster_display = ""
+        # ── Sprite preview (top-right corner) ──
+        # Determine step type to decide what preview to show
+        step_type = ""
         for fe in fields:
-            if fe.key == "monster":
-                monster_display = fe.value
+            if fe.key == "step_type":
+                step_type = fe.value
                 break
-        monster_tile = monster_tile_map.get(monster_display, "")
+
         preview_size = 64
         preview_drawn = False
-        if monster_tile:
-            preview = self._load_monster_tile_preview(
-                monster_tile, preview_size)
-            if preview:
-                px = rx + rw - preview_size - 16
-                py_pos = ry + 8
-                bg_rect = pygame.Rect(px - 4, py_pos - 4,
-                                      preview_size + 8, preview_size + 8)
-                pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
-                pygame.draw.rect(self.screen, (80, 80, 100),
-                                 bg_rect, 1)
-                self.screen.blit(preview, (px, py_pos))
-                preview_drawn = True
+        px = rx + rw - preview_size - 16
+        py_pos = ry + 8
+
+        if step_type == "kill":
+            # Show monster sprite preview
+            monster_display = ""
+            for fe in fields:
+                if fe.key == "monster":
+                    monster_display = fe.value
+                    break
+            monster_tile = monster_tile_map.get(monster_display, "")
+            if monster_tile:
+                preview = self._load_monster_tile_preview(
+                    monster_tile, preview_size)
+                if preview:
+                    bg_rect = pygame.Rect(px - 4, py_pos - 4,
+                                          preview_size + 8, preview_size + 8)
+                    pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
+                    pygame.draw.rect(self.screen, (80, 80, 100),
+                                     bg_rect, 1)
+                    self.screen.blit(preview, (px, py_pos))
+                    preview_drawn = True
+        else:
+            # Collect: show artifact tile sprite preview
+            artifact_sprite_map = qd.get("artifact_sprite_map", {})
+            item_display = ""
+            for fe in fields:
+                if fe.key == "collect_item":
+                    item_display = fe.value
+                    break
+            if item_display and item_display != "(none)":
+                sprite_key = artifact_sprite_map.get(item_display, "")
+                sprite = None
+                if sprite_key:
+                    sprite = self._feat_resolve_sprite_field(
+                        "collect_item", sprite_key, preview_size)
+                if sprite:
+                    bg_rect = pygame.Rect(px - 4, py_pos - 4,
+                                          preview_size + 8, preview_size + 8)
+                    pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
+                    pygame.draw.rect(self.screen, (80, 80, 100),
+                                     bg_rect, 1)
+                    self.screen.blit(sprite, (px, py_pos))
+                    preview_drawn = True
+
+        # Show guardian monster preview below item if applicable
+        if step_type == "collect":
+            guardian_display = ""
+            for fe in fields:
+                if fe.key == "guardian_monster":
+                    guardian_display = fe.value
+                    break
+            guardian_tile = monster_tile_map.get(guardian_display, "")
+            if guardian_tile:
+                guardian_preview = self._load_monster_tile_preview(
+                    guardian_tile, preview_size)
+                if guardian_preview:
+                    gpy = py_pos + preview_size + 12
+                    bg_rect2 = pygame.Rect(
+                        px - 4, gpy - 4,
+                        preview_size + 8, preview_size + 8)
+                    pygame.draw.rect(
+                        self.screen, (30, 30, 40), bg_rect2)
+                    pygame.draw.rect(
+                        self.screen, (80, 80, 100), bg_rect2, 1)
+                    self.screen.blit(guardian_preview, (px, gpy))
 
         ly = ry + 44
 
@@ -11142,6 +11239,12 @@ class Renderer(CombatEffectRendererMixin):
                     "stone floors, walls, stairs,",
                     "chests, traps, doors, and",
                     "environmental decorations.",
+                ],
+                "artifacts": [
+                    "Collectible artifact tiles:",
+                    "quest items, relics, keys,",
+                    "crystals, and other objects",
+                    "players can discover and gather.",
                 ],
                 "battle": [
                     "Battle arena tiles are rendered",

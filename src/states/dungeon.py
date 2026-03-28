@@ -230,13 +230,26 @@ class DungeonState(InventoryMixin, BaseState):
         Reads ``game.quest_dungeon_monsters`` for entries matching this
         dungeon's name, creates Monster objects and adds them to
         ``dungeon_data.monsters`` on walkable tiles.
+
+        Matches both the exact floor name (e.g. "Dank Place - Floor 1")
+        and the base dungeon name (e.g. "Dank Place") so that quest
+        monsters registered under the dungeon's top-level name are
+        injected into whichever floor the player enters.
         """
         import random as _rng
+        import re
         from src.monster import create_monster, MONSTERS
 
         dname = getattr(self.dungeon_data, "name", "")
         monsters_dict = getattr(self.game, "quest_dungeon_monsters", {})
+
+        # Try exact floor name first, then base dungeon name
         entries = monsters_dict.get(dname, [])
+        if not entries:
+            # Strip " - Floor N" suffix to match base name
+            base_name = re.sub(r"\s*-\s*Floor\s+\d+$", "", dname)
+            if base_name != dname:
+                entries = monsters_dict.get(base_name, [])
         if not entries:
             return
 
@@ -270,6 +283,13 @@ class DungeonState(InventoryMixin, BaseState):
             # Skip if this step is already complete
             progress = qstate.get("step_progress", [])
             if step_idx < len(progress) and progress[step_idx]:
+                continue
+            # Skip if quest monsters for this step are already present
+            already = any(
+                getattr(m, "_quest_name", None) == qname
+                and getattr(m, "_quest_step_idx", None) == step_idx
+                for m in self.dungeon_data.monsters)
+            if already:
                 continue
 
             for i in range(count):

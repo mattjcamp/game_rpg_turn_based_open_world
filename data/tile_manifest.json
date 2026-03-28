@@ -295,7 +295,8 @@
     "artifact": {
       "path": "src/assets/game/dungeon/artifact.png",
       "usable_in": [
-        "dungeon"
+        "dungeon",
+        "objects"
       ],
       "tile_id": 27
     },
@@ -1015,6 +1016,7 @@
     "seal_of_binding": {
       "path": "src/assets/game/landmarks/moongate_active.png",
       "usable_in": [
+        "objects",
         "town",
         "unique_tiles"
       ]
@@ -1172,8 +1174,10 @@
     "sword": {
       "path": "src/assets/game/items/icons_32/sword.png",
       "usable_in": [
-        "items"
-      ]
+        "items",
+        "objects"
+      ],
+      "tile_id": 44
     },
     "tool": {
       "path": "src/assets/game/items/icons_32/tool.png",

@@ -35,9 +35,9 @@
     "giver_npc": "Elrond",
     "giver_sprite": "src/assets/game/characters/illusionist.png",
     "giver_location": "overview",
-    "giver_dialogue": "",
-    "reward_xp": 0,
-    "reward_gold": 0,
+    "giver_dialogue": "Kill the Orc in the Dank Dungeon and retrieve The King's Sword",
+    "reward_xp": 100,
+    "reward_gold": 100,
     "steps": [
       {
         "description": "Kill Orc",
@@ -47,6 +47,18 @@
         "target": "",
         "target_count": 1,
         "optional": "no"
+      },
+      {
+        "description": "The King's Sword",
+        "step_type": "collect",
+        "monster": "",
+        "spawn_location": "interior:New York/General Shop",
+        "target": "",
+        "target_count": 1,
+        "optional": "no",
+        "collect_item": "King's Sword",
+        "has_guardian": "yes",
+        "guardian_monster": "Dark Mage"
       }
     ]
   }

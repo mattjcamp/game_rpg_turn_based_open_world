@@ -6540,8 +6540,7 @@ class Game:
         quest["steps"] = list(self._mod_quest_step_list)
 
     _QUEST_STEP_TYPES = [
-        "talk", "kill", "fetch", "escort", "explore",
-        "bounty", "deliver", "defend", "collect", "use_item",
+        "collect", "kill",
     ]
 
     def _mod_quest_load_monster_names(self):
@@ -6581,7 +6580,25 @@ class Game:
             except (OSError, json.JSONDecodeError):
                 continue
 
-    def _mod_quest_build_step_fields(self):
+    def _mod_quest_load_artifact_tiles(self):
+        """Load artifact tile names for the quest step editor's item picker.
+
+        Pulls from the 'artifacts' tile-type category so that the
+        collect-step Item picker shows only user-defined artifact tiles.
+        """
+        self._mod_quest_artifact_names = ["(none)"]
+        self._mod_quest_artifact_sprites = {}  # display name -> sprite key
+        fe = self.features_editor
+        for tile in fe.tile_list:
+            if tile.get("_context") == "artifacts":
+                name = tile.get("name", "")
+                if name:
+                    self._mod_quest_artifact_names.append(name)
+                    sprite = tile.get("_sprite", "")
+                    if sprite:
+                        self._mod_quest_artifact_sprites[name] = sprite
+
+    def _mod_quest_build_step_fields(self, preserve_cursor=False):
         """Build FieldEntry list for the selected quest step."""
         from src.editor_types import FieldEntry
         if not (0 <= self._mod_quest_step_cursor < len(
@@ -6590,13 +6607,11 @@ class Game:
             return
         step = self._mod_quest_step_list[self._mod_quest_step_cursor]
 
-        # Ensure monster names are loaded
+        # Ensure monster names and artifact tiles are loaded
         self._mod_quest_load_monster_names()
+        self._mod_quest_load_artifact_tiles()
 
-        # Resolve monster display name from stored value
-        current_monster = step.get("monster", "")
-        if not current_monster:
-            current_monster = "(none)"
+        step_type = step.get("step_type", "collect")
 
         # Resolve spawn location display
         current_spawn_loc = step.get("spawn_location", "")
@@ -6607,37 +6622,93 @@ class Game:
         loc_options, self._mod_quest_step_loc_map = (
             self._mod_quest_build_location_options())
 
-        self._mod_quest_step_fields = [
+        # Common fields: Description + Type
+        common_top = [
             FieldEntry("Description", "description",
                        step.get("description", ""), "text", True),
             FieldEntry("", "", "", "section", False),
             FieldEntry("Type", "step_type",
-                       step.get("step_type", "talk"), "choice", True),
-            FieldEntry("Monster", "monster",
-                       current_monster, "choice", True),
-            FieldEntry("Spawn Location", "spawn_location",
-                       spawn_loc_display, "choice", True),
-            FieldEntry("Target", "target",
-                       step.get("target", ""), "text", True),
-            FieldEntry("Target Count", "target_count",
-                       str(step.get("target_count", 1)), "int", True),
+                       step_type, "choice", True),
+        ]
+
+        # Common bottom: Optional
+        common_bottom = [
             FieldEntry("", "", "", "section", False),
             FieldEntry("Optional", "optional",
                        step.get("optional", "no"), "choice", True),
         ]
+
+        if step_type == "kill":
+            # Kill: Monster, Spawn Location, Target Count
+            current_monster = step.get("monster", "")
+            if not current_monster:
+                current_monster = "(none)"
+            type_fields = [
+                FieldEntry("Monster", "monster",
+                           current_monster, "choice", True),
+                FieldEntry("Spawn Location", "spawn_location",
+                           spawn_loc_display, "choice", True),
+                FieldEntry("Target Count", "target_count",
+                           str(step.get("target_count", 1)), "int", True),
+            ]
+        else:
+            # Collect: Item, Spawn Location, Guardian, Guardian Monster
+            current_item = step.get("collect_item", "")
+            if not current_item:
+                current_item = "(none)"
+            has_guardian = step.get("has_guardian", "no")
+            type_fields = [
+                FieldEntry("Item", "collect_item",
+                           current_item, "choice", True),
+                FieldEntry("Spawn Location", "spawn_location",
+                           spawn_loc_display, "choice", True),
+                FieldEntry("Target Count", "target_count",
+                           str(step.get("target_count", 1)), "int", True),
+                FieldEntry("", "", "", "section", False),
+                FieldEntry("Guardian", "has_guardian",
+                           has_guardian, "choice", True),
+            ]
+            if has_guardian == "yes":
+                guardian_monster = step.get("guardian_monster", "")
+                if not guardian_monster:
+                    guardian_monster = "(none)"
+                type_fields.append(
+                    FieldEntry("Guardian Monster", "guardian_monster",
+                               guardian_monster, "choice", True))
+
+        self._mod_quest_step_fields = common_top + type_fields + common_bottom
         self._mod_quest_step_choice_map = {
             "step_type": self._QUEST_STEP_TYPES,
             "monster": getattr(self, "_mod_quest_monster_names",
                                ["(none)"]),
+            "guardian_monster": getattr(self, "_mod_quest_monster_names",
+                                       ["(none)"]),
+            "collect_item": getattr(self, "_mod_quest_artifact_names",
+                                    ["(none)"]),
             "spawn_location": loc_options,
             "optional": ["no", "yes"],
+            "has_guardian": ["no", "yes"],
         }
         fe = self.features_editor
-        self._mod_quest_step_field = fe._next_editable_generic(
-            self._mod_quest_step_fields, 0)
-        self._mod_quest_step_buffer = self._mod_quest_step_fields[
-            self._mod_quest_step_field].value
-        self._mod_quest_step_field_scroll = 0
+        if not preserve_cursor:
+            self._mod_quest_step_field = fe._next_editable_generic(
+                self._mod_quest_step_fields, 0)
+            self._mod_quest_step_buffer = self._mod_quest_step_fields[
+                self._mod_quest_step_field].value
+            self._mod_quest_step_field_scroll = 0
+        else:
+            # Clamp cursor to valid range after rebuild
+            if self._mod_quest_step_field >= len(self._mod_quest_step_fields):
+                self._mod_quest_step_field = fe._next_editable_generic(
+                    self._mod_quest_step_fields,
+                    len(self._mod_quest_step_fields) - 1)
+            cur = self._mod_quest_step_fields[self._mod_quest_step_field]
+            if not cur.editable or cur.field_type == "section":
+                self._mod_quest_step_field = fe._next_editable_generic(
+                    self._mod_quest_step_fields,
+                    self._mod_quest_step_field)
+            self._mod_quest_step_buffer = self._mod_quest_step_fields[
+                self._mod_quest_step_field].value
 
     def _mod_quest_save_step_fields(self):
         """Write step fields back into the step dict."""
@@ -6656,8 +6727,9 @@ class Game:
                     val = int(val)
                 except ValueError:
                     val = 0
-            # Store "(none)" as empty string for monster field
-            if key == "monster" and val == "(none)":
+            # Store "(none)" as empty string for choice fields
+            if key in ("monster", "guardian_monster", "collect_item") \
+                    and val == "(none)":
                 val = ""
             # Convert spawn location display name to stored value
             if key == "spawn_location":
@@ -6685,8 +6757,11 @@ class Game:
         """Add a new default step to the current quest."""
         new_step = {
             "description": "New Step",
-            "step_type": "talk",
+            "step_type": "collect",
             "monster": "",
+            "collect_item": "",
+            "has_guardian": "no",
+            "guardian_monster": "",
             "spawn_location": "",
             "target": "",
             "target_count": 1,
@@ -6954,6 +7029,12 @@ class Game:
         idx = (idx + direction) % len(options)
         field.value = options[idx]
         self._mod_quest_step_buffer = field.value
+
+        # When step_type or has_guardian changes, save current values
+        # then rebuild the field list to show/hide relevant fields
+        if field.key in ("step_type", "has_guardian"):
+            self._mod_quest_save_step_fields()
+            self._mod_quest_build_step_fields(preserve_cursor=True)
 
     def _handle_mod_quest_step_field_input(self, event):
         """Handle input for step field editing (level 23)."""
@@ -7689,6 +7770,7 @@ class Game:
                         "level": max(0, self.module_edit_level - 20),
                         "sprite_map": getattr(self, "_mod_quest_sprite_name_to_file", {}),
                         "monster_tile_map": getattr(self, "_mod_quest_monster_tiles", {}),
+                        "artifact_sprite_map": getattr(self, "_mod_quest_artifact_sprites", {}),
                     })
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()
