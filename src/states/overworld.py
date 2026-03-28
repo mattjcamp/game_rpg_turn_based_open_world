@@ -105,6 +105,10 @@ class OverworldState(InventoryMixin, BaseState):
         self.ow_quest_choice_cursor = 0
         self.ow_quest_choices = []
 
+        # ── Quest visual effects ──
+        # List of active effects: {type, timer, duration, ...}
+        self.quest_effects = []
+
     def enter(self):
         self._apply_pending_combat_rewards()
         # Check quest kill progress (sets message if a step completed)
@@ -603,6 +607,16 @@ class OverworldState(InventoryMixin, BaseState):
             # Spawn quest monsters for any 'kill' steps
             if hasattr(self.game, "_spawn_quest_monsters"):
                 self.game._spawn_quest_monsters(mqname)
+            # Quest accepted visual effect
+            self.quest_effects.append({
+                "type": "quest_accepted",
+                "timer": 2500,
+                "duration": 2500,
+                "col": npc.col,
+                "row": npc.row,
+                "quest_name": mqname,
+            })
+            self.game.sfx.play("quest_complete")
             self.show_message(
                 f"{npc.name}: Wonderful! I'm counting on you. "
                 f"Good luck!", 3000)
@@ -688,10 +702,17 @@ class OverworldState(InventoryMixin, BaseState):
 
                 if kills_so_far >= target_count:
                     progress[i] = True
+                    desc = step.get('description', 'Kill step')
                     result_msg = (
-                        f"Quest '{qname}': "
-                        f"{step.get('description', 'Kill step')} "
-                        f"- Complete!")
+                        f"Quest '{qname}': {desc} - Complete!")
+                    # Step completed visual effect
+                    self.quest_effects.append({
+                        "type": "step_complete",
+                        "timer": 2000,
+                        "duration": 2000,
+                        "text": desc,
+                    })
+                    self.game.sfx.play("treasure")
 
             # Check if ALL steps are done
             if all(progress) and progress:
@@ -708,6 +729,16 @@ class OverworldState(InventoryMixin, BaseState):
                         f"+{reward_xp} XP, +{reward_gold} Gold")
                 else:
                     result_msg = f"Quest '{qname}' complete!"
+                # Quest completed visual effect
+                self.quest_effects.append({
+                    "type": "quest_complete",
+                    "timer": 3000,
+                    "duration": 3000,
+                    "quest_name": qname,
+                    "reward_xp": reward_xp,
+                    "reward_gold": reward_gold,
+                })
+                self.game.sfx.play("quest_complete")
 
         # Clean up killed list so it's not processed twice
         self.game.pending_killed_monsters = []
@@ -1895,6 +1926,13 @@ class OverworldState(InventoryMixin, BaseState):
                 self.unique_tile_text = ""
                 self.unique_tile_pos = None
 
+        # Tick quest visual effects
+        if self.quest_effects:
+            for fx in self.quest_effects:
+                fx["timer"] -= dt_ms
+            self.quest_effects = [
+                fx for fx in self.quest_effects if fx["timer"] > 0]
+
     def draw(self, renderer):
         """Draw the overworld in Ultima III style."""
         if self.showing_party_inv:
@@ -1940,6 +1978,14 @@ class OverworldState(InventoryMixin, BaseState):
         if self.showing_party:
             renderer.draw_party_screen_u3(self.game.party)
             return
+        # Sync quest status onto NPC objects for renderer
+        ow_npcs = getattr(self.game, "overworld_quest_npcs", [])
+        mq_states = getattr(self.game, "module_quest_states", {})
+        for npc in ow_npcs:
+            mqn = getattr(npc, "_module_quest_name", "")
+            npc._quest_status = mq_states.get(mqn, {}).get(
+                "status", "available")
+
         renderer.draw_overworld_u3(
             self.game.party,
             self.game.tile_map,
@@ -1951,7 +1997,8 @@ class OverworldState(InventoryMixin, BaseState):
             push_anim=self.push_spell_anim,
             repel_effect=self.repel_effect,
             darkness_active=getattr(self.game, "darkness_active", False),
-            overworld_npcs=getattr(self.game, "overworld_quest_npcs", []),
+            overworld_npcs=ow_npcs,
+            quest_effects=self.quest_effects,
         )
         # ── Overworld NPC quest choice overlay ──
         if self.ow_quest_choice_active:

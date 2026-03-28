@@ -237,6 +237,8 @@ class TownState(InventoryMixin, BaseState):
 
         # Quest completion celebration effect
         self.quest_complete_effect = None
+        # Module quest visual effects
+        self.quest_effects = []
         # Machine shutdown animation (Keys of Shadow victory)
         self.machine_shutdown_effect = None
         self._pending_victory = False  # deferred until dialogue dismissed
@@ -1461,6 +1463,14 @@ class TownState(InventoryMixin, BaseState):
             reward_xp = qdef.get("reward_xp", 0)
             reward_gold = qdef.get("reward_gold", 0)
 
+        # Quest accepted visual effect
+        self.quest_effects.append({
+            "type": "quest_accepted",
+            "timer": 2500,
+            "duration": 2500,
+        })
+        self.game.sfx.play("quest_complete")
+
         self._set_dialogue(
             f"{npc.name}: Wonderful! I'm counting on you. "
             f"Good luck out there!")
@@ -1995,6 +2005,13 @@ class TownState(InventoryMixin, BaseState):
         # Tick level-up animations
         self._update_level_up_queue(dt_ms)
 
+        # Tick module quest effects
+        if self.quest_effects:
+            for fx in self.quest_effects:
+                fx["timer"] -= dt_ms
+            self.quest_effects = [
+                fx for fx in self.quest_effects if fx["timer"] > 0]
+
         # NPC wandering
         self._update_npc_wandering(dt)
 
@@ -2207,6 +2224,10 @@ class TownState(InventoryMixin, BaseState):
         if self.quest_complete_effect:
             renderer.draw_quest_complete_effect(self.quest_complete_effect)
             return  # blocks dialogue rendering during animation
+
+        # Module quest visual effects (accepted, step complete, etc.)
+        if self.quest_effects:
+            renderer._draw_quest_effects(self.quest_effects)
 
         # Temple celestial animation overlay (when walking in town after service)
         if self.temple_heal_effect:

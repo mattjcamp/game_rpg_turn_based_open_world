@@ -2201,7 +2201,8 @@ class Renderer(CombatEffectRendererMixin):
     def draw_overworld_u3(self, party, tile_map, message="", overworld_monsters=None,
                           unique_text="", unique_flash=0.0, unique_pos=None,
                           push_anim=None, repel_effect=None,
-                          darkness_active=False, overworld_npcs=None):
+                          darkness_active=False, overworld_npcs=None,
+                          quest_effects=None):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -2293,6 +2294,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 2b. overworld quest NPC sprites ──
         if overworld_npcs:
+            import math as _m, time as _t
             for npc in overworld_npcs:
                 nsc = npc.col - off_c
                 nsr = npc.row - off_r
@@ -2315,12 +2317,40 @@ class Renderer(CombatEffectRendererMixin):
                         pygame.draw.circle(
                             self.screen, (60, 120, 180),
                             (nx, ny), ts // 2 - 2, 2)
-                        q_surf = self._font_sm.render(
+                        q_surf = self.font_small.render(
                             "?", True, (255, 255, 255))
                         self.screen.blit(
                             q_surf,
                             (nx - q_surf.get_width() // 2,
                              ny - q_surf.get_height() // 2))
+
+                    # ── Gold name tag above quest giver ──
+                    pulse = 0.7 + 0.3 * _m.sin(_t.time() * 3.0)
+                    gold = (255, int(200 * pulse + 55), 0)
+                    name_surf = self.font_small.render(
+                        npc.name, True, gold)
+                    name_rect = name_surf.get_rect(
+                        center=(nx, ny - ts // 2 - 10))
+                    bg = name_rect.inflate(6, 2)
+                    # Gold border glow
+                    glow_rect = bg.inflate(4, 4)
+                    pygame.draw.rect(
+                        self.screen, (180, 140, 0), glow_rect, 1)
+                    pygame.draw.rect(
+                        self.screen, (10, 10, 20), bg)
+                    self.screen.blit(name_surf, name_rect)
+                    # Status marker: ! for available, ? for active
+                    q_status = getattr(npc, "_quest_status", "available")
+                    if q_status == "available":
+                        ex = self.font_small.render(
+                            "!", True, (255, 220, 0))
+                        self.screen.blit(
+                            ex, (name_rect.right + 2, name_rect.y))
+                    elif q_status == "active":
+                        ex = self.font_small.render(
+                            "?", True, (200, 200, 200))
+                        self.screen.blit(
+                            ex, (name_rect.right + 2, name_rect.y))
 
         # ── 3. party sprite ──
         psc = party.col - off_c
@@ -2472,7 +2502,11 @@ class Renderer(CombatEffectRendererMixin):
                     pygame.draw.circle(dot_surf, (255, 255, 200, dot_alpha), (3, 3), 3)
                     self.screen.blit(dot_surf, (sx - 3, sy - 3))
 
-        # ── 6. floating message ──
+        # ── 6. quest visual effects ──
+        if quest_effects:
+            self._draw_quest_effects(quest_effects)
+
+        # ── 7. floating message ──
         self._draw_floating_message(message)
 
     # ── overworld tile rendering ─────────────────────────────
@@ -3525,6 +3559,220 @@ class Renderer(CombatEffectRendererMixin):
         self.screen.blit(glow_surf, (door_px, door_py))
 
     # ── Dungeon entry action screen ──────────────────────────────
+
+    def _draw_quest_effects(self, effects):
+        """Render quest visual effects (accepted, step complete, quest complete)."""
+        import math
+        for fx in effects:
+            p = 1.0 - fx["timer"] / fx["duration"]  # 0→1 progress
+            kind = fx["type"]
+
+            if kind == "quest_accepted":
+                self._draw_quest_accepted_effect(p)
+            elif kind == "step_complete":
+                self._draw_step_complete_effect(p, fx.get("text", ""))
+            elif kind == "quest_complete":
+                self._draw_quest_complete_ow_effect(
+                    p, fx.get("quest_name", ""),
+                    fx.get("reward_xp", 0),
+                    fx.get("reward_gold", 0))
+
+    def _draw_quest_accepted_effect(self, p):
+        """Golden flash and rising sparkles when a quest is accepted."""
+        import math, random as _rng
+        sw, sh = self.screen.get_size()
+
+        # Phase 1: golden flash overlay (0.0 - 0.3)
+        if p < 0.3:
+            flash_p = p / 0.3
+            alpha = int(80 * (1.0 - flash_p))
+            flash = pygame.Surface((sw, sh), pygame.SRCALPHA)
+            flash.fill((255, 200, 50, alpha))
+            self.screen.blit(flash, (0, 0))
+
+        # Phase 2: golden sparkles rising (0.1 - 0.9)
+        if 0.1 < p < 0.9:
+            spark_p = (p - 0.1) / 0.8
+            rng = _rng.Random(42)
+            for i in range(20):
+                sx = rng.randint(40, sw - 40)
+                base_y = sh - 40
+                sy = int(base_y - spark_p * (sh * 0.7)
+                         - rng.randint(0, 60))
+                size = rng.randint(2, 4)
+                # Fade in then out
+                life = (spark_p + i * 0.03) % 1.0
+                alpha = int(255 * math.sin(life * math.pi))
+                if alpha <= 0:
+                    continue
+                color = (255, 200 + rng.randint(0, 55),
+                         rng.randint(0, 80), min(255, alpha))
+                dot = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+                pygame.draw.circle(dot, color, (size, size), size)
+                self.screen.blit(dot, (sx - size, sy - size))
+
+        # Phase 3: "QUEST ACCEPTED" banner (0.15 - 0.85)
+        if 0.15 < p < 0.85:
+            text_p = (p - 0.15) / 0.7
+            alpha = int(255 * math.sin(text_p * math.pi))
+            rise = int(20 * (1.0 - text_p))
+            text = "QUEST ACCEPTED"
+            surf = self.font.render(text, True, (255, 220, 80))
+            # Outline
+            outline = self.font.render(text, True, (80, 50, 0))
+            cx = sw // 2 - surf.get_width() // 2
+            cy = sh // 3 - rise
+            alpha_surf = pygame.Surface(
+                (surf.get_width() + 4, surf.get_height() + 4),
+                pygame.SRCALPHA)
+            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1),
+                           (-1, -1), (1, 1), (-1, 1), (1, -1)]:
+                alpha_surf.blit(outline, (2 + ox, 2 + oy))
+            alpha_surf.blit(surf, (2, 2))
+            alpha_surf.set_alpha(min(255, alpha))
+            self.screen.blit(alpha_surf, (cx - 2, cy - 2))
+
+    def _draw_step_complete_effect(self, p, text):
+        """Rising golden text with sparkle burst for step completion."""
+        import math, random as _rng
+        sw, sh = self.screen.get_size()
+
+        # Rising text with fade
+        if p < 0.9:
+            alpha = int(255 * min(1.0, (1.0 - p / 0.9) * 2.0))
+            rise = int(40 * p)
+            label = f"Step Complete: {text}" if text else "Step Complete!"
+            surf = self.font.render(label, True, (255, 220, 100))
+            outline = self.font.render(label, True, (60, 40, 0))
+            cx = sw // 2 - surf.get_width() // 2
+            cy = sh // 3 - rise
+            alpha_surf = pygame.Surface(
+                (surf.get_width() + 4, surf.get_height() + 4),
+                pygame.SRCALPHA)
+            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                alpha_surf.blit(outline, (2 + ox, 2 + oy))
+            alpha_surf.blit(surf, (2, 2))
+            alpha_surf.set_alpha(min(255, alpha))
+            self.screen.blit(alpha_surf, (cx - 2, cy - 2))
+
+        # Expanding ring of sparkles
+        if 0.05 < p < 0.6:
+            ring_p = (p - 0.05) / 0.55
+            radius = int(30 + ring_p * 80)
+            num = 12
+            rng = _rng.Random(77)
+            for i in range(num):
+                angle = (i / num) * math.pi * 2
+                sx = sw // 2 + int(radius * math.cos(angle))
+                sy = sh // 3 + int(radius * math.sin(angle)) - 10
+                alpha = int(200 * (1.0 - ring_p))
+                size = rng.randint(2, 4)
+                color = (255, 200 + rng.randint(0, 55),
+                         rng.randint(0, 60), min(255, alpha))
+                dot = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+                pygame.draw.circle(dot, color, (size, size), size)
+                self.screen.blit(dot, (sx - size, sy - size))
+
+    def _draw_quest_complete_ow_effect(self, p, quest_name,
+                                        reward_xp, reward_gold):
+        """Full quest completion celebration effect."""
+        import math, random as _rng
+        sw, sh = self.screen.get_size()
+
+        # Phase 1: bright golden flash (0.0 - 0.2)
+        if p < 0.2:
+            flash_p = p / 0.2
+            alpha = int(120 * (1.0 - flash_p))
+            flash = pygame.Surface((sw, sh), pygame.SRCALPHA)
+            flash.fill((255, 215, 0, alpha))
+            self.screen.blit(flash, (0, 0))
+
+        # Phase 2: main banner (0.1 - 0.85)
+        if 0.1 < p < 0.85:
+            text_p = (p - 0.1) / 0.75
+            alpha = int(255 * math.sin(text_p * math.pi))
+            rise = int(15 * (1.0 - text_p))
+
+            # "QUEST COMPLETE!" in large gold
+            title = "QUEST COMPLETE!"
+            tsurf = self.font.render(title, True, (255, 220, 50))
+            toutline = self.font.render(title, True, (100, 60, 0))
+            cx = sw // 2 - tsurf.get_width() // 2
+            cy = sh // 4 - rise
+
+            # Quest name in smaller white
+            nsurf = self.font_small.render(
+                quest_name, True, (220, 220, 255))
+
+            # Rewards line
+            rewards = []
+            if reward_xp:
+                rewards.append(f"+{reward_xp} XP")
+            if reward_gold:
+                rewards.append(f"+{reward_gold} Gold")
+            rtext = "  ".join(rewards) if rewards else ""
+            rsurf = self.font_small.render(
+                rtext, True, (255, 255, 150)) if rtext else None
+
+            # Build composite surface
+            total_h = tsurf.get_height() + 6
+            if nsurf:
+                total_h += nsurf.get_height() + 4
+            if rsurf:
+                total_h += rsurf.get_height() + 4
+            max_w = max(tsurf.get_width(),
+                        nsurf.get_width() if nsurf else 0,
+                        rsurf.get_width() if rsurf else 0) + 24
+
+            comp = pygame.Surface(
+                (max_w + 4, total_h + 12), pygame.SRCALPHA)
+            # Background
+            pygame.draw.rect(comp, (10, 10, 30, 200),
+                             (0, 0, max_w + 4, total_h + 12))
+            pygame.draw.rect(comp, (200, 160, 0, 220),
+                             (0, 0, max_w + 4, total_h + 12), 2)
+
+            y_off = 6
+            # Title with outline
+            tx = (max_w + 4 - tsurf.get_width()) // 2
+            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                comp.blit(toutline, (tx + ox, y_off + oy))
+            comp.blit(tsurf, (tx, y_off))
+            y_off += tsurf.get_height() + 6
+
+            if nsurf:
+                nx = (max_w + 4 - nsurf.get_width()) // 2
+                comp.blit(nsurf, (nx, y_off))
+                y_off += nsurf.get_height() + 4
+
+            if rsurf:
+                rx = (max_w + 4 - rsurf.get_width()) // 2
+                comp.blit(rsurf, (rx, y_off))
+
+            comp.set_alpha(min(255, alpha))
+            self.screen.blit(comp,
+                             (sw // 2 - comp.get_width() // 2,
+                              cy))
+
+        # Phase 3: celebration sparkles (0.05 - 0.8)
+        if 0.05 < p < 0.8:
+            spark_p = (p - 0.05) / 0.75
+            rng = _rng.Random(123)
+            for i in range(30):
+                sx = rng.randint(20, sw - 20)
+                sy = rng.randint(20, sh // 2)
+                life = (spark_p * 3 + i * 0.05) % 1.0
+                alpha = int(255 * math.sin(life * math.pi))
+                if alpha <= 0:
+                    continue
+                size = rng.randint(2, 5)
+                g = rng.randint(150, 255)
+                color = (255, g, rng.randint(0, 80),
+                         min(255, alpha))
+                dot = pygame.Surface(
+                    (size * 2, size * 2), pygame.SRCALPHA)
+                pygame.draw.circle(dot, color, (size, size), size)
+                self.screen.blit(dot, (sx - size, sy - size))
 
     def draw_ow_quest_choice(self, choices, cursor):
         """Draw the accept/decline quest choice overlay on the overworld."""
