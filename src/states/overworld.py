@@ -460,6 +460,10 @@ class OverworldState(InventoryMixin, BaseState):
                             self._collect_building_quest_item(bnpc)
                             self.move_cooldown = MOVE_REPEAT_DELAY
                             return
+                        elif bnpc.npc_type == "module_quest_giver":
+                            self._start_ow_npc_dialogue(bnpc)
+                            self.move_cooldown = MOVE_REPEAT_DELAY
+                            return
 
             # Bump-to-talk: check if a quest NPC is on the target tile
             ow_npc = self._get_ow_npc_at(target_col, target_row)
@@ -1007,7 +1011,8 @@ class OverworldState(InventoryMixin, BaseState):
                                   source_state="overworld",
                                   encounter_name=enc_name,
                                   map_monster_refs=[orc],
-                                  terrain_tile=terrain_tile)
+                                  terrain_tile=terrain_tile,
+                                  combat_location="overview")
         self.game.change_state("combat")
 
     # ── Tile events ───────────────────────────────────────────────
@@ -1334,6 +1339,8 @@ class OverworldState(InventoryMixin, BaseState):
         quest_key_name = self._building_name
         self._spawn_building_quest_collect_items(quest_key_name, imap)
         self._spawn_building_quest_monsters(quest_key_name, imap)
+        self._spawn_building_quest_givers(
+            quest_key_name, interior_name, imap)
 
         self.show_message(f"Entering {interior_name}...", 1500)
 
@@ -1519,6 +1526,90 @@ class OverworldState(InventoryMixin, BaseState):
                     npc._guardian_leash = GUARDIAN_LEASH
                 self._building_interior_npcs.append(npc)
 
+    def _spawn_building_quest_givers(self, building_name, space_name, imap):
+        """Place quest giver NPCs inside a building interior.
+
+        Matches quests whose giver_location is
+        ``space:<building_name>/<space_name>``.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+
+        quest_defs = getattr(self.game, "_module_quest_defs", [])
+        if not quest_defs:
+            return
+
+        mq_states = getattr(self.game, "module_quest_states", {})
+
+        # Match locations like "space:Mystery Shrine/Main Hall"
+        loc_key = f"space:{building_name}/{space_name}"
+        # Also match just the building name for simpler configs
+        loc_key_bldg = f"space:{building_name}"
+
+        walkable = []
+        for wy in range(imap.height):
+            for wx in range(imap.width):
+                if imap.is_walkable(wx, wy):
+                    walkable.append((wx, wy))
+
+        occupied = {(n.col, n.row) for n in self._building_interior_npcs}
+        occupied.update(self._overworld_interior_exit_positions)
+        rng = _rng.Random(hash(building_name + space_name) & 0xFFFFFFFF)
+
+        for qdef in quest_defs:
+            qname = qdef.get("name", "")
+            if not qname:
+                continue
+            loc = qdef.get("giver_location", "")
+            if loc != loc_key and loc != loc_key_bldg:
+                continue
+
+            # Don't spawn if quest is fully turned in
+            qstate = mq_states.get(qname, {})
+            if qstate.get("status") == "turned_in":
+                continue
+
+            # Don't spawn if already present
+            already = any(
+                getattr(n, "_module_quest_name", "") == qname
+                for n in self._building_interior_npcs
+            )
+            if already:
+                continue
+
+            npc_label = qdef.get("giver_npc", "") or qname
+            sprite = qdef.get("giver_sprite", "") or None
+            dialogue_text = qdef.get("giver_dialogue", "")
+            if dialogue_text:
+                lines = [s.strip() for s in dialogue_text.split("\n")
+                         if s.strip()]
+                if not lines:
+                    lines = [dialogue_text]
+            else:
+                lines = [f"I have a quest for you: {qname}"]
+
+            free = [p for p in walkable if p not in occupied]
+            if not free:
+                break
+            col, row = rng.choice(free)
+            occupied.add((col, row))
+
+            npc = NPC(
+                col=col, row=row,
+                name=npc_label,
+                dialogue=[
+                    "Thank you for your help!",
+                    "The quest awaits...",
+                ],
+                npc_type="module_quest_giver",
+                quest_dialogue=lines,
+                quest_choices=["Accept quest", "Not right now"],
+                sprite=sprite,
+            )
+            npc._module_quest_name = qname
+            npc.wander_range = NPC_WANDER_RANGE
+            self._building_interior_npcs.append(npc)
+
     def _check_building_interior_npc(self):
         """Check if the party bumped into a building interior NPC."""
         party = self.game.party
@@ -1570,15 +1661,22 @@ class OverworldState(InventoryMixin, BaseState):
         npc._is_quest_monster_npc = True
         self._building_combat_npc = npc
         self._building_returning_from_combat = True
+        # Determine the combat location for quest kill tracking
+        int_name = self._overworld_interior_name
+        bld_name = self._building_name
+        bld_loc = f"space:{bld_name}/{int_name}" \
+            if bld_name and int_name and bld_name != int_name \
+            else f"building:{bld_name or int_name}"
         combat_state.start_combat(
             fighter, monsters,
             source_state="overworld",
             encounter_name=enc_name,
-            terrain_tile=terrain_tile)
+            terrain_tile=terrain_tile,
+            combat_location=bld_loc)
         self.game.change_state("combat")
 
     def _move_building_interior_npcs(self):
-        """Move guardian monsters inside a building interior."""
+        """Move NPCs inside a building interior (guardians + wanderers)."""
         import random as _rng
         import time as _t
 
@@ -1587,6 +1685,24 @@ class OverworldState(InventoryMixin, BaseState):
         occupied.add((party.col, party.row))
 
         for npc in self._building_interior_npcs:
+            # Random wandering for quest givers and non-guardian NPCs
+            wr = getattr(npc, "wander_range", 0)
+            if wr and npc.npc_type != "quest_monster":
+                if _rng.random() < 0.3:  # 30% chance each move
+                    dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+                    _rng.shuffle(dirs)
+                    for dc, dr in dirs:
+                        nc, nr = npc.col + dc, npc.row + dr
+                        if (nc, nr) in occupied:
+                            continue
+                        if not self.game.tile_map.is_walkable(nc, nr):
+                            continue
+                        occupied.discard((npc.col, npc.row))
+                        npc.col, npc.row = nc, nr
+                        occupied.add((nc, nr))
+                        break
+                continue
+
             if npc.npc_type != "quest_monster":
                 continue
 
@@ -2443,10 +2559,13 @@ class OverworldState(InventoryMixin, BaseState):
             renderer.draw_party_screen_u3(self.game.party)
             return
         # Sync quest status onto NPC objects for renderer
-        ow_npcs = getattr(self.game, "overworld_quest_npcs", [])
-        # Include building interior NPCs when inside a building
-        if self._in_overworld_interior and self._building_interior_npcs:
-            ow_npcs = list(ow_npcs) + self._building_interior_npcs
+        if self._in_overworld_interior:
+            # Inside a building: only show building interior NPCs,
+            # not overworld quest NPCs (whose coordinates are for the
+            # overworld map and would appear at wrong positions).
+            ow_npcs = list(self._building_interior_npcs)
+        else:
+            ow_npcs = getattr(self.game, "overworld_quest_npcs", [])
         mq_states = getattr(self.game, "module_quest_states", {})
         for npc in ow_npcs:
             mqn = getattr(npc, "_module_quest_name", "")

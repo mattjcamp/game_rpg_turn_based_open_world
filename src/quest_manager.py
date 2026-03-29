@@ -41,11 +41,32 @@ def collect_quest_item(game, quest_name, step_idx, item_name):
     return f"Found {item_name}!"
 
 
+def _location_matches(step_location, combat_location):
+    """Return True if *combat_location* satisfies *step_location*.
+
+    Matching rules:
+    - ``"overview"`` or ``"Overview Map"`` steps match combat in
+      ``"overview"`` (overworld random encounters & quest monsters).
+    - Location-specific steps (``"town:Yardley"``, ``"dungeon:X"``,
+      ``"interior:Town/Area"``, ``"space:Building/Space"``,
+      ``"building:Name"``) must match exactly (case-insensitive).
+    - If *step_location* is empty or missing, any location counts.
+    """
+    if not step_location or step_location in ("overview", "Overview Map"):
+        # Overworld steps — only satisfied by overworld combat
+        return combat_location in ("overview", "overworld", "")
+    if not combat_location:
+        return False
+    return step_location.lower() == combat_location.lower()
+
+
 def check_quest_kills(game):
     """Check if any pending killed monsters satisfy quest kill steps.
 
-    Reads game.pending_killed_monsters, matches against active quest
-    kill steps, updates progress, and clears the pending list.
+    Reads ``game.pending_killed_monsters`` and
+    ``game.pending_combat_location``, matches against active quest
+    kill steps **only when the combat location matches the step's
+    spawn_location**, updates progress, and clears the pending list.
 
     Args:
         game: The Game instance
@@ -58,6 +79,8 @@ def check_quest_kills(game):
     killed = getattr(game, "pending_killed_monsters", [])
     if not killed:
         return None
+
+    combat_location = getattr(game, "pending_combat_location", "")
 
     mq_states = getattr(game, "module_quest_states", {})
     quest_defs = getattr(game, "_module_quest_defs", [])
@@ -89,6 +112,12 @@ def check_quest_kills(game):
             monster_display = step.get("monster", "")
             if not monster_display:
                 continue
+
+            # Only credit kills that happened at the right location
+            step_location = step.get("spawn_location", "")
+            if not _location_matches(step_location, combat_location):
+                continue
+
             target_count = max(1, step.get("target_count", 1))
 
             monster_key = monster_display.lower().replace(" ", "_")
@@ -116,4 +145,5 @@ def check_quest_kills(game):
                     "giver for your reward.")
 
     game.pending_killed_monsters = []
+    game.pending_combat_location = ""
     return result_msg

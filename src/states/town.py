@@ -1309,12 +1309,14 @@ class TownState(InventoryMixin, BaseState):
         # Store the monster NPC reference so combat can clean it up
         self._combat_monster_npc = npc
         self._returning_from_combat = True
+        town_name = getattr(self.town_data, "name", "")
         combat_state.start_combat(
             fighter, monsters,
             source_state="town",
             encounter_name=enc_name,
             map_monster_refs=[npc],
-            terrain_tile=terrain_tile)
+            terrain_tile=terrain_tile,
+            combat_location=f"town:{town_name}")
         self.game.change_state("combat")
 
     def _collect_quest_item(self, npc):

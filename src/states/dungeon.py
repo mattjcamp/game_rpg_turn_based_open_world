@@ -114,6 +114,7 @@ class DungeonState(InventoryMixin, BaseState):
 
         # Consume the list so it doesn't get counted again
         self.game.pending_killed_monsters = []
+        self.game.pending_combat_location = ""
 
         active_q = self._get_active_quest()
         if not active_q or active_q.get("quest_type") != "kill":
@@ -1103,11 +1104,13 @@ class DungeonState(InventoryMixin, BaseState):
         combat_state = self.game.states.get("combat")
         if combat_state:
             self.game.sfx.play("encounter")
+            dname = getattr(self.dungeon_data, "name", "")
             combat_state.start_combat(fighter, monsters,
                                       source_state="dungeon",
                                       encounter_name=enc_name,
                                       map_monster_refs=[monster],
-                                      battle_screen=battle_screen)
+                                      battle_screen=battle_screen,
+                                      combat_location=f"dungeon:{dname}")
             self.game.change_state("combat")
 
     # ── Locked door interaction ─────────────────────────────────────

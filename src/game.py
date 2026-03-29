@@ -109,6 +109,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.machine_row = None
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
+        self.pending_combat_location = ""
         self.examined_tiles = {}
 
         # --- Darkness effect (Keys of Shadow module) ---
@@ -482,6 +483,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Combat rewards (must be set before change_state triggers enter())
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
+        self.pending_combat_location = ""
         # Examine tile persistence (must exist before examine state enter())
         self.examined_tiles = {}
 
@@ -708,6 +710,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.keys_inserted = 0  # how many keys placed in the machine
         self.pending_combat_rewards = None  # set by combat victory, consumed by source state
         self.pending_killed_monsters = []   # monster names killed in last combat
+        self.pending_combat_location = ""   # where the combat took place
         self.machine_col = None  # overworld position of the machine
         self.machine_row = None
         self.town_data_map = {}
@@ -1635,21 +1638,44 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         from src.monster import create_monster
         from src.settings import TILE_GRASS, TILE_PATH
 
-        tmap = self.tile_map
         party = self.party
         ow_state = self.states.get("overworld")
         if not ow_state:
             return
 
-        occupied = {(m.col, m.row) for m in ow_state.overworld_monsters}
-        occupied.add((party.col, party.row))
+        # Use the stashed overworld tile map if we're inside an interior,
+        # since self.tile_map may be the interior's small map.
+        stashed_tmap = getattr(ow_state, "_stashed_overworld_tile_map", None)
+        tmap = stashed_tmap or self.tile_map
+
+        # When inside an interior, monsters must go into the stashed
+        # list so they appear on the overworld when the player exits
+        # (the live overworld_monsters list is empty during interiors).
+        stashed_monsters = getattr(
+            ow_state, "_stashed_overworld_monsters", None)
+        if stashed_tmap and stashed_monsters is not None:
+            monster_list = stashed_monsters
+        else:
+            monster_list = ow_state.overworld_monsters
+
+        occupied = {(m.col, m.row) for m in monster_list}
+
+        # If inside an interior, use the stashed overworld position
+        # (the door tile) instead of the party's interior coordinates.
+        stack = getattr(ow_state, "_overworld_interior_stack", [])
+        if stack:
+            ow_col = stack[0].get("col", party.col)
+            ow_row = stack[0].get("row", party.row)
+        else:
+            ow_col, ow_row = party.col, party.row
+        occupied.add((ow_col, ow_row))
 
         rng = _rng.Random(hash((quest_name, step_idx)) & 0xFFFFFFFF)
 
         # If this is a guardian, place near the artifact instead of party
         anchor_col, anchor_row = (
             guardian_anchor if guardian_anchor else
-            (party.col, party.row))
+            (ow_col, ow_row))
 
         for i in range(count):
             mon = create_monster(monster_key)
@@ -1688,7 +1714,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "monster_names": [monster_key],
                         "monster_party_tile": monster_key,
                     }
-                    ow_state.overworld_monsters.append(mon)
+                    monster_list.append(mon)
                     occupied.add((col, row))
                     spawned.append(mon)
                     placed = True
@@ -1705,7 +1731,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     "monster_names": [monster_key],
                     "monster_party_tile": monster_key,
                 }
-                ow_state.overworld_monsters.append(mon)
+                monster_list.append(mon)
                 spawned.append(mon)
 
     def _spawn_quest_collect_overworld(self, item_info, spawned):

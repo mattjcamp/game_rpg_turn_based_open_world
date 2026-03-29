@@ -420,7 +420,8 @@ class CombatState(BaseState):
 
     def start_combat(self, fighter, monsters, source_state="dungeon",
                      encounter_name=None, map_monster_refs=None,
-                     terrain_tile=None, battle_screen=None):
+                     terrain_tile=None, battle_screen=None,
+                     combat_location=None):
         """Start combat with one or more monsters.
 
         Parameters
@@ -460,6 +461,10 @@ class CombatState(BaseState):
             self.source_state = "dungeon"
         else:
             self.source_state = source_state
+
+        # Where combat is taking place (e.g. "overview", "town:Yardley")
+        # Used by quest kill tracking to ensure kills count at the right location.
+        self.combat_location = combat_location or source_state
 
         # Store map refs for removal after combat (may differ from combat monsters)
         self.monster_refs = list(map_monster_refs) if map_monster_refs else list(monsters)
@@ -5069,6 +5074,8 @@ class CombatState(BaseState):
         # Store killed monster names for kill-quest tracking
         killed_names = [m.name for m in self.monsters if not m.is_alive()]
         self.game.pending_killed_monsters = killed_names
+        self.game.pending_combat_location = getattr(
+            self, "combat_location", "overview")
 
         # Store pending XP — gold is picked up during loot phase
         self.game.set_combat_rewards({
