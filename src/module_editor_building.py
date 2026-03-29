@@ -167,6 +167,31 @@ class ModuleBuildingEditorMixin:
             self._mod_building_space_list) - 1
         self._save_module_buildings()
 
+    def _mod_building_open_space_template_picker(self):
+        """Open the template picker to import a template into the current space."""
+        fe = self.features_editor
+        saved = fe.load_map_templates()
+        raw = saved.get("me_enclosure", [])
+        if not raw:
+            return
+        self._mod_building_enc_pick_list = list(raw)
+        self._mod_building_enc_pick_cursor = 0
+        self._mod_building_enc_pick_scroll = 0
+        self._mod_building_enc_picking = True
+        self._mod_building_importing_to_space = True
+
+    def _mod_building_apply_template_to_space(self, template):
+        """Apply an enclosure template to the current space (overwrites tiles)."""
+        import copy
+        space = self._mod_building_get_current_space()
+        if not space:
+            return
+        mc = template.get("map_config", {})
+        space["width"] = mc.get("width", space.get("width", 20))
+        space["height"] = mc.get("height", space.get("height", 20))
+        space["tiles"] = copy.deepcopy(template.get("tiles", {}))
+        self._save_module_buildings()
+
     # ── Encounter helpers (inside a space) ──
 
     def _mod_building_load_encounters(self):

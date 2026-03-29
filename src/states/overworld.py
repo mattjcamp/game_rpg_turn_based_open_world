@@ -1020,6 +1020,11 @@ class OverworldState(InventoryMixin, BaseState):
             self._exit_grace = False
             return
 
+        # Don't re-trigger if an action screen is already active
+        if (self.building_action_active or self.dungeon_action_active
+                or self.town_action_active):
+            return
+
         party = self.game.party
 
         # ── If inside an overworld interior, check exits and links ──
@@ -1755,11 +1760,17 @@ class OverworldState(InventoryMixin, BaseState):
                 buildings = json.load(f)
             if not isinstance(buildings, list):
                 return None
+            # Exact match first
             for b in buildings:
                 if b.get("name") == name:
                     return b
-        except (OSError, json.JSONDecodeError):
-            pass
+            # Case-insensitive fallback
+            name_lower = name.lower()
+            for b in buildings:
+                if b.get("name", "").lower() == name_lower:
+                    return b
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[building lookup] Error reading {p}: {exc}")
         return None
 
     def _enter_module_dungeon(self, dungeon_def, pcol, prow):
@@ -2122,8 +2133,10 @@ class OverworldState(InventoryMixin, BaseState):
                 self._enter_dungeon_confirmed()
             else:
                 self.dungeon_action_active = False
+                self._exit_grace = True
         elif event.key == pygame.K_ESCAPE:
             self.dungeon_action_active = False
+            self._exit_grace = True
 
     def _enter_dungeon_confirmed(self):
         """Execute the actual dungeon entry after the player confirms.
@@ -2193,18 +2206,28 @@ class OverworldState(InventoryMixin, BaseState):
                 self._enter_building_confirmed()
             else:
                 self.building_action_active = False
+                self._exit_grace = True
         elif event.key == pygame.K_ESCAPE:
             self.building_action_active = False
+            self._exit_grace = True
 
     def _enter_building_confirmed(self):
         """Execute the actual building entry after the player confirms."""
         self.building_action_active = False
         args = self.building_action_entry_args
+        self.building_action_entry_args = {}
         if not args:
             return
 
         building_def = args["building_def"]
         pcol, prow = args["col"], args["row"]
+
+        # Re-read building from disk to pick up any editor changes
+        bname = building_def.get("name", "")
+        fresh = self._find_module_building_by_name(bname)
+        if fresh is not None:
+            building_def = fresh
+
         spaces = building_def.get("spaces", [])
         if not spaces:
             return

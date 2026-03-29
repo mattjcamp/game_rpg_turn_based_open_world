@@ -260,7 +260,7 @@
       7,
       50,
       50,
-      2,
+      0,
       2,
       2,
       2,
@@ -324,7 +324,7 @@
       2,
       2,
       2,
-      50,
+      4,
       2,
       50,
       50,
@@ -825,7 +825,7 @@
       "type": "town"
     },
     "4,5": {
-      "interior": "Mysterious Shrine",
+      "interior": "Mystery Shrine",
       "type": "building"
     },
     "7,10": {
@@ -835,6 +835,10 @@
     "14,12": {
       "interior": "Hall of Procedures",
       "type": "dungeon"
+    },
+    "18,11": {
+      "interior": "Yardley",
+      "type": "town"
     }
   }
 }

@@ -327,9 +327,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_building_space_list = []
         self._mod_building_space_cursor = 0
         self._mod_building_space_scroll = 0
-        # Space sub-screen: 0=Edit Map, 1=Encounters
+        # Space sub-screen: 0=Edit Map, 1=Encounters, 2=Import Template
         self._mod_building_space_sub_cursor = 0
-        self._mod_building_space_sub_items = ["Edit Map", "Encounters"]
+        self._mod_building_space_sub_items = [
+            "Edit Map", "Encounters", "Import Template"]
         # Encounters list (within a space)
         self._mod_building_encounter_list = []
         self._mod_building_encounter_cursor = 0
@@ -353,6 +354,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_building_enc_pick_list = []
         self._mod_building_enc_pick_cursor = 0
         self._mod_building_enc_pick_scroll = 0
+        self._mod_building_importing_to_space = False
         # Save flash
         self._mod_building_save_flash = 0.0
 
@@ -4819,6 +4821,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         if event.key == pygame.K_ESCAPE:
             self._mod_building_enc_picking = False
+            self._mod_building_importing_to_space = False
             return
 
         if not n:
@@ -4837,22 +4840,36 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self._mod_building_enc_pick_cursor,
                 self._mod_building_enc_pick_scroll)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            # Select template → show naming overlay
             template = templates[self._mod_building_enc_pick_cursor]
-            self._mod_building_enc_template = template
-            self._mod_building_enc_picking = False
-            self._mod_building_naming = True
-            self._mod_building_naming_is_new = True
-            self._mod_building_naming_target = "space_from_template"
-            if template.get("_blank"):
-                idx = len(self._mod_building_space_list) + 1
-                self._mod_building_name_buf = f"Room {idx}"
+            if self._mod_building_importing_to_space:
+                # Apply template to current space directly
+                self._mod_building_apply_template_to_space(template)
+                self._mod_building_enc_picking = False
+                self._mod_building_importing_to_space = False
+                self._mod_building_save_flash = 1.5
             else:
-                self._mod_building_name_buf = template.get("label", "Room")
+                # Select template → show naming overlay for new space
+                self._mod_building_enc_template = template
+                self._mod_building_enc_picking = False
+                self._mod_building_naming = True
+                self._mod_building_naming_is_new = True
+                self._mod_building_naming_target = "space_from_template"
+                if template.get("_blank"):
+                    idx = len(self._mod_building_space_list) + 1
+                    self._mod_building_name_buf = f"Room {idx}"
+                else:
+                    self._mod_building_name_buf = template.get(
+                        "label", "Room")
 
     def _handle_mod_building_space_sub_input(self, event):
-        """Handle space sub-screen (level 17): Edit Map | Encounters."""
+        """Handle space sub-screen (level 17): Edit Map | Encounters | Import Template."""
         import pygame
+
+        # Intercept enclosure template picker overlay
+        if self._mod_building_enc_picking:
+            self._handle_mod_building_enc_picker_input(event)
+            return
+
         n = len(self._mod_building_space_sub_items)
         if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
             self.module_edit_level = 16
@@ -4869,6 +4886,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             elif self._mod_building_space_sub_cursor == 1:
                 self._mod_building_load_encounters()
                 self.module_edit_level = 18
+            elif self._mod_building_space_sub_cursor == 2:
+                self._mod_building_open_space_template_picker()
 
     def _handle_mod_building_encounter_list_input(self, event):
         """Handle encounter list (level 18)."""
@@ -5743,6 +5762,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "naming_is_new": self._mod_building_naming_is_new,
                         "naming_target": self._mod_building_naming_target,
                         "enc_picking": self._mod_building_enc_picking,
+                        "enc_importing": self._mod_building_importing_to_space,
                         "enc_pick_list": self._mod_building_enc_pick_list,
                         "enc_pick_cursor": self._mod_building_enc_pick_cursor,
                         "enc_pick_scroll": self._mod_building_enc_pick_scroll,

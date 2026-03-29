@@ -8611,7 +8611,9 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (180, 140, 60),
                          (ox, oy, ow, oh), 2)
 
-        self._u3_text("ADD SPACE", ox + 16, oy + 10,
+        title = ("IMPORT TEMPLATE" if bg.get("enc_importing")
+                 else "ADD SPACE")
+        self._u3_text(title, ox + 16, oy + 10,
                       self._U3_ORANGE, f)
         ly = oy + 42
         content_h = oh - 80
@@ -9586,6 +9588,11 @@ class Renderer(CombatEffectRendererMixin):
             self._u3_text(f"{prefix}{item}",
                           rx + 16, y + 8, color, fm)
 
+        # Enclosure template picker overlay (Import Template)
+        if bg.get("enc_picking"):
+            self._draw_building_enc_picker(bg, rx, ry, rw, rh, fm, fs, f)
+
+        self._draw_building_flash(bg, rx, ry, rw, rh, f)
         self._u3_text("[Enter] Open  [Esc] Back",
                       rx + 16, ry + rh - 24, self._U3_HINT, fs)
 
