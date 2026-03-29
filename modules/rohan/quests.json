@@ -88,7 +88,7 @@
         "collect_item": "Crystal",
         "has_guardian": "no",
         "guardian_monster": "",
-        "spawn_location": "overview",
+        "spawn_location": "building:Grotto",
         "target": "",
         "target_count": 1,
         "optional": "no"

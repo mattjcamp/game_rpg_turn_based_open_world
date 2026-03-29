@@ -587,7 +587,7 @@
       2,
       1,
       2,
-      50,
+      5,
       50,
       2,
       2,
@@ -839,6 +839,10 @@
     "18,11": {
       "interior": "Yardley",
       "type": "town"
+    },
+    "11,21": {
+      "interior": "Grotto",
+      "type": "building"
     }
   }
 }

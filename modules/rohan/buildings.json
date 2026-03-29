@@ -1136,5 +1136,210 @@
         "encounters": []
       }
     ]
+  },
+  {
+    "name": "Grotto",
+    "description": "A hole in the ground opens up to reveal a hidden world full of ric",
+    "spaces": [
+      {
+        "name": "Room 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {
+          "3,3": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "4,3": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "4,4": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "3,4": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "3,5": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "4,5": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "5,5": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "5,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "5,6": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "4,6": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "4,7": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "5,7": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "5,8": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "4,8": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "4,9": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "5,9": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "6,9": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "6,10": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "6,11": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "5,11": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "5,10": {
+            "tile_id": 46,
+            "name": "Path Floor"
+          },
+          "2,3": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "2,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "2,5": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "2,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,8": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,9": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "4,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "4,11": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "4,12": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "5,12": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,12": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "7,11": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "7,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "7,9": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "7,8": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,8": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,5": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "5,3": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "4,2": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "2,2": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,2": {
+            "tile_id": 5,
+            "name": "Dungeon",
+            "to_overworld": true
+          }
+        },
+        "encounters": []
+      }
+    ]
   }
 ]

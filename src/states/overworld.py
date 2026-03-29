@@ -1686,8 +1686,9 @@ class OverworldState(InventoryMixin, BaseState):
 
         for npc in self._building_interior_npcs:
             # Random wandering for quest givers and non-guardian NPCs
+            # Quest items (collectibles) must never move.
             wr = getattr(npc, "wander_range", 0)
-            if wr and npc.npc_type != "quest_monster":
+            if wr and npc.npc_type not in ("quest_monster", "quest_item"):
                 if _rng.random() < 0.3:  # 30% chance each move
                     dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
                     _rng.shuffle(dirs)

@@ -9322,9 +9322,9 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_map_editor_fullscreen(bg["editor_data"])
             return
 
-        # Semi-transparent overlay
-        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
-        overlay.fill((10, 8, 20, 230))
+        # Opaque background so module description text doesn't bleed through
+        overlay = pygame.Surface((rw, rh))
+        overlay.fill((10, 8, 20))
         self.screen.blit(overlay, (rx, ry))
         pygame.draw.rect(self.screen, (80, 120, 160),
                          (rx, ry, rw, rh), 1)
@@ -9447,6 +9447,10 @@ class Renderer(CombatEffectRendererMixin):
         row_h = 38
         max_visible = rh // row_h
 
+        # Clip all rendering to the container bounds
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(rx, ry, rw, rh))
+
         self._u3_text("Building Settings", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
         ly = ry + 44
@@ -9500,6 +9504,9 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(
             "[Up/Dn] Navigate  [L/R] Choice  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        # Restore previous clip rect
+        self.screen.set_clip(prev_clip)
 
     def _draw_building_space_list(self, bg, rx, ry, rw, rh, fm, fs, f):
         """Draw the space list within a building."""
