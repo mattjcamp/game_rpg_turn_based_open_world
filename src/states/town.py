@@ -680,8 +680,17 @@ class TownState(InventoryMixin, BaseState):
                 # "to_overworld" exits leave the town entirely
                 ow_exits = getattr(self, "_interior_overworld_exits", set())
                 if (party.col, party.row) in ow_exits:
-                    # Unwind the interior stack and exit the town
-                    self._interior_stack = []
+                    # Restore town-level state before exiting so the
+                    # TownData object isn't left pointing at an interior map.
+                    stack = getattr(self, "_interior_stack", [])
+                    if stack:
+                        bottom = stack[0]
+                        stack.clear()
+                        self.town_data.tile_map = bottom["tile_map"]
+                        self.town_data.npcs = bottom["npcs"]
+                        self.town_data.interior_links = bottom["interior_links"]
+                        self.town_data.overworld_exits = bottom.get(
+                            "overworld_exits", set())
                     self._in_interior = False
                     self._exit_town()
                     return

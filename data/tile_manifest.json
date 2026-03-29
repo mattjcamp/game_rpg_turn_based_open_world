@@ -130,7 +130,8 @@
       "path": "src/assets/unassigned/grass_plains.png",
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 50
     },
     "mountains": {
       "path": "src/assets/unassigned/mountains.png",
@@ -160,6 +161,12 @@
       "path": "src/assets/unassigned/forest.png",
       "usable_in": [
         "overworld"
+      ]
+    },
+    "brush_scrubland_dense": {
+      "path": "src/assets/unassigned/brush_scrubland_copy.png",
+      "usable_in": [
+        "unassigned"
       ]
     }
   },
@@ -247,6 +254,13 @@
         "overworld",
         "town"
       ]
+    },
+    "wall_lighter": {
+      "path": "src/assets/game/terrain/wall_copy.png",
+      "usable_in": [
+        "town"
+      ],
+      "tile_id": 51
     }
   },
   "dungeon": {

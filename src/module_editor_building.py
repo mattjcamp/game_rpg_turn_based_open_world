@@ -137,6 +137,36 @@ class ModuleBuildingEditorMixin:
             self._mod_building_space_cursor = n - 1
         self._save_module_buildings()
 
+    def _mod_building_open_enc_picker(self):
+        """Open the enclosure template import picker for building spaces."""
+        fe = self.features_editor
+        saved = fe.load_map_templates()
+        raw = saved.get("me_enclosure", [])
+        blank = {"_blank": True, "label": "Create Blank Space",
+                 "map_config": {"width": 20, "height": 20}}
+        self._mod_building_enc_pick_list = [blank] + list(raw)
+        self._mod_building_enc_pick_cursor = 0
+        self._mod_building_enc_pick_scroll = 0
+        self._mod_building_enc_picking = True
+
+    def _mod_building_generate_space_from_template(self, name, template):
+        """Create a new space from an enclosure template."""
+        import copy
+        mc = template.get("map_config", {})
+        new_space = {
+            "name": name,
+            "width": mc.get("width", 20),
+            "height": mc.get("height", 20),
+            "entry_col": 0,
+            "entry_row": 0,
+            "tiles": copy.deepcopy(template.get("tiles", {})),
+            "encounters": [],
+        }
+        self._mod_building_space_list.append(new_space)
+        self._mod_building_space_cursor = len(
+            self._mod_building_space_list) - 1
+        self._save_module_buildings()
+
     # ── Encounter helpers (inside a space) ──
 
     def _mod_building_load_encounters(self):

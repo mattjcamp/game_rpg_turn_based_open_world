@@ -188,6 +188,7 @@ class FeaturesEditor:
         self.pxedit_path = ""               # file path for saving
         self.pxedit_undo_stack = []         # list of pixel snapshots for undo
         # Color replace mode
+        self.pxedit_painting = False         # True when continuous paint active
         self.pxedit_replacing = False       # True when in replace mode
         self.pxedit_replace_src_color = (0, 0, 0, 255)  # actual RGBA from canvas
         self.pxedit_replace_dst = 0         # target palette index ("to")
@@ -1982,17 +1983,83 @@ class FeaturesEditor:
         self.game.renderer.reload_sprites()
 
     def gallery_duplicate(self):
-        """Duplicate the selected sprite in the gallery."""
+        """Duplicate the selected sprite in the gallery.
+
+        Copies the sprite PNG file, adds a new manifest entry, and
+        refreshes the gallery view so the duplicate is immediately
+        visible and editable.
+        """
+        import copy, shutil
         gi = self.gallery_cur_gi()
         if gi is None:
             return
         src = self.gallery_list[gi]
-        dup = dict(src)
-        dup["name"] = f"{src['name']}_copy"
+        base_name = src["name"]
+        cat = src["category"]
+
+        # ── Pick a unique name ──
+        existing_names = {e["name"] for e in self.gallery_list}
+        new_name = f"{base_name}_copy"
+        counter = 2
+        while new_name in existing_names:
+            new_name = f"{base_name}_copy{counter}"
+            counter += 1
+
+        # ── Copy the PNG file ──
+        root = os.path.dirname(os.path.dirname(__file__))
+        src_path = os.path.join(root, src["path"])
+        if os.path.isfile(src_path):
+            ext = os.path.splitext(src_path)[1]
+            dst_dir = os.path.dirname(src_path)
+            dst_path = os.path.join(dst_dir, f"{new_name}{ext}")
+            shutil.copy2(src_path, dst_path)
+            new_rel_path = os.path.relpath(dst_path, root)
+        else:
+            new_rel_path = src["path"]
+
+        # ── Add manifest entry ──
+        mpath = os.path.join(root, "data", "tile_manifest.json")
+        try:
+            with open(mpath, "r") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError):
+            manifest = {}
+        section = manifest.setdefault(cat, {})
+        section[new_name] = {
+            "path": new_rel_path,
+            "usable_in": list(src.get("usable_in", [cat])),
+        }
+        # Copy tile_id if present (assign new unique id)
+        if src.get("tile_id") is not None:
+            all_ids = set()
+            for sec in manifest.values():
+                if isinstance(sec, dict):
+                    for entry in sec.values():
+                        if isinstance(entry, dict) and "tile_id" in entry:
+                            all_ids.add(entry["tile_id"])
+            new_tid = max(all_ids) + 1 if all_ids else 100
+            section[new_name]["tile_id"] = new_tid
+        try:
+            with open(mpath, "w") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError:
+            pass
+
+        # ── Add gallery list entry ──
+        dup = copy.deepcopy(src)
+        dup["name"] = new_name
+        dup["path"] = new_rel_path
+        if "tile_id" in section[new_name]:
+            dup["tile_id"] = section[new_name]["tile_id"]
         self.gallery_list.append(dup)
-        # Keep cursor on the original, move to end
-        self.gallery_spr_cursor = min(
-            self.gallery_spr_cursor, len(self.gallery_sprites) - 1)
+
+        # ── Refresh view and reload sprites ──
+        self._rebuild_gallery_cats()
+        self.gallery_enter_cat()
+        self.gallery_spr_cursor = max(0, len(self.gallery_sprites) - 1)
+        self.gallery_spr_scroll = self._adjust_scroll_generic(
+            self.gallery_spr_cursor, self.gallery_spr_scroll)
+        self.game.renderer.reload_sprites()
 
     def gallery_delete(self):
         """Delete the selected sprite from the gallery (mark as unassigned)."""
@@ -2001,8 +2068,18 @@ class FeaturesEditor:
             return
         entry = self.gallery_list[gi]
         entry["usable_in"] = ["unassigned"]
-        # Rebuild category counts and reload sprites
+        # Persist to manifest, rebuild the filtered view, and reload sprites
+        self.save_gallery()
         self._rebuild_gallery_cats()
+        self.gallery_enter_cat()
+        # Keep cursor in bounds after removal from the current category
+        n = len(self.gallery_sprites)
+        if n > 0:
+            self.gallery_spr_cursor = min(self.gallery_spr_cursor, n - 1)
+        else:
+            self.gallery_spr_cursor = 0
+        self.gallery_spr_scroll = self._adjust_scroll_generic(
+            self.gallery_spr_cursor, self.gallery_spr_scroll)
         self.game.renderer.reload_sprites()
 
     def gallery_rename(self, new_name):
@@ -2089,6 +2166,7 @@ class FeaturesEditor:
             self.pxedit_color_idx = 0
             self.pxedit_path = sprite_path
             self.pxedit_undo_stack = []
+            self.pxedit_painting = False
             self.pxedit_replacing = False
             return True
         except Exception:
@@ -3092,8 +3170,9 @@ class FeaturesEditor:
                         self.level = 3
                 return
 
-            # Tab toggles focus between canvas and palette
+            # Tab toggles focus between canvas and palette (cancels paint mode)
             if event.key == pygame.K_TAB:
+                self.pxedit_painting = False
                 if self.pxedit_focus == "canvas":
                     self.pxedit_focus = "palette"
                 else:
@@ -3119,20 +3198,48 @@ class FeaturesEditor:
                 return
 
             # ── Canvas mode ──
+            # Cursor movement
+            moved = False
             if event.key == pygame.K_UP:
                 self.pxedit_cy = (
                     self.pxedit_cy - 1) % h
+                moved = True
             elif event.key == pygame.K_DOWN:
                 self.pxedit_cy = (
                     self.pxedit_cy + 1) % h
+                moved = True
             elif event.key == pygame.K_LEFT:
                 self.pxedit_cx = (
                     self.pxedit_cx - 1) % w
+                moved = True
             elif event.key == pygame.K_RIGHT:
                 self.pxedit_cx = (
                     self.pxedit_cx + 1) % w
-            # Paint with current color
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                moved = True
+            # Continuous paint: auto-paint after each move
+            if moved and self.pxedit_painting:
+                color = self.pxedit_palette[
+                    self.pxedit_color_idx]
+                if tuple(px[self.pxedit_cy][self.pxedit_cx]) != tuple(color):
+                    px[self.pxedit_cy][self.pxedit_cx] = color
+                    self.dirty = True
+            if moved:
+                pass  # already handled
+            # Enter: toggle continuous paint mode
+            elif event.key == pygame.K_RETURN:
+                if self.pxedit_painting:
+                    self.pxedit_painting = False
+                else:
+                    self.pxedit_painting = True
+                    # Snapshot for undo at the start of a paint stroke
+                    self.pxedit_undo_stack.append(
+                        [list(row) for row in px])
+                    color = self.pxedit_palette[
+                        self.pxedit_color_idx]
+                    px[self.pxedit_cy][self.pxedit_cx] = color
+                    self.dirty = True
+            # Space: single paint (does not toggle mode)
+            elif event.key == pygame.K_SPACE:
                 # Snapshot for undo
                 self.pxedit_undo_stack.append(
                     [list(row) for row in px])
@@ -3140,15 +3247,18 @@ class FeaturesEditor:
                     self.pxedit_color_idx]
                 px[self.pxedit_cy][self.pxedit_cx] = color
                 self.dirty = True
-            # Quick palette cycle: Q = prev, E = next
+            # Quick palette cycle: Q = prev, E = next (cancels paint mode)
             elif event.key == pygame.K_q:
+                self.pxedit_painting = False
                 self.pxedit_color_idx = (
                     self.pxedit_color_idx - 1) % n_pal
             elif event.key == pygame.K_e:
+                self.pxedit_painting = False
                 self.pxedit_color_idx = (
                     self.pxedit_color_idx + 1) % n_pal
-            # Pick color from canvas (P = eyedropper)
+            # Pick color from canvas (P = eyedropper, cancels paint mode)
             elif event.key == pygame.K_p:
+                self.pxedit_painting = False
                 picked = tuple(
                     px[self.pxedit_cy][self.pxedit_cx])
                 best_i = 0
@@ -3160,18 +3270,20 @@ class FeaturesEditor:
                         best_d = d
                         best_i = pi
                 self.pxedit_color_idx = best_i
-            # Enter color replace mode (R) — source = exact color under cursor
+            # Enter color replace mode (R, cancels paint mode)
             elif event.key == pygame.K_r:
+                self.pxedit_painting = False
                 picked = tuple(
                     px[self.pxedit_cy][self.pxedit_cx])
                 self.pxedit_replacing = True
                 self.pxedit_replace_src_color = picked
                 self.pxedit_replace_dst = self.pxedit_color_idx
                 self.pxedit_replace_sel = "dst"
-            # Undo (Ctrl+Z or U)
+            # Undo (Ctrl+Z or U, cancels paint mode)
             elif (event.key == pygame.K_z
                   and (event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META))) \
                     or event.key == pygame.K_u:
+                self.pxedit_painting = False
                 if self.pxedit_undo_stack:
                     restored = self.pxedit_undo_stack.pop()
                     # Copy restored data back into the live pixel array
@@ -4429,6 +4541,7 @@ class FeaturesEditor:
                 color_idx=self.pxedit_color_idx,
                 palette=self.pxedit_palette,
                 focus=self.pxedit_focus,
+                painting=self.pxedit_painting,
                 replacing=self.pxedit_replacing,
                 replace_src_color=self.pxedit_replace_src_color,
                 replace_dst=self.pxedit_replace_dst,

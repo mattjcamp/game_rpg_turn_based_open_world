@@ -335,6 +335,11 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_building_name_buf = ""
         self._mod_building_naming_is_new = False
         self._mod_building_naming_target = ""   # "building" or "space"
+        # Enclosure template picker (for importing into building spaces)
+        self._mod_building_enc_picking = False
+        self._mod_building_enc_pick_list = []
+        self._mod_building_enc_pick_cursor = 0
+        self._mod_building_enc_pick_scroll = 0
         # Save flash
         self._mod_building_save_flash = 0.0
 
@@ -2825,27 +2830,66 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.showing_title = False
 
     def _refresh_overworld_interior_data(self):
-        """Reload overworld interiors & tile_links from static_overworld.json.
+        """Reload overworld interiors & tile_links from disk.
 
         Called when returning to a running game so that any changes made in
         the module editor (add/delete/rename interiors, re-link tiles) are
         picked up without requiring a full new-game restart.
+
+        Checks two sources in priority order:
+          1. static_overworld.json  (full static overworld format)
+          2. overview_map.json      (module editor overview map format)
         """
         import json, os
         if not self.active_module_path:
             return
+
+        sdata = None
+
+        # ── 1. Try static_overworld.json ──
         static_path = os.path.join(
             self.active_module_path, "static_overworld.json")
-        if not os.path.isfile(static_path):
+        if os.path.isfile(static_path):
+            try:
+                with open(static_path, "r") as fh:
+                    sdata = json.load(fh)
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        # ── 2. Fall back to overview_map.json ──
+        if sdata is None:
+            overview_path = os.path.join(
+                self.active_module_path, "overview_map.json")
+            if os.path.isfile(overview_path):
+                try:
+                    with open(overview_path, "r") as fh:
+                        sdata = json.load(fh)
+                except (OSError, json.JSONDecodeError):
+                    pass
+
+        if sdata is None:
             return
-        try:
-            with open(static_path, "r") as fh:
-                sdata = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            return
-        tmap = self.tile_map
+
+        # If the player is inside an overworld interior, the current
+        # tile_map is the interior map.  Update the stashed overworld
+        # map instead so tile_links survive the exit.
+        ow_state = self.states.get("overworld")
+        stashed = (getattr(ow_state, "_stashed_overworld_tile_map", None)
+                   if ow_state else None)
+        tmap = stashed if stashed is not None else self.tile_map
+
         tmap.tile_links = sdata.get("tile_links", {})
         tmap.overworld_interiors = sdata.get("interiors", [])
+
+        # If the overview map tiles were also updated, refresh them
+        # so the player sees the latest map layout.
+        tiles = sdata.get("tiles")
+        if tiles and isinstance(tiles, list):
+            mc = sdata.get("map_config", {})
+            new_w = mc.get("width", 0) or (len(tiles[0]) if tiles else 0)
+            new_h = mc.get("height", 0) or len(tiles)
+            if new_w == tmap.width and new_h == tmap.height:
+                tmap.tiles = tiles
 
     def _title_quit(self):
         """Quit the game."""
@@ -3583,7 +3627,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             brushes=brushes,
             tile_context="overworld",
             supports_tile_links=True,
-            supports_replace=False,
+            supports_replace=True,
             on_save=_on_save,
             on_exit=_on_exit,
         )
@@ -4464,6 +4508,16 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         if building:
                             building["name"] = name
                             self._save_module_buildings()
+                elif target == "space_from_template":
+                    template = getattr(self, "_mod_building_enc_template", None)
+                    if template and template.get("_blank"):
+                        self._mod_building_add_space(name)
+                    elif template:
+                        self._mod_building_generate_space_from_template(
+                            name, template)
+                    else:
+                        self._mod_building_add_space(name)
+                    self._mod_building_enc_template = None
                 elif target == "space":
                     if self._mod_building_naming_is_new:
                         self._mod_building_add_space(name)
@@ -4563,6 +4617,11 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         """Handle space list browsing (level 16, sub 1)."""
         import pygame
 
+        # Intercept enclosure template picker overlay
+        if self._mod_building_enc_picking:
+            self._handle_mod_building_enc_picker_input(event)
+            return
+
         if self._mod_building_naming:
             self._handle_mod_building_naming_input(event)
             return
@@ -4575,11 +4634,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self.module_edit_level = 15
             return
         if self._is_new_shortcut(event):
-            self._mod_building_naming = True
-            self._mod_building_naming_is_new = True
-            self._mod_building_naming_target = "space"
-            idx = len(self._mod_building_space_list) + 1
-            self._mod_building_name_buf = f"Room {idx}"
+            # Open template picker instead of blank naming
+            self._mod_building_open_enc_picker()
             return
         if self._is_delete_shortcut(event) and n > 0:
             self._mod_building_delete_space()
@@ -4612,6 +4668,46 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
             self._mod_building_space_sub_cursor = 0
             self.module_edit_level = 17
+
+    def _handle_mod_building_enc_picker_input(self, event):
+        """Handle enclosure template picker for building spaces."""
+        import pygame
+        templates = self._mod_building_enc_pick_list
+        n = len(templates)
+        fe = self.features_editor
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_building_enc_picking = False
+            return
+
+        if not n:
+            return
+
+        if event.key == pygame.K_UP:
+            self._mod_building_enc_pick_cursor = (
+                self._mod_building_enc_pick_cursor - 1) % n
+            self._mod_building_enc_pick_scroll = fe._adjust_scroll_generic(
+                self._mod_building_enc_pick_cursor,
+                self._mod_building_enc_pick_scroll)
+        elif event.key == pygame.K_DOWN:
+            self._mod_building_enc_pick_cursor = (
+                self._mod_building_enc_pick_cursor + 1) % n
+            self._mod_building_enc_pick_scroll = fe._adjust_scroll_generic(
+                self._mod_building_enc_pick_cursor,
+                self._mod_building_enc_pick_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Select template → show naming overlay
+            template = templates[self._mod_building_enc_pick_cursor]
+            self._mod_building_enc_template = template
+            self._mod_building_enc_picking = False
+            self._mod_building_naming = True
+            self._mod_building_naming_is_new = True
+            self._mod_building_naming_target = "space_from_template"
+            if template.get("_blank"):
+                idx = len(self._mod_building_space_list) + 1
+                self._mod_building_name_buf = f"Room {idx}"
+            else:
+                self._mod_building_name_buf = template.get("label", "Room")
 
     def _handle_mod_building_space_sub_input(self, event):
         """Handle space sub-screen (level 17): Edit Map | Encounters."""
@@ -5492,6 +5588,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "name_buf": self._mod_building_name_buf,
                         "naming_is_new": self._mod_building_naming_is_new,
                         "naming_target": self._mod_building_naming_target,
+                        "enc_picking": self._mod_building_enc_picking,
+                        "enc_pick_list": self._mod_building_enc_pick_list,
+                        "enc_pick_cursor": self._mod_building_enc_pick_cursor,
+                        "enc_pick_scroll": self._mod_building_enc_pick_scroll,
                         "save_flash": self._mod_building_save_flash,
                         "level": max(0, self.module_edit_level - 14),
                     },

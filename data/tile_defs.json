@@ -462,5 +462,27 @@
     ],
     "context": "town",
     "sprite": "town/brick_wall_brown"
+  },
+  "50": {
+    "name": "Grass Sparse",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "overworld",
+    "sprite": "overworld/grass_plains"
+  },
+  "51": {
+    "name": "Lighter Bricks",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/wall_lighter"
   }
 }

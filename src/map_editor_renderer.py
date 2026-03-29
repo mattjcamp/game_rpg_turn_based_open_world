@@ -766,7 +766,7 @@ def _draw_footer(renderer, data: Dict):
         hint = "[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel"
     elif data["storage"] == STORAGE_DENSE:
         hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                "[Tab] Brush  [I] Link  [X] Unlink  "
+                "[Tab] Brush  [I] Link  [R] Replace  [X] Unlink  "
                 "[Ctrl+S] Save  [Esc] Save & Exit")
     else:
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "

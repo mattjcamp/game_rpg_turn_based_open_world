@@ -125,6 +125,7 @@ class PixelEditorRS:
     color_idx: int = 0
     palette: Optional[list] = None
     focus: str = "canvas"
+    painting: bool = False
     replacing: bool = False
     replace_src_color: tuple = (0, 0, 0, 255)
     replace_dst: int = 0

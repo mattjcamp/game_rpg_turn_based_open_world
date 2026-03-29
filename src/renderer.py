@@ -7649,7 +7649,8 @@ class Renderer(CombatEffectRendererMixin):
         pxedit_pixels = px.pixels; pxedit_cx = px.cx; pxedit_cy = px.cy
         pxedit_w = px.w; pxedit_h = px.h
         pxedit_color_idx = px.color_idx; pxedit_palette = px.palette
-        pxedit_focus = px.focus; pxedit_replacing = px.replacing
+        pxedit_focus = px.focus; pxedit_painting = px.painting
+        pxedit_replacing = px.replacing
         pxedit_replace_src_color = px.replace_src_color
         pxedit_replace_dst = px.replace_dst
         pxedit_replace_sel = px.replace_sel
@@ -7890,6 +7891,7 @@ class Renderer(CombatEffectRendererMixin):
                         pxedit_palette or [],
                         pxedit_focus,
                         fm, fs, f,
+                        painting=pxedit_painting,
                         replacing=pxedit_replacing,
                         replace_src_color=pxedit_replace_src_color,
                         replace_dst=pxedit_replace_dst,
@@ -8514,6 +8516,67 @@ class Renderer(CombatEffectRendererMixin):
                          (ox, oy, ow, oh), 2)
 
         self._u3_text("ADD ENCLOSURE", ox + 16, oy + 10,
+                      self._U3_ORANGE, f)
+        ly = oy + 42
+        content_h = oh - 80
+        max_vis = content_h // row_h
+
+        if len(templates) == 0:
+            self._u3_text("No enclosure templates found.",
+                          ox + 20, ly + 10, (140, 140, 160), fm)
+            self._u3_text("Create templates in the Map Editor hub.",
+                          ox + 20, ly + 30, (100, 160, 200), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(templates):
+                    break
+                tmpl = templates[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((ow - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (ox + 2, y - 1))
+                prefix = "> " if selected else "  "
+                is_blank = tmpl.get("_blank", False)
+                if is_blank:
+                    color = (100, 255, 130) if selected else (80, 200, 110)
+                else:
+                    color = self._U3_WHITE if selected else (180, 180, 180)
+                label = tmpl.get("label", "Unnamed")
+                mc = tmpl.get("map_config", {})
+                dims = f"{mc.get('width', '?')}x{mc.get('height', '?')}"
+                sub = tmpl.get("subtitle", dims) if not is_blank else dims
+                self._u3_text(f"{prefix}{label}",
+                              ox + 10, y, color, fm)
+                self._u3_text(f"  {sub}",
+                              ox + 10, y + 18, (140, 140, 160), fs)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Select  [Esc] Cancel",
+            ox + 16, oy + oh - 28, self._U3_HINT, fs)
+
+    def _draw_building_enc_picker(self, bg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the enclosure template picker overlay for building spaces."""
+        templates = bg.get("enc_pick_list") or []
+        cursor = bg.get("enc_pick_cursor", 0)
+        scroll = bg.get("enc_pick_scroll", 0)
+        row_h = 40
+
+        pad = 12
+        ox = rx + pad
+        oy = ry + pad
+        ow = rw - pad * 2
+        oh = rh - pad * 2
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((20, 12, 30, 240))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (180, 140, 60),
+                         (ox, oy, ow, oh), 2)
+
+        self._u3_text("ADD SPACE", ox + 16, oy + 10,
                       self._U3_ORANGE, f)
         ly = oy + 42
         content_h = oh - 80
@@ -9195,13 +9258,15 @@ class Renderer(CombatEffectRendererMixin):
                     f"  {sw}x{sh}  {n_enc} enc  ({map_tag})",
                     rx + 10, y + 18, (140, 140, 160), fs)
 
+        # Enclosure template picker overlay
+        if bg.get("enc_picking"):
+            self._draw_building_enc_picker(bg, rx, ry, rw, rh, fm, fs, f)
+
         # Naming overlay (spaces)
-        if bg.get("naming") and bg.get("naming_target") == "space":
+        if bg.get("naming") and bg.get("naming_target") in ("space", "space_from_template"):
+            label = "New Space Name:" if bg.get("naming_is_new") else "Rename Space:"
             self._draw_naming_overlay(
-                bg.get("name_buf", ""),
-                "New Space Name:" if bg.get("naming_is_new")
-                else "Rename Space:",
-                fm, f)
+                bg.get("name_buf", ""), label, fm, f)
 
         self._draw_building_flash(bg, rx, ry, rw, rh, f)
         self._u3_text(
@@ -10771,6 +10836,7 @@ class Renderer(CombatEffectRendererMixin):
 
     def _draw_pixel_editor(self, pixels, cx, cy, pw, ph,
                             color_idx, palette, focus, fm, fs, f,
+                            painting=False,
                             replacing=False,
                             replace_src_color=(0, 0, 0, 255),
                             replace_dst=0, replace_sel="dst"):
@@ -11067,12 +11133,23 @@ class Renderer(CombatEffectRendererMixin):
                 self._U3_HINT, fs)
             return  # skip normal footer
 
+        # ── PAINTING indicator (shown when continuous paint is active) ──
+        if painting and canvas_focused:
+            paint_label = "PAINTING"
+            plw = fm.size(paint_label)[0]
+            self._u3_text(paint_label,
+                          SCREEN_WIDTH // 2 - plw // 2,
+                          42, self._U3_ORANGE, fm)
+
         # ── Footer hints (context-sensitive) ──
         if palette_focused:
             hint = ("[Arrows] Select Color  [Enter] Confirm  "
                     "[Tab] Canvas  [Esc] Canvas")
+        elif painting:
+            hint = ("[Arrows] Paint  [Enter] Stop  "
+                    "[Q/E] Color  [Ctrl+Z] Undo  [Esc] Save")
         else:
-            hint = ("[Arrows] Move  [Space] Paint  [Tab] Palette  "
+            hint = ("[Arrows] Move  [Enter/Space] Paint  [Tab] Palette  "
                     "[Q/E] Color  [P] Pick  [R] Replace  "
                     "[Ctrl+Z] Undo  [Esc] Save")
         hw = fs.size(hint)[0]

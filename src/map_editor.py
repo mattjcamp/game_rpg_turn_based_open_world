@@ -474,44 +474,53 @@ class MapEditorState:
                           src_empty: bool,
                           dst_brush: Brush):
         """Replace all tiles matching source with destination brush."""
-        if self.config.storage != STORAGE_SPARSE:
-            return
         tiles = self.tiles
         w, h = self.config.width, self.config.height
 
-        if src_empty:
-            # Replace all empty cells with destination
-            if dst_brush.tile_id is not None:
-                for r in range(h):
-                    for c in range(w):
-                        pk = f"{c},{r}"
-                        if pk not in tiles:
-                            td = {"tile_id": dst_brush.tile_id,
-                                  "name": dst_brush.name}
-                            if dst_brush.path:
-                                td["path"] = dst_brush.path
-                            tiles[pk] = td
-                self.dirty = True
-        elif dst_brush.is_eraser:
-            # Replace source tiles with eraser (remove)
-            to_del = [k for k, v in tiles.items()
-                      if isinstance(v, dict)
-                      and v.get("tile_id") == src_tile_id]
-            for k in to_del:
-                del tiles[k]
-            if to_del:
-                self.dirty = True
-        else:
-            # Replace source tile_id with destination
-            for k, v in tiles.items():
-                if isinstance(v, dict) and v.get("tile_id") == src_tile_id:
-                    v["tile_id"] = dst_brush.tile_id
-                    v["name"] = dst_brush.name
-                    if dst_brush.path:
-                        v["path"] = dst_brush.path
-                    elif "path" in v:
-                        del v["path"]
+        if self.config.storage == STORAGE_DENSE:
+            # Dense: tiles[row][col] = tile_id (int)
+            if src_tile_id is None or dst_brush.tile_id is None:
+                return
+            dst_id = dst_brush.tile_id if not dst_brush.is_eraser else self.config.eraser_tile_id
+            for r in range(h):
+                for c in range(w):
+                    if tiles[r][c] == src_tile_id:
+                        tiles[r][c] = dst_id
+                        self.dirty = True
+        elif self.config.storage == STORAGE_SPARSE:
+            if src_empty:
+                # Replace all empty cells with destination
+                if dst_brush.tile_id is not None:
+                    for r in range(h):
+                        for c in range(w):
+                            pk = f"{c},{r}"
+                            if pk not in tiles:
+                                td = {"tile_id": dst_brush.tile_id,
+                                      "name": dst_brush.name}
+                                if dst_brush.path:
+                                    td["path"] = dst_brush.path
+                                tiles[pk] = td
                     self.dirty = True
+            elif dst_brush.is_eraser:
+                # Replace source tiles with eraser (remove)
+                to_del = [k for k, v in tiles.items()
+                          if isinstance(v, dict)
+                          and v.get("tile_id") == src_tile_id]
+                for k in to_del:
+                    del tiles[k]
+                if to_del:
+                    self.dirty = True
+            else:
+                # Replace source tile_id with destination
+                for k, v in tiles.items():
+                    if isinstance(v, dict) and v.get("tile_id") == src_tile_id:
+                        v["tile_id"] = dst_brush.tile_id
+                        v["name"] = dst_brush.name
+                        if dst_brush.path:
+                            v["path"] = dst_brush.path
+                        elif "path" in v:
+                            del v["path"]
+                        self.dirty = True
 
     # -- Data export (for saving / renderer consumption) --
 
@@ -837,6 +846,17 @@ class MapEditorInputHandler:
             st.replace_src_tile = td.get("tile_id")
             st.replace_src_name = td.get("name",
                                          f"Tile {td.get('tile_id', '?')}")
+            st.replace_src_empty = False
+        elif isinstance(td, int):
+            # Dense storage: tile is an int tile_id
+            st.replace_src_tile = td
+            # Look up name from brushes
+            name = f"Tile {td}"
+            for b in st.config.brushes:
+                if b.tile_id == td:
+                    name = b.name
+                    break
+            st.replace_src_name = name
             st.replace_src_empty = False
         else:
             st.replace_src_tile = None

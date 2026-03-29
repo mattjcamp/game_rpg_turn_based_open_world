@@ -20,6 +20,18 @@
         "target": "",
         "target_count": 1,
         "optional": "no"
+      },
+      {
+        "description": "Retrieve the Sword of Kings",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "King's Sword",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "interior:Aseroth/Tunnel",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
       }
     ]
   }
