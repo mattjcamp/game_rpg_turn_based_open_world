@@ -98,7 +98,7 @@
       "wisdom": 15,
       "level": 1,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Club",
         "left_hand": null,
         "body": "Cloth",
         "head": null
@@ -109,9 +109,9 @@
   ],
   "active_party": [
     0,
+    1,
     2,
-    3,
-    4
+    3
   ],
   "party_effects": {
     "effect_1": null,

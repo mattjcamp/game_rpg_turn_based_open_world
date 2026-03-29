@@ -439,9 +439,27 @@ class DungeonState(InventoryMixin, BaseState):
                 self.show_message(
                     f"You descend into {self.dungeon_data.name}... No torch equipped!", 2500
                 )
-            # Move party to dungeon entry point (the stairs)
-            self.game.party.col = self.dungeon_data.entry_col
-            self.game.party.row = self.dungeon_data.entry_row
+            # Move party to dungeon entry point.
+            # entry_col/entry_row is already resolved by the
+            # overworld loader (using to_overworld exits).
+            # Just verify it is walkable as a safety net.
+            ecol = self.dungeon_data.entry_col
+            erow = self.dungeon_data.entry_row
+            tmap = self.dungeon_data.tile_map
+            from src.settings import TILE_DEFS as _TD
+            if not _TD.get(tmap.get_tile(ecol, erow),
+                           {}).get("walkable", False):
+                for r in range(tmap.height):
+                    for c in range(tmap.width):
+                        if _TD.get(tmap.get_tile(c, r),
+                                   {}).get("walkable", False):
+                            ecol, erow = c, r
+                            break
+                    else:
+                        continue
+                    break
+            self.game.party.col = ecol
+            self.game.party.row = erow
             # Update camera for the dungeon map
             self.game.camera.map_width = self.dungeon_data.tile_map.width
             self.game.camera.map_height = self.dungeon_data.tile_map.height
@@ -522,9 +540,16 @@ class DungeonState(InventoryMixin, BaseState):
                     if self.showing_party:
                         self.showing_party = False
                         return
-                    # Only allow escape if standing on stairs
+                    # Only allow escape if standing on stairs or a custom exit door
                     tile_id = self.dungeon_data.tile_map.get_tile(
                         self.game.party.col, self.game.party.row
+                    )
+                    pcol, prow = self.game.party.col, self.game.party.row
+                    custom_exits = getattr(
+                        self.dungeon_data.tile_map, "_custom_exit_doors", None
+                    )
+                    on_custom_exit = (
+                        custom_exits and (pcol, prow) in custom_exits
                     )
                     if tile_id == TILE_STAIRS:
                         if self.quest_levels and self.current_level > 0:
@@ -533,9 +558,14 @@ class DungeonState(InventoryMixin, BaseState):
                         else:
                             # Already on top floor (level 0) — exit to overworld
                             self._exit_dungeon()
+                    elif on_custom_exit:
+                        if self.quest_levels and self.current_level > 0:
+                            self._ascend_level()
+                        else:
+                            self._exit_dungeon()
                     else:
                         self.show_message(
-                            "Find the stairs to escape!", 1500
+                            "Find the exit to escape!", 1500
                         )
                     return
                 if event.key == pygame.K_l:
@@ -1368,6 +1398,22 @@ class DungeonState(InventoryMixin, BaseState):
         if tile_id == TILE_STAIRS:
             self.show_message("Stairs up! Press ESC to leave.", 2000)
 
+        # ── Interior links (custom dungeon level transitions) ──
+        interior_links = getattr(
+            self.dungeon_data.tile_map, "_interior_links", None
+        )
+        if interior_links and (col, row) in interior_links:
+            target_name = interior_links[(col, row)]
+            self._enter_interior_level(target_name)
+            return
+
+        # ── Custom exit doors (to_overworld) ──
+        custom_exits = getattr(
+            self.dungeon_data.tile_map, "_custom_exit_doors", None
+        )
+        if custom_exits and (col, row) in custom_exits:
+            self.show_message("Exit! Press ESC to leave.", 2000)
+
         elif tile_id == TILE_CHEST:
             pos = (col, row)
             if pos not in self.dungeon_data.opened_chests:
@@ -1547,6 +1593,52 @@ class DungeonState(InventoryMixin, BaseState):
             active_q["current_level"] = self.current_level
         depth = self.current_level + 1
         self.show_message(f"You ascend to floor {depth}.", 2000)
+
+    def _enter_interior_level(self, target_name):
+        """Transition to another custom dungeon level by name.
+
+        Finds the target level in quest_levels by matching its name,
+        then spawns the party at the tile that links back to the
+        current level (the back-link).
+        """
+        if not self.quest_levels:
+            return
+        current_name = self.dungeon_data.name
+        # Find the target level by name
+        target_idx = None
+        for i, dd in enumerate(self.quest_levels):
+            if dd.name == target_name:
+                target_idx = i
+                break
+        if target_idx is None:
+            self.show_message(f"Cannot find {target_name}!", 1500)
+            return
+        # Switch to the target level
+        self.current_level = target_idx
+        self.dungeon_data = self.quest_levels[target_idx]
+        self._invalidate_torch_cache()
+        # Find the back-link tile on the target level — the tile
+        # whose interior link points back to the level we came from.
+        tmap = self.dungeon_data.tile_map
+        links = getattr(tmap, "_interior_links", {})
+        spawn = None
+        for (c, r), link_name in links.items():
+            if link_name == current_name:
+                spawn = (c, r)
+                break
+        if spawn:
+            self.game.party.col, self.game.party.row = spawn
+        else:
+            # Fallback to stored entry point
+            self.game.party.col = self.dungeon_data.entry_col
+            self.game.party.row = self.dungeon_data.entry_row
+        self.game.camera.map_width = tmap.width
+        self.game.camera.map_height = tmap.height
+        self.game.camera.update(self.game.party.col, self.game.party.row)
+        self._visible_tiles = set()
+        if self.torch_active:
+            self._visible_tiles = self._compute_visible_tiles()
+        self.show_message(f"Entering {target_name}...", 1500)
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""

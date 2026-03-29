@@ -421,7 +421,7 @@
   },
   "46": {
     "name": "Path Floor",
-    "walkable": false,
+    "walkable": true,
     "color": [
       128,
       128,
@@ -454,7 +454,7 @@
   },
   "49": {
     "name": "Brown Brick Wall",
-    "walkable": true,
+    "walkable": false,
     "color": [
       128,
       128,

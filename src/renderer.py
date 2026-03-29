@@ -3054,6 +3054,7 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 1. draw map tiles ──
         palette = self._get_dungeon_palette(dungeon_level)
+        _is_custom = getattr(tile_map, '_custom_mode', False)
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
@@ -3061,7 +3062,10 @@ class Renderer(CombatEffectRendererMixin):
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts
                 py = sr * ts
-                self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr, palette)
+                if _is_custom:
+                    self._draw_custom_dungeon_tile(tid, px, py, ts)
+                else:
+                    self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr, palette)
 
         # ── 1b. red glow on detected traps ──
         if detected_traps:
@@ -4174,6 +4178,25 @@ class Renderer(CombatEffectRendererMixin):
         hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
 
+    def _draw_custom_dungeon_tile(self, tile_id, px, py, ts):
+        """Draw a tile in a custom (designer-built) dungeon.
+
+        Uses the same sprites as the map editor — no procedural
+        reinterpretation.  Falls back to TILE_DEFS colour, then black.
+        """
+        sprite = self._tile_sprites.get(tile_id)
+        if sprite:
+            self.screen.blit(sprite, (px, py))
+        else:
+            from src.settings import TILE_DEFS as _TD_C
+            td = _TD_C.get(tile_id)
+            if td:
+                pygame.draw.rect(self.screen, td["color"],
+                                 pygame.Rect(px, py, ts, ts))
+            else:
+                pygame.draw.rect(self.screen, (0, 0, 0),
+                                 pygame.Rect(px, py, ts, ts))
+
     def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr, palette=None):
         """Draw a single dungeon tile in Ultima III style."""
         BLACK  = (0, 0, 0)
@@ -4591,8 +4614,20 @@ class Renderer(CombatEffectRendererMixin):
                                (cx, bracket_y - 2), 2)
 
         else:
-            # Fallback: black
-            pygame.draw.rect(self.screen, BLACK, rect)
+            # Non-dungeon tile (town/building/editor tile placed
+            # in a custom dungeon).  Use TILE_DEFS colour when
+            # available (designed for visibility), otherwise fall
+            # back to the sprite sheet for extended tiles.
+            from src.settings import TILE_DEFS as _TD_FB
+            td = _TD_FB.get(tile_id)
+            if td:
+                pygame.draw.rect(self.screen, td["color"], rect)
+            else:
+                sprite = self._tile_sprites.get(tile_id)
+                if sprite:
+                    self.screen.blit(sprite, (px, py))
+                else:
+                    pygame.draw.rect(self.screen, BLACK, rect)
 
     # ── unique tile sprite ─────────────────────────────────
 

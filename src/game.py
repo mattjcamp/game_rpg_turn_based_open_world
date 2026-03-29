@@ -2813,6 +2813,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             # Refresh overworld interiors & tile_links from disk in case the
             # module editor changed them since the game was started.
             self._refresh_overworld_interior_data()
+            # Clear dungeon cache so edited dungeon layouts are rebuilt
+            # with the latest level data on next entry.
+            self.dungeon_cache = {}
             self.showing_title = False
             return
 

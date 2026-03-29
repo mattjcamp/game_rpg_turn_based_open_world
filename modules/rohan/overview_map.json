@@ -347,7 +347,7 @@
       2,
       50,
       3,
-      50,
+      5,
       2,
       2,
       2,
@@ -827,6 +827,14 @@
     "4,5": {
       "interior": "Mysterious Shrine",
       "type": "building"
+    },
+    "7,10": {
+      "interior": "Morgoth",
+      "type": "dungeon"
+    },
+    "14,12": {
+      "interior": "Hall of Procedures",
+      "type": "dungeon"
     }
   }
 }

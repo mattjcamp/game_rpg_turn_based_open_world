@@ -1834,21 +1834,67 @@ class OverworldState(InventoryMixin, BaseState):
                 dungeon_state.enter_dungeon(dd, pcol, prow)
             else:
                 gen_levels = []
+                from src.settings import TILE_DEFS as _TD
+                from src.settings import TILE_STAIRS, TILE_STAIRS_DOWN
+                from src.settings import TILE_DWALL
                 for lv in levels_data:
                     lname = lv.get("name", name)
                     lw = lv.get("width", 20)
                     lh = lv.get("height", 20)
                     ecol = lv.get("entry_col", 0)
                     erow = lv.get("entry_row", 0)
-                    # Build a TileMap from sparse tile data
-                    tmap = TileMap(lw, lh)
+                    # Build a TileMap from sparse tile data.
+                    # Default to dungeon wall so unset cells render
+                    # as solid walls rather than overworld grass.
+                    # oob_tile also walls so camera edge is clean.
+                    tmap = TileMap(lw, lh, default_tile=TILE_DWALL,
+                                  oob_tile=TILE_DWALL)
+                    # Collect designer-placed links from tiles:
+                    #   to_overworld  — exit back to the overworld
+                    #   interior      — link to another named level
+                    overworld_exits = set()
+                    interior_links = {}  # (col,row) -> level_name
                     for pos_key, td in lv.get("tiles", {}).items():
                         parts = pos_key.split(",")
                         if len(parts) == 2:
                             c, r = int(parts[0]), int(parts[1])
-                            tile_id = td.get("tile_id", 0) if isinstance(td, dict) else td
+                            tile_id = (td.get("tile_id", 0)
+                                       if isinstance(td, dict) else td)
                             if 0 <= c < lw and 0 <= r < lh:
                                 tmap.set_tile(c, r, tile_id)
+                            if isinstance(td, dict):
+                                if td.get("to_overworld"):
+                                    overworld_exits.add((c, r))
+                                if td.get("interior"):
+                                    interior_links[(c, r)] = (
+                                        td["interior"])
+
+                    # ── Resolve entry point ──
+                    # For the first level entering from the
+                    # overworld, spawn at a to_overworld tile.
+                    # For other levels, the dungeon state resolves
+                    # spawn from the interior back-link at runtime.
+                    if overworld_exits:
+                        ecol, erow = next(iter(overworld_exits))
+                    elif not _TD.get(tmap.get_tile(ecol, erow),
+                                     {}).get("walkable", False):
+                        for r in range(lh):
+                            for c in range(lw):
+                                if _TD.get(tmap.get_tile(c, r),
+                                           {}).get("walkable", False):
+                                    ecol, erow = c, r
+                                    break
+                            else:
+                                continue
+                            break
+
+                    # ── Store links on the tile map ──
+                    tmap._custom_mode = True
+                    if overworld_exits:
+                        tmap._custom_exit_doors = overworld_exits
+                    if interior_links:
+                        tmap._interior_links = interior_links
+
                     dd = DungeonData(
                         tile_map=tmap, rooms=[],
                         entry_col=ecol, entry_row=erow,
