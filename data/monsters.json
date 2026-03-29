@@ -75,7 +75,7 @@
         80
       ],
       "spawn_weight": 40,
-      "tile": "monsters/giant_rat",
+      "tile": "game/monsters/giant_rat.png",
       "terrain": "land"
     },
     "Goblin": {

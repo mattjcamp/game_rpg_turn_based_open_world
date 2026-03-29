@@ -1619,7 +1619,18 @@
             "to_overworld": true
           }
         },
-        "encounters": []
+        "encounters": [
+          {
+            "name": "New Encounter",
+            "placement": "procedural",
+            "monsters": [
+              "Orc",
+              "Skeleton Archer",
+              "Giant Rat"
+            ],
+            "level": 1
+          }
+        ]
       },
       {
         "name": "Level 2",

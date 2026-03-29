@@ -216,18 +216,11 @@ class ModuleDungeonEditorMixin:
 
     def _mod_dungeon_add_encounter(self):
         """Add a new default encounter to the current level."""
-        level = self._mod_dungeon_get_current_level()
-        ec = level.get("entry_col", 1) if level else 1
-        er = level.get("entry_row", 1) if level else 1
         new_encounter = {
             "name": "New Encounter",
-            "encounter_type": "monster",
-            "col": ec,
-            "row": er,
-            "monster_id": "",
-            "count": 1,
+            "placement": "procedural",
+            "monsters": [],
             "level": 1,
-            "patrol_range": 3,
         }
         self._mod_dungeon_encounter_list.append(new_encounter)
         self._mod_dungeon_encounter_cursor = len(
@@ -248,58 +241,129 @@ class ModuleDungeonEditorMixin:
             self._mod_dungeon_encounter_cursor = n - 1
         self._mod_dungeon_save_encounters()
 
-    def _mod_dungeon_build_encounter_fields(self):
-        """Build FieldEntry list for the selected encounter."""
-        from src.editor_types import FieldEntry
+    def _mod_dungeon_open_encounter_editor(self):
+        """Prepare state for the encounter editor screen."""
         if not (0 <= self._mod_dungeon_encounter_cursor < len(
                 self._mod_dungeon_encounter_list)):
-            self._mod_dungeon_encounter_fields = []
             return
         enc = self._mod_dungeon_encounter_list[
             self._mod_dungeon_encounter_cursor]
-        self._mod_dungeon_encounter_fields = [
-            FieldEntry("Name", "name", enc.get("name", ""), "text", True),
-            FieldEntry("Type", "encounter_type",
-                       enc.get("encounter_type", "monster"), "text", True),
-            FieldEntry("", "", "", "section", False),
-            FieldEntry("Col", "col", str(enc.get("col", 0)), "int", True),
-            FieldEntry("Row", "row", str(enc.get("row", 0)), "int", True),
-            FieldEntry("", "", "", "section", False),
-            FieldEntry("Monster ID", "monster_id",
-                       enc.get("monster_id", ""), "text", True),
-            FieldEntry("Count", "count",
-                       str(enc.get("count", 1)), "int", True),
-            FieldEntry("Level", "level",
-                       str(enc.get("level", 1)), "int", True),
-            FieldEntry("Patrol Range", "patrol_range",
-                       str(enc.get("patrol_range", 3)), "int", True),
-        ]
-        fe = self.features_editor
-        self._mod_dungeon_encounter_field = fe._next_editable_generic(
-            self._mod_dungeon_encounter_fields, 0)
-        self._mod_dungeon_encounter_buffer = (
-            self._mod_dungeon_encounter_fields[
-                self._mod_dungeon_encounter_field].value)
-        self._mod_dungeon_encounter_field_scroll = 0
+        # Migrate legacy format if needed
+        if "monsters" not in enc:
+            mid = enc.get("monster_id", "")
+            cnt = max(1, int(enc.get("count", 1)))
+            enc["monsters"] = [mid] * cnt if mid else []
+            enc.setdefault("placement", "procedural")
+        enc.setdefault("placement", "procedural")
+        enc.setdefault("monsters", [])
+        # Reset cursor state
+        self._mod_dungeon_enc_cursor = 0
+        self._mod_dungeon_enc_editing = False
+        self._mod_dungeon_enc_buffer = ""
+        self._mod_dungeon_enc_monster_cursor = 0
 
-    def _mod_dungeon_save_encounter_fields(self):
-        """Write encounter fields back into the encounter dict."""
-        if not (0 <= self._mod_dungeon_encounter_cursor < len(
-                self._mod_dungeon_encounter_list)):
+    def _mod_dungeon_get_enc_rows(self):
+        """Return the list of row descriptors for the encounter editor.
+
+        Each row is a dict with 'type' and relevant keys:
+          {'type': 'name', 'value': str}
+          {'type': 'position'}   — toggle Procedural/Manual, Enter toggles
+          {'type': 'place_on_map'}  — action row to open placement view
+                                     (only when placement == manual)
+          {'type': 'section'}
+          {'type': 'monster', 'index': int, 'name': str}
+        """
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        placement = enc.get("placement", "procedural")
+        rows = [
+            {"type": "name", "value": enc.get("name", "")},
+            {"type": "position"},
+        ]
+        if placement == "manual":
+            rows.append({"type": "place_on_map"})
+        rows.append({"type": "section"})
+        for i, mname in enumerate(enc.get("monsters", [])):
+            rows.append({"type": "monster", "index": i, "name": mname})
+        return rows
+
+    def _mod_dungeon_save_enc_field(self, row_desc, value):
+        """Save a single encounter field back to the encounter dict."""
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        rt = row_desc["type"]
+        if rt == "name":
+            enc["name"] = value
+
+    def _mod_dungeon_enc_open_placement(self):
+        """Open the map placement view for the current encounter."""
+        level = self._mod_dungeon_get_current_level()
+        if not level:
             return
         enc = self._mod_dungeon_encounter_list[
             self._mod_dungeon_encounter_cursor]
-        for fe_entry in self._mod_dungeon_encounter_fields:
-            if not fe_entry.editable or fe_entry.field_type == "section":
-                continue
-            key = fe_entry.key
-            val = fe_entry.value
-            if fe_entry.field_type == "int":
-                try:
-                    val = int(val)
-                except ValueError:
-                    val = 0
-            enc[key] = val
+        # Start cursor at existing position or level entry point
+        if enc.get("placement") == "manual":
+            self._mod_dungeon_enc_place_col = enc.get("col", 0)
+            self._mod_dungeon_enc_place_row = enc.get("row", 0)
+        else:
+            self._mod_dungeon_enc_place_col = level.get("entry_col", 0)
+            self._mod_dungeon_enc_place_row = level.get("entry_row", 0)
+        self._mod_dungeon_enc_placing = True
+
+    def _mod_dungeon_enc_set_position(self, col, row):
+        """Set the current encounter to manual placement at (col, row)."""
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        enc["placement"] = "manual"
+        enc["col"] = col
+        enc["row"] = row
+
+    def _mod_dungeon_enc_clear_position(self):
+        """Clear placement — set encounter back to procedural."""
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        enc["placement"] = "procedural"
+        enc.pop("col", None)
+        enc.pop("row", None)
+
+    def _mod_dungeon_enc_add_monster(self, monster_name):
+        """Add a monster to the current encounter's monster list."""
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        enc.setdefault("monsters", []).append(monster_name)
+
+    def _mod_dungeon_enc_remove_monster(self):
+        """Remove the selected monster from the encounter's monster list."""
+        enc = self._mod_dungeon_encounter_list[
+            self._mod_dungeon_encounter_cursor]
+        monsters = enc.get("monsters", [])
+        rows = self._mod_dungeon_get_enc_rows()
+        if self._mod_dungeon_enc_cursor >= len(rows):
+            return
+        row = rows[self._mod_dungeon_enc_cursor]
+        if row["type"] == "monster" and row["index"] < len(monsters):
+            monsters.pop(row["index"])
+
+    def _mod_dungeon_get_all_monster_names(self):
+        """Return sorted list of all available monster names."""
+        import json, os
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "monsters.json")
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            return sorted(data.get("monsters", {}).keys())
+        except (OSError, ValueError):
+            return []
+
+    def _mod_dungeon_open_monster_picker(self):
+        """Open the monster picker overlay."""
+        self._mod_dungeon_enc_picker_monsters = (
+            self._mod_dungeon_get_all_monster_names())
+        self._mod_dungeon_enc_picker_cursor = 0
+        self._mod_dungeon_enc_picker_scroll = 0
 
     # ── Map editor for a dungeon level ──
 
@@ -404,7 +468,12 @@ class ModuleDungeonEditorMixin:
             return
 
         if self.module_edit_level == 13:
-            self._handle_mod_dungeon_encounter_field_input(event)
+            if self._mod_dungeon_enc_placing:
+                self._handle_mod_dungeon_enc_placement_input(event)
+            elif self._mod_dungeon_enc_picker_active:
+                self._handle_mod_dungeon_monster_picker_input(event)
+            else:
+                self._handle_mod_dungeon_encounter_field_input(event)
             return
         if self.module_edit_level == 12:
             self._handle_mod_dungeon_encounter_list_input(event)

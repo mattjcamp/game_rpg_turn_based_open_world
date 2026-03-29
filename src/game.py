@@ -280,11 +280,24 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_dungeon_encounter_list = []
         self._mod_dungeon_encounter_cursor = 0
         self._mod_dungeon_encounter_scroll = 0
-        # Encounter field editor
-        self._mod_dungeon_encounter_fields = []
-        self._mod_dungeon_encounter_field = 0
-        self._mod_dungeon_encounter_buffer = ""
-        self._mod_dungeon_encounter_field_scroll = 0
+        # Encounter editor (custom screen with monster list)
+        self._mod_dungeon_encounter_fields = []       # legacy compat
+        self._mod_dungeon_encounter_field = 0         # legacy compat
+        self._mod_dungeon_encounter_buffer = ""        # legacy compat
+        self._mod_dungeon_encounter_field_scroll = 0   # legacy compat
+        self._mod_dungeon_enc_cursor = 0
+        self._mod_dungeon_enc_editing = False
+        self._mod_dungeon_enc_buffer = ""
+        self._mod_dungeon_enc_monster_cursor = 0
+        # Encounter placement on map (overlay within edit_level 13)
+        self._mod_dungeon_enc_placing = False
+        self._mod_dungeon_enc_place_col = 0
+        self._mod_dungeon_enc_place_row = 0
+        # Monster picker (overlay within edit_level 13)
+        self._mod_dungeon_enc_picker_active = False
+        self._mod_dungeon_enc_picker_monsters = []
+        self._mod_dungeon_enc_picker_cursor = 0
+        self._mod_dungeon_enc_picker_scroll = 0
         # Map editor
         self._mod_dungeon_editor_active = False
         self._mod_dungeon_map_editor_state = None
@@ -4285,68 +4298,193 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self._mod_dungeon_encounter_cursor,
                 self._mod_dungeon_encounter_scroll)
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
-            self._mod_dungeon_build_encounter_fields()
+            self._mod_dungeon_open_encounter_editor()
             self.module_edit_level = 13
 
     def _handle_mod_dungeon_encounter_field_input(self, event):
-        """Handle encounter field editing (level 13)."""
+        """Handle encounter editor (level 13) — custom screen with monster list."""
         import pygame
-        fields = self._mod_dungeon_encounter_fields
-        n = len(fields)
-        fe = self.features_editor
+        if not (0 <= self._mod_dungeon_encounter_cursor < len(
+                self._mod_dungeon_encounter_list)):
+            if event.key == pygame.K_ESCAPE:
+                self.module_edit_level = 12
+            return
+
+        rows = self._mod_dungeon_get_enc_rows()
+        n = len(rows)
         if n == 0:
             if event.key == pygame.K_ESCAPE:
                 self.module_edit_level = 12
             return
 
+        cur = self._mod_dungeon_enc_cursor
+        if cur >= n:
+            cur = n - 1
+            self._mod_dungeon_enc_cursor = cur
+        row = rows[cur]
+
+        # ── Save shortcut ──
         if self._is_save_shortcut(event):
-            f = fields[self._mod_dungeon_encounter_field]
-            if f.editable:
-                f.value = self._mod_dungeon_encounter_buffer
-            self._mod_dungeon_save_encounter_fields()
+            if self._mod_dungeon_enc_editing and row["type"] in (
+                    "name", "col", "row"):
+                self._mod_dungeon_save_enc_field(
+                    row, self._mod_dungeon_enc_buffer)
+                self._mod_dungeon_enc_editing = False
             self._mod_dungeon_save_encounters()
             self._save_module_dungeons()
             self._mod_dungeon_save_flash = 1.5
             return
 
+        # ── Escape ──
         if event.key == pygame.K_ESCAPE:
-            f = fields[self._mod_dungeon_encounter_field]
-            if f.editable:
-                f.value = self._mod_dungeon_encounter_buffer
-            self._mod_dungeon_save_encounter_fields()
-            self._mod_dungeon_save_encounters()
-            self.module_edit_level = 12
+            if self._mod_dungeon_enc_editing:
+                self._mod_dungeon_save_enc_field(
+                    row, self._mod_dungeon_enc_buffer)
+                self._mod_dungeon_enc_editing = False
+            else:
+                self._mod_dungeon_save_encounters()
+                self.module_edit_level = 12
             return
 
+        # ── Navigation ──
         if event.key == pygame.K_UP:
-            f = fields[self._mod_dungeon_encounter_field]
-            if f.editable:
-                f.value = self._mod_dungeon_encounter_buffer
-            self._mod_dungeon_encounter_field = fe._next_editable_generic(
-                fields, (self._mod_dungeon_encounter_field - 1) % n)
-            self._mod_dungeon_encounter_buffer = fields[
-                self._mod_dungeon_encounter_field].value
-            self._mod_dungeon_encounter_field_scroll = (
-                fe._adjust_field_scroll_generic(
-                    self._mod_dungeon_encounter_field,
-                    self._mod_dungeon_encounter_field_scroll))
+            if self._mod_dungeon_enc_editing:
+                self._mod_dungeon_save_enc_field(
+                    row, self._mod_dungeon_enc_buffer)
+                self._mod_dungeon_enc_editing = False
+            new_cur = cur - 1
+            while new_cur >= 0 and rows[new_cur]["type"] == "section":
+                new_cur -= 1
+            if new_cur >= 0:
+                self._mod_dungeon_enc_cursor = new_cur
+            return
+
+        if event.key == pygame.K_DOWN:
+            if self._mod_dungeon_enc_editing:
+                self._mod_dungeon_save_enc_field(
+                    row, self._mod_dungeon_enc_buffer)
+                self._mod_dungeon_enc_editing = False
+            new_cur = cur + 1
+            while new_cur < n and rows[new_cur]["type"] == "section":
+                new_cur += 1
+            if new_cur < n:
+                self._mod_dungeon_enc_cursor = new_cur
+            return
+
+        # ── Enter / toggle / start editing ──
+        if event.key == pygame.K_RETURN:
+            if row["type"] == "position":
+                # Toggle between procedural and manual placement
+                enc = self._mod_dungeon_encounter_list[
+                    self._mod_dungeon_encounter_cursor]
+                if enc.get("placement", "procedural") == "procedural":
+                    enc["placement"] = "manual"
+                else:
+                    self._mod_dungeon_enc_clear_position()
+                return
+            if row["type"] == "place_on_map":
+                self._mod_dungeon_enc_open_placement()
+                return
+            if row["type"] == "name":
+                if not self._mod_dungeon_enc_editing:
+                    self._mod_dungeon_enc_editing = True
+                    self._mod_dungeon_enc_buffer = str(row["value"])
+                else:
+                    self._mod_dungeon_save_enc_field(
+                        row, self._mod_dungeon_enc_buffer)
+                    self._mod_dungeon_enc_editing = False
+                return
+            return
+
+        # ── Cmd+N: Add monster ──
+        if self._is_new_shortcut(event) and not self._mod_dungeon_enc_editing:
+            self._mod_dungeon_open_monster_picker()
+            self._mod_dungeon_enc_picker_active = True
+            return
+
+        # ── Cmd+D: Delete selected monster ──
+        if self._is_delete_shortcut(event) and not self._mod_dungeon_enc_editing:
+            if row["type"] == "monster":
+                self._mod_dungeon_enc_remove_monster()
+                new_rows = self._mod_dungeon_get_enc_rows()
+                if self._mod_dungeon_enc_cursor >= len(new_rows):
+                    self._mod_dungeon_enc_cursor = max(0, len(new_rows) - 1)
+            return
+
+        # ── Text editing ──
+        if self._mod_dungeon_enc_editing:
+            if event.key == pygame.K_BACKSPACE:
+                self._mod_dungeon_enc_buffer = (
+                    self._mod_dungeon_enc_buffer[:-1])
+            elif event.unicode and event.unicode.isprintable():
+                self._mod_dungeon_enc_buffer += event.unicode
+
+    def _handle_mod_dungeon_enc_placement_input(self, event):
+        """Handle encounter placement on the level map."""
+        import pygame
+        level = self._mod_dungeon_get_current_level()
+        if not level:
+            self._mod_dungeon_enc_placing = False
+            return
+        w = level.get("width", 20)
+        h = level.get("height", 20)
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_dungeon_enc_placing = False
+            return
+
+        # Navigation
+        if event.key == pygame.K_UP:
+            self._mod_dungeon_enc_place_row = max(
+                0, self._mod_dungeon_enc_place_row - 1)
         elif event.key == pygame.K_DOWN:
-            f = fields[self._mod_dungeon_encounter_field]
-            if f.editable:
-                f.value = self._mod_dungeon_encounter_buffer
-            self._mod_dungeon_encounter_field = fe._next_editable_generic(
-                fields, (self._mod_dungeon_encounter_field + 1) % n)
-            self._mod_dungeon_encounter_buffer = fields[
-                self._mod_dungeon_encounter_field].value
-            self._mod_dungeon_encounter_field_scroll = (
-                fe._adjust_field_scroll_generic(
-                    self._mod_dungeon_encounter_field,
-                    self._mod_dungeon_encounter_field_scroll))
-        elif event.key == pygame.K_BACKSPACE:
-            self._mod_dungeon_encounter_buffer = (
-                self._mod_dungeon_encounter_buffer[:-1])
-        elif event.key and event.unicode and event.unicode.isprintable():
-            self._mod_dungeon_encounter_buffer += event.unicode
+            self._mod_dungeon_enc_place_row = min(
+                h - 1, self._mod_dungeon_enc_place_row + 1)
+        elif event.key == pygame.K_LEFT:
+            self._mod_dungeon_enc_place_col = max(
+                0, self._mod_dungeon_enc_place_col - 1)
+        elif event.key == pygame.K_RIGHT:
+            self._mod_dungeon_enc_place_col = min(
+                w - 1, self._mod_dungeon_enc_place_col + 1)
+
+        # Enter/Space: place encounter at cursor
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._mod_dungeon_enc_set_position(
+                self._mod_dungeon_enc_place_col,
+                self._mod_dungeon_enc_place_row)
+            self._mod_dungeon_enc_placing = False
+
+        # X: remove placement (set back to random)
+        elif event.key == pygame.K_x:
+            self._mod_dungeon_enc_clear_position()
+            self._mod_dungeon_enc_placing = False
+
+    def _handle_mod_dungeon_monster_picker_input(self, event):
+        """Handle monster picker overlay — choose a monster to add."""
+        import pygame
+        monsters = self._mod_dungeon_enc_picker_monsters
+        n = len(monsters)
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_dungeon_enc_picker_active = False
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_dungeon_enc_picker_cursor = (
+                self._mod_dungeon_enc_picker_cursor - 1) % n
+            if self._mod_dungeon_enc_picker_cursor < self._mod_dungeon_enc_picker_scroll:
+                self._mod_dungeon_enc_picker_scroll = self._mod_dungeon_enc_picker_cursor
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_dungeon_enc_picker_cursor = (
+                self._mod_dungeon_enc_picker_cursor + 1) % n
+            if self._mod_dungeon_enc_picker_cursor >= self._mod_dungeon_enc_picker_scroll + 10:
+                self._mod_dungeon_enc_picker_scroll = (
+                    self._mod_dungeon_enc_picker_cursor - 9)
+        elif event.key == pygame.K_RETURN and n > 0:
+            name = monsters[self._mod_dungeon_enc_picker_cursor]
+            self._mod_dungeon_enc_add_monster(name)
+            self._mod_dungeon_enc_picker_active = False
+            return
 
     # ══════════════════════════════════════════════════════════
     # ── Building Editor Methods ────────────────────────────────
@@ -5554,6 +5692,19 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "encounter_field_cursor": self._mod_dungeon_encounter_field,
                         "encounter_field_buffer": self._mod_dungeon_encounter_buffer,
                         "encounter_field_scroll": self._mod_dungeon_encounter_field_scroll,
+                        "enc_cursor": self._mod_dungeon_enc_cursor,
+                        "enc_editing": self._mod_dungeon_enc_editing,
+                        "enc_buffer": self._mod_dungeon_enc_buffer,
+                        "enc_encounter_list": self._mod_dungeon_encounter_list,
+                        "enc_encounter_cursor": self._mod_dungeon_encounter_cursor,
+                        "enc_picker_active": self._mod_dungeon_enc_picker_active,
+                        "enc_picker_monsters": self._mod_dungeon_enc_picker_monsters,
+                        "enc_picker_cursor": self._mod_dungeon_enc_picker_cursor,
+                        "enc_picker_scroll": self._mod_dungeon_enc_picker_scroll,
+                        "enc_placing": self._mod_dungeon_enc_placing,
+                        "enc_place_col": self._mod_dungeon_enc_place_col,
+                        "enc_place_row": self._mod_dungeon_enc_place_row,
+                        "enc_level_data": self._mod_dungeon_get_current_level(),
                         "editor_active": self._mod_dungeon_editor_active,
                         "editor_data": self._mod_dungeon_map_editor_state,
                         "naming": self._mod_dungeon_naming,

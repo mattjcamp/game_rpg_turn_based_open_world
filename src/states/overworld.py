@@ -1899,6 +1899,48 @@ class OverworldState(InventoryMixin, BaseState):
                         tile_map=tmap, rooms=[],
                         entry_col=ecol, entry_row=erow,
                         name=lname)
+
+                    # ── Inject designer-placed encounters ──
+                    import random as _rng
+                    for enc_spec in lv.get("encounters", []):
+                        mon_names = enc_spec.get("monsters", [])
+                        if not mon_names:
+                            # Legacy format
+                            mid = enc_spec.get("monster_id", "")
+                            cnt = max(1, int(enc_spec.get("count", 1)))
+                            if mid:
+                                mon_names = [mid] * cnt
+                        if not mon_names:
+                            continue
+                        lead = mon_names[0]
+                        monster = create_monster(lead)
+                        placement = enc_spec.get("placement", "procedural")
+                        if placement == "manual":
+                            monster.col = int(enc_spec.get("col", ecol))
+                            monster.row = int(enc_spec.get("row", erow))
+                        else:
+                            # Procedural: pick a random walkable tile
+                            walkable = []
+                            for _wr in range(lh):
+                                for _wc in range(lw):
+                                    if (_TD.get(tmap.get_tile(_wc, _wr),
+                                                {}).get("walkable", False)
+                                            and (_wc, _wr)
+                                                not in overworld_exits):
+                                        walkable.append((_wc, _wr))
+                            if walkable:
+                                mc, mr = _rng.choice(walkable)
+                                monster.col, monster.row = mc, mr
+                            else:
+                                monster.col, monster.row = ecol, erow
+                        ename = enc_spec.get("name", f"Encounter")
+                        monster.encounter_template = {
+                            "name": ename,
+                            "monster_names": mon_names,
+                            "monster_party_tile": lead,
+                        }
+                        dd.monsters.append(monster)
+
                     gen_levels.append(dd)
                 cache[(pcol, prow)] = gen_levels
                 if len(gen_levels) > 1:

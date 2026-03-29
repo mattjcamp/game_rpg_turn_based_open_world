@@ -8778,10 +8778,17 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_dungeon_encounter_list(
                 dg, rx, ry, rw, rh, fm, fs, f)
 
-        # ── Level 5: Encounter field editor ──
+        # ── Level 5: Encounter editor (monster list) ──
         elif level == 5:
-            self._draw_dungeon_encounter_editor(
-                dg, rx, ry, rw, rh, fm, fs, f)
+            if dg.get("enc_placing"):
+                self._draw_dungeon_enc_placement(
+                    dg, rx, ry, rw, rh, fm, fs, f)
+            elif dg.get("enc_picker_active"):
+                self._draw_dungeon_monster_picker(
+                    dg, rx, ry, rw, rh, fm, fs, f)
+            else:
+                self._draw_dungeon_encounter_editor(
+                    dg, rx, ry, rw, rh, fm, fs, f)
 
     def _draw_dungeon_flash(self, dg, rx, ry, rw, rh, f):
         """Draw save flash if active."""
@@ -8976,13 +8983,17 @@ class Renderer(CombatEffectRendererMixin):
                 prefix = "> " if selected else "  "
                 color = self._U3_WHITE if selected else (180, 180, 180)
                 name = enc.get("name", "Unnamed")
-                enc_type = enc.get("encounter_type", "monster")
-                self._u3_text(f"{prefix}{name}  ({enc_type})",
+                monsters = enc.get("monsters", [])
+                n_mon = len(monsters) if monsters else enc.get("count", 1)
+                placement = enc.get("placement", "procedural")
+                self._u3_text(f"{prefix}{name}  ({n_mon} monsters)",
                               rx + 10, y + 4, color, fm)
-                self._u3_text(
-                    f"  pos: ({enc.get('col', 0)},{enc.get('row', 0)})  "
-                    f"x{enc.get('count', 1)}",
-                    rx + 10, y + 20, (140, 140, 160), fs)
+                plabel = placement
+                if placement == "manual":
+                    plabel += (f"  ({enc.get('col', 0)},"
+                               f"{enc.get('row', 0)})")
+                self._u3_text(f"  {plabel}",
+                              rx + 10, y + 20, (140, 140, 160), fs)
 
         self._draw_dungeon_flash(dg, rx, ry, rw, rh, f)
         self._u3_text(
@@ -8990,60 +9001,303 @@ class Renderer(CombatEffectRendererMixin):
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
 
     def _draw_dungeon_encounter_editor(self, dg, rx, ry, rw, rh, fm, fs, f):
-        """Draw the encounter field editor."""
-        fields = dg.get("encounter_fields") or []
-        field_cursor = dg.get("encounter_field_cursor", 0)
-        field_buffer = dg.get("encounter_field_buffer", "")
-        field_scroll = dg.get("encounter_field_scroll", 0)
-        row_h = 38
-        max_visible = rh // row_h
+        """Draw the encounter editor with monster list and sprites."""
+        enc_list = dg.get("enc_encounter_list") or []
+        enc_idx = dg.get("enc_encounter_cursor", 0)
+        if not (0 <= enc_idx < len(enc_list)):
+            self._u3_text("No encounter selected", rx + 16, ry + 30,
+                          self._U3_HINT, fm)
+            return
 
-        enc_name = ""
-        if fields:
-            for fe in fields:
-                if fe.key == "name":
-                    enc_name = fe.value
-                    break
+        enc = enc_list[enc_idx]
+        cur = dg.get("enc_cursor", 0)
+        editing = dg.get("enc_editing", False)
+        buf = dg.get("enc_buffer", "")
+
+        # Build row descriptors (mirror the logic in module_editor_dungeon)
+        placement = enc.get("placement", "procedural")
+        rows = [
+            {"type": "name", "value": enc.get("name", "")},
+            {"type": "position"},
+        ]
+        if placement == "manual":
+            rows.append({"type": "place_on_map"})
+        rows.append({"type": "section"})
+        for i, mname in enumerate(enc.get("monsters", [])):
+            rows.append({"type": "monster", "index": i, "name": mname})
+
+        # Title
+        enc_name = enc.get("name", "")
         self._u3_text(f"EDIT ENCOUNTER: {enc_name}", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
-        ly = ry + 44
+
+        row_h = 38
+        sprite_size = 32
+        ly = ry + 48
+        max_visible = (rh - 80) // row_h
 
         for vi in range(max_visible):
-            i = field_scroll + vi
-            if i >= len(fields):
+            ri = vi  # No scroll needed for now — encounters are small
+            if ri >= len(rows):
                 break
-            fe = fields[i]
+            row = rows[ri]
             y = ly + vi * row_h
-            selected = (i == field_cursor)
+            selected = (ri == cur)
 
-            if fe.field_type == "section":
+            if row["type"] == "section":
                 pygame.draw.line(self.screen, (60, 50, 40),
-                                 (rx + 10, y + 10),
-                                 (rx + rw - 10, y + 10), 1)
+                                 (rx + 10, y + 14),
+                                 (rx + rw - 10, y + 14), 1)
+                self._u3_text("MONSTERS", rx + 16, y + 4,
+                              (140, 140, 160), fs)
                 continue
 
+            # Selection highlight
             if selected:
                 bar = pygame.Surface(
-                    (rw - 4, row_h - 4), pygame.SRCALPHA)
+                    (rw - 4, row_h - 2), pygame.SRCALPHA)
                 bar.fill((255, 200, 60, 25))
                 self.screen.blit(bar, (rx + 2, y))
 
             label_color = self._U3_WHITE if selected else (160, 160, 180)
-            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
 
-            val_x = rx + 140
-            if selected and fe.editable:
-                val_text = field_buffer + "_"
-                val_color = (255, 220, 100)
-            else:
-                val_text = fe.value
-                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
-            self._u3_text(val_text, val_x, y + 4, val_color, fm)
+            if row["type"] == "name":
+                self._u3_text("Name", rx + 14, y + 6, label_color, fm)
+                if selected and editing:
+                    val = buf + "_"
+                    vc = (255, 220, 100)
+                else:
+                    val = str(row["value"])
+                    vc = (200, 200, 200)
+                self._u3_text(val, rx + 140, y + 6, vc, fm)
+
+            elif row["type"] == "position":
+                self._u3_text("Position", rx + 14, y + 6,
+                              label_color, fm)
+                # Toggle-style: Procedural / Manual
+                proc_col = ((100, 255, 100) if placement == "procedural"
+                            else (100, 100, 100))
+                man_col = ((100, 255, 100) if placement == "manual"
+                           else (100, 100, 100))
+                self._u3_text("Procedural", rx + 140, y + 6,
+                              proc_col, fm)
+                self._u3_text("/", rx + 248, y + 6,
+                              (120, 120, 120), fm)
+                self._u3_text("Manual", rx + 262, y + 6,
+                              man_col, fm)
+                if placement == "manual":
+                    pc = enc.get("col", 0)
+                    pr = enc.get("row", 0)
+                    self._u3_text(f"({pc}, {pr})", rx + 340, y + 6,
+                                  (200, 200, 100), fm)
+                if selected:
+                    self._u3_text("[Enter] Toggle", rx + 430, y + 6,
+                                  self._U3_HINT, fs)
+
+            elif row["type"] == "place_on_map":
+                self._u3_text("Place on Map", rx + 14, y + 6,
+                              label_color, fm)
+                if selected:
+                    self._u3_text("[Enter] Open map placement",
+                                  rx + 180, y + 6, self._U3_HINT, fs)
+
+            elif row["type"] == "monster":
+                # Monster sprite + name
+                mname = row["name"]
+                # Try to get monster sprite
+                sprite = self._get_monster_sprite_by_name(mname)
+                sx = rx + 14
+                if sprite:
+                    scaled = pygame.transform.scale(
+                        sprite, (sprite_size, sprite_size))
+                    self.screen.blit(scaled, (sx, y + 2))
+                else:
+                    # Fallback colored square
+                    pygame.draw.rect(self.screen, (100, 50, 50),
+                                     pygame.Rect(sx, y + 2,
+                                                 sprite_size, sprite_size))
+                self._u3_text(mname, sx + sprite_size + 8, y + 8,
+                              label_color, fm)
 
         self._draw_dungeon_flash(dg, rx, ry, rw, rh, f)
         self._u3_text(
-            "[Up/Dn] Navigate  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            "[Ctrl+N] Add  [Ctrl+D] Remove  [Enter] Edit/Toggle  [Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_dungeon_enc_placement(self, dg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the map placement view for visually placing an encounter."""
+        level_data = dg.get("enc_level_data")
+        if not level_data:
+            self._u3_text("No level data", rx + 16, ry + 30,
+                          self._U3_HINT, fm)
+            return
+
+        lw = level_data.get("width", 20)
+        lh = level_data.get("height", 20)
+        tiles = level_data.get("tiles", {})
+
+        # Title
+        self._u3_text("PLACE ENCOUNTER ON MAP", rx + 16, ry + 10,
+                      self._U3_ORANGE, f)
+
+        # Calculate tile size to fit in the panel
+        map_top = ry + 40
+        map_left = rx + 16
+        avail_w = rw - 32
+        avail_h = rh - 100  # leave room for title + hint bar
+        ts = min(avail_w // max(lw, 1), avail_h // max(lh, 1), 24)
+        ts = max(ts, 8)  # minimum size
+
+        # Draw tiles
+        from src.settings import TILE_DEFS as _TD_P
+        for row_i in range(lh):
+            for col_i in range(lw):
+                px = map_left + col_i * ts
+                py = map_top + row_i * ts
+                key = f"{col_i},{row_i}"
+                td_entry = tiles.get(key)
+                if td_entry:
+                    tid = td_entry.get("tile_id", 0) if isinstance(
+                        td_entry, dict) else int(td_entry)
+                    sprite = self._tile_sprites.get(tid)
+                    if sprite:
+                        scaled = pygame.transform.scale(sprite, (ts, ts))
+                        self.screen.blit(scaled, (px, py))
+                    else:
+                        td = _TD_P.get(tid)
+                        color = td["color"] if td else (30, 30, 30)
+                        pygame.draw.rect(self.screen, color,
+                                         pygame.Rect(px, py, ts, ts))
+                else:
+                    # Empty tile — dark background
+                    pygame.draw.rect(self.screen, (20, 15, 15),
+                                     pygame.Rect(px, py, ts, ts))
+
+        # Grid lines (subtle)
+        grid_col = (50, 40, 35)
+        for row_i in range(lh + 1):
+            gy = map_top + row_i * ts
+            pygame.draw.line(self.screen, grid_col,
+                             (map_left, gy),
+                             (map_left + lw * ts, gy), 1)
+        for col_i in range(lw + 1):
+            gx = map_left + col_i * ts
+            pygame.draw.line(self.screen, grid_col,
+                             (gx, map_top),
+                             (gx, map_top + lh * ts), 1)
+
+        # Draw encounter markers for ALL encounters in this level
+        enc_list = dg.get("enc_encounter_list") or []
+        enc_idx = dg.get("enc_encounter_cursor", 0)
+        for ei, enc in enumerate(enc_list):
+            if enc.get("placement") != "manual":
+                continue
+            ec = enc.get("col", -1)
+            er = enc.get("row", -1)
+            if 0 <= ec < lw and 0 <= er < lh:
+                mx = map_left + ec * ts
+                my = map_top + er * ts
+                is_current = (ei == enc_idx)
+                marker_col = (255, 200, 60) if is_current else (200, 100, 60)
+                # Draw a small diamond marker
+                cx = mx + ts // 2
+                cy = my + ts // 2
+                hs = max(ts // 3, 3)
+                points = [(cx, cy - hs), (cx + hs, cy),
+                          (cx, cy + hs), (cx - hs, cy)]
+                pygame.draw.polygon(self.screen, marker_col, points)
+                if is_current:
+                    pygame.draw.polygon(self.screen, (255, 255, 255),
+                                        points, 1)
+
+        # Draw cursor
+        cur_c = dg.get("enc_place_col", 0)
+        cur_r = dg.get("enc_place_row", 0)
+        cx = map_left + cur_c * ts
+        cy = map_top + cur_r * ts
+        cursor_rect = pygame.Rect(cx, cy, ts, ts)
+        # Pulsing cursor border
+        pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() * 0.006)
+        alpha = int(150 + 105 * pulse)
+        cursor_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        cursor_surf.fill((255, 255, 100, int(40 * pulse)))
+        self.screen.blit(cursor_surf, (cx, cy))
+        pygame.draw.rect(self.screen, (255, 255, 100, alpha),
+                         cursor_rect, 2)
+
+        # Coordinate display
+        self._u3_text(f"Col: {cur_c}  Row: {cur_r}",
+                      rx + 16, map_top + lh * ts + 8,
+                      (200, 200, 220), fm)
+
+        # Controls hint
+        self._u3_text(
+            "[Arrows] Move  [Enter/Space] Place  [X] Remove  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_dungeon_monster_picker(self, dg, rx, ry, rw, rh, fm, fs, f):
+        """Draw the monster picker overlay — list of all monsters with sprites."""
+        monsters = dg.get("enc_picker_monsters") or []
+        cursor = dg.get("enc_picker_cursor", 0)
+        scroll = dg.get("enc_picker_scroll", 0)
+
+        self._u3_text("SELECT MONSTER", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+
+        row_h = 42
+        sprite_size = 32
+        ly = ry + 48
+        max_visible = (rh - 80) // row_h
+
+        for vi in range(max_visible):
+            i = scroll + vi
+            if i >= len(monsters):
+                break
+            mname = monsters[i]
+            y = ly + vi * row_h
+            selected = (i == cursor)
+
+            if selected:
+                bar = pygame.Surface(
+                    (rw - 4, row_h - 2), pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (rx + 2, y))
+
+            # Monster sprite
+            sprite = self._get_monster_sprite_by_name(mname)
+            sx = rx + 14
+            if sprite:
+                scaled = pygame.transform.scale(
+                    sprite, (sprite_size, sprite_size))
+                self.screen.blit(scaled, (sx, y + 4))
+            else:
+                pygame.draw.rect(self.screen, (100, 50, 50),
+                                 pygame.Rect(sx, y + 4,
+                                             sprite_size, sprite_size))
+
+            label_color = self._U3_WHITE if selected else (160, 160, 180)
+            self._u3_text(mname, sx + sprite_size + 10, y + 10,
+                          label_color, fm)
+
+        self._draw_dungeon_flash(dg, rx, ry, rw, rh, f)
+        self._u3_text(
+            "[Enter] Select  [Esc] Cancel",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _get_monster_sprite_by_name(self, monster_name):
+        """Look up a monster's tile sprite by name (for editor previews)."""
+        # Check data/monsters.json for the tile path
+        if not hasattr(self, "_monster_name_sprites"):
+            self._monster_name_sprites = {}
+        if monster_name in self._monster_name_sprites:
+            return self._monster_name_sprites[monster_name]
+        # Try the loaded _monster_tiles dict (keyed by tile path)
+        from src.monster import MONSTERS
+        mdata = MONSTERS.get(monster_name, {})
+        tile_path = mdata.get("tile", "")
+        sprite = self._monster_tiles.get(tile_path)
+        self._monster_name_sprites[monster_name] = sprite
+        return sprite
 
     # ══════════════════════════════════════════════════════════
     # ── Building Editor Panel ─────────────────────────────────
