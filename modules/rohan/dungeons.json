@@ -1629,6 +1629,14 @@
               "Giant Rat"
             ],
             "level": 1
+          },
+          {
+            "name": "New Encounter",
+            "placement": "procedural",
+            "monsters": [
+              "Super Zombie"
+            ],
+            "level": 1
           }
         ]
       },

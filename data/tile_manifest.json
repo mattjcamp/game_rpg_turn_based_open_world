@@ -738,6 +738,12 @@
         "monsters"
       ]
     },
+    "super_zombie": {
+      "path": "src/assets/game/monsters/super_zombie.png",
+      "usable_in": [
+        "monsters"
+      ]
+    },
     "balron_demon_f1": {
       "path": "src/assets/unassigned/balron_demon_f1.png",
       "usable_in": [
