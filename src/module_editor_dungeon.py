@@ -381,7 +381,9 @@ class ModuleDungeonEditorMixin:
         h = level.get("height", 20)
 
         fe = self.features_editor
-        brushes = build_town_brushes(fe.TILE_CONTEXT)
+        saved_all = fe.load_map_templates()
+        brushes = build_town_brushes(fe.TILE_CONTEXT,
+                                     all_templates=saved_all)
         dungeon = self._mod_dungeon_get_current()
         dungeon_name = dungeon.get("name", "Dungeon") if dungeon else "Dungeon"
         level_name = level.get("name", "Unnamed")

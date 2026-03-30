@@ -484,5 +484,62 @@
     ],
     "context": "town",
     "sprite": "town/wall_lighter"
+  },
+  "52": {
+    "name": "General Store Sign",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/shop_sign",
+    "interaction_type": "sign",
+    "interaction_data": "General Store"
+  },
+  "53": {
+    "name": "Water",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "overworld/water"
+  },
+  "54": {
+    "name": "Scrub",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "overworld/brush_scrubland"
+  },
+  "55": {
+    "name": "Grass, Dense",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "overworld/grass"
+  },
+  "56": {
+    "name": "Gate",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "objects/town_gate"
   }
 }

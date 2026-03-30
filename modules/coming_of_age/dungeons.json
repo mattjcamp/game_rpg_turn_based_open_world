@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Morgoth",
+    "description": "An abandoned dwarven mine",
+    "mode": "procedural",
+    "dungeon_style": "mine",
+    "num_levels": 3,
+    "difficulty": "normal",
+    "level_size": "large",
+    "torch_density": "sparse",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  }
+]

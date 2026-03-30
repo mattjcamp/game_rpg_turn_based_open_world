@@ -305,7 +305,9 @@ class ModuleBuildingEditorMixin:
         h = space.get("height", 20)
 
         fe = self.features_editor
-        brushes = build_town_brushes(fe.TILE_CONTEXT)
+        saved_all = fe.load_map_templates()
+        brushes = build_town_brushes(fe.TILE_CONTEXT,
+                                     all_templates=saved_all)
         building = self._mod_building_get_current()
         building_name = building.get("name", "Building") if building else "Building"
         space_name = space.get("name", "Unnamed")

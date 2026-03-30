@@ -95,6 +95,7 @@ class MapEditorConfig:
     supports_tile_links: bool = False    # I key: interior link picker (overview map)
     supports_interior_links: bool = False  # I key: interior/overworld link (interior)
     supports_replace: bool = False       # R key: replace all of tile type
+    supports_party_start: bool = False   # P key: place party start position
     # Exit link types for the interior link picker.  Each entry is a dict
     # with "label" and "link_type" keys.  When empty (default), the picker
     # auto-generates options based on tile_context.
@@ -126,7 +127,8 @@ class MapEditorState:
     def __init__(self, config: MapEditorConfig,
                  tiles: Any = None,
                  tile_links: Optional[Dict] = None,
-                 interior_list: Optional[List] = None):
+                 interior_list: Optional[List] = None,
+                 party_start: Optional[Dict] = None):
         self.config = config
 
         # Grid data
@@ -142,6 +144,9 @@ class MapEditorState:
 
         # Tile links (overview map: "col,row" -> {"interior": name})
         self.tile_links: Dict = tile_links if tile_links is not None else {}
+
+        # Party start position (overview map: {"col": int, "row": int} or None)
+        self.party_start: Optional[Dict] = party_start
 
         # Interior list reference (for link picker options)
         self.interior_list: List = interior_list if interior_list is not None else []
@@ -547,6 +552,7 @@ class MapEditorState:
             "dirty": self.dirty,
             "save_flash": self.save_flash,
             "tile_links": self.tile_links,
+            "party_start": self.party_start,
             "tile_context": cfg.tile_context,
             # Overlay states
             "int_picking": self.int_picking,
@@ -695,6 +701,19 @@ class MapEditorInputHandler:
         # ── Link interior (I key) — interior editor ──
         if event.key == pygame.K_i and cfg.supports_interior_links:
             self._open_interior_link_picker()
+            return None
+
+        # ── Place party start (P key) — overview map ──
+        if event.key == pygame.K_p and cfg.supports_party_start:
+            cur = st.party_start
+            # Toggle: if already at this position, remove it; otherwise place it
+            if (cur and cur.get("col") == st.cursor_col
+                    and cur.get("row") == st.cursor_row):
+                st.party_start = None
+            else:
+                st.party_start = {"col": st.cursor_col,
+                                  "row": st.cursor_row}
+            st.dirty = True
             return None
 
         # ── Remove link (X key) ──
@@ -986,11 +1005,12 @@ def build_town_brushes(tile_context_map: Dict[int, str],
                        manifest: Optional[Dict] = None,
                        feat_tile_list: Optional[List] = None,
                        object_templates: Optional[List] = None,
+                       all_templates: Optional[Dict[str, List[Dict]]] = None,
                        ) -> List[Brush]:
     """Build brush list for town map editors.
 
     Includes Town tiles, Dungeon/Interior tiles (for buildings,
-    altars, doors), and optionally Objects.
+    altars, doors), and optionally template stamp folders.
     """
     resolve = _make_sprite_resolver(feat_tiles_path, manifest, feat_tile_list)
 
@@ -1028,8 +1048,10 @@ def build_town_brushes(tile_context_map: Dict[int, str],
                          is_folder_header=True))
     brushes.extend(_build_tile_brushes(overworld_ids, grp_ow, resolve))
 
-    # ── Objects folder ──
-    if object_templates:
+    # ── Template stamp folders ──
+    if all_templates:
+        _append_all_template_brushes(brushes, all_templates)
+    elif object_templates:
         _append_object_brushes(brushes, object_templates)
 
     return brushes
@@ -1037,10 +1059,12 @@ def build_town_brushes(tile_context_map: Dict[int, str],
 
 def build_overworld_brushes(tile_context_map: Dict[int, str],
                             object_templates: Optional[List] = None,
+                            all_templates: Optional[Dict[str, List[Dict]]] = None,
                             ) -> List[Brush]:
     """Build brush list for the overview map editor.
 
-    Includes folder headers for Tiles and (optionally) Objects.
+    Includes folder headers for Tiles and (optionally) template stamp
+    folders.
     """
     ow_ids = sorted(
         tid for tid, ctx in tile_context_map.items()
@@ -1059,8 +1083,10 @@ def build_overworld_brushes(tile_context_map: Dict[int, str],
         brushes.append(Brush(
             name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp))
 
-    # ── Objects folder ──
-    if object_templates:
+    # ── Template stamp folders ──
+    if all_templates:
+        _append_all_template_brushes(brushes, all_templates)
+    elif object_templates:
         _append_object_brushes(brushes, object_templates)
 
     return brushes
@@ -1068,11 +1094,14 @@ def build_overworld_brushes(tile_context_map: Dict[int, str],
 
 
 def _append_object_brushes(brushes: List[Brush],
-                           object_templates: List[Dict]):
-    """Append an "Objects" folder header followed by one brush per saved
-    object template.  Each brush carries the sparse tiles dict so
-    ``paint()`` can stamp it."""
-    grp = "Objects"
+                           object_templates: List[Dict],
+                           folder_name: str = "Objects"):
+    """Append a folder header followed by one stamp brush per template.
+
+    Each brush carries the sparse tiles dict so ``paint()`` can stamp it.
+    Works for any template type (objects, enclosures, battles, etc.).
+    """
+    grp = folder_name
     brushes.append(Brush(name=grp, tile_id=None, is_folder_header=True))
     for tmpl in object_templates:
         mc = tmpl.get("map_config", {})
@@ -1080,10 +1109,38 @@ def _append_object_brushes(brushes: List[Brush],
         if not tiles or not isinstance(tiles, dict):
             continue  # skip empty / non-sparse objects
         brushes.append(Brush(
-            name=tmpl.get("label", "Object"),
+            name=tmpl.get("label", "Template"),
             tile_id=None,
             group=grp,
             object_data=tiles,
             object_w=mc.get("width", 8),
             object_h=mc.get("height", 8),
         ))
+
+
+# Display names for each template category key.
+_TEMPLATE_FOLDER_NAMES: Dict[str, str] = {
+    "me_object":    "Objects",
+    "me_enclosure": "Enclosures",
+    "me_battle":    "Battles",
+    "me_dungeon":   "Dungeons",
+    "me_overview":  "Overviews",
+    "me_examine":   "Examines",
+}
+
+# Order in which template folders appear in the palette.
+_TEMPLATE_FOLDER_ORDER: List[str] = [
+    "me_object", "me_enclosure", "me_battle",
+    "me_dungeon", "me_overview", "me_examine",
+]
+
+
+def _append_all_template_brushes(brushes: List[Brush],
+                                 all_templates: Dict[str, List[Dict]]):
+    """Append stamp-brush folders for every non-empty template category."""
+    for key in _TEMPLATE_FOLDER_ORDER:
+        templates = all_templates.get(key)
+        if not templates:
+            continue
+        folder = _TEMPLATE_FOLDER_NAMES.get(key, key)
+        _append_object_brushes(brushes, templates, folder_name=folder)

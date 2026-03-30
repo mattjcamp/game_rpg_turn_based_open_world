@@ -222,7 +222,9 @@ class ModuleTownEditorMixin:
         h = town.get("height", 19)
 
         fe = self.features_editor
-        brushes = build_town_brushes(fe.TILE_CONTEXT)
+        saved_all = fe.load_map_templates()
+        brushes = build_town_brushes(fe.TILE_CONTEXT,
+                                     all_templates=saved_all)
 
         def on_save(state):
             town["tiles"] = state.tiles
@@ -896,7 +898,9 @@ class ModuleTownEditorMixin:
         h = enc.get("height", 14)
 
         fe = self.features_editor
-        brushes = build_town_brushes(fe.TILE_CONTEXT)
+        saved_all = fe.load_map_templates()
+        brushes = build_town_brushes(fe.TILE_CONTEXT,
+                                     all_templates=saved_all)
 
         def on_save(state):
             enc["tiles"] = state.tiles

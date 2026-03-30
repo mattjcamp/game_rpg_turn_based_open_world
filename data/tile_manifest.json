@@ -21,7 +21,8 @@
     "forest": {
       "path": "src/assets/game/terrain/forest.png",
       "usable_in": [
-        "overworld"
+        "overworld",
+        "town"
       ],
       "tile_id": 2
     },
@@ -123,13 +124,16 @@
     "brush_scrubland": {
       "path": "src/assets/unassigned/brush_scrubland.png",
       "usable_in": [
-        "overworld"
-      ]
+        "overworld",
+        "town"
+      ],
+      "tile_id": 54
     },
     "grass_plains": {
       "path": "src/assets/unassigned/grass_plains.png",
       "usable_in": [
-        "overworld"
+        "overworld",
+        "town"
       ],
       "tile_id": 50
     },
@@ -253,7 +257,8 @@
       "usable_in": [
         "overworld",
         "town"
-      ]
+      ],
+      "tile_id": 52
     },
     "wall_lighter": {
       "path": "src/assets/game/terrain/wall_copy.png",
@@ -1077,8 +1082,10 @@
     "town_gate": {
       "path": "src/assets/game/items/town_gate.png",
       "usable_in": [
-        "objects"
-      ]
+        "objects",
+        "town"
+      ],
+      "tile_id": 56
     }
   },
   "unassigned": {

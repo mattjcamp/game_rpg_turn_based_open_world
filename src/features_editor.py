@@ -584,7 +584,9 @@ class FeaturesEditor:
         w = town.get("width", 18)
         h = town.get("height", 19)
 
-        brushes = build_town_brushes(self.TILE_CONTEXT)
+        saved_all = self.load_map_templates()
+        brushes = build_town_brushes(self.TILE_CONTEXT,
+                                     all_templates=saved_all)
 
         def on_save(state):
             # Sparse tiles are already the same dict reference,
@@ -2612,9 +2614,8 @@ class FeaturesEditor:
         storage = mc["storage"]
         grid_type = mc["grid_type"]
 
-        # Load object templates for the Objects brush folder
+        # Load all templates for stamp brush folders
         saved_all = self.load_map_templates()
-        obj_templates = saved_all.get("me_object", [])
 
         # Build brushes based on tile context
         manifest = {}
@@ -2630,7 +2631,7 @@ class FeaturesEditor:
         if ctx == "overworld":
             brushes = build_overworld_brushes(
                 self.TILE_CONTEXT,
-                object_templates=obj_templates,
+                all_templates=saved_all,
             )
         else:
             # All non-overworld editors get every tile type,
@@ -2640,7 +2641,7 @@ class FeaturesEditor:
                 feat_tiles_path=self.tiles_path(),
                 manifest=manifest,
                 feat_tile_list=getattr(self, "tile_list", None),
-                object_templates=obj_templates,
+                all_templates=saved_all,
             )
 
         # Build initial tile data — reuse saved tiles when available

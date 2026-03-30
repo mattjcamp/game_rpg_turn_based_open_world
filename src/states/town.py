@@ -1282,7 +1282,7 @@ class TownState(InventoryMixin, BaseState):
             self.game.game_log.append(text)
 
     def _start_quest_monster_combat(self, npc):
-        """Initiate combat with a quest monster NPC inside an interior."""
+        """Initiate combat with a quest monster NPC inside a town or interior."""
         from src.monster import create_monster
 
         monster_key = getattr(npc, "_monster_key", "skeleton")
@@ -1310,13 +1310,25 @@ class TownState(InventoryMixin, BaseState):
         self._combat_monster_npc = npc
         self._returning_from_combat = True
         town_name = getattr(self.town_data, "name", "")
+
+        # Build the correct combat_location so quest kill tracking
+        # can match the step's spawn_location.  Inside a town interior
+        # the format must be "interior:TownName/InteriorName"; at the
+        # town level it is "town:TownName".
+        in_interior = getattr(self, "_in_interior", False)
+        interior_name = getattr(self, "_interior_name", "")
+        if in_interior and interior_name:
+            location = f"interior:{town_name}/{interior_name}"
+        else:
+            location = f"town:{town_name}"
+
         combat_state.start_combat(
             fighter, monsters,
             source_state="town",
             encounter_name=enc_name,
             map_monster_refs=[npc],
             terrain_tile=terrain_tile,
-            combat_location=f"town:{town_name}")
+            combat_location=location)
         self.game.change_state("combat")
 
     def _collect_quest_item(self, npc):

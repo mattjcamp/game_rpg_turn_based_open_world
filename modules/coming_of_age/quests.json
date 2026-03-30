@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Rats",
+    "description": "Rats have infested the shop basement",
+    "giver_npc": "Aeron the Shopkeeper",
+    "giver_sprite": "src/assets/game/npcs/villager_citizen.png",
+    "giver_location": "town:Midherm",
+    "giver_dialogue": "Rats! Rats have infested my shop's basement. Not just any rats, but Giant Rats. Can you kill them? All of them! I will reward you. I promise.",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "steps": [
+      {
+        "description": "Kill the Basement Rats",
+        "step_type": "kill",
+        "monster": "Giant Rat",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "interior:Midherm/Tunnel Short",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the Deep Tunnel Rats",
+        "step_type": "kill",
+        "monster": "Giant Rat",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "interior:Midherm/Tunnel Long",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the Grumpy Goblin",
+        "step_type": "kill",
+        "monster": "Goblin",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "interior:Midherm/Tunnel Long",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ]
+  }
+]

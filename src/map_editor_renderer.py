@@ -436,6 +436,55 @@ def _draw_dense_grid(renderer, data: Dict):
                 isf = tiny.render("I", True, (255, 255, 255))
                 screen.blit(isf, (ibx + 1, iby))
 
+    # Party start marker
+    _draw_party_start_marker(renderer, data, screen, ox, oy, ts,
+                             cam_c, cam_r, end_c, end_r)
+
+
+def _draw_party_start_marker(renderer, data, screen, ox, oy, ts,
+                              cam_c, cam_r, end_c, end_r):
+    """Draw the party start position marker on the grid."""
+    ps = data.get("party_start")
+    if not ps:
+        return
+    pc, pr = ps.get("col", -1), ps.get("row", -1)
+    if not (cam_c <= pc < end_c and cam_r <= pr < end_r):
+        return
+    px = ox + (pc - cam_c) * ts
+    py = oy + (pr - cam_r) * ts
+
+    # Draw the party map sprite if available, otherwise a white stick figure
+    party_spr = getattr(renderer, '_party_map_sprite', None)
+    if party_spr:
+        scaled = pygame.transform.scale(party_spr, (ts, ts))
+        screen.blit(scaled, (px, py))
+    else:
+        # Fallback: draw a simple white stick figure
+        cx, cy = px + ts // 2, py + ts // 2
+        r = max(ts // 6, 2)
+        pygame.draw.circle(screen, (255, 255, 255), (cx, cy - r * 2), r)
+        pygame.draw.line(screen, (255, 255, 255),
+                         (cx, cy - r), (cx, cy + r), 1)
+        pygame.draw.line(screen, (255, 255, 255),
+                         (cx - r, cy), (cx + r, cy), 1)
+        pygame.draw.line(screen, (255, 255, 255),
+                         (cx, cy + r), (cx - r, cy + r * 2), 1)
+        pygame.draw.line(screen, (255, 255, 255),
+                         (cx, cy + r), (cx + r, cy + r * 2), 1)
+
+    # Green border + "P" badge
+    pygame.draw.rect(screen, (80, 255, 80), (px, py, ts, ts), 2)
+    badge_sz = max(ts // 3, 8)
+    bx = px + ts - badge_sz - 1
+    by = py + 1
+    pygame.draw.rect(screen, (20, 120, 20), (bx, by, badge_sz, badge_sz))
+    if badge_sz >= 8:
+        tiny = (renderer.font_tiny
+                if hasattr(renderer, 'font_tiny')
+                else renderer.font_small)
+        psf = tiny.render("P", True, (255, 255, 255))
+        screen.blit(psf, (bx + 1, by))
+
 
 def _draw_sparse_grid(renderer, data: Dict):
     """Draw fixed-size sparse tile grid (interior style)."""
@@ -766,7 +815,8 @@ def _draw_footer(renderer, data: Dict):
         hint = "[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel"
     elif data["storage"] == STORAGE_DENSE:
         hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                "[Tab] Brush  [I] Link  [R] Replace  [X] Unlink  "
+                "[Tab] Brush  [I] Link  [P] Party Start  "
+                "[R] Replace  [X] Unlink  "
                 "[Ctrl+S] Save  [Esc] Save & Exit")
     else:
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "

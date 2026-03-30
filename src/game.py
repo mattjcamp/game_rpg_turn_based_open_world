@@ -633,6 +633,21 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     self.party.col = mod_start.get("col", self.party.col)
                     self.party.row = mod_start.get("row", self.party.row)
 
+        # ── Overview map party_start overrides everything ──
+        if self.active_module_path:
+            _ov_path = os.path.join(
+                self.active_module_path, "overview_map.json")
+            if os.path.isfile(_ov_path):
+                try:
+                    with open(_ov_path, "r") as _fh:
+                        _ov_data = json.load(_fh)
+                except (OSError, json.JSONDecodeError):
+                    _ov_data = {}
+                _ps = _ov_data.get("party_start")
+                if _ps:
+                    self.party.col = _ps.get("col", self.party.col)
+                    self.party.row = _ps.get("row", self.party.row)
+
         # ── Clamp start position to map bounds & find walkable tile ──
         from src.settings import TILE_WATER, TILE_MOUNTAIN
         mw, mh = self.tile_map.width, self.tile_map.height
@@ -3600,13 +3615,12 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         fe = self.features_editor
 
-        # Load object templates for the Objects brush folder
+        # Load all templates for stamp brush folders
         saved_all = fe.load_map_templates()
-        obj_templates = saved_all.get("me_object", [])
 
         brushes = build_overworld_brushes(
             fe.TILE_CONTEXT,
-            object_templates=obj_templates,
+            all_templates=saved_all,
         )
 
         # If tiles are missing, create a default grid
@@ -3648,14 +3662,19 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # ── Load existing tile links ──
         tile_links = self._mod_overview_map.get("tile_links", {})
 
+        # ── Load existing party start position ──
+        party_start = self._mod_overview_map.get("party_start")
+
         def _on_save(st):
             self._mod_overview_map["tiles"] = st.tiles
             self._mod_overview_map["tile_links"] = st.tile_links
+            self._mod_overview_map["party_start"] = st.party_start
             self._save_module_overview_map()
 
         def _on_exit(st):
             self._mod_overview_map["tiles"] = st.tiles
             self._mod_overview_map["tile_links"] = st.tile_links
+            self._mod_overview_map["party_start"] = st.party_start
             self._save_module_overview_map()
             self.showing_features = False
             self.showing_modules = True
@@ -3672,13 +3691,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             tile_context="overworld",
             supports_tile_links=True,
             supports_replace=True,
+            supports_party_start=True,
             on_save=_on_save,
             on_exit=_on_exit,
         )
 
         state = MapEditorState(config, tiles=tiles,
                                tile_links=tile_links,
-                               interior_list=interior_list)
+                               interior_list=interior_list,
+                               party_start=party_start)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
 

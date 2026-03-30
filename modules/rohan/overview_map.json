@@ -844,5 +844,9 @@
       "interior": "Grotto",
       "type": "building"
     }
+  },
+  "party_start": {
+    "col": 13,
+    "row": 16
   }
 }

@@ -41,19 +41,42 @@ def collect_quest_item(game, quest_name, step_idx, item_name):
     return f"Found {item_name}!"
 
 
+def _normalize_monster_name(name):
+    """Build a set of plausible lookup keys for a monster name.
+
+    Monster names can appear in several forms depending on whether
+    they come from the quest JSON ("Giant Rat"), the monster dict key
+    ("giant_rat"), or the Monster object's ``.name`` attribute
+    ("Giant Rat").  We generate all common variants so a match is
+    found regardless of which form is stored.
+    """
+    if not name:
+        return set()
+    keys = set()
+    keys.add(name)                               # original
+    keys.add(name.lower())                        # lowercase
+    keys.add(name.replace(" ", "_").lower())      # snake_case
+    keys.add(name.replace("_", " ").title())      # Title Case
+    keys.add(name.replace("_", " ").lower())      # lower with spaces
+    return keys
+
+
 def _location_matches(step_location, combat_location):
     """Return True if *combat_location* satisfies *step_location*.
 
     Matching rules:
+    - If *step_location* is empty or missing, any location counts.
     - ``"overview"`` or ``"Overview Map"`` steps match combat in
       ``"overview"`` (overworld random encounters & quest monsters).
     - Location-specific steps (``"town:Yardley"``, ``"dungeon:X"``,
       ``"interior:Town/Area"``, ``"space:Building/Space"``,
       ``"building:Name"``) must match exactly (case-insensitive).
-    - If *step_location* is empty or missing, any location counts.
     """
-    if not step_location or step_location in ("overview", "Overview Map"):
-        # Overworld steps — only satisfied by overworld combat
+    # No location requirement — any combat location satisfies the step
+    if not step_location:
+        return True
+    # Overworld steps — only satisfied by overworld combat
+    if step_location in ("overview", "Overview Map"):
         return combat_location in ("overview", "overworld", "")
     if not combat_location:
         return False
@@ -74,8 +97,6 @@ def check_quest_kills(game):
     Returns:
         str or None: Completion message, or None if no progress
     """
-    from collections import Counter
-
     killed = getattr(game, "pending_killed_monsters", [])
     if not killed:
         return None
@@ -85,11 +106,14 @@ def check_quest_kills(game):
     mq_states = getattr(game, "module_quest_states", {})
     quest_defs = getattr(game, "_module_quest_defs", [])
 
-    killed_counts = Counter()
-    for name in killed:
-        display = name.replace("_", " ").title()
-        killed_counts[display] += 1
-        killed_counts[name] += 1
+    # Build a lookup of killed monster names using all common variants
+    # so that e.g. "Giant Rat", "giant_rat", and "giant rat" all match.
+    killed_name_sets = [_normalize_monster_name(n) for n in killed]
+    # Flatten: map each variant -> count of kills
+    killed_counts = {}
+    for name_set in killed_name_sets:
+        for variant in name_set:
+            killed_counts[variant] = killed_counts.get(variant, 0) + 1
 
     result_msg = None
 
@@ -103,6 +127,12 @@ def check_quest_kills(game):
 
         steps = qdef.get("steps", [])
         progress = state.get("step_progress", [])
+
+        # Guard against mismatched step_progress length (e.g. quest
+        # was updated after game started).  Extend with False entries.
+        if len(progress) < len(steps):
+            progress.extend([False] * (len(steps) - len(progress)))
+            state["step_progress"] = progress
 
         for i, step in enumerate(steps):
             if i >= len(progress) or progress[i]:
@@ -120,10 +150,12 @@ def check_quest_kills(game):
 
             target_count = max(1, step.get("target_count", 1))
 
-            monster_key = monster_display.lower().replace(" ", "_")
-            match_count = max(
-                killed_counts.get(monster_display, 0),
-                killed_counts.get(monster_key, 0))
+            # Match against all name variants for the quest monster
+            monster_variants = _normalize_monster_name(monster_display)
+            match_count = 0
+            for variant in monster_variants:
+                match_count = max(match_count,
+                                  killed_counts.get(variant, 0))
 
             if match_count <= 0:
                 continue

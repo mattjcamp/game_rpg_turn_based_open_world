@@ -247,6 +247,28 @@
         "label": "bone arrow"
       }
     },
+    "Super Zombie": {
+      "description": "A new creature. A Super Zombie",
+      "hp": 15,
+      "ac": 10,
+      "attack_bonus": 1,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 20,
+      "gold_min": 3,
+      "gold_max": 10,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "tile": "game/monsters/super_zombie.png"
+    },
     "Troll": {
       "description": "A massive brute with thick hide. Hits hard and regenerates.",
       "undead": false,
@@ -320,28 +342,6 @@
       ],
       "spawn_weight": 30,
       "tile": "game/monsters/zombie.png"
-    },
-    "Super Zombie": {
-      "description": "A new creature. A Super Zombie",
-      "hp": 15,
-      "ac": 10,
-      "attack_bonus": 1,
-      "damage_dice": 1,
-      "damage_sides": 4,
-      "damage_bonus": 0,
-      "xp_reward": 20,
-      "gold_min": 3,
-      "gold_max": 10,
-      "color": [
-        200,
-        50,
-        50
-      ],
-      "spawn_weight": 20,
-      "undead": false,
-      "humanoid": false,
-      "terrain": "land",
-      "tile": "game/monsters/super_zombie.png"
     }
   },
   "spawn_tables": {

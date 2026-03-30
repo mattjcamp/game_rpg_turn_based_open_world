@@ -1,63 +1,63 @@
 [
   {
-    "name": "Aseroth",
+    "name": "Midherm",
     "width": 25,
     "height": 25,
     "tiles": {
       "0,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "1,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "2,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "3,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "4,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "5,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "6,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "7,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "8,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "9,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,0": {
         "tile_id": 47,
@@ -65,69 +65,69 @@
         "path": "game/terrain/sand.png"
       },
       "12,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "13,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "14,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "15,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "16,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "17,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "18,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "19,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "20,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "24,0": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,1": {
         "tile_id": 47,
@@ -135,125 +135,124 @@
         "path": "game/terrain/sand.png"
       },
       "1,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "2,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "3,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "4,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "5,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "6,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "7,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "8,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "9,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "10,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "11,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "12,1": {
-        "tile_id": 26,
-        "name": "Door",
-        "path": "game/dungeon/dungeon_door.png",
-        "to_overworld": true
-      },
-      "13,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "14,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "15,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "16,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "17,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "18,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "19,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "20,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "21,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "22,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "23,1": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
-      },
-      "24,1": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
+      },
+      "7,1": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "8,1": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "9,1": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "10,1": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "11,1": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "12,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "13,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "14,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "15,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "16,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "17,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "18,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "19,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "20,1": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "21,1": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "22,1": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "23,1": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "24,1": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,2": {
         "tile_id": 47,
@@ -261,114 +260,115 @@
         "path": "game/terrain/sand.png"
       },
       "1,2": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,2": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "4,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "5,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "6,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "7,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "8,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "9,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "10,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "11,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 13,
+        "name": "Door",
+        "path": "game/terrain/town_door.png",
+        "to_overworld": true
       },
       "12,2": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "13,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "14,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "15,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "16,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "17,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "18,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "19,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "20,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "21,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "22,2": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "23,2": {
         "tile_id": 49,
@@ -376,9 +376,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,2": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,3": {
         "tile_id": 47,
@@ -386,114 +386,114 @@
         "path": "game/terrain/sand.png"
       },
       "1,3": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,3": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,3": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,3": {
-        "tile_id": 34,
-        "name": "Wall Torch",
-        "path": "game/dungeon/wall_torch.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,3": {
-        "tile_id": 34,
-        "name": "Wall Torch",
-        "path": "game/dungeon/wall_torch.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,3": {
-        "tile_id": 34,
-        "name": "Wall Torch",
-        "path": "game/dungeon/wall_torch.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,3": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,3": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,3": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "13,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "14,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "15,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "18,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "19,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,3": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,3": {
         "tile_id": 49,
@@ -501,9 +501,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,3": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,4": {
         "tile_id": 47,
@@ -511,115 +511,114 @@
         "path": "game/terrain/sand.png"
       },
       "1,4": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,4": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,4": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,4": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,4": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,4": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,4": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,4": {
-        "tile_id": 26,
-        "name": "Door",
-        "path": "game/dungeon/dungeon_door.png",
-        "interior": "General Shop"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,4": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,4": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,4": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,4": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "13,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "14,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "15,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "18,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "19,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,4": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,4": {
         "tile_id": 49,
@@ -627,9 +626,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,4": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "0,5": {
         "tile_id": 47,
@@ -637,114 +636,114 @@
         "path": "game/terrain/sand.png"
       },
       "1,5": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,5": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,5": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,5": {
-        "tile_id": 34,
-        "name": "Wall Torch",
-        "path": "game/dungeon/wall_torch.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "5,5": {
-        "tile_id": 34,
-        "name": "Wall Torch",
-        "path": "game/dungeon/wall_torch.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "6,5": {
-        "tile_id": 34,
-        "name": "Wall Torch",
-        "path": "game/dungeon/wall_torch.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "7,5": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "8,5": {
-        "tile_id": 11,
-        "name": "Wall",
-        "path": "game/terrain/town_wall.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "9,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,5": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "13,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "14,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "15,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "18,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "19,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,5": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,5": {
         "tile_id": 49,
@@ -752,9 +751,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,5": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "0,6": {
         "tile_id": 47,
@@ -762,109 +761,109 @@
         "path": "game/terrain/sand.png"
       },
       "1,6": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,6": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "5,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "6,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "7,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "8,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "9,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "13,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "14,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "15,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "16,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "17,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "18,6": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "19,6": {
         "tile_id": 48,
         "name": "Brown Floor",
         "path": "game/terrain/floor_gray.png"
       },
-      "13,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "14,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "15,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "16,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "17,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "18,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "19,6": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "20,6": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,6": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,6": {
         "tile_id": 46,
@@ -877,9 +876,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,6": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "0,7": {
         "tile_id": 47,
@@ -887,89 +886,90 @@
         "path": "game/terrain/sand.png"
       },
       "1,7": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,7": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "5,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "6,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "7,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 13,
+        "name": "Door",
+        "path": "game/terrain/town_door.png",
+        "interior": "General Shop Interior"
       },
       "8,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "9,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,7": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "13,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "14,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "15,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,7": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "18,7": {
         "tile_id": 46,
@@ -977,19 +977,19 @@
         "path": "game/terrain/path.png"
       },
       "19,7": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "20,7": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,7": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,7": {
         "tile_id": 46,
@@ -1002,9 +1002,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,7": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "0,8": {
         "tile_id": 47,
@@ -1012,84 +1012,84 @@
         "path": "game/terrain/sand.png"
       },
       "1,8": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "2,8": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "8,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 52,
+        "name": "General Store Sign",
+        "path": "game/terrain/shop_sign.png"
       },
       "9,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,8": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "13,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "14,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "15,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,8": {
         "tile_id": 46,
@@ -1102,19 +1102,19 @@
         "path": "game/terrain/path.png"
       },
       "19,8": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "20,8": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,8": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,8": {
         "tile_id": 46,
@@ -1127,119 +1127,119 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,8": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "0,9": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "1,9": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "2,9": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "8,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "9,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "10,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "11,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,9": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "13,9": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "14,9": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "15,9": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "16,9": {
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
+      },
+      "17,9": {
         "tile_id": 48,
         "name": "Brown Floor",
         "path": "game/terrain/floor_gray.png"
       },
-      "13,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "14,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "15,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "16,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "17,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "18,9": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "19,9": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "20,9": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,9": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,9": {
         "tile_id": 46,
@@ -1252,124 +1252,124 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,9": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,10": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "1,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "2,10": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,10": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
-      },
       "3,10": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,10": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,10": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "13,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "14,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "15,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "16,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "17,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "18,10": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "19,10": {
         "tile_id": 48,
         "name": "Brown Floor",
         "path": "game/terrain/floor_gray.png"
       },
-      "13,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "14,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "15,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "16,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "17,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "18,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "19,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "20,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,10": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,10": {
         "tile_id": 49,
@@ -1377,124 +1377,124 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,10": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,11": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "1,11": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
       },
-      "1,11": {
+      "2,11": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,11": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
-      },
       "3,11": {
-        "tile_id": 35,
-        "name": "Altar",
-        "path": "game/dungeon/altar.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,11": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "13,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "14,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "15,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "16,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "17,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "18,11": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "19,11": {
         "tile_id": 48,
         "name": "Brown Floor",
         "path": "game/terrain/floor_gray.png"
       },
-      "13,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "14,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "15,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "16,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "17,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "18,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "19,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "20,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,11": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,11": {
         "tile_id": 49,
@@ -1502,124 +1502,124 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,11": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,12": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "1,12": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
       },
-      "1,12": {
+      "2,12": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,12": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
-      },
       "3,12": {
-        "tile_id": 35,
-        "name": "Altar",
-        "path": "game/dungeon/altar.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,12": {
-        "tile_id": 13,
-        "name": "Door",
-        "path": "game/terrain/town_door.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,12": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,12": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,12": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,12": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,12": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "11,12": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor",
+        "path": "game/terrain/sand.png"
       },
       "12,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "13,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "14,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "15,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "16,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "17,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "18,12": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "19,12": {
         "tile_id": 48,
         "name": "Brown Floor",
         "path": "game/terrain/floor_gray.png"
       },
-      "13,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "14,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "15,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "16,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "17,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "18,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "19,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "20,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "21,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 48,
+        "name": "Brown Floor",
+        "path": "game/terrain/floor_gray.png"
       },
       "22,12": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,12": {
         "tile_id": 49,
@@ -1627,59 +1627,59 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,12": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,13": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "1,13": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
       },
-      "1,13": {
+      "2,13": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,13": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
-      },
       "3,13": {
-        "tile_id": 35,
-        "name": "Altar",
-        "path": "game/dungeon/altar.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,13": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "10,13": {
         "tile_id": 0,
@@ -1692,59 +1692,59 @@
         "path": "game/terrain/grass.png"
       },
       "12,13": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "13,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "14,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "15,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "18,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "19,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,13": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,13": {
         "tile_id": 49,
@@ -1752,54 +1752,54 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,13": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,14": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "1,14": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
       },
-      "1,14": {
+      "2,14": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,14": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
-      },
       "3,14": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,14": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,14": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "9,14": {
         "tile_id": 0,
@@ -1812,14 +1812,14 @@
         "path": "game/terrain/grass.png"
       },
       "11,14": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "12,14": {
         "tile_id": 0,
         "name": "Grass",
         "path": "game/terrain/grass.png"
-      },
-      "12,14": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
       },
       "13,14": {
         "tile_id": 0,
@@ -1852,24 +1852,24 @@
         "path": "game/terrain/grass.png"
       },
       "19,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,14": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,14": {
         "tile_id": 49,
@@ -1877,49 +1877,49 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,14": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,15": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "1,15": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
       },
-      "1,15": {
+      "2,15": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,15": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,15": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,15": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,15": {
         "tile_id": 0,
@@ -1932,19 +1932,19 @@
         "path": "game/terrain/grass.png"
       },
       "10,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "11,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "12,15": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "13,15": {
         "tile_id": 0,
@@ -1967,9 +1967,9 @@
         "path": "game/terrain/grass.png"
       },
       "17,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "18,15": {
         "tile_id": 0,
@@ -1982,19 +1982,19 @@
         "path": "game/terrain/grass.png"
       },
       "20,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,15": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,15": {
         "tile_id": 49,
@@ -2002,104 +2002,104 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,15": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,16": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "1,16": {
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
       },
-      "1,16": {
+      "2,16": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,16": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,16": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,16": {
-        "tile_id": 1,
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "7,16": {
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
+      },
+      "8,16": {
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
+      },
+      "9,16": {
+        "tile_id": 53,
         "name": "Water",
         "path": "game/terrain/water.png"
       },
-      "7,16": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
-      "8,16": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
-      "9,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "10,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "11,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "12,16": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "13,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "14,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "15,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "16,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "17,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "18,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "19,16": {
         "tile_id": 0,
@@ -2107,19 +2107,19 @@
         "path": "game/terrain/grass.png"
       },
       "20,16": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,16": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,16": {
         "tile_id": 49,
@@ -2127,124 +2127,125 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,16": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,17": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "1,17": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "2,17": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,17": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,17": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,17": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,17": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,17": {
-        "tile_id": 1,
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
+      },
+      "8,17": {
+        "tile_id": 53,
         "name": "Water",
         "path": "game/terrain/water.png"
       },
-      "8,17": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
       "9,17": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "10,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "11,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "12,17": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "13,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "14,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "15,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "16,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 45,
+        "name": "Shrine",
+        "path": "unassigned/shrine_church.png",
+        "interior": "Shrine of Lanis"
       },
       "17,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "18,17": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "19,17": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "20,17": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "21,17": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "22,17": {
         "tile_id": 0,
         "name": "Grass",
         "path": "game/terrain/grass.png"
+      },
+      "20,17": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "21,17": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "22,17": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,17": {
         "tile_id": 49,
@@ -2252,9 +2253,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,17": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,18": {
         "tile_id": 47,
@@ -2262,114 +2263,114 @@
         "path": "game/terrain/sand.png"
       },
       "1,18": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "2,18": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,18": {
+      "3,18": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "4,18": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "5,18": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "6,18": {
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
+      },
+      "7,18": {
         "tile_id": 0,
         "name": "Grass",
         "path": "game/terrain/grass.png"
       },
-      "3,18": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
-      "4,18": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
-      },
-      "5,18": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
-      },
-      "6,18": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
-      },
-      "7,18": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
-      },
       "8,18": {
-        "tile_id": 1,
+        "tile_id": 53,
         "name": "Water",
         "path": "game/terrain/water.png"
       },
       "9,18": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "10,18": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "11,18": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "12,18": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "13,18": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "14,18": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "15,18": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "16,18": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "17,18": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "18,18": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "19,18": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "20,18": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,18": {
-        "tile_id": 38,
-        "name": "Jungle",
-        "path": "unassigned/island_jungle.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,18": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,18": {
         "tile_id": 49,
@@ -2377,9 +2378,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,18": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,19": {
         "tile_id": 47,
@@ -2387,114 +2388,114 @@
         "path": "game/terrain/sand.png"
       },
       "1,19": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,19": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,19": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,19": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,19": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,19": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,19": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,19": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "8,19": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "9,19": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "10,19": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
       },
       "11,19": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "12,19": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "13,19": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "14,19": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "15,19": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "16,19": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "17,19": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "18,19": {
         "tile_id": 0,
         "name": "Grass",
         "path": "game/terrain/grass.png"
       },
-      "12,19": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
-      },
-      "13,19": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
-      "14,19": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "15,19": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "16,19": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "17,19": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
-      },
-      "18,19": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
-      },
       "19,19": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,19": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,19": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,19": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,19": {
         "tile_id": 49,
@@ -2502,9 +2503,9 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "24,19": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "0,20": {
         "tile_id": 47,
@@ -2512,39 +2513,39 @@
         "path": "game/terrain/sand.png"
       },
       "1,20": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,20": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,20": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,20": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,20": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,20": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,20": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,20": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,20": {
         "tile_id": 0,
@@ -2552,74 +2553,74 @@
         "path": "game/terrain/grass.png"
       },
       "9,20": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "10,20": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "11,20": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
-      "12,20": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
-      },
-      "13,20": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
-      "14,20": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "15,20": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "16,20": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "17,20": {
-        "tile_id": 1,
+        "tile_id": 53,
         "name": "Water",
         "path": "game/terrain/water.png"
       },
+      "11,20": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "12,20": {
+        "tile_id": 53,
+        "name": "Water",
+        "path": "game/terrain/water.png"
+      },
+      "13,20": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "14,20": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "15,20": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "16,20": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "17,20": {
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
+      },
       "18,20": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "19,20": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,20": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,20": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,20": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,20": {
         "tile_id": 49,
@@ -2637,39 +2638,39 @@
         "path": "game/terrain/sand.png"
       },
       "1,21": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,21": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,21": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,21": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,21": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,21": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,21": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,21": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,21": {
         "tile_id": 0,
@@ -2677,74 +2678,74 @@
         "path": "game/terrain/grass.png"
       },
       "9,21": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "10,21": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
       },
       "11,21": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "12,21": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "13,21": {
+        "tile_id": 54,
+        "name": "Scrub",
+        "path": "unassigned/brush_scrubland.png"
+      },
+      "14,21": {
         "tile_id": 0,
         "name": "Grass",
         "path": "game/terrain/grass.png"
       },
-      "12,21": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
-      },
-      "13,21": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
-      "14,21": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
-      },
       "15,21": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "16,21": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "17,21": {
-        "tile_id": 1,
-        "name": "Water",
-        "path": "game/terrain/water.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "18,21": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "19,21": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,21": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,21": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,21": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,21": {
         "tile_id": 49,
@@ -2757,44 +2758,44 @@
         "path": "game/terrain/sand.png"
       },
       "0,22": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "1,22": {
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
+      },
+      "2,22": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "2,22": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
-      },
       "3,22": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "4,22": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "5,22": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "6,22": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "7,22": {
-        "tile_id": 0,
-        "name": "Grass",
-        "path": "game/terrain/grass.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "8,22": {
         "tile_id": 0,
@@ -2812,64 +2813,64 @@
         "path": "game/terrain/grass.png"
       },
       "11,22": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "12,22": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "13,22": {
-        "tile_id": 2,
-        "name": "Forest",
-        "path": "game/terrain/forest.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "14,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 0,
+        "name": "Grass",
+        "path": "game/terrain/grass.png"
       },
       "15,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "16,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "17,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "18,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "19,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,22": {
-        "tile_id": 37,
-        "name": "Brick",
-        "path": "unassigned/brick_wall_red.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,22": {
         "tile_id": 49,
@@ -2882,14 +2883,14 @@
         "path": "game/terrain/sand.png"
       },
       "0,23": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "1,23": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "2,23": {
         "tile_id": 49,
@@ -3042,34 +3043,34 @@
         "path": "game/terrain/sand.png"
       },
       "7,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "8,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "9,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "10,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "11,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "12,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 50,
+        "name": "Grass Sparse",
+        "path": "unassigned/grass_plains.png"
       },
       "13,24": {
         "tile_id": 47,
@@ -3107,19 +3108,19 @@
         "path": "game/terrain/sand.png"
       },
       "20,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "21,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,24": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "23,24": {
         "tile_id": 47,
@@ -3138,13 +3139,13 @@
     "entry_row": 12,
     "npcs": [
       {
-        "name": "Lord British",
+        "name": "Juno",
         "npc_type": "villager",
-        "sprite": "src/assets/unassigned/wizard_f1.png",
-        "col": 12,
-        "row": 12,
+        "sprite": "src/assets/game/npcs/villager_beggar.png",
+        "col": 0,
+        "row": 0,
         "dialogue": [
-          "Where all my subjects at?"
+          "Does my breath smell like cat food?"
         ],
         "god_name": "The Divine",
         "wander_range": 4
@@ -3152,7 +3153,7 @@
     ],
     "interiors": [
       {
-        "name": "General Shop",
+        "name": "General Shop Interior",
         "width": 16,
         "height": 14,
         "tiles": {
@@ -3182,9 +3183,9 @@
             "path": "game/dungeon/wall_torch.png"
           },
           "5,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 13,
+            "name": "Door",
+            "interior": "Tunnel Short"
           },
           "6,0": {
             "tile_id": 34,
@@ -3231,6 +3232,11 @@
             "tile_id": 34,
             "name": "Wall Torch",
             "path": "game/dungeon/wall_torch.png"
+          },
+          "7,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
           },
           "6,4": {
             "tile_id": 34,
@@ -3283,6 +3289,16 @@
             "path": "game/dungeon/stone_wall.png"
           },
           "8,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "8,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,1": {
             "tile_id": 20,
             "name": "Stone Floor",
             "path": "game/dungeon/stone_floor.png"
@@ -3347,14 +3363,25 @@
             "name": "Stone Floor",
             "path": "game/dungeon/stone_floor.png"
           },
+          "7,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
           "8,3": {
             "tile_id": 20,
             "name": "Stone Floor",
             "path": "game/dungeon/stone_floor.png"
           },
           "6,3": {
-            "tile_id": 11,
-            "name": "Wall"
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
           },
           "5,3": {
             "tile_id": 20,
@@ -3380,33 +3407,12 @@
             "tile_id": 12,
             "name": "Counter",
             "path": "game/terrain/town_counter.png"
-          },
-          "7,3": {
-            "tile_id": 10,
-            "name": "Floor"
-          },
-          "7,2": {
-            "tile_id": 10,
-            "name": "Floor"
-          },
-          "7,1": {
-            "tile_id": 10,
-            "name": "Floor"
-          },
-          "8,1": {
-            "tile_id": 25,
-            "name": "Stairs Down",
-            "interior": "Tunnel"
-          },
-          "7,4": {
-            "tile_id": 11,
-            "name": "Wall"
           }
         },
-        "template_label": "General Shop"
+        "template_label": "General Shop Interior"
       },
       {
-        "name": "Tunnel",
+        "name": "Tunnel Short",
         "width": 16,
         "height": 14,
         "tiles": {
@@ -3414,12 +3420,6 @@
             "tile_id": 21,
             "name": "Stone Wall",
             "path": "game/dungeon/stone_wall.png"
-          },
-          "0,1": {
-            "tile_id": 26,
-            "name": "Door",
-            "path": "game/dungeon/dungeon_door.png",
-            "interior": "General Shop"
           },
           "0,2": {
             "tile_id": 21,
@@ -3515,7 +3515,7 @@
             "tile_id": 26,
             "name": "Door",
             "path": "game/dungeon/dungeon_door.png",
-            "to_overworld": true
+            "interior": "Tunnel Long"
           },
           "15,0": {
             "tile_id": 21,
@@ -3721,1411 +3721,912 @@
             "tile_id": 20,
             "name": "Stone Floor",
             "path": "game/dungeon/stone_floor.png"
+          },
+          "0,1": {
+            "tile_id": 13,
+            "name": "Door",
+            "interior": "General Shop Interior"
           }
         },
-        "template_label": "Tunnel"
-      }
-    ],
-    "_action_import": "Map assigned",
-    "_action_generate": "Map assigned"
-  },
-  {
-    "name": "Yardley",
-    "width": 18,
-    "height": 19,
-    "tiles": {
-      "0,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
+        "template_label": "Tunnel Short"
       },
-      "1,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,0": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,1": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,2": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,3": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,4": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,5": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,6": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,7": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,8": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,9": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,10": {
-        "tile_id": 45,
-        "name": "Shrine",
-        "interior": "Shrine"
-      },
-      "6,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,10": {
-        "tile_id": 13,
-        "name": "Door",
-        "to_overworld": true
-      },
-      "10,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,10": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,11": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,12": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,13": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,14": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,15": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,16": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,17": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "0,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "1,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "2,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "3,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "4,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "5,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "6,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "7,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "8,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "9,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "10,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "11,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "12,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "13,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "14,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "15,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "16,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      },
-      "17,18": {
-        "tile_id": 47,
-        "name": "Sand Floor"
-      }
-    },
-    "description": "",
-    "town_style": "medieval",
-    "entry_col": 0,
-    "entry_row": 0,
-    "npcs": [
       {
-        "name": "Greg",
-        "npc_type": "villager",
-        "sprite": "src/assets/game/characters/druid.png",
-        "col": 0,
-        "row": 0,
-        "dialogue": [
-          "Hello there!"
-        ],
-        "god_name": "The Divine",
-        "wander_range": 4
-      }
-    ],
-    "interiors": [
+        "name": "Tunnel Long",
+        "width": 20,
+        "height": 20,
+        "tiles": {
+          "0,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "3,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "6,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "7,0": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "0,1": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,1": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "2,1": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "3,1": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "4,1": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "5,1": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,1": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,1": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "0,2": {
+            "tile_id": 13,
+            "name": "Door",
+            "path": "game/terrain/town_door.png",
+            "interior": "Tunnel Short"
+          },
+          "1,2": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "2,2": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "3,2": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "4,2": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "5,2": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,2": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,2": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "0,3": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,3": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "2,3": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "3,3": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "4,3": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "5,3": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,3": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,3": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "0,4": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,4": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,4": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "3,4": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,4": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,4": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "6,4": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "7,4": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,5": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "6,5": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "7,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "8,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "9,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "10,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "11,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "12,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "13,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "14,5": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,6": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "8,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "9,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "10,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "11,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "12,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "13,6": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "14,6": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "6,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "7,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "8,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "9,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "10,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "11,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "12,7": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "13,7": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "14,7": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "12,8": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "13,8": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "14,8": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "3,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "6,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "7,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "9,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "10,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "11,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "12,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "14,9": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,10": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "3,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "4,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "5,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,10": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "8,10": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "9,10": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "10,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "11,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "12,10": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "13,10": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "14,10": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,11": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "3,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "4,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "5,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,11": {
+            "tile_id": 13,
+            "name": "Door",
+            "path": "game/terrain/town_door.png"
+          },
+          "8,11": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "9,11": {
+            "tile_id": 26,
+            "name": "Door",
+            "path": "game/dungeon/dungeon_door.png"
+          },
+          "10,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "11,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "12,11": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "13,11": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "14,11": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,11": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "16,11": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,12": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "3,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "4,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "5,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "6,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "7,12": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "8,12": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "9,12": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "10,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "11,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "12,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "13,12": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "15,12": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,12": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "1,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "2,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "3,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "4,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "5,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "6,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "7,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "9,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "10,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "11,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "12,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "13,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "14,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,13": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,13": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "14,14": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "15,14": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,14": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "14,15": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,15": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,15": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "14,16": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,16": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,16": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "14,17": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,17": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,17": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "17,17": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "18,17": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "19,17": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "14,18": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,18": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "16,18": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "17,18": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "18,18": {
+            "tile_id": 7,
+            "name": "Sand",
+            "path": "game/terrain/sand.png"
+          },
+          "19,18": {
+            "tile_id": 5,
+            "name": "Dungeon",
+            "path": "game/terrain/dungeon.png",
+            "to_overworld": true
+          },
+          "14,19": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "15,19": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "16,19": {
+            "tile_id": 11,
+            "name": "Wall",
+            "path": "game/terrain/town_wall.png"
+          },
+          "17,19": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "18,19": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "19,19": {
+            "tile_id": 3,
+            "name": "Mountain",
+            "path": "game/terrain/mountain.png"
+          },
+          "13,9": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          },
+          "14,12": {
+            "tile_id": 47,
+            "name": "Sand Floor",
+            "path": "game/terrain/sand.png"
+          }
+        },
+        "template_label": "Tunnel Long"
+      },
       {
-        "name": "Shrine",
+        "name": "Shrine of Lanis",
         "width": 16,
         "height": 14,
         "tiles": {
@@ -5160,24 +4661,20 @@
             "path": "game/terrain/wall_copy.png"
           },
           "6,0": {
-            "tile_id": 51,
-            "name": "Lighter Bricks",
-            "path": "game/terrain/wall_copy.png"
+            "tile_id": 28,
+            "name": "Portal"
           },
           "7,0": {
-            "tile_id": 51,
-            "name": "Lighter Bricks",
-            "path": "game/terrain/wall_copy.png"
+            "tile_id": 28,
+            "name": "Portal"
           },
           "8,0": {
-            "tile_id": 51,
-            "name": "Lighter Bricks",
-            "path": "game/terrain/wall_copy.png"
+            "tile_id": 27,
+            "name": "Artifact"
           },
           "9,0": {
-            "tile_id": 51,
-            "name": "Lighter Bricks",
-            "path": "game/terrain/wall_copy.png"
+            "tile_id": 28,
+            "name": "Portal"
           },
           "10,0": {
             "tile_id": 51,
@@ -5480,14 +4977,12 @@
             "path": "game/terrain/town_floor.png"
           },
           "6,4": {
-            "tile_id": 51,
-            "name": "Lighter Bricks",
-            "path": "game/terrain/wall_copy.png"
+            "tile_id": 30,
+            "name": "Machine"
           },
           "7,4": {
             "tile_id": 10,
-            "name": "Floor",
-            "path": "game/terrain/town_floor.png"
+            "name": "Floor"
           },
           "8,4": {
             "tile_id": 10,
@@ -5495,9 +4990,8 @@
             "path": "game/terrain/town_floor.png"
           },
           "9,4": {
-            "tile_id": 51,
-            "name": "Lighter Bricks",
-            "path": "game/terrain/wall_copy.png"
+            "tile_id": 30,
+            "name": "Machine"
           },
           "10,4": {
             "tile_id": 10,

@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "id": "coming_of_age",
+    "name": "Coming of Age",
+    "author": "hyperbolic",
+    "description": "After running away from your home, you find yourself in a strange land with only a pocket full of rocks, polished sticks, and a few spells for defense. To your north is a town set in  a wild backdrop. You hear the sounds of gutteral grunts in the wind.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 64,
+    "map_height": 48,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "base_tile": "grass"
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "base_tile": "grass"
+    }
+  },
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "nettlevale",
+        "name": "Nettlevale",
+        "description": "A hillside town whose cobbled streets wind between stone cottages."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_vault"
+    },
+    "starting_quests": [
+      "reclaim"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Lost Tomb",
+        "key_name": "Jade Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "Thick vines choke the mouth of Lost Tomb. Beyond them, torchlight flickers in the gloom.",
+        "quest_type": "retrieve",
+        "quest_objective": "Purge Lost Tomb of evil and secure the Jade Key",
+        "quest_hint": "Dark forces have claimed this place as their own.",
+        "kill_target": "",
+        "kill_count": 0
+      }
+    ]
+  }
+}
