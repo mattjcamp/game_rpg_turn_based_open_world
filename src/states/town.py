@@ -910,33 +910,43 @@ class TownState(InventoryMixin, BaseState):
         self._spawn_interior_quest_collect_items(interior_name, imap)
         self._spawn_interior_quest_monsters(interior_name, imap)
 
-        # Collect exit positions and interior-to-interior links from tiles.
-        # Also track which tile links back to the source interior so we can
-        # spawn the party near the correct door.
+        # Build unified links from the interior tile flags, then derive
+        # the exit/interior-link sets from them.
+        from src.tile_map import TileMap as _TM
+        imap.links = _TM.build_links_from_sparse_tiles(
+            interior.get("tiles", {}), source_map=interior_name,
+            tile_context="town")
+
+        # Derive the legacy sets from unified links
         self._interior_exit_positions = set()
         self._interior_overworld_exits = set()
         interior_links = {}
-        entry_placed = False
-        first_walkable = None
         exit_positions = []
-        back_link_pos = None  # tile that links back to source interior
+        for pos, lnk in imap.links.items():
+            lt = lnk.get("target_type", "")
+            if lt == "to_town":
+                self._interior_exit_positions.add(pos)
+                exit_positions.append(pos)
+            elif lt == "overworld":
+                self._interior_overworld_exits.add(pos)
+                exit_positions.append(pos)
+            if lt == "interior":
+                interior_links[pos] = lnk["target_map"]
+
+        # Find the tile that links back to the source interior we came
+        # from so we can spawn near the correct door.
+        back_link_pos = None
         source_name = source_interior_name
+        for pos, tgt in interior_links.items():
+            if source_name and tgt == source_name:
+                back_link_pos = pos
+                break
+
+        # Track first walkable tile as fallback spawn point
+        first_walkable = None
         for pos_key, td in interior.get("tiles", {}).items():
             parts = pos_key.split(",")
             c, r = int(parts[0]), int(parts[1])
-            if td.get("to_town"):
-                self._interior_exit_positions.add((c, r))
-                exit_positions.append((c, r))
-            if td.get("to_overworld"):
-                self._interior_overworld_exits.add((c, r))
-                exit_positions.append((c, r))
-            if td.get("interior"):
-                interior_links[(c, r)] = td["interior"]
-                # If this tile links back to the source interior we came
-                # from, prefer spawning near it.
-                if source_name and td["interior"] == source_name:
-                    back_link_pos = (c, r)
-            # Track any walkable tile as fallback spawn point
             tid = td.get("tile_id")
             if first_walkable is None and tid is not None:
                 from src.settings import TILE_DEFS

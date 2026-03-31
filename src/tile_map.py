@@ -38,7 +38,117 @@ class TileMap:
         self.tile_links = {}          # (col, row) -> {"interior": name, ...}
         self.overworld_interiors = [] # list of interior dicts
 
-    # ── Tile link helpers ────────────────────────────────────────
+        # ── Unified link system ──────────────────────────────────
+        # All map transitions are stored in a single dict so every link
+        # is self-describing regardless of whether it connects an
+        # overworld to a town, a town to a shop, or an interior to an
+        # interior.
+        #
+        # Format:
+        #   (col, row) -> {
+        #       "target_map":  str   — name of destination map/interior
+        #       "target_type": str   — "town"|"dungeon"|"building"|
+        #                              "interior"|"overworld"|"to_town"
+        #       "target_pos":  (c,r) — where to place party in destination
+        #                              (None = auto-resolve)
+        #       "source_map":  str   — name of THIS map
+        #       "source_pos":  (c,r) — position of THIS link tile
+        #       "sub_interior": str  — specific room within building (opt)
+        #   }
+        self.links = {}  # (col, row) -> link dict
+
+    # ── Unified link helpers ─────────────────────────────────────
+
+    def get_link(self, col, row):
+        """Return the unified link at (col, row), or None."""
+        return self.links.get((col, row))
+
+    def get_links_by_type(self, *target_types):
+        """Return all links whose target_type is in *target_types*.
+
+        Returns a dict: (col, row) -> link_dict.
+        """
+        return {
+            pos: lnk for pos, lnk in self.links.items()
+            if lnk.get("target_type") in target_types
+        }
+
+    def get_exit_positions(self):
+        """Return the set of (col, row) that are exit links
+        (to_overworld or to_town).
+        """
+        return {
+            pos for pos, lnk in self.links.items()
+            if lnk.get("target_type") in ("overworld", "to_town")
+        }
+
+    def get_interior_links(self):
+        """Return {(col,row): target_map_name} for interior-to-interior
+        links — the subset of links that lead to another interior space.
+        """
+        return {
+            pos: lnk["target_map"]
+            for pos, lnk in self.links.items()
+            if lnk.get("target_type") == "interior"
+        }
+
+    @staticmethod
+    def build_links_from_sparse_tiles(tiles_dict, source_map="",
+                                       tile_context="overworld"):
+        """Scan a sparse tile dict and return a unified links dict.
+
+        This converts the legacy per-tile flags (``interior``,
+        ``to_overworld``, ``to_town``) into unified link entries.
+
+        *tile_context* controls how exits are typed:
+          - ``"town"`` → exit tiles become ``target_type="to_town"``
+          - anything else → exit tiles become ``target_type="overworld"``
+        """
+        links = {}
+        for pos_key, td in tiles_dict.items():
+            if not isinstance(td, dict):
+                continue
+            # Parse position key
+            if isinstance(pos_key, tuple):
+                c, r = pos_key
+            elif isinstance(pos_key, str) and "," in pos_key:
+                parts = pos_key.split(",")
+                if len(parts) != 2:
+                    continue
+                try:
+                    c, r = int(parts[0]), int(parts[1])
+                except ValueError:
+                    continue
+            else:
+                continue
+
+            if td.get("to_overworld"):
+                links[(c, r)] = {
+                    "target_map": source_map or "overworld",
+                    "target_type": "overworld",
+                    "target_pos": None,
+                    "source_map": source_map,
+                    "source_pos": (c, r),
+                }
+            elif td.get("to_town"):
+                links[(c, r)] = {
+                    "target_map": source_map or "town",
+                    "target_type": "to_town",
+                    "target_pos": None,
+                    "source_map": source_map,
+                    "source_pos": (c, r),
+                }
+            if td.get("interior"):
+                links[(c, r)] = {
+                    "target_map": td["interior"],
+                    "target_type": "interior",
+                    "target_pos": None,
+                    "source_map": source_map,
+                    "source_pos": (c, r),
+                }
+        return links
+
+    # ── Legacy tile_links helpers (kept for editor compatibility) ──
 
     @staticmethod
     def normalize_tile_links(raw_links):
@@ -78,6 +188,31 @@ class TileMap:
             else:
                 result[key] = value
         return result
+
+    @staticmethod
+    def tile_links_to_unified(tile_links, source_map="overworld"):
+        """Convert legacy overworld tile_links to unified link format.
+
+        Takes the normalised tile_links dict ``{(col,row): {interior,
+        type, sub_interior}}`` and produces unified link entries.
+        """
+        links = {}
+        for pos, info in tile_links.items():
+            if not isinstance(info, dict):
+                continue
+            interior = info.get("interior", "")
+            if not interior:
+                continue
+            link_type = info.get("type", "")
+            links[pos] = {
+                "target_map": interior,
+                "target_type": link_type or "interior",
+                "target_pos": None,
+                "source_map": source_map,
+                "source_pos": pos,
+                "sub_interior": info.get("sub_interior", ""),
+            }
+        return links
 
     def get_tile(self, col, row):
         """Get tile ID at (col, row). Returns oob_tile for out-of-bounds."""
@@ -185,6 +320,9 @@ def load_static_overworld(module_path):
                 tmap.tile_links = TileMap.normalize_tile_links(
                     data.get("tile_links", {}))
                 tmap.overworld_interiors = data.get("interiors", [])
+                # Populate unified links from legacy tile_links
+                tmap.links = TileMap.tile_links_to_unified(
+                    tmap.tile_links, source_map="overworld")
                 return tmap
 
     # ── 2. Try overview_map.json (module editor format) ──
@@ -211,6 +349,9 @@ def load_static_overworld(module_path):
                 tmap.tile_links = TileMap.normalize_tile_links(
                     data.get("tile_links", {}))
                 tmap.overworld_interiors = data.get("interiors", [])
+                # Populate unified links from legacy tile_links
+                tmap.links = TileMap.tile_links_to_unified(
+                    tmap.tile_links, source_map="overworld")
                 return tmap
 
     return None

@@ -1401,22 +1401,31 @@ class DungeonState(InventoryMixin, BaseState):
         if tile_id == TILE_STAIRS:
             self.show_message("Stairs up! Press ESC to leave.", 2000)
 
-        # ── Interior links (custom dungeon level transitions) ──
-        interior_links = getattr(
-            self.dungeon_data.tile_map, "_interior_links", None
-        )
-        if interior_links and (col, row) in interior_links:
-            target_name = interior_links[(col, row)]
-            self._enter_interior_level(target_name)
-            return
+        # ── Check unified links for level transitions and exits ──
+        tmap = self.dungeon_data.tile_map
+        link = tmap.get_link(col, row)
+        _link_handled = False
+        if link:
+            lt = link.get("target_type", "")
+            if lt == "interior":
+                self._enter_interior_level(link["target_map"])
+                return
+            elif lt == "overworld":
+                self.show_message("Exit! Press ESC to leave.", 2000)
+                _link_handled = True
+        if not link and not _link_handled:
+            # Legacy fallback for maps without unified links
+            interior_links = getattr(tmap, "_interior_links", None)
+            if interior_links and (col, row) in interior_links:
+                self._enter_interior_level(interior_links[(col, row)])
+                return
+            custom_exits = getattr(tmap, "_custom_exit_doors", None)
+            if custom_exits and (col, row) in custom_exits:
+                self.show_message("Exit! Press ESC to leave.", 2000)
+                _link_handled = True
 
-        # ── Custom exit doors (to_overworld) ──
-        custom_exits = getattr(
-            self.dungeon_data.tile_map, "_custom_exit_doors", None
-        )
-        if custom_exits and (col, row) in custom_exits:
-            self.show_message("Exit! Press ESC to leave.", 2000)
-
+        if _link_handled:
+            pass  # exit message already shown
         elif tile_id == TILE_CHEST:
             pos = (col, row)
             if pos not in self.dungeon_data.opened_chests:

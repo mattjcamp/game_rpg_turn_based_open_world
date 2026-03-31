@@ -1056,15 +1056,15 @@ class OverworldState(InventoryMixin, BaseState):
                 return
             return  # no other tile events inside interiors
 
-        # ── Overworld tile_link check (highest priority) ──
-        # An explicit tile_link overrides any tile-type behaviour so the
+        # ── Overworld link check (highest priority) ──
+        # An explicit link overrides any tile-type behaviour so the
         # designer can place an interior/town entrance on any tile graphic.
         pcol, prow = party.col, party.row
         tmap = self.game.tile_map
-        link = tmap.tile_links.get((pcol, prow))
-        if link and link.get("interior"):
-            link_name = link["interior"]
-            link_type = link.get("type", "")
+        link = tmap.get_link(pcol, prow)
+        if link and link.get("target_map"):
+            link_name = link["target_map"]
+            link_type = link.get("target_type", "")
 
             # ── Building link — show action screen ──
             if link_type == "building":
@@ -1148,15 +1148,16 @@ class OverworldState(InventoryMixin, BaseState):
                 return
 
         elif tile_id in (TILE_DUNGEON, TILE_DUNGEON_CLEARED):
-            # Check if a tile_link points to a module dungeon
-            # (handles links without the "type" field set)
-            link = tmap.tile_links.get((pcol, prow))
-            if link and link.get("interior"):
-                ddef = self._find_module_dungeon_by_name(link["interior"])
+            # Check if a unified link points to a module dungeon
+            # (handles dungeon tiles that have an explicit link)
+            link = tmap.get_link(pcol, prow)
+            if link and link.get("target_map"):
+                ddef = self._find_module_dungeon_by_name(
+                    link["target_map"])
                 if ddef is not None:
                     visited = self.game.is_dungeon_visited(pcol, prow)
                     self.dungeon_action_info = {
-                        "name": ddef.get("name", link["interior"]),
+                        "name": ddef.get("name", link["target_map"]),
                         "description": ddef.get("description",
                             "A dark entrance leads underground."),
                         "visited": visited,
@@ -1287,21 +1288,20 @@ class OverworldState(InventoryMixin, BaseState):
 
         self.game.tile_map = imap
 
-        # Collect exit positions and interior-to-interior links
-        self._overworld_interior_exit_positions = set()
-        self._overworld_interior_links = {}
-        exit_positions = []
+        # Build unified links from interior tile flags and derive
+        # exit/interior-link sets from them.
+        from src.tile_map import TileMap as _TM
+        imap.links = _TM.build_links_from_sparse_tiles(
+            interior.get("tiles", {}), source_map=interior_name)
+        self._overworld_interior_exit_positions = imap.get_exit_positions()
+        self._overworld_interior_links = imap.get_interior_links()
+        exit_positions = list(self._overworld_interior_exit_positions)
         first_walkable = None
         entry_placed = False
 
         for pos_key, td in interior.get("tiles", {}).items():
             parts = pos_key.split(",")
             c, r = int(parts[0]), int(parts[1])
-            if td.get("to_overworld"):
-                self._overworld_interior_exit_positions.add((c, r))
-                exit_positions.append((c, r))
-            if td.get("interior"):
-                self._overworld_interior_links[(c, r)] = td["interior"]
             # Track any walkable tile as fallback spawn
             tid = td.get("tile_id")
             if first_walkable is None and tid is not None:
@@ -2092,11 +2092,7 @@ class OverworldState(InventoryMixin, BaseState):
                     # oob_tile also walls so camera edge is clean.
                     tmap = TileMap(lw, lh, default_tile=TILE_DWALL,
                                   oob_tile=TILE_DWALL)
-                    # Collect designer-placed links from tiles:
-                    #   to_overworld  — exit back to the overworld
-                    #   interior      — link to another named level
-                    overworld_exits = set()
-                    interior_links = {}  # (col,row) -> level_name
+                    # Parse tiles and collect designer-placed links
                     for pos_key, td in lv.get("tiles", {}).items():
                         parts = pos_key.split(",")
                         if len(parts) == 2:
@@ -2105,12 +2101,13 @@ class OverworldState(InventoryMixin, BaseState):
                                        if isinstance(td, dict) else td)
                             if 0 <= c < lw and 0 <= r < lh:
                                 tmap.set_tile(c, r, tile_id)
-                            if isinstance(td, dict):
-                                if td.get("to_overworld"):
-                                    overworld_exits.add((c, r))
-                                if td.get("interior"):
-                                    interior_links[(c, r)] = (
-                                        td["interior"])
+
+                    # Build unified links from tile flags
+                    from src.tile_map import TileMap as _TM2
+                    tmap.links = _TM2.build_links_from_sparse_tiles(
+                        lv.get("tiles", {}), source_map=lname)
+                    overworld_exits = tmap.get_exit_positions()
+                    interior_links = tmap.get_interior_links()
 
                     # ── Resolve entry point ──
                     # For the first level entering from the
@@ -2131,7 +2128,8 @@ class OverworldState(InventoryMixin, BaseState):
                                 continue
                             break
 
-                    # ── Store links on the tile map ──
+                    # ── Store legacy link attributes for backward
+                    # compatibility with dungeon.py code ──
                     tmap._custom_mode = True
                     if overworld_exits:
                         tmap._custom_exit_doors = overworld_exits

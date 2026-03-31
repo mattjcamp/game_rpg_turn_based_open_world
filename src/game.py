@@ -2001,6 +2001,24 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if tile_id == TILE_EXIT:
                 entry_col, entry_row = col, row
 
+        # Populate unified links on the tile_map
+        for pos, iname in interior_links.items():
+            tm.links[pos] = {
+                "target_map": iname,
+                "target_type": "interior",
+                "target_pos": None,
+                "source_map": town_name,
+                "source_pos": pos,
+            }
+        for pos in overworld_exits:
+            tm.links[pos] = {
+                "target_map": "overworld",
+                "target_type": "overworld",
+                "target_pos": None,
+                "source_map": town_name,
+                "source_pos": pos,
+            }
+
         return TownData(
             tile_map=tm,
             npcs=[],
@@ -2116,6 +2134,24 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 npc.home_col = nc
                 npc.home_row = nr
                 occupied.add((nc, nr))
+
+        # Populate unified links on the tile_map
+        for pos, iname in interior_links.items():
+            tm.links[pos] = {
+                "target_map": iname,
+                "target_type": "interior",
+                "target_pos": None,
+                "source_map": name,
+                "source_pos": pos,
+            }
+        for pos in overworld_exits:
+            tm.links[pos] = {
+                "target_map": "overworld",
+                "target_type": "overworld",
+                "target_pos": None,
+                "source_map": name,
+                "source_pos": pos,
+            }
 
         return TownData(
             tile_map=tm,
@@ -3000,6 +3036,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         tmap.tile_links = TileMap.normalize_tile_links(
             sdata.get("tile_links", {}))
         tmap.overworld_interiors = sdata.get("interiors", [])
+        # Refresh unified links from legacy tile_links
+        tmap.links = TileMap.tile_links_to_unified(
+            tmap.tile_links, source_map="overworld")
 
         # If the overview map tiles were also updated, refresh them
         # so the player sees the latest map layout.
