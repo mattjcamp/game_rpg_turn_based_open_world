@@ -1027,6 +1027,8 @@ class TownState(InventoryMixin, BaseState):
                 nc, nr = rng.choice(free)
                 npc.col = nc
                 npc.row = nr
+                npc.home_col = nc
+                npc.home_row = nr
                 occupied.add((nc, nr))
 
         return npcs
@@ -2783,6 +2785,11 @@ class TownState(InventoryMixin, BaseState):
                     town_dark = self.town_data == getattr(
                         self.game, "town_data", None)
 
+        _int_dark = getattr(self, "_in_interior", False)
+        print(f"[TOWN DEBUG] draw call: _in_interior={_int_dark}, "
+              f"town={self.town_data.name}, "
+              f"party=({self.game.party.col},{self.game.party.row}), "
+              f"map_size=({self.town_data.tile_map.width}x{self.town_data.tile_map.height})")
         renderer.draw_town_u3(
             self.game.party,
             self.town_data,
@@ -2792,6 +2799,7 @@ class TownState(InventoryMixin, BaseState):
             keys_inserted=getattr(self.game, "keys_inserted", 0),
             total_keys=self.game.get_total_keys(),
             shake_offset=(shake_x, shake_y),
+            interior_darkness=_int_dark,
         )
         # Pickpocket targeting overlay
         if self.pickpocket_targeting and self.pickpocket_targets:

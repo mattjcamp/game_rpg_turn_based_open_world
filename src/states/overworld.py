@@ -2714,6 +2714,7 @@ class OverworldState(InventoryMixin, BaseState):
             darkness_active=getattr(self.game, "darkness_active", False),
             overworld_npcs=ow_npcs,
             quest_effects=self.quest_effects,
+            interior_darkness=getattr(self, "_in_overworld_interior", False),
         )
         # ── Overworld NPC quest choice overlay ──
         if self.ow_quest_choice_active:

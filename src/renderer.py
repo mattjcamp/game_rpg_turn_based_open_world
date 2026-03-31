@@ -509,7 +509,8 @@ class Renderer(CombatEffectRendererMixin):
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False, darkness_active=False,
                       keys_inserted=0, total_keys=8,
-                      shake_offset=(0, 0)):
+                      shake_offset=(0, 0),
+                      interior_darkness=False):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
@@ -630,7 +631,7 @@ class Renderer(CombatEffectRendererMixin):
             cy = psr * ts + ts // 2 + sy
             self._u3_draw_overworld_party(cx, cy, party)
 
-        # ── 3b. darkness overlay (Keys of Shadow / nighttime) ──
+        # ── 3b. darkness overlay (Keys of Shadow / nighttime / interior) ──
         # After all keys are inserted and darkness_active is cleared,
         # the town is permanently lit — skip even normal night darkness.
         clock = party.clock
@@ -638,11 +639,63 @@ class Renderer(CombatEffectRendererMixin):
         has_infravision = party.has_effect("Infravision")
         has_galadriels = (party.has_effect("Galadriel's Light")
                           and party.galadriels_light_steps > 0)
-        if (not clock.is_day or darkness_active) and not darkness_lifted:
+
+        # ── Scan visible tiles once for all light-emitting features ──
+        from src.settings import TILE_DOOR, TILE_ALTAR, TILE_EXIT
+        torch_lights = []
+        feature_lights = []
+        for sr in range(rows):
+            for sc in range(cols):
+                wc = sc + off_c
+                wr = sr + off_r
+                tid = tile_map.get_tile(wc, wr)
+                if tid == TILE_WALL_TORCH:
+                    torch_lights.append((sc, sr, 5.0, 3.0))
+                elif tid == TILE_DOOR:
+                    feature_lights.append((sc, sr, 2.5, 2.0))
+                elif tid == TILE_ALTAR:
+                    feature_lights.append((sc, sr, 3.0, 2.5))
+                elif tid == TILE_EXIT:
+                    feature_lights.append((sc, sr, 2.0, 1.5))
+
+        # Auto-detect interior darkness: if torch tiles are visible in the
+        # viewport, the player is in a covered/underground area that has
+        # no sunlight.  The torches themselves are the signal.
+        if not interior_darkness and torch_lights:
+            interior_darkness = True
+
+        # DEBUG: print to terminal so we can verify this code is running
+        print(f"[DARKNESS DEBUG] interior_darkness={interior_darkness}, "
+              f"torch_lights={len(torch_lights)}, feature_lights={len(feature_lights)}, "
+              f"is_day={clock.is_day}, darkness_active={darkness_active}")
+
+        # Interior / torch-lit areas — always dark regardless of time
+        if interior_darkness:
+            print(f"[DARKNESS DEBUG] >>> ENTERING interior_darkness branch, "
+                  f"calling _draw_overworld_darkness with force_night=True, "
+                  f"extra_lights count={len(torch_lights) + len(feature_lights)}")
+            # DEBUG VISUAL: bright red box in top-left proves this branch runs
+            pygame.draw.rect(self.screen, (255, 0, 0),
+                             pygame.Rect(0, 0, 40, 40))
+            has_light = (party.get_equipped_name("light") is not None
+                         or has_infravision or has_galadriels)
+            extra_lights = torch_lights + feature_lights
+            self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
+                                          has_light=has_light,
+                                          force_night=True,
+                                          extra_lights=extra_lights)
+            if has_infravision and party.get_equipped_name("light") is None:
+                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
+            elif (has_galadriels
+                  and party.get_equipped_name("light") is None
+                  and not has_infravision):
+                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr)
+
+        elif (not clock.is_day or darkness_active) and not darkness_lifted:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
             # Build extra light sources from filled keyslots
-            extra_lights = []
+            extra_lights = torch_lights + feature_lights
             if keys_inserted > 0 and self._keyslot_index:
                 for (kc, kr), si in self._keyslot_index.items():
                     if si < keys_inserted:
@@ -651,25 +704,6 @@ class Renderer(CombatEffectRendererMixin):
                         ks_radius = 1.5 + 0.3 * keys_inserted
                         extra_lights.append(
                             (ksc, ksr, ks_radius, 1.5))
-
-            # ── Building torches — doors, altars, and exits emit light ──
-            # Scan visible tiles for light-emitting features; each gets
-            # a warm glow so buildings look inviting at night.
-            from src.settings import TILE_DOOR, TILE_ALTAR, TILE_EXIT
-            for sr in range(rows):
-                for sc in range(cols):
-                    wc = sc + off_c
-                    wr = sr + off_r
-                    tid = tile_map.get_tile(wc, wr)
-                    if tid == TILE_DOOR:
-                        # Torch at the door — moderate warm glow
-                        extra_lights.append((sc, sr, 2.5, 2.0))
-                    elif tid == TILE_ALTAR:
-                        # Altar emits a softer, wider glow
-                        extra_lights.append((sc, sr, 3.0, 2.5))
-                    elif tid == TILE_EXIT:
-                        # Town gate torches — welcoming glow
-                        extra_lights.append((sc, sr, 2.0, 1.5))
 
             self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
                                           has_light=has_light,
@@ -2248,7 +2282,7 @@ class Renderer(CombatEffectRendererMixin):
                           unique_text="", unique_flash=0.0, unique_pos=None,
                           push_anim=None, repel_effect=None,
                           darkness_active=False, overworld_npcs=None,
-                          quest_effects=None):
+                          quest_effects=None, interior_darkness=False):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -2476,16 +2510,57 @@ class Renderer(CombatEffectRendererMixin):
         # stays centred on the party sprite.
         psc_dark = psc + pad_x / ts
         psr_dark = psr + pad_y / ts
-        if not clock.is_day or darkness_active:
+
+        # ── Scan visible tiles once for all light-emitting features ──
+        from src.settings import TILE_DOOR, TILE_ALTAR, TILE_EXIT
+        px_off = pad_x / ts
+        py_off = pad_y / ts
+        torch_lights = []
+        feature_lights = []
+        for sr in range(rows):
+            for sc in range(cols):
+                wc = sc + off_c
+                wr = sr + off_r
+                tid = tile_map.get_tile(wc, wr)
+                if tid == TILE_WALL_TORCH:
+                    torch_lights.append((sc + px_off, sr + py_off, 5.0, 3.0))
+                elif tid == TILE_DOOR:
+                    feature_lights.append((sc + px_off, sr + py_off, 2.5, 2.0))
+                elif tid == TILE_ALTAR:
+                    feature_lights.append((sc + px_off, sr + py_off, 3.0, 2.5))
+                elif tid == TILE_EXIT:
+                    feature_lights.append((sc + px_off, sr + py_off, 2.0, 1.5))
+
+        # Auto-detect: torch tiles in viewport signal a covered area
+        if not interior_darkness and torch_lights:
+            interior_darkness = True
+
+        # Interior / torch-lit areas — always dark regardless of time
+        if interior_darkness:
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
+            extra_lights = torch_lights + feature_lights
             self._draw_overworld_darkness(clock, psc_dark, psr_dark, ts, cols, rows,
                                           has_light=has_light,
-                                          force_night=darkness_active)
-            # Apply infravision red tint when it's the active light source
+                                          force_night=True,
+                                          extra_lights=extra_lights)
             if has_infravision and party.get_equipped_name("light") is None:
                 self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
-            # Apply Galadriel's Light blue tint (when no torch or infravision)
+            elif (has_galadriels
+                  and party.get_equipped_name("light") is None
+                  and not has_infravision):
+                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
+
+        elif not clock.is_day or darkness_active:
+            has_light = (party.get_equipped_name("light") is not None
+                         or has_infravision or has_galadriels)
+            extra_lights = torch_lights + feature_lights
+            self._draw_overworld_darkness(clock, psc_dark, psr_dark, ts, cols, rows,
+                                          has_light=has_light,
+                                          force_night=darkness_active,
+                                          extra_lights=extra_lights)
+            if has_infravision and party.get_equipped_name("light") is None:
+                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
             elif (has_galadriels
                   and party.get_equipped_name("light") is None
                   and not has_infravision):

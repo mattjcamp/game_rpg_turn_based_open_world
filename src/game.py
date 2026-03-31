@@ -2107,6 +2107,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 nc, nr = rng.choice(free)
                 npc.col = nc
                 npc.row = nr
+                npc.home_col = nc
+                npc.home_row = nr
                 occupied.add((nc, nr))
 
         return TownData(
