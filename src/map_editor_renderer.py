@@ -620,9 +620,12 @@ def _draw_int_picker_overlay(renderer, data: Dict):
 
     interiors = data.get("int_pick_list", [])
     cursor = data.get("int_pick_cursor", 0)
+    scroll = data.get("int_pick_scroll", 0)
 
-    ow = min(GRID_W - 40, 300)
-    oh = min(GRID_H - 40, 40 + (1 + len(interiors)) * 28)
+    row_h = 28
+    max_visible = min(14, 1 + len(interiors))
+    ow = min(GRID_W - 40, 380)
+    oh = min(GRID_H - 40, 40 + max_visible * row_h)
     ox = GRID_X + (GRID_W - ow) // 2
     oy = GRID_Y + (GRID_H - oh) // 2
 
@@ -633,29 +636,63 @@ def _draw_int_picker_overlay(renderer, data: Dict):
 
     renderer._u3_text("LINK INTERIOR", ox + 10, oy + 6, _COL_ORANGE, f)
 
-    row_h = 28
     ly = oy + 32
+
     def _fmt_interior(entry):
         name = entry.get("name", "?")
         itype = entry.get("type", "")
+        sub = entry.get("sub_interior", "")
+        if sub:
+            # Sub-interior: show indented under its parent
+            return f"    {name} / {sub}"
         if itype:
             return f"[{itype.capitalize()}] {name}"
         return name
+
     options = ["(none)"] + [_fmt_interior(i) for i in interiors]
-    for i, label in enumerate(options):
-        y = ly + i * row_h
-        if y + row_h > oy + oh:
+    n_options = len(options)
+
+    # Auto-scroll so cursor stays visible
+    visible_rows = (oh - 40) // row_h
+    if cursor < scroll:
+        scroll = cursor
+    elif cursor >= scroll + visible_rows:
+        scroll = cursor - visible_rows + 1
+    scroll = max(0, min(scroll, n_options - visible_rows))
+
+    for vi in range(visible_rows):
+        i = scroll + vi
+        if i >= n_options:
             break
+        y = ly + vi * row_h
         is_sel = (i == cursor)
         if is_sel:
             bar = pygame.Surface((ow - 8, row_h - 2), pygame.SRCALPHA)
             bar.fill((_COL_LINK_INT[0], _COL_LINK_INT[1],
                       _COL_LINK_INT[2], 40))
             screen.blit(bar, (ox + 4, y))
-        nc = ((255, 100, 100) if i == 0
-              else (_COL_LABEL_SEL if is_sel else _COL_LABEL_NORMAL))
+        # Sub-interiors get a dimmer default color
+        entry = interiors[i - 1] if i > 0 else None
+        is_sub = entry and entry.get("sub_interior") if entry else False
+        if i == 0:
+            nc = (255, 100, 100)
+        elif is_sel:
+            nc = _COL_LABEL_SEL
+        elif is_sub:
+            nc = (140, 160, 180)
+        else:
+            nc = _COL_LABEL_NORMAL
         prefix = "> " if is_sel else "  "
-        renderer._u3_text(f"{prefix}{label}", ox + 10, y + 4, nc, fs)
+        renderer._u3_text(f"{prefix}{options[i]}", ox + 10, y + 4,
+                          nc, fs)
+
+    # Scroll indicators
+    if scroll > 0:
+        renderer._u3_text("  ...", ox + 10, ly - 12,
+                          (120, 120, 140), fs)
+    if scroll + visible_rows < n_options:
+        renderer._u3_text("  ...", ox + 10, ly + visible_rows * row_h,
+                          (120, 120, 140), fs)
 
 
 def _draw_int_link_picker_overlay(renderer, data: Dict):

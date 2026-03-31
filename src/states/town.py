@@ -263,15 +263,22 @@ class TownState(InventoryMixin, BaseState):
         # We'll save the overworld position so we can restore it on exit
         self.overworld_col = 0
         self.overworld_row = 0
+        self._auto_interior = None  # set by enter_town for direct links
 
-    def enter_town(self, town_data, overworld_col, overworld_row):
+    def enter_town(self, town_data, overworld_col, overworld_row,
+                   auto_interior=None):
         """
         Set up the town state with town-specific data.
         Called before change_state so the town knows what to load.
+
+        If *auto_interior* is a string, the town will immediately
+        transition into that named interior after loading (used when
+        the overworld links directly to a sub-interior like a tunnel).
         """
         self.town_data = town_data
         self.overworld_col = overworld_col
         self.overworld_row = overworld_row
+        self._auto_interior = auto_interior
 
     def enter(self):
         """Called when this state becomes active."""
@@ -309,6 +316,15 @@ class TownState(InventoryMixin, BaseState):
             self._refresh_quest_highlights()
             # Spawn quest monsters registered for this town
             self._spawn_town_quest_monsters()
+
+            # If the overworld linked directly to a sub-interior
+            # (e.g. a specific tunnel), auto-enter it now.
+            auto = getattr(self, "_auto_interior", None)
+            if auto:
+                self._auto_interior = None
+                self._enter_interior(auto,
+                                     self.game.party.col,
+                                     self.game.party.row)
 
     def _check_quest_monster_kills(self):
         """After returning from combat in an interior, check if the killed
@@ -731,18 +747,33 @@ class TownState(InventoryMixin, BaseState):
             self._exit_town()
             return
 
-    def _try_tile_interaction(self, col, row):
-        """Check if a non-walkable tile has an interaction defined in TILE_DEFS.
+        # Check for walkable tile interactions (e.g. signs the player
+        # steps onto rather than bumps into).
+        self._try_tile_interaction(party.col, party.row,
+                                   walkable_only=True)
 
-        Called when the player bumps into a non-walkable tile.  Looks up the
-        tile's interaction_type from TILE_DEFS and triggers the appropriate
-        action (shop, sign, etc.).
+    def _try_tile_interaction(self, col, row, walkable_only=False):
+        """Check if a tile has an interaction defined in TILE_DEFS.
+
+        Called when the player bumps into a non-walkable tile, or when
+        they step onto a walkable tile that carries an interaction
+        (e.g. a sign).
+
+        When *walkable_only* is True only interactions on walkable
+        tiles fire (used by _check_tile_events to avoid duplicate
+        triggers for non-walkable tiles).
         """
         from src.settings import TILE_DEFS
         tile_id = self.town_data.tile_map.get_tile(col, row)
         tdef = TILE_DEFS.get(tile_id)
         if not tdef:
             return
+
+        # When called from _check_tile_events (walkable_only=True)
+        # skip non-walkable tiles — those are handled by the bump path.
+        if walkable_only and not tdef.get("walkable", False):
+            return
+
         itype = tdef.get("interaction_type", "")
         if not itype or itype == "none":
             return

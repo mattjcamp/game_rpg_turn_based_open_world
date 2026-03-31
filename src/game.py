@@ -160,6 +160,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             {"label": "QUIT GAME", "action": self._title_quit},
         ]
 
+        # --- Intro screen (shown between title and gameplay on new game) ---
+        self.showing_intro = False
+        self._intro_elapsed = 0.0
+        self._intro_module_name = ""
+        self._intro_module_desc = ""
+        self._intro_fading_out = False   # True once player presses key
+        self._intro_fade_elapsed = 0.0   # seconds since fade-out began
+
         # --- Module selection screen ---
         self.showing_modules = False
         self.module_cursor = 0
@@ -749,8 +757,23 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         self._game_started = True
         self.showing_title = False
-        self.change_state("overworld")
-        self.camera.update(self.party.col, self.party.row)
+
+        # Show a dramatic intro screen with the module name and lore
+        # before dropping the player into the overworld.
+        meta = {}
+        if self.module_manifest:
+            meta = self.module_manifest.get("metadata", {})
+        mod_name = meta.get("name", self.active_module_name or "")
+        mod_desc = meta.get("description", "")
+        if mod_name or mod_desc:
+            self._intro_module_name = mod_name
+            self._intro_module_desc = mod_desc
+            self._intro_elapsed = 0.0
+            self.showing_intro = True
+        else:
+            # No module metadata — skip straight to game
+            self.change_state("overworld")
+            self.camera.update(self.party.col, self.party.row)
 
     @staticmethod
     def _generate_window_icon():
@@ -3631,7 +3654,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         # ── Build interior list from module towns, dungeons, etc. ──
         # Each entry is {"name": str, "type": str} so the picker can
-        # display available link targets.
+        # display available link targets.  Sub-interiors (town
+        # interiors, building spaces) are included with a
+        # "sub_interior" key so the overworld can link directly to
+        # a specific room inside a town or building.
         interior_list = []
         mod = self.module_list[self.module_cursor]
         self._load_module_towns(mod["path"])
@@ -3642,6 +3668,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     "name": tname,
                     "type": "town",
                 })
+                # Add each town interior as a linkable sub-target
+                for sub in town.get("interiors", []):
+                    sname = sub.get("name", "")
+                    if sname:
+                        interior_list.append({
+                            "name": tname,
+                            "type": "town",
+                            "sub_interior": sname,
+                        })
         self._load_module_dungeons(mod["path"])
         for dng in self._mod_dungeon_list:
             dname = dng.get("name", "")
@@ -3658,6 +3693,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     "name": bname,
                     "type": "building",
                 })
+                # Add each building space as a linkable sub-target
+                for space in bldg.get("spaces", []):
+                    spname = space.get("name", "")
+                    if spname and spname != bname:
+                        interior_list.append({
+                            "name": bname,
+                            "type": "building",
+                            "sub_interior": spname,
+                        })
 
         # ── Load existing tile links ──
         tile_links = self._mod_overview_map.get("tile_links", {})
@@ -5519,7 +5563,34 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            if self.showing_title:
+            if self.showing_intro:
+                # Intro screen — dramatic module name / description
+                self._intro_elapsed += dt
+                if self._intro_fading_out:
+                    # Crossfade: advance fade timer, update overworld underneath
+                    self._intro_fade_elapsed += dt
+                    fade_duration = 1.5
+                    if self._intro_fade_elapsed >= fade_duration:
+                        # Fade complete — hand off fully to overworld
+                        self.showing_intro = False
+                        self._intro_fading_out = False
+                    else:
+                        # Keep overworld state ticking while we fade
+                        self.current_state.update(dt)
+                        self.camera.update(
+                            self.party.col, self.party.row)
+                else:
+                    for event in events:
+                        if event.type == pygame.KEYDOWN:
+                            # Allow skip only after the text has faded in
+                            if self._intro_elapsed > 2.0:
+                                # Start fade-out and activate overworld underneath
+                                self._intro_fading_out = True
+                                self._intro_fade_elapsed = 0.0
+                                self.change_state("overworld")
+                                self.camera.update(
+                                    self.party.col, self.party.row)
+            elif self.showing_title:
                 # Title screen intercepts all input
                 for event in events:
                     self._handle_title_input(event)
@@ -5640,6 +5711,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 if self.quick_save_msg_timer <= 0:
                     self.quick_save_message = None
             if (not self.showing_settings and not self.showing_title
+                    and not self.showing_intro
                     and not self.showing_game_over
                     and not self.showing_char_create
                     and not self.showing_form_party
@@ -5651,7 +5723,24 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
             # --- Draw ---
             self.screen.fill(COLOR_BLACK)
-            if self.showing_title:
+            if self.showing_intro:
+                if self._intro_fading_out:
+                    # Draw overworld underneath first
+                    self.current_state.draw(self.renderer)
+                    # Then overlay the intro with decreasing opacity
+                    fade_progress = min(1.0,
+                        self._intro_fade_elapsed / 1.5)
+                    self.renderer.draw_intro_screen(
+                        self._intro_module_name,
+                        self._intro_module_desc,
+                        self._intro_elapsed,
+                        fade_out=fade_progress)
+                else:
+                    self.renderer.draw_intro_screen(
+                        self._intro_module_name,
+                        self._intro_module_desc,
+                        self._intro_elapsed)
+            elif self.showing_title:
                 mod_info = f"Module: {self.active_module_name} v{self.active_module_version}"
                 self.renderer.draw_title_screen(
                     self.title_options, self.title_cursor,

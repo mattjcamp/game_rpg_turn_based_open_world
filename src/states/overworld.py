@@ -1067,8 +1067,13 @@ class OverworldState(InventoryMixin, BaseState):
                 if building_def is not None:
                     spaces = building_def.get("spaces", [])
                     if spaces:
+                        sub = link.get("sub_interior", "")
+                        display_name = (
+                            f"{building_def.get('name', link_name)}"
+                            f" / {sub}" if sub else
+                            building_def.get("name", link_name))
                         self.building_action_info = {
-                            "name": building_def.get("name", link_name),
+                            "name": display_name,
                             "description": building_def.get("description",
                                 "A structure stands before you."),
                         }
@@ -1076,6 +1081,7 @@ class OverworldState(InventoryMixin, BaseState):
                             "building_def": building_def,
                             "col": pcol,
                             "row": prow,
+                            "sub_interior": sub,
                         }
                         self.building_action_cursor = 0
                         self.building_action_active = True
@@ -1105,13 +1111,20 @@ class OverworldState(InventoryMixin, BaseState):
                     self.dungeon_action_active = True
                     return
 
-            # ── Town link ──
+            # ── Town link (optionally targeting a sub-interior) ──
             town_match = self._find_town_by_name(link_name)
             if town_match is not None:
                 # Ensure the town is registered at this tile position
                 # so get_town_at() finds it during _show_town_action.
                 if (pcol, prow) not in self.game.town_data_map:
                     self.game.town_data_map[(pcol, prow)] = town_match
+                # If the link targets a specific sub-interior, stash
+                # it so _enter_town_confirmed can auto-enter it.
+                sub = link.get("sub_interior", "")
+                if sub:
+                    self._pending_sub_interior = sub
+                else:
+                    self._pending_sub_interior = ""
                 self._show_town_action()
                 return
             self._enter_overworld_interior(
@@ -2142,8 +2155,16 @@ class OverworldState(InventoryMixin, BaseState):
         # Update game.town_data to the town being entered (for
         # downstream code that reads it, like victory messages)
         self.game.town_data = town_data
+
+        # If a sub-interior was requested (e.g. overworld tile linked
+        # directly to a tunnel inside this town), tell the town state
+        # to auto-enter it once the town loads.
+        sub = getattr(self, "_pending_sub_interior", "")
+        if sub:
+            self._pending_sub_interior = ""
         town_state = self.game.states["town"]
-        town_state.enter_town(town_data, pcol, prow)
+        town_state.enter_town(town_data, pcol, prow,
+                              auto_interior=sub or None)
         self.game.change_state("town")
 
     # ── Dungeon action screen ─────────────────────────────────
@@ -2378,7 +2399,15 @@ class OverworldState(InventoryMixin, BaseState):
             if not replaced:
                 interiors.append(new_entry)
         src_tmap.overworld_interiors = interiors
-        entrance_name = spaces[0].get("name", building_def.get("name", ""))
+        # Use the sub_interior if specified, otherwise default to
+        # the first space in the building.
+        sub = args.get("sub_interior", "")
+        if sub:
+            # Find the matching space by name
+            entrance_name = sub
+        else:
+            entrance_name = spaces[0].get("name",
+                                          building_def.get("name", ""))
         bldg_name = building_def.get("name", "")
         self._enter_overworld_interior(entrance_name, pcol, prow,
                                        building_name=bldg_name)

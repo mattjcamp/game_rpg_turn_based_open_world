@@ -48,6 +48,7 @@ class Renderer(CombatEffectRendererMixin):
         self.font = pygame.font.SysFont("liberationsans", 18)
         self.font_med = pygame.font.SysFont("liberationsans", 16)
         self.font_small = pygame.font.SysFont("liberationsans", 14)
+        self.font_large = pygame.font.SysFont("liberationsans", 46)
         self.font_mono = pygame.font.SysFont("liberationmono", 14)
 
         # Load unified tile manifest — single source of truth for all sprites
@@ -1097,7 +1098,8 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_altar_tile(px, py, ts)
 
         elif tile_id in (TILE_DFLOOR, TILE_DWALL, TILE_DDOOR, TILE_STAIRS,
-                         TILE_STAIRS_DOWN, TILE_TRAP):
+                         TILE_STAIRS_DOWN, TILE_TRAP,
+                         TILE_PORTAL, TILE_ARTIFACT):
             # Interior/dungeon tiles — delegate to the dungeon renderer
             # so they get proper textured rendering instead of flat color.
             self._u3_draw_dungeon_tile(tile_id, px, py, ts, wc, wr)
@@ -7184,6 +7186,162 @@ class Renderer(CombatEffectRendererMixin):
     # ========================================================
     # PARTY SCREEN  –  Ultima III retro style (P key overlay)
     # ========================================================
+
+    # ── Intro screen (new game cinematic) ──────────────────────
+
+    def draw_intro_screen(self, module_name, module_desc, elapsed,
+                          fade_out=0.0):
+        """Draw a dramatic intro screen with module name and description.
+
+        Shown briefly when starting a new game so the player sees the
+        module's title and lore text before gameplay begins.
+
+        Parameters
+        ----------
+        fade_out : float  0.0 = fully visible, 1.0 = fully transparent.
+                   Used during the crossfade to gameplay.
+
+        Timeline:
+          0.0 – 1.5s  starfield fades in
+          1.0 – 2.5s  module name fades in (large, golden)
+          2.0 – 4.0s  description text fades in line by line
+          4.0+        "Press any key" prompt pulses
+        """
+        import math as _math
+
+        SW, SH = SCREEN_WIDTH, SCREEN_HEIGHT
+
+        # During fade-out we draw onto a temporary surface so we can
+        # alpha-blend the whole intro over whatever is already on screen.
+        if fade_out > 0:
+            intro_surf = pygame.Surface((SW, SH), pygame.SRCALPHA)
+            # Fill with black at fading alpha so the background darkens
+            bg_a = int(255 * max(0.0, 1.0 - fade_out))
+            intro_surf.fill((0, 0, 0, bg_a))
+            target = intro_surf
+        else:
+            self.screen.fill((0, 0, 0))
+            target = self.screen
+
+        # Master alpha multiplier (1.0 fully opaque → 0.0 fully gone)
+        master_alpha = max(0.0, 1.0 - fade_out)
+
+        # ── Starfield background (same seeds as title screen) ──
+        stars = [17, 53, 97, 131, 173, 211, 263, 307, 359, 401,
+                 449, 491, 541, 587, 631, 677, 719, 761, 809, 853,
+                 29, 67, 113, 157, 199, 241, 283, 331, 379, 421]
+        bg_alpha = min(1.0, elapsed / 1.5) * master_alpha
+        for i, seed in enumerate(stars):
+            sx = (seed * 7 + i * 41) % SW
+            sy = (seed * 13 + i * 67) % SH
+            phase = elapsed * (0.3 + i * 0.1) + seed
+            brightness = int((40 + 40 * _math.sin(phase)) * bg_alpha)
+            brightness = max(0, min(120, brightness))
+            c = (brightness, brightness, min(255, brightness + 20))
+            target.set_at((sx, sy), c)
+            if i % 4 == 0 and sx + 1 < SW:
+                target.set_at((sx + 1, sy),
+                              (c[0] // 2, c[1] // 2, c[2] // 2))
+
+        # ── Decorative top and bottom rules ──
+        rule_alpha = min(255, int(255 * min(1.0, max(0, elapsed - 0.8) / 1.0)
+                                  * master_alpha))
+        if rule_alpha > 0:
+            rule_surf = pygame.Surface((SW, 1), pygame.SRCALPHA)
+            rule_surf.fill((120, 100, 60, rule_alpha))
+            target.blit(rule_surf, (0, SH // 4 - 30))
+            target.blit(rule_surf, (0, SH * 3 // 4 + 30))
+
+        # ── Module name (large, golden, centred) ──
+        if module_name:
+            name_alpha = min(1.0, max(0, elapsed - 1.0) / 1.5) * master_alpha
+            if name_alpha > 0:
+                font_title = self.font_large if hasattr(self, 'font_large') \
+                    else self.font
+                name_surf = font_title.render(module_name, True,
+                                              (255, 220, 140))
+                # Create an alpha overlay for the fade
+                tmp = pygame.Surface(name_surf.get_size(),
+                                     pygame.SRCALPHA)
+                tmp.fill((255, 255, 255, int(255 * name_alpha)))
+                name_surf = name_surf.copy()
+                name_surf.blit(tmp, (0, 0),
+                               special_flags=pygame.BLEND_RGBA_MULT)
+                nx = (SW - name_surf.get_width()) // 2
+                ny = SH // 4
+                target.blit(name_surf, (nx, ny))
+
+                # Subtle glow beneath the title
+                glow = pygame.Surface((name_surf.get_width() + 40, 6),
+                                      pygame.SRCALPHA)
+                glow_a = int(40 * name_alpha *
+                             (0.7 + 0.3 * _math.sin(elapsed * 2.0)))
+                glow.fill((200, 160, 80, max(0, glow_a)))
+                target.blit(glow,
+                            (nx - 20,
+                             ny + name_surf.get_height() + 4))
+
+        # ── Description text (fades in line by line) ──
+        if module_desc:
+            desc_font = self.font if hasattr(self, 'font') \
+                else self.font_small
+            # Word-wrap
+            max_w = int(SW * 0.7)
+            words = module_desc.split()
+            lines = []
+            cur_line = ""
+            for word in words:
+                test = f"{cur_line} {word}".strip() if cur_line else word
+                tw, _ = desc_font.size(test)
+                if tw <= max_w:
+                    cur_line = test
+                else:
+                    if cur_line:
+                        lines.append(cur_line)
+                    cur_line = word
+            if cur_line:
+                lines.append(cur_line)
+
+            line_h = desc_font.get_linesize()
+            total_h = len(lines) * (line_h + 4)
+            start_y = SH // 2 - total_h // 4
+
+            for li, line_text in enumerate(lines):
+                # Each line fades in with a stagger
+                line_delay = 2.0 + li * 0.4
+                line_alpha = min(1.0, max(0,
+                    (elapsed - line_delay) / 1.0)) * master_alpha
+                if line_alpha <= 0:
+                    continue
+                # Slight upward drift as it appears
+                drift = int(8 * (1.0 - min(1.0, max(0,
+                    (elapsed - line_delay) / 1.0))))
+                col_val = int(200 * line_alpha)
+                line_col = (col_val,
+                            int(col_val * 0.9),
+                            int(col_val * 0.75))
+                ls = desc_font.render(line_text, True, line_col)
+                lx = (SW - ls.get_width()) // 2
+                ly = start_y + li * (line_h + 4) + drift
+                target.blit(ls, (lx, ly))
+
+        # ── "Press any key to begin" prompt ──
+        prompt_delay = 2.0
+        if elapsed > prompt_delay and master_alpha > 0.1:
+            pulse = 0.5 + 0.5 * _math.sin(elapsed * 3.0)
+            pa = int((100 + 100 * pulse) * master_alpha)
+            prompt_col = (pa, pa, int(pa * 0.8))
+            prompt_font = self.font_med if hasattr(self, 'font_med') \
+                else self.font
+            ps = prompt_font.render("Press any key to begin...",
+                                    True, prompt_col)
+            px = (SW - ps.get_width()) // 2
+            py = SH - 60
+            target.blit(ps, (px, py))
+
+        # ── During fade-out, composite the intro overlay onto the screen ──
+        if fade_out > 0:
+            self.screen.blit(intro_surf, (0, 0))
 
     def draw_title_screen(self, options, cursor, elapsed, module_info=None):
         """Draw the title screen with ASCII art, menu options, and animation.

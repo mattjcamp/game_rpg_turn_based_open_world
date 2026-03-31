@@ -557,6 +557,7 @@ class MapEditorState:
             # Overlay states
             "int_picking": self.int_picking,
             "int_pick_cursor": self.int_pick_cursor,
+            "int_pick_scroll": self.int_pick_scroll,
             "int_pick_list": self.interior_list,
             "int_link_picking": self.int_link_picking,
             "int_link_pick_list": self.int_link_pick_list,
@@ -688,8 +689,10 @@ class MapEditorInputHandler:
             existing = st.get_tile_link(st.cursor_col, st.cursor_row)
             if existing and existing.get("interior"):
                 link_name = existing["interior"]
+                link_sub = existing.get("sub_interior", "")
                 for pi, intr in enumerate(st.interior_list):
-                    if intr.get("name") == link_name:
+                    if (intr.get("name") == link_name
+                            and intr.get("sub_interior", "") == link_sub):
                         st.int_pick_cursor = 1 + pi
                         break
                 else:
@@ -761,11 +764,16 @@ class MapEditorInputHandler:
             else:
                 idx = st.int_pick_cursor - 1
                 if idx < len(interiors):
-                    st.set_tile_link(col, row, {
-                        "interior": interiors[idx].get("name",
-                                                       f"Interior {idx}"),
-                        "type": interiors[idx].get("type", "town"),
-                    })
+                    entry = interiors[idx]
+                    link_data = {
+                        "interior": entry.get("name",
+                                              f"Interior {idx}"),
+                        "type": entry.get("type", "town"),
+                    }
+                    sub = entry.get("sub_interior", "")
+                    if sub:
+                        link_data["sub_interior"] = sub
+                    st.set_tile_link(col, row, link_data)
             st.int_picking = False
         return None
 
