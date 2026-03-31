@@ -541,5 +541,44 @@
     ],
     "context": "town",
     "sprite": "objects/town_gate"
+  },
+  "57": {
+    "name": "Weapon Counter",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/counter",
+    "interaction_type": "shop",
+    "interaction_data": "weapon"
+  },
+  "58": {
+    "name": "Armor Counter",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/counter",
+    "interaction_type": "shop",
+    "interaction_data": "armor"
+  },
+  "59": {
+    "name": "Magic Shop",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/counter",
+    "interaction_type": "shop",
+    "interaction_data": "magic"
   }
 }

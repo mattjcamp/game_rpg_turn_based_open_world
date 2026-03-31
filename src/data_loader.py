@@ -158,6 +158,23 @@ def load_items(data_dir=None):
     return weapons, armors, item_info, shop_inventory
 
 
+def load_counters(data_dir=None):
+    """Load counters.json and return a dict mapping shop_type → list of item names.
+
+    Looks in *data_dir* first (if given), then falls back to ``data/``.
+    Each key in the JSON is a shop type (e.g. "general", "weapon")
+    and the value contains a "items" list of item names sold there.
+    """
+    try:
+        raw = _load_json("counters.json", data_dir)
+    except (OSError, ValueError):
+        return {}
+    counters = {}
+    for key, entry in raw.items():
+        counters[key] = list(entry.get("items", []))
+    return counters
+
+
 def load_races(data_dir=None):
     """Load races.json and return a dict keyed by race name.
 

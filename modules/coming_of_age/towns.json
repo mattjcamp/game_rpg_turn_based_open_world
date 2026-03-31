@@ -591,29 +591,29 @@
         "path": "game/terrain/path.png"
       },
       "17,4": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "18,4": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "19,4": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "20,4": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "21,4": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "22,4": {
         "tile_id": 46,
@@ -716,29 +716,29 @@
         "path": "game/terrain/path.png"
       },
       "17,5": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "18,5": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "19,5": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "20,5": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "21,5": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 8,
+        "name": "Bridge",
+        "path": "game/terrain/bridge.png"
       },
       "22,5": {
         "tile_id": 46,
@@ -841,29 +841,30 @@
         "path": "game/terrain/path.png"
       },
       "17,6": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "18,6": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "19,6": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "20,6": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 13,
+        "name": "Door",
+        "path": "game/terrain/town_door.png",
+        "interior": "Weapons & Armor Interior"
       },
       "21,6": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 49,
+        "name": "Brown Brick Wall",
+        "path": "unassigned/brick_wall_brown.png"
       },
       "22,6": {
         "tile_id": 46,
@@ -977,19 +978,18 @@
         "path": "game/terrain/path.png"
       },
       "19,7": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,7": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "21,7": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,7": {
         "tile_id": 46,
@@ -1102,19 +1102,18 @@
         "path": "game/terrain/path.png"
       },
       "19,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "20,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "21,8": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 46,
+        "name": "Path Floor",
+        "path": "game/terrain/path.png"
       },
       "22,8": {
         "tile_id": 46,
@@ -1213,28 +1212,23 @@
       },
       "16,9": {
         "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "name": "Sand Floor"
       },
       "17,9": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "18,9": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "19,9": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "20,9": {
-        "tile_id": 48,
-        "name": "Brown Floor",
-        "path": "game/terrain/floor_gray.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "21,9": {
         "tile_id": 48,
@@ -3329,14 +3323,8 @@
             "path": "game/dungeon/stone_floor.png"
           },
           "1,1": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
-          },
-          "1,2": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 57,
+            "name": "Weapon Counter"
           },
           "2,2": {
             "tile_id": 20,
@@ -3407,6 +3395,10 @@
             "tile_id": 12,
             "name": "Counter",
             "path": "game/terrain/town_counter.png"
+          },
+          "1,2": {
+            "tile_id": 10,
+            "name": "Floor"
           }
         },
         "template_label": "General Shop Interior",
@@ -5762,6 +5754,269 @@
           }
         },
         "template_label": "Shrine"
+      },
+      {
+        "name": "Weapons & Armor Interior",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "0,0": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "1,0": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "2,0": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "3,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,0": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "5,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,0": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "7,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,0": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "9,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,2": {
+            "tile_id": 26,
+            "name": "Door",
+            "path": "game/dungeon/dungeon_door.png",
+            "to_town": true
+          },
+          "9,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,4": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "7,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,4": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "5,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,4": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "3,4": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "2,4": {
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
+          },
+          "1,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "0,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "0,3": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "0,2": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "0,1": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "8,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "8,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "6,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "5,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "4,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "4,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "5,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "6,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "8,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "6,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "5,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "4,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,3": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "1,1": {
+            "tile_id": 57,
+            "name": "Weapon Counter"
+          },
+          "1,3": {
+            "tile_id": 58,
+            "name": "Armor Counter"
+          },
+          "1,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          }
+        },
+        "template_label": "General Shop Interior",
+        "npcs": [
+          {
+            "name": "Amy the Armorer",
+            "npc_type": "villager",
+            "sprite": "src/assets/game/characters/fighter.png",
+            "col": 8,
+            "row": 7,
+            "dialogue": [
+              "Walk up to a counter to see what we have for sale"
+            ],
+            "god_name": "The Divine",
+            "wander_range": 4
+          }
+        ]
       }
     ],
     "_action_import": "Map assigned",

@@ -2786,10 +2786,6 @@ class TownState(InventoryMixin, BaseState):
                         self.game, "town_data", None)
 
         _int_dark = getattr(self, "_in_interior", False)
-        print(f"[TOWN DEBUG] draw call: _in_interior={_int_dark}, "
-              f"town={self.town_data.name}, "
-              f"party=({self.game.party.col},{self.game.party.row}), "
-              f"map_size=({self.town_data.tile_map.width}x{self.town_data.tile_map.height})")
         renderer.draw_town_u3(
             self.game.party,
             self.town_data,

@@ -11,7 +11,7 @@ from collections import Counter
 from src.editor_types import (
     FieldEntry, FeaturesRenderState, SpellEditorRS, ItemEditorRS,
     MonsterEditorRS, TileEditorRS, GalleryEditorRS, PixelEditorRS,
-    MapEditorHubRS, TownEditorRS,
+    MapEditorHubRS, TownEditorRS, CounterEditorRS,
 )
 
 
@@ -105,6 +105,19 @@ class FeaturesEditor:
         self.item_fields = []
         self.item_buffer = ""
         self.item_scroll_f = 0
+
+        # --- Counters editor state ---
+        self.counter_list = []              # list of counter-type dicts
+        self.counter_cursor = 0
+        self.counter_scroll = 0
+        self.counter_editing = False
+        self.counter_field = 0
+        self.counter_fields = []
+        self.counter_buffer = ""
+        self.counter_scroll_f = 0
+        self.counter_item_list = []         # item names in selected counter
+        self.counter_item_cursor = 0
+        self.counter_item_scroll = 0
 
         # --- Monsters editor state ---
         self.mon_list = []                  # list of (name, data) tuples
@@ -228,6 +241,7 @@ class FeaturesEditor:
             {"label": "Modules", "icon": "M"},
             {"label": "Spells", "icon": "S"},
             {"label": "Items", "icon": "I"},
+            {"label": "Counters", "icon": "C"},
             {"label": "Monsters", "icon": "X"},
             {"label": "Maps", "icon": "E"},
         ]
@@ -1671,6 +1685,174 @@ class FeaturesEditor:
             if self.item_cursor >= len(self.item_list):
                 self.item_cursor = max(
                     0, len(self.item_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
+    # ── Counters Editor Methods ────────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def counters_path(self):
+        """Path to counters.json (module dir first, then default)."""
+        if self.game.active_module_path:
+            p = os.path.join(self.game.active_module_path, "counters.json")
+            if os.path.isfile(p):
+                return p
+        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "counters.json")
+
+    def load_counters(self):
+        """Load counters from counters.json into the editor."""
+        path = self.counters_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        counters = []
+        for key in sorted(data.keys()):
+            entry = data[key]
+            counters.append({
+                "_key": key,
+                "_name": entry.get("name", key),
+                "description": entry.get("description", ""),
+                "items": list(entry.get("items", [])),
+            })
+        self.counter_list = counters
+        self.counter_cursor = 0
+        self.counter_scroll = 0
+        self.counter_item_list = []
+        self.counter_item_cursor = 0
+        self.counter_item_scroll = 0
+
+    def save_counters(self):
+        """Write counter list back to JSON."""
+        path = self.counters_path()
+        data = {}
+        for counter in self.counter_list:
+            key = counter["_key"]
+            data[key] = {
+                "name": counter["_name"],
+                "description": counter.get("description", ""),
+                "items": list(counter.get("items", [])),
+            }
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            return False
+        return True
+
+    def build_counter_fields(self, counter):
+        """Build editable field list for a single counter type."""
+        FE = FieldEntry
+        fields = [
+            FE("-- Counter Type --", "_hdr1", "", "section", False),
+            FE("Key", "_key", counter.get("_key", ""), "text", False),
+            FE("Name", "_name", counter.get("_name", "")),
+            FE("Description", "description",
+               counter.get("description", "")),
+            FE("-- Items for Sale --", "_hdr2", "", "section", False),
+        ]
+        items = counter.get("items", [])
+        for i, item_name in enumerate(items):
+            fields.append(
+                FE(f"  Item {i + 1}", f"_item_{i}", item_name, "choice"))
+        self.counter_fields = fields
+        idx, buf = self.finalize_fields(fields)
+        self.counter_field = idx
+        self.counter_scroll_f = 0
+        self.counter_buffer = buf
+
+    def save_counter_fields(self):
+        """Apply edited fields back to the counter dict in memory."""
+        if self.counter_cursor >= len(self.counter_list):
+            return
+        counter = self.counter_list[self.counter_cursor]
+        if self.counter_fields:
+            entry = self.counter_fields[self.counter_field]
+            entry.value = self.counter_buffer
+        for entry in self.counter_fields:
+            key, val = entry.key, entry.value
+            if key.startswith("_") and key not in ("_name", "_key"):
+                if key.startswith("_item_"):
+                    # Update item in the items list
+                    try:
+                        idx = int(key.split("_")[2])
+                        items = counter.get("items", [])
+                        if 0 <= idx < len(items):
+                            items[idx] = val
+                    except (ValueError, IndexError):
+                        pass
+                continue
+            if key == "_key":
+                continue  # Key is read-only
+            counter[key] = val
+
+    def get_counter_choices(self, key):
+        """Return choice options for a counter field."""
+        if key.startswith("_item_"):
+            # Return all item names from items.json
+            return self._get_all_item_names()
+        return []
+
+    def _get_all_item_names(self):
+        """Return a sorted list of all item names from items.json."""
+        path = self.items_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        names = []
+        for section in ("weapons", "armors", "general"):
+            section_items = data.get(section, {})
+            if isinstance(section_items, dict):
+                names.extend(sorted(section_items.keys()))
+        return sorted(set(names))
+
+    def add_counter(self):
+        """Add a new blank counter type."""
+        key = f"custom_{len(self.counter_list) + 1}"
+        new_counter = {
+            "_key": key,
+            "_name": f"New Counter {len(self.counter_list) + 1}",
+            "description": "A new shop counter.",
+            "items": [],
+        }
+        self.counter_list.append(new_counter)
+        self.counter_cursor = len(self.counter_list) - 1
+
+    def remove_counter(self):
+        """Remove the currently selected counter type."""
+        if not self.counter_list:
+            return
+        idx = self.counter_cursor
+        if 0 <= idx < len(self.counter_list):
+            self.counter_list.pop(idx)
+            if self.counter_cursor >= len(self.counter_list):
+                self.counter_cursor = max(
+                    0, len(self.counter_list) - 1)
+
+    def counter_add_item(self):
+        """Add a new item slot to the currently selected counter."""
+        if self.counter_cursor >= len(self.counter_list):
+            return
+        counter = self.counter_list[self.counter_cursor]
+        items = counter.get("items", [])
+        items.append("Torch")
+        counter["items"] = items
+        # Rebuild fields to show the new item
+        self.build_counter_fields(counter)
+
+    def counter_remove_item(self):
+        """Remove the last item slot from the currently selected counter."""
+        if self.counter_cursor >= len(self.counter_list):
+            return
+        counter = self.counter_list[self.counter_cursor]
+        items = counter.get("items", [])
+        if items:
+            items.pop()
+            counter["items"] = items
+            self.build_counter_fields(counter)
 
     # ══════════════════════════════════════════════════════════
     # ── Monsters Editor Methods ────────────────────────────────
@@ -3714,6 +3896,10 @@ class FeaturesEditor:
                 self.active_editor = "items"
                 self.load_items()
                 self.level = 1
+            elif cat["label"] == "Counters":
+                self.active_editor = "counters"
+                self.load_counters()
+                self.level = 1
             elif cat["label"] == "Monsters":
                 self.active_editor = "monsters"
                 self.load_monsters()
@@ -4239,6 +4425,37 @@ class FeaturesEditor:
                 "on_discard_exit": None,
                 "on_clean_exit": None,
             }
+        elif ed == "counters":
+            return {
+                "list": lambda: self.counter_list,
+                "cursor": lambda: self.counter_cursor,
+                "set_cursor": lambda v: setattr(self, "counter_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "counter_scroll",
+                    self._adjust_scroll_generic(
+                        self.counter_cursor, self.counter_scroll)),
+                "fields": lambda: self.counter_fields,
+                "field_idx": lambda: self.counter_field,
+                "set_field_idx": lambda v: setattr(self, "counter_field", v),
+                "buffer": lambda: self.counter_buffer,
+                "set_buffer": lambda v: setattr(self, "counter_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "counter_scroll_f",
+                    self._adjust_field_scroll_generic(
+                        self.counter_field, self.counter_scroll_f)),
+                "build_fields": self.build_counter_fields,
+                "save_fields": self.save_counter_fields,
+                "save_disk": self.save_counters,
+                "set_editing": lambda v: setattr(self, "counter_editing", v),
+                "add": self.add_counter,
+                "remove": self.remove_counter,
+                "get_choices": self.get_counter_choices,
+                "needs_live_sync": False,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
+            }
         elif ed == "monsters":
             return {
                 "list": lambda: self.mon_list,
@@ -4494,6 +4711,19 @@ class FeaturesEditor:
                 field=self.item_field,
                 buffer=self.item_buffer,
                 field_scroll=self.item_scroll_f,
+            ),
+            counters=CounterEditorRS(
+                list=self.counter_list,
+                cursor=self.counter_cursor,
+                scroll=self.counter_scroll,
+                editing=self.counter_editing,
+                fields=self.counter_fields,
+                field=self.counter_field,
+                buffer=self.counter_buffer,
+                field_scroll=self.counter_scroll_f,
+                item_list=self.counter_item_list,
+                item_cursor=self.counter_item_cursor,
+                item_scroll=self.counter_item_scroll,
             ),
             monsters=MonsterEditorRS(
                 list=self.mon_list,

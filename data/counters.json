@@ -1,0 +1,86 @@
+{
+  "armor": {
+    "name": "Armor Shop",
+    "description": "Sells protective armor and shields.",
+    "items": [
+      "Cloth",
+      "Leather",
+      "Chain",
+      "Plate"
+    ]
+  },
+  "general": {
+    "name": "General Store",
+    "description": "Sells supplies, tools, and everyday adventuring gear.",
+    "items": [
+      "Torch",
+      "Rope",
+      "Lockpick",
+      "Camping Supplies",
+      "Healing Herb",
+      "Antidote",
+      "Arrows",
+      "Bolts",
+      "Stones"
+    ]
+  },
+  "guild": {
+    "name": "Guild Hall",
+    "description": "Specialised equipment and services for guild members.",
+    "items": [
+      "Lockpick",
+      "Smoke Bomb",
+      "Fire Oil",
+      "Poison Vial"
+    ]
+  },
+  "inn": {
+    "name": "Inn",
+    "description": "Offers rest and refreshment for weary travelers.",
+    "items": [
+      "Healing Herb",
+      "Camping Supplies"
+    ]
+  },
+  "magic": {
+    "name": "Magic Shop",
+    "description": "Sells scrolls, potions, and enchanted goods.",
+    "items": [
+      "Healing Potion",
+      "Mana Potion",
+      "Elixir of Strength",
+      "Elixir of Warding",
+      "Scroll of Fire",
+      "Holy Water"
+    ]
+  },
+  "reagent": {
+    "name": "Reagent Shop",
+    "description": "Sells magical reagents and alchemical ingredients.",
+    "items": [
+      "Serpent Root",
+      "Glowcap Mushroom",
+      "Moonpetal",
+      "Brimite Ore",
+      "Spring Water"
+    ]
+  },
+  "weapon": {
+    "name": "Weapons Shop",
+    "description": "Sells melee and ranged weapons for all classes.",
+    "items": [
+      "Club",
+      "Dagger",
+      "Mace",
+      "Sword",
+      "Spear",
+      "Short Bow",
+      "Long Bow",
+      "Sling",
+      "Crossbow",
+      "Arrows",
+      "Bolts",
+      "Stones"
+    ]
+  }
+}

@@ -664,26 +664,43 @@ class Renderer(CombatEffectRendererMixin):
         if not interior_darkness and torch_lights:
             interior_darkness = True
 
-        # DEBUG: print to terminal so we can verify this code is running
-        print(f"[DARKNESS DEBUG] interior_darkness={interior_darkness}, "
-              f"torch_lights={len(torch_lights)}, feature_lights={len(feature_lights)}, "
-              f"is_day={clock.is_day}, darkness_active={darkness_active}")
-
         # Interior / torch-lit areas — always dark regardless of time
         if interior_darkness:
-            print(f"[DARKNESS DEBUG] >>> ENTERING interior_darkness branch, "
-                  f"calling _draw_overworld_darkness with force_night=True, "
-                  f"extra_lights count={len(torch_lights) + len(feature_lights)}")
-            # DEBUG VISUAL: bright red box in top-left proves this branch runs
-            pygame.draw.rect(self.screen, (255, 0, 0),
-                             pygame.Rect(0, 0, 40, 40))
             has_light = (party.get_equipped_name("light") is not None
                          or has_infravision or has_galadriels)
-            extra_lights = torch_lights + feature_lights
-            self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
-                                          has_light=has_light,
-                                          force_night=True,
-                                          extra_lights=extra_lights)
+            light_bonus = 3.0 if has_light else 0.0
+            p_radius = 1.0 + light_bonus
+            p_fade = 1.5
+            all_lights = [(psc, psr, p_radius, p_fade)]
+            for el in (torch_lights + feature_lights):
+                all_lights.append(el)
+            # Cache a single reusable SRCALPHA tile for the fog overlay.
+            # (Large SRCALPHA surfaces don't blit visibly on SCALED displays,
+            #  but per-tile blits work correctly.)
+            _fog_tile = pygame.Surface((ts, ts), pygame.SRCALPHA)
+            for sr in range(rows):
+                for sc in range(cols):
+                    best_t = 999.0
+                    for lsc, lsr, lr, lf in all_lights:
+                        dx = sc - lsc
+                        dy = sr - lsr
+                        dist = math.sqrt(dx * dx + dy * dy)
+                        if dist <= lr:
+                            best_t = 0.0
+                            break
+                        elif lf > 0:
+                            t_val = (dist - lr) / lf
+                            if t_val < best_t:
+                                best_t = t_val
+                    if best_t <= 0.0:
+                        continue
+                    elif best_t >= 1.0:
+                        alpha = 255
+                    else:
+                        alpha = int(255 * best_t)
+                    alpha = max(0, min(255, alpha))
+                    _fog_tile.fill((0, 0, 0, alpha))
+                    self.screen.blit(_fog_tile, (sc * ts, sr * ts))
             if has_infravision and party.get_equipped_name("light") is None:
                 self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
             elif (has_galadriels
@@ -7881,6 +7898,13 @@ class Renderer(CombatEffectRendererMixin):
         item_fields = it.fields; item_field = it.field
         item_buffer = it.buffer; item_field_scroll = it.field_scroll
 
+        # ── Counters ──
+        ct = state.counters
+        counter_list = ct.list; counter_cursor = ct.cursor
+        counter_scroll = ct.scroll; counter_editing = ct.editing
+        counter_fields = ct.fields; counter_field = ct.field
+        counter_buffer = ct.buffer; counter_field_scroll = ct.field_scroll
+
         # ── Monsters ──
         mn = state.monsters
         mon_list = mn.list; mon_cursor = mn.cursor
@@ -8037,6 +8061,23 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(
                     "Changes are saved to data/items.json",
                     right_x + 16, dy, (140, 140, 160), fs)
+            elif selected_cat == "Counters":
+                self._u3_text("Counters", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Manage shop counter inventories.",
+                    "Each counter type defines which",
+                    "items are available for sale. Add",
+                    "and remove items from each list.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+                dy += 18
+                self._u3_text(
+                    "Changes are saved to data/counters.json",
+                    right_x + 16, dy, (140, 140, 160), fs)
             elif selected_cat == "Monsters":
                 self._u3_text("Monsters", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
@@ -8108,6 +8149,17 @@ class Renderer(CombatEffectRendererMixin):
                         right_x, panel_y, right_w, panel_h,
                         item_fields or [], item_field, item_buffer,
                         item_field_scroll, fm, fs, f)
+            elif ed == "counters":
+                self._draw_features_generic_list(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    counter_list or [], counter_cursor, counter_scroll,
+                    "Counters", None, fm, fs, f)
+                if level == 2:
+                    self._draw_features_spell_editor(
+                        right_x, panel_y, right_w, panel_h,
+                        counter_fields or [], counter_field,
+                        counter_buffer, counter_field_scroll,
+                        fm, fs, f)
             elif ed == "monsters":
                 self._draw_features_generic_list(
                     left_x, left_w, right_x, right_w, panel_y, panel_h,
@@ -12312,6 +12364,8 @@ class Renderer(CombatEffectRendererMixin):
                     sub = item["_section"].title()
                 elif "hp" in item:
                     sub = f"HP {item['hp']}  AC {item['ac']}"
+                elif "items" in item and isinstance(item["items"], list):
+                    sub = f"{len(item['items'])} items"
                 elif "_tile_id" in item:
                     sub = ""
                 if sub:
@@ -12493,9 +12547,26 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(walk_str,
                               right_x + 16, dy, (180, 180, 200), fs)
                 dy += 22
+            elif "items" in item and isinstance(item["items"], list):
+                # Counter type — show items for sale
+                items = item["items"]
+                self._u3_text(f"Items for sale ({len(items)}):",
+                              right_x + 16, dy, (160, 160, 180), fm)
+                dy += 22
+                max_show = min(len(items), 12)
+                for i in range(max_show):
+                    self._u3_text(f"  {items[i]}",
+                                  right_x + 16, dy,
+                                  (140, 180, 140), fs)
+                    dy += 18
+                if len(items) > max_show:
+                    self._u3_text(
+                        f"  ... and {len(items) - max_show} more",
+                        right_x + 16, dy, (120, 120, 140), fs)
+                    dy += 18
 
         # Footer — Ctrl+N duplicates for tiles, adds new for items/monsters
-        add_label = "Add" if title in ("Items", "Monsters") else "Duplicate"
+        add_label = "Add" if title in ("Items", "Monsters", "Counters") else "Duplicate"
         hint = (f"[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] {add_label}"
                 "  [Ctrl+D] Delete  [Esc] Back")
         self._u3_text(hint,
@@ -16068,15 +16139,16 @@ class Renderer(CombatEffectRendererMixin):
         else:
             return  # daytime — nothing to draw
 
-        fog = pygame.Surface((cols * ts, rows * ts), pygame.SRCALPHA)
-
-        fade_end = light_radius + fade_tiles
-
         # Build list of all light sources: (screen_col, screen_row, radius, fade)
         all_lights = [(party_sc, party_sr, light_radius, fade_tiles)]
         if extra_lights:
             for el in extra_lights:
                 all_lights.append(el)
+
+        # Use per-tile SRCALPHA blits (a single large SRCALPHA surface blit
+        # has no visual effect on SCALED displays).
+        _fog_tile = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        r, g, b = tint
 
         for sr in range(rows):
             for sc in range(cols):
@@ -16102,13 +16174,8 @@ class Renderer(CombatEffectRendererMixin):
                     alpha = int(max_alpha * best_t)
 
                 alpha = max(0, min(255, alpha))
-                r = tint[0]
-                g = tint[1]
-                b = tint[2]
-                rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
-                fog.fill((r, g, b, alpha), rect)
-
-        self.screen.blit(fog, (0, 0))
+                _fog_tile.fill((r, g, b, alpha))
+                self.screen.blit(_fog_tile, (sc * ts, sr * ts))
 
     # ═══════════════════════════════════════════════════════════════
     # PUSH SPELL EXPANDING-WAVE ANIMATION  (drawn on overworld map)

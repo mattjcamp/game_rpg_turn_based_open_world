@@ -309,6 +309,29 @@ class BuildingEditorRS:
 
 
 @dataclass
+class CounterEditorRS:
+    """Render-state for the Counters editor.
+
+    Two-level hierarchy:
+    - Counter type list     (level 1)
+    - Counter item list     (level 2) – items sold at this counter
+    - Item field editor     (level 3) – add/remove items from the list
+    """
+    list: Optional[List[dict]] = None       # list of counter-type dicts
+    cursor: int = 0
+    scroll: int = 0
+    editing: bool = False
+    fields: Optional[List[FieldEntry]] = None
+    field: int = 0
+    buffer: str = ""
+    field_scroll: int = 0
+    # Item sub-list for the selected counter
+    item_list: Optional[List[str]] = None
+    item_cursor: int = 0
+    item_scroll: int = 0
+
+
+@dataclass
 class QuestEditorRS:
     """Render-state for the Quest Editor.
 
@@ -379,4 +402,5 @@ class FeaturesRenderState:
     town_map_editor_data: Optional[dict] = None
     dungeon_map_editor_data: Optional[dict] = None
     building_map_editor_data: Optional[dict] = None
+    counters: CounterEditorRS = field(default_factory=CounterEditorRS)
     quests: 'QuestEditorRS' = field(default_factory=lambda: QuestEditorRS())

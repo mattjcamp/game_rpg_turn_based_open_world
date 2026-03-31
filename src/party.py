@@ -13,7 +13,7 @@ touching this code.
 import json
 import os
 
-from src.data_loader import load_items, load_races, _load_json
+from src.data_loader import load_items, load_races, load_counters, _load_json
 
 # ── Default data directory ────────────────────────────────────────
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +27,9 @@ WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items()
 
 # ── Load race definitions from data/races.json ────────────────────
 RACE_INFO = load_races()
+
+# ── Load counter inventories from data/counters.json ──────────────
+COUNTER_DATA = load_counters()
 
 # ── Load party config from data/party.json ────────────────────────
 _PARTY_JSON = os.path.join(_DEFAULT_DATA_DIR, "party.json")
@@ -140,15 +143,16 @@ def reload_module_data(module_data_dir=None):
     Also clears the class-template cache so classes are re-read from the
     module directory.
     """
-    global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY
+    global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY, COUNTER_DATA
     global RACE_INFO, EFFECTS_DATA, SPELLS_DATA, POTIONS_DATA
     global VALID_RACES, _module_data_dir
 
     _module_data_dir = module_data_dir
 
-    # Reload items, races
+    # Reload items, races, counters
     WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items(module_data_dir)
     RACE_INFO = load_races(module_data_dir)
+    COUNTER_DATA = load_counters(module_data_dir)
     VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 
     # Reload effects and spells — update dicts/lists *in place* so that
@@ -283,10 +287,19 @@ SHOP_TYPE_NAMES = {
 
 
 def get_shop_items(shop_type="general"):
-    """Return a list of item names from SHOP_INVENTORY appropriate for *shop_type*.
+    """Return a list of item names appropriate for *shop_type*.
 
-    Falls back to the full inventory if *shop_type* is unknown.
+    If counters.json defines a list for this shop_type, use that list
+    (filtered to items that actually exist in the shop inventory).
+    Otherwise falls back to category-based filtering from SHOP_INVENTORY.
     """
+    # Check counter data first (data-driven per-counter item lists)
+    if COUNTER_DATA and shop_type in COUNTER_DATA:
+        counter_items = COUNTER_DATA[shop_type]
+        # Only include items that exist in SHOP_INVENTORY (have buy prices)
+        return [name for name in counter_items if name in SHOP_INVENTORY]
+
+    # Fallback to category-based filtering
     allowed_cats = SHOP_TYPE_CATEGORIES.get(shop_type)
     if allowed_cats is None:
         return list(SHOP_INVENTORY.keys())
