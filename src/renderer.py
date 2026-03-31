@@ -8267,8 +8267,19 @@ class Renderer(CombatEffectRendererMixin):
                 self._draw_town_npc_list(
                     tw, rx, ry, rw, rh, fm, fs, f)
             elif sub_cursor == 2:
-                self._draw_town_enc_list(
-                    tw, rx, ry, rw, rh, fm, fs, f)
+                enc_edit_mode = tw.get("enc_edit_mode", 0)
+                if enc_edit_mode == 1:
+                    self._draw_enc_sub_screen(
+                        tw, rx, ry, rw, rh, fm, fs, f)
+                elif enc_edit_mode == 2:
+                    self._draw_enc_npc_list(
+                        tw, rx, ry, rw, rh, fm, fs, f)
+                elif enc_edit_mode == 3:
+                    self._draw_enc_npc_editor(
+                        tw, rx, ry, rw, rh, fm, fs, f)
+                else:
+                    self._draw_town_enc_list(
+                        tw, rx, ry, rw, rh, fm, fs, f)
 
         # ── Level 3: NPC field editor ──
         elif level == 3:
@@ -8537,15 +8548,53 @@ class Renderer(CombatEffectRendererMixin):
             "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Del  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
 
-    def _draw_town_npc_editor(self, tw, rx, ry, rw, rh, fm, fs, f):
-        """Draw the NPC field editor."""
-        fields = tw.get("npc_fields") or []
-        field_cursor = tw.get("npc_field_cursor", 0)
-        field_buffer = tw.get("npc_field_buffer", "")
-        field_scroll = tw.get("npc_field_scroll", 0)
-        sprite_map = tw.get("npc_sprite_map", {})
-        row_h = 38
-        max_visible = rh // row_h
+    def _wrap_text(self, text, font, max_w):
+        """Word-wrap *text* into a list of lines that each fit within *max_w* pixels."""
+        if not text:
+            return [""]
+        # Fast path – fits on one line
+        if font.size(text)[0] <= max_w:
+            return [text]
+        words = text.split(" ")
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip() if current else word
+            if font.size(test)[0] <= max_w:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                # If a single word exceeds max_w, force-break it
+                if font.size(word)[0] > max_w:
+                    while word:
+                        for i in range(len(word), 0, -1):
+                            if font.size(word[:i])[0] <= max_w:
+                                lines.append(word[:i])
+                                word = word[i:]
+                                break
+                        else:
+                            lines.append(word[0])
+                            word = word[1:]
+                    current = ""
+                else:
+                    current = word
+        if current:
+            lines.append(current)
+        return lines if lines else [""]
+
+    def _draw_npc_field_editor_common(self, fields, field_cursor,
+                                      field_buffer, field_scroll,
+                                      sprite_map, rx, ry, rw, rh,
+                                      fm, fs, f, save_flash=0):
+        """Shared NPC field editor rendering used by town, enclosure, and
+        building NPC editors.  Supports word-wrapped multi-line values."""
+        base_row_h = 38
+        line_h = fm.get_linesize() if hasattr(fm, 'get_linesize') else 18
+
+        # Clip to container
+        prev_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(rx, ry, rw, rh))
 
         npc_name = ""
         sprite_display_name = ""
@@ -8565,63 +8614,93 @@ class Renderer(CombatEffectRendererMixin):
             if preview:
                 px = rx + rw - 80
                 py = ry + 8
-                # Dark background behind preview
                 bg_rect = pygame.Rect(px - 4, py - 4, 72, 72)
                 pygame.draw.rect(self.screen, (30, 30, 40), bg_rect)
                 pygame.draw.rect(self.screen, (80, 80, 100), bg_rect, 1)
                 self.screen.blit(preview, (px, py))
 
         ly = ry + 44
+        val_x = rx + 140
+        max_val_w = rw - 140 - 16  # available width for value text
+        bottom_limit = ry + rh - 40  # leave room for hint bar
 
-        for vi in range(max_visible):
-            i = field_scroll + vi
-            if i >= len(fields):
+        cur_y = ly
+        for i in range(field_scroll, len(fields)):
+            if cur_y >= bottom_limit:
                 break
             fe = fields[i]
-            y = ly + vi * row_h
             selected = (i == field_cursor)
 
             if fe.field_type == "section":
                 pygame.draw.line(self.screen, (60, 50, 40),
-                                 (rx + 10, y + 10),
-                                 (rx + rw - 10, y + 10), 1)
+                                 (rx + 10, cur_y + 10),
+                                 (rx + rw - 10, cur_y + 10), 1)
+                cur_y += base_row_h
                 continue
+
+            # Determine display text and wrap it
+            if fe.field_type == "choice":
+                display_text = fe.value
+                wrap_lines = [display_text]  # choices stay single-line
+            elif selected and fe.editable:
+                display_text = field_buffer + "_"
+                wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+            else:
+                display_text = fe.value
+                wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+
+            num_lines = len(wrap_lines)
+            row_h = max(base_row_h, 8 + num_lines * line_h)
 
             if selected:
                 bar = pygame.Surface(
                     (rw - 4, row_h - 4), pygame.SRCALPHA)
                 bar.fill((255, 200, 60, 25))
-                self.screen.blit(bar, (rx + 2, y))
+                self.screen.blit(bar, (rx + 2, cur_y))
 
             label_color = self._U3_WHITE if selected else (160, 160, 180)
-            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+            self._u3_text(fe.label, rx + 14, cur_y + 4, label_color, fm)
 
-            val_x = rx + 140
             if fe.field_type == "choice":
                 arrow_color = (255, 220, 100) if selected else (120, 120, 140)
                 val_color = (255, 220, 100) if selected else (200, 200, 200)
-                self._u3_text("<", val_x, y + 4, arrow_color, fm)
-                self._u3_text(fe.value, val_x + 18, y + 4, val_color, fm)
+                self._u3_text("<", val_x, cur_y + 4, arrow_color, fm)
+                self._u3_text(fe.value, val_x + 18, cur_y + 4, val_color, fm)
                 vw = fm.size(fe.value)[0] if hasattr(fm, 'size') else len(fe.value) * 9
-                self._u3_text(">", val_x + 18 + vw + 8, y + 4, arrow_color, fm)
-            elif selected and fe.editable:
-                val_text = field_buffer + "_"
-                val_color = (255, 220, 100)
-                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+                self._u3_text(">", val_x + 18 + vw + 8, cur_y + 4, arrow_color, fm)
             else:
-                val_text = fe.value
-                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
-                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+                if selected and fe.editable:
+                    val_color = (255, 220, 100)
+                else:
+                    val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+                for li, line in enumerate(wrap_lines):
+                    self._u3_text(line, val_x, cur_y + 4 + li * line_h,
+                                  val_color, fm)
 
-        sf = tw.get("save_flash", 0)
-        if sf > 0:
-            alpha = min(255, int(sf * 255))
+            cur_y += row_h
+
+        if save_flash > 0:
+            alpha = min(255, int(save_flash * 255))
             self._u3_text("Saved!", rx + rw // 2 - 30,
                           ry + rh - 36, (100, 255, 100, alpha), f)
 
         self._u3_text(
-            "[Up/Dn] Navigate  [L/R] Choose  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
+            "[Up/Dn] Navigate  [L/R] Choose  [Type] Edit  "
+            "[Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+        self.screen.set_clip(prev_clip)
+
+    def _draw_town_npc_editor(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the NPC field editor."""
+        self._draw_npc_field_editor_common(
+            tw.get("npc_fields") or [],
+            tw.get("npc_field_cursor", 0),
+            tw.get("npc_field_buffer", ""),
+            tw.get("npc_field_scroll", 0),
+            tw.get("npc_sprite_map", {}),
+            rx, ry, rw, rh, fm, fs, f,
+            save_flash=tw.get("save_flash", 0))
 
     def _draw_town_enc_list(self, tw, rx, ry, rw, rh, fm, fs, f):
         """Draw the enclosure instance list with import picker overlay."""
@@ -8750,6 +8829,176 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(
             "[Up/Dn] Browse  [Enter] Select  [Esc] Cancel",
             ox + 16, oy + oh - 28, self._U3_HINT, fs)
+
+    # ── Enclosure sub-screen / NPC renderers ──
+
+    def _draw_enc_sub_screen(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the enclosure sub-screen selector (Townspeople | Edit Map)."""
+        enclosures = tw.get("enclosures") or []
+        enc_cursor = tw.get("enc_cursor", 0)
+        enc_name = ""
+        if 0 <= enc_cursor < len(enclosures):
+            enc_name = enclosures[enc_cursor].get("name", "Unnamed")
+
+        self._u3_text(f"ENCLOSURE: {enc_name}",
+                      rx + 16, ry + 12, self._U3_ORANGE, f)
+
+        items = tw.get("enc_sub_items") or ["Townspeople", "Edit Map"]
+        cursor = tw.get("enc_sub_cursor", 0)
+        row_h = 36
+        ly = ry + 60
+
+        for i, item in enumerate(items):
+            selected = (i == cursor)
+            y = ly + i * row_h
+            if selected:
+                bar = pygame.Surface((rw - 4, row_h - 2),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (rx + 2, y))
+            prefix = "> " if selected else "  "
+            color = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(f"{prefix}{item}",
+                          rx + 16, y + 8, color, fm)
+
+        self._u3_text("[Enter] Open  [Esc] Back",
+                      rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_enc_npc_list(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the enclosure NPC list."""
+        npcs = tw.get("enc_npc_list") or []
+        cursor = tw.get("enc_npc_cursor", 0)
+        scroll = tw.get("enc_npc_scroll", 0)
+        row_h = 36
+
+        # Show enclosure name in title
+        enclosures = tw.get("enclosures") or []
+        enc_cursor = tw.get("enc_cursor", 0)
+        enc_name = ""
+        if 0 <= enc_cursor < len(enclosures):
+            enc_name = enclosures[enc_cursor].get("name", "")
+
+        title = f"TOWNSPEOPLE — {enc_name}" if enc_name else "TOWNSPEOPLE"
+        self._u3_text(title, rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        content_h = rh - 80
+        max_vis = content_h // row_h
+
+        if len(npcs) == 0:
+            self._u3_text("No NPCs yet. Press Ctrl+N to add.",
+                          rx + 20, ly + 10, (140, 140, 160), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(npcs):
+                    break
+                npc = npcs[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = self._U3_WHITE if selected else (180, 180, 180)
+                name = npc.get("name", "Unnamed")
+                npc_type = npc.get("npc_type", "villager")
+                self._u3_text(f"{prefix}{name}  ({npc_type})",
+                              rx + 10, y + 4, color, fm)
+                self._u3_text(
+                    f"  pos: ({npc.get('col', 0)},{npc.get('row', 0)})",
+                    rx + 10, y + 20, (140, 140, 160), fs)
+
+        sf = tw.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36, (100, 255, 100, alpha), f)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  [Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_enc_npc_editor(self, tw, rx, ry, rw, rh, fm, fs, f):
+        """Draw the enclosure NPC field editor."""
+        self._draw_npc_field_editor_common(
+            tw.get("enc_npc_fields") or [],
+            tw.get("enc_npc_field_cursor", 0),
+            tw.get("enc_npc_field_buffer", ""),
+            tw.get("enc_npc_field_scroll", 0),
+            tw.get("enc_npc_sprite_map", {}),
+            rx, ry, rw, rh, fm, fs, f,
+            save_flash=tw.get("save_flash", 0))
+
+    # ── Building space NPC renderers ──
+
+    def _draw_building_space_npc_list(self, bg, rx, ry, rw, rh,
+                                      fm, fs, f):
+        """Draw the building space NPC list (level 6)."""
+        npcs = bg.get("space_npc_list") or []
+        cursor = bg.get("space_npc_cursor", 0)
+        scroll = bg.get("space_npc_scroll", 0)
+        row_h = 36
+
+        self._u3_text("SPACE TOWNSPEOPLE", rx + 16, ry + 12,
+                      self._U3_ORANGE, f)
+        ly = ry + 44
+        content_h = rh - 80
+        max_vis = content_h // row_h
+
+        if len(npcs) == 0:
+            self._u3_text("No NPCs yet. Press Ctrl+N to add.",
+                          rx + 20, ly + 10, (140, 140, 160), fm)
+        else:
+            for vi in range(max_vis):
+                i = scroll + vi
+                if i >= len(npcs):
+                    break
+                npc = npcs[i]
+                selected = (i == cursor)
+                y = ly + vi * row_h
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, y - 1))
+                prefix = "> " if selected else "  "
+                color = (self._U3_WHITE if selected
+                         else (180, 180, 180))
+                name = npc.get("name", "Unnamed")
+                npc_type = npc.get("npc_type", "villager")
+                self._u3_text(
+                    f"{prefix}{name}  ({npc_type})",
+                    rx + 10, y + 4, color, fm)
+                self._u3_text(
+                    f"  pos: ({npc.get('col', 0)},"
+                    f"{npc.get('row', 0)})",
+                    rx + 10, y + 20, (140, 140, 160), fs)
+
+        sf = bg.get("save_flash", 0)
+        if sf > 0:
+            alpha = min(255, int(sf * 255))
+            self._u3_text("Saved!", rx + rw // 2 - 30,
+                          ry + rh - 36, (100, 255, 100, alpha), f)
+
+        self._u3_text(
+            "[Up/Dn] Browse  [Enter] Edit  [Ctrl+N] Add  "
+            "[Ctrl+D] Del  [Esc] Back",
+            rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_building_space_npc_editor(self, bg, rx, ry, rw, rh,
+                                        fm, fs, f):
+        """Draw the building space NPC field editor."""
+        self._draw_npc_field_editor_common(
+            bg.get("space_npc_fields") or [],
+            bg.get("space_npc_field_cursor", 0),
+            bg.get("space_npc_field_buffer", ""),
+            bg.get("space_npc_field_scroll", 0),
+            bg.get("space_npc_sprite_map", {}),
+            rx, ry, rw, rh, fm, fs, f,
+            save_flash=bg.get("save_flash", 0))
 
     def _draw_building_enc_picker(self, bg, rx, ry, rw, rh, fm, fs, f):
         """Draw the enclosure template picker overlay for building spaces."""
@@ -9572,10 +9821,18 @@ class Renderer(CombatEffectRendererMixin):
                 self._draw_building_space_list(
                     bg, rx, ry, rw, rh, fm, fs, f)
 
-        # ── Level 3: Space sub-screen (Edit Map | Encounters) ──
+        # ── Level 3: Space sub-screen (Townspeople | Edit Map | Encounters) ──
         elif level == 3:
-            self._draw_building_space_sub(
-                bg, rx, ry, rw, rh, fm, fs, f)
+            npc_mode = bg.get("space_npc_edit_mode", 0)
+            if npc_mode == 1:
+                self._draw_building_space_npc_list(
+                    bg, rx, ry, rw, rh, fm, fs, f)
+            elif npc_mode == 2:
+                self._draw_building_space_npc_editor(
+                    bg, rx, ry, rw, rh, fm, fs, f)
+            else:
+                self._draw_building_space_sub(
+                    bg, rx, ry, rw, rh, fm, fs, f)
 
         # ── Level 4: Encounter list ──
         elif level == 4:

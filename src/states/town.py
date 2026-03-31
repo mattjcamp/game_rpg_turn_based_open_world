@@ -895,7 +895,9 @@ class TownState(InventoryMixin, BaseState):
                     imap.sprite_overrides[(c, r)] = path
 
         self.town_data.tile_map = imap
-        self.town_data.npcs = []  # interiors start with no NPCs
+
+        # ── Build NPCs defined in the interior data ──
+        self.town_data.npcs = self._build_interior_npcs(interior, imap)
 
         # ── Spawn quest collect items first so guardians can anchor to them ──
         self._spawn_interior_quest_collect_items(interior_name, imap)
@@ -958,6 +960,76 @@ class TownState(InventoryMixin, BaseState):
         self.game.camera.map_height = ih
         self.game.camera.update(self.game.party.col, self.game.party.row)
         self.show_message(f"Entering {interior_name}...", 1500)
+
+    def _build_interior_npcs(self, interior_def, imap):
+        """Create NPC objects from an interior's ``npcs`` list.
+
+        Works the same way as the town-level NPC builder in
+        ``game._build_town_from_towns_json`` — reads an optional
+        ``"npcs"`` array from the interior definition and returns
+        a list of :class:`NPC` objects placed on walkable tiles.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+
+        npc_defs = interior_def.get("npcs")
+        if not npc_defs:
+            return []
+
+        npcs = []
+        for nd in npc_defs:
+            npc_name = nd.get("name", "Villager")
+            dialogue = nd.get("dialogue", ["..."])
+            if not dialogue:
+                dialogue = ["..."]
+            npc = NPC(
+                col=nd.get("col", 0),
+                row=nd.get("row", 0),
+                name=npc_name,
+                dialogue=dialogue,
+                npc_type=nd.get("npc_type", "villager"),
+                god_name=nd.get("god_name"),
+                shop_type=nd.get("shop_type", "general"),
+                sprite=nd.get("sprite") or None,
+                quest_dialogue=nd.get("quest_dialogue"),
+                quest_choices=nd.get("quest_choices"),
+                quest_name=nd.get("quest_name"),
+                artifact_name=nd.get("artifact_name"),
+                hint_active=nd.get("hint_active"),
+                text_complete=nd.get("text_complete"),
+                innkeeper_quests=nd.get("innkeeper_quests", False),
+            )
+            npc.wander_range = nd.get("wander_range", 4)
+            npcs.append(npc)
+
+        # Distribute NPCs so none share a tile
+        iw, ih = imap.width, imap.height
+        walkable = set()
+        for wy in range(ih):
+            for wx in range(iw):
+                if imap.is_walkable(wx, wy):
+                    walkable.add((wx, wy))
+        # Remove exit / link tiles from candidate positions
+        for pos in getattr(self, "_interior_exit_positions", set()):
+            walkable.discard(pos)
+        walkable.discard((self.game.party.col, self.game.party.row))
+
+        occupied = set()
+        rng = _rng.Random(
+            hash(interior_def.get("name", "")) & 0xFFFFFFFF)
+        for npc in npcs:
+            pos = (npc.col, npc.row)
+            if pos in walkable and pos not in occupied:
+                occupied.add(pos)
+                continue
+            free = list(walkable - occupied)
+            if free:
+                nc, nr = rng.choice(free)
+                npc.col = nc
+                npc.row = nr
+                occupied.add((nc, nr))
+
+        return npcs
 
     def _spawn_town_quest_monsters(self):
         """Place quest monster NPCs in the town when the player enters.
@@ -1808,8 +1880,14 @@ class TownState(InventoryMixin, BaseState):
 
         self.npc_dialogue_active = True
         self.npc_speaking = npc
-        line = npc.get_dialogue()
-        self._set_dialogue(f"{npc.name}: {line}")
+        # Show all dialogue lines sequentially — press Enter to advance
+        lines = list(npc.dialogue) if npc.dialogue else ["..."]
+        if len(lines) > 1:
+            self.quest_dialogue_lines = lines
+            self.quest_dialogue_index = 0
+            self._set_dialogue(f"{npc.name}: {lines[0]}")
+        else:
+            self._set_dialogue(f"{npc.name}: {lines[0]}")
 
     def _advance_dialogue(self):
         """Advance or dismiss the current dialogue."""

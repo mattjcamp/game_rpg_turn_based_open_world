@@ -464,6 +464,11 @@ class OverworldState(InventoryMixin, BaseState):
                             self._start_ow_npc_dialogue(bnpc)
                             self.move_cooldown = MOVE_REPEAT_DELAY
                             return
+                        else:
+                            # Regular NPC types (villager, shopkeep, etc.)
+                            self._start_building_npc_dialogue(bnpc)
+                            self.move_cooldown = MOVE_REPEAT_DELAY
+                            return
 
             # Bump-to-talk: check if a quest NPC is on the target tile
             ow_npc = self._get_ow_npc_at(target_col, target_row)
@@ -1345,9 +1350,12 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.camera.map_height = ih
         self.game.camera.update(self.game.party.col, self.game.party.row)
 
+        # Spawn data-defined NPCs from the interior definition first.
+        self._building_interior_npcs = []
+        self._build_building_interior_npcs(interior, imap)
+
         # Spawn quest items and guardians for this building interior.
         # Quest data is keyed by building name, not the space/interior name.
-        self._building_interior_npcs = []
         self._building_name = building_name or interior_name
         quest_key_name = self._building_name
         self._spawn_building_quest_collect_items(quest_key_name, imap)
@@ -1393,6 +1401,73 @@ class OverworldState(InventoryMixin, BaseState):
         self.show_message(f"Leaving {leaving_name}...", 1000)
 
     # ── Building interior quest spawning & interaction ─────────
+
+    def _build_building_interior_npcs(self, interior_def, imap):
+        """Create NPC objects from a building interior's ``npcs`` list.
+
+        Reads an optional ``"npcs"`` array from the interior/space
+        definition and appends :class:`NPC` objects to
+        ``_building_interior_npcs``.
+        """
+        import random as _rng
+        from src.town_generator import NPC
+
+        npc_defs = interior_def.get("npcs")
+        if not npc_defs:
+            return
+
+        iw, ih = imap.width, imap.height
+        walkable = set()
+        for wy in range(ih):
+            for wx in range(iw):
+                if imap.is_walkable(wx, wy):
+                    walkable.add((wx, wy))
+        # Remove exit tiles from candidates
+        for pos in self._overworld_interior_exit_positions:
+            walkable.discard(pos)
+        walkable.discard((self.game.party.col, self.game.party.row))
+
+        occupied = {(n.col, n.row) for n in self._building_interior_npcs}
+        rng = _rng.Random(
+            hash(interior_def.get("name", "")) & 0xFFFFFFFF)
+
+        for nd in npc_defs:
+            npc_name = nd.get("name", "Villager")
+            dialogue = nd.get("dialogue", ["..."])
+            if not dialogue:
+                dialogue = ["..."]
+            npc = NPC(
+                col=nd.get("col", 0),
+                row=nd.get("row", 0),
+                name=npc_name,
+                dialogue=dialogue,
+                npc_type=nd.get("npc_type", "villager"),
+                god_name=nd.get("god_name"),
+                shop_type=nd.get("shop_type", "general"),
+                sprite=nd.get("sprite") or None,
+                quest_dialogue=nd.get("quest_dialogue"),
+                quest_choices=nd.get("quest_choices"),
+                quest_name=nd.get("quest_name"),
+                artifact_name=nd.get("artifact_name"),
+                hint_active=nd.get("hint_active"),
+                text_complete=nd.get("text_complete"),
+                innkeeper_quests=nd.get("innkeeper_quests", False),
+            )
+            npc.wander_range = nd.get("wander_range", 4)
+
+            # If specified position is free, keep it; else pick random
+            pos = (npc.col, npc.row)
+            if pos in walkable and pos not in occupied:
+                occupied.add(pos)
+            else:
+                free = list(walkable - occupied)
+                if free:
+                    nc, nr = rng.choice(free)
+                    npc.col = nc
+                    npc.row = nr
+                    occupied.add((nc, nr))
+
+            self._building_interior_npcs.append(npc)
 
     def _spawn_building_quest_collect_items(self, interior_name, imap):
         """Place collectible quest items inside a building interior."""
@@ -1697,11 +1772,14 @@ class OverworldState(InventoryMixin, BaseState):
         occupied = {(n.col, n.row) for n in self._building_interior_npcs}
         occupied.add((party.col, party.row))
 
+        from src.town_generator import NPC as _NPCClass
         for npc in self._building_interior_npcs:
-            # Random wandering for quest givers and non-guardian NPCs
-            # Quest items (collectibles) must never move.
+            # Random wandering for quest givers and non-guardian NPCs.
+            # Quest items, quest monsters (guardians), and stationary
+            # types (shopkeep, innkeeper, priest, gnome) stay in place.
             wr = getattr(npc, "wander_range", 0)
-            if wr and npc.npc_type not in ("quest_monster", "quest_item"):
+            stationary = getattr(_NPCClass, "STATIONARY_TYPES", set())
+            if wr and npc.npc_type not in stationary and npc.npc_type != "quest_monster":
                 if _rng.random() < 0.3:  # 30% chance each move
                     dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
                     _rng.shuffle(dirs)
@@ -1770,6 +1848,26 @@ class OverworldState(InventoryMixin, BaseState):
                         occupied.discard((npc.col, npc.row))
                         npc.col, npc.row = best
                         occupied.add(best)
+
+    def _start_building_npc_dialogue(self, npc):
+        """Show dialogue for a regular NPC inside a building interior.
+
+        Shows all dialogue lines sequentially; press Enter to advance.
+        """
+        lines = list(npc.dialogue) if npc.dialogue else ["..."]
+        self.ow_npc_dialogue_active = True
+        self.ow_npc_speaking = npc
+        if len(lines) > 1:
+            self.ow_quest_dialogue_lines = lines
+            self.ow_quest_dialogue_index = 0
+            remaining = len(lines) - 1
+            hint = "  [ENTER] >" if remaining > 0 else "  [ENTER]"
+            self.show_message(
+                f"{npc.name}: {lines[0]}{hint}", 999999)
+        else:
+            self.ow_quest_dialogue_lines = []
+            self.show_message(
+                f"{npc.name}: {lines[0]}  [ENTER]", 999999)
 
     # ── Unique tile interaction ────────────────────────────────
 
@@ -2388,6 +2486,7 @@ class OverworldState(InventoryMixin, BaseState):
                 "entry_col": sp.get("entry_col", 0),
                 "entry_row": sp.get("entry_row", 0),
                 "tiles": sp.get("tiles", {}),
+                "npcs": sp.get("npcs", []),
             }
             # Replace existing entry or append new one
             replaced = False

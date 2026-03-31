@@ -3142,8 +3142,8 @@
         "name": "Juno",
         "npc_type": "villager",
         "sprite": "src/assets/game/npcs/villager_beggar.png",
-        "col": 0,
-        "row": 0,
+        "col": 24,
+        "row": 25,
         "dialogue": [
           "Does my breath smell like cat food?"
         ],
@@ -3409,7 +3409,22 @@
             "path": "game/terrain/town_counter.png"
           }
         },
-        "template_label": "General Shop Interior"
+        "template_label": "General Shop Interior",
+        "npcs": [
+          {
+            "name": "Stan the Shopkeeper",
+            "npc_type": "villager",
+            "sprite": "src/assets/game/npcs/shopkeep.png",
+            "col": 8,
+            "row": 7,
+            "dialogue": [
+              "Welcome to the General Store",
+              "walk up to a counter if you want to buy stuff."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 4
+          }
+        ]
       },
       {
         "name": "Tunnel Short",

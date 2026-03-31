@@ -113,7 +113,7 @@ class ModuleTownEditorMixin:
             FieldEntry("Row", "row", str(npc.get("row", 0)), "int", True),
             FieldEntry("", "", "", "section", False),
             FieldEntry("Dialogue", "dialogue",
-                       ", ".join(npc.get("dialogue", ["Hello."])),
+                       " | ".join(npc.get("dialogue", ["Hello."])),
                        "text", True),
             FieldEntry("God Name", "god_name",
                        npc.get("god_name", "The Divine"), "text", True),
@@ -148,7 +148,7 @@ class ModuleTownEditorMixin:
                 except ValueError:
                     val = 0
             if key == "dialogue":
-                val = [s.strip() for s in val.split(",") if s.strip()]
+                val = [s.strip() for s in val.split("|") if s.strip()]
                 if not val:
                     val = ["Hello."]
             # Convert sprite display name to file path for storage
@@ -316,7 +316,14 @@ class ModuleTownEditorMixin:
             elif self._mod_town_sub_cursor == 1:
                 self._handle_mod_town_npc_list_input(event)
             elif self._mod_town_sub_cursor == 2:
-                self._handle_mod_town_enc_list_input(event)
+                if self._mod_town_enc_edit_mode == 3:
+                    self._handle_mod_town_enc_npc_field_input(event)
+                elif self._mod_town_enc_edit_mode == 2:
+                    self._handle_mod_town_enc_npc_list_input(event)
+                elif self._mod_town_enc_edit_mode == 1:
+                    self._handle_mod_town_enc_sub_input(event)
+                else:
+                    self._handle_mod_town_enc_list_input(event)
             return
         if self.module_edit_level == 5:
             self._handle_mod_town_sub_input(event)
@@ -963,5 +970,299 @@ class ModuleTownEditorMixin:
         fe.active_editor = "mod_town_map"
         fe.level = 1
 
-    # ── Enclosure input handlers ──
+    # ── Enclosure sub-screen & NPC editing ──
 
+    def _mod_town_enc_get_current(self):
+        """Return the currently selected enclosure dict, or None."""
+        if not (0 <= self._mod_town_enc_cursor
+                < len(self._mod_town_enclosures)):
+            return None
+        return self._mod_town_enclosures[self._mod_town_enc_cursor]
+
+    def _mod_town_enc_load_npcs(self):
+        """Load NPC list from the currently selected enclosure."""
+        enc = self._mod_town_enc_get_current()
+        if not enc:
+            self._mod_town_enc_npc_list = []
+            return
+        self._mod_town_enc_npc_list = list(enc.get("npcs", []))
+        self._mod_town_enc_npc_cursor = 0
+        self._mod_town_enc_npc_scroll = 0
+
+    def _mod_town_enc_save_npcs(self):
+        """Write NPC list back into the current enclosure dict."""
+        enc = self._mod_town_enc_get_current()
+        if not enc:
+            return
+        enc["npcs"] = list(self._mod_town_enc_npc_list)
+
+    def _mod_town_enc_build_npc_fields(self):
+        """Build FieldEntry list for the selected enclosure NPC."""
+        from src.editor_types import FieldEntry
+        if not (0 <= self._mod_town_enc_npc_cursor
+                < len(self._mod_town_enc_npc_list)):
+            self._mod_town_enc_npc_fields = []
+            return
+        npc = self._mod_town_enc_npc_list[self._mod_town_enc_npc_cursor]
+
+        # Build sprite choice options from people tile manifest
+        if not hasattr(self, "_cc_tiles") or not self._cc_tiles:
+            self._cc_load_tiles()
+        sprite_names = [t["name"] for t in self._cc_tiles]
+        sprite_name_to_file = {t["name"]: t["file"]
+                               for t in self._cc_tiles}
+        sprite_file_to_name = {t["file"]: t["name"]
+                               for t in self._cc_tiles}
+        current_sprite_file = npc.get("sprite", "")
+        current_sprite_name = sprite_file_to_name.get(
+            current_sprite_file,
+            sprite_names[0] if sprite_names else "Default")
+
+        self._mod_town_enc_npc_fields = [
+            FieldEntry("Name", "name",
+                       npc.get("name", ""), "text", True),
+            FieldEntry("Type", "npc_type",
+                       npc.get("npc_type", "villager"), "text", True),
+            FieldEntry("Sprite", "sprite", current_sprite_name,
+                       "choice", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Col", "col",
+                       str(npc.get("col", 0)), "int", True),
+            FieldEntry("Row", "row",
+                       str(npc.get("row", 0)), "int", True),
+            FieldEntry("", "", "", "section", False),
+            FieldEntry("Dialogue", "dialogue",
+                       " | ".join(npc.get("dialogue", ["Hello."])),
+                       "text", True),
+            FieldEntry("God Name", "god_name",
+                       npc.get("god_name", "The Divine"), "text", True),
+            FieldEntry("Wander Range", "wander_range",
+                       str(npc.get("wander_range", 4)), "int", True),
+        ]
+        self._mod_town_enc_npc_choice_map = {
+            "sprite": sprite_names,
+        }
+        self._mod_town_enc_npc_sprite_name_to_file = sprite_name_to_file
+        fe = self.features_editor
+        self._mod_town_enc_npc_field = fe._next_editable_generic(
+            self._mod_town_enc_npc_fields, 0)
+        self._mod_town_enc_npc_buffer = self._mod_town_enc_npc_fields[
+            self._mod_town_enc_npc_field].value
+        self._mod_town_enc_npc_field_scroll = 0
+
+    def _mod_town_enc_save_npc_fields(self):
+        """Write NPC fields back into the enclosure NPC dict."""
+        if not (0 <= self._mod_town_enc_npc_cursor
+                < len(self._mod_town_enc_npc_list)):
+            return
+        npc = self._mod_town_enc_npc_list[self._mod_town_enc_npc_cursor]
+        for fe_entry in self._mod_town_enc_npc_fields:
+            if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            key = fe_entry.key
+            val = fe_entry.value
+            if fe_entry.field_type == "int":
+                try:
+                    val = int(val)
+                except ValueError:
+                    val = 0
+            if key == "dialogue":
+                val = [s.strip() for s in val.split("|")
+                       if s.strip()]
+                if not val:
+                    val = ["Hello."]
+            if key == "sprite":
+                name_to_file = getattr(
+                    self, "_mod_town_enc_npc_sprite_name_to_file", {})
+                val = name_to_file.get(val, val)
+            npc[key] = val
+
+    def _mod_town_enc_add_npc(self):
+        """Add a new default NPC to the current enclosure."""
+        enc = self._mod_town_enc_get_current()
+        # Place near centre of enclosure
+        w = enc.get("width", 16) if enc else 8
+        h = enc.get("height", 14) if enc else 7
+        new_npc = {
+            "name": "New NPC",
+            "npc_type": "villager",
+            "sprite": "",
+            "col": w // 2,
+            "row": h // 2,
+            "dialogue": ["Hello there!"],
+            "god_name": "The Divine",
+            "wander_range": 4,
+        }
+        self._mod_town_enc_npc_list.append(new_npc)
+        self._mod_town_enc_npc_cursor = (
+            len(self._mod_town_enc_npc_list) - 1)
+        self._mod_town_enc_save_npcs()
+
+    def _mod_town_enc_delete_npc(self):
+        """Delete the currently selected enclosure NPC."""
+        n = len(self._mod_town_enc_npc_list)
+        if n == 0:
+            return
+        self._mod_town_enc_npc_list.pop(self._mod_town_enc_npc_cursor)
+        n -= 1
+        if n == 0:
+            self._mod_town_enc_npc_cursor = 0
+        elif self._mod_town_enc_npc_cursor >= n:
+            self._mod_town_enc_npc_cursor = n - 1
+        self._mod_town_enc_save_npcs()
+
+    def _mod_town_enc_npc_cycle_choice(self, direction):
+        """Cycle the current enclosure NPC choice field."""
+        field = self._mod_town_enc_npc_fields[
+            self._mod_town_enc_npc_field]
+        options = self._mod_town_enc_npc_choice_map.get(
+            field.key, [])
+        if not options:
+            return
+        try:
+            idx = options.index(field.value)
+        except ValueError:
+            idx = 0
+        idx = (idx + direction) % len(options)
+        field.value = options[idx]
+        self._mod_town_enc_npc_buffer = field.value
+
+    # ── Enclosure sub-screen input handler (level 8) ──
+
+    def _handle_mod_town_enc_sub_input(self, event):
+        """Handle input on the enclosure sub-screen (enc_edit_mode=1)."""
+        import pygame
+        n = len(self._mod_town_enc_sub_items)
+        if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+            self._mod_town_enc_edit_mode = 0  # back to enclosure list
+            return
+        if event.key == pygame.K_UP:
+            self._mod_town_enc_sub_cursor = (
+                self._mod_town_enc_sub_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            self._mod_town_enc_sub_cursor = (
+                self._mod_town_enc_sub_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
+            if self._mod_town_enc_sub_cursor == 0:
+                # Townspeople
+                self._mod_town_enc_load_npcs()
+                self._mod_town_enc_edit_mode = 2
+            elif self._mod_town_enc_sub_cursor == 1:
+                # Edit Map
+                self._mod_town_launch_enc_editor()
+
+    # ── Enclosure NPC list input handler (level 9) ──
+
+    def _handle_mod_town_enc_npc_list_input(self, event):
+        """Handle input for the enclosure NPC list (enc_edit_mode=2)."""
+        import pygame
+        n = len(self._mod_town_enc_npc_list)
+        fe = self.features_editor
+
+        if event.key in (pygame.K_ESCAPE, pygame.K_LEFT):
+            self._mod_town_enc_save_npcs()
+            self._mod_town_save_enclosures()
+            self._mod_town_enc_edit_mode = 1
+            return
+        if self._is_new_shortcut(event):
+            self._mod_town_enc_add_npc()
+            return
+        if self._is_delete_shortcut(event) and n > 0:
+            self._mod_town_enc_delete_npc()
+            return
+        if self._is_save_shortcut(event):
+            self._mod_town_enc_save_npcs()
+            self._mod_town_save_enclosures()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self._mod_town_enc_npc_cursor = (
+                self._mod_town_enc_npc_cursor - 1) % n
+            self._mod_town_enc_npc_scroll = fe._adjust_scroll_generic(
+                self._mod_town_enc_npc_cursor,
+                self._mod_town_enc_npc_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self._mod_town_enc_npc_cursor = (
+                self._mod_town_enc_npc_cursor + 1) % n
+            self._mod_town_enc_npc_scroll = fe._adjust_scroll_generic(
+                self._mod_town_enc_npc_cursor,
+                self._mod_town_enc_npc_scroll)
+        elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
+            self._mod_town_enc_build_npc_fields()
+            self._mod_town_enc_edit_mode = 3
+
+    # ── Enclosure NPC field editor input handler (enc_edit_mode=3) ──
+
+    def _handle_mod_town_enc_npc_field_input(self, event):
+        """Handle input for enclosure NPC field editing (enc_edit_mode=3)."""
+        import pygame
+        fields = self._mod_town_enc_npc_fields
+        n = len(fields)
+        fe = self.features_editor
+        if n == 0:
+            if event.key == pygame.K_ESCAPE:
+                self._mod_town_enc_edit_mode = 2
+            return
+
+        if self._is_save_shortcut(event):
+            f = fields[self._mod_town_enc_npc_field]
+            if f.editable:
+                f.value = self._mod_town_enc_npc_buffer
+            self._mod_town_enc_save_npc_fields()
+            self._mod_town_enc_save_npcs()
+            self._mod_town_save_enclosures()
+            self._save_module_towns()
+            self._mod_town_save_flash = 1.5
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            f = fields[self._mod_town_enc_npc_field]
+            if f.editable:
+                f.value = self._mod_town_enc_npc_buffer
+            self._mod_town_enc_save_npc_fields()
+            self._mod_town_enc_save_npcs()
+            self._mod_town_save_enclosures()
+            self._mod_town_enc_edit_mode = 2
+            return
+
+        if event.key == pygame.K_UP:
+            f = fields[self._mod_town_enc_npc_field]
+            if f.editable:
+                f.value = self._mod_town_enc_npc_buffer
+            self._mod_town_enc_npc_field = fe._next_editable_generic(
+                fields, (self._mod_town_enc_npc_field - 1) % n)
+            self._mod_town_enc_npc_buffer = fields[
+                self._mod_town_enc_npc_field].value
+            self._mod_town_enc_npc_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_town_enc_npc_field,
+                    self._mod_town_enc_npc_field_scroll))
+        elif event.key == pygame.K_DOWN:
+            f = fields[self._mod_town_enc_npc_field]
+            if f.editable:
+                f.value = self._mod_town_enc_npc_buffer
+            self._mod_town_enc_npc_field = fe._next_editable_generic(
+                fields, (self._mod_town_enc_npc_field + 1) % n)
+            self._mod_town_enc_npc_buffer = fields[
+                self._mod_town_enc_npc_field].value
+            self._mod_town_enc_npc_field_scroll = (
+                fe._adjust_field_scroll_generic(
+                    self._mod_town_enc_npc_field,
+                    self._mod_town_enc_npc_field_scroll))
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            f = fields[self._mod_town_enc_npc_field]
+            if f.field_type == "choice":
+                direction = (-1 if event.key == pygame.K_LEFT
+                             else 1)
+                self._mod_town_enc_npc_cycle_choice(direction)
+        elif event.key == pygame.K_BACKSPACE:
+            f = fields[self._mod_town_enc_npc_field]
+            if f.field_type != "choice":
+                self._mod_town_enc_npc_buffer = (
+                    self._mod_town_enc_npc_buffer[:-1])
+        elif event.unicode and event.unicode.isprintable():
+            f = fields[self._mod_town_enc_npc_field]
+            if f.field_type != "choice":
+                self._mod_town_enc_npc_buffer += event.unicode

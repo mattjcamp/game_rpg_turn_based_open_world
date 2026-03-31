@@ -254,6 +254,21 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_town_enc_naming = False
         self._mod_town_enc_name_buf = ""
         self._mod_town_enc_template = None     # template being instantiated
+        # Enclosure sub-screen (Townspeople | Edit Map)
+        self._mod_town_enc_edit_mode = 0  # 0=list, 1=sub-screen, 2=npc list, 3=npc field editor
+        self._mod_town_enc_sub_cursor = 0
+        self._mod_town_enc_sub_items = ["Townspeople", "Edit Map"]
+        # Enclosure NPC list (parallel to town NPC state)
+        self._mod_town_enc_npc_list = []
+        self._mod_town_enc_npc_cursor = 0
+        self._mod_town_enc_npc_scroll = 0
+        # Enclosure NPC field editor
+        self._mod_town_enc_npc_fields = []
+        self._mod_town_enc_npc_field = 0
+        self._mod_town_enc_npc_buffer = ""
+        self._mod_town_enc_npc_field_scroll = 0
+        self._mod_town_enc_npc_choice_map = {}
+        self._mod_town_enc_npc_sprite_name_to_file = {}
         # Map editor
         self._mod_town_editor_active = False
         self._mod_town_map_editor_state = None
@@ -339,7 +354,20 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Space sub-screen: 0=Edit Map, 1=Encounters, 2=Import Template
         self._mod_building_space_sub_cursor = 0
         self._mod_building_space_sub_items = [
-            "Edit Map", "Encounters", "Import Template"]
+            "Townspeople", "Edit Map", "Encounters", "Import Template"]
+        # Building space NPC edit mode (sub-state within level 17)
+        self._mod_building_space_npc_edit_mode = 0  # 0=off, 1=npc list, 2=npc field editor
+        # Building space NPC list
+        self._mod_building_space_npc_list = []
+        self._mod_building_space_npc_cursor = 0
+        self._mod_building_space_npc_scroll = 0
+        # Building space NPC field editor
+        self._mod_building_space_npc_fields = []
+        self._mod_building_space_npc_field = 0
+        self._mod_building_space_npc_buffer = ""
+        self._mod_building_space_npc_field_scroll = 0
+        self._mod_building_space_npc_choice_map = {}
+        self._mod_building_space_npc_sprite_name_to_file = {}
         # Encounters list (within a space)
         self._mod_building_encounter_list = []
         self._mod_building_encounter_cursor = 0
@@ -4075,8 +4103,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self._mod_town_enc_scroll = fe._adjust_scroll_generic(
                 self._mod_town_enc_cursor, self._mod_town_enc_scroll)
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT) and n > 0:
-            # Edit the selected enclosure in the map editor
-            self._mod_town_launch_enc_editor()
+            # Open enclosure sub-screen (Townspeople | Edit Map)
+            self._mod_town_enc_sub_cursor = 0
+            self._mod_town_enc_edit_mode = 1
 
     def _handle_mod_town_enc_picker_input(self, event):
         """Handle input for the enclosure template import picker."""
@@ -4953,7 +4982,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "label", "Room")
 
     def _handle_mod_building_space_sub_input(self, event):
-        """Handle space sub-screen (level 17): Edit Map | Encounters | Import Template."""
+        """Handle space sub-screen (level 17): Townspeople | Edit Map | Encounters | Import Template."""
         import pygame
 
         # Intercept enclosure template picker overlay
@@ -4961,8 +4990,17 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self._handle_mod_building_enc_picker_input(event)
             return
 
+        # Dispatch to NPC sub-editors via edit mode (stays at level 17)
+        if self._mod_building_space_npc_edit_mode == 2:
+            self._handle_mod_building_space_npc_field_input(event)
+            return
+        if self._mod_building_space_npc_edit_mode == 1:
+            self._handle_mod_building_space_npc_list_input(event)
+            return
+
         n = len(self._mod_building_space_sub_items)
         if event.key == pygame.K_ESCAPE or event.key == pygame.K_LEFT:
+            self._mod_building_space_npc_edit_mode = 0
             self.module_edit_level = 16
             return
         if event.key == pygame.K_UP:
@@ -4973,11 +5011,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self._mod_building_space_sub_cursor + 1) % n
         elif event.key in (pygame.K_RETURN, pygame.K_RIGHT):
             if self._mod_building_space_sub_cursor == 0:
-                self._mod_building_launch_map_editor()
+                self._mod_building_space_load_npcs()
+                self._mod_building_space_npc_edit_mode = 1
             elif self._mod_building_space_sub_cursor == 1:
+                self._mod_building_launch_map_editor()
+            elif self._mod_building_space_sub_cursor == 2:
                 self._mod_building_load_encounters()
                 self.module_edit_level = 18
-            elif self._mod_building_space_sub_cursor == 2:
+            elif self._mod_building_space_sub_cursor == 3:
                 self._mod_building_open_space_template_picker()
 
     def _handle_mod_building_encounter_list_input(self, event):
@@ -5815,6 +5856,17 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "enc_pick_scroll": self._mod_town_enc_pick_scroll,
                         "enc_naming": self._mod_town_enc_naming,
                         "enc_name_buf": self._mod_town_enc_name_buf,
+                        "enc_edit_mode": self._mod_town_enc_edit_mode,
+                        "enc_sub_cursor": self._mod_town_enc_sub_cursor,
+                        "enc_sub_items": self._mod_town_enc_sub_items,
+                        "enc_npc_list": self._mod_town_enc_npc_list,
+                        "enc_npc_cursor": self._mod_town_enc_npc_cursor,
+                        "enc_npc_scroll": self._mod_town_enc_npc_scroll,
+                        "enc_npc_fields": self._mod_town_enc_npc_fields,
+                        "enc_npc_field_cursor": self._mod_town_enc_npc_field,
+                        "enc_npc_field_buffer": self._mod_town_enc_npc_buffer,
+                        "enc_npc_field_scroll": self._mod_town_enc_npc_field_scroll,
+                        "enc_npc_sprite_map": getattr(self, "_mod_town_enc_npc_sprite_name_to_file", {}),
                         "gen_mode": self._mod_town_gen_mode,
                         "gen_pick_list": self._mod_town_gen_pick_list,
                         "gen_pick_cursor": self._mod_town_gen_pick_cursor,
@@ -5902,6 +5954,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "enc_pick_list": self._mod_building_enc_pick_list,
                         "enc_pick_cursor": self._mod_building_enc_pick_cursor,
                         "enc_pick_scroll": self._mod_building_enc_pick_scroll,
+                        "space_npc_edit_mode": self._mod_building_space_npc_edit_mode,
+                        "space_npc_list": self._mod_building_space_npc_list,
+                        "space_npc_cursor": self._mod_building_space_npc_cursor,
+                        "space_npc_scroll": self._mod_building_space_npc_scroll,
+                        "space_npc_fields": self._mod_building_space_npc_fields,
+                        "space_npc_field_cursor": self._mod_building_space_npc_field,
+                        "space_npc_field_buffer": self._mod_building_space_npc_buffer,
+                        "space_npc_field_scroll": self._mod_building_space_npc_field_scroll,
+                        "space_npc_sprite_map": getattr(self, "_mod_building_space_npc_sprite_name_to_file", {}),
                         "save_flash": self._mod_building_save_flash,
                         "level": max(0, self.module_edit_level - 14),
                     },
