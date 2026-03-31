@@ -1123,10 +1123,16 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             link_name = link_val.get("interior", "")
             if not link_name:
                 continue
-            parts = pos_key.split(",")
-            if len(parts) != 2:
+            # Keys are now (col, row) tuples after normalisation
+            if isinstance(pos_key, tuple):
+                lcol, lrow = pos_key
+            elif isinstance(pos_key, str) and "," in pos_key:
+                parts = pos_key.split(",")
+                if len(parts) != 2:
+                    continue
+                lcol, lrow = int(parts[0]), int(parts[1])
+            else:
                 continue
-            lcol, lrow = int(parts[0]), int(parts[1])
             if (lcol, lrow) in self.town_data_map:
                 continue
             # If a town with this name was already generated from a
@@ -2990,7 +2996,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                    if ow_state else None)
         tmap = stashed if stashed is not None else self.tile_map
 
-        tmap.tile_links = sdata.get("tile_links", {})
+        from src.tile_map import TileMap
+        tmap.tile_links = TileMap.normalize_tile_links(
+            sdata.get("tile_links", {}))
         tmap.overworld_interiors = sdata.get("interiors", [])
 
         # If the overview map tiles were also updated, refresh them

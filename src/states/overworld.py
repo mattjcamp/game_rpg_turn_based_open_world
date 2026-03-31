@@ -1061,7 +1061,7 @@ class OverworldState(InventoryMixin, BaseState):
         # designer can place an interior/town entrance on any tile graphic.
         pcol, prow = party.col, party.row
         tmap = self.game.tile_map
-        link = tmap.tile_links.get(f"{pcol},{prow}")
+        link = tmap.tile_links.get((pcol, prow))
         if link and link.get("interior"):
             link_name = link["interior"]
             link_type = link.get("type", "")
@@ -1150,7 +1150,7 @@ class OverworldState(InventoryMixin, BaseState):
         elif tile_id in (TILE_DUNGEON, TILE_DUNGEON_CLEARED):
             # Check if a tile_link points to a module dungeon
             # (handles links without the "type" field set)
-            link = tmap.tile_links.get(f"{pcol},{prow}")
+            link = tmap.tile_links.get((pcol, prow))
             if link and link.get("interior"):
                 ddef = self._find_module_dungeon_by_name(link["interior"])
                 if ddef is not None:
@@ -1244,10 +1244,14 @@ class OverworldState(InventoryMixin, BaseState):
             self.show_message("Nothing here.", 1500)
             return
 
-        # Push current state onto the interior stack
+        # Push current state onto the interior stack.
+        # ``source_map`` records where we came from so the destination
+        # interior can find the correct back-link tile without searching.
+        source_map_name = self._overworld_interior_name or "overworld"
         self._overworld_interior_stack.append({
             "col": door_col,
             "row": door_row,
+            "source_map": source_map_name,
             "tile_map": self.game.tile_map,
             "interior_links": dict(self._overworld_interior_links),
             "exit_positions": set(self._overworld_interior_exit_positions),

@@ -658,11 +658,10 @@ class Renderer(CombatEffectRendererMixin):
                 elif tid == TILE_EXIT:
                     feature_lights.append((sc, sr, 2.0, 1.5))
 
-        # Auto-detect interior darkness: if torch tiles are visible in the
-        # viewport, the player is in a covered/underground area that has
-        # no sunlight.  The torches themselves are the signal.
-        if not interior_darkness and torch_lights:
-            interior_darkness = True
+        # Interior darkness is now set explicitly by the calling state
+        # (town.py ``_in_interior`` or overworld.py ``_in_overworld_interior``)
+        # rather than auto-detected from viewport torch presence, which was
+        # fragile when torches were just off-screen.
 
         # Interior / torch-lit areas — always dark regardless of time
         if interior_darkness:
@@ -674,6 +673,37 @@ class Renderer(CombatEffectRendererMixin):
             all_lights = [(psc, psr, p_radius, p_fade)]
             for el in (torch_lights + feature_lights):
                 all_lights.append(el)
+
+            # ── Warm torch glow (ported from dungeon renderer) ──
+            # Wall torches cast a warm flickering orange light on nearby
+            # floor tiles, matching the dungeon atmosphere.
+            _now = pygame.time.get_ticks()
+            _torch_flicker = 0.6 + 0.4 * math.sin(_now * 0.008)
+            _torch_flicker2 = 0.6 + 0.4 * math.sin(_now * 0.011 + 1.5)
+            _torch_glow_radius = 3  # tiles of light radius
+            for tsc, tsr, _tr, _tf in torch_lights:
+                tsc_i = int(round(tsc))
+                tsr_i = int(round(tsr))
+                for dr in range(-_torch_glow_radius, _torch_glow_radius + 1):
+                    for dc in range(-_torch_glow_radius, _torch_glow_radius + 1):
+                        dist = abs(dr) + abs(dc)
+                        if dist == 0 or dist > _torch_glow_radius:
+                            continue
+                        nsc = tsc_i + dc
+                        nsr = tsr_i + dr
+                        if 0 <= nsc < cols and 0 <= nsr < rows:
+                            flk = (_torch_flicker if (dc + dr) % 2 == 0
+                                   else _torch_flicker2)
+                            intensity = (1.0 - dist /
+                                         (_torch_glow_radius + 1)) * flk
+                            alpha = int(35 * intensity)
+                            if alpha > 0:
+                                glow_s = pygame.Surface(
+                                    (ts, ts), pygame.SRCALPHA)
+                                glow_s.fill((255, 160, 50, alpha))
+                                self.screen.blit(
+                                    glow_s, (nsc * ts, nsr * ts))
+
             # Cache a single reusable SRCALPHA tile for the fog overlay.
             # (Large SRCALPHA surfaces don't blit visibly on SCALED displays,
             #  but per-tile blits work correctly.)
@@ -2548,9 +2578,9 @@ class Renderer(CombatEffectRendererMixin):
                 elif tid == TILE_EXIT:
                     feature_lights.append((sc + px_off, sr + py_off, 2.0, 1.5))
 
-        # Auto-detect: torch tiles in viewport signal a covered area
-        if not interior_darkness and torch_lights:
-            interior_darkness = True
+        # Interior darkness is now set explicitly by the calling state
+        # (overworld.py ``_in_overworld_interior``) rather than
+        # auto-detected from viewport torch presence.
 
         # Interior / torch-lit areas — always dark regardless of time
         if interior_darkness:

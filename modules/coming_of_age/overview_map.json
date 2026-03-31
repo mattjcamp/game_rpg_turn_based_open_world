@@ -1274,14 +1274,14 @@
       "interior": "Midherm",
       "type": "town"
     },
-    "7,10": {
-      "interior": "Morgoth",
-      "type": "dungeon"
-    },
     "17,14": {
       "interior": "Midherm",
       "type": "town",
       "sub_interior": "Tunnel Long"
+    },
+    "7,10": {
+      "interior": "Grotto",
+      "type": "dungeon"
     }
   },
   "party_start": {

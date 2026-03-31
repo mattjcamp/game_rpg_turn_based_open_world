@@ -858,12 +858,19 @@ class TownState(InventoryMixin, BaseState):
         # the back-link tile in the destination and spawn near it.
         source_interior_name = getattr(self, "_interior_name", "")
 
-        # Push current state onto the interior stack so we can return
+        # Push current state onto the interior stack so we can return.
+        # ``source_map`` records where we came from so the destination
+        # interior can find the correct back-link tile without searching
+        # by name.
         if not hasattr(self, "_interior_stack"):
             self._interior_stack = []
+        source_map_name = getattr(self, "_interior_name", "")
+        if not source_map_name:
+            source_map_name = getattr(self.town_data, "name", "town")
         self._interior_stack.append({
             "col": door_col,
             "row": door_row,
+            "source_map": source_map_name,
             "tile_map": self.town_data.tile_map,
             "npcs": self.town_data.npcs,
             "interior_links": getattr(self.town_data, "interior_links", {}),

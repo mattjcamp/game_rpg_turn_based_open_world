@@ -35,8 +35,49 @@ class TileMap:
         # Cooldown timers: tile_id -> remaining steps
         self.unique_cooldowns = {}
         # Overworld interior data (populated by load_static_overworld)
-        self.tile_links = {}          # "col,row" -> {"interior": name}
+        self.tile_links = {}          # (col, row) -> {"interior": name, ...}
         self.overworld_interiors = [] # list of interior dicts
+
+    # ── Tile link helpers ────────────────────────────────────────
+
+    @staticmethod
+    def normalize_tile_links(raw_links):
+        """Convert tile_links from JSON string-key format to tuple-key format.
+
+        JSON stores keys as ``"col,row"`` strings; at runtime we use
+        ``(col, row)`` tuples for consistent, O(1) lookups everywhere.
+
+        Already-normalised dicts (with tuple keys) are returned as-is.
+        """
+        if not raw_links:
+            return {}
+        normalised = {}
+        for key, value in raw_links.items():
+            if isinstance(key, tuple):
+                normalised[key] = value
+            elif isinstance(key, str) and "," in key:
+                parts = key.split(",")
+                if len(parts) == 2:
+                    try:
+                        normalised[(int(parts[0]), int(parts[1]))] = value
+                    except ValueError:
+                        continue
+        return normalised
+
+    @staticmethod
+    def denormalize_tile_links(links):
+        """Convert tile_links from tuple-key format back to JSON string-key
+        format for serialisation (editor saves, overview_map.json, etc.).
+        """
+        if not links:
+            return {}
+        result = {}
+        for key, value in links.items():
+            if isinstance(key, tuple):
+                result[f"{key[0]},{key[1]}"] = value
+            else:
+                result[key] = value
+        return result
 
     def get_tile(self, col, row):
         """Get tile ID at (col, row). Returns oob_tile for out-of-bounds."""
@@ -141,7 +182,8 @@ def load_static_overworld(module_path):
                     if uid:
                         tmap.place_unique(c, r, uid, udef)
 
-                tmap.tile_links = data.get("tile_links", {})
+                tmap.tile_links = TileMap.normalize_tile_links(
+                    data.get("tile_links", {}))
                 tmap.overworld_interiors = data.get("interiors", [])
                 return tmap
 
@@ -166,7 +208,8 @@ def load_static_overworld(module_path):
                 # load path will prefer the static file over
                 # procedural regeneration regardless of seed.
                 tmap.seed = data.get("seed", mc.get("seed", 0))
-                tmap.tile_links = data.get("tile_links", {})
+                tmap.tile_links = TileMap.normalize_tile_links(
+                    data.get("tile_links", {}))
                 tmap.overworld_interiors = data.get("interiors", [])
                 return tmap
 
