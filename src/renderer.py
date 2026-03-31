@@ -38,6 +38,10 @@ from src.party import (
     PartyMember, VALID_RACES, RACE_INFO, grouped_index_to_original,
 )
 from src.tile_manifest import TileManifest
+from src.lighting import (
+    LightingContext, LightingMode, TintEffect,
+    render_lighting, scan_light_sources,
+)
 
 
 class Renderer(CombatEffectRendererMixin):
@@ -641,127 +645,54 @@ class Renderer(CombatEffectRendererMixin):
                           and party.galadriels_light_steps > 0)
 
         # ── Scan visible tiles once for all light-emitting features ──
-        from src.settings import TILE_DOOR, TILE_ALTAR, TILE_EXIT
-        torch_lights = []
-        feature_lights = []
-        for sr in range(rows):
-            for sc in range(cols):
-                wc = sc + off_c
-                wr = sr + off_r
-                tid = tile_map.get_tile(wc, wr)
-                if tid == TILE_WALL_TORCH:
-                    torch_lights.append((sc, sr, 5.0, 3.0))
-                elif tid == TILE_DOOR:
-                    feature_lights.append((sc, sr, 2.5, 2.0))
-                elif tid == TILE_ALTAR:
-                    feature_lights.append((sc, sr, 3.0, 2.5))
-                elif tid == TILE_EXIT:
-                    feature_lights.append((sc, sr, 2.0, 1.5))
+        torch_lights, feature_lights, torch_positions = scan_light_sources(
+            tile_map, off_c, off_r, cols, rows)
 
-        # Interior darkness is now set explicitly by the calling state
-        # (town.py ``_in_interior`` or overworld.py ``_in_overworld_interior``)
-        # rather than auto-detected from viewport torch presence, which was
-        # fragile when torches were just off-screen.
+        # Determine post-processing tint
+        has_equipped_light = party.get_equipped_name("light") is not None
+        has_any_light = has_equipped_light or has_infravision or has_galadriels
+        if has_infravision and not has_equipped_light:
+            tint = TintEffect.INFRAVISION
+        elif has_galadriels and not has_equipped_light and not has_infravision:
+            tint = TintEffect.GALADRIELS_LIGHT
+        else:
+            tint = TintEffect.NONE
 
-        # Interior / torch-lit areas — always dark regardless of time
         if interior_darkness:
-            has_light = (party.get_equipped_name("light") is not None
-                         or has_infravision or has_galadriels)
-            light_bonus = 3.0 if has_light else 0.0
-            p_radius = 1.0 + light_bonus
-            p_fade = 1.5
-            all_lights = [(psc, psr, p_radius, p_fade)]
-            for el in (torch_lights + feature_lights):
-                all_lights.append(el)
-
-            # ── Warm torch glow (ported from dungeon renderer) ──
-            # Wall torches cast a warm flickering orange light on nearby
-            # floor tiles, matching the dungeon atmosphere.
-            _now = pygame.time.get_ticks()
-            _torch_flicker = 0.6 + 0.4 * math.sin(_now * 0.008)
-            _torch_flicker2 = 0.6 + 0.4 * math.sin(_now * 0.011 + 1.5)
-            _torch_glow_radius = 3  # tiles of light radius
-            for tsc, tsr, _tr, _tf in torch_lights:
-                tsc_i = int(round(tsc))
-                tsr_i = int(round(tsr))
-                for dr in range(-_torch_glow_radius, _torch_glow_radius + 1):
-                    for dc in range(-_torch_glow_radius, _torch_glow_radius + 1):
-                        dist = abs(dr) + abs(dc)
-                        if dist == 0 or dist > _torch_glow_radius:
-                            continue
-                        nsc = tsc_i + dc
-                        nsr = tsr_i + dr
-                        if 0 <= nsc < cols and 0 <= nsr < rows:
-                            flk = (_torch_flicker if (dc + dr) % 2 == 0
-                                   else _torch_flicker2)
-                            intensity = (1.0 - dist /
-                                         (_torch_glow_radius + 1)) * flk
-                            alpha = int(35 * intensity)
-                            if alpha > 0:
-                                glow_s = pygame.Surface(
-                                    (ts, ts), pygame.SRCALPHA)
-                                glow_s.fill((255, 160, 50, alpha))
-                                self.screen.blit(
-                                    glow_s, (nsc * ts, nsr * ts))
-
-            # Cache a single reusable SRCALPHA tile for the fog overlay.
-            # (Large SRCALPHA surfaces don't blit visibly on SCALED displays,
-            #  but per-tile blits work correctly.)
-            _fog_tile = pygame.Surface((ts, ts), pygame.SRCALPHA)
-            for sr in range(rows):
-                for sc in range(cols):
-                    best_t = 999.0
-                    for lsc, lsr, lr, lf in all_lights:
-                        dx = sc - lsc
-                        dy = sr - lsr
-                        dist = math.sqrt(dx * dx + dy * dy)
-                        if dist <= lr:
-                            best_t = 0.0
-                            break
-                        elif lf > 0:
-                            t_val = (dist - lr) / lf
-                            if t_val < best_t:
-                                best_t = t_val
-                    if best_t <= 0.0:
-                        continue
-                    elif best_t >= 1.0:
-                        alpha = 255
-                    else:
-                        alpha = int(255 * best_t)
-                    alpha = max(0, min(255, alpha))
-                    _fog_tile.fill((0, 0, 0, alpha))
-                    self.screen.blit(_fog_tile, (sc * ts, sr * ts))
-            if has_infravision and party.get_equipped_name("light") is None:
-                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
-            elif (has_galadriels
-                  and party.get_equipped_name("light") is None
-                  and not has_infravision):
-                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr)
+            # Interior / torch-lit areas — always dark regardless of time
+            lctx = LightingContext(
+                mode=LightingMode.INTERIOR_DARKNESS,
+                tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+                party_screen_pos=(psc, psr),
+                has_party_light=has_any_light,
+                extra_lights=torch_lights + feature_lights,
+                torch_tiles=torch_positions,
+                tint=tint,
+            )
+            render_lighting(self.screen, lctx)
 
         elif (not clock.is_day or darkness_active) and not darkness_lifted:
-            has_light = (party.get_equipped_name("light") is not None
-                         or has_infravision or has_galadriels)
             # Build extra light sources from filled keyslots
-            extra_lights = torch_lights + feature_lights
+            extra = list(torch_lights + feature_lights)
             if keys_inserted > 0 and self._keyslot_index:
                 for (kc, kr), si in self._keyslot_index.items():
                     if si < keys_inserted:
                         ksc = kc - off_c
                         ksr = kr - off_r
                         ks_radius = 1.5 + 0.3 * keys_inserted
-                        extra_lights.append(
-                            (ksc, ksr, ks_radius, 1.5))
+                        extra.append((ksc, ksr, ks_radius, 1.5))
 
-            self._draw_overworld_darkness(clock, psc, psr, ts, cols, rows,
-                                          has_light=has_light,
-                                          force_night=darkness_active,
-                                          extra_lights=extra_lights)
-            if has_infravision and party.get_equipped_name("light") is None:
-                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc, psr)
-            elif (has_galadriels
-                  and party.get_equipped_name("light") is None
-                  and not has_infravision):
-                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc, psr)
+            lctx = LightingContext(
+                mode=LightingMode.CLOCK_DARKNESS,
+                clock=clock, tile_size=ts,
+                viewport_cols=cols, viewport_rows=rows,
+                party_screen_pos=(psc, psr),
+                has_party_light=has_any_light,
+                force_night=darkness_active,
+                extra_lights=extra,
+                tint=tint,
+            )
+            render_lighting(self.screen, lctx)
 
         # ── 4. blue border around map ──
         pygame.draw.rect(self.screen, (68, 68, 255),
@@ -2557,65 +2488,58 @@ class Renderer(CombatEffectRendererMixin):
         # stays centred on the party sprite.
         psc_dark = psc + pad_x / ts
         psr_dark = psr + pad_y / ts
-
-        # ── Scan visible tiles once for all light-emitting features ──
-        from src.settings import TILE_DOOR, TILE_ALTAR, TILE_EXIT
         px_off = pad_x / ts
         py_off = pad_y / ts
-        torch_lights = []
-        feature_lights = []
-        for sr in range(rows):
-            for sc in range(cols):
-                wc = sc + off_c
-                wr = sr + off_r
-                tid = tile_map.get_tile(wc, wr)
-                if tid == TILE_WALL_TORCH:
-                    torch_lights.append((sc + px_off, sr + py_off, 5.0, 3.0))
-                elif tid == TILE_DOOR:
-                    feature_lights.append((sc + px_off, sr + py_off, 2.5, 2.0))
-                elif tid == TILE_ALTAR:
-                    feature_lights.append((sc + px_off, sr + py_off, 3.0, 2.5))
-                elif tid == TILE_EXIT:
-                    feature_lights.append((sc + px_off, sr + py_off, 2.0, 1.5))
 
-        # Interior darkness is now set explicitly by the calling state
-        # (overworld.py ``_in_overworld_interior``) rather than
-        # auto-detected from viewport torch presence.
+        # ── Scan visible tiles once for all light-emitting features ──
+        torch_lights, feature_lights, torch_positions = scan_light_sources(
+            tile_map, off_c, off_r, cols, rows,
+            pad_sc=px_off, pad_sr=py_off)
 
-        # Interior / torch-lit areas — always dark regardless of time
+        # Determine post-processing tint
+        has_equipped_light = party.get_equipped_name("light") is not None
+        has_any_light = has_equipped_light or has_infravision or has_galadriels
+        if has_infravision and not has_equipped_light:
+            tint = TintEffect.INFRAVISION
+        elif has_galadriels and not has_equipped_light and not has_infravision:
+            tint = TintEffect.GALADRIELS_LIGHT
+        else:
+            tint = TintEffect.NONE
+
         if interior_darkness:
-            has_light = (party.get_equipped_name("light") is not None
-                         or has_infravision or has_galadriels)
-            extra_lights = torch_lights + feature_lights
-            self._draw_overworld_darkness(clock, psc_dark, psr_dark, ts, cols, rows,
-                                          has_light=has_light,
-                                          force_night=True,
-                                          extra_lights=extra_lights)
-            if has_infravision and party.get_equipped_name("light") is None:
-                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
-            elif (has_galadriels
-                  and party.get_equipped_name("light") is None
-                  and not has_infravision):
-                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
+            # Interior / torch-lit areas — always dark regardless of time
+            lctx = LightingContext(
+                mode=LightingMode.INTERIOR_DARKNESS,
+                tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+                party_screen_pos=(psc_dark, psr_dark),
+                has_party_light=has_any_light,
+                extra_lights=torch_lights + feature_lights,
+                torch_tiles=torch_positions,
+                tint=tint,
+            )
+            render_lighting(self.screen, lctx)
 
         elif not clock.is_day or darkness_active:
-            has_light = (party.get_equipped_name("light") is not None
-                         or has_infravision or has_galadriels)
-            extra_lights = torch_lights + feature_lights
-            self._draw_overworld_darkness(clock, psc_dark, psr_dark, ts, cols, rows,
-                                          has_light=has_light,
-                                          force_night=darkness_active,
-                                          extra_lights=extra_lights)
-            if has_infravision and party.get_equipped_name("light") is None:
-                self._u3_infravision_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
-            elif (has_galadriels
-                  and party.get_equipped_name("light") is None
-                  and not has_infravision):
-                self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark)
+            lctx = LightingContext(
+                mode=LightingMode.CLOCK_DARKNESS,
+                clock=clock, tile_size=ts,
+                viewport_cols=cols, viewport_rows=rows,
+                party_screen_pos=(psc_dark, psr_dark),
+                has_party_light=has_any_light,
+                force_night=darkness_active,
+                extra_lights=torch_lights + feature_lights,
+                tint=tint,
+            )
+            render_lighting(self.screen, lctx)
+
         # Galadriel's Light blue tint also applies during day (subtle)
         if has_galadriels and not has_infravision:
-            self._u3_galadriels_tint(cols, rows, ts, None, 0, 0, psc_dark, psr_dark,
-                                      subtle=True)
+            lctx_subtle = LightingContext(
+                mode=LightingMode.NONE,
+                tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+                tint=TintEffect.GALADRIELS_SUBTLE,
+            )
+            render_lighting(self.screen, lctx_subtle)
 
         # ── 4. blue border around map ──
         # If the map is smaller than the viewport, border only the map area
@@ -3284,11 +3208,9 @@ class Renderer(CombatEffectRendererMixin):
                         col_mote = (bright // 2, bright, 255) if i % 2 == 0 else (bright, bright, 255)
                         pygame.draw.circle(self.screen, col_mote, (mx, my), 1)
 
-        # ── 1e. animated torch light glow ──
-        # Wall torches cast a warm flickering light on nearby floor tiles
-        _torch_flicker = 0.6 + 0.4 * _math.sin(_art_t * 0.008)
-        _torch_flicker2 = 0.6 + 0.4 * _math.sin(_art_t * 0.011 + 1.5)
-        _torch_radius = 3  # tiles of light radius
+        # ── 1e. animated torch light glow (via unified lighting) ──
+        # Scan for wall torches visible to the party; filter by LOS set
+        _dg_torch_positions = []
         for sr2 in range(rows):
             for sc2 in range(cols):
                 wc2 = sc2 + off_c
@@ -3296,24 +3218,14 @@ class Renderer(CombatEffectRendererMixin):
                 if tile_map.get_tile(wc2, wr2) == TILE_WALL_TORCH:
                     if visible_tiles and (wc2, wr2) not in visible_tiles:
                         continue
-                    # Light up surrounding tiles in a radius
-                    for dr in range(-_torch_radius, _torch_radius + 1):
-                        for dc in range(-_torch_radius, _torch_radius + 1):
-                            dist = abs(dr) + abs(dc)
-                            if dist == 0 or dist > _torch_radius:
-                                continue
-                            nsc = sc2 + dc
-                            nsr = sr2 + dr
-                            if 0 <= nsc < cols and 0 <= nsr < rows:
-                                # Use alternating flicker for variety
-                                flk = _torch_flicker if (dc + dr) % 2 == 0 else _torch_flicker2
-                                # Intensity falls off with distance
-                                intensity = (1.0 - dist / (_torch_radius + 1)) * flk
-                                alpha = int(35 * intensity)
-                                if alpha > 0:
-                                    glow_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
-                                    glow_s.fill((255, 160, 50, alpha))
-                                    self.screen.blit(glow_s, (nsc * ts, nsr * ts))
+                    _dg_torch_positions.append((sc2, sr2))
+        if _dg_torch_positions:
+            _glow_ctx = LightingContext(
+                mode=LightingMode.NONE,
+                tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+                torch_tiles=_dg_torch_positions,
+            )
+            render_lighting(self.screen, _glow_ctx)
 
         # ── 2. monster sprites (only within visible tiles) ──
         for monster in dungeon_data.monsters:
@@ -3366,20 +3278,24 @@ class Renderer(CombatEffectRendererMixin):
             cy = psr * ts + ts // 2
             self._u3_draw_overworld_party(cx, cy, party)
 
-        # ── 3b. infravision red/black tint ──
+        # ── 3b/3c/4. unified lighting: tint + fog of war ──
         if infravision:
-            self._u3_infravision_tint(cols, rows, ts, visible_tiles,
-                                       off_c, off_r, psc, psr)
-        # ── 3c. Galadriel's Light blue tint ──
+            _dg_tint = TintEffect.INFRAVISION
         elif galadriels_light:
-            self._u3_galadriels_tint(cols, rows, ts, visible_tiles,
-                                      off_c, off_r, psc, psr)
-
-        # ── 4. fog of war ──
-        self._u3_dungeon_fog(psc, psr, cols, rows, ts,
-                              visible_tiles=visible_tiles,
-                              explored_tiles=explored_tiles,
-                              off_c=off_c, off_r=off_r)
+            _dg_tint = TintEffect.GALADRIELS_LIGHT
+        else:
+            _dg_tint = TintEffect.NONE
+        _fog_ctx = LightingContext(
+            mode=LightingMode.FOG_OF_WAR,
+            tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+            party_screen_pos=(psc, psr),
+            visible_tiles=visible_tiles,
+            explored_tiles=explored_tiles,
+            camera_offset=(off_c, off_r),
+            fog_surface_size=(self._U3_DG_MAP_W, self._U3_DG_MAP_H),
+            tint=_dg_tint,
+        )
+        render_lighting(self.screen, _fog_ctx)
 
         # ── 4b. door unlock animation ──
         if door_unlock_anim:
