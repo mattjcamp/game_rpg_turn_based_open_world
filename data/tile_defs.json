@@ -487,7 +487,7 @@
   },
   "52": {
     "name": "General Store Sign",
-    "walkable": true,
+    "walkable": false,
     "color": [
       128,
       128,
@@ -580,5 +580,31 @@
     "sprite": "town/counter",
     "interaction_type": "shop",
     "interaction_data": "magic"
+  },
+  "60": {
+    "name": "Armor & Weapons",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/shop_sign",
+    "interaction_type": "sign",
+    "interaction_data": "Armor & Weapons"
+  },
+  "61": {
+    "name": "Healing Counter",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/altar",
+    "interaction_type": "shop",
+    "interaction_data": "guild"
   }
 }

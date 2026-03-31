@@ -8150,16 +8150,29 @@ class Renderer(CombatEffectRendererMixin):
                         item_fields or [], item_field, item_buffer,
                         item_field_scroll, fm, fs, f)
             elif ed == "counters":
-                self._draw_features_generic_list(
-                    left_x, left_w, right_x, right_w, panel_y, panel_h,
-                    counter_list or [], counter_cursor, counter_scroll,
-                    "Counters", None, fm, fs, f)
-                if level == 2:
-                    self._draw_features_spell_editor(
-                        right_x, panel_y, right_w, panel_h,
-                        counter_fields or [], counter_field,
-                        counter_buffer, counter_field_scroll,
+                if level == 3:
+                    # Item sub-list view
+                    ct = state.counters
+                    self._draw_counter_items_list(
+                        left_x, left_w, right_x, right_w,
+                        panel_y, panel_h,
+                        ct.item_list or [], ct.item_cursor,
+                        ct.item_scroll, ct.items_cache or {},
+                        counter_list, counter_cursor,
                         fm, fs, f)
+                else:
+                    self._draw_features_generic_list(
+                        left_x, left_w, right_x, right_w,
+                        panel_y, panel_h,
+                        counter_list or [], counter_cursor,
+                        counter_scroll,
+                        "Counters", None, fm, fs, f)
+                    if level == 2:
+                        self._draw_features_spell_editor(
+                            right_x, panel_y, right_w, panel_h,
+                            counter_fields or [], counter_field,
+                            counter_buffer, counter_field_scroll,
+                            fm, fs, f)
             elif ed == "monsters":
                 self._draw_features_generic_list(
                     left_x, left_w, right_x, right_w, panel_y, panel_h,
@@ -12571,6 +12584,146 @@ class Renderer(CombatEffectRendererMixin):
                 "  [Ctrl+D] Delete  [Esc] Back")
         self._u3_text(hint,
                       SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
+                      self._U3_HINT, fs)
+
+    def _draw_counter_items_list(self, left_x, left_w, right_x,
+                                 right_w, panel_y, panel_h,
+                                 items, cursor, scroll,
+                                 items_cache, counter_list,
+                                 counter_cursor, fm, fs, f):
+        """Draw the counter item sub-list with item icons."""
+        # Get counter name for title
+        counter_name = ""
+        if counter_list and 0 <= counter_cursor < len(counter_list):
+            counter_name = counter_list[counter_cursor].get(
+                "_name", "Counter")
+
+        # ── Left panel: item list ──
+        self._u3_text(counter_name, left_x + 12, panel_y + 8,
+                      self._U3_ORANGE, fs)
+        row_h = 36
+        ly = panel_y + 30
+        max_visible = (panel_h - 40) // row_h
+
+        # Adjust scroll
+        dscroll = scroll
+        if cursor < dscroll:
+            dscroll = cursor
+        if cursor >= dscroll + max_visible:
+            dscroll = cursor - max_visible + 1
+
+        dy = ly
+        for di in range(dscroll, min(dscroll + max_visible, len(items))):
+            item_name = items[di]
+            selected = (di == cursor)
+
+            if selected:
+                bar = pygame.Surface((left_w - 4, row_h - 2),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (left_x + 2, dy))
+
+            # Draw item icon (24px)
+            icon_x = left_x + 12
+            icon_size = 24
+            text_x = left_x + 14
+            info = items_cache.get(item_name, {})
+            icon_type = info.get("icon", "")
+            if icon_type:
+                self._draw_item_icon(
+                    icon_x + icon_size // 2,
+                    dy + 4 + icon_size // 2,
+                    icon_type, icon_size)
+                text_x = icon_x + icon_size + 8
+
+            prefix = "> " if selected else "  "
+            nc = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(f"{prefix}{item_name}",
+                          text_x, dy + 4, nc, fm)
+
+            # Show section as subtitle
+            section = info.get("section", "")
+            if section:
+                sc = (140, 180, 140) if selected else (120, 120, 140)
+                self._u3_text(section.title(),
+                              text_x + 16, dy + 20, sc, fs)
+            dy += row_h
+
+        # Empty list message
+        if not items:
+            self._u3_text("No items yet.",
+                          left_x + 20, ly + 10,
+                          (120, 120, 140), fm)
+            self._u3_text("Press Ctrl+N to add items.",
+                          left_x + 20, ly + 32,
+                          (100, 100, 120), fs)
+
+        # Scroll indicators
+        if dscroll > 0:
+            self._u3_text("^", left_x + left_w // 2 - 4, ly - 8,
+                          (180, 180, 200), fs)
+        if dscroll + max_visible < len(items):
+            self._u3_text("v", left_x + left_w // 2 - 4,
+                          ly + max_visible * row_h - 4,
+                          (180, 180, 200), fs)
+
+        # ── Right panel: selected item detail ──
+        if 0 <= cursor < len(items):
+            item_name = items[cursor]
+            info = items_cache.get(item_name, {})
+            dy = panel_y + 12
+
+            # Item icon large preview
+            icon_type = info.get("icon", "")
+            preview_size = 56
+            if icon_type:
+                px = right_x + right_w - preview_size - 20
+                py = panel_y + 16
+                bg = pygame.Surface(
+                    (preview_size + 8, preview_size + 8),
+                    pygame.SRCALPHA)
+                bg.fill((0, 0, 0, 160))
+                self.screen.blit(bg, (px - 4, py - 4))
+                self._draw_item_icon(
+                    px + preview_size // 2,
+                    py + preview_size // 2,
+                    icon_type, preview_size)
+                pygame.draw.rect(self.screen, (80, 70, 50),
+                                 (px - 4, py - 4,
+                                  preview_size + 8,
+                                  preview_size + 8), 1)
+
+            self._u3_text(item_name, right_x + 16, dy,
+                          self._U3_WHITE, f)
+            dy += 28
+
+            section = info.get("section", "")
+            if section:
+                self._u3_text(f"Type: {section.title()}",
+                              right_x + 16, dy,
+                              (160, 160, 180), fm)
+                dy += 22
+
+            buy = info.get("buy", 0)
+            if buy:
+                self._u3_text(f"Buy: {buy}g",
+                              right_x + 16, dy,
+                              (140, 140, 160), fs)
+                dy += 18
+
+            dy += 10
+            pygame.draw.line(self.screen, (60, 50, 40),
+                             (right_x + 12, dy),
+                             (right_x + right_w - 12, dy), 1)
+            dy += 14
+            self._u3_text("[Left/Right] Change Item",
+                          right_x + 16, dy, (120, 120, 140), fs)
+
+        # Footer
+        hint = ("[Up/Dn] Browse  [Left/Right] Change"
+                "  [Ctrl+N] Add  [Ctrl+D] Remove  [Esc] Back")
+        self._u3_text(hint,
+                      SCREEN_WIDTH // 2 - 250, SCREEN_HEIGHT - 45,
                       self._U3_HINT, fs)
 
     def draw_module_screen(self, modules, cursor, active_path,

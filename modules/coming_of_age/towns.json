@@ -5466,9 +5466,8 @@
             "path": "game/terrain/wall_copy.png"
           },
           "7,10": {
-            "tile_id": 10,
-            "name": "Floor",
-            "path": "game/terrain/town_floor.png"
+            "tile_id": 61,
+            "name": "Healing Counter"
           },
           "8,10": {
             "tile_id": 10,

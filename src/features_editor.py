@@ -1742,8 +1742,13 @@ class FeaturesEditor:
         return True
 
     def build_counter_fields(self, counter):
-        """Build editable field list for a single counter type."""
+        """Build editable field list for a single counter type.
+
+        Only includes counter-type settings (name, description).
+        Items are managed in a dedicated sub-list at level 3.
+        """
         FE = FieldEntry
+        n_items = len(counter.get("items", []))
         fields = [
             FE("-- Counter Type --", "_hdr1", "", "section", False),
             FE("Key", "_key", counter.get("_key", ""), "text", False),
@@ -1751,11 +1756,9 @@ class FeaturesEditor:
             FE("Description", "description",
                counter.get("description", "")),
             FE("-- Items for Sale --", "_hdr2", "", "section", False),
+            FE(f"Items ({n_items})", "_edit_items",
+               "Enter to edit >", "text", True),
         ]
-        items = counter.get("items", [])
-        for i, item_name in enumerate(items):
-            fields.append(
-                FE(f"  Item {i + 1}", f"_item_{i}", item_name, "choice"))
         self.counter_fields = fields
         idx, buf = self.finalize_fields(fields)
         self.counter_field = idx
@@ -1772,26 +1775,17 @@ class FeaturesEditor:
             entry.value = self.counter_buffer
         for entry in self.counter_fields:
             key, val = entry.key, entry.value
-            if key.startswith("_") and key not in ("_name", "_key"):
-                if key.startswith("_item_"):
-                    # Update item in the items list
-                    try:
-                        idx = int(key.split("_")[2])
-                        items = counter.get("items", [])
-                        if 0 <= idx < len(items):
-                            items[idx] = val
-                    except (ValueError, IndexError):
-                        pass
+            if key.startswith("_"):
+                if key == "_name":
+                    counter["_name"] = val
                 continue
-            if key == "_key":
-                continue  # Key is read-only
             counter[key] = val
 
     def get_counter_choices(self, key):
         """Return choice options for a counter field."""
-        if key.startswith("_item_"):
-            # Return all item names from items.json
-            return self._get_all_item_names()
+        if key == "_edit_items":
+            # Not a real choice — handled by entering the item sub-list
+            return []
         return []
 
     def _get_all_item_names(self):
@@ -1808,6 +1802,62 @@ class FeaturesEditor:
             if isinstance(section_items, dict):
                 names.extend(sorted(section_items.keys()))
         return sorted(set(names))
+
+    def _get_item_info(self, item_name):
+        """Return (section, icon, buy_price) for an item name."""
+        path = self.items_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        for section in ("weapons", "armors", "general"):
+            section_items = data.get(section, {})
+            if item_name in section_items:
+                entry = section_items[item_name]
+                return (section, entry.get("icon", ""),
+                        entry.get("buy", 0))
+        return ("unknown", "", 0)
+
+    def _load_items_cache(self):
+        """Load items data for use by the counter item editor.
+
+        Returns a dict mapping item_name → {section, icon, buy}.
+        """
+        path = self.items_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        cache = {}
+        for section in ("weapons", "armors", "general"):
+            for name, entry in data.get(section, {}).items():
+                cache[name] = {
+                    "section": section,
+                    "icon": entry.get("icon", ""),
+                    "buy": entry.get("buy", 0),
+                }
+        return cache
+
+    def counter_open_items(self):
+        """Open the item sub-list for the selected counter (enters level 3)."""
+        if self.counter_cursor >= len(self.counter_list):
+            return
+        counter = self.counter_list[self.counter_cursor]
+        self.counter_item_list = list(counter.get("items", []))
+        self.counter_item_cursor = 0
+        self.counter_item_scroll = 0
+        self._counter_items_cache = self._load_items_cache()
+        self._counter_all_items = self._get_all_item_names()
+        self.level = 3
+
+    def counter_save_items(self):
+        """Save the item sub-list back to the counter dict."""
+        if self.counter_cursor >= len(self.counter_list):
+            return
+        counter = self.counter_list[self.counter_cursor]
+        counter["items"] = list(self.counter_item_list)
 
     def add_counter(self):
         """Add a new blank counter type."""
@@ -1833,26 +1883,94 @@ class FeaturesEditor:
                     0, len(self.counter_list) - 1)
 
     def counter_add_item(self):
-        """Add a new item slot to the currently selected counter."""
-        if self.counter_cursor >= len(self.counter_list):
-            return
-        counter = self.counter_list[self.counter_cursor]
-        items = counter.get("items", [])
-        items.append("Torch")
-        counter["items"] = items
-        # Rebuild fields to show the new item
-        self.build_counter_fields(counter)
+        """Add a new item to the counter's item list (first available item)."""
+        all_items = getattr(self, '_counter_all_items', None)
+        if not all_items:
+            all_items = self._get_all_item_names()
+            self._counter_all_items = all_items
+        if all_items:
+            self.counter_item_list.append(all_items[0])
+            self.counter_item_cursor = len(self.counter_item_list) - 1
+            self.counter_save_items()
+            self.dirty = True
 
     def counter_remove_item(self):
-        """Remove the last item slot from the currently selected counter."""
-        if self.counter_cursor >= len(self.counter_list):
+        """Remove the currently selected item from the counter's list."""
+        if not self.counter_item_list:
             return
-        counter = self.counter_list[self.counter_cursor]
-        items = counter.get("items", [])
-        if items:
-            items.pop()
-            counter["items"] = items
-            self.build_counter_fields(counter)
+        idx = self.counter_item_cursor
+        if 0 <= idx < len(self.counter_item_list):
+            self.counter_item_list.pop(idx)
+            if self.counter_item_cursor >= len(self.counter_item_list):
+                self.counter_item_cursor = max(
+                    0, len(self.counter_item_list) - 1)
+            self.counter_save_items()
+            self.dirty = True
+
+    def counter_cycle_item(self, direction=1):
+        """Cycle the currently selected item through all available items."""
+        if not self.counter_item_list:
+            return
+        idx = self.counter_item_cursor
+        if idx < 0 or idx >= len(self.counter_item_list):
+            return
+        all_items = getattr(self, '_counter_all_items', None)
+        if not all_items:
+            all_items = self._get_all_item_names()
+            self._counter_all_items = all_items
+        if not all_items:
+            return
+        current = self.counter_item_list[idx]
+        try:
+            ci = all_items.index(current)
+        except ValueError:
+            ci = 0
+        ci = (ci + direction) % len(all_items)
+        self.counter_item_list[idx] = all_items[ci]
+        self.counter_save_items()
+        self.dirty = True
+
+    def _handle_counter_items_input(self, event):
+        """Handle input for the counter item sub-list (level 3)."""
+        items = self.counter_item_list
+        n = len(items)
+
+        if self._is_save_shortcut(event):
+            self.counter_save_items()
+            self.save_counters()
+            self.dirty = False
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            self.counter_save_items()
+            # Rebuild the counter fields to update the item count
+            if self.counter_cursor < len(self.counter_list):
+                self.build_counter_fields(
+                    self.counter_list[self.counter_cursor])
+            self.level = 2
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self.counter_item_cursor = (
+                self.counter_item_cursor - 1) % n
+            self.counter_item_scroll = self._adjust_scroll_generic(
+                self.counter_item_cursor, self.counter_item_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self.counter_item_cursor = (
+                self.counter_item_cursor + 1) % n
+            self.counter_item_scroll = self._adjust_scroll_generic(
+                self.counter_item_cursor, self.counter_item_scroll)
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            # Cycle the selected item through all available items
+            if n > 0:
+                direction = 1 if event.key == pygame.K_RIGHT else -1
+                self.counter_cycle_item(direction)
+        elif self._is_new_shortcut(event):
+            self.counter_add_item()
+            self.counter_item_scroll = self._adjust_scroll_generic(
+                self.counter_item_cursor, self.counter_item_scroll)
+        elif self._is_delete_shortcut(event):
+            self.counter_remove_item()
 
     # ══════════════════════════════════════════════════════════
     # ── Monsters Editor Methods ────────────────────────────────
@@ -3272,6 +3390,22 @@ class FeaturesEditor:
         # Build a context dict so the level-1 and level-2 code
         # can work generically across all editor types
         ctx = self.editor_ctx()
+
+        # ── Level 3: counter item sub-list ──
+        if self.level == 3 and ed == "counters":
+            self._handle_counter_items_input(event)
+            return
+
+        # ── Level 2 counters: intercept Enter on "Edit Items" field ──
+        if self.level == 2 and ed == "counters" and ctx:
+            fields = ctx["fields"]()
+            field_idx = ctx["field_idx"]()
+            if (fields and 0 <= field_idx < len(fields)
+                    and fields[field_idx].key == "_edit_items"
+                    and event.key in (pygame.K_RETURN, pygame.K_RIGHT)):
+                ctx["save_fields"]()
+                self.counter_open_items()
+                return
 
         # ── Level 2: editing individual fields ──
         # (tiles and gallery use level 2 for browsing, not field editing)
@@ -4724,6 +4858,7 @@ class FeaturesEditor:
                 item_list=self.counter_item_list,
                 item_cursor=self.counter_item_cursor,
                 item_scroll=self.counter_item_scroll,
+                items_cache=getattr(self, '_counter_items_cache', None),
             ),
             monsters=MonsterEditorRS(
                 list=self.mon_list,

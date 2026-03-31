@@ -329,6 +329,8 @@ class CounterEditorRS:
     item_list: Optional[List[str]] = None
     item_cursor: int = 0
     item_scroll: int = 0
+    # Cache of item info for rendering (name → {section, icon, buy})
+    items_cache: Optional[Dict[str, dict]] = None
 
 
 @dataclass
