@@ -206,6 +206,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.active_module_name = "No Module"
         self.active_module_version = "0.0.0"
         self.module_manifest = None  # populated on new game start
+        self.link_registry = None   # LinkRegistry – loaded per module
 
         # ── Town Editor (within module) ──
         self._mod_town_list = []          # list of town dicts for current module
@@ -605,6 +606,21 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 overworld_cfg=overworld_cfg,
                 data_dir=self.active_module_path)
         self.camera = Camera(self.tile_map.width, self.tile_map.height)
+
+        # ── Validate bidirectional links ──
+        if self.active_module_path:
+            from src.tile_map import validate_module_links
+            validate_module_links(self.active_module_path)
+
+        # ── Load link registry and push into tile map ──
+        if self.active_module_path:
+            from src.link_registry import LinkRegistry
+            self.link_registry = LinkRegistry()
+            self.link_registry.load(self.active_module_path)
+            # Sync registry links into the overworld TileMap so runtime
+            # transition code (tmap.get_link()) sees them.
+            self.link_registry.populate_tile_map(
+                self.tile_map, "overworld")
 
         if self.party.members:
             # Player already formed a party - keep roster & active members,
@@ -1116,23 +1132,38 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Reuse the pre-loaded towns.json data (loaded before the
         # landmark loop above).
         towns_json_by_name = _towns_json_by_name
+        # Merge legacy tile_links AND unified links (from link registry)
+        # into a single dict so the registration loop handles both.
+        _all_links = {}  # (col, row) -> {"interior": name, ...}
         tile_links = getattr(self.tile_map, "tile_links", {})
         for pos_key, link_val in tile_links.items():
             if not isinstance(link_val, dict):
                 continue
-            link_name = link_val.get("interior", "")
-            if not link_name:
+            name = link_val.get("interior", "")
+            if not name:
                 continue
-            # Keys are now (col, row) tuples after normalisation
             if isinstance(pos_key, tuple):
-                lcol, lrow = pos_key
+                _all_links[pos_key] = link_val
             elif isinstance(pos_key, str) and "," in pos_key:
                 parts = pos_key.split(",")
-                if len(parts) != 2:
-                    continue
-                lcol, lrow = int(parts[0]), int(parts[1])
-            else:
+                if len(parts) == 2:
+                    _all_links[(int(parts[0]), int(parts[1]))] = link_val
+        # Also include unified links populated from the link registry.
+        for pos_key, link_val in getattr(self.tile_map, "links", {}).items():
+            if not isinstance(link_val, dict):
                 continue
+            name = link_val.get("interior", "") or link_val.get("target_map", "")
+            if not name:
+                continue
+            if isinstance(pos_key, tuple) and pos_key not in _all_links:
+                _all_links[pos_key] = link_val
+
+        for pos_key, link_val in _all_links.items():
+            link_name = (link_val.get("interior", "")
+                         or link_val.get("target_map", ""))
+            if not link_name:
+                continue
+            lcol, lrow = pos_key
             if (lcol, lrow) in self.town_data_map:
                 continue
             # If a town with this name was already generated from a
@@ -3040,6 +3071,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         tmap.links = TileMap.tile_links_to_unified(
             tmap.tile_links, source_map="overworld")
 
+        # Re-validate links after editor changes
+        from src.tile_map import validate_module_links
+        validate_module_links(self.active_module_path)
+
         # If the overview map tiles were also updated, refresh them
         # so the player sees the latest map layout.
         tiles = sdata.get("tiles")
@@ -3780,6 +3815,40 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                             "sub_interior": spname,
                         })
 
+        # ── Ensure link registry exists ──
+        if self.link_registry is None and self.active_module_path:
+            from src.link_registry import LinkRegistry
+            self.link_registry = LinkRegistry()
+            self.link_registry.load(self.active_module_path)
+
+        # ── Build module maps list for link manager ──
+        # Stored on self so other editors (town, building, dungeon) can reuse it.
+        module_maps = [("overworld", "Overworld")]
+        for t in getattr(self, '_mod_town_list', []):
+            tname = t.get("name", "")
+            if tname:
+                module_maps.append((f"town:{tname}", f"Town: {tname}"))
+        for b in getattr(self, '_mod_building_list', []):
+            bname = b.get("name", "")
+            if bname:
+                for sp in b.get("spaces", []):
+                    spname = sp.get("name", "")
+                    if spname:
+                        module_maps.append(
+                            (f"building:{bname}:{spname}",
+                             f"Building: {bname} / {spname}"))
+        for d in getattr(self, '_mod_dungeon_list', []):
+            dname = d.get("name", "")
+            if dname:
+                for lv in d.get("levels", []):
+                    lvname = lv.get("name", "")
+                    if lvname:
+                        module_maps.append(
+                            (f"dungeon:{dname}:{lvname}",
+                             f"Dungeon: {dname} / {lvname}"))
+
+        self._mod_module_maps = module_maps
+
         # ── Load existing tile links ──
         tile_links = self._mod_overview_map.get("tile_links", {})
 
@@ -3791,12 +3860,18 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self._mod_overview_map["tile_links"] = st.tile_links
             self._mod_overview_map["party_start"] = st.party_start
             self._save_module_overview_map()
+            # Persist link registry changes
+            if self.link_registry and self.link_registry.dirty:
+                self.link_registry.save(self.active_module_path)
 
         def _on_exit(st):
             self._mod_overview_map["tiles"] = st.tiles
             self._mod_overview_map["tile_links"] = st.tile_links
             self._mod_overview_map["party_start"] = st.party_start
             self._save_module_overview_map()
+            # Persist link registry changes
+            if self.link_registry and self.link_registry.dirty:
+                self.link_registry.save(self.active_module_path)
             self.showing_features = False
             self.showing_modules = True
             self.module_edit_mode = True
@@ -3811,6 +3886,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             brushes=brushes,
             tile_context="overworld",
             supports_tile_links=True,
+            supports_connecting_links=True,
+            map_address="overworld",
+            link_registry=self.link_registry,
+            module_maps=module_maps,
             supports_replace=True,
             supports_party_start=True,
             on_save=_on_save,

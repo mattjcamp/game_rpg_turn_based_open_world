@@ -1408,7 +1408,9 @@ class DungeonState(InventoryMixin, BaseState):
         if link:
             lt = link.get("target_type", "")
             if lt == "interior":
-                self._enter_interior_level(link["target_map"])
+                self._enter_interior_level(
+                    link["target_map"],
+                    target_pos=link.get("target_pos"))
                 return
             elif lt == "overworld":
                 self.show_message("Exit! Press ESC to leave.", 2000)
@@ -1606,12 +1608,12 @@ class DungeonState(InventoryMixin, BaseState):
         depth = self.current_level + 1
         self.show_message(f"You ascend to floor {depth}.", 2000)
 
-    def _enter_interior_level(self, target_name):
+    def _enter_interior_level(self, target_name, target_pos=None):
         """Transition to another custom dungeon level by name.
 
-        Finds the target level in quest_levels by matching its name,
-        then spawns the party at the tile that links back to the
-        current level (the back-link).
+        If *target_pos* is set (from the link registry), the party is
+        placed there directly.  Otherwise, finds the back-link tile
+        on the target level.
         """
         if not self.quest_levels:
             return
@@ -1629,21 +1631,25 @@ class DungeonState(InventoryMixin, BaseState):
         self.current_level = target_idx
         self.dungeon_data = self.quest_levels[target_idx]
         self._invalidate_torch_cache()
-        # Find the back-link tile on the target level — the tile
-        # whose interior link points back to the level we came from.
-        tmap = self.dungeon_data.tile_map
-        links = getattr(tmap, "_interior_links", {})
-        spawn = None
-        for (c, r), link_name in links.items():
-            if link_name == current_name:
-                spawn = (c, r)
-                break
-        if spawn:
-            self.game.party.col, self.game.party.row = spawn
+
+        # Priority 1: explicit target_pos from link
+        if target_pos and target_pos != (0, 0):
+            self.game.party.col, self.game.party.row = target_pos
         else:
-            # Fallback to stored entry point
-            self.game.party.col = self.dungeon_data.entry_col
-            self.game.party.row = self.dungeon_data.entry_row
+            # Priority 2: back-link tile on the target level
+            tmap = self.dungeon_data.tile_map
+            links = getattr(tmap, "_interior_links", {})
+            spawn = None
+            for (c, r), link_name in links.items():
+                if link_name == current_name:
+                    spawn = (c, r)
+                    break
+            if spawn:
+                self.game.party.col, self.game.party.row = spawn
+            else:
+                # Fallback to stored entry point
+                self.game.party.col = self.dungeon_data.entry_col
+                self.game.party.row = self.dungeon_data.entry_row
         self.game.camera.map_width = tmap.width
         self.game.camera.map_height = tmap.height
         self.game.camera.update(self.game.party.col, self.game.party.row)

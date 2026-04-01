@@ -312,8 +312,7 @@
       "11,2": {
         "tile_id": 13,
         "name": "Door",
-        "path": "game/terrain/town_door.png",
-        "to_overworld": true
+        "path": "game/terrain/town_door.png"
       },
       "12,2": {
         "tile_id": 49,
@@ -455,21 +454,6 @@
         "name": "Path Floor",
         "path": "game/terrain/path.png"
       },
-      "15,3": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
-      },
-      "16,3": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
-      },
-      "17,3": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
-      },
       "18,3": {
         "tile_id": 46,
         "name": "Path Floor",
@@ -576,11 +560,6 @@
         "path": "game/terrain/path.png"
       },
       "14,4": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
-      },
-      "15,4": {
         "tile_id": 46,
         "name": "Path Floor",
         "path": "game/terrain/path.png"
@@ -701,11 +680,6 @@
         "path": "game/terrain/path.png"
       },
       "14,5": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
-      },
-      "15,5": {
         "tile_id": 46,
         "name": "Path Floor",
         "path": "game/terrain/path.png"
@@ -858,8 +832,7 @@
       "20,6": {
         "tile_id": 13,
         "name": "Door",
-        "path": "game/terrain/town_door.png",
-        "interior": "Weapons & Armor Interior"
+        "path": "game/terrain/town_door.png"
       },
       "21,6": {
         "tile_id": 49,
@@ -919,8 +892,7 @@
       "7,7": {
         "tile_id": 13,
         "name": "Door",
-        "path": "game/terrain/town_door.png",
-        "interior": "General Shop Interior"
+        "path": "game/terrain/town_door.png"
       },
       "8,7": {
         "tile_id": 49,
@@ -2208,8 +2180,7 @@
       "16,17": {
         "tile_id": 45,
         "name": "Shrine",
-        "path": "unassigned/shrine_church.png",
-        "interior": "Shrine of Lanis"
+        "path": "unassigned/shrine_church.png"
       },
       "17,17": {
         "tile_id": 54,
@@ -3178,8 +3149,7 @@
           },
           "5,0": {
             "tile_id": 13,
-            "name": "Door",
-            "interior": "Tunnel Short"
+            "name": "Door"
           },
           "6,0": {
             "tile_id": 34,
@@ -3209,8 +3179,7 @@
           "9,2": {
             "tile_id": 26,
             "name": "Door",
-            "path": "game/dungeon/dungeon_door.png",
-            "to_town": true
+            "path": "game/dungeon/dungeon_door.png"
           },
           "9,3": {
             "tile_id": 21,
@@ -3521,8 +3490,7 @@
           "15,1": {
             "tile_id": 26,
             "name": "Door",
-            "path": "game/dungeon/dungeon_door.png",
-            "interior": "Tunnel Long"
+            "path": "game/dungeon/dungeon_door.png"
           },
           "15,0": {
             "tile_id": 21,
@@ -3731,8 +3699,7 @@
           },
           "0,1": {
             "tile_id": 13,
-            "name": "Door",
-            "interior": "General Shop Interior"
+            "name": "Door"
           }
         },
         "template_label": "Tunnel Short"

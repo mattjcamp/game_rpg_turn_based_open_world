@@ -641,8 +641,8 @@
     [
       7,
       7,
-      7,
-      7,
+      0,
+      0,
       1,
       1,
       1,
@@ -683,7 +683,7 @@
     [
       7,
       7,
-      7,
+      0,
       7,
       8,
       1,
@@ -694,7 +694,7 @@
       0,
       6,
       6,
-      6,
+      0,
       0,
       0,
       0,
@@ -725,7 +725,7 @@
     [
       7,
       7,
-      7,
+      0,
       1,
       1,
       1,
@@ -1269,26 +1269,7 @@
       1
     ]
   ],
-  "tile_links": {
-    "15,15": {
-      "interior": "Midherm",
-      "type": "town"
-    },
-    "17,14": {
-      "interior": "Midherm",
-      "type": "town",
-      "sub_interior": "Tunnel Long"
-    },
-    "7,10": {
-      "interior": "Grotto",
-      "type": "dungeon"
-    },
-    "15,20": {
-      "interior": "Abandoned Building",
-      "type": "building",
-      "sub_interior": "Main Hall"
-    }
-  },
+  "tile_links": {},
   "party_start": {
     "col": 16,
     "row": 17

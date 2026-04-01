@@ -357,6 +357,313 @@ def load_static_overworld(module_path):
     return None
 
 
+# ── Bidirectional link validation ──────────────────────────────
+
+def validate_module_links(module_path):
+    """Check every map link has a corresponding return link.
+
+    Scans the overworld (tile_links), towns, buildings, and dungeons
+    in a module and warns about any one-way links that could trap the
+    player at runtime.
+
+    Returns a list of ``(severity, message)`` tuples.
+    Severity is ``"warning"`` for missing return links or ``"info"``
+    for structural notes.
+
+    Designed to be called once at module load time — cheap enough to
+    run every time without noticeable delay.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    issues = []
+
+    if not module_path or not os.path.isdir(module_path):
+        return issues
+
+    # ── 1. Load all data sources ──────────────────────────────
+
+    # Overworld tile_links  (overworld → town/dungeon/building)
+    overworld_links = {}   # name -> target_type
+    ow_data = None
+    for fname in ("static_overworld.json", "overview_map.json"):
+        fpath = os.path.join(module_path, fname)
+        if os.path.isfile(fpath):
+            try:
+                with open(fpath, "r") as fh:
+                    ow_data = json.load(fh)
+                break
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    if ow_data:
+        raw_tl = ow_data.get("tile_links", {})
+        for pos_key, info in raw_tl.items():
+            if isinstance(info, dict):
+                name = info.get("interior", "")
+                ltype = info.get("type", "")
+                if name:
+                    overworld_links[name] = ltype
+
+    # Overworld interiors (inline interior definitions)
+    ow_interiors = {}  # name -> tiles_dict
+    if ow_data:
+        for idef in ow_data.get("interiors", []):
+            iname = idef.get("name", "")
+            if iname:
+                ow_interiors[iname] = idef.get("tiles", {})
+
+    # Towns
+    towns_by_name = {}     # name -> layout tiles dict
+    town_interior_targets = {}  # town_name -> set of interior names
+    towns_path = os.path.join(module_path, "towns.json")
+    if os.path.isfile(towns_path):
+        try:
+            with open(towns_path, "r") as fh:
+                towns_raw = json.load(fh)
+        except (json.JSONDecodeError, OSError):
+            towns_raw = []
+        if isinstance(towns_raw, list):
+            for t in towns_raw:
+                tname = t.get("name", "")
+                layout = t.get("layout", {})
+                tiles = layout.get("tiles", {})
+                if tname:
+                    towns_by_name[tname] = tiles
+                    targets = set()
+                    for td in tiles.values():
+                        if isinstance(td, dict) and td.get("interior"):
+                            targets.add(td["interior"])
+                    town_interior_targets[tname] = targets
+
+    # Buildings
+    buildings_by_name = {}  # name -> list of space dicts
+    buildings_path = os.path.join(module_path, "buildings.json")
+    if os.path.isfile(buildings_path):
+        try:
+            with open(buildings_path, "r") as fh:
+                buildings_raw = json.load(fh)
+        except (json.JSONDecodeError, OSError):
+            buildings_raw = []
+        if isinstance(buildings_raw, list):
+            for b in buildings_raw:
+                bname = b.get("name", "")
+                if bname:
+                    buildings_by_name[bname] = b.get("spaces", [])
+
+    # Dungeons
+    dungeon_names = set()
+    dungeons_path = os.path.join(module_path, "dungeons.json")
+    if os.path.isfile(dungeons_path):
+        try:
+            with open(dungeons_path, "r") as fh:
+                dungeons_raw = json.load(fh)
+        except (json.JSONDecodeError, OSError):
+            dungeons_raw = []
+        if isinstance(dungeons_raw, list):
+            for d in dungeons_raw:
+                dname = d.get("name", "")
+                if dname:
+                    dungeon_names.add(dname)
+        elif isinstance(dungeons_raw, dict):
+            for dname in dungeons_raw:
+                dungeon_names.add(dname)
+
+    # ── 2. Helper: check if a tile set has an exit back ───────
+
+    def _has_exit_back(tiles_dict, exit_types=("to_overworld",)):
+        """Return True if any tile in tiles_dict has a flag in exit_types."""
+        for td in tiles_dict.values():
+            if not isinstance(td, dict):
+                continue
+            for etype in exit_types:
+                if td.get(etype):
+                    return True
+        return False
+
+    # ── 3. Validate overworld → destination links ─────────────
+
+    for target_name, target_type in overworld_links.items():
+
+        if target_type == "town":
+            # Town must exist and have an overworld exit.
+            # Towns with no custom layout (empty tiles dict) are built
+            # procedurally at runtime and always include exits, so we
+            # only flag towns that have an explicit layout but are
+            # missing exit tiles.
+            if target_name in towns_by_name:
+                tiles = towns_by_name[target_name]
+                if tiles and not _has_exit_back(tiles, ("to_overworld",)):
+                    issues.append((
+                        "warning",
+                        f"Overworld links to town '{target_name}' but the "
+                        f"town layout has no to_overworld exit — player "
+                        f"may be trapped."
+                    ))
+
+        elif target_type == "building":
+            # Building must exist and have an exit back to overworld
+            if target_name in buildings_by_name:
+                spaces = buildings_by_name[target_name]
+                has_exit = False
+                for sp in spaces:
+                    sp_tiles = sp.get("tiles", {})
+                    if _has_exit_back(sp_tiles, ("to_overworld",)):
+                        has_exit = True
+                        break
+                if not has_exit:
+                    issues.append((
+                        "warning",
+                        f"Overworld links to building '{target_name}' but no "
+                        f"space in the building has a to_overworld exit."
+                    ))
+            elif target_name in ow_interiors:
+                # Overworld interior (inline) — check exit tiles
+                tiles = ow_interiors[target_name]
+                if not _has_exit_back(tiles, ("to_overworld",)):
+                    issues.append((
+                        "warning",
+                        f"Overworld links to interior '{target_name}' but "
+                        f"the interior has no to_overworld exit."
+                    ))
+            else:
+                issues.append((
+                    "warning",
+                    f"Overworld links to building '{target_name}' but no "
+                    f"building or interior with that name was found."
+                ))
+
+        elif target_type == "dungeon":
+            # Dungeons always generate an exit staircase, so we just
+            # check the dungeon data exists.
+            if target_name not in dungeon_names:
+                issues.append((
+                    "info",
+                    f"Overworld links to dungeon '{target_name}' — not "
+                    f"found in dungeons.json (may be procedurally generated)."
+                ))
+
+    # ── 4. Validate town → interior links ─────────────────────
+
+    for town_name, interior_names in town_interior_targets.items():
+        for int_name in interior_names:
+            if int_name in buildings_by_name:
+                spaces = buildings_by_name[int_name]
+                has_exit = False
+                for sp in spaces:
+                    sp_tiles = sp.get("tiles", {})
+                    if _has_exit_back(sp_tiles, ("to_town", "to_overworld")):
+                        has_exit = True
+                        break
+                if not has_exit:
+                    issues.append((
+                        "warning",
+                        f"Town '{town_name}' links to building "
+                        f"'{int_name}' but no space in the building "
+                        f"has a to_town or to_overworld exit."
+                    ))
+            else:
+                issues.append((
+                    "warning",
+                    f"Town '{town_name}' links to interior '{int_name}' "
+                    f"but no building with that name was found."
+                ))
+
+    # ── 5. Validate building spaces have exits ────────────────
+
+    for bname, spaces in buildings_by_name.items():
+        for sp in spaces:
+            sp_name = sp.get("name", "?")
+            sp_tiles = sp.get("tiles", {})
+            if not sp_tiles:
+                continue
+            if not _has_exit_back(sp_tiles, ("to_overworld", "to_town")):
+                # Check if it has sub-interior links (chain exits)
+                has_interior = any(
+                    isinstance(td, dict) and td.get("interior")
+                    for td in sp_tiles.values()
+                )
+                if not has_interior:
+                    issues.append((
+                        "warning",
+                        f"Building '{bname}' space '{sp_name}' has no "
+                        f"exit (to_overworld, to_town, or interior link)."
+                    ))
+
+    # ── 6. Validate link registry (links.json) ─────────────────
+
+    links_path = os.path.join(module_path, "links.json")
+    if os.path.isfile(links_path):
+        try:
+            with open(links_path, "r") as fh:
+                links_raw = json.load(fh)
+        except (json.JSONDecodeError, OSError):
+            links_raw = []
+
+        if isinstance(links_raw, list):
+            links_by_id = {}
+            for entry in links_raw:
+                lid = entry.get("link_id", "")
+                if lid:
+                    links_by_id[lid] = entry
+
+            # All known map addresses for quick existence checking
+            known_maps = {"overworld"}
+            for tname in towns_by_name:
+                known_maps.add(f"town:{tname}")
+            for bname, spaces in buildings_by_name.items():
+                for sp in spaces:
+                    sp_name = sp.get("name", "")
+                    if sp_name:
+                        known_maps.add(f"building:{bname}:{sp_name}")
+            for dname in dungeon_names:
+                known_maps.add(f"dungeon:{dname}")
+            for iname in ow_interiors:
+                known_maps.add(f"interior:{iname}")
+
+            for entry in links_raw:
+                lid = entry.get("link_id", "")
+                src_map = entry.get("source_map", "")
+                tgt_map = entry.get("target_map", "")
+                partner = entry.get("partner_id", "")
+
+                # Check partner exists
+                if partner and partner not in links_by_id:
+                    issues.append((
+                        "warning",
+                        f"Link '{lid}' references partner '{partner}' "
+                        f"which does not exist in links.json."
+                    ))
+
+                # Check source map is known
+                if src_map and src_map not in known_maps:
+                    issues.append((
+                        "info",
+                        f"Link '{lid}' source map '{src_map}' is not a "
+                        f"known map in this module."
+                    ))
+
+                # Check target map is known
+                if tgt_map and tgt_map not in known_maps:
+                    issues.append((
+                        "info",
+                        f"Link '{lid}' target map '{tgt_map}' is not a "
+                        f"known map in this module."
+                    ))
+
+    # ── 7. Log results ────────────────────────────────────────
+
+    for severity, msg in issues:
+        if severity == "warning":
+            log.warning("Link validation: %s", msg)
+        else:
+            log.info("Link validation: %s", msg)
+
+    if not issues:
+        log.info("Link validation: all links are bidirectional — OK")
+
+    return issues
+
+
 # ── Unique tile loader ──────────────────────────────────────────
 
 def load_unique_tiles(data_dir=None):

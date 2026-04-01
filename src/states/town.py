@@ -266,7 +266,7 @@ class TownState(InventoryMixin, BaseState):
         self._auto_interior = None  # set by enter_town for direct links
 
     def enter_town(self, town_data, overworld_col, overworld_row,
-                   auto_interior=None):
+                   auto_interior=None, target_pos=None):
         """
         Set up the town state with town-specific data.
         Called before change_state so the town knows what to load.
@@ -274,11 +274,15 @@ class TownState(InventoryMixin, BaseState):
         If *auto_interior* is a string, the town will immediately
         transition into that named interior after loading (used when
         the overworld links directly to a sub-interior like a tunnel).
+
+        If *target_pos* is a (col, row) tuple, the party spawns at
+        that exact tile instead of the town's default entry point.
         """
         self.town_data = town_data
         self.overworld_col = overworld_col
         self.overworld_row = overworld_row
         self._auto_interior = auto_interior
+        self._entry_target_pos = target_pos
 
     def enter(self):
         """Called when this state becomes active."""
@@ -306,9 +310,16 @@ class TownState(InventoryMixin, BaseState):
         if self.town_data:
             town_name = self.town_data.name
             self.show_message(f"Welcome to {town_name}!", 2500)
-            # Move party to town entry point
-            self.game.party.col = self.town_data.entry_col
-            self.game.party.row = self.town_data.entry_row
+            # Move party to town entry point — explicit target_pos
+            # from the link registry takes priority over the default.
+            _etp = getattr(self, "_entry_target_pos", None)
+            if _etp and _etp != (0, 0):
+                self.game.party.col = _etp[0]
+                self.game.party.row = _etp[1]
+            else:
+                self.game.party.col = self.town_data.entry_col
+                self.game.party.row = self.town_data.entry_row
+            self._entry_target_pos = None  # consumed
             # Update camera for the town map
             self.game.camera.map_width = self.town_data.tile_map.width
             self.game.camera.map_height = self.town_data.tile_map.height
@@ -954,18 +965,28 @@ class TownState(InventoryMixin, BaseState):
                 if tdef.get("walkable", False):
                     first_walkable = (c, r)
 
-        # Place the party directly on the entry door tile.
+        # Place the party on the destination tile.
         # Priority:
+        #   0. Explicit target_pos from the link (connecting tile)
         #   1. The tile linking back to the source interior we came from
         #   2. The first to_town exit (coming from town level)
         #   3. Any exit position
         #   4. First walkable tile
         #   5. Center of grid
         # The entry grace flag prevents immediate ejection.
-        spawn = (back_link_pos
-                 or (exit_positions[0] if exit_positions else None)
-                 or first_walkable
-                 or (iw // 2, ih // 2))
+        # Look up the link on the *source* map (now on the stack)
+        _prev_tmap = (self._interior_stack[-1]["tile_map"]
+                      if self._interior_stack else None)
+        _src_link = _prev_tmap.get_link(door_col, door_row) if _prev_tmap else None
+        _target_pos = (_src_link.get("target_pos")
+                       if _src_link else None)
+        if _target_pos and _target_pos != (0, 0):
+            spawn = _target_pos
+        else:
+            spawn = (back_link_pos
+                     or (exit_positions[0] if exit_positions else None)
+                     or first_walkable
+                     or (iw // 2, ih // 2))
         self.game.party.col = spawn[0]
         self.game.party.row = spawn[1]
 

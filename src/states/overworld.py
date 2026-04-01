@@ -1299,16 +1299,28 @@ class OverworldState(InventoryMixin, BaseState):
         first_walkable = None
         entry_placed = False
 
-        for pos_key, td in interior.get("tiles", {}).items():
-            parts = pos_key.split(",")
-            c, r = int(parts[0]), int(parts[1])
-            # Track any walkable tile as fallback spawn
-            tid = td.get("tile_id")
-            if first_walkable is None and tid is not None:
-                from src.settings import TILE_DEFS
-                tdef = TILE_DEFS.get(tid, {})
-                if tdef.get("walkable", False):
-                    first_walkable = (c, r)
+        # ── Priority 1: explicit target_pos from link registry ──
+        # If the link that triggered this transition has a target_pos,
+        # use it directly — no guessing.
+        _src_link = tmap.get_link(door_col, door_row) if tmap else None
+        if _src_link:
+            _tp = _src_link.get("target_pos")
+            if _tp and _tp != (0, 0) and _tp is not None:
+                self.game.party.col = _tp[0]
+                self.game.party.row = _tp[1]
+                entry_placed = True
+
+        # ── Priority 2+: BFS / fallback ──
+        if not entry_placed:
+            for pos_key, td in interior.get("tiles", {}).items():
+                parts = pos_key.split(",")
+                c, r = int(parts[0]), int(parts[1])
+                tid = td.get("tile_id")
+                if first_walkable is None and tid is not None:
+                    from src.settings import TILE_DEFS
+                    tdef = TILE_DEFS.get(tid, {})
+                    if tdef.get("walkable", False):
+                        first_walkable = (c, r)
 
         # BFS from exit tile to find nearest walkable non-exit tile for spawn
         if exit_positions and not entry_placed:
@@ -2262,9 +2274,17 @@ class OverworldState(InventoryMixin, BaseState):
         sub = getattr(self, "_pending_sub_interior", "")
         if sub:
             self._pending_sub_interior = ""
+        # Look up the link to get target_pos for exact placement
+        _link = self.game.tile_map.get_link(pcol, prow)
+        _target_pos = (_link.get("target_pos")
+                       if _link else None)
+        if _target_pos == (0, 0):
+            _target_pos = None  # unresolved, use default
+
         town_state = self.game.states["town"]
         town_state.enter_town(town_data, pcol, prow,
-                              auto_interior=sub or None)
+                              auto_interior=sub or None,
+                              target_pos=_target_pos)
         self.game.change_state("town")
 
     # ── Dungeon action screen ─────────────────────────────────

@@ -245,8 +245,9 @@ class ModuleTownEditorMixin:
             self._mod_town_map_editor_state = None
             self._mod_town_map_editor_handler = None
 
+        town_name = town.get("name", "Unnamed")
         config = MapEditorConfig(
-            title=f"Town: {town.get('name', 'Unnamed')}",
+            title=f"Town: {town_name}",
             storage=STORAGE_SPARSE,
             grid_type=GRID_FIXED,
             width=w,
@@ -254,6 +255,10 @@ class ModuleTownEditorMixin:
             tile_context="town",
             brushes=brushes,
             supports_interior_links=True,
+            supports_connecting_links=True,
+            map_address=f"town:{town_name}",
+            link_registry=getattr(self, 'link_registry', None),
+            module_maps=getattr(self, '_mod_module_maps', []),
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
@@ -929,8 +934,14 @@ class ModuleTownEditorMixin:
             self._mod_town_map_editor_state = None
             self._mod_town_map_editor_handler = None
 
+        enc_display = enc.get("name", "Unnamed")
+        # Determine parent town name for map address
+        _parent_town = ""
+        if 0 <= self._mod_town_cursor < len(self._mod_town_list):
+            _parent_town = self._mod_town_list[
+                self._mod_town_cursor].get("name", "")
         config = MapEditorConfig(
-            title=f"Enclosure: {enc.get('name', 'Unnamed')}",
+            title=f"Enclosure: {enc_display}",
             storage=STORAGE_SPARSE,
             grid_type=GRID_FIXED,
             width=w,
@@ -938,6 +949,10 @@ class ModuleTownEditorMixin:
             tile_context="town",
             brushes=brushes,
             supports_interior_links=True,
+            supports_connecting_links=True,
+            map_address=f"building:{_parent_town}:{enc_display}",
+            link_registry=getattr(self, 'link_registry', None),
+            module_maps=getattr(self, '_mod_module_maps', []),
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,

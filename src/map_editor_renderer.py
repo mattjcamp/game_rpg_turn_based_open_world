@@ -66,6 +66,9 @@ _COL_LINK_INT = (80, 220, 255)
 _COL_LINK_INT_BG = (0, 140, 200)
 _COL_LINK_OW = (255, 180, 60)
 _COL_LINK_OW_BG = (200, 120, 0)
+_COL_LINK_CONNECT = (180, 80, 255)     # connecting-link badge border (purple)
+_COL_LINK_CONNECT_BG = (120, 40, 200)  # connecting-link badge fill
+_COL_LINK_PENDING = (255, 100, 100)    # pulsing highlight on pending source
 
 
 # ─── Main entry point ────────────────────────────────────────────────
@@ -94,9 +97,14 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
         title += " *"
     renderer._u3_text(title, 16, 6, _COL_ORANGE, fm)
 
-    # Painting mode indicator
-    if data.get("painting"):
-        tw_title = fm.size(title)[0]
+    # Mode indicators
+    tw_title = fm.size(title)[0]
+    if data.get("link_pending"):
+        src_c = data.get("link_source_col", 0)
+        src_r = data.get("link_source_row", 0)
+        lbl = f"LINKING from ({src_c},{src_r})"
+        renderer._u3_text(lbl, tw_title + 30, 6, (255, 120, 120), fm)
+    elif data.get("painting"):
         renderer._u3_text("PAINTING", tw_title + 30, 6, (120, 255, 120), fm)
 
     # Coordinates + tile info
@@ -113,6 +121,8 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     _draw_tile_grid(renderer, data)
 
     # ── Overlays ──
+    if data.get("link_manager"):
+        _draw_link_manager_overlay(renderer, data)
     if data.get("int_picking"):
         _draw_int_picker_overlay(renderer, data)
     if data.get("int_link_picking"):
@@ -436,9 +446,56 @@ def _draw_dense_grid(renderer, data: Dict):
                 isf = tiny.render("I", True, (255, 255, 255))
                 screen.blit(isf, (ibx + 1, iby))
 
+    # Connecting-link badges (from LinkRegistry)
+    _draw_connecting_link_badges(renderer, data, screen, ox, oy, ts,
+                                 cam_c, cam_r, end_c, end_r)
+
     # Party start marker
     _draw_party_start_marker(renderer, data, screen, ox, oy, ts,
                              cam_c, cam_r, end_c, end_r)
+
+
+def _draw_connecting_link_badges(renderer, data, screen, ox, oy, ts,
+                                  cam_c, cam_r, end_c, end_r):
+    """Draw purple 'L' badges on tiles that have connecting links,
+    and a pulsing red highlight on the pending source tile."""
+    reg = data.get("link_registry")
+    map_addr = data.get("map_address", "")
+    if not reg or not map_addr:
+        return
+
+    # Draw badges for all established links on this map
+    for rec in reg.get_links_for_map(map_addr):
+        lc, lr = rec.source.col, rec.source.row
+        if cam_c <= lc < end_c and cam_r <= lr < end_r:
+            bx = ox + (lc - cam_c) * ts
+            by_ = oy + (lr - cam_r) * ts
+            pygame.draw.rect(screen, _COL_LINK_CONNECT,
+                             (bx, by_, ts, ts), 2)
+            badge_sz = max(ts // 3, 8)
+            ibx = bx + 1
+            iby = by_ + 1
+            pygame.draw.rect(screen, _COL_LINK_CONNECT_BG,
+                             (ibx, iby, badge_sz, badge_sz))
+            if badge_sz >= 8:
+                tiny = (renderer.font_tiny
+                        if hasattr(renderer, 'font_tiny')
+                        else renderer.font_small)
+                lsf = tiny.render("L", True, (255, 255, 255))
+                screen.blit(lsf, (ibx + 1, iby))
+
+    # Pulsing highlight on pending source tile
+    if data.get("link_pending"):
+        sc = data.get("link_source_col", -1)
+        sr = data.get("link_source_row", -1)
+        src_map = data.get("link_source_map", "")
+        if src_map == map_addr and cam_c <= sc < end_c and cam_r <= sr < end_r:
+            elapsed = pygame.time.get_ticks() / 1000.0
+            pulse = int(120 + 80 * math.sin(elapsed * 5))
+            sx = ox + (sc - cam_c) * ts
+            sy = oy + (sr - cam_r) * ts
+            pulse_col = (255, min(pulse, 255), min(pulse, 255))
+            pygame.draw.rect(screen, pulse_col, (sx, sy, ts, ts), 3)
 
 
 def _draw_party_start_marker(renderer, data, screen, ox, oy, ts,
@@ -611,6 +668,161 @@ def _draw_sparse_link_badge(screen, renderer, td: Dict,
 
 
 # ─── Overlays ─────────────────────────────────────────────────────────
+
+
+def _draw_link_manager_overlay(renderer, data: Dict):
+    """Draw the link manager overlay.
+
+    Shows either:
+    - Main list of existing links with Create/Delete options
+    - New-link creation sub-flow (map selection + position input)
+    """
+    screen = renderer.screen
+    fs = renderer.font_small
+    fm = renderer.font
+
+    # Overlay box dimensions (centred)
+    ow = min(SCREEN_WIDTH - 40, 560)
+    oh = min(SCREEN_HEIGHT - 60, 400)
+    ox = (SCREEN_WIDTH - ow) // 2
+    oy = (SCREEN_HEIGHT - oh) // 2
+
+    # Background
+    bg = pygame.Surface((ow, oh), pygame.SRCALPHA)
+    bg.fill((16, 12, 28, 230))
+    screen.blit(bg, (ox, oy))
+    pygame.draw.rect(screen, _COL_LINK_CONNECT, (ox, oy, ow, oh), 1)
+
+    if data.get("link_mgr_creating"):
+        _draw_link_mgr_creation(renderer, data, ox, oy, ow, oh)
+        return
+
+    # ── Main list view ──
+    title = "Link Manager"
+    tsf = fm.render(title, True, _COL_LINK_CONNECT)
+    screen.blit(tsf, (ox + 8, oy + 6))
+
+    items = data.get("link_mgr_items", [])
+    cursor = data.get("link_mgr_cursor", 0)
+    row_h = 22
+    pad_top = 32
+    max_visible = (oh - pad_top - 8) // row_h
+
+    # Compute scroll to keep cursor visible
+    scroll = data.get("link_mgr_scroll", 0)
+    if cursor < scroll:
+        scroll = cursor
+    elif cursor >= scroll + max_visible:
+        scroll = cursor - max_visible + 1
+
+    for vi, idx in enumerate(range(scroll, min(scroll + max_visible,
+                                                len(items)))):
+        item = items[idx]
+        iy = oy + pad_top + vi * row_h
+        is_sel = (idx == cursor)
+
+        # Selection highlight
+        if is_sel:
+            bar = pygame.Surface((ow - 12, row_h), pygame.SRCALPHA)
+            bar.fill((_COL_LINK_CONNECT[0], _COL_LINK_CONNECT[1],
+                      _COL_LINK_CONNECT[2], 40))
+            screen.blit(bar, (ox + 6, iy))
+
+        label = item.get("label", "")
+        if item["type"] == "header":
+            col = (180, 255, 180) if is_sel else (120, 200, 120)
+        else:
+            col = (255, 255, 255) if is_sel else (180, 180, 200)
+
+        lsf = fs.render(label, True, col)
+        screen.blit(lsf, (ox + 12, iy + 2))
+
+
+def _draw_link_mgr_creation(renderer, data, ox, oy, ow, oh):
+    """Draw the new-link creation sub-flow inside the manager overlay."""
+    screen = renderer.screen
+    fs = renderer.font_small
+    fm = renderer.font
+
+    phase = data.get("link_mgr_phase", "")
+
+    # Phase title
+    phase_titles = {
+        "source_map": "Select Source Map",
+        "source_pos": "Enter Source Position",
+        "target_map": "Select Target Map",
+        "target_pos": "Enter Target Position",
+    }
+    title = phase_titles.get(phase, "New Link")
+    tsf = fm.render(title, True, _COL_LINK_CONNECT)
+    screen.blit(tsf, (ox + 8, oy + 6))
+
+    # Show already-chosen values as breadcrumb
+    crumb_y = oy + 28
+    src_map = data.get("link_mgr_new_source_map", "")
+    src_c = data.get("link_mgr_new_source_col", 0)
+    src_r = data.get("link_mgr_new_source_row", 0)
+    tgt_map = data.get("link_mgr_new_target_map", "")
+
+    if phase in ("source_pos", "target_map", "target_pos"):
+        txt = f"Source: {src_map}"
+        if phase in ("target_map", "target_pos"):
+            txt += f" ({src_c},{src_r})"
+        sf = fs.render(txt, True, (140, 140, 160))
+        screen.blit(sf, (ox + 12, crumb_y))
+        crumb_y += 16
+
+    if phase == "target_pos":
+        txt = f"Target: {tgt_map}"
+        sf = fs.render(txt, True, (140, 140, 160))
+        screen.blit(sf, (ox + 12, crumb_y))
+        crumb_y += 16
+
+    content_y = crumb_y + 8
+
+    # ── Map selection phases ──
+    if phase in ("source_map", "target_map"):
+        maps = data.get("module_maps", [])
+        map_cursor = data.get("link_mgr_map_cursor", 0)
+        row_h = 22
+        max_vis = (oh - (content_y - oy) - 8) // row_h
+
+        for vi, idx in enumerate(range(0, min(max_vis, len(maps)))):
+            iy = content_y + vi * row_h
+            is_sel = (idx == map_cursor)
+            if is_sel:
+                bar = pygame.Surface((ow - 12, row_h), pygame.SRCALPHA)
+                bar.fill((_COL_LINK_CONNECT[0], _COL_LINK_CONNECT[1],
+                          _COL_LINK_CONNECT[2], 40))
+                screen.blit(bar, (ox + 6, iy))
+
+            addr, label = maps[idx]
+            col = (255, 255, 255) if is_sel else (180, 180, 200)
+            sf = fs.render(f"{label}  ({addr})", True, col)
+            screen.blit(sf, (ox + 12, iy + 2))
+
+    # ── Position input phases ──
+    elif phase in ("source_pos", "target_pos"):
+        pos_field = data.get("link_mgr_pos_field", "col")
+        buf = data.get("link_mgr_pos_buffer", "")
+
+        label = f"Enter {pos_field.upper()}: "
+        sf = fm.render(label, True, (200, 200, 220))
+        screen.blit(sf, (ox + 12, content_y))
+        lw = fm.size(label)[0]
+
+        # Blinking cursor
+        elapsed = pygame.time.get_ticks() / 1000.0
+        cursor_vis = int(elapsed * 3) % 2 == 0
+        display = buf + ("|" if cursor_vis else " ")
+        vsf = fm.render(display, True, (255, 255, 255))
+        screen.blit(vsf, (ox + 12 + lw, content_y))
+
+        # Hint
+        hint = "(Type digits, Up/Down to adjust, Enter to confirm)"
+        hsf = fs.render(hint, True, (100, 100, 120))
+        screen.blit(hsf, (ox + 12, content_y + 26))
+
 
 def _draw_int_picker_overlay(renderer, data: Dict):
     """Draw the interior link picker for the overview map editor."""
@@ -843,7 +1055,21 @@ def _draw_replace_overlay(renderer, data: Dict):
 def _draw_footer(renderer, data: Dict):
     fs = renderer.font_small
 
-    if data.get("replacing"):
+    if data.get("link_manager"):
+        if data.get("link_mgr_creating"):
+            phase = data.get("link_mgr_phase", "")
+            if phase in ("source_map", "target_map"):
+                hint = "[Up/Dn] Select Map  [Enter] Confirm  [Esc] Back"
+            else:
+                hint = ("[Up/Dn] +/-  [0-9] Type  "
+                        "[Enter/Tab] Next  [Esc] Back")
+        else:
+            hint = ("[Up/Dn] Select  [Enter] Create  "
+                    "[X] Delete  [Esc] Close")
+    elif data.get("link_pending"):
+        hint = ("[Arrows] Move to target  "
+                "[L] Complete Link  [X/Esc] Cancel")
+    elif data.get("replacing"):
         hint = ("[Up/Dn] Select Destination  "
                 "[Enter] Replace All  [Esc] Cancel")
     elif data.get("int_link_picking"):
@@ -851,13 +1077,15 @@ def _draw_footer(renderer, data: Dict):
     elif data.get("int_picking"):
         hint = "[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel"
     elif data["storage"] == STORAGE_DENSE:
+        lk = "[L] Connect  [Shift+L] Manage  " if data.get("supports_connecting_links") else ""
         hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                "[Tab] Brush  [I] Link  [P] Party Start  "
+                f"[Tab] Brush  [I] Link  {lk}[P] Party Start  "
                 "[R] Replace  [X] Unlink  "
                 "[Ctrl+S] Save  [Esc] Save & Exit")
     else:
+        lk = "[L] Connect  [Shift+L] Manage  " if data.get("supports_connecting_links") else ""
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "
-                "[I] Link  [R] Replace  [X] Unlink  "
+                f"[I] Link  {lk}[R] Replace  [X] Unlink  "
                 "[Tab] Brush  [Ctrl+S] Save  [Esc] Save & Exit")
 
     hw = fs.size(hint)[0]

@@ -1,0 +1,30 @@
+[
+  {
+    "link_id": "lnk_a8f0a71a9fad",
+    "source_map": "overworld",
+    "source_pos": [
+      15,
+      15
+    ],
+    "target_map": "town:Midherm",
+    "target_pos": [
+      11,
+      2
+    ],
+    "partner_id": "lnk_8e81a9c6e396"
+  },
+  {
+    "link_id": "lnk_8e81a9c6e396",
+    "source_map": "town:Midherm",
+    "source_pos": [
+      11,
+      2
+    ],
+    "target_map": "overworld",
+    "target_pos": [
+      15,
+      15
+    ],
+    "partner_id": "lnk_a8f0a71a9fad"
+  }
+]
