@@ -110,5 +110,65 @@
     ],
     "giver_col": 14,
     "giver_row": 5
+  },
+  {
+    "name": "Destroy the Goblin Army",
+    "description": "",
+    "giver_npc": "Alek",
+    "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
+    "giver_location": "town:Midherm",
+    "giver_dialogue": "",
+    "reward_xp": 150,
+    "reward_gold": 100,
+    "steps": [
+      {
+        "description": "Kill Globins",
+        "step_type": "kill",
+        "monster": "Goblin",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "dungeon:Goblin Hole",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the Orcs",
+        "step_type": "kill",
+        "monster": "Orc",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "dungeon:Goblin Hole",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the Orc Shaman",
+        "step_type": "kill",
+        "monster": "Orc Shaman",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "dungeon:Goblin Hole",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      },
+      {
+        "description": "Retrieve the King's Sword",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "King's Sword",
+        "has_guardian": "yes",
+        "guardian_monster": "Dark Mage",
+        "spawn_location": "dungeon:Goblin Hole",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ]
   }
 ]
