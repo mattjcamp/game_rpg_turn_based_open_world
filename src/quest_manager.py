@@ -68,9 +68,13 @@ def _location_matches(step_location, combat_location):
     - If *step_location* is empty or missing, any location counts.
     - ``"overview"`` or ``"Overview Map"`` steps match combat in
       ``"overview"`` (overworld random encounters & quest monsters).
-    - Location-specific steps (``"town:Yardley"``, ``"dungeon:X"``,
-      ``"interior:Town/Area"``, ``"space:Building/Space"``,
-      ``"building:Name"``) must match exactly (case-insensitive).
+    - ``"building:Name"`` steps are satisfied by combat in any space
+      within that building (``"space:Name/SpaceName"``), as well as
+      an exact ``"building:Name"`` match.
+    - Other location-specific steps (``"town:Yardley"``,
+      ``"dungeon:X"``, ``"interior:Town/Area"``,
+      ``"space:Building/Space"``) must match exactly
+      (case-insensitive).
     """
     # No location requirement — any combat location satisfies the step
     if not step_location:
@@ -80,7 +84,18 @@ def _location_matches(step_location, combat_location):
         return combat_location in ("overview", "overworld", "")
     if not combat_location:
         return False
-    return step_location.lower() == combat_location.lower()
+    sl = step_location.lower()
+    cl = combat_location.lower()
+    if sl == cl:
+        return True
+    # A "building:X" step is satisfied by combat in any space of that
+    # building, i.e. "space:X/Y".
+    if sl.startswith("building:"):
+        bld_name = sl[len("building:"):]
+        if cl.startswith("space:") and cl[len("space:"):].startswith(
+                bld_name + "/"):
+            return True
+    return False
 
 
 def check_quest_kills(game):

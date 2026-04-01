@@ -4989,6 +4989,9 @@ class Renderer(CombatEffectRendererMixin):
 
         box_x = (SCREEN_WIDTH - box_w) // 2
         box_y = y - box_h // 2
+        # Clamp so the box never bleeds above the screen
+        if box_y < 4:
+            box_y = 4
 
         # Background and border
         bg_rect = pygame.Rect(box_x, box_y, box_w, box_h)

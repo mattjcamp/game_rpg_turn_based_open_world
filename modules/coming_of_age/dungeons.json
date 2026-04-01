@@ -19,5 +19,68 @@
         "encounters": []
       }
     ]
+  },
+  {
+    "name": "Orc Caves",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 6,
+    "difficulty": "normal",
+    "level_size": "medium",
+    "torch_density": "sparse",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Goblin Hole",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 3,
+    "difficulty": "normal",
+    "level_size": "small",
+    "torch_density": "sparse",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Dragon's Lair",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 10,
+    "difficulty": "hard",
+    "level_size": "large",
+    "torch_density": "sparse",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
   }
 ]

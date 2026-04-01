@@ -46,5 +46,43 @@
         "optional": "no"
       }
     ]
+  },
+  {
+    "name": "Find the Heirloom",
+    "description": "",
+    "giver_npc": "Harrard Harry",
+    "giver_sprite": "src/assets/game/npcs/u4_citizen.png",
+    "giver_location": "overview",
+    "giver_dialogue": "A crazy lady took my granpa's heirloom sword and hid it somewhere in an abandoned building. Can you help me get it back? Also, there may be goblins involved.",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "steps": [
+      {
+        "description": "Deal with the Goblins",
+        "step_type": "kill",
+        "monster": "Goblin",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "building:Abandoned Building",
+        "target": "",
+        "target_count": 5,
+        "optional": "no"
+      },
+      {
+        "description": "Retrieve Granpa's Sword",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "King's Sword",
+        "has_guardian": "yes",
+        "guardian_monster": "Zombie",
+        "spawn_location": "space:Abandoned Building/Basement",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 35,
+    "giver_row": 14
   }
 ]

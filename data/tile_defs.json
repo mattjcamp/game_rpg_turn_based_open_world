@@ -606,5 +606,38 @@
     "sprite": "town/altar",
     "interaction_type": "shop",
     "interaction_data": "guild"
+  },
+  "62": {
+    "name": "Floor Copy",
+    "walkable": true,
+    "color": [
+      160,
+      130,
+      100
+    ],
+    "context": "town",
+    "sprite": "town/floor"
+  },
+  "63": {
+    "name": "Floor Light",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/floor_light"
+  },
+  "64": {
+    "name": "Ship",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "overworld",
+    "sprite": "overworld/ship_frigate"
   }
 }

@@ -125,6 +125,10 @@ class ModuleQuestEditorMixin:
                        current_sprite_name, "choice", True),
             FieldEntry("Location", "giver_location",
                        current_loc_display, "choice", True),
+            FieldEntry("Giver Col", "giver_col",
+                       str(quest.get("giver_col", "")), "int", True),
+            FieldEntry("Giver Row", "giver_row",
+                       str(quest.get("giver_row", "")), "int", True),
             FieldEntry("Dialogue", "giver_dialogue",
                        quest.get("giver_dialogue", ""), "text", True),
             FieldEntry("Rewards", "", "", "section", False),
@@ -157,6 +161,11 @@ class ModuleQuestEditorMixin:
             key = fe_entry.key
             val = fe_entry.value
             if fe_entry.field_type == "int":
+                # giver_col / giver_row: blank means "auto-place"
+                if key in ("giver_col", "giver_row") and (
+                        val == "" or val is None):
+                    quest.pop(key, None)
+                    continue
                 try:
                     val = int(val)
                 except ValueError:

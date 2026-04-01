@@ -153,7 +153,8 @@
       "path": "src/assets/unassigned/ship_frigate.png",
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 64
     },
     "void_empty": {
       "path": "src/assets/unassigned/void_empty.png",
@@ -266,6 +267,13 @@
         "town"
       ],
       "tile_id": 51
+    },
+    "floor_light": {
+      "path": "src/assets/game/terrain/floor_copy.png",
+      "usable_in": [
+        "town"
+      ],
+      "tile_id": 63
     }
   },
   "dungeon": {

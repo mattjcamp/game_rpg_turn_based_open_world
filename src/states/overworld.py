@@ -1052,7 +1052,8 @@ class OverworldState(InventoryMixin, BaseState):
                 (party.col, party.row))
             if interior_name:
                 self._enter_overworld_interior(
-                    interior_name, party.col, party.row)
+                    interior_name, party.col, party.row,
+                    building_name=self._building_name)
                 return
             return  # no other tile events inside interiors
 
@@ -1371,11 +1372,14 @@ class OverworldState(InventoryMixin, BaseState):
         self._build_building_interior_npcs(interior, imap)
 
         # Spawn quest items and guardians for this building interior.
-        # Quest data is keyed by building name, not the space/interior name.
+        # Quest data can be keyed by building name ("building:X") or
+        # by a specific space ("space:X/Y").
         self._building_name = building_name or interior_name
         quest_key_name = self._building_name
-        self._spawn_building_quest_collect_items(quest_key_name, imap)
-        self._spawn_building_quest_monsters(quest_key_name, imap)
+        self._spawn_building_quest_collect_items(
+            quest_key_name, imap, space_name=interior_name)
+        self._spawn_building_quest_monsters(
+            quest_key_name, imap, space_name=interior_name)
         self._spawn_building_quest_givers(
             quest_key_name, interior_name, imap)
 
@@ -1485,14 +1489,20 @@ class OverworldState(InventoryMixin, BaseState):
 
             self._building_interior_npcs.append(npc)
 
-    def _spawn_building_quest_collect_items(self, interior_name, imap):
+    def _spawn_building_quest_collect_items(self, interior_name, imap,
+                                               space_name=""):
         """Place collectible quest items inside a building interior."""
         import random as _rng
         from src.town_generator import NPC
 
         items_dict = getattr(self.game, "quest_collect_items", {})
-        key = f"building:{interior_name}"
-        entries = items_dict.get(key, [])
+        # Check both the generic building key and the specific space key.
+        # e.g. "building:Abandoned Building" and
+        #      "space:Abandoned Building/Basement"
+        entries = list(items_dict.get(f"building:{interior_name}", []))
+        if space_name:
+            entries.extend(items_dict.get(
+                f"space:{interior_name}/{space_name}", []))
         if not entries:
             return
 
@@ -1540,15 +1550,19 @@ class OverworldState(InventoryMixin, BaseState):
             npc.quest_highlight = True
             self._building_interior_npcs.append(npc)
 
-    def _spawn_building_quest_monsters(self, interior_name, imap):
+    def _spawn_building_quest_monsters(self, interior_name, imap,
+                                          space_name=""):
         """Place quest monster NPCs inside a building interior."""
         import random as _rng
         from src.town_generator import NPC
         from src.monster import MONSTERS
 
         monsters_dict = getattr(self.game, "quest_interior_monsters", {})
-        key = f"building:{interior_name}"
-        entries = monsters_dict.get(key, [])
+        # Check both the generic building key and the specific space key.
+        entries = list(monsters_dict.get(f"building:{interior_name}", []))
+        if space_name:
+            entries.extend(monsters_dict.get(
+                f"space:{interior_name}/{space_name}", []))
         if not entries:
             return
 
@@ -2281,10 +2295,25 @@ class OverworldState(InventoryMixin, BaseState):
         if _target_pos == (0, 0):
             _target_pos = None  # unresolved, use default
 
+        # If entering via a registry link (has link_id), preserve the
+        # town's existing overworld exit position so that normal exits
+        # still return the party to their original entry point — not
+        # to the registry link's source tile.  This prevents
+        # bidirectional links from "coupling" the exit behaviour.
+        _preserve = False
+        if _link and _link.get("link_id"):
+            town_state = self.game.states["town"]
+            # Only preserve if the party was already in this town
+            # (town_data is set from a prior visit to the same town).
+            if (getattr(town_state, "town_data", None) is not None
+                    and getattr(town_state, "town_data", None) is town_data):
+                _preserve = True
+
         town_state = self.game.states["town"]
         town_state.enter_town(town_data, pcol, prow,
                               auto_interior=sub or None,
-                              target_pos=_target_pos)
+                              target_pos=_target_pos,
+                              preserve_exit=_preserve)
         self.game.change_state("town")
 
     # ── Dungeon action screen ─────────────────────────────────

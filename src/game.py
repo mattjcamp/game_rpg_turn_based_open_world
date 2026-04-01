@@ -1441,7 +1441,13 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 )
                 if already:
                     continue
-                # Find a walkable grass tile near the party start
+
+                # If designer set explicit giver_col / giver_row, use
+                # those directly; otherwise fall back to the ring search
+                # near the party's starting position.
+                explicit_col = qdef.get("giver_col")
+                explicit_row = qdef.get("giver_row")
+
                 from src.settings import TILE_GRASS, TILE_PATH
                 tmap = self.tile_map
                 party_col = self.party.col
@@ -1449,25 +1455,32 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 occupied = {(n.col, n.row)
                             for n in self.overworld_quest_npcs}
                 occupied.add((party_col, party_row))
+
                 placed = None
-                _r = __import__("random").Random(
-                    hash(qname) & 0xFFFFFFFF)
-                for ring in range(3, 20):
-                    candidates = []
-                    for dc in range(-ring, ring + 1):
-                        for dr in range(-ring, ring + 1):
-                            if max(abs(dc), abs(dr)) != ring:
-                                continue
-                            c, r = party_col + dc, party_row + dr
-                            if (0 <= c < tmap.width
-                                    and 0 <= r < tmap.height
-                                    and tmap.get_tile(c, r) in (
-                                        TILE_GRASS, TILE_PATH)
-                                    and (c, r) not in occupied):
-                                candidates.append((c, r))
-                    if candidates:
-                        placed = _r.choice(candidates)
-                        break
+                if (explicit_col is not None and explicit_row is not None
+                        and isinstance(explicit_col, int)
+                        and isinstance(explicit_row, int)):
+                    placed = (explicit_col, explicit_row)
+                else:
+                    # Ring-based search near the party start
+                    _r = __import__("random").Random(
+                        hash(qname) & 0xFFFFFFFF)
+                    for ring in range(3, 20):
+                        candidates = []
+                        for dc in range(-ring, ring + 1):
+                            for dr in range(-ring, ring + 1):
+                                if max(abs(dc), abs(dr)) != ring:
+                                    continue
+                                c, r = party_col + dc, party_row + dr
+                                if (0 <= c < tmap.width
+                                        and 0 <= r < tmap.height
+                                        and tmap.get_tile(c, r) in (
+                                            TILE_GRASS, TILE_PATH)
+                                        and (c, r) not in occupied):
+                                    candidates.append((c, r))
+                        if candidates:
+                            placed = _r.choice(candidates)
+                            break
                 if placed is None:
                     placed = (party_col + 4, party_row + 4)
                 col, row = placed
@@ -1582,6 +1595,11 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             return ("town", spawn_loc[5:])
         if spawn_loc.startswith("building:"):
             return ("building", spawn_loc[len("building:"):])
+        if spawn_loc.startswith("space:"):
+            # Format: "space:BuildingName/SpaceName"
+            # Returns ("space", "BuildingName/SpaceName") so items
+            # are placed only in the specific space, not all spaces.
+            return ("space", spawn_loc[len("space:"):])
         return ("overview", "")
 
     def _spawn_quest_monsters(self, quest_name):
@@ -1646,6 +1664,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         quest_name, step_idx, monster_key,
                         target_count, loc_name,
                         key_prefix="building")
+                elif loc_type == "space":
+                    # "space:BuildingName/SpaceName" → register under
+                    # the building name so it spawns in that building,
+                    # but use a space-specific key for finer matching.
+                    self._register_quest_interior_monster(
+                        quest_name, step_idx, monster_key,
+                        target_count, loc_name,
+                        key_prefix="space")
 
             elif step_type == "collect":
                 collect_item = step.get("collect_item", "")
@@ -1684,6 +1710,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     loc_key = f"town:{loc_name}"
                 elif loc_type == "building":
                     loc_key = f"building:{loc_name}"
+                elif loc_type == "space":
+                    loc_key = f"space:{loc_name}"
                 else:
                     loc_key = "overview"
 
@@ -1725,6 +1753,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                             quest_name, step_idx, guardian_key,
                             1, loc_name, is_guardian=True,
                             key_prefix="building")
+                elif loc_type == "space":
+                    # Register guardian for deferred spawning in a
+                    # specific building space.
+                    if guardian_key:
+                        self._register_quest_interior_monster(
+                            quest_name, step_idx, guardian_key,
+                            1, loc_name, is_guardian=True,
+                            key_prefix="space")
 
         self.quest_spawned_monsters[quest_name] = spawned
 
@@ -2183,6 +2219,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 "source_map": name,
                 "source_pos": pos,
             }
+
+        # ── Merge registry-based links into the town TileMap ──
+        # The link registry stores links created via the link manager.
+        # Without this call, links originating from this town (e.g. back
+        # to the overworld or to another town) would never trigger at
+        # runtime because the town's TileMap wouldn't know about them.
+        if self.link_registry:
+            self.link_registry.populate_tile_map(tm, f"town:{name}")
 
         return TownData(
             tile_map=tm,
@@ -3287,6 +3331,20 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.module_edit_buffer = ""
         self.module_edit_scroll = 0
         self.module_edit_nav_stack = []
+
+        # ── Pre-load all module data so _mod_module_maps is available ──
+        # This ensures the link manager's map selection list is populated
+        # regardless of which sub-editor the user opens first.
+        self._load_module_towns(mod["path"])
+        self._load_module_dungeons(mod["path"])
+        self._load_module_buildings(mod["path"])
+        self._build_module_maps()
+
+        # ── Ensure link registry exists ──
+        if self.link_registry is None and self.active_module_path:
+            from src.link_registry import LinkRegistry
+            self.link_registry = LinkRegistry()
+            self.link_registry.load(self.active_module_path)
         self._module_edit_folder_label = ""
 
     def _next_editable_field(self, direction):
@@ -3732,6 +3790,39 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_overview_picking = False
         self._open_overview_map_children()
 
+    def _build_module_maps(self):
+        """Build the module_maps list for the link manager.
+
+        Collects all map addresses (overworld, towns, buildings, dungeons)
+        from the currently loaded module data.  Stores the result on
+        ``self._mod_module_maps`` so all sub-editors can share it.
+        """
+        module_maps = [("overworld", "Overworld")]
+        for t in getattr(self, '_mod_town_list', []):
+            tname = t.get("name", "")
+            if tname:
+                module_maps.append((f"town:{tname}", f"Town: {tname}"))
+        for b in getattr(self, '_mod_building_list', []):
+            bname = b.get("name", "")
+            if bname:
+                for sp in b.get("spaces", []):
+                    spname = sp.get("name", "")
+                    if spname:
+                        module_maps.append(
+                            (f"building:{bname}:{spname}",
+                             f"Building: {bname} / {spname}"))
+        for d in getattr(self, '_mod_dungeon_list', []):
+            dname = d.get("name", "")
+            if dname:
+                for lv in d.get("levels", []):
+                    lvname = lv.get("name", "")
+                    if lvname:
+                        module_maps.append(
+                            (f"dungeon:{dname}:{lvname}",
+                             f"Dungeon: {dname} / {lvname}"))
+        self._mod_module_maps = module_maps
+        return module_maps
+
     def _launch_module_overview_editor(self):
         """Launch the shared map editor for the module's overview map."""
         if self._mod_overview_map is None:
@@ -3822,32 +3913,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self.link_registry.load(self.active_module_path)
 
         # ── Build module maps list for link manager ──
-        # Stored on self so other editors (town, building, dungeon) can reuse it.
-        module_maps = [("overworld", "Overworld")]
-        for t in getattr(self, '_mod_town_list', []):
-            tname = t.get("name", "")
-            if tname:
-                module_maps.append((f"town:{tname}", f"Town: {tname}"))
-        for b in getattr(self, '_mod_building_list', []):
-            bname = b.get("name", "")
-            if bname:
-                for sp in b.get("spaces", []):
-                    spname = sp.get("name", "")
-                    if spname:
-                        module_maps.append(
-                            (f"building:{bname}:{spname}",
-                             f"Building: {bname} / {spname}"))
-        for d in getattr(self, '_mod_dungeon_list', []):
-            dname = d.get("name", "")
-            if dname:
-                for lv in d.get("levels", []):
-                    lvname = lv.get("name", "")
-                    if lvname:
-                        module_maps.append(
-                            (f"dungeon:{dname}:{lvname}",
-                             f"Dungeon: {dname} / {lvname}"))
-
-        self._mod_module_maps = module_maps
+        module_maps = self._build_module_maps()
 
         # ── Load existing tile links ──
         tile_links = self._mod_overview_map.get("tile_links", {})
