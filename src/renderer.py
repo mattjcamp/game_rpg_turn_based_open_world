@@ -2428,14 +2428,17 @@ class Renderer(CombatEffectRendererMixin):
                             (nx - q_surf.get_width() // 2,
                              ny - q_surf.get_height() // 2))
 
-                    # ── Name tag above quest giver ──
+                    # ── Name tag above NPC ──
+                    is_quest_giver = getattr(
+                        npc, "npc_type", "") == "module_quest_giver"
                     q_status = getattr(npc, "_quest_status", "available")
-                    if q_status == "turned_in":
-                        # Plain white name, no glow or marker
+                    if not is_quest_giver or q_status == "turned_in":
+                        # Plain white name for regular NPCs and
+                        # fully turned-in quest givers
                         name_color = (200, 200, 200)
                         border_color = None
                     else:
-                        # Pulsing gold name
+                        # Pulsing gold name for quest givers
                         pulse = 0.7 + 0.3 * _m.sin(_t.time() * 3.0)
                         name_color = (255, int(200 * pulse + 55), 0)
                         border_color = (180, 140, 0)
@@ -2453,16 +2456,18 @@ class Renderer(CombatEffectRendererMixin):
                         self.screen, (10, 10, 20), bg)
                     self.screen.blit(name_surf, name_rect)
                     # Status marker: ! for available, ? for active
-                    if q_status == "available":
-                        ex = self.font_small.render(
-                            "!", True, (255, 220, 0))
-                        self.screen.blit(
-                            ex, (name_rect.right + 2, name_rect.y))
-                    elif q_status == "active" or q_status == "completed":
-                        ex = self.font_small.render(
-                            "?", True, (200, 200, 200))
-                        self.screen.blit(
-                            ex, (name_rect.right + 2, name_rect.y))
+                    # (only for quest givers, not regular NPCs)
+                    if is_quest_giver:
+                        if q_status == "available":
+                            ex = self.font_small.render(
+                                "!", True, (255, 220, 0))
+                            self.screen.blit(
+                                ex, (name_rect.right + 2, name_rect.y))
+                        elif q_status in ("active", "completed"):
+                            ex = self.font_small.render(
+                                "?", True, (200, 200, 200))
+                            self.screen.blit(
+                                ex, (name_rect.right + 2, name_rect.y))
 
         # ── 3. party sprite ──
         psc = party.col - off_c

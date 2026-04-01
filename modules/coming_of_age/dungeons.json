@@ -4,7 +4,7 @@
     "description": "A dirty hole in the ground that animals and some monsters live in",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 1,
+    "num_levels": 5,
     "difficulty": "easy",
     "level_size": "small",
     "torch_density": "sparse",

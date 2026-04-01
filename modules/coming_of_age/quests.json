@@ -84,5 +84,31 @@
     ],
     "giver_col": 35,
     "giver_row": 14
+  },
+  {
+    "name": "Clear the Grotto",
+    "description": "",
+    "giver_npc": "Lucian",
+    "giver_sprite": "src/assets/game/npcs/vga_mage.png",
+    "giver_location": "overview",
+    "giver_dialogue": "The mage guild has lost the Dark Crystal in the Grotto. If you can bring this back to me, I will make it worth your while",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "steps": [
+      {
+        "description": "Collect the Crystal",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "Crystal",
+        "has_guardian": "yes",
+        "guardian_monster": "Dark Mage",
+        "spawn_location": "dungeon:Grotto",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 14,
+    "giver_row": 5
   }
 ]
