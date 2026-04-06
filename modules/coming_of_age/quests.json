@@ -117,7 +117,7 @@
     "giver_npc": "Alek",
     "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
     "giver_location": "town:Midherm",
-    "giver_dialogue": "",
+    "giver_dialogue": "Our brave warriors have been unable to stop the advanced of the Goblin Army. They are hiding in their stronghold to the north and west. Can you root them out, destroy them, and retrieve the lost King's Sword?",
     "reward_xp": 150,
     "reward_gold": 100,
     "steps": [

@@ -95,6 +95,17 @@ def _location_matches(step_location, combat_location):
         if cl.startswith("space:") and cl[len("space:"):].startswith(
                 bld_name + "/"):
             return True
+    # A "dungeon:X" step is satisfied by combat on any floor of that
+    # dungeon, i.e. "dungeon:X - Floor N".
+    if sl.startswith("dungeon:"):
+        base = sl[len("dungeon:"):]
+        if cl.startswith("dungeon:"):
+            cl_base = cl[len("dungeon:"):]
+            # Strip " - floor N" suffix from the combat location
+            import re
+            cl_stripped = re.sub(r"\s*-\s*floor\s+\d+$", "", cl_base)
+            if cl_stripped == base:
+                return True
     return False
 
 
@@ -130,7 +141,7 @@ def check_quest_kills(game):
         for variant in name_set:
             killed_counts[variant] = killed_counts.get(variant, 0) + 1
 
-    result_msg = None
+    messages = []
 
     for qdef in quest_defs:
         qname = qdef.get("name", "")
@@ -181,16 +192,23 @@ def check_quest_kills(game):
             if kills_so_far >= target_count:
                 progress[i] = True
                 desc = step.get("description", "Kill step")
-                result_msg = f"Quest '{qname}': {desc} - Complete!"
+                messages.append(
+                    f"Quest '{qname}': {desc} - Complete!")
                 game.sfx.play("treasure")
+            else:
+                # Show progress toward completing this step
+                display_name = monster_display.replace("_", " ").title()
+                messages.append(
+                    f"{display_name} defeated! "
+                    f"({kills_so_far}/{target_count})")
 
         if all(progress) and progress:
             if state["status"] != "completed":
                 state["status"] = "completed"
-                result_msg = (
+                messages.append(
                     "All steps done! Return to the quest "
                     "giver for your reward.")
 
     game.pending_killed_monsters = []
     game.pending_combat_location = ""
-    return result_msg
+    return " | ".join(messages) if messages else None
