@@ -169,6 +169,8 @@
         "target_count": 1,
         "optional": "no"
       }
-    ]
+    ],
+    "giver_col": 20,
+    "giver_row": 11
   }
 ]

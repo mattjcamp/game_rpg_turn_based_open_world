@@ -286,18 +286,59 @@ SHOP_TYPE_NAMES = {
 }
 
 
+def _derive_buy_price(item_name):
+    """Derive a reasonable buy price for an item that lacks one.
+
+    Uses item stats (evasion for armor, damage for weapons) to
+    generate a price, then registers it in SHOP_INVENTORY so the
+    shop UI can look it up normally.  Returns the derived price.
+    """
+    # Armor: base price scales with evasion
+    armor = ARMORS.get(item_name)
+    if armor:
+        evasion = armor.get("evasion", 50)
+        price = max(10, int((evasion - 50) * 20))
+        SHOP_INVENTORY[item_name] = {"buy": price, "sell": price // 2}
+        return price
+    # Weapons: base price scales with damage dice
+    weapon = WEAPONS.get(item_name)
+    if weapon:
+        dice = weapon.get("damage_dice", 1)
+        sides = weapon.get("damage_sides", 4)
+        bonus = weapon.get("damage_bonus", 0)
+        price = max(10, (dice * sides + bonus) * 8)
+        SHOP_INVENTORY[item_name] = {"buy": price, "sell": price // 2}
+        return price
+    # General / unknown: flat default
+    price = 25
+    SHOP_INVENTORY[item_name] = {"buy": price, "sell": price // 2}
+    return price
+
+
 def get_shop_items(shop_type="general"):
     """Return a list of item names appropriate for *shop_type*.
 
-    If counters.json defines a list for this shop_type, use that list
-    (filtered to items that actually exist in the shop inventory).
+    If counters.json defines a list for this shop_type, use that list.
+    Items listed in a counter that lack an explicit buy price get one
+    derived from their stats so they always appear in the shop.
     Otherwise falls back to category-based filtering from SHOP_INVENTORY.
     """
     # Check counter data first (data-driven per-counter item lists)
     if COUNTER_DATA and shop_type in COUNTER_DATA:
         counter_items = COUNTER_DATA[shop_type]
-        # Only include items that exist in SHOP_INVENTORY (have buy prices)
-        return [name for name in counter_items if name in SHOP_INVENTORY]
+        # Ensure every counter-defined item has a shop price.
+        # Items with explicit buy prices are already in SHOP_INVENTORY;
+        # for the rest, derive a reasonable price from their stats.
+        result = []
+        for name in counter_items:
+            if name not in SHOP_INVENTORY:
+                # Only include items that are actually defined somewhere
+                if name in ITEM_INFO or name in ARMORS or name in WEAPONS:
+                    _derive_buy_price(name)
+                else:
+                    continue  # unknown item — skip
+            result.append(name)
+        return result
 
     # Fallback to category-based filtering
     allowed_cats = SHOP_TYPE_CATEGORIES.get(shop_type)
