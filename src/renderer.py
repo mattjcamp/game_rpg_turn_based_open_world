@@ -8219,58 +8219,78 @@ class Renderer(CombatEffectRendererMixin):
         field_cursor = tw.get("field_cursor", 0)
         field_buffer = tw.get("field_buffer", "")
         field_scroll = tw.get("field_scroll", 0)
-        row_h = 38
-        max_visible = rh // row_h
+        base_row_h = 38
+        line_h = 20
 
         self._u3_text("Town Settings", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
         ly = ry + 44
+        val_x = rx + 140
+        max_val_w = rw - 140 - 16
+        bottom_limit = ry + rh - 40
 
-        for vi in range(max_visible):
-            i = field_scroll + vi
-            if i >= len(fields):
+        cur_y = ly
+        for i in range(field_scroll, len(fields)):
+            if cur_y >= bottom_limit:
                 break
             fe = fields[i]
-            y = ly + vi * row_h
             selected = (i == field_cursor)
 
             if fe.field_type == "section":
                 pygame.draw.line(self.screen, (60, 50, 40),
-                                 (rx + 10, y + 10),
-                                 (rx + rw - 10, y + 10), 1)
+                                 (rx + 10, cur_y + 10),
+                                 (rx + rw - 10, cur_y + 10), 1)
                 if fe.label:
-                    self._u3_text(fe.label, rx + 14, y + 14,
+                    self._u3_text(fe.label, rx + 14, cur_y + 14,
                                   (180, 140, 60), fs)
+                cur_y += base_row_h
                 continue
+
+            # ── Action field (button-like) ──
+            if fe.field_type == "action":
+                if selected:
+                    bar = pygame.Surface(
+                        (rw - 4, base_row_h - 4), pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 25))
+                    self.screen.blit(bar, (rx + 2, cur_y))
+                label_color = (100, 200, 255) if selected else (80, 150, 200)
+                prefix = "> " if selected else "  "
+                self._u3_text(f"{prefix}{fe.label}",
+                              rx + 14, cur_y + 4, label_color, fm)
+                # Status text
+                self._u3_text(fe.value,
+                              rx + 14, cur_y + 20, (140, 140, 160), fs)
+                cur_y += base_row_h
+                continue
+
+            # Determine display text and wrap it
+            if selected and fe.editable:
+                display_text = field_buffer + "_"
+            else:
+                display_text = fe.value
+            wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+
+            num_lines = len(wrap_lines)
+            row_h = max(base_row_h, 8 + num_lines * line_h)
 
             if selected:
                 bar = pygame.Surface(
                     (rw - 4, row_h - 4), pygame.SRCALPHA)
                 bar.fill((255, 200, 60, 25))
-                self.screen.blit(bar, (rx + 2, y))
-
-            # ── Action field (button-like) ──
-            if fe.field_type == "action":
-                label_color = (100, 200, 255) if selected else (80, 150, 200)
-                prefix = "> " if selected else "  "
-                self._u3_text(f"{prefix}{fe.label}",
-                              rx + 14, y + 4, label_color, fm)
-                # Status text
-                self._u3_text(fe.value,
-                              rx + 14, y + 20, (140, 140, 160), fs)
-                continue
+                self.screen.blit(bar, (rx + 2, cur_y))
 
             label_color = self._U3_WHITE if selected else (160, 160, 180)
-            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+            self._u3_text(fe.label, rx + 14, cur_y + 4, label_color, fm)
 
-            val_x = rx + 140
             if selected and fe.editable:
-                val_text = field_buffer + "_"
                 val_color = (255, 220, 100)
             else:
-                val_text = fe.value
                 val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
-            self._u3_text(val_text, val_x, y + 4, val_color, fm)
+            for li, line in enumerate(wrap_lines):
+                self._u3_text(line, val_x, cur_y + 4 + li * line_h,
+                              val_color, fm)
+
+            cur_y += row_h
 
         sf = tw.get("save_flash", 0)
         if sf > 0:
@@ -9141,58 +9161,76 @@ class Renderer(CombatEffectRendererMixin):
         field_cursor = dg.get("field_cursor", 0)
         field_buffer = dg.get("field_buffer", "")
         field_scroll = dg.get("field_scroll", 0)
-        row_h = 38
-        max_visible = rh // row_h
+        base_row_h = 38
+        line_h = 20
 
         self._u3_text("Dungeon Settings", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
         ly = ry + 44
+        val_x = rx + 140
+        max_val_w = rw - 140 - 16  # available width for value text
+        bottom_limit = ry + rh - 40  # leave room for hint bar
 
-        for vi in range(max_visible):
-            i = field_scroll + vi
-            if i >= len(fields):
+        cur_y = ly
+        for i in range(field_scroll, len(fields)):
+            if cur_y >= bottom_limit:
                 break
             fe = fields[i]
-            y = ly + vi * row_h
             selected = (i == field_cursor)
 
             if fe.field_type == "section":
                 pygame.draw.line(self.screen, (60, 50, 40),
-                                 (rx + 10, y + 10),
-                                 (rx + rw - 10, y + 10), 1)
+                                 (rx + 10, cur_y + 10),
+                                 (rx + rw - 10, cur_y + 10), 1)
                 if fe.label:
-                    self._u3_text(fe.label, rx + 14, y + 14,
+                    self._u3_text(fe.label, rx + 14, cur_y + 14,
                                   (180, 140, 60), fs)
+                cur_y += base_row_h
                 continue
+
+            # Determine display text and wrap it
+            if fe.field_type == "choice":
+                display_text = fe.value
+                wrap_lines = [display_text]  # choices stay single-line
+            elif selected and fe.editable:
+                display_text = field_buffer + "_"
+                wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+            else:
+                display_text = fe.value
+                wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+
+            num_lines = len(wrap_lines)
+            row_h = max(base_row_h, 8 + num_lines * line_h)
 
             if selected:
                 bar = pygame.Surface(
                     (rw - 4, row_h - 4), pygame.SRCALPHA)
                 bar.fill((255, 200, 60, 25))
-                self.screen.blit(bar, (rx + 2, y))
+                self.screen.blit(bar, (rx + 2, cur_y))
 
             label_color = self._U3_WHITE if selected else (160, 160, 180)
-            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+            self._u3_text(fe.label, rx + 14, cur_y + 4, label_color, fm)
 
-            val_x = rx + 140
             if fe.field_type == "choice":
                 # Choice fields: < value > with arrows
                 arrow_color = (255, 220, 100) if selected else (120, 120, 140)
                 text_color = (255, 220, 100) if selected else (200, 200, 200)
-                self._u3_text("<", val_x, y + 4, arrow_color, fm)
+                self._u3_text("<", val_x, cur_y + 4, arrow_color, fm)
                 disp = fe.value or "(none)"
-                self._u3_text(disp, val_x + 14, y + 4, text_color, fm)
+                self._u3_text(disp, val_x + 14, cur_y + 4, text_color, fm)
                 vw = fm.size(disp)[0]
-                self._u3_text(">", val_x + 18 + vw, y + 4,
+                self._u3_text(">", val_x + 18 + vw, cur_y + 4,
                               arrow_color, fm)
-            elif selected and fe.editable:
-                val_text = field_buffer + "_"
-                val_color = (255, 220, 100)
-                self._u3_text(val_text, val_x, y + 4, val_color, fm)
             else:
-                val_text = fe.value
-                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
-                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+                if selected and fe.editable:
+                    val_color = (255, 220, 100)
+                else:
+                    val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+                for li, line in enumerate(wrap_lines):
+                    self._u3_text(line, val_x, cur_y + 4 + li * line_h,
+                                  val_color, fm)
+
+            cur_y += row_h
 
         self._draw_dungeon_flash(dg, rx, ry, rw, rh, f)
         self._u3_text(
@@ -9786,8 +9824,8 @@ class Renderer(CombatEffectRendererMixin):
         field_cursor = bg.get("field_cursor", 0)
         field_buffer = bg.get("field_buffer", "")
         field_scroll = bg.get("field_scroll", 0)
-        row_h = 38
-        max_visible = rh // row_h
+        base_row_h = 38
+        line_h = 20
 
         # Clip all rendering to the container bounds
         prev_clip = self.screen.get_clip()
@@ -9796,51 +9834,69 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text("Building Settings", rx + 16, ry + 12,
                       self._U3_ORANGE, f)
         ly = ry + 44
+        val_x = rx + 140
+        max_val_w = rw - 140 - 16
+        bottom_limit = ry + rh - 40
 
-        for vi in range(max_visible):
-            i = field_scroll + vi
-            if i >= len(fields):
+        cur_y = ly
+        for i in range(field_scroll, len(fields)):
+            if cur_y >= bottom_limit:
                 break
             fe = fields[i]
-            y = ly + vi * row_h
             selected = (i == field_cursor)
 
             if fe.field_type == "section":
                 pygame.draw.line(self.screen, (60, 50, 40),
-                                 (rx + 10, y + 10),
-                                 (rx + rw - 10, y + 10), 1)
+                                 (rx + 10, cur_y + 10),
+                                 (rx + rw - 10, cur_y + 10), 1)
                 if fe.label:
-                    self._u3_text(fe.label, rx + 14, y + 14,
+                    self._u3_text(fe.label, rx + 14, cur_y + 14,
                                   (180, 140, 60), fs)
+                cur_y += base_row_h
                 continue
+
+            # Determine display text and wrap it
+            if fe.field_type == "choice":
+                display_text = fe.value
+                wrap_lines = [display_text]  # choices stay single-line
+            elif selected and fe.editable:
+                display_text = field_buffer + "_"
+                wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+            else:
+                display_text = fe.value
+                wrap_lines = self._wrap_text(display_text, fm, max_val_w)
+
+            num_lines = len(wrap_lines)
+            row_h = max(base_row_h, 8 + num_lines * line_h)
 
             if selected:
                 bar = pygame.Surface(
                     (rw - 4, row_h - 4), pygame.SRCALPHA)
                 bar.fill((255, 200, 60, 25))
-                self.screen.blit(bar, (rx + 2, y))
+                self.screen.blit(bar, (rx + 2, cur_y))
 
             label_color = self._U3_WHITE if selected else (160, 160, 180)
-            self._u3_text(fe.label, rx + 14, y + 4, label_color, fm)
+            self._u3_text(fe.label, rx + 14, cur_y + 4, label_color, fm)
 
-            val_x = rx + 140
             if fe.field_type == "choice":
                 arrow_color = (255, 220, 100) if selected else (120, 120, 140)
                 text_color = (255, 220, 100) if selected else (200, 200, 200)
-                self._u3_text("<", val_x, y + 4, arrow_color, fm)
+                self._u3_text("<", val_x, cur_y + 4, arrow_color, fm)
                 disp = fe.value or "(none)"
-                self._u3_text(disp, val_x + 14, y + 4, text_color, fm)
+                self._u3_text(disp, val_x + 14, cur_y + 4, text_color, fm)
                 vw = fm.size(disp)[0]
-                self._u3_text(">", val_x + 18 + vw, y + 4,
+                self._u3_text(">", val_x + 18 + vw, cur_y + 4,
                               arrow_color, fm)
-            elif selected and fe.editable:
-                val_text = field_buffer + "_"
-                val_color = (255, 220, 100)
-                self._u3_text(val_text, val_x, y + 4, val_color, fm)
             else:
-                val_text = fe.value
-                val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
-                self._u3_text(val_text, val_x, y + 4, val_color, fm)
+                if selected and fe.editable:
+                    val_color = (255, 220, 100)
+                else:
+                    val_color = (200, 200, 200) if fe.editable else (120, 120, 140)
+                for li, line in enumerate(wrap_lines):
+                    self._u3_text(line, val_x, cur_y + 4 + li * line_h,
+                                  val_color, fm)
+
+            cur_y += row_h
 
         self._draw_building_flash(bg, rx, ry, rw, rh, f)
         self._u3_text(

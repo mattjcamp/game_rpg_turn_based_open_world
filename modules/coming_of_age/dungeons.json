@@ -82,5 +82,26 @@
         "encounters": []
       }
     ]
+  },
+  {
+    "name": "Dark Mage Coven",
+    "description": "Strange purple light seeps from the ground around a deep hole in the earlth ",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 4,
+    "difficulty": "hard",
+    "level_size": "medium",
+    "torch_density": "abundant",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
   }
 ]

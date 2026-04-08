@@ -792,7 +792,7 @@
       3,
       3,
       3,
-      3,
+      5,
       2,
       2,
       2,
@@ -1297,6 +1297,10 @@
     },
     "34,4": {
       "interior": "Dragon's Lair",
+      "type": "dungeon"
+    },
+    "27,18": {
+      "interior": "Dark Mage Coven",
       "type": "dungeon"
     }
   },

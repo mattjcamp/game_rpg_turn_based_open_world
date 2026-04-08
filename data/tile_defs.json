@@ -639,5 +639,16 @@
     ],
     "context": "overworld",
     "sprite": "overworld/ship_frigate"
+  },
+  "65": {
+    "name": "Seal of Binding",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "artifacts",
+    "sprite": "unique_tiles/seal_of_binding"
   }
 }

@@ -1059,7 +1059,8 @@
         "objects",
         "town",
         "unique_tiles"
-      ]
+      ],
+      "tile_id": 65
     },
     "poison_swamp": {
       "path": "src/assets/game/landmarks/poison_swamp.png",

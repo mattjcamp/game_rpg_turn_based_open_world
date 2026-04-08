@@ -172,5 +172,43 @@
     ],
     "giver_col": 20,
     "giver_row": 11
+  },
+  {
+    "name": "Retrieve the Seal of Binding",
+    "description": "",
+    "giver_npc": "Helok",
+    "giver_sprite": "src/assets/game/npcs/vga_mage.png",
+    "giver_location": "overview",
+    "giver_dialogue": "The dark mages have stolen my order's Seal of Binding! It is critical that we get this back to protect our lands. Please help us locate this and you will be rewarded handsomely.",
+    "reward_xp": 200,
+    "reward_gold": 200,
+    "steps": [
+      {
+        "description": "Beat the Dark Mages",
+        "step_type": "kill",
+        "monster": "Dark Mage",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "dungeon:Dark Mage Coven",
+        "target": "",
+        "target_count": 10,
+        "optional": "no"
+      },
+      {
+        "description": "Retrieve the Seal of Binding",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "Seal of Binding",
+        "has_guardian": "yes",
+        "guardian_monster": "Troll",
+        "spawn_location": "dungeon:Dark Mage Coven",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 34,
+    "giver_row": 16
   }
 ]
