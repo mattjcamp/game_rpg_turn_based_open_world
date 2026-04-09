@@ -318,11 +318,12 @@ class MonsterSpellEffect(_TimerEffect):
 
     # Default colour per spell type
     COLORS = {
-        "sleep":     (120,  80, 200),
-        "curse":     (200,  60,  60),
-        "heal_self": ( 60, 200,  80),
-        "heal_ally": ( 60, 200,  80),
-        "poison":    (100, 180,  40),
+        "sleep":        (120,  80, 200),
+        "curse":        (200,  60,  60),
+        "heal_self":    ( 60, 200,  80),
+        "heal_ally":    ( 60, 200,  80),
+        "poison":       (100, 180,  40),
+        "breath_fire":  (255, 120,  30),
     }
 
     def __init__(self, col, row, spell_type="sleep", label="", success=True):

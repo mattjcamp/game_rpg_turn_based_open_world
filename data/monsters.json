@@ -84,6 +84,18 @@
         {
           "type": "fire_resistance"
         }
+      ],
+      "spells": [
+        {
+          "type": "breath_fire",
+          "name": "Fire Breath",
+          "cast_chance": 50,
+          "range": 4,
+          "damage_dice": 3,
+          "damage_sides": 6,
+          "damage_bonus": 0,
+          "save_dc": 13
+        }
       ]
     },
     "Giant Rat": {

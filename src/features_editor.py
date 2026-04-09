@@ -2028,6 +2028,89 @@ class FeaturesEditor:
             pass
         return True
 
+    # ── Spell helper utilities for the monster editor ──
+
+    @staticmethod
+    def _spell_val(mon, spell_type, key, default):
+        """Return a value from an existing spell entry, or *default*."""
+        for s in (mon.get("spells") or []):
+            if s.get("type") == spell_type:
+                return s.get(key, default)
+        return default
+
+    # Wizard spell templates by level (1-5).  Each level provides a
+    # sleep + curse pair with scaled stats.
+    _WIZARD_LEVELS = {
+        1: {"sleep": {"save_dc": 10, "duration": 2, "max_target_hp": 20,
+                       "cast_chance": 25, "range": 5},
+            "curse": {"duration": 2, "ac_penalty": 1, "attack_penalty": 1,
+                      "cast_chance": 20, "range": 5}},
+        2: {"sleep": {"save_dc": 12, "duration": 3, "max_target_hp": 25,
+                       "cast_chance": 30, "range": 6},
+            "curse": {"duration": 3, "ac_penalty": 2, "attack_penalty": 2,
+                      "cast_chance": 25, "range": 6}},
+        3: {"sleep": {"save_dc": 14, "duration": 3, "max_target_hp": 35,
+                       "cast_chance": 35, "range": 7},
+            "curse": {"duration": 4, "ac_penalty": 3, "attack_penalty": 3,
+                      "cast_chance": 30, "range": 7}},
+        4: {"sleep": {"save_dc": 16, "duration": 4, "max_target_hp": 50,
+                       "cast_chance": 40, "range": 8},
+            "curse": {"duration": 5, "ac_penalty": 4, "attack_penalty": 3,
+                      "cast_chance": 35, "range": 8}},
+        5: {"sleep": {"save_dc": 18, "duration": 5, "max_target_hp": 70,
+                       "cast_chance": 45, "range": 9},
+            "curse": {"duration": 6, "ac_penalty": 5, "attack_penalty": 4,
+                      "cast_chance": 40, "range": 9}},
+    }
+
+    # Healer spell templates by level (1-5).
+    _HEALER_LEVELS = {
+        1: {"heal_self": {"heal_dice": 1, "heal_sides": 4, "heal_bonus": 0,
+                          "cast_chance": 35},
+            "heal_ally": {"heal_dice": 1, "heal_sides": 4, "heal_bonus": 0,
+                          "cast_chance": 30, "range": 4}},
+        2: {"heal_self": {"heal_dice": 1, "heal_sides": 6, "heal_bonus": 1,
+                          "cast_chance": 40},
+            "heal_ally": {"heal_dice": 1, "heal_sides": 6, "heal_bonus": 1,
+                          "cast_chance": 35, "range": 5}},
+        3: {"heal_self": {"heal_dice": 1, "heal_sides": 8, "heal_bonus": 2,
+                          "cast_chance": 40},
+            "heal_ally": {"heal_dice": 1, "heal_sides": 8, "heal_bonus": 2,
+                          "cast_chance": 40, "range": 6}},
+        4: {"heal_self": {"heal_dice": 2, "heal_sides": 6, "heal_bonus": 2,
+                          "cast_chance": 45},
+            "heal_ally": {"heal_dice": 2, "heal_sides": 6, "heal_bonus": 2,
+                          "cast_chance": 45, "range": 7}},
+        5: {"heal_self": {"heal_dice": 2, "heal_sides": 8, "heal_bonus": 3,
+                          "cast_chance": 50},
+            "heal_ally": {"heal_dice": 2, "heal_sides": 8, "heal_bonus": 3,
+                          "cast_chance": 50, "range": 8}},
+    }
+
+    @classmethod
+    def _wizard_level_from_spells(cls, mon):
+        """Infer wizard level from existing sleep/curse spell stats."""
+        for s in (mon.get("spells") or []):
+            if s.get("type") == "sleep":
+                dc = s.get("save_dc", 10)
+                for lvl in (5, 4, 3, 2, 1):
+                    if dc >= cls._WIZARD_LEVELS[lvl]["sleep"]["save_dc"]:
+                        return lvl
+        return 2  # default
+
+    @classmethod
+    def _healer_level_from_spells(cls, mon):
+        """Infer healer level from existing heal spell stats."""
+        for s in (mon.get("spells") or []):
+            if s.get("type") in ("heal_self", "heal_ally"):
+                dice = s.get("heal_dice", 1)
+                sides = s.get("heal_sides", 4)
+                for lvl in (5, 4, 3, 2, 1):
+                    t = cls._HEALER_LEVELS[lvl].get(s["type"], {})
+                    if dice >= t.get("heal_dice", 1) and sides >= t.get("heal_sides", 4):
+                        return lvl
+        return 2  # default
+
     def build_mon_fields(self, mon):
         """Build editable field list for a single monster."""
         FE = FieldEntry
@@ -2083,6 +2166,50 @@ class FeaturesEditor:
                str(mon.get("humanoid", False)), "choice"),
             FE("Terrain", "terrain",
                mon.get("terrain", "land"), "choice"),
+            FE("-- Abilities --", "_hdr_abilities", "", "section", False),
+            FE("Breath Fire", "_sp_breath_fire",
+               str(any(s.get("type") == "breath_fire"
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Cast Chance %", "_sp_bf_chance",
+               str(self._spell_val(mon, "breath_fire",
+                                   "cast_chance", 30)), "int"),
+            FE("  Range", "_sp_bf_range",
+               str(self._spell_val(mon, "breath_fire", "range", 4)),
+               "int"),
+            FE("  Dmg Dice", "_sp_bf_dice",
+               str(self._spell_val(mon, "breath_fire",
+                                   "damage_dice", 3)), "int"),
+            FE("  Dmg Sides", "_sp_bf_sides",
+               str(self._spell_val(mon, "breath_fire",
+                                   "damage_sides", 6)), "int"),
+            FE("  Save DC", "_sp_bf_dc",
+               str(self._spell_val(mon, "breath_fire",
+                                   "save_dc", 13)), "int"),
+            FE("Wizard Spells", "_sp_wizard",
+               str(any(s.get("type") in ("sleep", "curse")
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Spell Level", "_sp_wiz_level",
+               str(self._wizard_level_from_spells(mon)), "choice"),
+            FE("Healer Spells", "_sp_healer",
+               str(any(s.get("type") in ("heal_self", "heal_ally")
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Healer Level", "_sp_heal_level",
+               str(self._healer_level_from_spells(mon)), "choice"),
+            FE("Poison Spell", "_sp_poison",
+               str(any(s.get("type") == "poison"
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Cast Chance %", "_sp_poi_chance",
+               str(self._spell_val(mon, "poison",
+                                   "cast_chance", 30)), "int"),
+            FE("  Save DC", "_sp_poi_dc",
+               str(self._spell_val(mon, "poison", "save_dc", 11)),
+               "int"),
+            FE("  Dmg/Turn", "_sp_poi_dpt",
+               str(self._spell_val(mon, "poison",
+                                   "damage_per_turn", 2)), "int"),
+            FE("  Duration", "_sp_poi_dur",
+               str(self._spell_val(mon, "poison", "duration", 4)),
+               "int"),
             FE("-- On-Hit Effects --", "_hdr_onhit", "", "section", False),
             FE("Poison On Hit", "_oh_poison",
                str("poison" in on_hit), "choice"),
@@ -2167,6 +2294,69 @@ class FeaturesEditor:
             elif not key.startswith("_"):
                 mon[key] = val
 
+        # ── Rebuild spells list from ability fields ──
+        spells = []
+        if fvals.get("_sp_breath_fire") == "True":
+            spells.append({
+                "type": "breath_fire",
+                "name": "Fire Breath",
+                "cast_chance": int(fvals.get("_sp_bf_chance", "30")),
+                "range": int(fvals.get("_sp_bf_range", "4")),
+                "damage_dice": int(fvals.get("_sp_bf_dice", "3")),
+                "damage_sides": int(fvals.get("_sp_bf_sides", "6")),
+                "damage_bonus": 0,
+                "save_dc": int(fvals.get("_sp_bf_dc", "13")),
+            })
+        if fvals.get("_sp_wizard") == "True":
+            lvl = int(fvals.get("_sp_wiz_level", "2"))
+            lvl = max(1, min(5, lvl))
+            wt = self._WIZARD_LEVELS[lvl]
+            sl = wt["sleep"]
+            spells.append({
+                "type": "sleep", "name": "Dark Slumber",
+                "range": sl["range"], "cast_chance": sl["cast_chance"],
+                "save_dc": sl["save_dc"], "duration": sl["duration"],
+                "max_target_hp": sl["max_target_hp"],
+            })
+            cu = wt["curse"]
+            spells.append({
+                "type": "curse", "name": "Hex",
+                "range": cu["range"], "cast_chance": cu["cast_chance"],
+                "duration": cu["duration"],
+                "ac_penalty": cu["ac_penalty"],
+                "attack_penalty": cu["attack_penalty"],
+            })
+        if fvals.get("_sp_healer") == "True":
+            lvl = int(fvals.get("_sp_heal_level", "2"))
+            lvl = max(1, min(5, lvl))
+            ht = self._HEALER_LEVELS[lvl]
+            hs = ht["heal_self"]
+            spells.append({
+                "type": "heal_self", "name": "Self Heal",
+                "cast_chance": hs["cast_chance"],
+                "heal_dice": hs["heal_dice"],
+                "heal_sides": hs["heal_sides"],
+                "heal_bonus": hs["heal_bonus"],
+            })
+            ha = ht["heal_ally"]
+            spells.append({
+                "type": "heal_ally", "name": "Mend Wounds",
+                "range": ha["range"], "cast_chance": ha["cast_chance"],
+                "heal_dice": ha["heal_dice"],
+                "heal_sides": ha["heal_sides"],
+                "heal_bonus": ha["heal_bonus"],
+            })
+        if fvals.get("_sp_poison") == "True":
+            spells.append({
+                "type": "poison", "name": "Poison",
+                "range": 5,
+                "cast_chance": int(fvals.get("_sp_poi_chance", "30")),
+                "save_dc": int(fvals.get("_sp_poi_dc", "11")),
+                "damage_per_turn": int(fvals.get("_sp_poi_dpt", "2")),
+                "duration": int(fvals.get("_sp_poi_dur", "4")),
+            })
+        mon["spells"] = spells if spells else None
+
         # ── Rebuild on_hit_effects list from flat _oh_ fields ──
         on_hit = []
         if fvals.get("_oh_poison") == "True":
@@ -2218,8 +2408,12 @@ class FeaturesEditor:
         if key in ("undead", "humanoid"):
             return ["True", "False"]
         if key in ("_oh_poison", "_oh_stun", "_oh_slow", "_oh_drain",
-                    "_pas_fire_res", "_pas_ice_res", "_pas_poison_imm"):
+                    "_pas_fire_res", "_pas_ice_res", "_pas_poison_imm",
+                    "_sp_breath_fire", "_sp_wizard", "_sp_healer",
+                    "_sp_poison"):
             return ["True", "False"]
+        if key in ("_sp_wiz_level", "_sp_heal_level"):
+            return ["1", "2", "3", "4", "5"]
         if key == "terrain":
             return ["land", "sea"]
         return []

@@ -4556,6 +4556,14 @@ class CombatState(BaseState):
                     return True
                 continue
 
+            # ── breath_fire — cone of fire hitting multiple fighters ──
+            if stype == "breath_fire":
+                targets = self._pick_breath_targets(monster, srange)
+                if targets:
+                    self._monster_cast_breath_fire(monster, targets, spell)
+                    return True
+                continue
+
         return False  # no spell was cast
 
     def _pick_spell_target(self, monster, max_range):
@@ -4740,6 +4748,104 @@ class CombatState(BaseState):
         self.active_monster_idx += 1
         self.phase = PHASE_MONSTER_SPELL
         self.phase_timer = 1200
+
+    # ── Breath fire (AOE) ─────────────────────────────────────────
+
+    def _pick_breath_targets(self, monster, max_range):
+        """Return all alive, visible fighters within *max_range* of monster."""
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        targets = []
+        for member in self.fighters:
+            if not member.is_alive():
+                continue
+            if member in self.invisibility_buffs:
+                continue
+            fc, fr = self.fighter_positions[member]
+            dist = max(abs(fc - mc), abs(fr - mr))
+            if dist <= max_range:
+                targets.append(member)
+        return targets
+
+    def _monster_cast_breath_fire(self, monster, targets, spell):
+        """Monster breathes fire hitting all *targets* in range.
+
+        Each target makes a DEX-based save (using Dexterity stat) to
+        take half damage.
+        """
+        name = spell.get("name", "Fire Breath")
+        save_dc = spell.get("save_dc", 13)
+        dice = spell.get("damage_dice", 3)
+        sides = spell.get("damage_sides", 6)
+        bonus = spell.get("damage_bonus", 0)
+
+        total_damage = roll_dice(dice, sides) + bonus
+
+        self.combat_log.append(
+            f"{monster.name} unleashes {name}! "
+            f"({dice}d{sides}+{bonus} = {total_damage} fire damage)")
+
+        for target in targets:
+            # DEX save
+            save_roll = roll_d20()
+            dex_mod = get_modifier(target.dexterity)
+            save_total = save_roll + dex_mod
+
+            tc, tr = self.fighter_positions.get(target, (0, 0))
+
+            # Check fire resistance on target (halves damage before save)
+            resist = False
+            for pas in getattr(target, "passives", None) or []:
+                if pas.get("type") == "fire_resistance":
+                    resist = True
+                    break
+
+            if save_total >= save_dc:
+                # Saved — half damage
+                dmg = max(1, total_damage // 2)
+                if resist:
+                    dmg = max(1, dmg // 2)
+                    self.combat_log.append(
+                        f"{target.name} saves & resists! Takes {dmg} fire damage.")
+                else:
+                    self.combat_log.append(
+                        f"{target.name} saves ({save_roll}+{dex_mod}="
+                        f"{save_total} vs DC {save_dc}) — {dmg} damage!")
+                self.monster_spell_effects.append(
+                    MonsterSpellEffect(tc, tr, "breath_fire", name,
+                                       success=False))
+            else:
+                # Failed — full damage
+                dmg = total_damage
+                if resist:
+                    dmg = max(1, dmg // 2)
+                    self.combat_log.append(
+                        f"{target.name} fails save but resists! "
+                        f"Takes {dmg} fire damage.")
+                else:
+                    self.combat_log.append(
+                        f"{target.name} fails save ({save_roll}+{dex_mod}="
+                        f"{save_total} vs DC {save_dc}) — {dmg} damage!")
+                self.monster_spell_effects.append(
+                    MonsterSpellEffect(tc, tr, "breath_fire", name,
+                                       success=True))
+
+            target.hp = max(0, target.hp - dmg)
+            self.hit_effects.append(HitEffect(tc, tr, dmg))
+            self._wake_fighter(target)
+
+            if not target.is_alive():
+                self.combat_log.append(f"{target.name} has fallen!")
+
+        if not any(m.is_alive() for m in self.fighters):
+            self.phase = PHASE_DEFEAT
+            self.phase_timer = 2500
+            self.game.sfx.play("defeat")
+            self.combat_log.append("The party has been defeated!")
+            self.game.game_log.append("The party was defeated in battle.")
+        else:
+            self.active_monster_idx += 1
+            self.phase = PHASE_MONSTER_SPELL
+            self.phase_timer = 1400
 
     # ── Charmed monster AI ─────────────────────────────────────────
 
