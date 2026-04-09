@@ -17,6 +17,7 @@ class ModuleDungeonEditorMixin:
     _DUNGEON_SIZE_OPTIONS = ["small", "medium", "large"]
     _DUNGEON_DIFFICULTY_OPTIONS = ["easy", "normal", "hard", "deadly"]
     _DUNGEON_TORCH_OPTIONS = ["none", "sparse", "moderate", "abundant"]
+    _DUNGEON_LOCKED_DOORS_OPTIONS = ["off", "on"]
 
     def _mod_dungeon_add_new(self, name):
         """Add a new blank dungeon with one default level."""
@@ -30,6 +31,7 @@ class ModuleDungeonEditorMixin:
             "difficulty": "normal",
             "level_size": "medium",
             "torch_density": "moderate",
+            "locked_doors": "off",
             # Custom dungeons use levels array
             "levels": [
                 {
@@ -90,6 +92,9 @@ class ModuleDungeonEditorMixin:
                 FieldEntry("Torch Density", "torch_density",
                            dungeon.get("torch_density", "moderate"),
                            "choice", True),
+                FieldEntry("Locked Doors", "locked_doors",
+                           dungeon.get("locked_doors", "off"),
+                           "choice", True),
             ])
 
         # Map field keys to their valid options for choice cycling
@@ -99,6 +104,7 @@ class ModuleDungeonEditorMixin:
             "difficulty": self._DUNGEON_DIFFICULTY_OPTIONS,
             "level_size": self._DUNGEON_SIZE_OPTIONS,
             "torch_density": self._DUNGEON_TORCH_OPTIONS,
+            "locked_doors": self._DUNGEON_LOCKED_DOORS_OPTIONS,
         }
 
         self._mod_dungeon_fields = fields

@@ -2079,6 +2079,7 @@ class OverworldState(InventoryMixin, BaseState):
             td = torch_map.get(
                 dungeon_def.get("torch_density", "moderate"), "medium")
             num_levels = max(1, int(dungeon_def.get("num_levels", 1)))
+            doors = dungeon_def.get("locked_doors", "off") == "on"
 
             gen_levels = []
             seed_base = hash((name, pcol, prow)) & 0xFFFFFFFF
@@ -2089,6 +2090,7 @@ class OverworldState(InventoryMixin, BaseState):
                     min_rooms=rm[0], max_rooms=rm[1],
                     seed=seed_base + li,
                     place_stairs_down=(li < num_levels - 1),
+                    place_doors=doors,
                     torch_density=td)
                 gen_levels.append(dd)
 

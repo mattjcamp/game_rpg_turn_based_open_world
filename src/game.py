@@ -956,13 +956,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             kc = int(kd.get("kill_count", 0)) if quest_type == "kill" else 0
             td = kd.get("torch_density", "medium")
             dsz = kd.get("size", "medium")
+            locked = kd.get("locked_doors", "off") == "on"
             levels = generate_keys_dungeon(
                 dnum, name=name,
                 place_artifact=needs_artifact,
                 module_levels=module_levels,
                 kill_target=kt, kill_count=kc,
                 torch_density=td,
-                dungeon_size=dsz)
+                dungeon_size=dsz,
+                place_doors=locked)
             self.key_dungeons[(col, row)] = {
                 "dungeon_number": dnum,
                 "name": name,

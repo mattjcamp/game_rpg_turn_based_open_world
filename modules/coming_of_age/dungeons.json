@@ -18,7 +18,8 @@
         "tiles": {},
         "encounters": []
       }
-    ]
+    ],
+    "locked_doors": "on"
   },
   {
     "name": "Orc Caves",
@@ -43,7 +44,7 @@
   },
   {
     "name": "Goblin Hole",
-    "description": "",
+    "description": "A dank hole, preferred by golbins and other creatures.",
     "mode": "procedural",
     "dungeon_style": "cave",
     "num_levels": 8,

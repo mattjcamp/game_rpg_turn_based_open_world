@@ -745,7 +745,8 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
                                      place_artifact=True,
                                      kill_target=None, kill_count=0,
                                      torch_density="medium",
-                                     dungeon_size="medium"):
+                                     dungeon_size="medium",
+                                     place_doors=False):
     """Generate a random multi-level dungeon for an innkeeper quest.
 
     Parameters
@@ -811,7 +812,7 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
             max_rooms=max(4, 6 + floor + room_offset),
             place_stairs_down=not is_last,
             place_artifact=(is_last and place_artifact),
-            place_doors=False,
+            place_doors=place_doors,
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
@@ -838,7 +839,8 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
                           module_levels=None,
                           kill_target=None, kill_count=0,
                           torch_density="medium",
-                          dungeon_size="medium"):
+                          dungeon_size="medium",
+                          place_doors=False):
     """Generate a progressive dungeon for a module.
 
     When *module_levels* is provided (from the module editor), the floor
@@ -964,7 +966,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             min_rooms=min_r, max_rooms=max_r,
             place_stairs_down=not is_last,
             place_artifact=(is_last and place_artifact),
-            place_doors=False,
+            place_doors=place_doors,
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
