@@ -67,7 +67,7 @@
     "description": "",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 10,
+    "num_levels": 1,
     "difficulty": "hard",
     "level_size": "large",
     "torch_density": "sparse",

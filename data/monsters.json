@@ -56,6 +56,36 @@
       ],
       "terrain": "land"
     },
+    "Dragon": {
+      "description": "A younger dragon",
+      "hp": 75,
+      "ac": 18,
+      "attack_bonus": 4,
+      "damage_dice": 2,
+      "damage_sides": 8,
+      "damage_bonus": 0,
+      "xp_reward": 35,
+      "gold_min": 10,
+      "gold_max": 25,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "tile": "monsters/dragon_f1",
+      "move_range": 8,
+      "post_attack_move": 2,
+      "on_hit_effects": null,
+      "passives": [
+        {
+          "type": "fire_resistance"
+        }
+      ]
+    },
     "Giant Rat": {
       "description": "A large rat. Weak but fast.Gross.Meh",
       "undead": false,

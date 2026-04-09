@@ -9013,20 +9013,7 @@
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
-    "npcs": [
-      {
-        "name": "Lord British",
-        "npc_type": "villager",
-        "sprite": "src/assets/unassigned/wizard_f1.png",
-        "col": 12,
-        "row": 12,
-        "dialogue": [
-          "How fares thee?"
-        ],
-        "god_name": "The Divine",
-        "wander_range": 4
-      }
-    ],
+    "npcs": [],
     "_action_import": "Map assigned",
     "_action_generate": "Map assigned",
     "interiors": [

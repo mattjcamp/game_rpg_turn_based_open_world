@@ -210,5 +210,29 @@
     ],
     "giver_col": 34,
     "giver_row": 16
+  },
+  {
+    "name": "Save the Capital!",
+    "description": "",
+    "giver_npc": "Lord British",
+    "giver_sprite": "src/assets/unassigned/wizard_f1.png",
+    "giver_location": "town:Capital",
+    "giver_dialogue": "Hail Adventurers! Our city is under attack from a dragon who lives on the island just North of us. The beast lives in a deep dungeon, I require you to destroy this beast and save us all!",
+    "reward_xp": 500,
+    "reward_gold": 500,
+    "steps": [
+      {
+        "description": "Kill the Dragon",
+        "step_type": "kill",
+        "monster": "Dragon",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "dungeon:Dragon's Lair",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ]
   }
 ]

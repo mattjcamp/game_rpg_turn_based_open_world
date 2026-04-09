@@ -2034,6 +2034,16 @@ class FeaturesEditor:
         color = mon.get("color", [200, 50, 50])
         color_str = f"{color[0]}, {color[1]}, {color[2]}" \
             if isinstance(color, (list, tuple)) else str(color)
+        # ── Unpack on-hit effects from list into flat fields ──
+        on_hit = {}
+        for eff in (mon.get("on_hit_effects") or []):
+            on_hit[eff.get("type", "")] = eff
+
+        # ── Unpack passives from list into flat fields ──
+        passive_map = {}
+        for p in (mon.get("passives") or []):
+            passive_map[p.get("type", "")] = p
+
         fields = [
             FE("-- Identity --", "_hdr1", "", "section", False),
             FE("Name", "_name", mon.get("_name", "")),
@@ -2052,6 +2062,11 @@ class FeaturesEditor:
                str(mon.get("damage_sides", 4)), "int"),
             FE("Damage Bonus", "damage_bonus",
                str(mon.get("damage_bonus", 0)), "int"),
+            FE("-- Movement --", "_hdr_move", "", "section", False),
+            FE("Move Range", "move_range",
+               str(mon.get("move_range", 1)), "int"),
+            FE("Post-Atk Move", "post_attack_move",
+               str(mon.get("post_attack_move", 0)), "int"),
             FE("-- Rewards --", "_hdr3", "", "section", False),
             FE("XP Reward", "xp_reward",
                str(mon.get("xp_reward", 25)), "int"),
@@ -2068,6 +2083,44 @@ class FeaturesEditor:
                str(mon.get("humanoid", False)), "choice"),
             FE("Terrain", "terrain",
                mon.get("terrain", "land"), "choice"),
+            FE("-- On-Hit Effects --", "_hdr_onhit", "", "section", False),
+            FE("Poison On Hit", "_oh_poison",
+               str("poison" in on_hit), "choice"),
+            FE("  Chance %", "_oh_poison_chance",
+               str(on_hit.get("poison", {}).get("chance", 30)), "int"),
+            FE("  Dmg/Turn", "_oh_poison_dpt",
+               str(on_hit.get("poison", {}).get("damage_per_turn", 2)),
+               "int"),
+            FE("  Duration", "_oh_poison_dur",
+               str(on_hit.get("poison", {}).get("duration", 3)), "int"),
+            FE("Stun On Hit", "_oh_stun",
+               str("stun" in on_hit), "choice"),
+            FE("  Chance %", "_oh_stun_chance",
+               str(on_hit.get("stun", {}).get("chance", 20)), "int"),
+            FE("  Duration", "_oh_stun_dur",
+               str(on_hit.get("stun", {}).get("duration", 1)), "int"),
+            FE("Slow On Hit", "_oh_slow",
+               str("slow" in on_hit), "choice"),
+            FE("  Chance %", "_oh_slow_chance",
+               str(on_hit.get("slow", {}).get("chance", 25)), "int"),
+            FE("  Duration", "_oh_slow_dur",
+               str(on_hit.get("slow", {}).get("duration", 2)), "int"),
+            FE("Drain On Hit", "_oh_drain",
+               str("drain" in on_hit), "choice"),
+            FE("  Chance %", "_oh_drain_chance",
+               str(on_hit.get("drain", {}).get("chance", 25)), "int"),
+            FE("  Amount", "_oh_drain_amt",
+               str(on_hit.get("drain", {}).get("amount", 3)), "int"),
+            FE("-- Passives --", "_hdr_passives", "", "section", False),
+            FE("Regen/Turn", "_pas_regen",
+               str(passive_map.get("regen", {}).get("amount", 0)),
+               "int"),
+            FE("Fire Resist", "_pas_fire_res",
+               str("fire_resistance" in passive_map), "choice"),
+            FE("Ice Resist", "_pas_ice_res",
+               str("ice_resistance" in passive_map), "choice"),
+            FE("Poison Immune", "_pas_poison_imm",
+               str("poison_immunity" in passive_map), "choice"),
         ]
         self.mon_fields = fields
         idx, buf = self.finalize_fields(fields)
@@ -2083,6 +2136,13 @@ class FeaturesEditor:
         if self.mon_fields:
             entry = self.mon_fields[self.mon_field]
             entry.value = self.mon_buffer
+
+        # ── Collect all field values into a lookup dict ──
+        fvals = {}
+        for entry in self.mon_fields:
+            fvals[entry.key] = entry.value
+
+        # ── Standard flat fields ──
         for entry in self.mon_fields:
             key, val = entry.key, entry.value
             if key.startswith("_") and key not in ("_name", "_color"):
@@ -2096,15 +2156,58 @@ class FeaturesEditor:
                     pass
             elif key in ("hp", "ac", "attack_bonus", "damage_dice",
                          "damage_sides", "damage_bonus", "xp_reward",
-                         "gold_min", "gold_max", "spawn_weight"):
+                         "gold_min", "gold_max", "spawn_weight",
+                         "move_range", "post_attack_move"):
                 try:
                     mon[key] = int(val)
                 except ValueError:
                     pass
             elif key in ("undead", "humanoid"):
                 mon[key] = val == "True"
-            else:
+            elif not key.startswith("_"):
                 mon[key] = val
+
+        # ── Rebuild on_hit_effects list from flat _oh_ fields ──
+        on_hit = []
+        if fvals.get("_oh_poison") == "True":
+            on_hit.append({
+                "type": "poison",
+                "chance": int(fvals.get("_oh_poison_chance", "30")),
+                "damage_per_turn": int(fvals.get("_oh_poison_dpt", "2")),
+                "duration": int(fvals.get("_oh_poison_dur", "3")),
+            })
+        if fvals.get("_oh_stun") == "True":
+            on_hit.append({
+                "type": "stun",
+                "chance": int(fvals.get("_oh_stun_chance", "20")),
+                "duration": int(fvals.get("_oh_stun_dur", "1")),
+            })
+        if fvals.get("_oh_slow") == "True":
+            on_hit.append({
+                "type": "slow",
+                "chance": int(fvals.get("_oh_slow_chance", "25")),
+                "duration": int(fvals.get("_oh_slow_dur", "2")),
+            })
+        if fvals.get("_oh_drain") == "True":
+            on_hit.append({
+                "type": "drain",
+                "chance": int(fvals.get("_oh_drain_chance", "25")),
+                "amount": int(fvals.get("_oh_drain_amt", "3")),
+            })
+        mon["on_hit_effects"] = on_hit if on_hit else None
+
+        # ── Rebuild passives list from flat _pas_ fields ──
+        passives = []
+        regen_amt = int(fvals.get("_pas_regen", "0"))
+        if regen_amt > 0:
+            passives.append({"type": "regen", "amount": regen_amt})
+        if fvals.get("_pas_fire_res") == "True":
+            passives.append({"type": "fire_resistance"})
+        if fvals.get("_pas_ice_res") == "True":
+            passives.append({"type": "ice_resistance"})
+        if fvals.get("_pas_poison_imm") == "True":
+            passives.append({"type": "poison_immunity"})
+        mon["passives"] = passives if passives else None
 
     def get_mon_choices(self, key):
         """Return choice options for a monster field."""
@@ -2113,6 +2216,9 @@ class FeaturesEditor:
             # All sprites tagged with the "monsters" category
             return DR.sprites_for_category("monsters")
         if key in ("undead", "humanoid"):
+            return ["True", "False"]
+        if key in ("_oh_poison", "_oh_stun", "_oh_slow", "_oh_drain",
+                    "_pas_fire_res", "_pas_ice_res", "_pas_poison_imm"):
             return ["True", "False"]
         if key == "terrain":
             return ["land", "sea"]

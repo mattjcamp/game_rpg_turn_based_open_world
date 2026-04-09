@@ -35,7 +35,9 @@ class Monster:
                  damage_dice=1, damage_sides=4, damage_bonus=0,
                  xp_reward=25, gold_reward=10, color=(200, 50, 50),
                  tile=None, undead=False, humanoid=False, terrain="land",
-                 ranged=None, spells=None):
+                 ranged=None, spells=None,
+                 move_range=1, post_attack_move=0,
+                 on_hit_effects=None, passives=None):
         self.name = name
         self.max_hp = hp
         self.hp = hp
@@ -61,6 +63,26 @@ class Monster:
         # Spell-like abilities (list of dicts, or None)
         # Each: type, name, range, cast_chance, + type-specific fields
         self.spells = spells or []
+
+        # ── Movement & tactical attributes (combat arena) ──
+        self.move_range = max(1, move_range)  # squares per combat turn
+        self.post_attack_move = max(0, post_attack_move)  # retreat after melee
+
+        # On-hit effects applied when melee attack lands
+        # List of dicts: [{type, chance, ...}]
+        #   type "poison"  → damage_per_turn, duration
+        #   type "stun"    → duration (target skips turns)
+        #   type "slow"    → duration (target move_range halved)
+        #   type "drain"   → amount (heals monster for that much)
+        self.on_hit_effects = on_hit_effects or []
+
+        # Passive abilities always active during combat
+        # List of dicts: [{type, ...}]
+        #   type "regen"           → amount (HP healed per turn)
+        #   type "fire_resistance" → (halves fire damage)
+        #   type "ice_resistance"  → (halves ice damage)
+        #   type "poison_immunity" → (immune to poison status)
+        self.passives = passives or []
 
         # Position on the dungeon map (set by generator)
         self.col = 0
@@ -189,6 +211,10 @@ def create_monster(name):
         terrain=data.get("terrain", "land"),
         ranged=data.get("ranged"),
         spells=data.get("spells"),
+        move_range=data.get("move_range", 1),
+        post_attack_move=data.get("post_attack_move", 0),
+        on_hit_effects=data.get("on_hit_effects"),
+        passives=data.get("passives"),
     )
 
 

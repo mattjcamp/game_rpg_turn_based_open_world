@@ -4009,6 +4009,34 @@ class CombatState(BaseState):
                 self.combat_log.append(
                     f"The weakening poison wears off {mon.name}.")
 
+        # ── Passive: regeneration ──
+        for pas in getattr(mon, "passives", None) or []:
+            if pas.get("type") == "regen":
+                amt = pas.get("amount", 0)
+                if amt > 0 and mon.hp < mon.max_hp:
+                    healed = min(amt, mon.max_hp - mon.hp)
+                    mon.hp += healed
+                    self.combat_log.append(
+                        f"{mon.name} regenerates {healed} HP! "
+                        f"({mon.hp}/{mon.max_hp})")
+
+        # ── Passive: poison immunity — clear poison if somehow applied ──
+        if getattr(mon, "poisoned", False):
+            for pas in getattr(mon, "passives", None) or []:
+                if pas.get("type") == "poison_immunity":
+                    mon.poisoned = False
+                    self.combat_log.append(
+                        f"{mon.name} shrugs off the poison!")
+                    break
+
+        # ── Tick slow debuffs ──
+        if hasattr(self, "slow_debuffs") and mon in self.slow_debuffs:
+            self.slow_debuffs[mon] -= 1
+            if self.slow_debuffs[mon] <= 0:
+                del self.slow_debuffs[mon]
+                self.combat_log.append(
+                    f"{mon.name} is no longer slowed.")
+
         # ── Charmed monster: attacks other (non-charmed) monsters ──
         if getattr(mon, "charmed", False):
             self._charmed_monster_turn(mon)
@@ -4076,49 +4104,57 @@ class CombatState(BaseState):
             self.phase_timer = 500
 
     def _monster_move_toward(self, monster, target):
-        """Step monster 1 tile toward the target (Chebyshev)."""
-        mc, mr = self.monster_positions.get(monster, (0, 0))
-        tc, tr = self.fighter_positions[target]
+        """Step monster up to *move_range* tiles toward *target* (Chebyshev)."""
+        steps = getattr(monster, "move_range", 1) or 1
+        for _ in range(steps):
+            mc, mr = self.monster_positions.get(monster, (0, 0))
+            tc, tr = self.fighter_positions[target]
 
-        best_dist = max(abs(mc - tc), abs(mr - tr))
-        candidates = []
+            cur_dist = max(abs(mc - tc), abs(mr - tr))
+            if cur_dist <= 1:
+                break  # already adjacent — stop
 
-        for dcol, drow in [
-            (0, -1), (0, 1), (-1, 0), (1, 0),
-            (-1, -1), (-1, 1), (1, -1), (1, 1),
-        ]:
-            nc, nr = mc + dcol, mr + drow
-            # Check occupied by fighter
-            occupied = False
-            for m in self.fighters:
-                if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
-                    occupied = True
-                    break
-            if occupied:
-                continue
-            # Check occupied by another alive monster
-            for other in self.monsters:
-                if other is monster or not other.is_alive():
+            best_dist = cur_dist
+            candidates = []
+
+            for dcol, drow in [
+                (0, -1), (0, 1), (-1, 0), (1, 0),
+                (-1, -1), (-1, 1), (1, -1), (1, 1),
+            ]:
+                nc, nr = mc + dcol, mr + drow
+                # Check occupied by fighter
+                occupied = False
+                for m in self.fighters:
+                    if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
+                        occupied = True
+                        break
+                if occupied:
                     continue
-                if self.monster_positions.get(other) == (nc, nr):
-                    occupied = True
-                    break
-            if occupied:
-                continue
-            if self._is_arena_wall(nc, nr):
-                continue
-            if self._is_obstacle(nc, nr):
-                continue
-            dist = max(abs(nc - tc), abs(nr - tr))
-            if dist < best_dist:
-                candidates = [(nc, nr)]
-                best_dist = dist
-            elif dist == best_dist:
-                candidates.append((nc, nr))
+                # Check occupied by another alive monster
+                for other in self.monsters:
+                    if other is monster or not other.is_alive():
+                        continue
+                    if self.monster_positions.get(other) == (nc, nr):
+                        occupied = True
+                        break
+                if occupied:
+                    continue
+                if self._is_arena_wall(nc, nr):
+                    continue
+                if self._is_obstacle(nc, nr):
+                    continue
+                dist = max(abs(nc - tc), abs(nr - tr))
+                if dist < best_dist:
+                    candidates = [(nc, nr)]
+                    best_dist = dist
+                elif dist == best_dist:
+                    candidates.append((nc, nr))
 
-        if candidates:
-            nc, nr = random.choice(candidates)
-            self.monster_positions[monster] = (nc, nr)
+            if candidates:
+                nc, nr = random.choice(candidates)
+                self.monster_positions[monster] = (nc, nr)
+            else:
+                break  # stuck — stop early
 
     def _monster_attack_player(self, monster, target):
         """A specific monster attacks a specific party member."""
@@ -4184,6 +4220,9 @@ class CombatState(BaseState):
             # Damage wakes sleeping fighters
             self._wake_fighter(target)
 
+            # ── On-hit effects ──
+            self._apply_on_hit_effects(monster, target)
+
         if not target.is_alive():
             self.combat_log.append(f"{target.name} has fallen!")
 
@@ -4194,8 +4233,107 @@ class CombatState(BaseState):
             self.combat_log.append("The party has been defeated!")
             self.game.game_log.append("The party was defeated in battle.")
         else:
+            # ── Post-attack movement (hit-and-run) ──
+            retreat = getattr(monster, "post_attack_move", 0) or 0
+            if retreat > 0 and target.is_alive():
+                self._monster_retreat(monster, target, retreat)
             self.phase = PHASE_MONSTER_ACT
             self.phase_timer = 800
+
+    def _apply_on_hit_effects(self, monster, target):
+        """Roll for each on-hit effect and apply to *target*."""
+        for eff in getattr(monster, "on_hit_effects", None) or []:
+            etype = eff.get("type", "")
+            chance = eff.get("chance", 0)
+            if random.randint(1, 100) > chance:
+                continue
+
+            if etype == "poison":
+                # Check target poison immunity
+                passives = getattr(target, "passives", None) or []
+                if any(p.get("type") == "poison_immunity" for p in passives):
+                    self.combat_log.append(
+                        f"{target.name} resists the poison!")
+                    continue
+                dpt = eff.get("damage_per_turn", 2)
+                dur = eff.get("duration", 3)
+                target.poisoned = True
+                target.poison_damage = dpt
+                target.poison_turns = dur
+                self.combat_log.append(
+                    f"{target.name} is poisoned! "
+                    f"({dpt} dmg/turn for {dur} turns)")
+
+            elif etype == "stun":
+                dur = eff.get("duration", 1)
+                # Use sleep_buffs as the stun mechanic (skip turns)
+                self.sleep_buffs[target] = dur
+                self.combat_log.append(
+                    f"{target.name} is stunned for {dur} turn(s)!")
+
+            elif etype == "slow":
+                dur = eff.get("duration", 2)
+                # Store slow debuff — checked by player movement
+                if not hasattr(self, "slow_debuffs"):
+                    self.slow_debuffs = {}
+                self.slow_debuffs[target] = dur
+                self.combat_log.append(
+                    f"{target.name} is slowed for {dur} turn(s)!")
+
+            elif etype == "drain":
+                amt = eff.get("amount", 3)
+                healed = min(amt, monster.max_hp - monster.hp)
+                if healed > 0:
+                    monster.hp += healed
+                    self.combat_log.append(
+                        f"{monster.name} drains {healed} HP "
+                        f"from {target.name}!")
+
+    def _monster_retreat(self, monster, target, steps):
+        """Move *monster* up to *steps* tiles away from *target*."""
+        tc, tr = self.fighter_positions.get(target, (0, 0))
+        for _ in range(steps):
+            mc, mr = self.monster_positions.get(monster, (0, 0))
+            best_dist = max(abs(mc - tc), abs(mr - tr))
+            candidates = []
+            for dcol, drow in [
+                (0, -1), (0, 1), (-1, 0), (1, 0),
+                (-1, -1), (-1, 1), (1, -1), (1, 1),
+            ]:
+                nc, nr = mc + dcol, mr + drow
+                occupied = False
+                for m in self.fighters:
+                    if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
+                        occupied = True
+                        break
+                if occupied:
+                    continue
+                for other in self.monsters:
+                    if other is monster or not other.is_alive():
+                        continue
+                    if self.monster_positions.get(other) == (nc, nr):
+                        occupied = True
+                        break
+                if occupied:
+                    continue
+                if self._is_arena_wall(nc, nr):
+                    continue
+                if self._is_obstacle(nc, nr):
+                    continue
+                dist = max(abs(nc - tc), abs(nr - tr))
+                if dist > best_dist:
+                    candidates = [(nc, nr)]
+                    best_dist = dist
+                elif dist == best_dist:
+                    candidates.append((nc, nr))
+            if candidates:
+                nc, nr = random.choice(candidates)
+                self.monster_positions[monster] = (nc, nr)
+            else:
+                break
+        if steps > 0:
+            self.combat_log.append(
+                f"{monster.name} darts away after attacking!")
 
     # ── Monster ranged attacks ──────────────────────────────────────
 

@@ -159,14 +159,8 @@ class Renderer(CombatEffectRendererMixin):
         for mon_name, data in MONSTERS.items():
             tile_file = data.get("tile")
             if tile_file and tile_file not in self._monster_tiles:
-                # Look up via manifest by matching the filename
-                sprite = None
-                for mname in m.names_in("monsters"):
-                    entry = m.get_entry_by_name("monsters", mname)
-                    if entry and entry["path"].endswith(tile_file):
-                        sprite = m.get_sprite_by_name(
-                            "monsters", mname, dst_ts)
-                        break
+                sprite = self._resolve_manifest_sprite(
+                    m, tile_file, dst_ts)
                 if sprite:
                     self._monster_tiles[tile_file] = sprite
 
@@ -217,6 +211,46 @@ class Renderer(CombatEffectRendererMixin):
         # ── Load skeleton fallback for monster sprite misses ──
         self._skeleton_fallback = m.get_sprite_by_name(
             "monsters", "skeleton", dst_ts)
+
+    def _resolve_manifest_sprite(self, m, tile_file, size):
+        """Load a sprite from *tile_file* handling both reference formats.
+
+        Formats supported:
+        - ``"category/name"`` (new): e.g. ``"monsters/dragon_f1"``
+          → direct ``m.get_sprite_by_name(category, name, size)``
+        - path-suffix (old): e.g. ``"game/monsters/zombie.png"``
+          → scan manifest entries whose ``path`` ends with *tile_file*
+
+        Returns a pygame Surface or None.
+        """
+        if not tile_file:
+            return None
+
+        # ── New category/name format ──
+        if "/" in tile_file and not tile_file.endswith(".png"):
+            cat, name = tile_file.split("/", 1)
+            sprite = m.get_sprite_by_name(cat, name, size)
+            if sprite:
+                return sprite
+
+        # ── Old path-suffix format (or fallback) ──
+        # Determine which category to scan.  If the key started with
+        # "category/" we already know; otherwise guess "monsters" for
+        # backward compat with old monster tiles.
+        categories_to_scan = ["monsters"]
+        if "/" in tile_file:
+            first = tile_file.split("/", 1)[0]
+            if first not in categories_to_scan:
+                categories_to_scan.insert(0, first)
+
+        for cat in categories_to_scan:
+            for mname in m.names_in(cat):
+                entry = m.get_entry_by_name(cat, mname)
+                if entry and entry.get("path", "").endswith(tile_file):
+                    sprite = m.get_sprite_by_name(cat, mname, size)
+                    if sprite:
+                        return sprite
+        return None
 
     def reload_sprites(self):
         """Clear all sprite caches and reload from disk.
@@ -10432,15 +10466,9 @@ class Renderer(CombatEffectRendererMixin):
                 self._unique_tile_sprites[key] = (
                     pygame.transform.scale(base, (size, size)))
             else:
-                # Try loading via manifest
-                m = self._manifest
-                sprite = None
-                for mname in m.names_in("monsters"):
-                    entry = m.get_entry_by_name("monsters", mname)
-                    if entry and entry["path"].endswith(tile_file):
-                        sprite = m.get_sprite_by_name(
-                            "monsters", mname, size)
-                        break
+                # Try loading via manifest (handles both formats)
+                sprite = self._resolve_manifest_sprite(
+                    self._manifest, tile_file, size)
                 self._unique_tile_sprites[key] = sprite
         return self._unique_tile_sprites[key]
 
