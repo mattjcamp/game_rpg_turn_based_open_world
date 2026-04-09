@@ -212,26 +212,25 @@ class OverworldState(InventoryMixin, BaseState):
     def _spawn_orcs(self):
         """Top-up roaming orcs to _MAX_OVERWORLD_ORCS.
 
-        Each candidate position is classified as ``"land"`` or ``"sea"``
-        based on the tile type, and the encounter template is chosen to
-        match.  Sea encounters can only appear on water tiles, and land
-        encounters can only appear on walkable land tiles.
+        Monsters are only spawned on walkable land tiles.  Water,
+        mountains, and any other non-walkable tiles are excluded.
 
-        Also prunes any monster that has somehow ended up on a water tile
-        (safety net for movement edge-cases or legacy state).
+        Also prunes any existing monster that has somehow ended up on a
+        non-walkable tile (safety net for movement edge-cases, map edits,
+        or legacy state).
         """
         tile_map = self.game.tile_map
         party = self.game.party
 
-        # Keep only alive monsters that are NOT standing on invalid terrain.
-        # Land monsters on water tiles are removed as a safety net.
+        # Keep only alive monsters standing on walkable tiles.
+        # Removes any monster that ended up on water, mountains, or
+        # any other non-walkable tile (e.g. after map edits or bugs).
         valid = []
         for m in self.overworld_monsters:
             if not m.is_alive():
                 continue
-            tile_id = tile_map.get_tile(m.col, m.row)
-            if getattr(m, "terrain", "land") != "sea" and tile_id == TILE_WATER:
-                continue  # land monster on water — remove it
+            if not tile_map.is_walkable(m.col, m.row):
+                continue  # monster on non-walkable tile — remove it
             valid.append(m)
         self.overworld_monsters = valid
 
@@ -248,15 +247,14 @@ class OverworldState(InventoryMixin, BaseState):
                 if not (0 <= c < tile_map.width and 0 <= r < tile_map.height):
                     continue
 
-                # Determine terrain at this position
+                # Only spawn on walkable land tiles — skip water,
+                # mountains, and any other non-walkable tile.
+                if not tile_map.is_walkable(c, r):
+                    continue
                 tile_id = tile_map.get_tile(c, r)
                 if tile_id == TILE_WATER:
-                    terrain = "sea"
-                else:
-                    # Land monsters require a walkable tile
-                    if not tile_map.is_walkable(c, r):
-                        continue
-                    terrain = "land"
+                    continue  # water is non-walkable but guard anyway
+                terrain = "land"
 
                 # Pick an encounter matching this terrain
                 enc = create_encounter("overworld", terrain=terrain)
@@ -817,6 +815,7 @@ class OverworldState(InventoryMixin, BaseState):
 
         for mon in alive:
             occupied.discard((mon.col, mon.row))
+            prev_col, prev_row = mon.col, mon.row
             cheb = max(abs(mon.col - party.col), abs(mon.row - party.row))
 
             anchor = getattr(mon, "_guardian_anchor", None)
@@ -862,6 +861,10 @@ class OverworldState(InventoryMixin, BaseState):
                     party_col=party.col,
                     party_row=party.row,
                 )
+            # Safety: if a monster somehow landed on a non-walkable tile,
+            # snap it back to its previous position.
+            if not self.game.tile_map.is_walkable(mon.col, mon.row):
+                mon.col, mon.row = prev_col, prev_row
             occupied.add((mon.col, mon.row))
 
         # Tick down the lingering repel effect (one step per party move)

@@ -9371,12 +9371,12 @@
             "name": "Counter"
           },
           "5,7": {
-            "tile_id": 63,
-            "name": "Floor Light"
+            "tile_id": 58,
+            "name": "Armor Counter"
           },
           "5,8": {
-            "tile_id": 12,
-            "name": "Counter"
+            "tile_id": 57,
+            "name": "Weapon Counter"
           },
           "6,8": {
             "tile_id": 63,

@@ -64,10 +64,10 @@
   },
   {
     "name": "Dragon's Lair",
-    "description": "",
+    "description": "Smoke seeps from the ground surrounding this deep lair. This hole has all the signs of a dragon's den.",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 1,
+    "num_levels": 10,
     "difficulty": "hard",
     "level_size": "large",
     "torch_density": "sparse",

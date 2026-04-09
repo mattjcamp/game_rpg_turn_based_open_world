@@ -169,14 +169,18 @@ class DungeonState(InventoryMixin, BaseState):
         dungeon's name, creates Monster objects and adds them to
         ``dungeon_data.monsters`` on walkable tiles.
 
-        Matches both the exact floor name (e.g. "Dank Place - Floor 1")
-        and the base dungeon name (e.g. "Dank Place") so that quest
-        monsters registered under the dungeon's top-level name are
-        injected into whichever floor the player enters.
+        Quest monsters only spawn on the **lowest** floor of a
+        multi-level dungeon so the player must descend all the way
+        before encountering the boss.
         """
         import random as _rng
         import re
         from src.monster import create_monster, MONSTERS
+
+        # Only place quest monsters on the lowest floor
+        if self.quest_levels:
+            if self.current_level < len(self.quest_levels) - 1:
+                return  # not the lowest floor yet
 
         dname = getattr(self.dungeon_data, "name", "")
         monsters_dict = getattr(self.game, "quest_dungeon_monsters", {})
