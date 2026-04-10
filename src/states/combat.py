@@ -597,24 +597,14 @@ class CombatState(BaseState):
             f"{len(self.fighters)} party members engage!"
         )
 
-        # Music override from custom battle screen
-        bs = getattr(self, "battle_screen", None)
-        if bs and bs.get("music") and bs["music"] != "Default":
-            self._prev_music_style = self.game.music.style
-            self.game.music.set_style(bs["music"])
-            self.game.music.play("combat")
-        else:
-            self._prev_music_style = None
+        self._prev_music_style = None
 
         self.phase = PHASE_PLAYER
         self.active_idx = 0
         self._announce_turn()
 
     def exit(self):
-        # Restore music style if it was overridden by battle screen
-        prev = getattr(self, "_prev_music_style", None)
-        if prev is not None:
-            self.game.music.set_style(prev)
+        pass
 
     def _announce_turn(self):
         """Add a log entry for whose turn it is and reset move budget.

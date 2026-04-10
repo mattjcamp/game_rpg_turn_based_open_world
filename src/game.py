@@ -30,7 +30,7 @@ from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.states.examine import ExamineState
 from src.town_generator import generate_town, generate_duskhollow
-from src.music import MusicManager, SoundEffects, SOUNDTRACK_STYLES
+from src.music import SoundEffects
 from src.save_load import (save_game, load_game, get_save_info,
                            delete_save, quick_save,
                            NUM_SAVE_SLOTS, QUICK_SAVE_SLOT,
@@ -126,14 +126,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.start_with_equipment = self._config.get("start_with_equipment", True)
         self.start_level = max(1, min(10, self._config.get("start_level", 1)))
 
-        # --- Music & Sound Effects ---
-        saved_style = self._config.get("soundtrack_style", "Classic")
-        if saved_style not in SOUNDTRACK_STYLES:
-            saved_style = "Classic"
-        self.music = MusicManager(style=saved_style)
+        # --- Sound Effects ---
         self.sfx = SoundEffects()
-        if not self._config.get("music_enabled", True):
-            self.music.toggle_mute()   # start muted if saved that way
 
         # --- Game-in-progress flag ---
         # True once the player has started or loaded a game.
@@ -490,13 +484,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.quick_save_message = None
         self.quick_save_msg_timer = 0.0
         self.settings_options = [
-            {"label": "MUSIC",
-             "value": self._config.get("music_enabled", True),
-             "type": "toggle", "action": self._toggle_music},
-            {"label": "SOUNDTRACK",
-             "value": self.music.style,
-             "choices": SOUNDTRACK_STYLES,
-             "type": "choice", "action": self._cycle_soundtrack},
             {"label": "DUNGEON MASTER MODE",
              "value": self._config.get("dm_mode", False),
              "type": "toggle", "action": self._toggle_dm_mode},
@@ -532,9 +519,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         }
         self.current_state = None
         self.change_state("overworld")
-
-        # Play title music (overrides the overworld music set by change_state)
-        self.music.play("title")
 
     @property
     def title_options(self):
@@ -2616,7 +2600,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.showing_game_over = True
         self.game_over_cursor = 0
         self.game_over_elapsed = 0.0
-        self.music.play("title")  # somber music
 
     def _game_over_load(self):
         """Open load screen from the game over screen."""
@@ -5494,29 +5477,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._config["active_module_path"] = path
         save_config(self._config)
 
-    # ── Music / settings helpers ────────────────────────────────
-
-    def _toggle_music(self):
-        """Toggle music on/off, sync settings display, and persist."""
-        muted = self.music.toggle_mute()
-        self.settings_options[0]["value"] = not muted
-        self._config["music_enabled"] = not muted
-        save_config(self._config)
-
-    def _cycle_soundtrack(self, direction=1):
-        """Cycle through available soundtrack styles and apply immediately.
-
-        direction: +1 for next, -1 for previous.
-        """
-        opt = self.settings_options[1]  # SOUNDTRACK entry
-        choices = opt["choices"]
-        cur_idx = choices.index(opt["value"]) if opt["value"] in choices else 0
-        new_idx = (cur_idx + direction) % len(choices)
-        new_style = choices[new_idx]
-        opt["value"] = new_style
-        self.music.set_style(new_style)
-        self._config["soundtrack_style"] = new_style
-        save_config(self._config)
+    # ── Settings helpers ─────────────────────────────────────────
 
     def _toggle_dm_mode(self):
         """Toggle Dungeon Master mode on/off.
@@ -5527,7 +5488,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         gameplay options.
         """
         self.dm_mode = not self.dm_mode
-        self.settings_options[2]["value"] = self.dm_mode
+        self.settings_options[0]["value"] = self.dm_mode
         self._config["dm_mode"] = self.dm_mode
         # Smite tracks DM mode
         self.smite_enabled = self.dm_mode
@@ -5619,8 +5580,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self.current_state.exit()
         self.current_state = self.states[state_name]
         self.current_state.enter()
-        # Switch music to match the new state
-        self.music.play(state_name)
 
     # ── Input handlers ──────────────────────────────────────────
 
@@ -5725,7 +5684,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if getattr(self, '_title_settings_mode', False):
                 self._title_settings_mode = False
                 self.showing_title = True
-                self.music.play("title")
         elif event.key == pygame.K_UP:
             self.settings_cursor = (
                 (self.settings_cursor - 1) % len(self.settings_options))
@@ -5767,12 +5725,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self._title_load_mode = False
                 self.showing_settings = False
                 self.showing_title = True
-                self.music.play("title")
             elif getattr(self, '_title_save_mode', False):
                 self._title_save_mode = False
                 self.showing_settings = False
                 self.showing_title = True
-                self.music.play("title")
             # If we came from the game over screen, go back to game over
             elif getattr(self, '_game_over_load_mode', False):
                 self._game_over_load_mode = False
@@ -5951,7 +5907,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     if event.key == pygame.K_m:
                         self.showing_title = True
                         self.title_cursor = 0
-                        self.music.play("title")
                         break
                     # Ctrl-S / Cmd-S: Quick Save
                     if self._is_save_shortcut(event):
@@ -5978,7 +5933,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     self.current_state.handle_input(events, keys_pressed)
 
             # --- Update ---
-            self.music.update(dt)
             # Tick quick save HUD timer
             if self.quick_save_msg_timer > 0:
                 self.quick_save_msg_timer -= dt

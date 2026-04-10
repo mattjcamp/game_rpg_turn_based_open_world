@@ -344,7 +344,6 @@ class OverworldState(InventoryMixin, BaseState):
                     # Return to title screen (where the player can save)
                     self.game.showing_title = True
                     self.game.title_cursor = 0
-                    self.game.music.play("title")
                     return
                 if event.key == pygame.K_p:
                     if self.showing_char_detail is not None:

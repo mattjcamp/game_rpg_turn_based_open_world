@@ -29,7 +29,6 @@ _CONFIG_PATH = os.path.join(
 
 # Default player settings
 _DEFAULT_CONFIG = {
-    "music_enabled": True,
     "smite_enabled": False,
     "start_with_equipment": True,
     "dm_mode": False,
