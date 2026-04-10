@@ -1515,31 +1515,54 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if already:
                 continue
 
-            # Find an open floor tile to place the NPC
+            # Find an open, *reachable* walkable tile to place the NPC.
+            # Flood-fill from the entry point to discover only the tiles
+            # the player can actually walk to, then pick a spot that
+            # maximises distance from existing NPCs.
             tmap = target_td.tile_map
-            from src.settings import TILE_FLOOR
             occupied = {(n.col, n.row) for n in target_td.npcs}
             occupied.add((target_td.entry_col, target_td.entry_row))
-            cx, cy = tmap.width // 2, tmap.height // 2
+
+            # BFS flood-fill from town entry to find reachable tiles
+            from collections import deque
+            reachable = set()
+            start = (target_td.entry_col, target_td.entry_row)
+            queue = deque([start])
+            reachable.add(start)
+            while queue:
+                cx, cy = queue.popleft()
+                for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                    nx, ny = cx + dx, cy + dy
+                    if ((nx, ny) not in reachable
+                            and 0 <= nx < tmap.width
+                            and 0 <= ny < tmap.height
+                            and tmap.is_walkable(nx, ny)):
+                        reachable.add((nx, ny))
+                        queue.append((nx, ny))
+
+            all_floor = [p for p in reachable if p not in occupied]
+
             placed = None
-            for ring in range(0, 12):
-                candidates = []
-                for dc in range(-ring, ring + 1):
-                    for dr in range(-ring, ring + 1):
-                        if ring > 0 and max(abs(dc), abs(dr)) != ring:
-                            continue
-                        c, r = cx + dc, cy + dr
-                        if (0 <= c < tmap.width and 0 <= r < tmap.height
-                                and tmap.get_tile(c, r) == TILE_FLOOR
-                                and (c, r) not in occupied):
-                            candidates.append((c, r))
-                if candidates:
+            if all_floor:
+                if occupied:
+                    # Score each candidate by its minimum distance to any
+                    # already-placed NPC — pick from the best candidates
+                    # so quest-givers are spread across the town.
+                    def _min_dist(pos):
+                        return min(abs(pos[0] - ox) + abs(pos[1] - oy)
+                                   for ox, oy in occupied)
+                    all_floor.sort(key=_min_dist, reverse=True)
+                    # Pick randomly from the top 25 % farthest tiles
+                    top_n = max(1, len(all_floor) // 4)
                     import random as _rng
                     _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
-                    placed = _r.choice(candidates)
-                    break
+                    placed = _r.choice(all_floor[:top_n])
+                else:
+                    import random as _rng
+                    _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
+                    placed = _r.choice(all_floor)
             if placed is None:
-                placed = (cx, cy)
+                placed = start
 
             col, row = placed
 

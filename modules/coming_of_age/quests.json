@@ -50,9 +50,9 @@
   {
     "name": "Find the Heirloom",
     "description": "",
-    "giver_npc": "Harrard Harry",
+    "giver_npc": "Hargard",
     "giver_sprite": "src/assets/game/npcs/u4_citizen.png",
-    "giver_location": "overview",
+    "giver_location": "town:Midherm",
     "giver_dialogue": "A crazy lady took my granpa's heirloom sword and hid it somewhere in an abandoned building. Can you help me get it back? Also, there may be goblins involved.",
     "reward_xp": 100,
     "reward_gold": 100,
@@ -116,7 +116,7 @@
     "description": "",
     "giver_npc": "Alek",
     "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
-    "giver_location": "town:Midherm",
+    "giver_location": "overview",
     "giver_dialogue": "Our brave warriors have been unable to stop the advanced of the Goblin Army. They are hiding in their stronghold to the north and west. Can you root them out, destroy them, and retrieve the lost King's Sword?",
     "reward_xp": 150,
     "reward_gold": 100,
@@ -170,8 +170,8 @@
         "optional": "no"
       }
     ],
-    "giver_col": 20,
-    "giver_row": 11
+    "giver_col": 35,
+    "giver_row": 14
   },
   {
     "name": "Retrieve the Seal of Binding",

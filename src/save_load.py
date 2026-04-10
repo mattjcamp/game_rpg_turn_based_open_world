@@ -399,6 +399,8 @@ def save_game(slot, game):
             "darkness_active": getattr(game, "darkness_active", False),
             "quest_npc_assignments": getattr(
                 game, "quest_npc_assignments", {}),
+            "module_quest_states": getattr(
+                game, "module_quest_states", {}),
             "quest": _serialize_quest(getattr(game, "quest", None)),
             "house_quest": _serialize_quest(getattr(game, "house_quest", None)),
             # ── Game log ──
@@ -545,6 +547,12 @@ def load_game(slot, game):
         # ── Restore quest NPC assignments (before town generation) ─
         game.quest_npc_assignments = save_data.get(
             "quest_npc_assignments", {})
+
+        # ── Restore module quest states (before NPC injection so
+        #    completed quests stay completed) ─
+        saved_mqs = save_data.get("module_quest_states", {})
+        if saved_mqs:
+            game.module_quest_states = saved_mqs
 
         # ── Restore towns (module-specific) ─────────────────────
         if game.module_manifest:

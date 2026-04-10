@@ -40,14 +40,15 @@
         "tiles": {},
         "encounters": []
       }
-    ]
+    ],
+    "locked_doors": "on"
   },
   {
     "name": "Goblin Hole",
     "description": "A dank hole, preferred by golbins and other creatures.",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 8,
+    "num_levels": 4,
     "difficulty": "normal",
     "level_size": "medium",
     "torch_density": "sparse",
@@ -61,7 +62,8 @@
         "tiles": {},
         "encounters": []
       }
-    ]
+    ],
+    "locked_doors": "on"
   },
   {
     "name": "Dragon's Lair",
@@ -82,7 +84,8 @@
         "tiles": {},
         "encounters": []
       }
-    ]
+    ],
+    "locked_doors": "on"
   },
   {
     "name": "Dark Mage Coven",
@@ -103,6 +106,7 @@
         "tiles": {},
         "encounters": []
       }
-    ]
+    ],
+    "locked_doors": "on"
   }
 ]

@@ -1107,29 +1107,42 @@ def add_quest_giver_npc(town_data, quest_giver_name, dungeon_key_str,
     rng = random.Random(seed)
     tmap = town_data.tile_map
     occupied = {(n.col, n.row) for n in town_data.npcs}
-    occupied.add((town_data.entry_col, town_data.entry_row))
+    start = (town_data.entry_col, town_data.entry_row)
+    occupied.add(start)
 
-    # Try to find an open floor tile near the centre of town
-    cx = tmap.width // 2
-    cy = tmap.height // 2
+    # BFS flood-fill from town entry to find reachable tiles
+    from collections import deque
+    reachable = set()
+    queue = deque([start])
+    reachable.add(start)
+    while queue:
+        cx, cy = queue.popleft()
+        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nx, ny = cx + dx, cy + dy
+            if ((nx, ny) not in reachable
+                    and 0 <= nx < tmap.width
+                    and 0 <= ny < tmap.height
+                    and tmap.is_walkable(nx, ny)):
+                reachable.add((nx, ny))
+                queue.append((nx, ny))
+
+    # Pick a reachable spot that maximises distance from existing NPCs
+    all_floor = [p for p in reachable if p not in occupied]
+
     placed = None
-    for ring in range(0, 10):
-        candidates = []
-        for dc in range(-ring, ring + 1):
-            for dr in range(-ring, ring + 1):
-                if ring > 0 and max(abs(dc), abs(dr)) != ring:
-                    continue
-                c, r = cx + dc, cy + dr
-                if (0 <= c < tmap.width and 0 <= r < tmap.height
-                        and tmap.get_tile(c, r) == TILE_FLOOR
-                        and (c, r) not in occupied):
-                    candidates.append((c, r))
-        if candidates:
-            placed = rng.choice(candidates)
-            break
+    if all_floor:
+        if occupied:
+            def _min_dist(pos):
+                return min(abs(pos[0] - ox) + abs(pos[1] - oy)
+                           for ox, oy in occupied)
+            all_floor.sort(key=_min_dist, reverse=True)
+            # Pick randomly from the top 25 % farthest tiles
+            top_n = max(1, len(all_floor) // 4)
+            placed = rng.choice(all_floor[:top_n])
+        else:
+            placed = rng.choice(all_floor)
     if placed is None:
-        # Absolute fallback — just put them at town centre
-        placed = (cx, cy)
+        placed = start
 
     col, row = placed
 

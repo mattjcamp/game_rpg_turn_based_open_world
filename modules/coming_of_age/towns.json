@@ -1483,19 +1483,16 @@
         "path": "game/terrain/sand.png"
       },
       "2,12": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 46,
+        "name": "Path Floor"
       },
       "3,12": {
         "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "name": "Path Floor"
       },
       "4,12": {
         "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "name": "Path Floor"
       },
       "5,12": {
         "tile_id": 46,
@@ -1588,9 +1585,8 @@
         "path": "game/terrain/path.png"
       },
       "23,12": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 46,
+        "name": "Path Floor"
       },
       "24,12": {
         "tile_id": 46,
