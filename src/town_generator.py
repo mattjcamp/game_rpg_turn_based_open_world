@@ -1107,27 +1107,35 @@ def add_quest_giver_npc(town_data, quest_giver_name, dungeon_key_str,
     rng = random.Random(seed)
     tmap = town_data.tile_map
     occupied = {(n.col, n.row) for n in town_data.npcs}
-    start = (town_data.entry_col, town_data.entry_row)
-    occupied.add(start)
+    occupied.add((town_data.entry_col, town_data.entry_row))
 
-    # BFS flood-fill from town entry to find reachable tiles
+    # Find the largest connected walkable component — custom towns
+    # may have the entry door walled off from the interior.
     from collections import deque
-    reachable = set()
-    queue = deque([start])
-    reachable.add(start)
-    while queue:
-        cx, cy = queue.popleft()
-        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            nx, ny = cx + dx, cy + dy
-            if ((nx, ny) not in reachable
-                    and 0 <= nx < tmap.width
-                    and 0 <= ny < tmap.height
-                    and tmap.is_walkable(nx, ny)):
-                reachable.add((nx, ny))
-                queue.append((nx, ny))
+    visited = set()
+    best_component = []
+    for sy in range(tmap.height):
+        for sx in range(tmap.width):
+            if (sx, sy) in visited or not tmap.is_walkable(sx, sy):
+                continue
+            component = []
+            queue = deque([(sx, sy)])
+            visited.add((sx, sy))
+            while queue:
+                cx, cy = queue.popleft()
+                component.append((cx, cy))
+                for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                    nx, ny = cx + dx, cy + dy
+                    if ((nx, ny) not in visited
+                            and 0 <= nx < tmap.width
+                            and 0 <= ny < tmap.height
+                            and tmap.is_walkable(nx, ny)):
+                        visited.add((nx, ny))
+                        queue.append((nx, ny))
+            if len(component) > len(best_component):
+                best_component = component
 
-    # Pick a reachable spot that maximises distance from existing NPCs
-    all_floor = [p for p in reachable if p not in occupied]
+    all_floor = [p for p in best_component if p not in occupied]
 
     placed = None
     if all_floor:
@@ -1136,13 +1144,12 @@ def add_quest_giver_npc(town_data, quest_giver_name, dungeon_key_str,
                 return min(abs(pos[0] - ox) + abs(pos[1] - oy)
                            for ox, oy in occupied)
             all_floor.sort(key=_min_dist, reverse=True)
-            # Pick randomly from the top 25 % farthest tiles
             top_n = max(1, len(all_floor) // 4)
             placed = rng.choice(all_floor[:top_n])
         else:
             placed = rng.choice(all_floor)
     if placed is None:
-        placed = start
+        placed = (town_data.entry_col, town_data.entry_row)
 
     col, row = placed
 

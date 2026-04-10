@@ -23,7 +23,7 @@
   },
   {
     "name": "Orc Caves",
-    "description": "",
+    "description": "A dark, dank, hole where the orcs go about their unseen business",
     "mode": "procedural",
     "dungeon_style": "cave",
     "num_levels": 6,

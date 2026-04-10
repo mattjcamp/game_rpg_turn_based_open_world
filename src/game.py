@@ -1515,44 +1515,50 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if already:
                 continue
 
-            # Find an open, *reachable* walkable tile to place the NPC.
-            # Flood-fill from the entry point to discover only the tiles
-            # the player can actually walk to, then pick a spot that
-            # maximises distance from existing NPCs.
+            # Find an open walkable tile in the town's largest connected
+            # region.  Custom towns may have the entry door walled off
+            # from the interior (the player passes through it during the
+            # transition), so a plain BFS from the entry can fail.
+            # Instead, find ALL walkable connected components and use the
+            # biggest one — that's the playable interior.
             tmap = target_td.tile_map
             occupied = {(n.col, n.row) for n in target_td.npcs}
             occupied.add((target_td.entry_col, target_td.entry_row))
 
-            # BFS flood-fill from town entry to find reachable tiles
             from collections import deque
-            reachable = set()
-            start = (target_td.entry_col, target_td.entry_row)
-            queue = deque([start])
-            reachable.add(start)
-            while queue:
-                cx, cy = queue.popleft()
-                for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-                    nx, ny = cx + dx, cy + dy
-                    if ((nx, ny) not in reachable
-                            and 0 <= nx < tmap.width
-                            and 0 <= ny < tmap.height
-                            and tmap.is_walkable(nx, ny)):
-                        reachable.add((nx, ny))
-                        queue.append((nx, ny))
+            visited = set()
+            best_component = []
+            for sy in range(tmap.height):
+                for sx in range(tmap.width):
+                    if (sx, sy) in visited or not tmap.is_walkable(sx, sy):
+                        continue
+                    # BFS to find this connected component
+                    component = []
+                    queue = deque([(sx, sy)])
+                    visited.add((sx, sy))
+                    while queue:
+                        cx, cy = queue.popleft()
+                        component.append((cx, cy))
+                        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                            nx, ny = cx + dx, cy + dy
+                            if ((nx, ny) not in visited
+                                    and 0 <= nx < tmap.width
+                                    and 0 <= ny < tmap.height
+                                    and tmap.is_walkable(nx, ny)):
+                                visited.add((nx, ny))
+                                queue.append((nx, ny))
+                    if len(component) > len(best_component):
+                        best_component = component
 
-            all_floor = [p for p in reachable if p not in occupied]
+            all_floor = [p for p in best_component if p not in occupied]
 
             placed = None
             if all_floor:
                 if occupied:
-                    # Score each candidate by its minimum distance to any
-                    # already-placed NPC — pick from the best candidates
-                    # so quest-givers are spread across the town.
                     def _min_dist(pos):
                         return min(abs(pos[0] - ox) + abs(pos[1] - oy)
                                    for ox, oy in occupied)
                     all_floor.sort(key=_min_dist, reverse=True)
-                    # Pick randomly from the top 25 % farthest tiles
                     top_n = max(1, len(all_floor) // 4)
                     import random as _rng
                     _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
@@ -1562,7 +1568,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
                     placed = _r.choice(all_floor)
             if placed is None:
-                placed = start
+                placed = (target_td.entry_col, target_td.entry_row)
 
             col, row = placed
 

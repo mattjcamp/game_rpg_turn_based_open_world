@@ -1476,7 +1476,8 @@ class DungeonState(InventoryMixin, BaseState):
                 total = len(self.quest_levels)
                 self.show_message(
                     f"You descend deeper... (Floor {depth}/{total})", 2000)
-                # Inject quest collect items on the lowest floor
+                # Inject quest monsters and collect items on the lowest floor
+                self._inject_quest_dungeon_monsters()
                 self._inject_quest_dungeon_collect_items()
                 active_q = self._get_active_quest()
                 if active_q:

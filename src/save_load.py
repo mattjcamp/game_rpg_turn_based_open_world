@@ -331,6 +331,14 @@ def _serialize_state_context(game, state_name):
             ctx["party_row"] = game.party.row
             ctx["torch_active"] = ds.torch_active
             ctx["torch_steps"] = ds.torch_steps
+            # Save dungeon name so module dungeons can be re-found
+            if ds.dungeon_data:
+                ctx["dungeon_name"] = getattr(ds.dungeon_data, "name", "")
+            # Ensure module dungeon levels are in the cache so they
+            # survive save/load even if the cache was empty before.
+            ow_key = (ds.overworld_col, ds.overworld_row)
+            if ds.quest_levels and ow_key not in game.dungeon_cache:
+                game.dungeon_cache[ow_key] = ds.quest_levels
 
     elif state_name == "town":
         ts = game.states.get("town")
@@ -401,6 +409,12 @@ def save_game(slot, game):
                 game, "quest_npc_assignments", {}),
             "module_quest_states": getattr(
                 game, "module_quest_states", {}),
+            "quest_dungeon_monsters": getattr(
+                game, "quest_dungeon_monsters", {}),
+            "quest_interior_monsters": getattr(
+                game, "quest_interior_monsters", {}),
+            "quest_collect_items": getattr(
+                game, "quest_collect_items", {}),
             "quest": _serialize_quest(getattr(game, "quest", None)),
             "house_quest": _serialize_quest(getattr(game, "house_quest", None)),
             # ── Game log ──
@@ -553,6 +567,19 @@ def load_game(slot, game):
         saved_mqs = save_data.get("module_quest_states", {})
         if saved_mqs:
             game.module_quest_states = saved_mqs
+
+        # ── Restore deferred quest spawn registrations ─────────
+        # These dicts tell dungeons/interiors which quest monsters
+        # and collect items to inject when the player enters them.
+        saved_qdm = save_data.get("quest_dungeon_monsters", {})
+        if saved_qdm:
+            game.quest_dungeon_monsters = saved_qdm
+        saved_qim = save_data.get("quest_interior_monsters", {})
+        if saved_qim:
+            game.quest_interior_monsters = saved_qim
+        saved_qci = save_data.get("quest_collect_items", {})
+        if saved_qci:
+            game.quest_collect_items = saved_qci
 
         # ── Restore towns (module-specific) ─────────────────────
         if game.module_manifest:
@@ -720,6 +747,79 @@ def _restore_quest(game, save_data, quest_attr):
     setattr(game, quest_attr, quest)
 
 
+def _regenerate_module_dungeon(game, dungeon_name, ow_col, ow_row):
+    """Regenerate a module dungeon by name when the cache is empty.
+
+    Searches the module's dungeon definitions for a matching name,
+    then generates the dungeon levels using the same deterministic
+    seed that ``_enter_module_dungeon`` uses so the layout is
+    consistent.  Returns a list of DungeonData objects, or None.
+    """
+    if not dungeon_name:
+        return None
+    mod_path = getattr(game, "active_module_path", None)
+    if not mod_path:
+        return None
+    import re
+    base_name = re.sub(r"\s*-\s*Floor\s+\d+$", "", dungeon_name)
+
+    # Load dungeon definitions from the module's dungeons.json
+    dungeons_path = os.path.join(mod_path, "dungeons.json")
+    if not os.path.isfile(dungeons_path):
+        return None
+    try:
+        with open(dungeons_path, "r") as f:
+            dungeons = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    dungeon_def = None
+    for d in dungeons:
+        if d.get("name") == base_name:
+            dungeon_def = d
+            break
+    if dungeon_def is None:
+        return None
+
+    from src.dungeon_generator import generate_dungeon
+
+    mode = dungeon_def.get("mode", "procedural")
+    if mode != "procedural":
+        return None  # custom dungeons need the full layout data
+
+    name = dungeon_def.get("name", "Dungeon")
+    size_map = {"small": (30, 20), "medium": (40, 30),
+                "large": (60, 40)}
+    diff_rooms = {"easy": (4, 6), "normal": (6, 10),
+                  "hard": (8, 14), "deadly": (10, 18)}
+    torch_map = {"none": "none", "sparse": "sparse",
+                 "moderate": "medium", "abundant": "dense"}
+    sz = size_map.get(dungeon_def.get("level_size", "medium"), (40, 30))
+    rm = diff_rooms.get(dungeon_def.get("difficulty", "normal"), (6, 10))
+    td = torch_map.get(dungeon_def.get("torch_density", "moderate"),
+                       "medium")
+    num_levels = max(1, int(dungeon_def.get("num_levels", 1)))
+    doors = dungeon_def.get("locked_doors", "off") == "on"
+
+    gen_levels = []
+    seed_base = hash((name, ow_col, ow_row)) & 0xFFFFFFFF
+    for li in range(num_levels):
+        lname = (f"{name} - Floor {li + 1}"
+                 if num_levels > 1 else name)
+        dd = generate_dungeon(
+            name=lname, width=sz[0], height=sz[1],
+            min_rooms=rm[0], max_rooms=rm[1],
+            seed=seed_base + li,
+            place_stairs_down=(li < num_levels - 1),
+            place_doors=doors,
+            torch_density=td)
+        gen_levels.append(dd)
+
+    # Cache so subsequent saves will persist them
+    game.dungeon_cache[(ow_col, ow_row)] = gen_levels
+    return gen_levels
+
+
 def _restore_dungeon_state(game, ctx):
     """Re-enter a dungeon from saved state context.
 
@@ -753,12 +853,31 @@ def _restore_dungeon_state(game, ctx):
             # Random / cached dungeon
             cached = game.dungeon_cache.get((ow_col, ow_row))
             if cached:
-                dungeon_state.enter_dungeon(cached[0], ow_col, ow_row)
+                if isinstance(cached, list) and len(cached) > 1:
+                    dungeon_state.enter_quest_dungeon(
+                        cached, ow_col, ow_row)
+                elif isinstance(cached, list) and len(cached) == 1:
+                    dungeon_state.enter_dungeon(
+                        cached[0], ow_col, ow_row)
+                else:
+                    dungeon_state.enter_dungeon(cached, ow_col, ow_row)
             else:
-                # Fallback: cannot find dungeon data, go to overworld
-                game.change_state("overworld")
-                game.camera.update(game.party.col, game.party.row)
-                return
+                # Try to regenerate a module dungeon by name
+                dname = ctx.get("dungeon_name", "")
+                regenerated = _regenerate_module_dungeon(
+                    game, dname, ow_col, ow_row)
+                if regenerated:
+                    if len(regenerated) > 1:
+                        dungeon_state.enter_quest_dungeon(
+                            regenerated, ow_col, ow_row)
+                    else:
+                        dungeon_state.enter_dungeon(
+                            regenerated[0], ow_col, ow_row)
+                else:
+                    # Fallback: cannot find dungeon data, go to overworld
+                    game.change_state("overworld")
+                    game.camera.update(game.party.col, game.party.row)
+                    return
 
     # Advance to the correct level if multi-level
     if dungeon_state.quest_levels and level_idx < len(dungeon_state.quest_levels):
