@@ -18,9 +18,9 @@
       "wisdom": 8,
       "level": 1,
       "equipped": {
-        "right_hand": "Sword",
-        "left_hand": "Long Bow",
-        "body": "Leather",
+        "right_hand": "Club",
+        "left_hand": null,
+        "body": "Cloth",
         "head": null
       },
       "inventory": [],
@@ -38,7 +38,7 @@
       "wisdom": 12,
       "level": 1,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Club",
         "left_hand": null,
         "body": "Cloth",
         "head": null
@@ -58,9 +58,9 @@
       "wisdom": 10,
       "level": 1,
       "equipped": {
-        "right_hand": "Short Bow",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Leather",
+        "body": "Cloth",
         "head": null
       },
       "inventory": [],
@@ -78,39 +78,19 @@
       "wisdom": 18,
       "level": 1,
       "equipped": {
-        "right_hand": "Mace",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Chain",
+        "body": "Cloth",
         "head": null
       },
       "inventory": [],
       "sprite": "src/assets/game/characters/cleric.png"
     },
     {
-      "name": "Paladin",
-      "class": "Paladin",
-      "race": "Human",
+      "name": "Test Guy",
+      "class": "Ranger",
+      "race": "Gnome",
       "gender": "Male",
-      "hp": 20,
-      "strength": 16,
-      "dexterity": 10,
-      "intelligence": 8,
-      "wisdom": 16,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/paladin.png"
-    },
-    {
-      "name": "Druid",
-      "class": "Druid",
-      "race": "Elf",
-      "gender": "Female",
       "hp": 20,
       "strength": 10,
       "dexterity": 10,
@@ -118,33 +98,13 @@
       "wisdom": 15,
       "level": 1,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Club",
         "left_hand": null,
         "body": "Cloth",
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/druid.png"
-    },
-    {
-      "name": "Ranger",
-      "class": "Ranger",
-      "race": "Human",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 15,
-      "intelligence": 10,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/ranger.png"
+      "sprite": "src/assets/game/npcs/u4_beggar.png"
     }
   ],
   "active_party": [

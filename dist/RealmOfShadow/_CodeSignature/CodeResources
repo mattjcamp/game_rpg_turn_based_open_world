@@ -14,47 +14,47 @@
 		</data>
 		<key>_internal/base_library.zip</key>
 		<data>
-		lG3j3SMja4zWL78mkp0PXPo6RoE=
-		</data>
-		<key>_internal/data/character_tiles.json</key>
-		<data>
-		v4S/GfrbLlMvFBY8EztG6r1AOSc=
+		XMd/suRAhzg/EZNB13YU4G0dVKs=
 		</data>
 		<key>_internal/data/classes/alchemist.json</key>
 		<data>
-		hsrkA0BpVXhlsv+sDqIbnRzaSo0=
+		DPMfOv06istmBB85/+eJwIGsHCY=
 		</data>
 		<key>_internal/data/classes/cleric.json</key>
 		<data>
-		EqZp7JjoUkvIu8A2gALk0P5KJNg=
+		HX5XlTFqo3rMuBpL/tTqqcXoirU=
 		</data>
 		<key>_internal/data/classes/druid.json</key>
 		<data>
-		9TtHvL+NXpldeB3EcArK4EOpHnA=
+		YdpUcoOIzLmzc4OCD5/HztJeK2o=
 		</data>
 		<key>_internal/data/classes/fighter.json</key>
 		<data>
-		bey2ExyF9yIm79C6aJVsXrK6b/4=
+		ImKiAUCUBJBgN2Kb2fMaQIhGkCU=
 		</data>
 		<key>_internal/data/classes/paladin.json</key>
 		<data>
-		s28fnf/sRLnn4/FbYEbtF871rzo=
+		TzigYlJlnhBCBS0I4PvwjiVVpu0=
 		</data>
 		<key>_internal/data/classes/ranger.json</key>
 		<data>
-		HfztzOrlNBtFYFHRcJp6QgT/7Ak=
+		symjsN+ZIPw0P/7MG3yLD+62nrk=
 		</data>
 		<key>_internal/data/classes/thief.json</key>
 		<data>
-		y3vb5Sz0obkZi5QMt6CyFDmiiUU=
+		9W9KcnBh2suJT1jJOIZCMdZLTWE=
 		</data>
 		<key>_internal/data/classes/wizard.json</key>
 		<data>
-		aJJ3oxydBsi5bGQ8YnxYVipzm6Y=
+		JctLigjkp7ecWHuyzLComuk87AA=
 		</data>
 		<key>_internal/data/config.json</key>
 		<data>
-		ce1GyG1AIo+HW5ud8WN+lnZtP0U=
+		E3sWQaCqdV+6k9XwJJILAFy4rKc=
+		</data>
+		<key>_internal/data/counters.json</key>
+		<data>
+		H8CFLNHcFnvEhcymzrJ7tUZgduY=
 		</data>
 		<key>_internal/data/effects.json</key>
 		<data>
@@ -66,15 +66,23 @@
 		</data>
 		<key>_internal/data/items.json</key>
 		<data>
-		5Ij860BmmsOIz8OIMVcjjVRy43c=
+		I4SDbgi12nnPPacKyHkaY702AFc=
+		</data>
+		<key>_internal/data/loot.json</key>
+		<data>
+		ZTWhF056pMZH393EziiZ+kvqYIE=
+		</data>
+		<key>_internal/data/map_templates.json</key>
+		<data>
+		LVKHWj1es7jKctJbLZmValOkeKg=
 		</data>
 		<key>_internal/data/monsters.json</key>
 		<data>
-		fJeU/lYPXpO1IBN4/p19caDOGUo=
+		1iobyaTk+qFZblQqQCO7x7P62nU=
 		</data>
 		<key>_internal/data/party.json</key>
 		<data>
-		l6ahjT8spT+p7lA4J+/HYiXdT7Y=
+		ZxFtX95ynn4zp6za10zjk/M9qgM=
 		</data>
 		<key>_internal/data/potions.json</key>
 		<data>
@@ -84,13 +92,49 @@
 		<data>
 		OvvJgQ+zPSGPxo3+6gUTNJnLiMI=
 		</data>
+		<key>_internal/data/reusable_features.json</key>
+		<data>
+		v39AbQQb46Dj9RakDBFQDoG9ZWg=
+		</data>
+		<key>_internal/data/soundtrack/battle/03 - Crimson Skies.mp3</key>
+		<data>
+		5PnaV1VplcgbuJ/mxYpsKveeO4U=
+		</data>
+		<key>_internal/data/soundtrack/dungeon/13 - Lost in the Labyrinth.mp3</key>
+		<data>
+		yzOH9YM7rR0/WzbfzUSrtBmfWZ4=
+		</data>
+		<key>_internal/data/soundtrack/overview/01 - Scepter of the Celestial Guardian.mp3</key>
+		<data>
+		YErpXLLf5vZz6X02uBOphWMfWeg=
+		</data>
+		<key>_internal/data/soundtrack/overview/12 - Mysteries of the Moonstone Citadel.mp3</key>
+		<data>
+		eJJPCuqJFlt+ZG2k+KTMpxBxfqA=
+		</data>
+		<key>_internal/data/soundtrack/town/05 - Dungeons of Desolation.mp3</key>
+		<data>
+		Px7zr32oGrWBcYBbJ2+DI9/IfDA=
+		</data>
+		<key>_internal/data/soundtrack/town/18 - Bard's Ballad.mp3</key>
+		<data>
+		eCfVhvGKk5dzGVlNhwkHu5Y4pSA=
+		</data>
 		<key>_internal/data/spells.json</key>
 		<data>
-		w2x4BUIfzQR94I5x4nhV6xibR70=
+		8jQLoLSUCBlmeCgZGOeN60eyiEs=
+		</data>
+		<key>_internal/data/tile_defs.json</key>
+		<data>
+		9AawAUUqAeVrOyxxfldaS0JUddo=
 		</data>
 		<key>_internal/data/tile_manifest.json</key>
 		<data>
-		lBvjdNlwHTL/hLN7j+7dIOGvN4Q=
+		MAN2RZsiHkdZzqpIcrbxe7eh3Lc=
+		</data>
+		<key>_internal/data/town_templates.json</key>
+		<data>
+		p/QW/JUhRreEECg0iu8b4PNjkuQ=
 		</data>
 		<key>_internal/data/u4_tiles.json</key>
 		<data>
@@ -234,15 +278,39 @@
 		</data>
 		<key>_internal/docs/manuals/players_manual.md</key>
 		<data>
-		METXHW5+SsrmJQapedCV5Oz5xaw=
+		JD47cdRmctMPBRpc9wQoVgPdJGw=
 		</data>
-		<key>_internal/modules/on_an_island/module.json</key>
+		<key>_internal/modules/coming_of_age/buildings.json</key>
 		<data>
-		0DRlx1w1xLju2gQOz0wSGdsSh6w=
+		+i1/Po4eJHPYmZyegG0jBCZFlJo=
 		</data>
-		<key>_internal/modules/on_an_island/overworld.json</key>
+		<key>_internal/modules/coming_of_age/dungeons.json</key>
 		<data>
-		cS/v5HOG3foqbnXoUzwsBu5WM0Q=
+		RnamHTp/aPoIC/KaW+0VT2DuU68=
+		</data>
+		<key>_internal/modules/coming_of_age/links.json</key>
+		<data>
+		t8FgRVu5oE84FuJwp3LgV1Xauko=
+		</data>
+		<key>_internal/modules/coming_of_age/module.json</key>
+		<data>
+		7gqjo+LdQcEgWVtfRhAopJwow+A=
+		</data>
+		<key>_internal/modules/coming_of_age/overview_map.json</key>
+		<data>
+		rUgis866oc3Ny5wLpdlol4yCuZ8=
+		</data>
+		<key>_internal/modules/coming_of_age/overworld.json</key>
+		<data>
+		xTjxQNAB0eMSILzOXNKsAqiFm/M=
+		</data>
+		<key>_internal/modules/coming_of_age/quests.json</key>
+		<data>
+		YSMSo64Ur0Iiqy1BnE4qSSeqCHk=
+		</data>
+		<key>_internal/modules/coming_of_age/towns.json</key>
+		<data>
+		JxHkEiQIJdKufc31iP6BJMS1hHI=
 		</data>
 		<key>_internal/numpy/_core/_multiarray_tests.cpython-39-darwin.so</key>
 		<data>
@@ -2118,295 +2186,527 @@
 		</data>
 		<key>_internal/src/assets/game/characters/alchemist.png</key>
 		<data>
-		ko9CQKpBszMFKt67YcZBTvctsWE=
+		lmXDOB2mElx4K7ZpxcqKlVv6FFg=
 		</data>
 		<key>_internal/src/assets/game/characters/barbarian.png</key>
 		<data>
-		WxOe845Lm4BJETtUfEWoOZ2MKhc=
+		VgoKHX9LIg3DMpnegANqfEkAO9g=
 		</data>
 		<key>_internal/src/assets/game/characters/cleric.png</key>
 		<data>
-		M44lFRCe5aZ+43B1NHKbA1wlGfY=
+		PjWgLJICCoxPljMhkrWLy3ImZVc=
 		</data>
 		<key>_internal/src/assets/game/characters/druid.png</key>
 		<data>
-		XK6x40XUtAnZ1jiHhx4rPJqtQyU=
+		aYA/b3s0S//ITsVUdoLF9uAZWiE=
 		</data>
 		<key>_internal/src/assets/game/characters/fighter.png</key>
 		<data>
-		ftOgFnlEogwARihdWbuuYisRNO4=
+		dsNrR6RDnktnkcaA/+F8EqfkPiY=
 		</data>
 		<key>_internal/src/assets/game/characters/illusionist.png</key>
 		<data>
-		kJhycY5PCUXBmYzOGpBwOoz2Vi8=
+		doCehgc7HfDezpMoP2fGSYCuP4I=
 		</data>
 		<key>_internal/src/assets/game/characters/lark.png</key>
 		<data>
-		/4DACrpNSUYmMHR+UvmShG8Oefc=
+		OtWKxTJ2VsYt/ktUmC/38rctf6c=
 		</data>
 		<key>_internal/src/assets/game/characters/paladin.png</key>
 		<data>
-		xmOS/8j6be5RYLnJ6U6TercJkLA=
+		C+4nktf+iwosJQh2AgAyd93CyC4=
 		</data>
 		<key>_internal/src/assets/game/characters/ranger.png</key>
 		<data>
-		HBFO4fNvZVd6femIpKGdcM7q69E=
+		kVAJE1AORCza48TQ6j2P0x/q6sE=
 		</data>
 		<key>_internal/src/assets/game/characters/ranger_alt.png</key>
 		<data>
-		p6sh+jd5baIGv7JnMjfXAUSAC5c=
+		Xjb0gpS0Lxeaep+5obIs0xTwsRA=
 		</data>
 		<key>_internal/src/assets/game/characters/thief.png</key>
 		<data>
-		L9Ys5pg72Hx757Wzbd3z394nanI=
+		JxB24GfkXm+pTuYepi4qokVc9yY=
 		</data>
 		<key>_internal/src/assets/game/characters/wizard.png</key>
 		<data>
-		C/75qvAL830MRWfUjZ6Y39WRka8=
+		I2TFOU0NKgeP7dfDZEsZrJ4ZLkA=
+		</data>
+		<key>_internal/src/assets/game/dungeon/altar.png</key>
+		<data>
+		x6Oj5ji8K3KBWdu13ynrxlGSwm8=
+		</data>
+		<key>_internal/src/assets/game/dungeon/artifact.png</key>
+		<data>
+		PAL+l231Zsw0R3Wl2u09OynlynI=
 		</data>
 		<key>_internal/src/assets/game/dungeon/brick_floor.png</key>
 		<data>
-		79qtslgsh96ve5X8OskqpCIv62Y=
+		Df4ObiyRxV+l5tUwkL+enhHgDok=
 		</data>
 		<key>_internal/src/assets/game/dungeon/brick_wall.png</key>
 		<data>
-		4LYXFlvQo89dkihMY6X6MigutQI=
+		RT+2OX39hAv0/2JeVE2od2GqPs8=
 		</data>
 		<key>_internal/src/assets/game/dungeon/chest_tile.png</key>
 		<data>
-		k27As4gDHiPlg7FDfGCsUC6g4JM=
+		yHKiE52aOCuhn9VR0BMm9kRNwUA=
+		</data>
+		<key>_internal/src/assets/game/dungeon/dungeon_door.png</key>
+		<data>
+		itFISBzxcpYW8ai8DNK+faOUmgY=
+		</data>
+		<key>_internal/src/assets/game/dungeon/keyslot.png</key>
+		<data>
+		C5KEivqJa9XYjEuRppwCwqLX51M=
 		</data>
 		<key>_internal/src/assets/game/dungeon/locked_door.png</key>
 		<data>
-		p/cq1OX4ciAU5KxsfA65fyiTys0=
+		XxbQkZyyFBF2JZFm0tm08K1YBqA=
+		</data>
+		<key>_internal/src/assets/game/dungeon/locked_door_new.png</key>
+		<data>
+		IJbSPaR9grvyuWInXbKpX2ZgKjQ=
+		</data>
+		<key>_internal/src/assets/game/dungeon/machine.png</key>
+		<data>
+		hMOLoMa8Bv8QItrz/v17Ls0yt14=
+		</data>
+		<key>_internal/src/assets/game/dungeon/moss.png</key>
+		<data>
+		y1GFdWUi8mmYdlj0jzXVi78z21I=
+		</data>
+		<key>_internal/src/assets/game/dungeon/portal.png</key>
+		<data>
+		Z0AWN/0JeGpxQam5OQ4RH/Q70ZA=
 		</data>
 		<key>_internal/src/assets/game/dungeon/portal_open.png</key>
 		<data>
-		smoc58Bfed8JOM8mA9JNcffKEMs=
+		GgMWXuJ+7e4Mew4fLsRWUUjHbXA=
+		</data>
+		<key>_internal/src/assets/game/dungeon/puddle.png</key>
+		<data>
+		e1zsJAQp70MqDjtw+wSocU7FRTY=
 		</data>
 		<key>_internal/src/assets/game/dungeon/shallow_water.png</key>
 		<data>
-		Raw246ZOKprZG1k39e7DAfieRQg=
+		K6vt4Bh1UQ9qMOEdDtDf9L4B65o=
 		</data>
 		<key>_internal/src/assets/game/dungeon/sparkle.png</key>
 		<data>
-		1hlvP10PII4D6VZIUM4m/T27/y0=
+		3W1QPlH5IXeinv6Od8aEjmAIgHc=
+		</data>
+		<key>_internal/src/assets/game/dungeon/stairs_down.png</key>
+		<data>
+		Qesdwl9xpmIuUNC/WuOeYXy/dA4=
+		</data>
+		<key>_internal/src/assets/game/dungeon/stairs_up.png</key>
+		<data>
+		KQrVeqqTwbs9ARrL/zsuolIWD1k=
+		</data>
+		<key>_internal/src/assets/game/dungeon/stone_floor.png</key>
+		<data>
+		VdlJrPtbzw+Yo8BunLxJrxEQVlU=
+		</data>
+		<key>_internal/src/assets/game/dungeon/stone_wall.png</key>
+		<data>
+		sXKI7f2/SwdL+4M2oTOB35RFaB8=
 		</data>
 		<key>_internal/src/assets/game/dungeon/swamp.png</key>
 		<data>
-		zKo5yzJgY5EImwrMdJsEbcdbd9Y=
+		Hmj6SBcozKvB3jHt1YygpOOvgpQ=
 		</data>
 		<key>_internal/src/assets/game/dungeon/torch_post.png</key>
 		<data>
-		I4/wZfpgmKnPJyds3IpwzmjtjgQ=
+		A7nPWYo4GaiHsHJlQcD9nP15CCM=
+		</data>
+		<key>_internal/src/assets/game/dungeon/trap.png</key>
+		<data>
+		xANKK0h88BHZvOsjoiGFzGAeI9s=
+		</data>
+		<key>_internal/src/assets/game/dungeon/wall_torch.png</key>
+		<data>
+		inYEv4p3d7Szz+G+ufzeZKhNaLo=
 		</data>
 		<key>_internal/src/assets/game/items/chest.png</key>
 		<data>
-		k27As4gDHiPlg7FDfGCsUC6g4JM=
+		yHKiE52aOCuhn9VR0BMm9kRNwUA=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/ammo.png</key>
+		<data>
+		shfvA+Z+V6u/h+9s2gaD//tLxMs=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/armor_heavy.png</key>
+		<data>
+		/tACHOsVx3IWVBK3cNBI7QD+KPQ=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/armor_light.png</key>
+		<data>
+		yvzrpkB9YI+ice/v28DWu0n9shg=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/artifact.png</key>
+		<data>
+		iQd58md8E1AVbUA6KvGpP7T8Z1I=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/bomb.png</key>
+		<data>
+		L6GrdqDZHDTKGpJaTursou0twAI=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/bow.png</key>
+		<data>
+		MCxV8QvQS1FdQh66TgxuCZvEniM=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/campfire.png</key>
+		<data>
+		CwQRxm4dZCYIttvUypCxt5YE06I=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/dagger.png</key>
+		<data>
+		J1daYJMUzNqXn5bsSyYgbUZam1g=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/gloves.png</key>
+		<data>
+		ZqLddlk7B3n31VOH3+KARJRjJYA=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/halberd.png</key>
+		<data>
+		wOry6BmBHJunoZsmGuRTPG1lDKg=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/herb.png</key>
+		<data>
+		BiDwEkk58qWGQ+54rDsLQMSOH3c=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/holy.png</key>
+		<data>
+		++a7R8OYriwU5ZJ5vEJwbt2zO/8=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/mace.png</key>
+		<data>
+		Scx0qvqUY18uGjoCvvTziCMDH6w=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/potion.png</key>
+		<data>
+		0tnqdB4WhiLqclxljDGOl35gmT8=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/rock.png</key>
+		<data>
+		9HjEtoI4kI7zeluCasvWtb6m1iQ=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/rope.png</key>
+		<data>
+		Bv0zJ3s9DVHZ8jOd++jsiVAiLW0=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/scroll.png</key>
+		<data>
+		1+PLn9DMzVIsaPdV52z+pGwqRgs=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/spear.png</key>
+		<data>
+		BYEx1KNiDLXfFFMjOhF7NpMMv04=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/sword.png</key>
+		<data>
+		20RLk4dTyqFKROB3n4BFEb9GNqg=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/tool.png</key>
+		<data>
+		pP0D12OF/gXE3vQHfwRWCUF7ew8=
+		</data>
+		<key>_internal/src/assets/game/items/icons_32/torch.png</key>
+		<data>
+		QIIHRVWM5PTsrhIJqDpQKcKMpgg=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/ammo.png</key>
+		<data>
+		uAjirYjuV9BY/qo+sqIqa71qe1A=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/armor_heavy.png</key>
+		<data>
+		HP5jrejWXw8Di5k8EI46RtnWV8g=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/armor_light.png</key>
+		<data>
+		fuhdpZsx/s80kCSIONcM6iqJMQM=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/artifact.png</key>
+		<data>
+		VcLSzq6pp5kcWwQIRLqMntVaklA=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/bomb.png</key>
+		<data>
+		UJSGWMXDxH/E/l3BJ0LwhMwEuMI=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/bow.png</key>
+		<data>
+		pm/HdzUUe6jZwFOhFwPArTl8dBg=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/campfire.png</key>
+		<data>
+		gWOccTakxC3c4+cTnfU76TJseY0=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/dagger.png</key>
+		<data>
+		kMTNnis/vXRQuY6S+H+OrXrtyjs=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/gloves.png</key>
+		<data>
+		z+gOZiwMiFm6/tk1WzIjEB5RGWk=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/halberd.png</key>
+		<data>
+		91o+k/GYnR1YkFj5TtKYcmpgQfk=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/herb.png</key>
+		<data>
+		ACrjBjAPYEid0MtruYoSo70gMuA=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/holy.png</key>
+		<data>
+		1sFMlDg89Sc1cyAkMGocOnOOzOg=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/mace.png</key>
+		<data>
+		Ka3JB+duIi6tp4R/oxbBfCarOvQ=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/potion.png</key>
+		<data>
+		TaIR9drXfwwyO6LEknEIeE5RccQ=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/rock.png</key>
+		<data>
+		TE/s8qKRb86LiA0SYd97HP8rbB4=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/rope.png</key>
+		<data>
+		ZDmwXwIuTgV3D0KdDBWjNiivBg4=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/scroll.png</key>
+		<data>
+		YkmhQ+IukpEQpR3/cvWktyqZUCI=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/spear.png</key>
+		<data>
+		J7xjdrMotRxzZ+OU+jK4IyDIKnA=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/sword.png</key>
+		<data>
+		5bZeGV2DfRrCF47oGgKkztsiXD0=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/tool.png</key>
+		<data>
+		yzcdc5ohQpseIcSYSnvcWW3TZfU=
+		</data>
+		<key>_internal/src/assets/game/items/icons_64/torch.png</key>
+		<data>
+		OA4jPofgQ6HQY3XkAQd3WlVUE3U=
 		</data>
 		<key>_internal/src/assets/game/items/town_gate.png</key>
 		<data>
-		BDgJA3cWuApgu1B6SNrsZDROtpE=
+		E4ElndZiPVzbZKGeRYI3DxYNNjA=
 		</data>
 		<key>_internal/src/assets/game/landmarks/lava_vent.png</key>
 		<data>
-		bVgSimvkps29jaGmfRos+v73VT0=
+		vX+CwdF1oEH++AITSJNov1W0InM=
 		</data>
 		<key>_internal/src/assets/game/landmarks/moongate_active.png</key>
 		<data>
-		3IkeYIlD4hWxOuT2yQouPp6EdXk=
+		IX9QbdYVM4lmOs3ZxddMmdG9n0U=
 		</data>
 		<key>_internal/src/assets/game/landmarks/moongate_dormant.png</key>
 		<data>
-		P7xYJxeJSzlJlLCAOFbQ/LuGl4U=
+		ZE6sU7wwH6Y/wpKjsrLeDyCUHj4=
 		</data>
 		<key>_internal/src/assets/game/landmarks/poison_swamp.png</key>
 		<data>
-		n70fMVbQth9eenCEzHQbfAD2giM=
+		Ogd+D+gXLxii31svPDXLYVJrGQA=
 		</data>
 		<key>_internal/src/assets/game/landmarks/ruined_tower.png</key>
 		<data>
-		OuqTTNcRlUR4lqGpSIMhasMxmss=
+		SVYv7wgGhauTA7K3OpZ0xJVhemw=
 		</data>
 		<key>_internal/src/assets/game/landmarks/smuggler_tunnel.png</key>
 		<data>
-		MNCiJ4gq5D4EiJn3E4Z+FrPOp9Q=
+		L4MHL+io8pt7GIIsGf1XN7nfeoI=
 		</data>
 		<key>_internal/src/assets/game/landmarks/sunken_shipwreck.png</key>
 		<data>
-		j5ew3nmjK2Ichl3LPr7/xR7iQE8=
+		Taycu8DfTMhilo4aqWbtzQfed54=
 		</data>
 		<key>_internal/src/assets/game/landmarks/treasure_hoard.png</key>
 		<data>
-		k27As4gDHiPlg7FDfGCsUC6g4JM=
+		yHKiE52aOCuhn9VR0BMm9kRNwUA=
 		</data>
 		<key>_internal/src/assets/game/monsters/dark_mage.png</key>
 		<data>
-		iaaA+3U+xJTQuAgXdRVcDTZKnos=
+		XZ9QKnTQ+uXmW+FZMpwhAI7Wzp4=
 		</data>
 		<key>_internal/src/assets/game/monsters/giant_rat.png</key>
 		<data>
-		renD+VrIJR0JxR7ilM/20i3jv5o=
+		jjEMPqFDSovUJHh3Go8Sm/dgWgk=
 		</data>
 		<key>_internal/src/assets/game/monsters/goblin.png</key>
 		<data>
-		gRFIl9edLHKtuHn03fiEvb9Ryvw=
+		SwWPOyZg40lSvDTaNKMqSacTj8M=
 		</data>
 		<key>_internal/src/assets/game/monsters/orc.png</key>
 		<data>
-		4Bvx4SR31S/kPzh4Sjrczuc7JZo=
+		0v7+Pg7r7LuzIN88bnR/uBDcsCA=
 		</data>
 		<key>_internal/src/assets/game/monsters/skeleton.png</key>
 		<data>
-		mCStIfQDl/eHUNkj4xONH2/fC6I=
+		6RtTWMrSD8N/uNcV3kkRt/u4V1s=
+		</data>
+		<key>_internal/src/assets/game/monsters/super_zombie.png</key>
+		<data>
+		EHGcagnQ6/xFku+ldi8PmCRUWxI=
 		</data>
 		<key>_internal/src/assets/game/monsters/troll.png</key>
 		<data>
-		JAxJEWqAi17HccY7OpaNiESY1A0=
+		U07nW5fDmKq/0DcX7DHS9AVz4PY=
 		</data>
 		<key>_internal/src/assets/game/monsters/wolf.png</key>
 		<data>
-		Z78FaJEBjhr6x3ao6sZb/HeLBkE=
+		Uu842saXpqqKkByIIfeKXCkWvx0=
 		</data>
 		<key>_internal/src/assets/game/monsters/zombie.png</key>
 		<data>
-		aHqhV1bryQFZ0aVqOWf1ZtGWnZM=
+		EHGcagnQ6/xFku+ldi8PmCRUWxI=
 		</data>
 		<key>_internal/src/assets/game/npcs/brigand.png</key>
 		<data>
-		m2LmZANzUDVTuFgTsdevjRMQ5/Q=
+		5I42IsFWuQZnJAY2d5BTBj4i+L0=
 		</data>
 		<key>_internal/src/assets/game/npcs/elder.png</key>
 		<data>
-		XoX+Gqav9jpf7TF/u/Jln3pv1G0=
+		r+H9on+KZYD1bwD21vy2ZQhj20s=
 		</data>
 		<key>_internal/src/assets/game/npcs/innkeeper.png</key>
 		<data>
-		SNG0ZWQSCVpO0oyzHAaOXpIbkkE=
+		GYGYJQ1/Xs6Ibl6uRst9p45PQ+s=
 		</data>
 		<key>_internal/src/assets/game/npcs/shopkeep.png</key>
 		<data>
-		ZJjQzGL7Wen2s0pjGPPBVhW7nw0=
+		7M8/xGnvU51GL0DMZI7vQ2wttrM=
 		</data>
 		<key>_internal/src/assets/game/npcs/townsfolk.png</key>
 		<data>
-		nq207XS/e788zeR4mm9ecJyawlM=
+		YFyVK6JkftlrKSqRUCV4KcTluM0=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_avatar.png</key>
 		<data>
-		Y+vs+KQmIC8wUeGUdVxJ4qPlriM=
+		j86EFDvR/p4ItsQ3Cr615zO1F9M=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_beggar.png</key>
 		<data>
-		N94P/Qsr9QOu2+IfbPhYJnsraUk=
+		9/HR8DIlmxgV60ApArXWLmQVSJE=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_child.png</key>
 		<data>
-		ecM1vFrFaG6HlNOKIKP88FdQ2dk=
+		7qDpfwspcEWeuhgK/LTL9/Zss8o=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_citizen.png</key>
 		<data>
-		i819baz/pRfVLpMpLh+hNBaCClY=
+		YSDO0sQothUJvmU7ukaoP+5TTNs=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_guard.png</key>
 		<data>
-		ueDFFFQs/wtq5I8EebV+QsPOnig=
+		c4K4HUFLOI3ALXyo7dh+fYJlW4s=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_guard_npc.png</key>
 		<data>
-		Pcv+g2EUB0AiE7iPMEKmhY8PhNA=
+		+9YaqxYzRs00irKbQQYO1jR9E1A=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_healer.png</key>
 		<data>
-		OgHvsFG+SEeyYN0HPorNiOckasI=
+		LuaCOH11UdMDDiSnam4KXGT2SBg=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_jester.png</key>
 		<data>
-		SN1cad4dQfImQLWBw+CxuDdRQrk=
+		hjWOhC7Altv1WG5uukMeIilIzjU=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_knight.png</key>
 		<data>
-		oBrpxl+kpp1cWr5Zk6vwAx3s4e8=
+		HOr2aY0V3/A4fuFOmTQ9MFBz1lA=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_monk.png</key>
 		<data>
-		pNYLy9UkO3T2mZryqMVkOh3K6+0=
+		ZF4dTifFxllRAtnPTw5bvp21T/I=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_shepherd.png</key>
 		<data>
-		YwwWdqHHSE91WDVub+ZKg62veaI=
+		kQvjreNOFTZ6cJ200dyrq2v9Mec=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_tinker.png</key>
 		<data>
-		W1eujGUtFUSLoVK245bmzz3M9aM=
+		pNkRx3i7UD0anOQktNvv/66ld9Q=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_villager_female.png</key>
 		<data>
-		/zynWEBbcD/qD7JWyJEaF063YvA=
+		lEy2Xrr7P3517ZYy98brGhsp7oU=
 		</data>
 		<key>_internal/src/assets/game/npcs/u4_villager_male.png</key>
 		<data>
-		F8NJ62M6fN456Hu7m2ogUKNaqOM=
+		BwiKoNrTmCE65MLaMTHX0PxMDcA=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_avatar.png</key>
 		<data>
-		UqWEm4K1sLnuKV7cO7koy3vxdbI=
+		7mxZGeAK6OjdS8j8287CWk1Nf2s=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_druid.png</key>
 		<data>
-		VvrsnuajIX4Tw+rdBm5DlRVc60c=
+		Sj3pYTApzPdRY++SjjNaAw3NRCw=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_evil_mage.png</key>
 		<data>
-		o1dB3q1O4FqN7S/F0I5Y95W2SCc=
+		ZCZfeXUKlp2Yolowp0v7oEuPXGc=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_fighter.png</key>
 		<data>
-		5SrgEuCfJWBb7Q6w5RKRVILksHw=
+		KYnk0tKm/D2GLLtSXOG2uYk91Zs=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_jester.png</key>
 		<data>
-		xafkW+oVWVMVfwb3TeByAtzRyMI=
+		KjVz0Qj4/LDE5gI80pW0J45IyBE=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_mage.png</key>
 		<data>
-		oa07VlpgWtAduqjG0i2FdtNkh1E=
+		Qvlro+y+hycqTPmD02SLREaj18E=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_paladin.png</key>
 		<data>
-		7M7/VPjiYRUIKinukP06eYQpVAs=
+		wYUBHyZbLg64aW06muWj6bkIQcI=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_ranger.png</key>
 		<data>
-		geBUXFt8p20Q/gezYDcGztlAICg=
+		ZrEUj40vAWKSnKtzlbse7LNtQn8=
 		</data>
 		<key>_internal/src/assets/game/npcs/vga_rogue.png</key>
 		<data>
-		EP5oyXNHxiR22GblV9Ud2B6EjE8=
+		BEolQBGcS674LrtIyQW+RApoWMA=
 		</data>
 		<key>_internal/src/assets/game/npcs/villager_bard.png</key>
 		<data>
-		jYT+GXi95LU78WbwX+GN1YCEAqg=
+		Z69pgrv7n0KyZKoZr+BiLkxfjRU=
 		</data>
 		<key>_internal/src/assets/game/npcs/villager_beggar.png</key>
 		<data>
-		VZqRCUIn96RIT4fBLRZaf9qxE6o=
+		slOsAPJ+ipOT/ZKvvBhA1/u62HE=
 		</data>
 		<key>_internal/src/assets/game/npcs/villager_child.png</key>
 		<data>
-		5VITeDSpalsvG73SGaGg/5ToYBQ=
+		kRQF7FNn9Kt9WR7HvUDh34ZNwhM=
 		</data>
 		<key>_internal/src/assets/game/npcs/villager_citizen.png</key>
 		<data>
-		/0Bz8zVt5lcBEikJwXt0B6+2Wig=
+		M1KaUDsK4bJAANiPZvoCRxasCj8=
 		</data>
 		<key>_internal/src/assets/game/npcs/villager_guard.png</key>
 		<data>
-		Ah9Q7yn8qXvnEj7JlQUV86UZSPs=
+		qWGkGCMCVuuAsRr4g72YcYGjd8Y=
 		</data>
 		<key>_internal/src/assets/game/npcs/villager_shepherd.png</key>
 		<data>
-		7WDWNKUIDFdQddq8y2i+3geQnjQ=
+		dCSwFO3Y8ey7t5XmNREfKvlap5I=
 		</data>
 		<key>_internal/src/assets/game/terrain/altar.png</key>
 		<data>
@@ -2414,11 +2714,11 @@
 		</data>
 		<key>_internal/src/assets/game/terrain/bridge.png</key>
 		<data>
-		01eLGrnPJD1P7JvGFdAPZRgBMNs=
+		QJ/NL2fNVDsx6ojO2sJAYGBtbIc=
 		</data>
 		<key>_internal/src/assets/game/terrain/counter.png</key>
 		<data>
-		4IER0wrGz43ODjFq1v6Z9xEhr3w=
+		eaoTggdDMupETvvNXWtkTLXj9HY=
 		</data>
 		<key>_internal/src/assets/game/terrain/door.png</key>
 		<data>
@@ -2428,17 +2728,33 @@
 		<data>
 		NudoGIzeop4hM3OIRNHa8DCAaYA=
 		</data>
+		<key>_internal/src/assets/game/terrain/dungeon_cleared.png</key>
+		<data>
+		P8v/NTXa5wwH6rENDomIkIlANTA=
+		</data>
+		<key>_internal/src/assets/game/terrain/floor_copy.png</key>
+		<data>
+		OElCZJDgoQbWDJsai3TKO2TvaqQ=
+		</data>
+		<key>_internal/src/assets/game/terrain/floor_gray.png</key>
+		<data>
+		V/Mpkmg39Gk3gzmhgf7mC/cGi4M=
+		</data>
 		<key>_internal/src/assets/game/terrain/forest.png</key>
 		<data>
-		YSTfC81y8B37svpQ4O9VqWzqdIQ=
+		mTr5mMoXpK+c1vtdrVYSxn98irM=
 		</data>
 		<key>_internal/src/assets/game/terrain/grass.png</key>
 		<data>
-		HeLLGYBmXqFxB7XFW4RSjL46t2c=
+		ybj+HvlrsJgRcsnBIO9hmJfXAj0=
 		</data>
 		<key>_internal/src/assets/game/terrain/mountain.png</key>
 		<data>
 		NMwvKF86tQ/3TPEXWXPGvIDKI4Y=
+		</data>
+		<key>_internal/src/assets/game/terrain/party_marker.png</key>
+		<data>
+		uldPu/kuU2SYMulkBozqetNkwRQ=
 		</data>
 		<key>_internal/src/assets/game/terrain/path.png</key>
 		<data>
@@ -2448,21 +2764,265 @@
 		<data>
 		E26LlqA2GOZcqMh2ZZIcGMF378c=
 		</data>
+		<key>_internal/src/assets/game/terrain/shop_sign.png</key>
+		<data>
+		7wBa0JnnlYQ347BgsFmcfat+VG4=
+		</data>
 		<key>_internal/src/assets/game/terrain/town.png</key>
 		<data>
-		2jicj0dOtGCfaw5oWOMPFk5qmC0=
+		2TtjKRWelKDw4N5kIimF8Zb/shI=
+		</data>
+		<key>_internal/src/assets/game/terrain/town_counter.png</key>
+		<data>
+		za9RpW19jHPX0paABfOdeuW/JGY=
+		</data>
+		<key>_internal/src/assets/game/terrain/town_door.png</key>
+		<data>
+		T8Vpac82zjz3BLcFUKysyZykwJI=
+		</data>
+		<key>_internal/src/assets/game/terrain/town_exit.png</key>
+		<data>
+		RPn5bxTKCVWaNjrkKhSFEHIuTYU=
+		</data>
+		<key>_internal/src/assets/game/terrain/town_floor.png</key>
+		<data>
+		SDeX3iUWb2tfpE2ULx//umEAfSI=
+		</data>
+		<key>_internal/src/assets/game/terrain/town_wall.png</key>
+		<data>
+		sXKI7f2/SwdL+4M2oTOB35RFaB8=
 		</data>
 		<key>_internal/src/assets/game/terrain/wall.png</key>
 		<data>
 		Gv52+Kz7glJVlrEdMjPEooIi918=
 		</data>
+		<key>_internal/src/assets/game/terrain/wall_copy.png</key>
+		<data>
+		GbHbU1pGDrUMuszIrQGxa+Qoo5Q=
+		</data>
 		<key>_internal/src/assets/game/terrain/water.png</key>
 		<data>
 		vDlJDnco/F1RZByfgSnusCffF38=
 		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/alchemist_16x16_original.png</key>
+		<data>
+		ko9CQKpBszMFKt67YcZBTvctsWE=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/barbarian_30x34_original.png</key>
+		<data>
+		WxOe845Lm4BJETtUfEWoOZ2MKhc=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/druid_16x16_original.png</key>
+		<data>
+		XK6x40XUtAnZ1jiHhx4rPJqtQyU=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/fighter_28x32_original.png</key>
+		<data>
+		ftOgFnlEogwARihdWbuuYisRNO4=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/illusionist_16x16_original.png</key>
+		<data>
+		kJhycY5PCUXBmYzOGpBwOoz2Vi8=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/lark_16x16_original.png</key>
+		<data>
+		/4DACrpNSUYmMHR+UvmShG8Oefc=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/paladin_16x16_original.png</key>
+		<data>
+		xmOS/8j6be5RYLnJ6U6TercJkLA=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/ranger_16x16_original.png</key>
+		<data>
+		HBFO4fNvZVd6femIpKGdcM7q69E=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/ranger_alt_16x16_original.png</key>
+		<data>
+		p6sh+jd5baIGv7JnMjfXAUSAC5c=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/thief_34x32_original.png</key>
+		<data>
+		L9Ys5pg72Hx757Wzbd3z394nanI=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/characters/wizard_28x32_original.png</key>
+		<data>
+		C/75qvAL830MRWfUjZ6Y39WRka8=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/brick_floor_16x16_original.png</key>
+		<data>
+		79qtslgsh96ve5X8OskqpCIv62Y=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/brick_wall_16x16_original.png</key>
+		<data>
+		4LYXFlvQo89dkihMY6X6MigutQI=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/chest_tile_64x64_original.png</key>
+		<data>
+		k27As4gDHiPlg7FDfGCsUC6g4JM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/locked_door_16x16_original.png</key>
+		<data>
+		p/cq1OX4ciAU5KxsfA65fyiTys0=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/portal_open_16x16_original.png</key>
+		<data>
+		smoc58Bfed8JOM8mA9JNcffKEMs=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/shallow_water_16x16_original.png</key>
+		<data>
+		Raw246ZOKprZG1k39e7DAfieRQg=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/sparkle_16x16_original.png</key>
+		<data>
+		1hlvP10PII4D6VZIUM4m/T27/y0=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/swamp_16x16_original.png</key>
+		<data>
+		zKo5yzJgY5EImwrMdJsEbcdbd9Y=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/dungeon/torch_post_16x16_original.png</key>
+		<data>
+		I4/wZfpgmKnPJyds3IpwzmjtjgQ=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/items/chest_64x64_original.png</key>
+		<data>
+		k27As4gDHiPlg7FDfGCsUC6g4JM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/items/town_gate_64x64_original.png</key>
+		<data>
+		BDgJA3cWuApgu1B6SNrsZDROtpE=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/lava_vent_64x64_original.png</key>
+		<data>
+		bVgSimvkps29jaGmfRos+v73VT0=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/moongate_active_64x64_original.png</key>
+		<data>
+		3IkeYIlD4hWxOuT2yQouPp6EdXk=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/moongate_dormant_64x64_original.png</key>
+		<data>
+		P7xYJxeJSzlJlLCAOFbQ/LuGl4U=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/poison_swamp_64x64_original.png</key>
+		<data>
+		n70fMVbQth9eenCEzHQbfAD2giM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/ruined_tower_64x64_original.png</key>
+		<data>
+		OuqTTNcRlUR4lqGpSIMhasMxmss=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/smuggler_tunnel_64x64_original.png</key>
+		<data>
+		MNCiJ4gq5D4EiJn3E4Z+FrPOp9Q=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/sunken_shipwreck_64x64_original.png</key>
+		<data>
+		j5ew3nmjK2Ichl3LPr7/xR7iQE8=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/landmarks/treasure_hoard_64x64_original.png</key>
+		<data>
+		k27As4gDHiPlg7FDfGCsUC6g4JM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/dark_mage_64x64_original.png</key>
+		<data>
+		iaaA+3U+xJTQuAgXdRVcDTZKnos=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/giant_rat_64x64_original.png</key>
+		<data>
+		renD+VrIJR0JxR7ilM/20i3jv5o=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/goblin_64x64_original.png</key>
+		<data>
+		gRFIl9edLHKtuHn03fiEvb9Ryvw=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/orc_64x64_original.png</key>
+		<data>
+		4Bvx4SR31S/kPzh4Sjrczuc7JZo=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/skeleton_64x64_original.png</key>
+		<data>
+		mCStIfQDl/eHUNkj4xONH2/fC6I=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/troll_64x64_original.png</key>
+		<data>
+		JAxJEWqAi17HccY7OpaNiESY1A0=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/wolf_64x64_original.png</key>
+		<data>
+		Z78FaJEBjhr6x3ao6sZb/HeLBkE=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/monsters/zombie_64x64_original.png</key>
+		<data>
+		aHqhV1bryQFZ0aVqOWf1ZtGWnZM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/brigand_64x64_original.png</key>
+		<data>
+		m2LmZANzUDVTuFgTsdevjRMQ5/Q=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/townsfolk_64x64_original.png</key>
+		<data>
+		nq207XS/e788zeR4mm9ecJyawlM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_avatar_16x16_original.png</key>
+		<data>
+		Y+vs+KQmIC8wUeGUdVxJ4qPlriM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_beggar_16x16_original.png</key>
+		<data>
+		N94P/Qsr9QOu2+IfbPhYJnsraUk=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_child_16x16_original.png</key>
+		<data>
+		ecM1vFrFaG6HlNOKIKP88FdQ2dk=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_citizen_16x16_original.png</key>
+		<data>
+		i819baz/pRfVLpMpLh+hNBaCClY=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_guard_16x16_original.png</key>
+		<data>
+		ueDFFFQs/wtq5I8EebV+QsPOnig=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_guard_npc_16x16_original.png</key>
+		<data>
+		Pcv+g2EUB0AiE7iPMEKmhY8PhNA=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_healer_16x16_original.png</key>
+		<data>
+		OgHvsFG+SEeyYN0HPorNiOckasI=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_jester_16x16_original.png</key>
+		<data>
+		SN1cad4dQfImQLWBw+CxuDdRQrk=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_knight_16x16_original.png</key>
+		<data>
+		oBrpxl+kpp1cWr5Zk6vwAx3s4e8=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_monk_16x16_original.png</key>
+		<data>
+		pNYLy9UkO3T2mZryqMVkOh3K6+0=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_shepherd_16x16_original.png</key>
+		<data>
+		YwwWdqHHSE91WDVub+ZKg62veaI=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_tinker_16x16_original.png</key>
+		<data>
+		W1eujGUtFUSLoVK245bmzz3M9aM=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_villager_female_16x16_original.png</key>
+		<data>
+		/zynWEBbcD/qD7JWyJEaF063YvA=
+		</data>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_villager_male_16x16_original.png</key>
+		<data>
+		F8NJ62M6fN456Hu7m2ogUKNaqOM=
+		</data>
 		<key>_internal/src/assets/unassigned/balron_demon_f1.png</key>
 		<data>
-		TL+PNS9cTQ6X4enYUdgiVJdaXSM=
+		PQaynP2xmZUMrrgCCW/WCEEFiOA=
 		</data>
 		<key>_internal/src/assets/unassigned/balron_demon_f2.png</key>
 		<data>
@@ -2476,7 +3036,11 @@
 		<data>
 		iKyBxzCabMrVdzVP43/pKiGOUcM=
 		</data>
-		<key>_internal/src/assets/unassigned/brick_wall.png</key>
+		<key>_internal/src/assets/unassigned/brick_wall_brown.png</key>
+		<data>
+		kTWN3RMivbU7VZp/1jM8w8nrcJA=
+		</data>
+		<key>_internal/src/assets/unassigned/brick_wall_red.png</key>
 		<data>
 		Gv52+Kz7glJVlrEdMjPEooIi918=
 		</data>
@@ -2484,13 +3048,17 @@
 		<data>
 		4dENi+HX1SWH2tcQqja5uXz3tDI=
 		</data>
+		<key>_internal/src/assets/unassigned/brush_scrubland_copy.png</key>
+		<data>
+		4dENi+HX1SWH2tcQqja5uXz3tDI=
+		</data>
 		<key>_internal/src/assets/unassigned/cleric_f1.png</key>
 		<data>
-		243lF2Hk2ILyQH5sTDqgMWq+f2Y=
+		RdhAckk7A52c8t77ZwgTFDtdHEw=
 		</data>
 		<key>_internal/src/assets/unassigned/cleric_f2.png</key>
 		<data>
-		T3CRKiX57hfnGPNBEOhOPuftvkg=
+		3yRlG4X/MzamoODqpUL1EjNzvtA=
 		</data>
 		<key>_internal/src/assets/unassigned/cursor_sparkle.png</key>
 		<data>
@@ -2522,7 +3090,7 @@
 		</data>
 		<key>_internal/src/assets/unassigned/forest.png</key>
 		<data>
-		YSTfC81y8B37svpQ4O9VqWzqdIQ=
+		2E1IyckiJ/TL8+5VHaaFCfrDXbU=
 		</data>
 		<key>_internal/src/assets/unassigned/grass_plains.png</key>
 		<data>
@@ -2626,11 +3194,11 @@
 		</data>
 		<key>_internal/src/assets/unassigned/wizard_f1.png</key>
 		<data>
-		1CLt5n/7obxsCJm/cLk7H0lUy+s=
+		KRh+s1YTALDqw5Pz0cpIPQHfgZ0=
 		</data>
 		<key>_internal/src/assets/unassigned/wizard_f2.png</key>
 		<data>
-		SJPegZKxi4q+7u/4OWwVddwzAxU=
+		utnpew3M27IUBrtNUqD2Dntk19A=
 		</data>
 		<key>data/config.json</key>
 		<data>
@@ -2677,77 +3245,77 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			V4dX4vgEu4HizpmdAG2mpSCu6g1Gp6LbSxe/7Iw/Ps4=
-			</data>
-		</dict>
-		<key>_internal/data/character_tiles.json</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			4nKiLlZv4xS3IifSest2ndYyTVsIU0uNLSlYhSbZxJo=
+			QfW9ICDYzB0JRdBE8NFs8NilyOLqy6cFe6RRD4cPzOA=
 			</data>
 		</dict>
 		<key>_internal/data/classes/alchemist.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			SWga6MqRZ3T0pV+YaDQs9oKU9Z+NFxG9SW4ISH6Z0Rw=
+			kjAhu8x4UUI+uUAyoSXZwa3ZZp426sbdaKHMmE9ynIQ=
 			</data>
 		</dict>
 		<key>_internal/data/classes/cleric.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			HxP/IhFsUlqa8zTum2VG0PCsatQdvCYNkrdVbzM2R2s=
+			45Gl0WIHdmT8Ltg1dJA/oe9YMdXNGXOaut/H+4O8W70=
 			</data>
 		</dict>
 		<key>_internal/data/classes/druid.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			E7UkfC0o0uy6Xgv83bR3FXgNSacsjNVyoxP10D/spY8=
+			/twGujsxNpFoI4izgVxhOlhlhSgiRrvDUrgsW9EhN1A=
 			</data>
 		</dict>
 		<key>_internal/data/classes/fighter.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			EUxNFyCNkk/slFBfRdy4kWok2q2EwsPmEJ7eugfz5QQ=
+			nucTkwPjBHP1hw5wvcBJ2hJYNjL5QUH9Espviu3VbzA=
 			</data>
 		</dict>
 		<key>_internal/data/classes/paladin.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			6VgkY6+HFTHB9Atngb5eWXeM8QSvP0a5frDxIeMLi1o=
+			SIkSStRvh1JiEDD4oMHuaugij5AfvzrhBtTq6aKe96M=
 			</data>
 		</dict>
 		<key>_internal/data/classes/ranger.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			0WuVOaOVEgA/KxrmXol/7qNe+G6WlfqZdq7nyfDA0Y4=
+			6TVjZs8RpFrcFW4Qo5w3cdNTM5lVhAgdu2y0iE7Jvg0=
 			</data>
 		</dict>
 		<key>_internal/data/classes/thief.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			wNpYD6W6ErxrTQ2UDdgbYxZXVY81FlD7FNhgswDBdwM=
+			tnYLBy2MYMwU89rBrIQ1Mq1C0a8LiQt8uzCSNMcYZv8=
 			</data>
 		</dict>
 		<key>_internal/data/classes/wizard.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			6yXOAEht7qax42tPMKEGK4CQCXeCMsN0P2kvtyyVrSc=
+			16VpTbojmd/gCG8yCHaWxJpzp4mlyFUWMx46FsjT1Oc=
 			</data>
 		</dict>
 		<key>_internal/data/config.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			3AgPEQh3naEZudgviNsRGvqDKbYHiNXbWuYDfJ7psLo=
+			Q2xJY4LV+DzrCycoLq8s+gI8dTc0IM4L7jSrvhBjWnM=
+			</data>
+		</dict>
+		<key>_internal/data/counters.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Axr7LiE0poT9zQ3RWZ7YzgXBfAAN/dmTr70YExGTkwo=
 			</data>
 		</dict>
 		<key>_internal/data/effects.json</key>
@@ -2768,21 +3336,35 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			6mx5Fkyn6NuWlZpcTI7d4oh4coDLtq01xhol1bAIkuE=
+			Y2sxl+WEsTvfjSG21GDgfF1oLea6juydcaYQamdxhJI=
+			</data>
+		</dict>
+		<key>_internal/data/loot.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			pZZtmpkSmjhmD3TiNhRJaLoVYj5kcafXBEDdicia+PA=
+			</data>
+		</dict>
+		<key>_internal/data/map_templates.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			qou1A0/icCsRNXXls+zlNchI3gO34mCHrUdPpHvLAEg=
 			</data>
 		</dict>
 		<key>_internal/data/monsters.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			NRn7QzP09Rq/54upkkehRO1kiLgK6OznMBk+gr8tWfo=
+			BSCLf6hSZhPy/K6Mz2rBK+EEAPmH5IOdFmxAcfjEBjE=
 			</data>
 		</dict>
 		<key>_internal/data/party.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			xoB7qfqwLIXvPp2uHDPFxjo17DvSzfus6cqAHuwbCgk=
+			JqeQNPXwWV6P3UVEYi8e3p2WoEsXwzd0pjmvUi2i4Tw=
 			</data>
 		</dict>
 		<key>_internal/data/potions.json</key>
@@ -2799,18 +3381,81 @@
 			KkNdOaGhGaAZOfy91CaRn6cWAMkkJQfj4fmXGCNYalw=
 			</data>
 		</dict>
+		<key>_internal/data/reusable_features.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			rL5UzeIDLr2yMdwDRTu75yQym1ZuAE6rWpS/a3mCLe0=
+			</data>
+		</dict>
+		<key>_internal/data/soundtrack/battle/03 - Crimson Skies.mp3</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			ljSWXapEQTGi44bipOWRcXawcdUJDScIhImabVJHP9M=
+			</data>
+		</dict>
+		<key>_internal/data/soundtrack/dungeon/13 - Lost in the Labyrinth.mp3</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			zdg2upse3HGG7C6PqF7f0fml53ju/cPR5JM7rf7Hb3A=
+			</data>
+		</dict>
+		<key>_internal/data/soundtrack/overview/01 - Scepter of the Celestial Guardian.mp3</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			b7nvnxGHOlU5b3TP79gEVGRVnBp/IXQX9wgshu4aToU=
+			</data>
+		</dict>
+		<key>_internal/data/soundtrack/overview/12 - Mysteries of the Moonstone Citadel.mp3</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			asBXIr8PD17rswgMlLFB5qaUHImZk+3K/wn4cllPi0M=
+			</data>
+		</dict>
+		<key>_internal/data/soundtrack/town/05 - Dungeons of Desolation.mp3</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			qKUvEMm8BIc5uoIldyrWR++SokXDoCc3q/DryF/RY6E=
+			</data>
+		</dict>
+		<key>_internal/data/soundtrack/town/18 - Bard's Ballad.mp3</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			j65JRIiYaGi4BDgcFMwtMfXLSEvV//CeqZjcPh7+U4E=
+			</data>
+		</dict>
 		<key>_internal/data/spells.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			qYNZbdcgSEYnzGpIyxgJbH3xPa3eYwUhKxkX/5BVa7I=
+			B9O5eIDtx1QYQZIqEXGDAYQ6tUGq0nWe+m5i/aDdAAM=
+			</data>
+		</dict>
+		<key>_internal/data/tile_defs.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			wSCirns4mx1dFXTuAugcv+E3TFFgrNlENfOeKuwHjDw=
 			</data>
 		</dict>
 		<key>_internal/data/tile_manifest.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			9jlT8jekstYkJ4Ul3mCGfZj6G2K19LKGFt5uoCag7uo=
+			o/HKBaga588ZckrrdOQ2Q16kzUM+q9ArDJqqeMdznHU=
+			</data>
+		</dict>
+		<key>_internal/data/town_templates.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			3xAX2xbIR5sysqJ3s7n2lr8ZnnI2/1cjoD2FcayeIf8=
 			</data>
 		</dict>
 		<key>_internal/data/u4_tiles.json</key>
@@ -3062,7 +3707,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			c6kLsDHy7qCZielOx/fOpy9J+4xmlIysiCQ3sV5zn3s=
+			/Wx3wVqRQJIuds71Ak7RCM/Arq2licRq4ak5hwkf+z4=
 			</data>
 		</dict>
 		<key>_internal/libFLAC.8.dylib</key>
@@ -3200,18 +3845,60 @@
 			<key>symlink</key>
 			<string>pygame/.dylibs/libz.1.2.11.zlib-ng.dylib</string>
 		</dict>
-		<key>_internal/modules/on_an_island/module.json</key>
+		<key>_internal/modules/coming_of_age/buildings.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			VKrYbTdL1DdIzd8Fj5fzE1u9klePEHZMjBHyD4Vdr0w=
+			T7a1MZwa5gzx5QYRLq5DKAbh4h+8Bze2X8Y0Oatwqnc=
 			</data>
 		</dict>
-		<key>_internal/modules/on_an_island/overworld.json</key>
+		<key>_internal/modules/coming_of_age/dungeons.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JpJzXBmH9eOlvLuc6tfCnZwTeKAejAawc2r805Cq3GE=
+			zMtPUEu45ZdtLntBOhf+ZPkAVyqcu3sRx4/C0Wn2GP4=
+			</data>
+		</dict>
+		<key>_internal/modules/coming_of_age/links.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			ptwfgQEUTHdqFIQxcPCfWY0K9nekEraX4r5q7nECLhc=
+			</data>
+		</dict>
+		<key>_internal/modules/coming_of_age/module.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			KaKKOraTipiyHyeNDk9DXEj8Sm2foEkS3wqdZb1R2Og=
+			</data>
+		</dict>
+		<key>_internal/modules/coming_of_age/overview_map.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			xN5wBq1rcPrr426tcJ4d8Wa5t0HXVvgN9JqtxzOpCUo=
+			</data>
+		</dict>
+		<key>_internal/modules/coming_of_age/overworld.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			t4bFM1LCl/k/hPSGAjHXNh7z6LKVXcy2p7we+zu5e4M=
+			</data>
+		</dict>
+		<key>_internal/modules/coming_of_age/quests.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			37DZLoouSgTAxutOOLb7lxzxCUaa6YloyePIj0fuEjM=
+			</data>
+		</dict>
+		<key>_internal/modules/coming_of_age/towns.json</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			sNBqeDk7NyTEUsb1ZCzadVNL4pWHJANn8nsCDukG8UI=
 			</data>
 		</dict>
 		<key>_internal/numpy/_core/_multiarray_tests.cpython-39-darwin.so</key>
@@ -6494,511 +7181,917 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			8wAmK9n3C+RmwKpP8sjqHYOCCi1lKfcrhuZFVRBiBsQ=
+			GQoGWyqZ/y4bf/MSyk519893mYpc6lEPVsLNsvB61yo=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/barbarian.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			FBn4JwKbpIjOk9wowP8qI5FEKL+6isEqG79Om5qdQ9M=
+			X9NbgC9XoJw08fYb2qPkTsIqR4OAryOd/bu6rpxSylQ=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/cleric.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			AtXUpcFAxF3EU6T7rtIuj2CzDvnEHBnTdrgu6PX8Sno=
+			9d55R/LJ5T97P2g8pbaNDn5o/tYW+j8jqPhXvfqsOp0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/druid.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			TiPx3J95xOdkCuBS8kjWAe1uvfiIBmYLNAFLgX4FbfA=
+			lVwSaaL0snnob1+B/hfpVtvwUT/JrIx2p6jIMXNi4EE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/fighter.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			MZySGiBHXQbhEpg/RRSyHtd2UolWLSsHnhGh+mgK9cs=
+			NArdYWYqisoUGluq6BweqUMranMHAo27zoiwwyP4elU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/illusionist.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			I4M/DZH4XZlAhf5swo7e7PLiiS7OTXxUgf/rtkM1Ies=
+			xzCuyhVaLyzgm5NmYdacRnn2bMM2dD/JCc3sM/w6uyQ=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/lark.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			nDHNYrr/nDcGyoLfUvAlTgGfibz4BQEi6WyBDR5KVMo=
+			X/WODBzx6yAtVNuizokxGCaazR2MLccBMnBIVu5FfQY=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/paladin.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			fkaE+z0YBaX2jlY5LEQWHMhlcVSQn63ojwczpVw2QfU=
+			PdvWhTsi/tI2OTPtkwEdxd3qciXuO9n+yxWMUtx92uY=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/ranger.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			VoD3ClFITVAQ/cQESmIafbc/+oAmrIX6rsCzMddXZcM=
+			odW6iuzWZz+Te3HM/i+tjjTjS/oze6ymkoS16WBcnGc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/ranger_alt.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			5fiRTxeFaJODLJYce7h02lWAadwvEsnHbsK008+CNpY=
+			JW/LcRVlUYPuY3fgwFEVtI2k1ejPBf/CTwrA2rknIZo=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/thief.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			4pVqtPFJkA041NBVGcKUbHvM45SzOaUjN64nr6cKLU0=
+			glZcnPlbFe9CqmB1hEScPG43JFTSfb/+Sxo+LjgCruQ=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/characters/wizard.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			anQr6TKbOQFbbF3MrjesDt/nb3fqHowPEc2+vBZjdLE=
+			/xBS5/m9+IAGXbspm7/sOIOo+s+DtRfhgrGYu/+k6QY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/altar.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			uXVVZZhhgMaGbv/EojQA97/aISfVFckizDM2nU49PXU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/artifact.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			/su3e2tf01Xc5N0LCiriQFyOMpOy91wghxIo7fOpvIY=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/brick_floor.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			a1os7Tar+WWziyMgK9J6wU8liZT2Jaa3p9ZQsxXyuII=
+			fkISeZV6rT6HlHlPQ86JNOAlaMQCd9zFrXLad/KVjGU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/brick_wall.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			hr4Q4TD4JCAY62+q7KhdphCC5X+sZkn+A8ssjQMefCI=
+			oTPluW1yGFNKB3KFZMjI2hd+wkLidNpg7nXfUihuZYk=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/chest_tile.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			KgXHofsBBTyvkOcbsoT4ZNKT0+bFRPZfXeW4De55kiM=
+			Fesjol7hZS/VRS07mEyfQVaw7l0TVTmP/Tar/WQAFA8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/dungeon_door.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			2BMGZdk6IBIgH3xSUrnK+++qqr1nO/SSKFXx//+1x2Y=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/keyslot.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			G7YnK5+HlEGhk+HzghZ4ig8GZqZ/2HFR9Jn/TY4J12A=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/locked_door.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JKWoYsZl/aP20wFJPT50Rwjy3sF0r/TEmSuOUzQj9HY=
+			entJs5O8McVeUZF+zBynawGv/OMxLhB949+2deOaV3Y=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/locked_door_new.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			KGzGon+WqwLoniWx/PAvqGxcAe4BsJvjWPOVW4zmG6M=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/machine.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			f7lD9fjpTIVE3Y9XzUsxcYivdGIGv18xNV1sQgWRZ9M=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/moss.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			+NAs6xFjtn/Rf+j0c6GZt2bN/RQd2Zb2Uvb728ViT1o=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/portal.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			eJXPYPUFJDm1ZuN49GJ+hOWZGRyeIoodRcLPA7UTwxc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/portal_open.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			vRjh/TMLuq9bRWKoMfVrfKjyyU0S98mjRzGwDDzN/CQ=
+			X8jOQg/YVOGoaIB/OWzU0FPvbo5Oi4j0nctD3Q7CG1I=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/puddle.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			wJ+gIguW88KvjCt25skeNOD32pyjk5XBbu+saLrh5no=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/shallow_water.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			biLnh8u7Fwj2o+vUKvSJmBzOp+p7FETDW8qGhmO70Pc=
+			TqtNo9GA2yXgc2lOZEyPuWgaASot5rF519cqVGKIMKU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/sparkle.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			RYEA0BH8bdHlNy1MfvOEPh2jY8FZbHedAr9bQqt30hY=
+			quGNlTXw73WJ0u2XddbA3yBreZcsUAfLgUCO9xDAJoo=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/stairs_down.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			CYjlVqNmcVbSmdiLRkvo/Tyw/3s0G1KVgXjjD0R9dIs=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/stairs_up.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			P1dn5dITpNmw/y0osqLualYRQji5kgi1NCsbozxfUYs=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/stone_floor.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			gS8my7dLQX2Lt4WqkyPqrlq1RGZIfHOTesAyWPq1hJ4=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/stone_wall.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			sfA2Yi1Usc7VvGR6BK6U8zAVrjkQwjBuBILEOsdekc4=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/swamp.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			eqooi0zXDp0sH2pFTmy0yQE89XiL5Dacxt+/GhnjRgU=
+			vqRK6WbYeZ0YiVkwCx3CTcRSl3YfoKINBllcdxpNLTQ=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/dungeon/torch_post.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			5BcAx/8ZQz3vamtpevfC71VHa7ZN4KQF0+hlwYuRUD8=
+			/HQAhNGrv+0uDOlh5LeO9Uf4tIS4b262zLKqhWD36kU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/trap.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			e84RNGs1JaErfb+0rkrb1kMCM/fDmPmlzfpHcSvutXw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/dungeon/wall_torch.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			bi6tm92DoQ/2O0v8O+CBIY4kN9SMMFdv1JCHiugyehc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/items/chest.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			KgXHofsBBTyvkOcbsoT4ZNKT0+bFRPZfXeW4De55kiM=
+			Fesjol7hZS/VRS07mEyfQVaw7l0TVTmP/Tar/WQAFA8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/ammo.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			fRTn/mkhVPd39tPkMYbovVUqjGf7ACWsMgmoUISEp0w=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/armor_heavy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			U45jECBc+FCnHIUg/dLODY2B8ZKq8i5c0KZc+lLO6rs=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/armor_light.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			PsXHRyLFrwdMbv/Sf4ajG4nItVeHcVar2vQwNc49uuw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/artifact.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			sF/jge3HAW2kCl0j20FPmnCrs5/5utVFCiPQew3VXOk=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/bomb.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			9nSPu0j4xrKG0EOICVGP9+R5Yeyk2rNdqJk3Zta4D+Y=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/bow.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			L7jtuuawiCXbfJAoVNAUUrY2VyedcpMEcoz+1F8w7nY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/campfire.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			mEuozmqMQGepf0fBwKA60pSilCu/iNz+fUILbK/ApHU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/dagger.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			56OvJM+M18tbY8WhZ1EYAfujC9BMl6GMoALQ5op41P8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/gloves.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			A1y4rt1V6HDBWkKI9RiMPCd9luaExrZea4E8mHp646g=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/halberd.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			efFp5NEYRMomlymyk1kPb4VhAGmM1tvEHQhqkh0SEXA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/herb.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			H/oHIpUTGBuaDbIU8Kn7XvgnjosCfhtOhnZZ8X91dLU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/holy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			afLI50w62/x3tiKSmZu2WNG27IbjVPGCvKUve9VZtho=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/mace.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			nUXCW67kmzMUtvoTL25d49/v8UNPCU3kFBiS3UEjDMU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/potion.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			tobXrXpiYxW62jcFmiHpWIkmp07xlbyYOzfB0b1tgJc=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/rock.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			oU+yRUmAOuK2955rXdUNi32fwSabqmb+FpRckBRGY08=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/rope.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			96P2zMOwXulxzEK/0uMCsNPWAsRJ/hvpexu0BVNQPCw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/scroll.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			M0YfE4ZaVYcJ+UMAglCvkyVTanggU2P7MsIFOJrY0G4=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/spear.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			K/hmYav3nwu9qG4iuwVUZcao1CNe6S/mVNk78lYn7Eo=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/sword.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			g7MlQzPqrWDpIHt+qznoDbpuaBkIyTO6XmLEsUGijpA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/tool.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			henBOOGLeo7EoTI3FmKe108iKwSDZYwGoCl10VcTLqY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_32/torch.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			d0pidXC2je7XFEXR9wujZ5xVA/ioDjIF9n0cu0g+aRI=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/ammo.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			xuvdMLo58hk2Z47sfxyitllK3Rt36FBvjunhjG6hvfg=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/armor_heavy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			8tHoF01TsqZdd3HNPt8sxfq7vAA0lA07dbO77lZ51bY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/armor_light.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			08vOywWbqoSkP3uAY4fxdeyUElQUFErWYYwd1eV+wNY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/artifact.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Va1bUw5772GlWPmWY1mEALqnEC2dw7kol51jT1795Rc=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/bomb.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			i6rsCJpyohHl9AcZaz1nWQMiMbzKAh26cLbOMquzxvo=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/bow.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			G1ZeHLvV7T1iGcRDaUJXiouyblyW0YNdm/W+9HiPI00=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/campfire.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			1SPcKj30ufemoIM7wvD+OqjX69aWES4MgF+49vb07lA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/dagger.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			G5W/E/JJubx8gRDdmRelyWcoYk5yIcjE4kbFs1FtcVg=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/gloves.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			0d1UB4peJaGgT6fGqZSUdvhes1c39YKHdwNddfQhCww=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/halberd.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			bL20ybs6igxMaiAnAYWNukPn00IjH64lrAYFLLb4MX0=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/herb.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			SpPovTzHdmM0KrGfCBcMWp/TGXvuXaOtLpQ0v8vgzUk=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/holy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			AFu37HG1DNVyGo2N033Zy0Qk6pmg78G1UPb1ydiYhas=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/mace.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			en0k1MMCYT6yN2DPw3Uc7HzjcERihzeJ8wMinCNGEu0=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/potion.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			/DD/1T7KiG2upbb76+Ij8pFJxXfosfXU1lEEJf+QPzM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/rock.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			ccMPUzxmORnr4atNfH3SUCDcV1L0agzsjMqoa9QOEng=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/rope.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			RrKOONkmPAnem7zv0wYR2GQ3IwBhd57akc8YnLI8TWw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/scroll.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			5Ey7t3PoySuL3aRo/MWHIQ4FS61isZQpWWrzNBCHoig=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/spear.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Ny9cKsMiWNp78NUVQBPX+aRmXLxrnlkfOYp+j9aNU+U=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/sword.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jx0v0MgUA+D62WtX+4JMeQflmrxz57sdbOtzF2Joo1I=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/tool.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			bPGUmuR70CW+If2QrQajqkB+VkTM0n4vycUlf6KXKhA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/items/icons_64/torch.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			oaB+X1s/6QwRd8INIHHXThRTRYk8CvzZeW7nHP+/oW0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/items/town_gate.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			rfc87whxn/I5aSBTHFkWp+lf8O2+oFsesEIK6IGnto8=
+			OzAP61PLqCHwfWMNm/8JnXwWsTcra3k/Bg6LuMpPKp4=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/lava_vent.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JVVuanL/8bsgQhn+NmpmBBNIK6VWij2/OCoWWQwcNOw=
+			EV6kui0//gGqG7f/uH4josiSn9QMB0GwcsIjUp+/IyU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/moongate_active.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Fc0uX80I1vMt+SIoO4qQ2mzp3jdsHOKLk2XMtYNb8Dw=
+			UVndYIeI90l+V2yvH1Slrve8ikr8y283KgFwTVCiaJE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/moongate_dormant.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			RTtjgUPdZKyzN6oXX8sutt4+zMCQmkA0I16+k+mv5DI=
+			h0knYC4JCcsIEmewN6EO+5gJo9fGekk2uE1X+JVAM/0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/poison_swamp.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			4eWcVwsJUJI40KMXCOBq8jCKo1zL0cnOd6LZfPoEMYc=
+			Q+XTsPs3yColr11EcF70Qi3cV7TBbwYoWB6e1okck3A=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/ruined_tower.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			bmFAdZoDPWd216a56xReVUC2nxhkTIcB15FdfsxYjIw=
+			yCECGvhqcg/PY1EGRcd/ZYqawL9mCOt/mM3II6ciU6g=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/smuggler_tunnel.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			zK7EzfFpRa+TkL2P81TLMTGlTi1pBfo70KfXoM6qL2I=
+			F4ZGM/U6xKJLPAfBpoMlV5aTqwPBcDoB5GGyZ1i5fyM=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/sunken_shipwreck.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			pT06TiuPiHbAoKmXtQeo0x7Aa7NbNGxhHw/gUIQTHXA=
+			ys/MKgT1B4zSHtCp+HIdp+MWwDFobjGTn6vflhEWKuw=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/landmarks/treasure_hoard.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			KgXHofsBBTyvkOcbsoT4ZNKT0+bFRPZfXeW4De55kiM=
+			Fesjol7hZS/VRS07mEyfQVaw7l0TVTmP/Tar/WQAFA8=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/dark_mage.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			DMJNBdUcUzjkqCLr7Q/63Iz9aFBFol+TDNq+vWC+Yqk=
+			bRK5zLB98RxTa41tt5IE0F7U0muAO41K90U1bydYfW8=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/giant_rat.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			qYQihrvOAGeBTP4G15yuExVfRuScTw/ziP9KMzy6uLU=
+			OkSzuosPjj7+tJrGgO3ZGElr0mPEP23eG2pXSaLMf1k=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/goblin.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			DWBx+o8oWp5DY7tRVWci2s6D1WMQjp7yLGkBgKDjcGo=
+			Nn6dhcPy+kP0OMQGMZBe8rSieU79RDfeZXCkAyFot6Y=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/orc.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			GUEOpO/Ir07Mp/Z4zerDRvUE5k83ZUjFRT6WUmt0nQc=
+			3UE31D3ouKgUEq2dKE6RoK7vxSqLfUwZnOLs3ucn24s=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/skeleton.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			+nHxmQrza8b7M3UxtxUt7uNnBQMG5CfJVwiZz01hwaQ=
+			RzlDa5Gtny+leh9jdA8zze/hVEfDWAimzdb7Zc3WB48=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/monsters/super_zombie.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			eGk7h2dlYbY05BGVGOfSm2LKehWeAJ2YrGzCI3POMaE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/troll.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			+shkRzsM6Vqb9NbN1/gNaRXXP+x5xy+PzV2427dIFK0=
+			K6SjjcEkgJgiA+W4jgwsoIg4FxT2mZBdD3XJuvM+s8M=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/wolf.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JhRdWV7Beh7xqJWl0woxiVtxVnf6XTus9gjim35hdxY=
+			DpVMli8leox+4n0Z4mvUC93Dc3uqXry/YsIbLdJiZMM=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/monsters/zombie.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			xIMLfiWSWn7+1575JBprdoFT0FbA67ResY64uRsOsW4=
+			eGk7h2dlYbY05BGVGOfSm2LKehWeAJ2YrGzCI3POMaE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/brigand.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			yPbL0Y3nCz1hat6T/bKNdWtA8jXhutq3HU48GLsbfj4=
+			qh0mBFna7RpO5tABawBAdE74awW7JhAPQGPTQnDUEnQ=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/elder.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			LIjNRmePmaTt/iqm0lhgNXDpg4GeWZw7nrCqd2UizAo=
+			HsGx4M2AyTk9HeoOPyI8y8pV71ClGvpSYETahSuFbxk=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/innkeeper.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			PxYQ5OUz85ScBgxjo+KklxJ+2WhsUu0IG/YywIUTis0=
+			dsBH2NMkqyg+9/wE6X3NCw92O+MdpWSyTtWi77MdrNQ=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/shopkeep.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JwAHszsusOJirk7kpBnkl8P63hwuoJNFh1CkDHBuN8Q=
+			filHmgUK77aOi9tKoll6cSuA/yPm9AHoc/1MhffiFNU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/townsfolk.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			yp0pw1F4H/PimCQryj0tWpkxH/UpD+0poGQpRW8Q7kM=
+			iIth08EBNU2wwkG64tRQ5y+yQJiutpEHCXodvsNCRpk=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_avatar.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			N1dIty5HmS+xl28981fBXYe4kPyKNf5wWQDWz31v0rw=
+			PZ5SxX5OKBXGkBXm/nRRsQfdd6L3bJIHbdff/eTm1kc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_beggar.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			vQkP2Vy1xeMp6938pXwAoegAHFWLrGPhG9R58pIhwHM=
+			hdVSZ94w7rs0RkrHfYBSxxsvp8WRWgd/NJZtx5bPN9o=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_child.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			2Z+Y8fC+wIDQK6/NYCg59pCMsme7FAxSWk3dylTdljU=
+			HnTWz5m2l3Zjxk8jJv3fltIbSsjt5UaWRs9ZemJvdAU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_citizen.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			v1YcN/FlwYBSsU5CJaj764/pDKPjIJPB0gguObF6OqA=
+			3WrKhvxQrcAnYXc//36h1VjKOzYFZn8MIF9kiXXaYN8=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_guard.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			7OiSEmITtYceUucNjTDxKOs9AIYUUcxi+gR8cBx477A=
+			z1SB6e+2zZyCPb7Gy2BaoeNIKt78+re1kyFzWafpCHc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_guard_npc.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Pj4z5NNr5mNTNJG8r0v7sykpAXMAi+w3QsDOdSrIfj0=
+			9TjChyPWpNque600YT96mgJzqu3xjNzwsMNSTYLfykw=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_healer.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			+1uNPo5Zucxx3y+Y2bNOO5XdZGLbAx8aL2aHZ9fzqO4=
+			Wy3oLA1z87T+nyKI/DTNaoRZkxU/swA+uGNb7DrOwtk=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_jester.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			fzxwy5UFiHvAe56kKAuG3aJbAx9LZWh+cwNZ2xGsKzw=
+			JzQpyypIPuL6CoUEi2pawVct57SNxTOSzSPzOK3PJqg=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_knight.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			L4hdGin3pklT1zfJhNQYB48ctcCQE5MQGOCktRd2DrA=
+			rxydRnCrjF8+sWNVgZ0NtINICK4hSG913hqXjIp1qz8=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_monk.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			td4VnXPEoW820244Fxq8I9Dt8t3awv1cGIkPGCZd4bc=
+			7aT+kFDjcL3/sTNc2S3qH4o+gj1J+KJyBsIftDikeVY=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_shepherd.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Ac/VMFl0+JUhKk5ycTriGcduZU6zB/iDtS3Oncz/XSw=
+			Hhks+xQOe6adpcd1EtKdhWG3uw8VNwsp9GfdUKfUgLM=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_tinker.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			uRgh1B/0XsRi/mLA6I2/+mqmdO7kXUOJ2nJaenVl/JI=
+			Hw8P8Us1IQgzbjJkpilminvHM8KkY/BjGDg/UpCDtx0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_villager_female.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			6D/gFWMMGf5OQbR7CjlJFEIQimT+oVJ7hVCRubQrp6U=
+			lCp+W5kbgBO1WRYH4sKQJjDDjte3Dm6CvObUd6jp6Qk=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/u4_villager_male.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Gd9/6Dt2odsduMe02PlTq3i4fpWkOMftunWRCEFf3K4=
+			b4sG/afVSC3InyshQlz2h3GsPmuvr/Mpe8D3kvhMXLM=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_avatar.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			rVpRR91/aHs2G+F2ujxlKzy3EWD70GVWfXlf45ySguE=
+			tNdZHfTkeKxZUro1c1Q4u5NJ9qUfWmJG8khpaqKmVlA=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_druid.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			OfxqHCzmGtvhdxWYvaUxY2KNQjiu2Hak4MSRDrrPW5k=
+			LLIzopD0AdpmlplquT24G3gFUIoOllfm2dARN7vtoRc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_evil_mage.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			VFDUJmy4RmLIOR36aMhpw2CsnEavpmV+aKx23E6V6uQ=
+			3Q/dAQshmRbPeZnbmHjLykwgb7W9NbOB/zKNgln7uxc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_fighter.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			e+1DQJOjV8Nf+ARHrlmmMpM4G0wj2vlkzroIHc4NciM=
+			IPOqL67Qzwb+EU/XAoSJLKVD56f72n8kO1yofKG9Il0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_jester.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			L2VbuxYlhavu/w411rpq4SRnH62gOMpEkheRG4de8qs=
+			kZ09pmDJYp4xTzsj4BPkDDzVJVwgjvjZNejq7nOqWag=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_mage.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			a83S6uiyVTU1hENZ02kojLco/dxY46NI1wFRTacv1HM=
+			HzC5rw+yTTzOJSAQxmL/setmDcuplxoUQVQ4N7qT8Jc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_paladin.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			pHH8i3XuBFAFP+Nkk3C6Ul3nWg6VTrWsQ8teEEQVbaU=
+			lG5yXX/Dtg2ZE2NCT/xy2AZ5LiGlgzNRChzPI525feg=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_ranger.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			ec9jiVu/np4kEtFmwuAN7KaD8MtTNUGuWkxmFIy+ZsQ=
+			ktBt7v7fzf4blvkEwxbgcOL8Z3vK8uI/D6WifX7DcIE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/vga_rogue.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			OX8srJ0a7q7FFrNJ+VAWM80jtofUPMjrWgl7Sq5RSbg=
+			eSw66bZmDL1qFdCZCla3HLMqk/6yOoUMIjbzpf9SqO4=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/villager_bard.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Lqyc+qRETNw791iLU1RyfTRNiNvTq3iwvd+KqVl5qoU=
+			0FmA6hzlT0Y/rFkb1KLQZcQBMj4HWwlq7gWywC7iAic=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/villager_beggar.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			zzjJvLQBNDI0dZ339jgJlmrbXinwmvitJeMhVs+Ppk0=
+			4OnGIrIdJ0JGPQOWTtpD3t78sg0ZQ9SvMOz4rjlrTO0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/villager_child.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			j9N7QqqoFqzwIyGoC5rEeujvBgKcy6QTfLa4a9cByp0=
+			+sAUN630b5xtLKiS9vgL+bu3XENC4IL2B6VUSRDUyjA=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/villager_citizen.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			c0/p6rV7jRXp9m+Vfvdq5DU8n/GLtMgHty5WRmr26dY=
+			A4RWFMUhAp16nNZweZ4yhpwqkA3LqNO9W1gjUn9wsDY=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/villager_guard.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			pcGj1B7qNTACl+Zv+cEfRSsFCdgiuciwLRl/8OWxijU=
+			crIQNooNZ/QKSW9z+hcAsL5Js1Q2M1ga78GR5cnsO/E=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/npcs/villager_shepherd.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			fNAohDKZFLsMDfO3SpeBDST6R+afWEzniKyqjpFOWjw=
+			INV3oGKBzmDD8ZCw1/q50hzp4Op2YREWu2LYy+S+1ew=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/altar.png</key>
@@ -7012,14 +8105,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			ccZzLFmKJuWb7pjQFhmdyFVnF/5gkoXFWgU3XOQ1DnE=
+			e0CzoclqfiqAm7L+/Blg0jstrIzfVYmDb/KWCPCArlA=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/counter.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			aNfP9vGhj3k27rma4cCbpI54DSEjB2n/WqcWjWR/szo=
+			2rpRCFFRsSBMuUXSuGKt98U1ZMKU+OWhNjdkUPZSUYs=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/door.png</key>
@@ -7036,18 +8129,39 @@
 			7lRiqqk0Y+bH8nZa7LbNx+PFi2Ei5+Ua3y8XzmqKxWs=
 			</data>
 		</dict>
+		<key>_internal/src/assets/game/terrain/dungeon_cleared.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			WWzjCXelVVbCJ8ACRxi4jlzCtwzyupmuZe61zko822Y=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/floor_copy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			NLkF12yBLzcQJFJc0b9jqApHqlVyL2n5sUONvEqGJx0=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/floor_gray.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			pbrbafy3C8+Xrtvzm6W7Cmviv330TYHMqtG4BZsFjp0=
+			</data>
+		</dict>
 		<key>_internal/src/assets/game/terrain/forest.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			qaD3XZOzAJldgDAdHm99w9tGG6JVTSmjlaw6+wH8W44=
+			8VzFo+y3UsCRljb63pgQHgqHozmNSOxDrj2H0HPwbCE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/grass.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			bB+cT3C6k+wfD+3NyxQFevY6hMPvdatjMbs10sV16xo=
+			OgbaCgfscd0qFn0gsK7rigXvFXYYO4DabR4IzxTmvSI=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/mountain.png</key>
@@ -7055,6 +8169,13 @@
 			<key>hash2</key>
 			<data>
 			joyDMFl02LS6VqnM0Vmpfielg0HzjaJu3b54ce45nls=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/party_marker.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			L761A2zIJ2Ux8p76SK1MtiWiL3qp1oDAONobwt8/qBE=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/path.png</key>
@@ -7071,11 +8192,53 @@
 			gEJ0MItTKilMNOXLsHGdfz3hfvBab9KRask3yZ8OQkI=
 			</data>
 		</dict>
+		<key>_internal/src/assets/game/terrain/shop_sign.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			l5VlWv8iQkNf/tvX4ZSSay8XwebTkzuUtJfGDafTeIQ=
+			</data>
+		</dict>
 		<key>_internal/src/assets/game/terrain/town.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			rvW0JGldxRdTqbMVEVyxGNYALSKnRyWl48oMEDuF0YU=
+			Bay8VhzYEH2JfUVF3ubQwbOiRXIBWB3tpTzxMHxertA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/town_counter.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			r6AfkJBlGFtpN6MMrpdUEovGjhtOTil/chlg07ZNA0o=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/town_door.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			dhon4sQfv8J8pXsGsqCXmx0QP6eRfPjSpD3e1Vn7nDw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/town_exit.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			aG+4rmABNpKHOFxqqrYX7OUEp5e/L9+nZWPc4SxGrSQ=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/town_floor.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			4KTqtvZSQfvaFyPRAcWruIgLu+G0WFfoA5nHfFpbgh8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/game/terrain/town_wall.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			sfA2Yi1Usc7VvGR6BK6U8zAVrjkQwjBuBILEOsdekc4=
 			</data>
 		</dict>
 		<key>_internal/src/assets/game/terrain/wall.png</key>
@@ -7085,6 +8248,13 @@
 			Nbk6HDbAtrR8sxFHSD4hLuaRE+7GQGAawLb8+yKBd3o=
 			</data>
 		</dict>
+		<key>_internal/src/assets/game/terrain/wall_copy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			UC7YrVot+b2e772lLlPHt3StR/AsqtdAQ5d/5XyZ9Rg=
+			</data>
+		</dict>
 		<key>_internal/src/assets/game/terrain/water.png</key>
 		<dict>
 			<key>hash2</key>
@@ -7092,11 +8262,389 @@
 			lsBJwFhXIh1HJN2OsFK7j/5bFgO+ef51pWBtFcePOeQ=
 			</data>
 		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/alchemist_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			8wAmK9n3C+RmwKpP8sjqHYOCCi1lKfcrhuZFVRBiBsQ=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/barbarian_30x34_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			FBn4JwKbpIjOk9wowP8qI5FEKL+6isEqG79Om5qdQ9M=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/druid_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			TiPx3J95xOdkCuBS8kjWAe1uvfiIBmYLNAFLgX4FbfA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/fighter_28x32_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			MZySGiBHXQbhEpg/RRSyHtd2UolWLSsHnhGh+mgK9cs=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/illusionist_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			I4M/DZH4XZlAhf5swo7e7PLiiS7OTXxUgf/rtkM1Ies=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/lark_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			nDHNYrr/nDcGyoLfUvAlTgGfibz4BQEi6WyBDR5KVMo=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/paladin_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			fkaE+z0YBaX2jlY5LEQWHMhlcVSQn63ojwczpVw2QfU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/ranger_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			VoD3ClFITVAQ/cQESmIafbc/+oAmrIX6rsCzMddXZcM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/ranger_alt_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			5fiRTxeFaJODLJYce7h02lWAadwvEsnHbsK008+CNpY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/thief_34x32_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			4pVqtPFJkA041NBVGcKUbHvM45SzOaUjN64nr6cKLU0=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/characters/wizard_28x32_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			anQr6TKbOQFbbF3MrjesDt/nb3fqHowPEc2+vBZjdLE=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/brick_floor_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			a1os7Tar+WWziyMgK9J6wU8liZT2Jaa3p9ZQsxXyuII=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/brick_wall_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			hr4Q4TD4JCAY62+q7KhdphCC5X+sZkn+A8ssjQMefCI=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/chest_tile_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			KgXHofsBBTyvkOcbsoT4ZNKT0+bFRPZfXeW4De55kiM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/locked_door_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			JKWoYsZl/aP20wFJPT50Rwjy3sF0r/TEmSuOUzQj9HY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/portal_open_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			vRjh/TMLuq9bRWKoMfVrfKjyyU0S98mjRzGwDDzN/CQ=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/shallow_water_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			biLnh8u7Fwj2o+vUKvSJmBzOp+p7FETDW8qGhmO70Pc=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/sparkle_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			RYEA0BH8bdHlNy1MfvOEPh2jY8FZbHedAr9bQqt30hY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/swamp_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			eqooi0zXDp0sH2pFTmy0yQE89XiL5Dacxt+/GhnjRgU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/dungeon/torch_post_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			5BcAx/8ZQz3vamtpevfC71VHa7ZN4KQF0+hlwYuRUD8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/items/chest_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			KgXHofsBBTyvkOcbsoT4ZNKT0+bFRPZfXeW4De55kiM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/items/town_gate_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			rfc87whxn/I5aSBTHFkWp+lf8O2+oFsesEIK6IGnto8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/lava_vent_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			JVVuanL/8bsgQhn+NmpmBBNIK6VWij2/OCoWWQwcNOw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/moongate_active_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Fc0uX80I1vMt+SIoO4qQ2mzp3jdsHOKLk2XMtYNb8Dw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/moongate_dormant_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			RTtjgUPdZKyzN6oXX8sutt4+zMCQmkA0I16+k+mv5DI=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/poison_swamp_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			4eWcVwsJUJI40KMXCOBq8jCKo1zL0cnOd6LZfPoEMYc=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/ruined_tower_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			bmFAdZoDPWd216a56xReVUC2nxhkTIcB15FdfsxYjIw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/smuggler_tunnel_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			zK7EzfFpRa+TkL2P81TLMTGlTi1pBfo70KfXoM6qL2I=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/sunken_shipwreck_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			pT06TiuPiHbAoKmXtQeo0x7Aa7NbNGxhHw/gUIQTHXA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/landmarks/treasure_hoard_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			KgXHofsBBTyvkOcbsoT4ZNKT0+bFRPZfXeW4De55kiM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/dark_mage_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			DMJNBdUcUzjkqCLr7Q/63Iz9aFBFol+TDNq+vWC+Yqk=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/giant_rat_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			qYQihrvOAGeBTP4G15yuExVfRuScTw/ziP9KMzy6uLU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/goblin_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			DWBx+o8oWp5DY7tRVWci2s6D1WMQjp7yLGkBgKDjcGo=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/orc_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			GUEOpO/Ir07Mp/Z4zerDRvUE5k83ZUjFRT6WUmt0nQc=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/skeleton_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			+nHxmQrza8b7M3UxtxUt7uNnBQMG5CfJVwiZz01hwaQ=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/troll_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			+shkRzsM6Vqb9NbN1/gNaRXXP+x5xy+PzV2427dIFK0=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/wolf_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			JhRdWV7Beh7xqJWl0woxiVtxVnf6XTus9gjim35hdxY=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/monsters/zombie_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			xIMLfiWSWn7+1575JBprdoFT0FbA67ResY64uRsOsW4=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/brigand_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			yPbL0Y3nCz1hat6T/bKNdWtA8jXhutq3HU48GLsbfj4=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/townsfolk_64x64_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			yp0pw1F4H/PimCQryj0tWpkxH/UpD+0poGQpRW8Q7kM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_avatar_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			N1dIty5HmS+xl28981fBXYe4kPyKNf5wWQDWz31v0rw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_beggar_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			vQkP2Vy1xeMp6938pXwAoegAHFWLrGPhG9R58pIhwHM=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_child_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			2Z+Y8fC+wIDQK6/NYCg59pCMsme7FAxSWk3dylTdljU=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_citizen_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			v1YcN/FlwYBSsU5CJaj764/pDKPjIJPB0gguObF6OqA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_guard_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			7OiSEmITtYceUucNjTDxKOs9AIYUUcxi+gR8cBx477A=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_guard_npc_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Pj4z5NNr5mNTNJG8r0v7sykpAXMAi+w3QsDOdSrIfj0=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_healer_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			+1uNPo5Zucxx3y+Y2bNOO5XdZGLbAx8aL2aHZ9fzqO4=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_jester_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			fzxwy5UFiHvAe56kKAuG3aJbAx9LZWh+cwNZ2xGsKzw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_knight_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			L4hdGin3pklT1zfJhNQYB48ctcCQE5MQGOCktRd2DrA=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_monk_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			td4VnXPEoW820244Fxq8I9Dt8t3awv1cGIkPGCZd4bc=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_shepherd_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Ac/VMFl0+JUhKk5ycTriGcduZU6zB/iDtS3Oncz/XSw=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_tinker_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			uRgh1B/0XsRi/mLA6I2/+mqmdO7kXUOJ2nJaenVl/JI=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_villager_female_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			6D/gFWMMGf5OQbR7CjlJFEIQimT+oVJ7hVCRubQrp6U=
+			</data>
+		</dict>
+		<key>_internal/src/assets/originals_backup/game/npcs/u4_villager_male_16x16_original.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Gd9/6Dt2odsduMe02PlTq3i4fpWkOMftunWRCEFf3K4=
+			</data>
+		</dict>
 		<key>_internal/src/assets/unassigned/balron_demon_f1.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			FR8+g8eqULBk0QiT7v/ofvM/BVZ5cojArRAkzjC20YM=
+			/vXBV9uWES+hj0aMKRVGtCP0fT3osF03nViy1QBGtl8=
 			</data>
 		</dict>
 		<key>_internal/src/assets/unassigned/balron_demon_f2.png</key>
@@ -7120,7 +8668,14 @@
 			6dmePp9aB2qJmcc3VR4R/13wVKfgDTqEmY+Ha/nX0qk=
 			</data>
 		</dict>
-		<key>_internal/src/assets/unassigned/brick_wall.png</key>
+		<key>_internal/src/assets/unassigned/brick_wall_brown.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			3dBlBDIsLNZi/DND6+lHr9Q8/JxDQG2oN68drwUGvh8=
+			</data>
+		</dict>
+		<key>_internal/src/assets/unassigned/brick_wall_red.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
@@ -7134,18 +8689,25 @@
 			8mI3Qut2HnNcbSn2WLC3JJECUtiomR/8O9d/OzRK4dk=
 			</data>
 		</dict>
+		<key>_internal/src/assets/unassigned/brush_scrubland_copy.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			8mI3Qut2HnNcbSn2WLC3JJECUtiomR/8O9d/OzRK4dk=
+			</data>
+		</dict>
 		<key>_internal/src/assets/unassigned/cleric_f1.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			BZAXstyOX/l/5+K5A64UgcUVRN0yEy4vVAq0pmKAWY8=
+			nlYZm5cF1x9dpEin9a2JFqqM5/vEHEMfHPsZg3kgpmU=
 			</data>
 		</dict>
 		<key>_internal/src/assets/unassigned/cleric_f2.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			bzlaMVC8n+PBI2qQvgbsBsZ5qz1olQRDrvM6sC6rPqI=
+			wyB20GH+ujceDXEoNaQ+hrL4i+hMjqojz/FwrXOvxL0=
 			</data>
 		</dict>
 		<key>_internal/src/assets/unassigned/cursor_sparkle.png</key>
@@ -7201,7 +8763,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			qaD3XZOzAJldgDAdHm99w9tGG6JVTSmjlaw6+wH8W44=
+			bABfrQdl3PcKfxVmC+ZdrmRX5tzSxnwt+9yOQktZdCY=
 			</data>
 		</dict>
 		<key>_internal/src/assets/unassigned/grass_plains.png</key>
@@ -7383,14 +8945,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			eRKW2Lr9ICLXuzgfO/PFU7VGLUu9wOiZSS1F7r4LZZ8=
+			XAuZE+O8Zek1lYHBGV3pF9Ny4ZiF5DgusHWbz/H68Nc=
 			</data>
 		</dict>
 		<key>_internal/src/assets/unassigned/wizard_f2.png</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JCP64svc1efj6pzgt9PR6gtUgnF3tj9WEk0XPeCRRW0=
+			ft0unal/tlLo5n0Yw20UICSWm2tyZ5Rtn0SbnJ4durM=
 			</data>
 		</dict>
 		<key>data/config.json</key>

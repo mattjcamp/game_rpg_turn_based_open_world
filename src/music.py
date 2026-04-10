@@ -1,9 +1,13 @@
 """
-Chiptune sound effects system.
+Audio system: chiptune sound effects + background music manager.
 
 Generates retro square-wave / pulse-wave sound effects procedurally
-using numpy and pygame.mixer.
+using numpy and pygame.mixer, and manages background music playlists
+from the data/soundtrack/ directory.
 """
+
+import os
+import random
 
 import numpy as np
 import pygame
@@ -527,3 +531,225 @@ class SoundEffects:
     @muted.setter
     def muted(self, value):
         self._muted = value
+
+
+# ═══════════════════════════════════════════════════════════════
+#  BACKGROUND MUSIC MANAGER — playlist-based area soundtrack
+# ═══════════════════════════════════════════════════════════════
+
+# Map game state names to soundtrack subdirectory names.
+# The keys match the state names used in game.change_state().
+STATE_TO_SOUNDTRACK = {
+    "overworld": "overview",
+    "town":      "town",
+    "dungeon":   "dungeon",
+    "combat":    "battle",
+}
+
+# Custom pygame event fired when a track finishes playing.
+MUSIC_END_EVENT = pygame.USEREVENT + 10
+
+
+class MusicManager:
+    """Manages background music playlists tied to game areas.
+
+    Reads MP3 files from data/soundtrack/<area>/ directories and
+    plays them in shuffled order, looping the playlist when all
+    tracks have been played.  Supports crossfade between areas,
+    volume control, and muting.
+
+    Usage:
+        music_mgr = MusicManager(base_path="data/soundtrack")
+        music_mgr.play_area("overworld")   # starts overworld playlist
+        music_mgr.play_area("combat")      # crossfades to battle music
+        music_mgr.stop()                   # fade out and stop
+    """
+
+    def __init__(self, base_path="data/soundtrack", volume=0.5):
+        """Initialise the music manager.
+
+        Parameters
+        ----------
+        base_path : str
+            Path to the root soundtrack directory containing area
+            subdirectories (overview/, town/, dungeon/, battle/).
+        volume : float
+            Initial music volume (0.0 – 1.0).
+        """
+        self._base_path = base_path
+        self._volume = volume
+        self._muted = False
+        self._current_area = None
+        self._playlists = {}       # area_name -> list of file paths
+        self._play_queue = []      # shuffled list for current area
+        self._current_track = None
+
+        # Tell pygame.mixer.music to post an event when a track ends
+        pygame.mixer.music.set_endevent(MUSIC_END_EVENT)
+
+        # Scan all area subdirectories for MP3 files
+        self._scan_playlists()
+
+    # ── Playlist scanning ──────────────────────────────────────
+
+    def _scan_playlists(self):
+        """Scan data/soundtrack/ subdirectories and build playlists."""
+        self._playlists.clear()
+        if not os.path.isdir(self._base_path):
+            return
+        for entry in os.listdir(self._base_path):
+            area_dir = os.path.join(self._base_path, entry)
+            if not os.path.isdir(area_dir):
+                continue
+            tracks = sorted(
+                os.path.join(area_dir, f)
+                for f in os.listdir(area_dir)
+                if f.lower().endswith((".mp3", ".ogg", ".wav"))
+            )
+            if tracks:
+                self._playlists[entry] = tracks
+
+    def rescan(self):
+        """Re-scan playlists (call after adding new tracks at runtime)."""
+        self._scan_playlists()
+
+    # ── Playback control ───────────────────────────────────────
+
+    def play_area(self, state_name, fade_ms=1500):
+        """Start playing the playlist for a game area.
+
+        Parameters
+        ----------
+        state_name : str
+            The game state name (e.g. "overworld", "town", "dungeon",
+            "combat").  Mapped to a soundtrack subdirectory via
+            STATE_TO_SOUNDTRACK.
+        fade_ms : int
+            Crossfade duration in milliseconds when switching areas.
+        """
+        area = STATE_TO_SOUNDTRACK.get(state_name, state_name)
+
+        # Don't restart if we're already playing this area
+        if area == self._current_area and pygame.mixer.music.get_busy():
+            return
+
+        tracks = self._playlists.get(area)
+        if not tracks:
+            # No music for this area — let any current track keep playing
+            return
+
+        self._current_area = area
+
+        # Build a shuffled queue
+        self._play_queue = list(tracks)
+        random.shuffle(self._play_queue)
+
+        # Crossfade: fade out current, then start new track
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.fadeout(fade_ms)
+            # The MUSIC_END_EVENT will fire, but we pre-empt it by
+            # loading and playing the first track after a short fadeout.
+            # pygame.mixer.music.queue() doesn't support fade-in, so
+            # we load immediately; pygame handles the overlap gracefully.
+
+        self._play_next(fade_ms=fade_ms)
+
+    def _play_next(self, fade_ms=500):
+        """Load and play the next track in the queue."""
+        if not self._play_queue:
+            # Re-shuffle the full playlist for the current area
+            tracks = self._playlists.get(self._current_area)
+            if not tracks:
+                return
+            self._play_queue = list(tracks)
+            random.shuffle(self._play_queue)
+
+        track = self._play_queue.pop(0)
+        self._current_track = track
+        try:
+            pygame.mixer.music.load(track)
+            pygame.mixer.music.set_volume(0.0 if self._muted else self._volume)
+            pygame.mixer.music.play(fade_ms=fade_ms)
+        except pygame.error:
+            # Skip unloadable tracks
+            if self._play_queue:
+                self._play_next(fade_ms=fade_ms)
+
+    def handle_event(self, event):
+        """Call from the main event loop to advance the playlist.
+
+        When a track finishes, this method automatically plays the
+        next track in the shuffled queue.
+        """
+        if event.type == MUSIC_END_EVENT:
+            self._play_next()
+
+    def stop(self, fade_ms=1000):
+        """Fade out and stop all background music."""
+        pygame.mixer.music.fadeout(fade_ms)
+        self._current_area = None
+        self._play_queue.clear()
+        self._current_track = None
+
+    def pause(self):
+        """Pause the current track."""
+        pygame.mixer.music.pause()
+
+    def unpause(self):
+        """Resume the current track."""
+        pygame.mixer.music.unpause()
+
+    # ── Volume control ─────────────────────────────────────────
+
+    @property
+    def volume(self):
+        """Current music volume (0.0 – 1.0)."""
+        return self._volume
+
+    @volume.setter
+    def volume(self, value):
+        self._volume = max(0.0, min(1.0, value))
+        if not self._muted:
+            pygame.mixer.music.set_volume(self._volume)
+
+    @property
+    def muted(self):
+        """Whether background music is muted."""
+        return self._muted
+
+    @muted.setter
+    def muted(self, value):
+        self._muted = bool(value)
+        if self._muted:
+            pygame.mixer.music.set_volume(0.0)
+        else:
+            pygame.mixer.music.set_volume(self._volume)
+
+    # ── Info ───────────────────────────────────────────────────
+
+    @property
+    def current_track_name(self):
+        """Human-friendly name of the currently playing track, or None."""
+        if self._current_track is None:
+            return None
+        name = os.path.basename(self._current_track)
+        # Strip numbering prefix like "01 - " and extension
+        name = os.path.splitext(name)[0]
+        if " - " in name:
+            name = name.split(" - ", 1)[1]
+        return name
+
+    @property
+    def current_area(self):
+        """The area key currently playing, or None."""
+        return self._current_area
+
+    def get_playlist_info(self):
+        """Return dict of area -> list of track names (for debug/UI)."""
+        info = {}
+        for area, tracks in self._playlists.items():
+            info[area] = [
+                os.path.splitext(os.path.basename(t))[0]
+                for t in tracks
+            ]
+        return info

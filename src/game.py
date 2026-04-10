@@ -30,7 +30,7 @@ from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.states.examine import ExamineState
 from src.town_generator import generate_town, generate_duskhollow
-from src.music import SoundEffects
+from src.music import SoundEffects, MusicManager
 from src.save_load import (save_game, load_game, get_save_info,
                            delete_save, quick_save,
                            NUM_SAVE_SLOTS, QUICK_SAVE_SLOT,
@@ -128,6 +128,16 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         # --- Sound Effects ---
         self.sfx = SoundEffects()
+        self.sfx.muted = self._config.get("sfx_muted", False)
+
+        # --- Background Music ---
+        soundtrack_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "soundtrack")
+        self.music = MusicManager(
+            base_path=soundtrack_path,
+            volume=self._config.get("music_volume", 0.5))
+        self.music.muted = self._config.get("music_muted", False)
 
         # --- Game-in-progress flag ---
         # True once the player has started or loaded a game.
@@ -484,6 +494,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.quick_save_message = None
         self.quick_save_msg_timer = 0.0
         self.settings_options = [
+            {"label": "MUSIC VOLUME",
+             "value": self._format_volume(self.music.volume),
+             "type": "choice", "action": self._change_music_volume},
+            {"label": "MUSIC",
+             "value": not self.music.muted,
+             "type": "toggle", "action": self._toggle_music_mute},
+            {"label": "SFX",
+             "value": not self.sfx.muted,
+             "type": "toggle", "action": self._toggle_sfx_mute},
             {"label": "DUNGEON MASTER MODE",
              "value": self._config.get("dm_mode", False),
              "type": "toggle", "action": self._toggle_dm_mode},
@@ -5488,13 +5507,46 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         gameplay options.
         """
         self.dm_mode = not self.dm_mode
-        self.settings_options[0]["value"] = self.dm_mode
+        # DM mode is the 4th settings option (index 3)
+        self.settings_options[3]["value"] = self.dm_mode
         self._config["dm_mode"] = self.dm_mode
         # Smite tracks DM mode
         self.smite_enabled = self.dm_mode
         self._config["smite_enabled"] = self.dm_mode
         # Rebuild title menu to show/hide Edit Game
         self._rebuild_title_options()
+        save_config(self._config)
+
+    # ── Audio settings helpers ────────────────────────────────────
+
+    @staticmethod
+    def _format_volume(vol):
+        """Format a 0.0–1.0 volume as a percentage string."""
+        return f"{int(round(vol * 100))}%"
+
+    def _change_music_volume(self, direction=1):
+        """Adjust music volume in 10% steps."""
+        step = 0.1 * direction
+        new_vol = max(0.0, min(1.0, round(self.music.volume + step, 2)))
+        self.music.volume = new_vol
+        # Update the settings display
+        self.settings_options[0]["value"] = self._format_volume(new_vol)
+        # Persist
+        self._config["music_volume"] = new_vol
+        save_config(self._config)
+
+    def _toggle_music_mute(self):
+        """Toggle background music mute on/off."""
+        self.music.muted = not self.music.muted
+        self.settings_options[1]["value"] = not self.music.muted
+        self._config["music_muted"] = self.music.muted
+        save_config(self._config)
+
+    def _toggle_sfx_mute(self):
+        """Toggle sound effects mute on/off."""
+        self.sfx.muted = not self.sfx.muted
+        self.settings_options[2]["value"] = not self.sfx.muted
+        self._config["sfx_muted"] = self.sfx.muted
         save_config(self._config)
 
     def _open_save_screen(self):
@@ -5580,6 +5632,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self.current_state.exit()
         self.current_state = self.states[state_name]
         self.current_state.enter()
+        # Start area-appropriate background music
+        self.music.play_area(state_name)
 
     # ── Input handlers ──────────────────────────────────────────
 
@@ -5792,6 +5846,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             for event in events:
                 if event.type == pygame.QUIT:
                     self.running = False
+                # Advance background music playlist when a track ends
+                self.music.handle_event(event)
 
             if self.showing_intro:
                 # Intro screen — dramatic module name / description

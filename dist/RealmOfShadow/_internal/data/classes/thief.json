@@ -1,4 +1,5 @@
 {
+  "name": "Thief",
   "_comment": "Thief class template. Thieves favor light weapons and light armor.",
   "allowed_weapons": [
     "fists",
@@ -13,7 +14,7 @@
   ],
   "hp_per_level": 5,
   "mp_per_level": 0,
-  "range": 10,
+  "range": 6,
   "exp_per_level": 1000,
   "allowed_races": [
     "human",
