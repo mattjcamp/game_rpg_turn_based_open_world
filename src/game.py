@@ -121,6 +121,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         # --- Load persistent player config ---
         self._config = load_config()
+        self.dm_mode = self._config.get("dm_mode", False)
         self.smite_enabled = self._config.get("smite_enabled", False)
         self.start_with_equipment = self._config.get("start_with_equipment", True)
         self.start_level = max(1, min(10, self._config.get("start_level", 1)))
@@ -155,10 +156,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             {"label": "FORM PARTY", "action": self._title_form_party},
             {"label": "SAVE GAME", "action": self._title_save_game},
             {"label": "LOAD GAME", "action": self._title_load_game},
-            {"label": "EDIT GAME", "action": self.features_editor.open_from_title},
             {"label": "SETTINGS", "action": self._title_settings},
             {"label": "QUIT GAME", "action": self._title_quit},
         ]
+        self._title_dm_option = {
+            "label": "EDIT GAME",
+            "action": self.features_editor.open_from_title,
+        }
+        self._rebuild_title_options()
 
         # --- Intro screen (shown between title and gameplay on new game) ---
         self.showing_intro = False
@@ -492,16 +497,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
              "value": self.music.style,
              "choices": SOUNDTRACK_STYLES,
              "type": "choice", "action": self._cycle_soundtrack},
-            {"label": "SMITE (DEBUG)",
-             "value": self._config.get("smite_enabled", False),
-             "type": "toggle", "action": self._toggle_smite},
-            {"label": "START WITH EQUIPMENT",
-             "value": self._config.get("start_with_equipment", True),
-             "type": "toggle", "action": self._toggle_start_equipment},
-            {"label": "START LEVEL",
-             "value": self.start_level,
-             "choices": list(range(1, 11)),
-             "type": "choice", "action": self._cycle_start_level},
+            {"label": "DUNGEON MASTER MODE",
+             "value": self._config.get("dm_mode", False),
+             "type": "toggle", "action": self._toggle_dm_mode},
         ]
 
         # --- Quest log screen ---
@@ -540,18 +538,36 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
     @property
     def title_options(self):
-        """Build title menu options, adding RETURN TO GAME when applicable.
+        """Build title menu options dynamically.
 
-        Shows RETURN TO GAME if a game is actively in progress, OR if
-        there is at least one save file the player can resume from.
+        Adds RETURN TO GAME at the top when a game is in progress or a
+        save exists.  Inserts EDIT GAME before SETTINGS when Dungeon
+        Master mode is enabled.
         """
+        opts = list(self._title_options_base)
+        if self.dm_mode:
+            # Insert EDIT GAME before SETTINGS
+            settings_idx = next(
+                (i for i, o in enumerate(opts) if o["label"] == "SETTINGS"),
+                len(opts) - 1)
+            opts.insert(settings_idx, self._title_dm_option)
         if self._game_started or self._find_most_recent_save() is not None:
-            return ([{"label": "RETURN TO GAME",
+            opts = ([{"label": "RETURN TO GAME",
                        "action": self._title_return_to_game}]
-                    + self._title_options_base)
-        return self._title_options_base
+                    + opts)
+        return opts
 
     # ── Title screen actions ────────────────────────────────────
+
+    def _rebuild_title_options(self):
+        """Clamp the title cursor after DM mode changes.
+
+        The title_options property builds the list dynamically, so this
+        just ensures the cursor stays in range.
+        """
+        if hasattr(self, 'title_cursor'):
+            self.title_cursor = min(self.title_cursor,
+                                    len(self.title_options) - 1)
 
     def _title_new_game(self):
         """Start a fresh new game from the title screen.
@@ -5502,30 +5518,22 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._config["soundtrack_style"] = new_style
         save_config(self._config)
 
-    def _toggle_smite(self):
-        """Toggle the Smite debug action in combat menus."""
-        self.smite_enabled = not self.smite_enabled
-        self.settings_options[2]["value"] = self.smite_enabled
-        self._config["smite_enabled"] = self.smite_enabled
-        save_config(self._config)
+    def _toggle_dm_mode(self):
+        """Toggle Dungeon Master mode on/off.
 
-    def _toggle_start_equipment(self):
-        """Toggle whether new games start with full equipment or minimal gear."""
-        self.start_with_equipment = not self.start_with_equipment
-        self.settings_options[3]["value"] = self.start_with_equipment
-        self._config["start_with_equipment"] = self.start_with_equipment
-        save_config(self._config)
-
-    def _cycle_start_level(self, direction=1):
-        """Cycle the starting experience level (1-10) for new games."""
-        opt = self.settings_options[4]  # START LEVEL entry
-        choices = opt["choices"]
-        cur_idx = choices.index(opt["value"]) if opt["value"] in choices else 0
-        new_idx = (cur_idx + direction) % len(choices)
-        new_val = choices[new_idx]
-        opt["value"] = new_val
-        self.start_level = new_val
-        self._config["start_level"] = new_val
+        When DM mode is on, Smite is available in combat and the
+        Edit Game option appears on the title screen.  When off,
+        these features are hidden and the player sees only normal
+        gameplay options.
+        """
+        self.dm_mode = not self.dm_mode
+        self.settings_options[2]["value"] = self.dm_mode
+        self._config["dm_mode"] = self.dm_mode
+        # Smite tracks DM mode
+        self.smite_enabled = self.dm_mode
+        self._config["smite_enabled"] = self.dm_mode
+        # Rebuild title menu to show/hide Edit Game
+        self._rebuild_title_options()
         save_config(self._config)
 
     def _open_save_screen(self):
