@@ -105,6 +105,26 @@
       },
       "inventory": [],
       "sprite": "src/assets/game/npcs/u4_beggar.png"
+    },
+    {
+      "name": "Fauron",
+      "class": "Fighter",
+      "race": "Dwarf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 18,
+      "dexterity": 10,
+      "intelligence": 10,
+      "wisdom": 12,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/game/npcs/villager_guard.png"
     }
   ],
   "active_party": [

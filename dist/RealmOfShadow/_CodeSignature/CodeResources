@@ -14,7 +14,7 @@
 		</data>
 		<key>_internal/base_library.zip</key>
 		<data>
-		g1IQ9sJ/wk5hpO8S3rF5Y6g47AI=
+		t0IglC9hk4/weQWiFoOc8dKolNc=
 		</data>
 		<key>_internal/data/classes/alchemist.json</key>
 		<data>
@@ -275,6 +275,10 @@
 		<key>_internal/docs/manuals/images/race_human.png</key>
 		<data>
 		Ki6AVFCfXWc6G5S6dRlk0JfV4HA=
+		</data>
+		<key>_internal/docs/manuals/players_guide.pdf</key>
+		<data>
+		RfYOyaLlnHk5nrYzkK7nMiHo6Dw=
 		</data>
 		<key>_internal/docs/manuals/players_manual.md</key>
 		<data>
@@ -3245,7 +3249,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			7yk3kG8/Fq4rVKqHtayTEsCew+EKolY/qkd5FdkXJTk=
+			UQ9t/E6GV8ow/ZhJ0KtKrleGiS8R4ZKA9he2XZb9vLE=
 			</data>
 		</dict>
 		<key>_internal/data/classes/alchemist.json</key>
@@ -3701,6 +3705,13 @@
 			<key>hash2</key>
 			<data>
 			840d8BzbIx7kzO40E/k6V6paOms0UYS6grt2KDVxRac=
+			</data>
+		</dict>
+		<key>_internal/docs/manuals/players_guide.pdf</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			U+9MjvX8gxTSMw4Q+gs/hruKjjpvmSVl70ZXaT9+drQ=
 			</data>
 		</dict>
 		<key>_internal/docs/manuals/players_manual.md</key>

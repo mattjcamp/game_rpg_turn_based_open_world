@@ -3,5 +3,8 @@
 ## Bugs
 
 ## Features
-- Add monster spawn system, some monsters spawn at night. Some areas have higher chances of spawning more dangerous monsters. Or alternatively, create Spawns that spawn creatures until the party destroyes the spawnn
+- Cool player's manual
+- Better monster spawn system
+- Time based events
+- Larger overview map editor
 
