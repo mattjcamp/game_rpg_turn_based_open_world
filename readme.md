@@ -2,7 +2,14 @@
 
 An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. Lead a party of four adventurers through a procedurally generated world of overworld exploration, town visits, dungeon delving, and tactical grid combat.
 
-This is a hobby project. The programming was done with the help of AI (primarily Anthropic's Claude), and the codebase is designed to be approachable for anyone who wants to tinker, extend, or learn from it. See the [Developer Guide](docs/dev_guides/DEVELOPER_GUIDE.md) for tips on how to make changes yourself — even if you're not a programmer.
+## Features
+
+- Dungeons & Dragons inspired turn-based combat system
+- Quest system
+- Proceduraly generated dungeons and intentionally crafted adventures
+- Race and class system
+- 1980's style Player's Manual and Adventure Map
+- Dungeon Master mode that allows players to craft their own adventures
 
 ---
 
@@ -11,17 +18,11 @@ This is a hobby project. The programming was done with the help of AI (primarily
 <td align="center"><img src="docs/blog/screens_v0.2.0/01_title_screen.png" width="400" alt="Title Screen"></td>
 <td align="center"><img src="docs/blog/screens_v0.2.0/05_overworld.png" width="400" alt="Overworld Exploration"></td>
 </tr>
-<tr>
-<td align="center"><img src="docs/blog/screens_v0.2.0/09_combat.png" width="400" alt="Tactical Combat"></td>
-<td align="center"><img src="docs/blog/screens_v0.2.0/10_dungeon.png" width="400" alt="Dungeon Delving"></td>
-</tr>
 </table>
-
-**[See the full visual tour &rarr;](docs/blog/screenshots_v0.2.0.md)** — title screen, party creation, overworld, combat, dungeons, towns, and more.
 
 ---
 
-## Downloading & Playing
+## How to Install and Play Realm of Shadow
 
 A pre-built macOS version is available on the [Releases](../../releases) page. To get started:
 
@@ -40,23 +41,9 @@ A pre-built macOS version is available on the [Releases](../../releases) page. T
 
 ---
 
-## Documentation & Reference
+## How to Build Realm of Shadow in Python
 
-Before diving into the code, these documents give useful context on the game's design and mechanics:
-
-- **[Developer Guide](docs/dev_guides/DEVELOPER_GUIDE.md)** — project structure, architecture, testing, making changes, working with AI, and game design philosophy. Start here if you want to contribute or modify the game.
-- **[Player's Manual](docs/manuals/players_manual.md)** — races, classes, combat, spells, quests, items, and controls from the player's perspective. Illustrations are in `docs/manuals/images/`.
-- **[Visual Style Guide](docs/dev_guides/STYLE_GUIDE.md)** — color palette, layout rules, sprite specs, and tile patterns. Derived from the Ultima III reference screenshots in `docs/research/`.
-- **[Graphics Reference](docs/dev_guides/GRAPHICS_REFERENCE.md)** — tile IDs, sprite assignments, and asset file locations for every visual element.
-- **[Combat Mechanics](docs/dev_guides/COMBAT_MECHANICS.md)** — the single source of truth for how attacks, damage, defense, and spells work under the hood.
-- **[Ultima III Character Reference](docs/research/ULTIMA3_CHARACTERS.md)** — original game's race/class/attribute system, used as a design template.
-- **[Ultima III StrategyWiki](https://strategywiki.org/wiki/Ultima_III:_Exodus)** — external reference for the original game.
-
-The `docs/research/` folder also contains reference screenshots (`example_combat.webp`, `example_overview_map.png`, etc.) and sprite reference material in `docs/research/example_graphics/` that were used to guide the visual style.
-
----
-
-## Getting Started
+If you want to run this game on Windows or Linux, or if you just want to tinker with the code you will need to clone this repository and use Python. 
 
 ### What You Need
 
@@ -87,44 +74,6 @@ The `docs/research/` folder also contains reference screenshots (`example_combat
    ```
 
 That's it. A window should open with the title screen.
-
-### Controls
-
-**Overworld:**
-
-- Arrow keys or WASD — Move the party
-- E — Examine the local area (zoomed-in view of the current tile)
-- L — Load game
-- P — Pause / open settings
-- H — Help
-- Walk into a town tile to enter it; walk into a dungeon tile to enter it
-- ESC — Quit
-
-**Towns:**
-
-- Arrow keys or WASD — Move
-- Walk into NPCs to talk; Space/Enter to advance dialogue
-- ESC — Leave town
-
-**Dungeons:**
-
-- Arrow keys or WASD — Move
-- Walk into monsters to fight; walk into chests to loot
-- ESC on stairs — Leave dungeon
-
-**Combat (tactical grid):**
-
-- WASD — Move on the arena grid (each move takes a turn)
-- Walk into a monster to melee attack
-- Arrow keys — Navigate action menu
-- Enter — Confirm action
-- ESC — Flee attempt
-
-**Examine mode:**
-
-- Arrow keys or WASD — Walk around the zoomed-in area
-- Q — Drop an item from inventory
-- ESC — Return to overworld
 
 ---
 
@@ -167,22 +116,4 @@ Upload the zip to [itch.io](https://itch.io), attach it to a GitHub Release, or 
 chmod +x RealmOfShadow/RealmOfShadow
 ./RealmOfShadow/RealmOfShadow
 ```
-
 ---
-
-## Running the Tests
-
-The test suite runs entirely headless (no display needed) using a mock pygame layer defined in `tests/conftest.py`.
-
-```
-pip3 install pytest
-python3 -m pytest tests/ -v
-```
-
-All 177 tests should pass. Run this before and after making changes to catch regressions.
-
----
-
-## Contributing
-
-For project structure, architecture, testing details, making changes (including with AI), and game design notes, see the **[Developer Guide](docs/dev_guides/DEVELOPER_GUIDE.md)**.
