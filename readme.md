@@ -15,10 +15,16 @@ An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. 
 
 <table>
 <tr>
-<td align="center"><img src="docs/blog/screens_v0.2.0/01_title_screen.png" width="400" alt="Title Screen"></td>
-<td align="center"><img src="docs/blog/screens_v0.2.0/05_overworld.png" width="400" alt="Overworld Exploration"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/overview_map.png" width="400" alt="Title Screen"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/town.png" width="400" alt="Overworld Exploration"></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/blog/screens_v1.0.0/combat.png" width="400" alt="Title Screen"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/dungeon.png" width="400" alt="Overworld Exploration"></td>
 </tr>
 </table>
+
+[Read about the April 2026 Update](docs/blog/screenshots_v1.0.0.md)
 
 ---
 
