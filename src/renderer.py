@@ -7100,6 +7100,62 @@ class Renderer(CombatEffectRendererMixin):
     # PARTY SCREEN  –  Ultima III retro style (P key overlay)
     # ========================================================
 
+    # ── Loading screen (area transition) ──────────────────────
+
+    def draw_loading_screen(self, label, phase, elapsed,
+                            fade_out_dur, hold_dur, fade_in_dur):
+        """Draw a dark loading overlay during area transitions.
+
+        Phases:
+          fade_out  – darken the screen from transparent to opaque black
+          hold      – fully dark with the location label shown
+          fade_in   – lighten from opaque black back to transparent
+        """
+        SW, SH = SCREEN_WIDTH, SCREEN_HEIGHT
+
+        # Compute overlay alpha (0 = transparent, 255 = fully dark)
+        if phase == "fade_out":
+            progress = min(1.0, elapsed / max(0.01, fade_out_dur))
+            alpha = int(255 * progress)
+        elif phase == "hold":
+            alpha = 255
+        elif phase == "fade_in":
+            progress = min(1.0, elapsed / max(0.01, fade_in_dur))
+            alpha = int(255 * (1.0 - progress))
+        else:
+            alpha = 0
+
+        # Dark overlay
+        overlay = pygame.Surface((SW, SH), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, alpha))
+        self.screen.blit(overlay, (0, 0))
+
+        # Show label text only when mostly/fully dark
+        if alpha > 180 and label:
+            # Text alpha ramps with overlay darkness
+            text_alpha = min(255, max(0, (alpha - 180) * 255 // 75))
+
+            # "Loading..." subtext
+            sub_surf = self.font_med.render("Loading...", True, (180, 180, 180))
+            sub_surf.set_alpha(text_alpha)
+            sub_rect = sub_surf.get_rect(center=(SW // 2, SH // 2 + 24))
+            self.screen.blit(sub_surf, sub_rect)
+
+            # Location label (larger, brighter)
+            label_surf = self.font.render(label, True, (220, 200, 160))
+            label_surf.set_alpha(text_alpha)
+            label_rect = label_surf.get_rect(center=(SW // 2, SH // 2 - 8))
+            self.screen.blit(label_surf, label_rect)
+
+            # Small decorative dots either side of the label
+            dot_y = SH // 2 - 8
+            dot_w = label_rect.width // 2 + 30
+            for dx in (-dot_w, dot_w):
+                dot_surf = self.font_small.render("·", True, (120, 110, 90))
+                dot_surf.set_alpha(text_alpha)
+                dr = dot_surf.get_rect(center=(SW // 2 + dx, dot_y))
+                self.screen.blit(dot_surf, dr)
+
     # ── Intro screen (new game cinematic) ──────────────────────
 
     def draw_intro_screen(self, module_name, module_desc, elapsed,

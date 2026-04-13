@@ -1,9 +1,10 @@
 {
-  "smite_enabled": false,
+  "smite_enabled": true,
   "start_with_equipment": false,
-  "dm_mode": false,
+  "dm_mode": true,
   "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/coming_of_age",
   "music_enabled": false,
   "soundtrack_style": "Classic",
-  "start_level": 1
+  "start_level": 1,
+  "music_muted": true
 }

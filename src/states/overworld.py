@@ -2313,12 +2313,17 @@ class OverworldState(InventoryMixin, BaseState):
                     and getattr(town_state, "town_data", None) is town_data):
                 _preserve = True
 
-        town_state = self.game.states["town"]
-        town_state.enter_town(town_data, pcol, prow,
-                              auto_interior=sub or None,
-                              target_pos=_target_pos,
-                              preserve_exit=_preserve)
-        self.game.change_state("town")
+        town_name = getattr(town_data, "name", None) or "Town"
+
+        def _do_enter():
+            town_state = self.game.states["town"]
+            town_state.enter_town(town_data, pcol, prow,
+                                  auto_interior=sub or None,
+                                  target_pos=_target_pos,
+                                  preserve_exit=_preserve)
+            self.game.change_state("town")
+
+        self.game.start_loading_screen(f"Entering {town_name}", _do_enter)
 
     # ── Dungeon action screen ─────────────────────────────────
 
@@ -2443,46 +2448,59 @@ class OverworldState(InventoryMixin, BaseState):
 
         pcol, prow = args["col"], args["row"]
         entry_type = args["type"]
-        dungeon_state = self.game.states["dungeon"]
-        cache = self.game.dungeon_cache
+        dungeon_name = self.dungeon_action_info.get("name", "Dungeon")
 
-        # Mark as visited
-        self.game.mark_dungeon_visited(pcol, prow)
-
-        if entry_type == "key_dungeon":
-            kd = self.game.get_key_dungeon(pcol, prow)
-            if kd:
-                # If quest hasn't been accepted yet, mask floor names
-                # so they don't reveal quest details.
-                if kd["status"] == "undiscovered":
-                    for i, level in enumerate(kd["levels"]):
-                        level.name = f"Unknown Cave - Floor {i + 1}"
-                dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)
-        elif entry_type == "quest":
-            quest = self.game.get_quest()
-            if quest:
-                dungeon_state.enter_quest_dungeon(quest["levels"], pcol, prow)
-        elif entry_type == "house_quest":
-            hq = self.game.get_house_quest()
-            if hq:
-                dungeon_state.enter_quest_dungeon(hq["levels"], pcol, prow)
-        elif entry_type == "module_dungeon":
+        # For module dungeons, handle specially (they have their own
+        # state-change logic inside _enter_module_dungeon).
+        if entry_type == "module_dungeon":
             dungeon_def = args.get("dungeon_def")
             if dungeon_def:
-                self._enter_module_dungeon(dungeon_def, pcol, prow)
-                return  # _enter_module_dungeon handles state change
-        else:
-            # Random / cleared dungeon — use cached version if available
-            cached = cache.get((pcol, prow))
-            if cached:
-                dungeon_data = cached[0]
+                self.dungeon_action_active = False
+
+                def _do_enter_module():
+                    self._enter_module_dungeon(dungeon_def, pcol, prow)
+
+                self.game.start_loading_screen(
+                    f"Entering {dungeon_name}", _do_enter_module)
             else:
-                dungeon_data = generate_dungeon("The Depths")
-                cache[(pcol, prow)] = [dungeon_data]
-            dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
+                self.dungeon_action_active = False
+            return
+
+        def _do_enter():
+            dungeon_state = self.game.states["dungeon"]
+            cache = self.game.dungeon_cache
+
+            # Mark as visited
+            self.game.mark_dungeon_visited(pcol, prow)
+
+            if entry_type == "key_dungeon":
+                kd = self.game.get_key_dungeon(pcol, prow)
+                if kd:
+                    if kd["status"] == "undiscovered":
+                        for i, level in enumerate(kd["levels"]):
+                            level.name = f"Unknown Cave - Floor {i + 1}"
+                    dungeon_state.enter_quest_dungeon(kd["levels"], pcol, prow)
+            elif entry_type == "quest":
+                quest = self.game.get_quest()
+                if quest:
+                    dungeon_state.enter_quest_dungeon(quest["levels"], pcol, prow)
+            elif entry_type == "house_quest":
+                hq = self.game.get_house_quest()
+                if hq:
+                    dungeon_state.enter_quest_dungeon(hq["levels"], pcol, prow)
+            else:
+                cached = cache.get((pcol, prow))
+                if cached:
+                    dungeon_data = cached[0]
+                else:
+                    dungeon_data = generate_dungeon("The Depths")
+                    cache[(pcol, prow)] = [dungeon_data]
+                dungeon_state.enter_dungeon(dungeon_data, pcol, prow)
+
+            self.game.change_state("dungeon")
 
         self.dungeon_action_active = False
-        self.game.change_state("dungeon")
+        self.game.start_loading_screen(f"Entering {dungeon_name}", _do_enter)
 
     # ── Building action screen ─────────────────────────────────
 

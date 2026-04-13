@@ -1,5 +1,4 @@
 ## Polish
-- Remove the "new spell" left over spell
 - "Camping Supplies" should not appear in the battle screen, only items usable in combat should appear in this screen
 - Add fade-out/fade-in effect during transitions
 
@@ -14,7 +13,6 @@
 - Add more tiles
 
 ## Features
-- Cool player's manual (Get party artwork)
 - Add weapon/armor wear-down system
 - Better monster spawn system
 - Time based events

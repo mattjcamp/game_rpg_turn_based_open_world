@@ -177,6 +177,18 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._intro_fading_out = False   # True once player presses key
         self._intro_fade_elapsed = 0.0   # seconds since fade-out began
 
+        # --- Loading screen (fade-to-black transition between areas) ---
+        self._loading_screen_active = False
+        self._loading_screen_phase = "idle"   # idle / fade_out / hold / fade_in
+        self._loading_screen_elapsed = 0.0
+        self._loading_screen_label = ""       # e.g. "Entering Riverdale"
+        self._loading_screen_callback = None  # called once at start of hold
+        self._loading_screen_callback_fired = False
+        # Timing (seconds)
+        self._loading_fade_out_dur = 0.6    # screen goes dark
+        self._loading_hold_dur = 0.5        # stay dark while assets load
+        self._loading_fade_in_dur = 0.6     # new area fades in
+
         # --- Module selection screen ---
         self.showing_modules = False
         self.module_cursor = 0
@@ -5635,6 +5647,20 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Start area-appropriate background music
         self.music.play_area(state_name)
 
+    def start_loading_screen(self, label, callback):
+        """Begin a fade-out → hold → fade-in loading transition.
+
+        *label* is shown on screen (e.g. "Entering Riverdale").
+        *callback* is invoked once at the start of the hold phase —
+        it should perform the actual state change / heavy loading.
+        """
+        self._loading_screen_active = True
+        self._loading_screen_phase = "fade_out"
+        self._loading_screen_elapsed = 0.0
+        self._loading_screen_label = label
+        self._loading_screen_callback = callback
+        self._loading_screen_callback_fired = False
+
     # ── Input handlers ──────────────────────────────────────────
 
     # Modifier mask: Ctrl and Cmd (GUI/Meta) - the actual "command" keys.
@@ -5848,6 +5874,41 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     self.running = False
                 # Advance background music playlist when a track ends
                 self.music.handle_event(event)
+
+            # --- Loading screen transition (overrides all other screens) ---
+            if self._loading_screen_active:
+                self._loading_screen_elapsed += dt
+                phase = self._loading_screen_phase
+
+                if phase == "fade_out":
+                    if self._loading_screen_elapsed >= self._loading_fade_out_dur:
+                        self._loading_screen_phase = "hold"
+                        self._loading_screen_elapsed = 0.0
+                elif phase == "hold":
+                    if not self._loading_screen_callback_fired:
+                        self._loading_screen_callback_fired = True
+                        if self._loading_screen_callback:
+                            self._loading_screen_callback()
+                    if self._loading_screen_elapsed >= self._loading_hold_dur:
+                        self._loading_screen_phase = "fade_in"
+                        self._loading_screen_elapsed = 0.0
+                elif phase == "fade_in":
+                    if self._loading_screen_elapsed >= self._loading_fade_in_dur:
+                        self._loading_screen_active = False
+                        self._loading_screen_phase = "idle"
+
+                # Draw: current state underneath, then loading overlay
+                self.current_state.draw(self.renderer)
+                self.renderer.draw_loading_screen(
+                    self._loading_screen_label,
+                    self._loading_screen_phase,
+                    self._loading_screen_elapsed,
+                    self._loading_fade_out_dur,
+                    self._loading_hold_dur,
+                    self._loading_fade_in_dur,
+                )
+                pygame.display.flip()
+                continue
 
             if self.showing_intro:
                 # Intro screen — dramatic module name / description

@@ -1526,13 +1526,23 @@ class DungeonState(InventoryMixin, BaseState):
             self.pending_combat_message = None
             self.quest_levels = None
             self.current_level = 0
-            self.game.party.col = self.overworld_col
-            self.game.party.row = self.overworld_row
-            self.game.camera.map_width = self.game.tile_map.width
-            self.game.camera.map_height = self.game.tile_map.height
-            self.game.camera.update(self.game.party.col, self.game.party.row)
-            self.show_message("The portal returns you to the surface!", 3000)
-            self.game.change_state("overworld")
+            ow_col, ow_row = self.overworld_col, self.overworld_row
+
+            def _do_portal_exit():
+                self.game.party.col = ow_col
+                self.game.party.row = ow_row
+                self.game.camera.map_width = self.game.tile_map.width
+                self.game.camera.map_height = self.game.tile_map.height
+                self.game.camera.update(self.game.party.col,
+                                        self.game.party.row)
+                self.show_message(
+                    "The portal returns you to the surface!", 3000)
+                self.game.change_state("overworld")
+
+            dungeon_name = getattr(self.dungeon_data, "name",
+                                   None) or "Dungeon"
+            self.game.start_loading_screen(
+                f"Leaving {dungeon_name}", _do_portal_exit)
 
     # ── Chest loot ─────────────────────────────────────────────
 
@@ -1669,16 +1679,20 @@ class DungeonState(InventoryMixin, BaseState):
         self._entered = False
         self.pending_combat_message = None
 
-        # Restore party position on the overworld
-        self.game.party.col = self.overworld_col
-        self.game.party.row = self.overworld_row
+        ow_col, ow_row = self.overworld_col, self.overworld_row
+        dungeon_name = getattr(self.dungeon_data, "name", None) or "Dungeon"
 
-        # Restore camera for overworld map
-        self.game.camera.map_width = self.game.tile_map.width
-        self.game.camera.map_height = self.game.tile_map.height
-        self.game.camera.update(self.game.party.col, self.game.party.row)
+        def _do_exit():
+            # Restore party position on the overworld
+            self.game.party.col = ow_col
+            self.game.party.row = ow_row
+            # Restore camera for overworld map
+            self.game.camera.map_width = self.game.tile_map.width
+            self.game.camera.map_height = self.game.tile_map.height
+            self.game.camera.update(self.game.party.col, self.game.party.row)
+            self.game.change_state("overworld")
 
-        self.game.change_state("overworld")
+        self.game.start_loading_screen(f"Leaving {dungeon_name}", _do_exit)
 
 
     def update(self, dt):

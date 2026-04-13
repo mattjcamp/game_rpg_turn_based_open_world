@@ -2508,12 +2508,17 @@ class TownState(InventoryMixin, BaseState):
                     self.town_data.overworld_exits = bottom.get(
                         "overworld_exits", set())
                 self._in_interior = False
-            if target_pos:
-                self.game.party.col, self.game.party.row = target_pos
-            else:
-                self.game.party.col = self.overworld_col
-                self.game.party.row = self.overworld_row
-            self.game.change_state("overworld")
+            ow_col = target_pos[0] if target_pos else self.overworld_col
+            ow_row = target_pos[1] if target_pos else self.overworld_row
+            town_name = getattr(self.town_data, "name", None) or "Town"
+
+            def _do_exit_link():
+                self.game.party.col = ow_col
+                self.game.party.row = ow_row
+                self.game.change_state("overworld")
+
+            self.game.start_loading_screen(
+                f"Leaving {town_name}", _do_exit_link)
 
         elif target_type == "town":
             target_name = link.get("target_map", "")
@@ -2524,12 +2529,18 @@ class TownState(InventoryMixin, BaseState):
                     found_td = td
                     break
             if found_td is not None:
-                town_state = self.game.states["town"]
-                town_state.enter_town(found_td,
-                                      self.overworld_col,
-                                      self.overworld_row,
-                                      target_pos=target_pos)
-                self.game.change_state("town")
+                ow_col = self.overworld_col
+                ow_row = self.overworld_row
+
+                def _do_enter_town():
+                    town_state = self.game.states["town"]
+                    town_state.enter_town(found_td,
+                                          ow_col, ow_row,
+                                          target_pos=target_pos)
+                    self.game.change_state("town")
+
+                self.game.start_loading_screen(
+                    f"Entering {target_name}", _do_enter_town)
             else:
                 self.show_message(
                     f"Cannot find town: {target_name}", 2000)
@@ -2557,12 +2568,17 @@ class TownState(InventoryMixin, BaseState):
                     self.town_data.overworld_exits = bottom.get(
                         "overworld_exits", set())
                 self._in_interior = False
-            if target_pos:
-                self.game.party.col, self.game.party.row = target_pos
-            else:
-                self.game.party.col = self.overworld_col
-                self.game.party.row = self.overworld_row
-            self.game.change_state("overworld")
+            ow_col = target_pos[0] if target_pos else self.overworld_col
+            ow_row = target_pos[1] if target_pos else self.overworld_row
+            town_name = getattr(self.town_data, "name", None) or "Town"
+
+            def _do_exit_fallback():
+                self.game.party.col = ow_col
+                self.game.party.row = ow_row
+                self.game.change_state("overworld")
+
+            self.game.start_loading_screen(
+                f"Leaving {town_name}", _do_exit_fallback)
 
     def _exit_town(self):
         """Leave the town (or exit an interior back to the town)."""
@@ -2570,10 +2586,16 @@ class TownState(InventoryMixin, BaseState):
         if getattr(self, "_in_interior", False):
             self._exit_interior()
             return
-        # Otherwise leave the town entirely
-        self.game.party.col = self.overworld_col
-        self.game.party.row = self.overworld_row
-        self.game.change_state("overworld")
+        # Otherwise leave the town entirely — use loading screen
+        ow_col, ow_row = self.overworld_col, self.overworld_row
+        town_name = getattr(self.town_data, "name", None) or "Town"
+
+        def _do_exit():
+            self.game.party.col = ow_col
+            self.game.party.row = ow_row
+            self.game.change_state("overworld")
+
+        self.game.start_loading_screen(f"Leaving {town_name}", _do_exit)
 
     def _exit_to_town(self):
         """Unwind the entire interior stack, returning to the town level."""
