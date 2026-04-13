@@ -766,14 +766,19 @@ class CombatState(BaseState):
         """Build the list of usable items available to this fighter.
 
         Scans personal inventory and party shared stash for items with
-        the 'usable' attribute. Returns [(item_name, count, effect, power), ...].
+        the 'usable' attribute **that are also usable in combat**.
+        Items like Camping Supplies (effect "rest") are excluded via
+        the ``combat_usable`` flag in items.json.  When the flag is
+        absent, usable items default to combat-usable.
+
+        Returns [(item_name, count, effect, power), ...].
         """
         from src.party import ITEM_INFO
         seen = {}  # name -> (count, effect, power)
         # Check personal inventory
         for item in fighter.inventory:
             info = ITEM_INFO.get(item, {})
-            if info.get("usable", False):
+            if info.get("usable", False) and info.get("combat_usable", True):
                 if item not in seen:
                     seen[item] = [0, info.get("effect", ""), info.get("power", 0)]
                 seen[item][0] += 1
@@ -782,7 +787,7 @@ class CombatState(BaseState):
         for entry in party.shared_inventory:
             name = party.item_name(entry)
             info = ITEM_INFO.get(name, {})
-            if info.get("usable", False):
+            if info.get("usable", False) and info.get("combat_usable", True):
                 if name not in seen:
                     seen[name] = [0, info.get("effect", ""), info.get("power", 0)]
                 seen[name][0] += 1

@@ -417,6 +417,7 @@
       "icon": "campfire",
       "item_type": "camping_supplies",
       "usable": true,
+      "combat_usable": false,
       "effect": "rest",
       "power": 0,
       "charges": 3,

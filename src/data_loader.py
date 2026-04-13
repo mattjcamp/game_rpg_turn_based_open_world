@@ -126,6 +126,11 @@ def load_items(data_dir=None):
                 info["throwable"] = True
             if data.get("usable"):
                 info["usable"] = True
+            # combat_usable defaults to True for usable items;
+            # set explicitly to False for items like Camping
+            # Supplies that only work outside combat.
+            if "combat_usable" in data:
+                info["combat_usable"] = data["combat_usable"]
             if data.get("effect"):
                 info["effect"] = data["effect"]
             if "power" in data:

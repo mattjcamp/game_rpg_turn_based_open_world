@@ -1,6 +1,5 @@
 ## Polish
 - "Camping Supplies" should not appear in the battle screen, only items usable in combat should appear in this screen
-- Add fade-out/fade-in effect during transitions
 
 ## Bugs
 - In the adandoned building quest, the monsters don't move around and the battle screen looks like the forest
