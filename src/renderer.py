@@ -4393,6 +4393,129 @@ class Renderer(CombatEffectRendererMixin):
         hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
 
+    def draw_encounter_action_screen(self, monster, cursor, result):
+        """Draw the roaming monster encounter prompt panel.
+
+        Shows monster name, options (Engage / Flee), and flee result
+        messages when applicable.
+        """
+        panel_w = 440
+        pad = 16
+        content_w = panel_w - pad * 2
+        line_h = 24
+        body_font = self.font
+        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
+
+        def _wrap(text, font, max_w):
+            lines = []
+            for word in text.split():
+                if lines and font.size(lines[-1] + " " + word)[0] <= max_w:
+                    lines[-1] += " " + word
+                else:
+                    lines.append(word)
+            return lines or [""]
+
+        mon_name = getattr(monster, "name", "Monster") if monster else "Monster"
+        title = f"Encounter: {mon_name}"
+        title_lines = _wrap(title, title_font, content_w)
+
+        # Build description from monster stats
+        if monster:
+            hp_text = f"HP {monster.hp}/{monster.max_hp}  AC {monster.ac}"
+        else:
+            hp_text = ""
+        desc_lines = _wrap(hp_text, body_font, content_w) if hp_text else []
+
+        # Calculate panel height
+        h = pad
+        h += len(title_lines) * 28
+        h += 12
+        if desc_lines:
+            h += len(desc_lines) * line_h
+            h += 10
+        h += line_h  # flavour line
+        h += 16
+
+        if result is not None:
+            h += line_h + 12  # result message
+            h += line_h       # "Press ENTER to continue"
+        else:
+            h += line_h * 2   # two options
+            h += 12
+            h += 18           # hint
+        h += pad
+
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
+
+        # Dim background
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.screen.blit(dim, (0, 0))
+
+        self._u3_panel(panel_x, panel_y, panel_w, h)
+
+        y = panel_y + pad
+
+        # Title
+        for tline in title_lines:
+            title_surf = title_font.render(tline, True, (220, 160, 60))
+            self.screen.blit(title_surf, (panel_x + pad, y))
+            y += 28
+        y += 12
+
+        # Monster stats
+        for line in desc_lines:
+            line_surf = body_font.render(line, True, (200, 200, 220))
+            self.screen.blit(line_surf, (panel_x + pad, y))
+            y += line_h
+        if desc_lines:
+            y += 10
+
+        # Flavour text
+        flavour = f"A {mon_name} blocks your path!"
+        flav_surf = body_font.render(flavour, True, (255, 200, 140))
+        self.screen.blit(flav_surf, (panel_x + pad, y))
+        y += line_h + 16
+
+        if result is not None:
+            # Show flee result
+            if result == "fled_far":
+                msg = "The party dashes away to safety!"
+                msg_color = (100, 255, 100)
+            elif result == "fled":
+                msg = "The party narrowly escapes!"
+                msg_color = (200, 255, 100)
+            else:
+                msg = "Failed to escape! You must fight!"
+                msg_color = (255, 100, 100)
+            msg_surf = body_font.render(msg, True, msg_color)
+            self.screen.blit(msg_surf, (panel_x + pad, y))
+            y += line_h + 12
+            cont_surf = body_font.render(
+                "Press ENTER to continue...", True, (180, 180, 200))
+            self.screen.blit(cont_surf, (panel_x + pad, y))
+        else:
+            # Draw options
+            option_labels = ["Engage", "Flee"]
+            for i, label in enumerate(option_labels):
+                is_sel = (i == cursor)
+                if is_sel:
+                    hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
+                    pygame.draw.rect(self.screen, (80, 60, 20), hl)
+                    arrow_surf = body_font.render(">", True, (255, 200, 80))
+                    self.screen.blit(arrow_surf, (panel_x + pad, y))
+                color = (255, 255, 255) if is_sel else (180, 180, 200)
+                opt_surf = body_font.render(label, True, color)
+                self.screen.blit(opt_surf, (panel_x + pad + 18, y))
+                y += line_h
+            y += 12
+
+            hint_font = self.font_small
+            hint_surf = hint_font.render(
+                "[ENTER] Select  [ESC] Flee", True, self._U3_HINT)
+            self.screen.blit(hint_surf, (panel_x + pad, y))
+
     def _draw_custom_dungeon_tile(self, tile_id, px, py, ts):
         """Draw a tile in a custom (designer-built) dungeon.
 

@@ -88,6 +88,13 @@ class OverworldState(InventoryMixin, BaseState):
         self.spawn_action_info = {}        # name, description, tile_id
         self.spawn_action_pos = (0, 0)     # (col, row) of the spawn tile
 
+        # Monster encounter action screen (roaming monsters)
+        self.encounter_action_active = False
+        self.encounter_action_cursor = 0   # 0=Engage, 1=Flee
+        self.encounter_action_monster = None  # the contacted Monster object
+        self.encounter_action_result = None   # None, "fled", "failed"
+        self.encounter_result_timer = 0       # ms remaining for result msg
+
         # Destroyed spawn points
         self.destroyed_spawns = set()  # set of (col,row) tuples for destroyed spawn points
 
@@ -350,6 +357,10 @@ class OverworldState(InventoryMixin, BaseState):
                         continue
                     if sc == party.col and sr == party.row:
                         continue
+                    # Don't spawn adjacent to the party — it would
+                    # trigger an encounter before the player can see it
+                    if abs(sc - party.col) + abs(sr - party.row) <= 1:
+                        continue
                     if any(m.col == sc and m.row == sr
                            for m in self.overworld_monsters):
                         continue
@@ -405,6 +416,11 @@ class OverworldState(InventoryMixin, BaseState):
                 # ── Dungeon action screen input ──
                 if self.dungeon_action_active:
                     self._handle_dungeon_action_input(event)
+                    return
+
+                # ── Monster encounter action screen input ──
+                if self.encounter_action_active:
+                    self._handle_encounter_action_input(event)
                     return
 
                 # ── Spawn action screen input ──
@@ -523,7 +539,8 @@ class OverworldState(InventoryMixin, BaseState):
         if (self.showing_party or self.showing_char_detail is not None
                 or self.showing_party_inv or self.ow_npc_dialogue_active
                 or self.town_action_active or self.dungeon_action_active
-                or self.building_action_active or self.spawn_action_active):
+                or self.building_action_active or self.spawn_action_active
+                or self.encounter_action_active):
             return
 
         # Movement only if cooldown has elapsed
@@ -585,7 +602,7 @@ class OverworldState(InventoryMixin, BaseState):
             # Bump-to-fight: check if an orc is on the target tile
             orc = self._get_monster_at(target_col, target_row)
             if orc:
-                self._start_orc_combat(orc)
+                self._show_encounter_action(orc)
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
 
@@ -1016,14 +1033,128 @@ class OverworldState(InventoryMixin, BaseState):
             mon.col, mon.row = best
 
     def _check_monster_contact(self):
-        """If an orc is adjacent to (or on top of) the party, start combat."""
+        """If an orc is adjacent to (or on top of) the party, show encounter screen."""
         party = self.game.party
         for mon in self.overworld_monsters:
             if not mon.is_alive():
                 continue
             if abs(mon.col - party.col) + abs(mon.row - party.row) <= 1:
-                self._start_orc_combat(mon)
+                self._show_encounter_action(mon)
                 return
+
+    # ── Encounter action screen (roaming monsters) ───────────
+
+    def _show_encounter_action(self, monster):
+        """Show the encounter prompt for a roaming overworld monster."""
+        self.encounter_action_monster = monster
+        self.encounter_action_cursor = 0
+        self.encounter_action_result = None
+        self.encounter_result_timer = 0
+        self.encounter_action_active = True
+
+    def _handle_encounter_action_input(self, event):
+        """Handle input for the monster encounter action screen."""
+        # While showing a flee result message, consume any key to dismiss
+        if self.encounter_action_result is not None:
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
+                if self.encounter_action_result in ("fled", "fled_far"):
+                    # Successful flee — push monster away by the
+                    # distance determined by the saving throw
+                    flee_dist = getattr(
+                        self, '_encounter_flee_distance', 2)
+                    mon = self.encounter_action_monster
+                    if mon:
+                        party = self.game.party
+                        dx = mon.col - party.col
+                        dy = mon.row - party.row
+                        # Normalise direction (handle zero)
+                        step_x = (1 if dx > 0 else -1 if dx < 0
+                                  else (1 if dy == 0 else 0))
+                        step_y = (1 if dy > 0 else -1 if dy < 0
+                                  else (0 if dx != 0 else 1))
+                        for _ in range(flee_dist):
+                            nc = mon.col + step_x
+                            nr = mon.row + step_y
+                            if (0 <= nc < self.game.tile_map.width
+                                    and 0 <= nr < self.game.tile_map.height
+                                    and self.game.tile_map.is_walkable(
+                                        nc, nr)):
+                                mon.col, mon.row = nc, nr
+                            else:
+                                break
+                    self.encounter_action_active = False
+                    self._exit_grace = True
+                else:
+                    # Failed flee — enter combat
+                    self._encounter_engage()
+            return
+
+        n_options = 2  # Engage, Flee
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.encounter_action_cursor = (
+                self.encounter_action_cursor - 1) % n_options
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.encounter_action_cursor = (
+                self.encounter_action_cursor + 1) % n_options
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self.encounter_action_cursor == 0:
+                self._encounter_engage()
+            elif self.encounter_action_cursor == 1:
+                self._encounter_flee()
+        elif event.key == pygame.K_ESCAPE:
+            # ESC = flee
+            self._encounter_flee()
+
+    def _encounter_engage(self):
+        """Confirm engagement — start combat with the contacted monster."""
+        mon = self.encounter_action_monster
+        self.encounter_action_active = False
+        if mon:
+            self._start_orc_combat(mon)
+
+    def _encounter_flee(self):
+        """Attempt to flee using a DEX saving throw.
+
+        Party average DEX modifier vs. monster effective DEX (derived from AC).
+        Roll d20 + party_avg_dex_mod >= 10 + monster_dex_mod to escape.
+        """
+        import random as _rng
+        party = self.game.party
+        mon = self.encounter_action_monster
+
+        # Party: average dex modifier of alive members
+        alive = [m for m in party.members if m.is_alive()]
+        if alive:
+            avg_dex_mod = sum(m.dex_mod for m in alive) / len(alive)
+        else:
+            avg_dex_mod = 0
+
+        # Monster: derive a rough dex modifier from AC
+        # Base AC 10 implies +0 mod; each point above is roughly +1
+        monster_dex_mod = max(0, (getattr(mon, 'ac', 10) - 10) // 2)
+
+        roll = _rng.randint(1, 20)
+        dc = 10 + monster_dex_mod
+        total = roll + int(avg_dex_mod)
+
+        if total >= dc:
+            # Second saving throw determines escape distance:
+            # Beat the DC again → 4 tiles, otherwise → 2 tiles
+            dist_roll = _rng.randint(1, 20) + int(avg_dex_mod)
+            if dist_roll >= dc:
+                flee_dist = 4
+                self.encounter_action_result = "fled_far"
+            else:
+                flee_dist = 2
+                self.encounter_action_result = "fled"
+            self._encounter_flee_distance = flee_dist
+            self.encounter_result_timer = 1500
+            self.game.sfx.play("chirp")
+        else:
+            self.encounter_action_result = "failed"
+            self._encounter_flee_distance = 0
+            self.encounter_result_timer = 1500
+            self.game.sfx.play("hit")
 
     # ── Push spell (repel monsters) ───────────────────────────
 
@@ -2906,6 +3037,11 @@ class OverworldState(InventoryMixin, BaseState):
                                if e["timer"] > 0]
 
         dt_ms = dt * 1000  # convert seconds to ms
+
+        # Tick encounter result display timer
+        if self.encounter_result_timer > 0:
+            self.encounter_result_timer -= dt_ms
+
         if self.message_timer > 0:
             self.message_timer -= dt_ms
             if self.message_timer <= 0:
@@ -3045,6 +3181,11 @@ class OverworldState(InventoryMixin, BaseState):
         if self.spawn_action_active:
             renderer.draw_spawn_action_screen(
                 self.spawn_action_info, self.spawn_action_cursor)
+        if self.encounter_action_active:
+            renderer.draw_encounter_action_screen(
+                self.encounter_action_monster,
+                self.encounter_action_cursor,
+                self.encounter_action_result)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:
