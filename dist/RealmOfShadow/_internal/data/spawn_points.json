@@ -1,0 +1,22 @@
+{
+  "_comment": "Monster spawn point definitions. Keyed by tile ID.",
+  "spawn_points": {
+    "66": {
+      "name": "Monster Spawn",
+      "description": "A monster lair.",
+      "spawn_monsters": [
+        "Giant Rat"
+      ],
+      "spawn_chance": 50,
+      "spawn_radius": 5,
+      "max_spawned": 2,
+      "boss_monster": "Goblin",
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [
+        "+2 Chain",
+        "Arrows"
+      ]
+    }
+  }
+}

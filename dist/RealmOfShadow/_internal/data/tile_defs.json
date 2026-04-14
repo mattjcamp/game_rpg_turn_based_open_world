@@ -650,5 +650,18 @@
     ],
     "context": "artifacts",
     "sprite": "unique_tiles/seal_of_binding"
+  },
+  "66": {
+    "name": "Monster Spawn",
+    "walkable": true,
+    "color": [
+      180,
+      40,
+      40
+    ],
+    "context": "spawns",
+    "sprite": "",
+    "interaction_type": "spawn",
+    "interaction_data": ""
   }
 }

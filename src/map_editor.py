@@ -1453,6 +1453,10 @@ def build_overworld_brushes(tile_context_map: Dict[int, str],
         tid for tid, ctx in tile_context_map.items()
         if ctx == "overworld" and tid in TILE_DEFS
     )
+    spawn_ids = sorted(
+        tid for tid, ctx in tile_context_map.items()
+        if ctx == "spawns" and tid in TILE_DEFS
+    )
 
     brushes: List[Brush] = []
 
@@ -1465,6 +1469,15 @@ def build_overworld_brushes(tile_context_map: Dict[int, str],
     for tid in ow_ids:
         brushes.append(Brush(
             name=TILE_DEFS[tid]["name"], tile_id=tid, group=grp))
+
+    # ── Spawn tiles folder ──
+    if spawn_ids:
+        sp_grp = "Spawns"
+        brushes.append(Brush(name=sp_grp, tile_id=None,
+                             is_folder_header=True))
+        for tid in spawn_ids:
+            brushes.append(Brush(
+                name=TILE_DEFS[tid]["name"], tile_id=tid, group=sp_grp))
 
     # ── Template stamp folders ──
     if all_templates:

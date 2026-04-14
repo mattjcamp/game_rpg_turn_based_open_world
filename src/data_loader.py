@@ -183,6 +183,35 @@ def load_items(data_dir=None):
     return weapons, armors, item_info, shop_inventory
 
 
+def load_spawn_points(data_dir=None):
+    """Load spawn_points.json and return a dict mapping tile_id (int) → spawn config.
+
+    Looks in *data_dir* first (if given), then falls back to ``data/``.
+    Each spawn point has: spawn_monsters, spawn_chance, spawn_radius,
+    max_spawned, boss_monster, xp_reward, gold_reward, loot, description.
+    """
+    try:
+        raw = _load_json("spawn_points.json", data_dir)
+    except (OSError, ValueError):
+        return {}
+    points = {}
+    for tid_str, entry in raw.get("spawn_points", {}).items():
+        tid = int(tid_str)
+        points[tid] = {
+            "name": entry.get("name", "Monster Spawn"),
+            "description": entry.get("description", "A monster lair."),
+            "spawn_monsters": list(entry.get("spawn_monsters", [])),
+            "spawn_chance": entry.get("spawn_chance", 20),
+            "spawn_radius": entry.get("spawn_radius", 3),
+            "max_spawned": entry.get("max_spawned", 2),
+            "boss_monster": entry.get("boss_monster", ""),
+            "xp_reward": entry.get("xp_reward", 50),
+            "gold_reward": entry.get("gold_reward", 25),
+            "loot": list(entry.get("loot", [])),
+        }
+    return points
+
+
 def load_counters(data_dir=None):
     """Load counters.json and return a dict mapping shop_type → list of item names.
 

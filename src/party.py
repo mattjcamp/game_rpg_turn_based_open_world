@@ -31,6 +31,10 @@ RACE_INFO = load_races()
 # ── Load counter inventories from data/counters.json ──────────────
 COUNTER_DATA = load_counters()
 
+# ── Load spawn point definitions from data/spawn_points.json ──────
+from src.data_loader import load_spawn_points
+SPAWN_POINTS = load_spawn_points()
+
 # ── Load party config from data/party.json ────────────────────────
 _PARTY_JSON = os.path.join(_DEFAULT_DATA_DIR, "party.json")
 
@@ -154,14 +158,15 @@ def reload_module_data(module_data_dir=None):
     """
     global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY, COUNTER_DATA
     global RACE_INFO, EFFECTS_DATA, SPELLS_DATA, POTIONS_DATA
-    global VALID_RACES, _module_data_dir
+    global VALID_RACES, _module_data_dir, SPAWN_POINTS
 
     _module_data_dir = module_data_dir
 
-    # Reload items, races, counters
+    # Reload items, races, counters, spawn points
     WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items(module_data_dir)
     RACE_INFO = load_races(module_data_dir)
     COUNTER_DATA = load_counters(module_data_dir)
+    SPAWN_POINTS = load_spawn_points(module_data_dir)
     VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 
     # Reload effects and spells — update dicts/lists *in place* so that

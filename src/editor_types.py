@@ -95,6 +95,11 @@ class TileEditorRS:
     field: int = 0
     buffer: str = ""
     field_scroll: int = 0
+    # Spawn sub-list (level 4)
+    spawn_sublist: Optional[List[str]] = None
+    spawn_sublist_mode: Optional[str] = None  # "monsters" or "loot"
+    spawn_sublist_cursor: int = 0
+    spawn_sublist_scroll: int = 0
 
 
 @dataclass

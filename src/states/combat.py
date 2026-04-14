@@ -5374,6 +5374,36 @@ class CombatState(BaseState):
         self.game.pending_combat_location = getattr(
             self, "combat_location", "overview")
 
+        # Check for spawn boss kills and award bonus rewards
+        for m in self.monsters:
+            if getattr(m, 'is_spawn_boss', False):
+                pos = getattr(m, 'spawn_tile_pos', None)
+                tid = getattr(m, 'spawn_tile_id', None)
+                if pos:
+                    if not hasattr(self.game, 'pending_spawn_destroys'):
+                        self.game.pending_spawn_destroys = []
+                    self.game.pending_spawn_destroys.append({
+                        'pos': pos,
+                        'tile_id': tid,
+                    })
+                    # Award spawn destruction rewards
+                    from src.party import SPAWN_POINTS
+                    sp = SPAWN_POINTS.get(tid, {})
+                    xp_bonus = sp.get('xp_reward', 0)
+                    gold_bonus = sp.get('gold_reward', 0)
+                    loot_items = sp.get('loot', [])
+                    if xp_bonus:
+                        for member in self.game.party.members:
+                            if member.is_alive():
+                                member.exp += xp_bonus
+                        self.combat_log.append(f"Spawn destroyed! +{xp_bonus} XP!")
+                    if gold_bonus:
+                        self.game.party.gold += gold_bonus
+                        self.combat_log.append(f"+{gold_bonus} gold!")
+                    for item in loot_items:
+                        self.game.party.shared_inventory.append(item)
+                        self.combat_log.append(f"Found: {item}!")
+
         # Store pending XP — gold is picked up during loot phase
         self.game.set_combat_rewards({
             "xp": total_xp,

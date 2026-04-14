@@ -61,6 +61,9 @@ TILE_WALL_TORCH = 34
 TILE_ALTAR     = 35
 TILE_VOID      = 36  # Black empty space (non-walkable, for interior edges)
 
+# ----- Spawn tile IDs -----
+TILE_SPAWN     = 66  # Monster spawn point (overworld)
+
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
 TILE_DEFS = {
@@ -99,6 +102,8 @@ TILE_DEFS = {
     TILE_WALL_TORCH: {"color": (160, 120, 40), "walkable": False, "name": "Wall Torch"},
     TILE_ALTAR:      {"color": (200, 160, 100), "walkable": False, "name": "Altar"},
     TILE_VOID:       {"color": (0, 0, 0),       "walkable": False, "name": "Void"},
+    # Spawn tiles
+    TILE_SPAWN:      {"color": (180, 40, 40),    "walkable": True,  "name": "Monster Spawn"},
 }
 
 # ----- Colors (UI) -----

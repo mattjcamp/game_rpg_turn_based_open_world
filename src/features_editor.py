@@ -144,6 +144,18 @@ class FeaturesEditor:
         self.tile_scroll_f = 0
         self.tile_in_folder = False         # True when browsing inside a folder
 
+        # Spawn point data — extended config for tiles with context "spawns"
+        # Keyed by tile_id (int) → spawn config dict
+        self.spawn_data = {}
+
+        # Spawn sub-list editor state (level 4 within tile editing)
+        self.spawn_sublist_mode = None      # "monsters" or "loot" or None
+        self.spawn_sublist = []             # current list being edited
+        self.spawn_sublist_cursor = 0
+        self.spawn_sublist_scroll = 0
+        self._spawn_all_monsters = None     # cached monster name list
+        self._spawn_all_items = None        # cached item name list
+
         # Classification of tile IDs into context folders
         self.TILE_CONTEXT = {
             0: "overworld", 1: "overworld", 2: "overworld",
@@ -158,11 +170,13 @@ class FeaturesEditor:
             26: "dungeon", 27: "dungeon", 28: "dungeon",
             29: "dungeon",
             32: "dungeon", 33: "dungeon", 34: "dungeon",
+            66: "spawns",
         }
         self.TILE_FOLDER_ORDER = [
             {"name": "overworld", "label": "Overworld"},
             {"name": "town", "label": "Town"},
             {"name": "dungeon", "label": "Dungeon"},
+            {"name": "spawns", "label": "Spawns"},
             {"name": "artifacts", "label": "Artifacts"},
             {"name": "battle", "label": "Battle Screen"},
             {"name": "examine", "label": "Examine Screen"},
@@ -682,6 +696,11 @@ class FeaturesEditor:
         return os.path.join(os.path.dirname(os.path.dirname(__file__)),
                             "data", "tile_defs.json")
 
+    def spawn_points_path(self):
+        """Path to spawn_points.json."""
+        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "spawn_points.json")
+
     def load_tiles(self):
         """Load tile types from disk (tile_defs.json) merged with
         hardcoded settings.TILE_DEFS into the editor."""
@@ -758,6 +777,16 @@ class FeaturesEditor:
         self.tile_folder_cursor = 0
         self.tile_folder_scroll = 0
         self._rebuild_tile_folders()
+
+        # Load spawn point extended data
+        try:
+            with open(self.spawn_points_path(), "r") as f:
+                sp_raw = json.load(f)
+            self.spawn_data = {}
+            for tid_str, entry in sp_raw.get("spawn_points", {}).items():
+                self.spawn_data[int(tid_str)] = dict(entry)
+        except (OSError, ValueError):
+            self.spawn_data = {}
 
     def _rebuild_tile_folders(self):
         """Build folder list with tile counts per context."""
@@ -867,9 +896,29 @@ class FeaturesEditor:
 
         # Persist sprite assignments to the tile manifest
         self._save_tile_sprites()
+        # Save spawn point data
+        self._save_spawn_data()
         # Invalidate cached town brushes so new/changed tiles appear
         self.townlayout_brushes = None
         return True
+
+    def _save_spawn_data(self):
+        """Persist spawn_data to spawn_points.json and reload runtime data."""
+        sp_json = {
+            "_comment": "Monster spawn point definitions. Keyed by tile ID.",
+            "spawn_points": {str(k): v for k, v in self.spawn_data.items()},
+        }
+        try:
+            with open(self.spawn_points_path(), "w") as f:
+                json.dump(sp_json, f, indent=2)
+                f.write("\n")
+        except OSError:
+            pass
+        # Reload runtime spawn data
+        from src.party import reload_module_data as _reload
+        from src import party as _party_mod
+        from src.data_loader import load_spawn_points
+        _party_mod.SPAWN_POINTS = load_spawn_points()
 
     def _save_tile_sprites(self):
         """Update tile_manifest.json with sprite ↔ tile_id bindings.
@@ -965,6 +1014,47 @@ class FeaturesEditor:
         elif interact == "sign":
             fields.append(
                 FE("Sign Text", "interaction_data", interact_data))
+        elif interact == "spawn":
+            # Spawn-specific fields — loaded from spawn_data
+            tid = tile.get("_tile_id", 0)
+            sp = self.spawn_data.get(tid, {})
+            fields.append(
+                FE("-- Spawn Config --", "_hdr_sp1", "", "section", False))
+            fields.append(
+                FE("Description", "_sp_description",
+                   sp.get("description", "A monster lair.")))
+            # Spawn monsters — clickable sub-list editor
+            _n_mon = len(sp.get("spawn_monsters", []))
+            fields.append(
+                FE("Edit Monsters", "_sp_edit_monsters",
+                   f"{_n_mon} monster{'s' if _n_mon != 1 else ''} [>]",
+                   "choice"))
+            fields.append(
+                FE("Spawn Chance %", "_sp_spawn_chance",
+                   str(sp.get("spawn_chance", 20)), "int"))
+            fields.append(
+                FE("Spawn Radius", "_sp_spawn_radius",
+                   str(sp.get("spawn_radius", 3)), "int"))
+            fields.append(
+                FE("Max Spawned", "_sp_max_spawned",
+                   str(sp.get("max_spawned", 2)), "int"))
+            fields.append(
+                FE("-- Boss & Rewards --", "_hdr_sp2", "", "section", False))
+            fields.append(
+                FE("Boss Monster", "_sp_boss_monster",
+                   sp.get("boss_monster", ""), "choice"))
+            fields.append(
+                FE("XP Reward", "_sp_xp_reward",
+                   str(sp.get("xp_reward", 50)), "int"))
+            fields.append(
+                FE("Gold Reward", "_sp_gold_reward",
+                   str(sp.get("gold_reward", 25)), "int"))
+            # Loot items — clickable sub-list editor
+            _n_loot = len(sp.get("loot", []))
+            fields.append(
+                FE("Edit Loot", "_sp_edit_loot",
+                   f"{_n_loot} item{'s' if _n_loot != 1 else ''} [>]",
+                   "choice"))
         elif interact != "none":
             fields.append(
                 FE("Data", "interaction_data", interact_data))
@@ -991,8 +1081,17 @@ class FeaturesEditor:
         if self.tile_fields:
             entry = self.tile_fields[self.tile_field]
             entry.value = self.tile_buffer
+        # Collect spawn field changes to apply in one pass
+        spawn_changes = {}
         for entry in self.tile_fields:
             key, val = entry.key, entry.value
+            # Handle spawn-specific fields (skip sub-list launchers)
+            if key.startswith("_sp_") and key not in (
+                    "_sp_edit_monsters", "_sp_edit_loot"):
+                spawn_changes[key] = val
+                continue
+            if key in ("_sp_edit_monsters", "_sp_edit_loot"):
+                continue  # read-only display fields
             if key.startswith("_") and key not in ("_color", "_sprite"):
                 continue
             if key == "_sprite":
@@ -1028,6 +1127,22 @@ class FeaturesEditor:
                     break
             elif key == "interaction_data":
                 tile["interaction_data"] = val
+
+        # Apply collected spawn field changes to spawn_data
+        if spawn_changes:
+            tid = tile.get("_tile_id", 0)
+            sp = self.spawn_data.setdefault(tid, {})
+            sp["name"] = tile.get("name", "Monster Spawn")
+            for skey, sval in spawn_changes.items():
+                field_name = skey[4:]  # strip "_sp_" prefix
+                if field_name in ("spawn_chance", "spawn_radius",
+                                  "max_spawned", "xp_reward", "gold_reward"):
+                    try:
+                        sp[field_name] = int(sval)
+                    except ValueError:
+                        pass
+                else:
+                    sp[field_name] = sval
 
     @staticmethod
     def tile_sprite_key(tile_id):
@@ -1089,7 +1204,7 @@ class FeaturesEditor:
         if key == "walkable":
             return ["True", "False"]
         if key == "interaction_type":
-            return ["none", "shop", "sign"]
+            return ["none", "shop", "sign", "spawn"]
         if key == "interaction_data":
             # When interaction_type is "shop", offer shop type choices
             real_idx = self.tile_real_index()
@@ -1099,6 +1214,21 @@ class FeaturesEditor:
                     return ["general", "reagent", "weapon", "armor",
                             "magic", "inn", "guild"]
             return []
+        # Sub-list launchers — no cycling, Enter/Right opens the list
+        if key in ("_sp_edit_monsters", "_sp_edit_loot"):
+            return []  # handled by level intercept, not choice cycling
+        # Boss monster choice — list all known monster names
+        if key == "_sp_boss_monster":
+            try:
+                mpath = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)),
+                    "data", "monsters.json")
+                with open(mpath) as f:
+                    mon_data = json.load(f)
+                names = sorted(mon_data.get("monsters", {}).keys())
+                return [""] + names  # empty = no boss
+            except (OSError, ValueError):
+                return []
         return []
 
     def add_tile(self):
@@ -1115,16 +1245,39 @@ class FeaturesEditor:
         # battle uses procedural tiles).
         if context in ("examine", "battle"):
             context = "overworld"
+        # Spawn tiles default to "spawn" interaction type
+        if context == "spawns":
+            interact = "spawn"
+            tile_color = [180, 40, 40]
+            tile_name = f"Monster Spawn {new_id}"
+        else:
+            interact = "none"
+            tile_color = [128, 128, 128]
+            tile_name = f"New Tile {new_id}"
         new_tile = {
             "_tile_id": new_id,
-            "name": f"New Tile {new_id}",
+            "name": tile_name,
             "walkable": True,
-            "color": [128, 128, 128],
+            "color": tile_color,
             "_context": context,
-            "interaction_type": "none",
+            "interaction_type": interact,
             "interaction_data": "",
         }
         self.tile_list.append(new_tile)
+        # Initialize spawn data for new spawn tiles
+        if context == "spawns":
+            self.spawn_data[new_id] = {
+                "name": tile_name,
+                "description": "A monster lair.",
+                "spawn_monsters": [],
+                "spawn_chance": 20,
+                "spawn_radius": 3,
+                "max_spawned": 2,
+                "boss_monster": "",
+                "xp_reward": 50,
+                "gold_reward": 25,
+                "loot": [],
+            }
         self.tile_cursor = len(self.tile_list) - 1
 
     def duplicate_tile(self):
@@ -1165,6 +1318,163 @@ class FeaturesEditor:
                 if self.tile_in_folder else len(self.tile_list)
             if self.tile_cursor >= folder_len:
                 self.tile_cursor = max(0, folder_len - 1)
+
+    # ── Spawn sub-list editor (monsters / loot) ──────────────
+
+    def _get_all_monster_names(self):
+        """Return sorted list of all monster names from monsters.json."""
+        if self._spawn_all_monsters is not None:
+            return self._spawn_all_monsters
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "data", "monsters.json")
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            self._spawn_all_monsters = sorted(
+                data.get("monsters", {}).keys())
+        except (OSError, ValueError):
+            self._spawn_all_monsters = []
+        return self._spawn_all_monsters
+
+    def _get_all_item_names_for_spawn(self):
+        """Return sorted list of all item names from items.json."""
+        if self._spawn_all_items is not None:
+            return self._spawn_all_items
+        path = self.items_path()
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            names = []
+            for section in ("weapons", "armors", "general"):
+                names.extend(data.get(section, {}).keys())
+            self._spawn_all_items = sorted(set(names))
+        except (OSError, ValueError):
+            self._spawn_all_items = []
+        return self._spawn_all_items
+
+    def spawn_open_sublist(self, mode):
+        """Open the spawn sub-list editor for 'monsters' or 'loot'.
+
+        Enters level 4 within the tile field editor.
+        """
+        real_idx = self.tile_real_index()
+        if real_idx >= len(self.tile_list):
+            return
+        tile = self.tile_list[real_idx]
+        tid = tile.get("_tile_id", 0)
+        sp = self.spawn_data.setdefault(tid, {})
+
+        self.spawn_sublist_mode = mode
+        if mode == "monsters":
+            self.spawn_sublist = list(sp.get("spawn_monsters", []))
+        else:
+            self.spawn_sublist = list(sp.get("loot", []))
+        self.spawn_sublist_cursor = 0
+        self.spawn_sublist_scroll = 0
+        # Invalidate caches so fresh data is loaded
+        self._spawn_all_monsters = None
+        self._spawn_all_items = None
+        self.level = 4
+
+    def spawn_save_sublist(self):
+        """Save the current sub-list back to spawn_data."""
+        real_idx = self.tile_real_index()
+        if real_idx >= len(self.tile_list):
+            return
+        tile = self.tile_list[real_idx]
+        tid = tile.get("_tile_id", 0)
+        sp = self.spawn_data.setdefault(tid, {})
+        if self.spawn_sublist_mode == "monsters":
+            sp["spawn_monsters"] = list(self.spawn_sublist)
+        else:
+            sp["loot"] = list(self.spawn_sublist)
+
+    def spawn_sublist_add(self):
+        """Add a new entry to the spawn sub-list."""
+        if self.spawn_sublist_mode == "monsters":
+            options = self._get_all_monster_names()
+        else:
+            options = self._get_all_item_names_for_spawn()
+        if options:
+            self.spawn_sublist.append(options[0])
+            self.spawn_sublist_cursor = len(self.spawn_sublist) - 1
+            self.spawn_save_sublist()
+
+    def spawn_sublist_remove(self):
+        """Remove the selected entry from the spawn sub-list."""
+        if not self.spawn_sublist:
+            return
+        idx = self.spawn_sublist_cursor
+        if 0 <= idx < len(self.spawn_sublist):
+            self.spawn_sublist.pop(idx)
+            if self.spawn_sublist_cursor >= len(self.spawn_sublist):
+                self.spawn_sublist_cursor = max(
+                    0, len(self.spawn_sublist) - 1)
+            self.spawn_save_sublist()
+
+    def spawn_sublist_cycle(self, direction=1):
+        """Cycle the selected entry through available options."""
+        if not self.spawn_sublist:
+            return
+        idx = self.spawn_sublist_cursor
+        if idx < 0 or idx >= len(self.spawn_sublist):
+            return
+        if self.spawn_sublist_mode == "monsters":
+            options = self._get_all_monster_names()
+        else:
+            options = self._get_all_item_names_for_spawn()
+        if not options:
+            return
+        current = self.spawn_sublist[idx]
+        try:
+            ci = options.index(current)
+        except ValueError:
+            ci = 0
+        ci = (ci + direction) % len(options)
+        self.spawn_sublist[idx] = options[ci]
+        self.spawn_save_sublist()
+
+    def _handle_spawn_sublist_input(self, event):
+        """Handle input for the spawn sub-list editor (level 4)."""
+        items = self.spawn_sublist
+        n = len(items)
+
+        if self._is_save_shortcut(event):
+            self.spawn_save_sublist()
+            self.save_tiles()
+            self.dirty = False
+            return
+
+        if event.key == pygame.K_ESCAPE:
+            self.spawn_save_sublist()
+            # Rebuild tile fields to update the count display
+            real_idx = self.tile_real_index()
+            if real_idx < len(self.tile_list):
+                self.build_tile_fields(self.tile_list[real_idx])
+            self.spawn_sublist_mode = None
+            self.level = 3
+            return
+
+        if event.key == pygame.K_UP and n > 0:
+            self.spawn_sublist_cursor = (
+                self.spawn_sublist_cursor - 1) % n
+            self.spawn_sublist_scroll = self._adjust_scroll_generic(
+                self.spawn_sublist_cursor, self.spawn_sublist_scroll)
+        elif event.key == pygame.K_DOWN and n > 0:
+            self.spawn_sublist_cursor = (
+                self.spawn_sublist_cursor + 1) % n
+            self.spawn_sublist_scroll = self._adjust_scroll_generic(
+                self.spawn_sublist_cursor, self.spawn_sublist_scroll)
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            if n > 0:
+                direction = 1 if event.key == pygame.K_RIGHT else -1
+                self.spawn_sublist_cycle(direction)
+        elif self._is_new_shortcut(event):
+            self.spawn_sublist_add()
+            self.spawn_sublist_scroll = self._adjust_scroll_generic(
+                self.spawn_sublist_cursor, self.spawn_sublist_scroll)
+        elif self._is_delete_shortcut(event):
+            self.spawn_sublist_remove()
 
     # ══════════════════════════════════════════════════════════
     # ── Spell Editor Methods ───────────────────────────────────
@@ -4057,10 +4367,25 @@ class FeaturesEditor:
                     self.level = 2
             return
 
+        # ── Level 4: spawn sub-list editor (monsters / loot) ──
+        if self.level == 4 and ed == "tiles":
+            self._handle_spawn_sublist_input(event)
+            return
+
         # ── Level 3: tile field editor (inside folder) ──
-        if self.level == 3 and ed == "tiles":
-            if ctx:
-                self.handle_field_editing(event, ctx, ed, exit_level=2)
+        # Intercept Enter/Right on spawn sub-list launcher fields
+        if self.level == 3 and ed == "tiles" and ctx:
+            fields = ctx["fields"]()
+            field_idx = ctx["field_idx"]()
+            if (fields and 0 <= field_idx < len(fields)):
+                fkey = fields[field_idx].key
+                if (fkey in ("_sp_edit_monsters", "_sp_edit_loot")
+                        and event.key in (pygame.K_RETURN, pygame.K_RIGHT)):
+                    ctx["save_fields"]()
+                    mode = "monsters" if fkey == "_sp_edit_monsters" else "loot"
+                    self.spawn_open_sublist(mode)
+                    return
+            self.handle_field_editing(event, ctx, ed, exit_level=2)
             return
 
         # ── Level 2: tile list inside folder ──
@@ -5193,6 +5518,10 @@ class FeaturesEditor:
                 field=self.tile_field,
                 buffer=self.tile_buffer,
                 field_scroll=self.tile_scroll_f,
+                spawn_sublist=self.spawn_sublist if self.spawn_sublist_mode else None,
+                spawn_sublist_mode=self.spawn_sublist_mode,
+                spawn_sublist_cursor=self.spawn_sublist_cursor,
+                spawn_sublist_scroll=self.spawn_sublist_scroll,
             ),
             gallery=GalleryEditorRS(
                 list=self.gallery_list,

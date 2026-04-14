@@ -2294,7 +2294,8 @@ class Renderer(CombatEffectRendererMixin):
                           unique_text="", unique_flash=0.0, unique_pos=None,
                           push_anim=None, repel_effect=None,
                           darkness_active=False, overworld_npcs=None,
-                          quest_effects=None, interior_darkness=False):
+                          quest_effects=None, interior_darkness=False,
+                          spawn_effects=None):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -2386,6 +2387,62 @@ class Renderer(CombatEffectRendererMixin):
                         sx = mx - mon_sprite.get_width() // 2
                         sy = my - mon_sprite.get_height() // 2
                         self.screen.blit(mon_sprite, (sx, sy))
+
+        # ── 2a. spawn effects (monster materialising from spawn tile) ──
+        if spawn_effects:
+            import math as _sm
+            for eff in spawn_effects:
+                sc = eff["col"] - off_c
+                sr = eff["row"] - off_r
+                src_c = eff["src_col"] - off_c
+                src_r = eff["src_row"] - off_r
+                t = 1.0 - eff["timer"]  # 0 → 1 progress
+                if 0 <= sc < cols and 0 <= sr < rows:
+                    cx = sc * ts + ts // 2 + pad_x
+                    cy = sr * ts + ts // 2 + pad_y
+                    # Source position (spawn tile)
+                    sx_src = src_c * ts + ts // 2 + pad_x
+                    sy_src = src_r * ts + ts // 2 + pad_y
+
+                    if t < 0.4:
+                        # Phase 1: pulsing glow at the spawn tile
+                        sub = t / 0.4
+                        glow_r = int(8 + sub * 14)
+                        alpha = int(180 * (1.0 - sub * 0.3))
+                        glow = pygame.Surface(
+                            (glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+                        pygame.draw.circle(
+                            glow, (220, 60, 60, alpha),
+                            (glow_r, glow_r), glow_r)
+                        self.screen.blit(
+                            glow, (sx_src - glow_r, sy_src - glow_r))
+                    elif t < 0.7:
+                        # Phase 2: particle trail from spawn to target
+                        sub = (t - 0.4) / 0.3
+                        px = sx_src + int((cx - sx_src) * sub)
+                        py = sy_src + int((cy - sy_src) * sub)
+                        for i in range(5):
+                            angle = _sm.pi * 2 * i / 5 + sub * 3
+                            ox = int(_sm.cos(angle) * 4 * (1 - sub))
+                            oy = int(_sm.sin(angle) * 4 * (1 - sub))
+                            alpha = int(200 * (1 - sub))
+                            if alpha > 0:
+                                pygame.draw.circle(
+                                    self.screen,
+                                    (255, 120, 60),
+                                    (px + ox, py + oy), 2)
+                    else:
+                        # Phase 3: flash ring at monster position
+                        sub = (t - 0.7) / 0.3
+                        ring_r = int(6 + sub * 10)
+                        alpha_f = 1.0 - sub
+                        if alpha_f > 0:
+                            c_val = (int(255 * alpha_f),
+                                     int(100 * alpha_f),
+                                     int(50 * alpha_f))
+                            pygame.draw.circle(
+                                self.screen, c_val,
+                                (cx, cy), ring_r, 2)
 
         # ── 2b. overworld quest NPC sprites ──
         if overworld_npcs:
@@ -4253,6 +4310,85 @@ class Renderer(CombatEffectRendererMixin):
         y += 12
 
         # ── Hint ──
+        hint_font = self.font_small
+        hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
+        self.screen.blit(hint_surf, (panel_x + pad, y))
+
+    def draw_spawn_action_screen(self, info, cursor):
+        """Draw the monster spawn entry confirmation panel."""
+        panel_w = 440
+        pad = 16
+        content_w = panel_w - pad * 2
+        line_h = 24
+        body_font = self.font
+        title_font = pygame.font.SysFont("liberationsans", 22, bold=True)
+
+        def _wrap(text, font, max_w):
+            lines = []
+            for word in text.split():
+                if lines and font.size(lines[-1] + " " + word)[0] <= max_w:
+                    lines[-1] += " " + word
+                else:
+                    lines.append(word)
+            return lines or [""]
+
+        name = info.get("name", "Monster Lair")
+        desc = info.get("description", "Something dangerous lurks within.")
+        title_lines = _wrap(name, title_font, content_w)
+        desc_lines = _wrap(desc, body_font, content_w)
+
+        h = pad
+        h += len(title_lines) * 28
+        h += 12
+        h += len(desc_lines) * line_h
+        h += 14
+        h += line_h  # warning line
+        h += 16
+        h += line_h * 2  # options
+        h += 12
+        h += 18  # hint
+        h += pad
+
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - h) // 2 - 20
+
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.screen.blit(dim, (0, 0))
+
+        self._u3_panel(panel_x, panel_y, panel_w, h)
+
+        y = panel_y + pad
+        for tline in title_lines:
+            title_surf = title_font.render(tline, True, (220, 60, 60))
+            self.screen.blit(title_surf, (panel_x + pad, y))
+            y += 28
+        y += 12
+
+        for line in desc_lines:
+            line_surf = body_font.render(line, True, (220, 220, 240))
+            self.screen.blit(line_surf, (panel_x + pad, y))
+            y += line_h
+        y += 14
+
+        warn_surf = body_font.render("A powerful creature guards this lair!", True, (255, 180, 60))
+        self.screen.blit(warn_surf, (panel_x + pad, y))
+        y += line_h + 16
+
+        option_labels = ["Challenge the Boss", "Leave"]
+        for i, label in enumerate(option_labels):
+            is_sel = (i == cursor)
+            if is_sel:
+                hl = pygame.Rect(panel_x + 4, y - 1, panel_w - 8, line_h)
+                pygame.draw.rect(self.screen, (80, 30, 30), hl)
+                arrow_surf = body_font.render(">", True, (255, 100, 100))
+                self.screen.blit(arrow_surf, (panel_x + pad, y))
+            color = (255, 255, 255) if is_sel else (180, 180, 200)
+            opt_surf = body_font.render(label, True, color)
+            self.screen.blit(opt_surf, (panel_x + pad + 18, y))
+            y += line_h
+        y += 12
+
         hint_font = self.font_small
         hint_surf = hint_font.render("[ENTER] Select  [ESC] Leave", True, self._U3_HINT)
         self.screen.blit(hint_surf, (panel_x + pad, y))
@@ -8071,7 +8207,7 @@ class Renderer(CombatEffectRendererMixin):
                         tile_folders or [],
                         tile_folder_cursor, tile_folder_scroll,
                         fm, fs, f)
-                elif level in (2, 3):
+                elif level in (2, 3, 4):
                     # Tile list inside folder
                     folder_name = ""
                     if tile_folders and 0 <= tile_folder_cursor < len(
@@ -8088,12 +8224,22 @@ class Renderer(CombatEffectRendererMixin):
                         panel_y, panel_h,
                         sub_list, tile_cursor, tile_scroll,
                         folder_name, None, fm, fs, f)
-                    if level == 3:
+                    if level in (3, 4):
                         self._draw_features_spell_editor(
                             right_x, panel_y, right_w, panel_h,
                             tile_fields or [], tile_field,
                             tile_buffer, tile_field_scroll,
                             fm, fs, f)
+                    if level == 4:
+                        # Draw spawn sub-list overlay on right panel
+                        tl = state.tiles
+                        if tl.spawn_sublist is not None:
+                            self._draw_spawn_sublist(
+                                right_x, panel_y, right_w, panel_h,
+                                tl.spawn_sublist, tl.spawn_sublist_mode,
+                                tl.spawn_sublist_cursor,
+                                tl.spawn_sublist_scroll,
+                                fm, fs, f)
             elif ed == "gallery":
                 if level == 5 and pxedit_pixels is not None:
                     self._draw_pixel_editor(
@@ -11182,12 +11328,18 @@ class Renderer(CombatEffectRendererMixin):
                                   arrow_color, fm)
                 else:
                     # Text field - truncate to fit
-                    disp = display or "(empty)"
+                    if display:
+                        disp = display
+                    elif selected:
+                        disp = ""  # show cursor, no placeholder
+                    else:
+                        disp = "(empty — type to edit)"
                     while len(disp) > 2 and fm.size(disp)[0] > max_pw:
                         disp = disp[:-1]
-                    if len(disp) < len(display or "(empty)"):
+                    if display and len(disp) < len(display):
                         disp += ".."
-                    self._u3_text(disp, rx + 20, dy, text_color, fm)
+                    disp_color = text_color if display else (100, 100, 120)
+                    self._u3_text(disp, rx + 20, dy, disp_color, fm)
                     # Show cursor for active text field
                     if selected:
                         cur_w = fm.size(display)[0]
@@ -12514,6 +12666,85 @@ class Renderer(CombatEffectRendererMixin):
         self._u3_text(hint,
                       SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 45,
                       self._U3_HINT, fs)
+
+    def _draw_spawn_sublist(self, rx, ry, rw, rh,
+                            items, mode, cursor, scroll,
+                            fm, fs, f):
+        """Draw the spawn sub-list overlay for monsters or loot."""
+        # Opaque overlay on the right panel
+        overlay = pygame.Surface((rw, rh), pygame.SRCALPHA)
+        overlay.fill((10, 8, 20, 240))
+        self.screen.blit(overlay, (rx, ry))
+        pygame.draw.rect(self.screen, (180, 60, 60),
+                         (rx, ry, rw, rh), 1)
+
+        title = "Spawn Monsters" if mode == "monsters" else "Loot Items"
+        self._u3_text(title, rx + 16, ry + 10, (220, 80, 80), f)
+
+        row_h = 36
+        ly = ry + 40
+        max_visible = (rh - 80) // row_h
+
+        if not items:
+            self._u3_text("(none — Ctrl+N to add)",
+                          rx + 20, ly + 8, (120, 120, 140), fm)
+        else:
+            dscroll = scroll
+            if cursor < dscroll:
+                dscroll = cursor
+            if cursor >= dscroll + max_visible:
+                dscroll = cursor - max_visible + 1
+
+            dy = ly
+            for di in range(dscroll, min(dscroll + max_visible,
+                                         len(items))):
+                name = items[di]
+                selected = (di == cursor)
+
+                if selected:
+                    bar = pygame.Surface((rw - 4, row_h - 2),
+                                         pygame.SRCALPHA)
+                    bar.fill((255, 200, 60, 30))
+                    self.screen.blit(bar, (rx + 2, dy))
+
+                # Draw monster sprite or item icon
+                icon_x = rx + 12
+                icon_size = 24
+                text_x = rx + 14
+                if mode == "monsters":
+                    sprite = self._get_monster_sprite_by_name(name)
+                    if sprite:
+                        scaled = pygame.transform.scale(
+                            sprite, (icon_size, icon_size))
+                        self.screen.blit(scaled, (icon_x, dy + 5))
+                        text_x = icon_x + icon_size + 8
+                    else:
+                        pygame.draw.rect(
+                            self.screen, (100, 50, 50),
+                            pygame.Rect(icon_x, dy + 5,
+                                        icon_size, icon_size))
+                        text_x = icon_x + icon_size + 8
+                else:
+                    from src.party import ITEM_INFO
+                    info = ITEM_INFO.get(name, {})
+                    icon_type = info.get("icon", "")
+                    if icon_type:
+                        self._draw_item_icon(
+                            icon_x + icon_size // 2,
+                            dy + 5 + icon_size // 2,
+                            icon_type, icon_size)
+                        text_x = icon_x + icon_size + 8
+
+                prefix = "> " if selected else "  "
+                nc = self._U3_WHITE if selected else (180, 180, 180)
+                self._u3_text(f"{prefix}{name}",
+                              text_x, dy + 8, nc, fm)
+                dy += row_h
+
+        # Hint bar
+        self._u3_text(
+            "[L/R] Cycle  [Ctrl+N] Add  [Ctrl+D] Del  [Esc] Back",
+            rx + 12, ry + rh - 24, self._U3_HINT, fs)
 
     def _draw_counter_items_list(self, left_x, left_w, right_x,
                                  right_w, panel_y, panel_h,

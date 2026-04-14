@@ -14,7 +14,7 @@ from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
-    TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED,
+    TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED, TILE_SPAWN,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_OVERWORLD, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
     NPC_WANDER_RANGE, ORC_RESPAWN_CHANCE,
 )
@@ -81,6 +81,18 @@ class OverworldState(InventoryMixin, BaseState):
         self.building_action_cursor = 0       # 0=Enter, 1=Leave
         self.building_action_info = {}        # {name, description}
         self.building_action_entry_args = None
+
+        # Spawn point action screen
+        self.spawn_action_active = False
+        self.spawn_action_cursor = 0       # 0=Enter, 1=Leave
+        self.spawn_action_info = {}        # name, description, tile_id
+        self.spawn_action_pos = (0, 0)     # (col, row) of the spawn tile
+
+        # Destroyed spawn points
+        self.destroyed_spawns = set()  # set of (col,row) tuples for destroyed spawn points
+
+        # Spawn tile animation effects (list of dicts with col, row, timer)
+        self._spawn_effects = []
 
         # Grace flag: skip one tile-event check after returning from a
         # town/dungeon so the player isn't immediately prompted to re-enter
@@ -275,6 +287,94 @@ class OverworldState(InventoryMixin, BaseState):
             if placed:
                 self.overworld_monsters.append(orc)
 
+        # Spawn tile monsters are handled separately in _try_spawn_tile_monsters()
+
+    def _spawn_from_spawn_tiles(self):
+        """Spawn roaming monsters from nearby Monster Spawn tiles."""
+        from src.party import SPAWN_POINTS
+
+        if not SPAWN_POINTS:
+            return
+        tile_map = self.game.tile_map
+        party = self.game.party
+        scan_dist = 16  # only check spawn tiles near the party
+
+        for dr in range(-scan_dist, scan_dist + 1):
+            for dc in range(-scan_dist, scan_dist + 1):
+                c = party.col + dc
+                r = party.row + dr
+                if not (0 <= c < tile_map.width and 0 <= r < tile_map.height):
+                    continue
+                tid = tile_map.get_tile(c, r)
+                if tid not in SPAWN_POINTS:
+                    continue
+                if (c, r) in self.destroyed_spawns:
+                    continue
+
+                sp = SPAWN_POINTS[tid]
+
+                # ── Spawn chance: percentage chance PER call ──
+                chance = sp.get("spawn_chance", 20)
+                if random.randint(1, 100) > chance:
+                    continue
+
+                # Count existing monsters near this spawn
+                radius = sp.get("spawn_radius", 3)
+                max_spawned = sp.get("max_spawned", 2)
+                nearby = sum(1 for m in self.overworld_monsters
+                             if abs(m.col - c) <= radius
+                             and abs(m.row - r) <= radius)
+                if nearby >= max_spawned:
+                    continue
+
+                # Pick a random monster from the spawn list
+                monster_names = sp.get("spawn_monsters", [])
+                if not monster_names:
+                    continue
+                chosen_name = random.choice(monster_names)
+
+                # Find a valid position on or adjacent to the spawn tile.
+                # Try the spawn tile itself first, then the 8 neighbours.
+                spawn_offsets = [(0, 0)]
+                for _od in [(-1, 0), (1, 0), (0, -1), (0, 1),
+                            (-1, -1), (1, -1), (-1, 1), (1, 1)]:
+                    spawn_offsets.append(_od)
+                random.shuffle(spawn_offsets)
+                for _odc, _odr in spawn_offsets:
+                    sc = c + _odc
+                    sr = r + _odr
+                    if not (0 <= sc < tile_map.width
+                            and 0 <= sr < tile_map.height):
+                        continue
+                    if not tile_map.is_walkable(sc, sr):
+                        continue
+                    if sc == party.col and sr == party.row:
+                        continue
+                    if any(m.col == sc and m.row == sr
+                           for m in self.overworld_monsters):
+                        continue
+                    try:
+                        monster = create_monster(chosen_name)
+                        monster.col = sc
+                        monster.row = sr
+                        # Set encounter template so combat uses
+                        # the correct monster, not a random encounter
+                        monster.encounter_template = {
+                            "name": chosen_name,
+                            "monster_names": [chosen_name],
+                            "monster_party_tile": chosen_name,
+                        }
+                        self.overworld_monsters.append(monster)
+                        # Track for spawn animation
+                        self._spawn_effects.append({
+                            "col": sc, "row": sr,
+                            "src_col": c, "src_row": r,
+                            "timer": 1.0,
+                        })
+                    except Exception:
+                        pass
+                    break
+
     # ── Input ─────────────────────────────────────────────────────
 
     def handle_input(self, events, keys_pressed):
@@ -305,6 +405,11 @@ class OverworldState(InventoryMixin, BaseState):
                 # ── Dungeon action screen input ──
                 if self.dungeon_action_active:
                     self._handle_dungeon_action_input(event)
+                    return
+
+                # ── Spawn action screen input ──
+                if self.spawn_action_active:
+                    self._handle_spawn_action_input(event)
                     return
 
                 # ── Building action screen input ──
@@ -418,7 +523,7 @@ class OverworldState(InventoryMixin, BaseState):
         if (self.showing_party or self.showing_char_detail is not None
                 or self.showing_party_inv or self.ow_npc_dialogue_active
                 or self.town_action_active or self.dungeon_action_active
-                or self.building_action_active):
+                or self.building_action_active or self.spawn_action_active):
             return
 
         # Movement only if cooldown has elapsed
@@ -499,6 +604,9 @@ class OverworldState(InventoryMixin, BaseState):
                     # Occasionally respawn orcs that were killed
                     if random.random() < ORC_RESPAWN_CHANCE:
                         self._spawn_orcs()
+                    # Check spawn tiles every step — the spawn_chance
+                    # percentage is the per-step probability
+                    self._spawn_from_spawn_tiles()
                 else:
                     # Move building interior guardian NPCs
                     if self._building_interior_npcs:
@@ -1034,7 +1142,7 @@ class OverworldState(InventoryMixin, BaseState):
 
         # Don't re-trigger if an action screen is already active
         if (self.building_action_active or self.dungeon_action_active
-                or self.town_action_active):
+                or self.town_action_active or self.spawn_action_active):
             return
 
         party = self.game.party
@@ -1192,6 +1300,14 @@ class OverworldState(InventoryMixin, BaseState):
             pos = (pcol, prow)
             original = self.chest_under_tiles.pop(pos, TILE_GRASS)
             tmap.set_tile(pos[0], pos[1], original)
+            return
+
+        # Check for spawn tiles (any tile with interaction_type == "spawn")
+        from src import settings as _settings
+        tdef = _settings.TILE_DEFS.get(tile_id, {})
+        if tdef.get("interaction_type") == "spawn" or tile_id == TILE_SPAWN:
+            if (pcol, prow) not in self.destroyed_spawns:
+                self._show_spawn_action(pcol, prow, tile_id)
             return
 
         # ── Unique tile check ──
@@ -2636,6 +2752,97 @@ class OverworldState(InventoryMixin, BaseState):
             f"Quest complete! Elara rewards the party with {reward_gold} gold."
         )
 
+    # ── Spawn point action screen ──────────────────────────────
+
+    def _show_spawn_action(self, pcol, prow, tile_id):
+        """Show the spawn point action screen."""
+        from src.party import SPAWN_POINTS
+        sp = SPAWN_POINTS.get(tile_id, {})
+        self.spawn_action_info = {
+            "name": sp.get("name", "Monster Lair"),
+            "description": sp.get("description", "A creature's lair. Something dangerous lurks within."),
+            "tile_id": tile_id,
+        }
+        self.spawn_action_pos = (pcol, prow)
+        self.spawn_action_cursor = 0
+        self.spawn_action_active = True
+
+    def _handle_spawn_action_input(self, event):
+        """Handle input for the spawn entry action screen."""
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.spawn_action_cursor = (self.spawn_action_cursor - 1) % 2
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.spawn_action_cursor = (self.spawn_action_cursor + 1) % 2
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self.spawn_action_cursor == 0:
+                self._enter_spawn_confirmed()
+            else:
+                self.spawn_action_active = False
+                self._exit_grace = True
+        elif event.key == pygame.K_ESCAPE:
+            self.spawn_action_active = False
+            self._exit_grace = True
+
+    def _enter_spawn_confirmed(self):
+        """Enter the monster spawn — trigger boss fight."""
+        from src.party import SPAWN_POINTS
+        from src.monster import create_monster
+
+        tile_id = self.spawn_action_info.get("tile_id")
+        sp = SPAWN_POINTS.get(tile_id, {})
+        boss_name = sp.get("boss_monster", "")
+        if not boss_name:
+            # No boss defined — just close
+            self.spawn_action_active = False
+            self._exit_grace = True
+            self.message = "The lair is empty."
+            self.message_timer = 2000
+            return
+
+        # Create boss monster
+        try:
+            boss = create_monster(boss_name)
+        except Exception:
+            self.spawn_action_active = False
+            self._exit_grace = True
+            return
+
+        pcol, prow = self.spawn_action_pos
+        boss.col = pcol
+        boss.row = prow
+
+        # Find first alive fighter
+        fighter = None
+        for member in self.game.party.members:
+            if member.is_alive():
+                fighter = member
+                break
+        if not fighter:
+            self.spawn_action_active = False
+            return
+
+        self.spawn_action_active = False
+        self.game.sfx.play("encounter")
+
+        # Store spawn info so we can destroy it on victory
+        # We'll use a special attribute on combat_state
+        terrain_tile = self.game.tile_map.get_tile(pcol, prow)
+
+        # Create a sentinel monster ref so combat can track it
+        boss.is_spawn_boss = True
+        boss.spawn_tile_pos = (pcol, prow)
+        boss.spawn_tile_id = tile_id
+
+        combat = self.game.states.get("combat")
+        combat.start_combat(
+            fighter, [boss],
+            source_state="overworld",
+            encounter_name=f"Boss: {boss_name}",
+            map_monster_refs=[],
+            terrain_tile=terrain_tile,
+            combat_location="overview")
+        self.game.change_state("combat")
+
     # ── Chest loot ─────────────────────────────────────────────
 
     def _open_chest(self):
@@ -2666,6 +2873,21 @@ class OverworldState(InventoryMixin, BaseState):
 
     def update(self, dt):
         """Update timers."""
+        # Check for pending spawn point destructions
+        if hasattr(self.game, 'pending_spawn_destroys') and self.game.pending_spawn_destroys:
+            for destroy in self.game.pending_spawn_destroys:
+                pos = destroy['pos']
+                self.destroyed_spawns.add(pos)
+                # Replace spawn tile with grass
+                self.game.tile_map.set_tile(pos[0], pos[1], TILE_GRASS)
+            self.game.pending_spawn_destroys = []
+
+        # Tick spawn effects
+        for eff in self._spawn_effects:
+            eff["timer"] -= dt
+        self._spawn_effects = [e for e in self._spawn_effects
+                               if e["timer"] > 0]
+
         dt_ms = dt * 1000  # convert seconds to ms
         if self.message_timer > 0:
             self.message_timer -= dt_ms
@@ -2788,6 +3010,7 @@ class OverworldState(InventoryMixin, BaseState):
             overworld_npcs=ow_npcs,
             quest_effects=self.quest_effects,
             interior_darkness=getattr(self, "_in_overworld_interior", False),
+            spawn_effects=self._spawn_effects,
         )
         # ── Overworld NPC quest choice overlay ──
         if self.ow_quest_choice_active:
@@ -2802,6 +3025,9 @@ class OverworldState(InventoryMixin, BaseState):
         if self.building_action_active:
             renderer.draw_building_action_screen(
                 self.building_action_info, self.building_action_cursor)
+        if self.spawn_action_active:
+            renderer.draw_spawn_action_screen(
+                self.spawn_action_info, self.spawn_action_cursor)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:
