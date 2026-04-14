@@ -15,7 +15,9 @@
       "melee": false,
       "throwable": false,
       "buy": 0,
-      "sell": 0
+      "sell": 0,
+      "durability": 80,
+      "indestructible": false
     },
     "Club": {
       "power": 1,
@@ -32,7 +34,9 @@
       "party_can_equip": false,
       "character_can_equip": true,
       "melee": false,
-      "throwable": false
+      "throwable": false,
+      "durability": 2,
+      "indestructible": false
     },
     "Crossbow": {
       "power": 9,
@@ -50,7 +54,9 @@
       "party_can_equip": false,
       "character_can_equip": true,
       "melee": false,
-      "throwable": false
+      "throwable": false,
+      "durability": 100,
+      "indestructible": false
     },
     "Dagger": {
       "power": 1,
@@ -67,7 +73,9 @@
       "buy": 20,
       "sell": 10,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 60,
+      "indestructible": false
     },
     "Fists": {
       "power": 0,
@@ -80,7 +88,9 @@
       "icon": "gloves",
       "item_type": "fists",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Gloves": {
       "power": 1,
@@ -97,7 +107,9 @@
       "melee": false,
       "throwable": false,
       "buy": 0,
-      "sell": 0
+      "sell": 0,
+      "durability": 50,
+      "indestructible": false
     },
     "Halberd": {
       "power": 9,
@@ -110,7 +122,9 @@
       "icon": "halberd",
       "item_type": "halberd",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 90,
+      "indestructible": false
     },
     "Iron Sword": {
       "power": 8,
@@ -123,7 +137,9 @@
       "icon": "sword",
       "item_type": "sword",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 100,
+      "indestructible": false
     },
     "Long Bow": {
       "power": 7,
@@ -139,7 +155,9 @@
       "buy": 150,
       "sell": 75,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 80,
+      "indestructible": false
     },
     "Mace": {
       "power": 2,
@@ -154,7 +172,9 @@
       "buy": 40,
       "sell": 20,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 70,
+      "indestructible": false
     },
     "Mystic Sword": {
       "power": 10,
@@ -167,7 +187,9 @@
       "icon": "sword",
       "item_type": "sword",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Rock": {
       "power": 1,
@@ -184,7 +206,9 @@
       "buy": 0,
       "sell": 0,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Short Bow": {
       "power": 4,
@@ -200,7 +224,9 @@
       "buy": 60,
       "sell": 30,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 60,
+      "indestructible": false
     },
     "Silver Bow": {
       "power": 9,
@@ -214,7 +240,9 @@
       "icon": "bow",
       "item_type": "long_bow",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Sling": {
       "power": 2,
@@ -230,7 +258,9 @@
       "buy": 60,
       "sell": 30,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 50,
+      "indestructible": false
     },
     "Spear": {
       "power": 6,
@@ -243,7 +273,9 @@
       "icon": "spear",
       "item_type": "spear",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 70,
+      "indestructible": false
     },
     "Sun Sword": {
       "power": 10,
@@ -256,7 +288,9 @@
       "icon": "sword",
       "item_type": "sword",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Sword": {
       "power": 5,
@@ -271,7 +305,9 @@
       "buy": 120,
       "sell": 60,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 80,
+      "indestructible": false
     }
   },
   "armors": {
@@ -284,7 +320,9 @@
       "icon": "armor_heavy",
       "item_type": "chain",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "+2 Plate": {
       "evasion": 64,
@@ -295,7 +333,9 @@
       "icon": "armor_heavy",
       "item_type": "plate",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Chain": {
       "evasion": 58,
@@ -308,7 +348,9 @@
       "buy": 120,
       "sell": 60,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 80,
+      "indestructible": false
     },
     "Cloth": {
       "evasion": 50,
@@ -321,7 +363,9 @@
       "buy": 20,
       "sell": 10,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Exotic": {
       "evasion": 67,
@@ -332,7 +376,9 @@
       "icon": "armor_heavy",
       "item_type": "exotic",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 0,
+      "indestructible": true
     },
     "Leather": {
       "evasion": 56,
@@ -345,7 +391,9 @@
       "buy": 50,
       "sell": 25,
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 60,
+      "indestructible": false
     },
     "Plate": {
       "evasion": 60,
@@ -356,7 +404,9 @@
       "icon": "armor_heavy",
       "item_type": "plate",
       "party_can_equip": false,
-      "character_can_equip": true
+      "character_can_equip": true,
+      "durability": 100,
+      "indestructible": false
     }
   },
   "general": {

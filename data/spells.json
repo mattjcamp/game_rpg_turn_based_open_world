@@ -340,13 +340,15 @@
       ],
       "casting_type": "priest",
       "min_level": 1,
-      "mp_cost": 3,
+      "mp_cost": 5,
       "duration": "instant",
       "effect_type": "heal",
       "effect_value": {
         "dice": "1d6",
         "stat_bonus": "wisdom",
-        "min_heal": 1
+        "min_heal": 1,
+        "dice_count": 1,
+        "dice_sides": 6
       },
       "range": 6,
       "targeting": "select_ally_or_self",
@@ -357,7 +359,8 @@
         "dungeon"
       ],
       "sfx": "heal",
-      "hit_sfx": null
+      "hit_sfx": "",
+      "icon": ""
     },
     {
       "id": "cure_poison",

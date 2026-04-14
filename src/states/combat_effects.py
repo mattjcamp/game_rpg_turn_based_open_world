@@ -334,3 +334,19 @@ class MonsterSpellEffect(_TimerEffect):
         self.color = self.COLORS.get(spell_type, (200, 200, 200))
         self.label = label
         self.success = success
+
+
+class ShatterEffect(_TimerEffect):
+    """A dramatic weapon/armor shatter burst.
+
+    Rendered as expanding red-orange shards radiating outward from the
+    target tile, with a brief screen-shake cue.
+    """
+    DURATION = 0.7
+
+    def __init__(self, col, row, item_name=""):
+        super().__init__()
+        self.col = col
+        self.row = row
+        self.item_name = item_name
+        self.damage = 0  # not used for damage numbers

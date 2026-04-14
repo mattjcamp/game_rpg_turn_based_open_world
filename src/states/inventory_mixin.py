@@ -33,6 +33,7 @@ class InventoryMixin:
         self.char_action_menu = False     # True when action popup open
         self.char_action_cursor = 0       # selected option in popup
         self.examining_item = None        # item name being examined
+        self.examining_durability = None  # (current, max) or None for examine popup
 
         # Party shared-inventory screen
         self.showing_party_inv = False
@@ -177,6 +178,26 @@ class InventoryMixin:
                 return member.inventory[inv_idx]
         return None
 
+    def _get_durability_at_cursor(self, member):
+        """Return (current, max) durability for the item at cursor, or None."""
+        idx = self.char_sheet_cursor
+        if idx < 4:
+            slot_keys = ["right_hand", "left_hand", "body", "head"]
+            slot = slot_keys[idx]
+            return member.get_slot_durability(slot)
+        else:
+            inv_idx = idx - 4
+            if inv_idx < len(member.inventory):
+                item_name = member.inventory[inv_idx]
+                max_dur, indestructible = member._get_item_max_durability(item_name)
+                if indestructible:
+                    return None
+                saved = member.inventory_durability.get(item_name)
+                if saved is not None:
+                    return (saved, max_dur)
+                return (max_dur, max_dur)  # Fresh item — full durability
+        return None
+
     def _handle_equip_action(self, member):
         """Open the action menu for the selected item/slot."""
         options = self._get_action_options(member)
@@ -222,6 +243,7 @@ class InventoryMixin:
         if self.examining_item is not None:
             if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self.examining_item = None
+                self.examining_durability = None
             return
 
         member = self.game.party.members[self.showing_char_detail]
@@ -240,6 +262,7 @@ class InventoryMixin:
             idx = self.char_sheet_cursor
             if chosen == "Examine":
                 self.examining_item = self._get_item_at_cursor(member)
+                self.examining_durability = self._get_durability_at_cursor(member)
                 return
             elif chosen == "Use":
                 inv_idx = idx - 4
@@ -746,6 +769,7 @@ class InventoryMixin:
         if self.examining_item is not None:
             if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self.examining_item = None
+                self.examining_durability = None
             return
 
         # Poison application workflow is active
@@ -886,6 +910,8 @@ class InventoryMixin:
                         self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen == "Examine":
                     self.examining_item = item_name
+                    # No per-instance durability for party stash items
+                    self.examining_durability = None
                 elif chosen == "Apply to weapon":
                     # Start poison application workflow
                     self.applying_poison_item = item_name

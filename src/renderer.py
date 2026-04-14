@@ -5497,10 +5497,12 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 2d. hit flash effects ──
         if hit_effects:
-            from src.states.combat_effects import _BackstabEffect
+            from src.states.combat_effects import _BackstabEffect, ShatterEffect
             for fx in hit_effects:
                 if fx.alive:
-                    if isinstance(fx, _BackstabEffect):
+                    if isinstance(fx, ShatterEffect):
+                        self._u3_draw_shatter_effect(mx, my, ts, fx)
+                    elif isinstance(fx, _BackstabEffect):
                         self._u3_draw_backstab(mx, my, ts, fx)
                     else:
                         self._u3_draw_hit_effect(mx, my, ts, fx)
@@ -17017,10 +17019,11 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.rect(self.screen, STEEL, (cx - 14, cy - 14, 28, 28), 2, border_radius=4)
             self._u3_text("?", cx - 4, cy - 6, WHITE, self.font)
 
-    def draw_item_examine(self, item_name):
+    def draw_item_examine(self, item_name, durability=None):
         """Draw a centered item examination popup overlay.
 
         Shows a pixel-art icon, item name, type, stats, and description.
+        *durability* is an optional (current, max) tuple for destructible items.
         """
         from src.party import WEAPONS, ARMORS, ITEM_INFO
 
@@ -17028,7 +17031,7 @@ class Renderer(CombatEffectRendererMixin):
         f = self.font
 
         # Popup dimensions
-        pw, ph = 340, 280
+        pw, ph = 340, 300
         px = (SCREEN_WIDTH - pw) // 2
         py = (SCREEN_HEIGHT - ph) // 2
 
@@ -17081,6 +17084,25 @@ class Renderer(CombatEffectRendererMixin):
             ty += 20
             self._u3_text("EVASION:", name_x, ty, self._U3_LTBLUE, fm)
             self._u3_text(f"{arm['evasion']}%", name_x + 80, ty, self._U3_GREEN, fm)
+            # Durability display for armor
+            ty += 20
+            if arm.get("indestructible", False):
+                self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                self._u3_text("\u221e", name_x + 55, ty, self._U3_GREEN, fm)
+            elif durability is not None:
+                cur, mx = durability
+                self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                ratio = cur / mx if mx > 0 else 0
+                dur_color = self._U3_GREEN if ratio > 0.5 else self._U3_ORANGE if ratio > 0.2 else self._U3_RED
+                self._u3_text(f"{cur}/{mx}", name_x + 55, ty, dur_color, fm)
+            else:
+                max_dur = arm.get("durability", 0)
+                if max_dur > 0:
+                    self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                    self._u3_text(f"{max_dur}/{max_dur}", name_x + 55, ty, self._U3_GREEN, fm)
+                else:
+                    self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                    self._u3_text("\u221e", name_x + 55, ty, self._U3_GREEN, fm)
         elif item_name in WEAPONS:
             wp = WEAPONS[item_name]
             wtype = "RANGED" if wp.get("ranged", False) else "MELEE"
@@ -17098,6 +17120,25 @@ class Renderer(CombatEffectRendererMixin):
                 ty += 20
                 self._u3_text("NOTE:", name_x, ty, self._U3_LTBLUE, fm)
                 self._u3_text("CONSUMABLE", name_x + 55, ty, self._U3_RED, fm)
+            # Durability display for weapons
+            ty += 20
+            if wp.get("indestructible", False):
+                self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                self._u3_text("\u221e", name_x + 55, ty, self._U3_GREEN, fm)
+            elif durability is not None:
+                cur, mx = durability
+                self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                ratio = cur / mx if mx > 0 else 0
+                dur_color = self._U3_GREEN if ratio > 0.5 else self._U3_ORANGE if ratio > 0.2 else self._U3_RED
+                self._u3_text(f"{cur}/{mx}", name_x + 55, ty, dur_color, fm)
+            else:
+                max_dur = wp.get("durability", 0)
+                if max_dur > 0:
+                    self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                    self._u3_text(f"{max_dur}/{max_dur}", name_x + 55, ty, self._U3_GREEN, fm)
+                else:
+                    self._u3_text("USES:", name_x, ty, self._U3_LTBLUE, fm)
+                    self._u3_text("\u221e", name_x + 55, ty, self._U3_GREEN, fm)
         else:
             self._u3_text("TYPE:", name_x, ty, self._U3_LTBLUE, fm)
             self._u3_text("GENERAL ITEM", name_x + 55, ty, self._U3_WHITE, fm)

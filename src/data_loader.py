@@ -58,6 +58,11 @@ def load_items(data_dir=None):
             entry["slots"] = data["slots"]
         if data.get("item_type"):
             entry["item_type"] = data["item_type"]
+        # Durability system
+        if "durability" in data:
+            entry["durability"] = data["durability"]
+        if data.get("indestructible"):
+            entry["indestructible"] = True
         weapons[name] = entry
 
         # Description & icon (what ITEM_INFO needs)
@@ -72,6 +77,11 @@ def load_items(data_dir=None):
                 info["charges"] = data["charges"]
             if data.get("item_type"):
                 info["item_type"] = data["item_type"]
+            # Durability info for display
+            if "durability" in data:
+                info["durability"] = data["durability"]
+            if data.get("indestructible"):
+                info["indestructible"] = True
             item_info[name] = info
 
         # Shop prices (what SHOP_INVENTORY needs)
@@ -88,6 +98,11 @@ def load_items(data_dir=None):
             entry["slots"] = data["slots"]
         if data.get("item_type"):
             entry["item_type"] = data["item_type"]
+        # Durability system
+        if "durability" in data:
+            entry["durability"] = data["durability"]
+        if data.get("indestructible"):
+            entry["indestructible"] = True
         armors[name] = entry
 
         if "description" in data or "icon" in data:
@@ -101,6 +116,11 @@ def load_items(data_dir=None):
                 info["charges"] = data["charges"]
             if data.get("item_type"):
                 info["item_type"] = data["item_type"]
+            # Durability info for display
+            if "durability" in data:
+                info["durability"] = data["durability"]
+            if data.get("indestructible"):
+                info["indestructible"] = True
             item_info[name] = info
 
         if "buy" in data:

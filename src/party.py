@@ -75,6 +75,15 @@ def _roster_member_to_json(member):
     }
     if member.sprite:
         data["sprite"] = member.sprite
+    # Durability state — only save slots that have finite durability
+    dur = getattr(member, "equipped_durability", {})
+    dur_save = {s: v for s, v in dur.items() if v is not None}
+    if dur_save:
+        data["equipped_durability"] = dur_save
+    # Inventory durability — items in inventory with partial wear
+    inv_dur = getattr(member, "inventory_durability", {})
+    if inv_dur:
+        data["inventory_durability"] = dict(inv_dur)
     return data
 
 
@@ -443,6 +452,11 @@ class PartyMember:
         # Inventory — list of item name strings the character is carrying
         self.inventory = []
 
+        # Per-item durability for items in inventory (not currently equipped).
+        # Maps item_name → remaining durability (int).  Items not in this dict
+        # are assumed to be at full durability when equipped.
+        self.inventory_durability = {}
+
         # Mutable MP pool — initialized lazily on first access
         self._current_mp = None
 
@@ -464,6 +478,16 @@ class PartyMember:
         # Dict: {"poison_name", "poison_type", "damage", "mp_drain",
         #        "debilitate", "duration", "save_dc", "hits_remaining"}
         self.weapon_poison = {"right_hand": None, "left_hand": None}
+
+        # Durability tracking — current remaining uses for each equipped slot.
+        # Initialized from item data when an item is equipped.
+        # Values: int (remaining uses) or None (indestructible / not tracked).
+        self.equipped_durability = {
+            "right_hand": None,  # Fists are indestructible
+            "left_hand": None,
+            "body": None,        # Cloth is indestructible
+            "head": None,
+        }
 
     # ── Stats (base + racial modifiers) ─────────────────────────
 
@@ -1066,8 +1090,11 @@ class PartyMember:
                     other_is_ranged = other_wp.get("ranged", False)
                     if new_is_ranged == other_is_ranged:
                         # Same type in the other hand — unequip it first
+                        # Save durability of swapped-out item
+                        self._save_slot_durability_to_inventory(other_slot, other_item)
                         self.inventory.append(other_item)
                         self.equipped[other_slot] = other_default
+                        self.equipped_durability[other_slot] = None
                         # Clear weapon poison from swapped-out weapon
                         if hasattr(self, 'weapon_poison'):
                             self.weapon_poison[other_slot] = None
@@ -1075,6 +1102,8 @@ class PartyMember:
         # Move the currently equipped item back to inventory (if not a default)
         old_item = self.equipped.get(slot)
         if old_item and old_item != self._SLOT_DEFAULTS.get(slot):
+            # Save durability of the item being replaced
+            self._save_slot_durability_to_inventory(slot, old_item)
             self.inventory.append(old_item)
             # Clear weapon poison from the slot being replaced
             if hasattr(self, 'weapon_poison') and slot in self.weapon_poison:
@@ -1083,6 +1112,13 @@ class PartyMember:
         # Remove from inventory and equip
         self.inventory.remove(item_name)
         self.equipped[slot] = item_name
+
+        # Restore durability from inventory tracking, or initialize fresh
+        saved_dur = self.inventory_durability.pop(item_name, None)
+        if saved_dur is not None:
+            self.equipped_durability[slot] = saved_dur
+        else:
+            self._init_slot_durability(slot, item_name)
 
         # Sync legacy fields used by combat engine
         self._sync_legacy_fields()
@@ -1099,8 +1135,11 @@ class PartyMember:
         if current is None or current == default:
             return False
 
+        # Save durability before moving to inventory
+        self._save_slot_durability_to_inventory(slot, current)
         self.inventory.append(current)
         self.equipped[slot] = default
+        self.equipped_durability[slot] = None
         # Clear weapon poison from unequipped slot
         if hasattr(self, 'weapon_poison') and slot in self.weapon_poison:
             self.weapon_poison[slot] = None
@@ -1129,10 +1168,108 @@ class PartyMember:
         default = self._SLOT_DEFAULTS.get(slot)
         if current is None or current == default:
             return False
+        # Save durability before sending to party stash
+        self._save_slot_durability_to_inventory(slot, current)
         party.shared_inventory.append(current)
         self.equipped[slot] = default
+        self.equipped_durability[slot] = None
         self._sync_legacy_fields()
         return True
+
+    def _save_slot_durability_to_inventory(self, slot, item_name):
+        """Save the current durability of an equipped item before it goes to inventory."""
+        cur = self.equipped_durability.get(slot)
+        if cur is not None:
+            # Only track if the item has finite durability
+            self.inventory_durability[item_name] = cur
+
+    # ── Durability helpers ──────────────────────────────────────
+
+    @staticmethod
+    def _get_item_max_durability(item_name):
+        """Return (max_durability, indestructible) for an item.
+
+        Returns (0, True) for indestructible items.
+        Returns (max_uses, False) for destructible items.
+        Returns (0, True) if the item has no durability data (legacy/safe default).
+        """
+        entry = WEAPONS.get(item_name) or ARMORS.get(item_name)
+        if not entry:
+            return (0, True)  # Unknown items are treated as indestructible
+        if entry.get("indestructible", False):
+            return (0, True)
+        dur = entry.get("durability", 0)
+        if dur <= 0:
+            return (0, True)  # No durability set = indestructible
+        return (dur, False)
+
+    def _init_slot_durability(self, slot, item_name):
+        """Set initial durability for a freshly equipped item."""
+        max_dur, indestructible = self._get_item_max_durability(item_name)
+        if indestructible:
+            self.equipped_durability[slot] = None
+        else:
+            self.equipped_durability[slot] = max_dur
+
+    def get_slot_durability(self, slot):
+        """Return (current, max) durability for a slot, or None if indestructible."""
+        item_name = self.equipped.get(slot)
+        if not item_name:
+            return None
+        max_dur, indestructible = self._get_item_max_durability(item_name)
+        if indestructible:
+            return None  # Infinite
+        current = self.equipped_durability.get(slot)
+        if current is None:
+            # Item became destructible after data edit — initialize now
+            self.equipped_durability[slot] = max_dur
+            return (max_dur, max_dur)
+        # Clamp: if the max was lowered in the editor, current can't exceed it
+        if current > max_dur:
+            current = max_dur
+            self.equipped_durability[slot] = current
+        return (current, max_dur)
+
+    def use_durability(self, slot):
+        """Decrement durability for the item in *slot* by 1.
+
+        Returns True if the item just broke (durability reached 0).
+        Returns False if the item is still usable or is indestructible.
+        """
+        item_name = self.equipped.get(slot)
+        if not item_name:
+            return False
+        max_dur, indestructible = self._get_item_max_durability(item_name)
+        if indestructible:
+            return False
+        current = self.equipped_durability.get(slot)
+        if current is None:
+            # Item became destructible after data edit — initialize now
+            current = max_dur
+        # Clamp current to max (handles editor changes to durability)
+        if current > max_dur:
+            current = max_dur
+        current -= 1
+        self.equipped_durability[slot] = current
+        return current <= 0
+
+    def break_equipped_item(self, slot):
+        """Destroy the item in *slot* and revert to the slot default.
+
+        Returns the name of the destroyed item, or None.
+        """
+        item_name = self.equipped.get(slot)
+        default = self._SLOT_DEFAULTS.get(slot)
+        if not item_name or item_name == default:
+            return None
+        # Item is destroyed — do NOT return it to inventory
+        self.equipped[slot] = default
+        self.equipped_durability[slot] = None
+        # Clear weapon poison from broken weapon
+        if hasattr(self, 'weapon_poison') and slot in self.weapon_poison:
+            self.weapon_poison[slot] = None
+        self._sync_legacy_fields()
+        return item_name
 
     def _sync_legacy_fields(self):
         """Keep the old .weapon and .armor fields in sync with equipped dict."""
@@ -1561,6 +1698,19 @@ def _build_member_from_cfg(char_cfg):
     # Personal inventory
     for item in char_cfg.get("inventory", []):
         member.inventory.append(item)
+
+    # Restore durability state
+    saved_dur = char_cfg.get("equipped_durability", {})
+    for slot, val in saved_dur.items():
+        member.equipped_durability[slot] = val
+    # For equipped slots without saved durability, initialize from item data
+    for slot in ("right_hand", "left_hand", "body", "head"):
+        if slot not in saved_dur:
+            item_name = member.equipped.get(slot)
+            if item_name:
+                member._init_slot_durability(slot, item_name)
+    # Restore inventory durability
+    member.inventory_durability = dict(char_cfg.get("inventory_durability", {}))
 
     return member
 

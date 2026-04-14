@@ -1880,3 +1880,68 @@ class CombatEffectRendererMixin:
                 self.screen.blit(outline, (rx + ox, float_y + oy))
             self.screen.blit(surf, (rx, float_y))
 
+    # ── Shatter effect ─────────────────────────────────────────────
+
+    def _u3_draw_shatter_effect(self, ax, ay, ts, fx):
+        """Draw a dramatic item-shatter burst — red/orange shards
+        radiating outward with a brief screen shake and floating text."""
+        import math
+        cx = ax + fx.col * ts + ts // 2
+        cy = ay + fx.row * ts + ts // 2
+        p = fx.progress  # 0 → 1
+
+        # Screen shake in early phase
+        if p < 0.3:
+            import random
+            shake = int(3 * (1.0 - p / 0.3))
+            if shake > 0:
+                cx += random.randint(-shake, shake)
+                cy += random.randint(-shake, shake)
+
+        # Phase 1 (0–0.25): bright orange-white flash
+        if p < 0.25:
+            sub_p = p / 0.25
+            radius = int(6 + sub_p * 14)
+            alpha_f = 1.0 - sub_p * 0.4
+            c = (int(255 * alpha_f), int(180 * alpha_f), int(60 * alpha_f))
+            pygame.draw.circle(self.screen, c, (cx, cy), radius)
+            # White core
+            pygame.draw.circle(self.screen, (255, 255, 220),
+                               (cx, cy), int(4 + sub_p * 6))
+
+        # Phase 2 (0.15–0.7): shards radiating outward
+        if 0.15 < p < 0.7:
+            sub_p = (p - 0.15) / 0.55
+            num_shards = 8
+            for i in range(num_shards):
+                angle = (2 * math.pi * i) / num_shards + 0.3
+                dist = int(8 + sub_p * 24)
+                sx = cx + int(math.cos(angle) * dist)
+                sy = cy + int(math.sin(angle) * dist)
+                alpha_f = 1.0 - sub_p
+                # Alternating red/orange shards
+                if i % 2 == 0:
+                    c = (int(255 * alpha_f), int(80 * alpha_f), int(20 * alpha_f))
+                else:
+                    c = (int(255 * alpha_f), int(160 * alpha_f), int(40 * alpha_f))
+                shard_size = max(1, int(3 * alpha_f))
+                pygame.draw.rect(self.screen, c,
+                                 (sx - shard_size, sy - shard_size,
+                                  shard_size * 2, shard_size * 2))
+
+        # Phase 3 (0.3–1.0): "SHATTERED!" text floating up
+        if p > 0.3:
+            sub_p = (p - 0.3) / 0.7
+            float_y = cy - 16 - int(sub_p * 24)
+            alpha_f = max(0, 1.0 - sub_p * 1.2)
+            if alpha_f > 0:
+                txt = "SHATTERED!"
+                r_val = int(255 * alpha_f)
+                g_val = int(100 * alpha_f)
+                surf = self.font_small.render(txt, True, (r_val, g_val, 0))
+                outline = self.font_small.render(txt, True, self._U3_BLACK)
+                rx = cx - surf.get_width() // 2
+                for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    self.screen.blit(outline, (rx + ox, float_y + oy))
+                self.screen.blit(surf, (rx, float_y))
+

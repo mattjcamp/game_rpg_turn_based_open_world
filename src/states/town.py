@@ -2898,7 +2898,7 @@ class TownState(InventoryMixin, BaseState):
             if self.use_item_anim:
                 renderer.draw_use_item_animation(self.game.party, self.use_item_anim)
             if self.examining_item:
-                renderer.draw_item_examine(self.examining_item)
+                renderer.draw_item_examine(self.examining_item, getattr(self, 'examining_durability', None))
             return
         if self.showing_char_detail is not None:
             idx = self.showing_char_detail
@@ -2909,7 +2909,7 @@ class TownState(InventoryMixin, BaseState):
                 self.char_action_menu, self.char_action_cursor,
                 action_options=action_opts)
             if self.examining_item:
-                renderer.draw_item_examine(self.examining_item)
+                renderer.draw_item_examine(self.examining_item, getattr(self, 'examining_durability', None))
             return
         if self.showing_party:
             renderer.draw_party_screen_u3(self.game.party)

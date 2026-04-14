@@ -1,19 +1,12 @@
 ## Polish
-- "Camping Supplies" should not appear in the battle screen, only items usable in combat should appear in this screen
 
 ## Bugs
 - In the adandoned building quest, the monsters don't move around and the battle screen looks like the forest
 
-## Content
-- Add/Balance spells
-- Add/Balance weapons/armor
-- Add/Balance magic items
-- Add monsters
-- Add more tiles
-
 ## Features
 - Add weapon/armor wear-down system
 - Better monster spawn system
-- Time based events
+- Time based events like entrances that only appear during full moons at night
 - Larger overview map editor
 - "Epic" system to define game spawning quest system
+- Make some monsters physically bigger

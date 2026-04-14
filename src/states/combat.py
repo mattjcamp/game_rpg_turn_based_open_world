@@ -31,6 +31,7 @@ from src.states.combat_effects import (
     AnimateDeadEffect, AoeFireballEffect, AoeExplosionEffect,
     BlessEffect, CurseEffect, CurePoisonEffect,
     LightningBoltEffect, MonsterSpellEffect,
+    ShatterEffect,
 )
 
 # SPELLS_DATA is imported from src.party (shared across combat and exploration)
@@ -1851,6 +1852,11 @@ class CombatState(BaseState):
                         break
                 self._try_weapon_poison(f, target, ranged_slot)
 
+            # ── Weapon durability on ranged hit (non-thrown only) ──
+            if not thrown_item:
+                rw_name = info.get("ranged_weapon") or f.weapon
+                self._apply_weapon_durability(f, rw_name)
+
         self._check_monster_death(target)
 
     # ── Weapon poison application on hit ───────────────────────────
@@ -1970,6 +1976,52 @@ class CombatState(BaseState):
                 f"— {amount} attack penalty for {duration} turns")
 
     # ── Shared attack helpers ────────────────────────────────────
+
+    # ── Durability system ─────────────────────────────────────────
+
+    def _apply_weapon_durability(self, fighter, weapon_name):
+        """Decrement weapon durability after a successful hit.
+
+        If the weapon breaks, log it, spawn a shatter effect on the
+        fighter's position, and revert to Fists.
+        """
+        if not hasattr(fighter, 'use_durability'):
+            return  # Monsters don't have durability
+        # Find the slot the weapon is in
+        slot = None
+        for s in ("right_hand", "left_hand"):
+            if fighter.equipped.get(s) == weapon_name:
+                slot = s
+                break
+        if slot is None:
+            return
+        broke = fighter.use_durability(slot)
+        if broke:
+            destroyed_name = fighter.break_equipped_item(slot)
+            if destroyed_name:
+                self.combat_log.append(
+                    f"{fighter.name}'s {destroyed_name} shatters!")
+                fc, fr = self.fighter_positions.get(fighter, (0, 0))
+                self.hit_effects.append(ShatterEffect(fc, fr, destroyed_name))
+                self.game.sfx.play("critical")
+
+    def _apply_armor_durability(self, fighter):
+        """Decrement body armor durability after being hit.
+
+        If the armor breaks, log it, spawn a shatter effect, and revert
+        to Cloth.
+        """
+        if not hasattr(fighter, 'use_durability'):
+            return
+        broke = fighter.use_durability("body")
+        if broke:
+            destroyed_name = fighter.break_equipped_item("body")
+            if destroyed_name:
+                self.combat_log.append(
+                    f"{fighter.name}'s {destroyed_name} is destroyed!")
+                fc, fr = self.fighter_positions.get(fighter, (0, 0))
+                self.hit_effects.append(ShatterEffect(fc, fr, destroyed_name))
+                self.game.sfx.play("critical")
 
     def _roll_attack_with_buffs(self, f, target, ranged=False):
         """Roll to hit, applying bless/curse buffs and logging the result.
@@ -2159,6 +2211,9 @@ class CombatState(BaseState):
                         melee_slot = s
                         break
                 self._try_weapon_poison(f, target, melee_slot)
+
+            # ── Weapon durability on melee hit ──
+            self._apply_weapon_durability(f, melee_wp)
 
         self._check_monster_death(target)
 
@@ -4218,6 +4273,9 @@ class CombatState(BaseState):
             # ── On-hit effects ──
             self._apply_on_hit_effects(monster, target)
 
+            # ── Armor durability on being hit ──
+            self._apply_armor_durability(target)
+
         if not target.is_alive():
             self.combat_log.append(f"{target.name} has fallen!")
 
@@ -5445,7 +5503,7 @@ class CombatState(BaseState):
                 self.equip_action_menu, self.equip_action_cursor,
                 action_options=action_opts)
             if self.equip_examining:
-                renderer.draw_item_examine(self.equip_examining)
+                renderer.draw_item_examine(self.equip_examining, getattr(self, 'equip_examining_durability', None))
             return
 
         renderer.draw_combat_arena(

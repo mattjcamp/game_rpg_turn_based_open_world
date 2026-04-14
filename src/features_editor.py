@@ -1575,6 +1575,11 @@ class FeaturesEditor:
                    str(item.get("throwable", False)), "choice"),
                 FE("Slots", "_slots",
                    ", ".join(item.get("slots", []))),
+                FE("-- Durability --", "_hdr_dur", "", "section", False),
+                FE("Durability", "durability",
+                   str(item.get("durability", 0)), "int"),
+                FE("Indestructible", "indestructible",
+                   str(item.get("indestructible", False)), "choice"),
             ]
         elif section == "armors":
             fields += [
@@ -1583,6 +1588,11 @@ class FeaturesEditor:
                    str(item.get("evasion", 50)), "int"),
                 FE("Slots", "_slots",
                    ", ".join(item.get("slots", []))),
+                FE("-- Durability --", "_hdr_dur", "", "section", False),
+                FE("Durability", "durability",
+                   str(item.get("durability", 0)), "int"),
+                FE("Indestructible", "indestructible",
+                   str(item.get("indestructible", False)), "choice"),
             ]
         else:
             fields += [
@@ -1630,14 +1640,14 @@ class FeaturesEditor:
             if key == "_slots":
                 item["slots"] = [s.strip() for s in val.split(",")
                                  if s.strip()]
-            elif key in ("power", "evasion", "buy", "sell"):
+            elif key in ("power", "evasion", "buy", "sell", "durability"):
                 try:
                     item[key] = int(val)
                 except ValueError:
                     pass
             elif key in ("ranged", "melee", "throwable", "usable",
                          "stackable", "party_can_equip",
-                         "character_can_equip"):
+                         "character_can_equip", "indestructible"):
                 item[key] = val == "True"
             else:
                 item[key] = val
@@ -1655,7 +1665,7 @@ class FeaturesEditor:
             return procedural + tagged
         if key in ("ranged", "melee", "throwable", "usable",
                    "stackable", "party_can_equip",
-                   "character_can_equip"):
+                   "character_can_equip", "indestructible"):
             return ["True", "False"]
         return []
 
