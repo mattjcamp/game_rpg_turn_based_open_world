@@ -12678,7 +12678,12 @@ class Renderer(CombatEffectRendererMixin):
         pygame.draw.rect(self.screen, (180, 60, 60),
                          (rx, ry, rw, rh), 1)
 
-        title = "Spawn Monsters" if mode == "monsters" else "Loot Items"
+        if mode == "monsters":
+            title = "Spawn Monsters"
+        elif mode == "boss":
+            title = "Boss Encounter"
+        else:
+            title = "Loot Items"
         self._u3_text(title, rx + 16, ry + 10, (220, 80, 80), f)
 
         row_h = 36

@@ -188,7 +188,7 @@ def load_spawn_points(data_dir=None):
 
     Looks in *data_dir* first (if given), then falls back to ``data/``.
     Each spawn point has: spawn_monsters, spawn_chance, spawn_radius,
-    max_spawned, boss_monster, xp_reward, gold_reward, loot, description.
+    max_spawned, boss_monsters, xp_reward, gold_reward, loot, description.
     """
     try:
         raw = _load_json("spawn_points.json", data_dir)
@@ -205,6 +205,7 @@ def load_spawn_points(data_dir=None):
             "spawn_radius": entry.get("spawn_radius", 3),
             "max_spawned": entry.get("max_spawned", 2),
             "boss_monster": entry.get("boss_monster", ""),
+            "boss_monsters": list(entry.get("boss_monsters", [])),
             "xp_reward": entry.get("xp_reward", 50),
             "gold_reward": entry.get("gold_reward", 25),
             "loot": list(entry.get("loot", [])),

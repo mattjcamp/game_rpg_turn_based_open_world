@@ -1040,9 +1040,16 @@ class FeaturesEditor:
                    str(sp.get("max_spawned", 2)), "int"))
             fields.append(
                 FE("-- Boss & Rewards --", "_hdr_sp2", "", "section", False))
+            # Boss monsters — clickable sub-list editor (like Edit Monsters)
+            _boss_list = sp.get("boss_monsters", [])
+            # Backwards compat: migrate old single boss_monster string
+            if not _boss_list and sp.get("boss_monster"):
+                _boss_list = [sp["boss_monster"]]
+            _n_boss = len(_boss_list)
             fields.append(
-                FE("Boss Monster", "_sp_boss_monster",
-                   sp.get("boss_monster", ""), "choice"))
+                FE("Edit Boss Encounter", "_sp_edit_boss",
+                   f"{_n_boss} monster{'s' if _n_boss != 1 else ''} [>]",
+                   "choice"))
             fields.append(
                 FE("XP Reward", "_sp_xp_reward",
                    str(sp.get("xp_reward", 50)), "int"))
@@ -1087,10 +1094,10 @@ class FeaturesEditor:
             key, val = entry.key, entry.value
             # Handle spawn-specific fields (skip sub-list launchers)
             if key.startswith("_sp_") and key not in (
-                    "_sp_edit_monsters", "_sp_edit_loot"):
+                    "_sp_edit_monsters", "_sp_edit_loot", "_sp_edit_boss"):
                 spawn_changes[key] = val
                 continue
-            if key in ("_sp_edit_monsters", "_sp_edit_loot"):
+            if key in ("_sp_edit_monsters", "_sp_edit_loot", "_sp_edit_boss"):
                 continue  # read-only display fields
             if key.startswith("_") and key not in ("_color", "_sprite"):
                 continue
@@ -1215,20 +1222,8 @@ class FeaturesEditor:
                             "magic", "inn", "guild"]
             return []
         # Sub-list launchers — no cycling, Enter/Right opens the list
-        if key in ("_sp_edit_monsters", "_sp_edit_loot"):
+        if key in ("_sp_edit_monsters", "_sp_edit_loot", "_sp_edit_boss"):
             return []  # handled by level intercept, not choice cycling
-        # Boss monster choice — list all known monster names
-        if key == "_sp_boss_monster":
-            try:
-                mpath = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    "data", "monsters.json")
-                with open(mpath) as f:
-                    mon_data = json.load(f)
-                names = sorted(mon_data.get("monsters", {}).keys())
-                return [""] + names  # empty = no boss
-            except (OSError, ValueError):
-                return []
         return []
 
     def add_tile(self):
@@ -1274,6 +1269,7 @@ class FeaturesEditor:
                 "spawn_radius": 3,
                 "max_spawned": 2,
                 "boss_monster": "",
+                "boss_monsters": [],
                 "xp_reward": 50,
                 "gold_reward": 25,
                 "loot": [],
@@ -1367,6 +1363,12 @@ class FeaturesEditor:
         self.spawn_sublist_mode = mode
         if mode == "monsters":
             self.spawn_sublist = list(sp.get("spawn_monsters", []))
+        elif mode == "boss":
+            boss_list = list(sp.get("boss_monsters", []))
+            # Backwards compat: migrate old single boss_monster string
+            if not boss_list and sp.get("boss_monster"):
+                boss_list = [sp["boss_monster"]]
+            self.spawn_sublist = boss_list
         else:
             self.spawn_sublist = list(sp.get("loot", []))
         self.spawn_sublist_cursor = 0
@@ -1386,12 +1388,14 @@ class FeaturesEditor:
         sp = self.spawn_data.setdefault(tid, {})
         if self.spawn_sublist_mode == "monsters":
             sp["spawn_monsters"] = list(self.spawn_sublist)
+        elif self.spawn_sublist_mode == "boss":
+            sp["boss_monsters"] = list(self.spawn_sublist)
         else:
             sp["loot"] = list(self.spawn_sublist)
 
     def spawn_sublist_add(self):
         """Add a new entry to the spawn sub-list."""
-        if self.spawn_sublist_mode == "monsters":
+        if self.spawn_sublist_mode in ("monsters", "boss"):
             options = self._get_all_monster_names()
         else:
             options = self._get_all_item_names_for_spawn()
@@ -1419,7 +1423,7 @@ class FeaturesEditor:
         idx = self.spawn_sublist_cursor
         if idx < 0 or idx >= len(self.spawn_sublist):
             return
-        if self.spawn_sublist_mode == "monsters":
+        if self.spawn_sublist_mode in ("monsters", "boss"):
             options = self._get_all_monster_names()
         else:
             options = self._get_all_item_names_for_spawn()
@@ -4379,10 +4383,16 @@ class FeaturesEditor:
             field_idx = ctx["field_idx"]()
             if (fields and 0 <= field_idx < len(fields)):
                 fkey = fields[field_idx].key
-                if (fkey in ("_sp_edit_monsters", "_sp_edit_loot")
+                if (fkey in ("_sp_edit_monsters", "_sp_edit_loot",
+                            "_sp_edit_boss")
                         and event.key in (pygame.K_RETURN, pygame.K_RIGHT)):
                     ctx["save_fields"]()
-                    mode = "monsters" if fkey == "_sp_edit_monsters" else "loot"
+                    if fkey == "_sp_edit_monsters":
+                        mode = "monsters"
+                    elif fkey == "_sp_edit_boss":
+                        mode = "boss"
+                    else:
+                        mode = "loot"
                     self.spawn_open_sublist(mode)
                     return
             self.handle_field_editing(event, ctx, ed, exit_level=2)

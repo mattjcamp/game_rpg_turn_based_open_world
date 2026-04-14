@@ -11,6 +11,9 @@
       "spawn_radius": 5,
       "max_spawned": 2,
       "boss_monster": "Goblin",
+      "boss_monsters": [
+        "Goblin"
+      ],
       "xp_reward": 50,
       "gold_reward": 25,
       "loot": [

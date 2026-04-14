@@ -598,9 +598,14 @@ class OverworldState(InventoryMixin, BaseState):
                 self._check_tile_events()
                 # Move orcs after party moves (not inside interiors)
                 if not self._in_overworld_interior:
+                    # Check contact BEFORE monsters move so the player
+                    # only enters combat with monsters they could see as
+                    # adjacent.  Previously both the party and monster
+                    # moved in the same frame, making it look like combat
+                    # triggered from 2+ tiles away.
+                    self._check_monster_contact()
                     self._move_monsters()
                     self._move_overworld_npcs()
-                    self._check_monster_contact()
                     # Occasionally respawn orcs that were killed
                     if random.random() < ORC_RESPAWN_CHANCE:
                         self._spawn_orcs()
@@ -2790,8 +2795,14 @@ class OverworldState(InventoryMixin, BaseState):
 
         tile_id = self.spawn_action_info.get("tile_id")
         sp = SPAWN_POINTS.get(tile_id, {})
-        boss_name = sp.get("boss_monster", "")
-        if not boss_name:
+
+        # Support new boss_monsters list with fallback to old boss_monster string
+        boss_names = list(sp.get("boss_monsters", []))
+        if not boss_names:
+            old_boss = sp.get("boss_monster", "")
+            if old_boss:
+                boss_names = [old_boss]
+        if not boss_names:
             # No boss defined — just close
             self.spawn_action_active = False
             self._exit_grace = True
@@ -2799,17 +2810,23 @@ class OverworldState(InventoryMixin, BaseState):
             self.message_timer = 2000
             return
 
-        # Create boss monster
-        try:
-            boss = create_monster(boss_name)
-        except Exception:
+        # Create all boss monsters
+        bosses = []
+        for bname in boss_names:
+            try:
+                b = create_monster(bname)
+                bosses.append(b)
+            except Exception:
+                pass
+        if not bosses:
             self.spawn_action_active = False
             self._exit_grace = True
             return
 
         pcol, prow = self.spawn_action_pos
-        boss.col = pcol
-        boss.row = prow
+        for b in bosses:
+            b.col = pcol
+            b.row = prow
 
         # Find first alive fighter
         fighter = None
@@ -2825,19 +2842,19 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.sfx.play("encounter")
 
         # Store spawn info so we can destroy it on victory
-        # We'll use a special attribute on combat_state
         terrain_tile = self.game.tile_map.get_tile(pcol, prow)
 
-        # Create a sentinel monster ref so combat can track it
-        boss.is_spawn_boss = True
-        boss.spawn_tile_pos = (pcol, prow)
-        boss.spawn_tile_id = tile_id
+        # Mark the first boss as the spawn boss sentinel for reward tracking
+        bosses[0].is_spawn_boss = True
+        bosses[0].spawn_tile_pos = (pcol, prow)
+        bosses[0].spawn_tile_id = tile_id
 
+        enc_label = ", ".join(boss_names)
         combat = self.game.states.get("combat")
         combat.start_combat(
-            fighter, [boss],
+            fighter, bosses,
             source_state="overworld",
-            encounter_name=f"Boss: {boss_name}",
+            encounter_name=f"Boss: {enc_label}",
             map_monster_refs=[],
             terrain_tile=terrain_tile,
             combat_location="overview")

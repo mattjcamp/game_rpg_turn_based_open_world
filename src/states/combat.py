@@ -5323,6 +5323,17 @@ class CombatState(BaseState):
         if gold_pos and total_gold > 0:
             self.ground_items[gold_pos] = {"item": None, "gold": total_gold}
 
+        # Drop spawn-boss loot items first (configured in the editor)
+        spawn_loot = getattr(self, '_pending_spawn_loot', [])
+        lp_idx = 0
+        for item in spawn_loot:
+            near = loot_positions[lp_idx % len(loot_positions)]
+            lp_idx += 1
+            tile = self._find_free_loot_tile(*near)
+            if tile:
+                self.ground_items[tile] = {"item": item, "gold": 0}
+        self._pending_spawn_loot = []
+
         # Roll one item per dead monster, each on a separate tile
         for pos in loot_positions:
             item = self._roll_loot_item()
@@ -5400,9 +5411,10 @@ class CombatState(BaseState):
                     if gold_bonus:
                         self.game.party.gold += gold_bonus
                         self.combat_log.append(f"+{gold_bonus} gold!")
-                    for item in loot_items:
-                        self.game.party.shared_inventory.append(item)
-                        self.combat_log.append(f"Found: {item}!")
+                    # Queue spawn loot for the ground-loot phase
+                    if not hasattr(self, '_pending_spawn_loot'):
+                        self._pending_spawn_loot = []
+                    self._pending_spawn_loot.extend(loot_items)
 
         # Store pending XP — gold is picked up during loot phase
         self.game.set_combat_rewards({
