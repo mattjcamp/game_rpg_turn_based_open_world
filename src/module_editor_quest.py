@@ -318,12 +318,7 @@ class ModuleQuestEditorMixin:
                        step_type, "choice", True),
         ]
 
-        # Common bottom: Optional
-        common_bottom = [
-            FieldEntry("", "", "", "section", False),
-            FieldEntry("Optional", "optional",
-                       step.get("optional", "no"), "choice", True),
-        ]
+        common_bottom = []
 
         if step_type == "kill":
             # Kill: Monster, Spawn Location, Target Count

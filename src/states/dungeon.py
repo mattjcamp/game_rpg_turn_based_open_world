@@ -1530,34 +1530,7 @@ class DungeonState(InventoryMixin, BaseState):
         if tile_id == TILE_STAIRS:
             self.show_message("Stairs up! Press ESC to leave.", 2000)
 
-        # ── Check unified links for level transitions and exits ──
-        tmap = self.dungeon_data.tile_map
-        link = tmap.get_link(col, row)
-        _link_handled = False
-        if link:
-            lt = link.get("target_type", "")
-            if lt == "interior":
-                self._enter_interior_level(
-                    link["target_map"],
-                    target_pos=link.get("target_pos"))
-                return
-            elif lt == "overworld":
-                self.show_message("Exit! Press ESC to leave.", 2000)
-                _link_handled = True
-        if not link and not _link_handled:
-            # Legacy fallback for maps without unified links
-            interior_links = getattr(tmap, "_interior_links", None)
-            if interior_links and (col, row) in interior_links:
-                self._enter_interior_level(interior_links[(col, row)])
-                return
-            custom_exits = getattr(tmap, "_custom_exit_doors", None)
-            if custom_exits and (col, row) in custom_exits:
-                self.show_message("Exit! Press ESC to leave.", 2000)
-                _link_handled = True
-
-        if _link_handled:
-            pass  # exit message already shown
-        elif tile_id == TILE_CHEST:
+        if tile_id == TILE_CHEST:
             pos = (col, row)
             if pos not in self.dungeon_data.opened_chests:
                 self.dungeon_data.opened_chests.add(pos)
@@ -1747,56 +1720,6 @@ class DungeonState(InventoryMixin, BaseState):
             active_q["current_level"] = self.current_level
         depth = self.current_level + 1
         self.show_message(f"You ascend to floor {depth}.", 2000)
-
-    def _enter_interior_level(self, target_name, target_pos=None):
-        """Transition to another custom dungeon level by name.
-
-        If *target_pos* is set (from the link registry), the party is
-        placed there directly.  Otherwise, finds the back-link tile
-        on the target level.
-        """
-        if not self.quest_levels:
-            return
-        current_name = self.dungeon_data.name
-        # Find the target level by name
-        target_idx = None
-        for i, dd in enumerate(self.quest_levels):
-            if dd.name == target_name:
-                target_idx = i
-                break
-        if target_idx is None:
-            self.show_message(f"Cannot find {target_name}!", 1500)
-            return
-        # Switch to the target level
-        self.current_level = target_idx
-        self.dungeon_data = self.quest_levels[target_idx]
-        self._invalidate_torch_cache()
-
-        # Priority 1: explicit target_pos from link
-        if target_pos and target_pos != (0, 0):
-            self.game.party.col, self.game.party.row = target_pos
-        else:
-            # Priority 2: back-link tile on the target level
-            tmap = self.dungeon_data.tile_map
-            links = getattr(tmap, "_interior_links", {})
-            spawn = None
-            for (c, r), link_name in links.items():
-                if link_name == current_name:
-                    spawn = (c, r)
-                    break
-            if spawn:
-                self.game.party.col, self.game.party.row = spawn
-            else:
-                # Fallback to stored entry point
-                self.game.party.col = self.dungeon_data.entry_col
-                self.game.party.row = self.dungeon_data.entry_row
-        self.game.camera.map_width = tmap.width
-        self.game.camera.map_height = tmap.height
-        self.game.camera.update(self.game.party.col, self.game.party.row)
-        self._visible_tiles = set()
-        if self.torch_active:
-            self._visible_tiles = self._compute_visible_tiles()
-        self.show_message(f"Entering {target_name}...", 1500)
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""

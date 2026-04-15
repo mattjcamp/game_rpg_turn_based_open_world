@@ -17,9 +17,6 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from src.link_registry import LinkRegistry
-
 import pygame
 
 from src.settings import (
@@ -94,29 +91,8 @@ class MapEditorConfig:
     # -- Tile context filter (used when building palette dynamically) --
     tile_context: str = "overworld"  # "overworld", "dungeon", etc.
 
-    # -- Link support --
-    supports_tile_links: bool = False    # I key: interior link picker (overview map)
-    supports_interior_links: bool = False  # I key: interior/overworld link (interior)
     supports_replace: bool = False       # R key: replace all of tile type
     supports_party_start: bool = False   # P key: place party start position
-    # -- Connecting-link support (L key: click-to-link workflow) --
-    supports_connecting_links: bool = False
-    # Canonical map address for this editor surface (e.g. "overworld",
-    # "town:Aseroth").  Required for connecting links so the registry
-    # knows which map the source/target tile belongs to.
-    map_address: str = ""
-    # Reference to the module's LinkRegistry (injected at editor creation).
-    link_registry: Optional["LinkRegistry"] = None
-    # All map surfaces in the module — list of (address, label) tuples.
-    # Populated at editor creation so the link manager overlay can offer
-    # cross-map targets.  Example:
-    #   [("overworld", "Overworld"), ("town:Aseroth", "Town: Aseroth"), ...]
-    module_maps: List[Tuple[str, str]] = field(default_factory=list)
-
-    # Exit link types for the interior link picker.  Each entry is a dict
-    # with "label" and "link_type" keys.  When empty (default), the picker
-    # auto-generates options based on tile_context.
-    interior_exit_types: List = field(default_factory=list)
 
     # -- Eraser behaviour --
     eraser_tile_id: int = TILE_GRASS  # dense: what eraser paints
@@ -143,7 +119,6 @@ class MapEditorState:
 
     def __init__(self, config: MapEditorConfig,
                  tiles: Any = None,
-                 tile_links: Optional[Dict] = None,
                  interior_list: Optional[List] = None,
                  party_start: Optional[Dict] = None):
         self.config = config
@@ -158,9 +133,6 @@ class MapEditorState:
                 self.tiles = {}
         else:
             self.tiles = tiles
-
-        # Tile links (overview map: "col,row" -> {"interior": name})
-        self.tile_links: Dict = tile_links if tile_links is not None else {}
 
         # Party start position (overview map: {"col": int, "row": int} or None)
         self.party_start: Optional[Dict] = party_start
@@ -200,47 +172,12 @@ class MapEditorState:
             if b.is_folder_header and b.name not in self.brush_folders:
                 self.brush_folders[b.name] = True
 
-        # Overlay states
-        self.int_picking: bool = False       # overview map interior picker
-        self.int_pick_cursor: int = 0
-        self.int_pick_scroll: int = 0
-
-        self.int_link_picking: bool = False  # interior link picker
-        self.int_link_pick_list: List = []
-        self.int_link_pick_cursor: int = 0
-        self.int_link_exit_options: List = []  # exit option dicts
-
+        # Replace tile overlay
         self.replacing: bool = False         # replace tile overlay
         self.replace_src_tile: Optional[int] = None
         self.replace_src_name: str = ""
         self.replace_src_empty: bool = False
         self.replace_dst_idx: int = 0
-
-        # Connecting-link pending state (L key workflow)
-        self.link_pending: bool = False      # True while waiting for target
-        self.link_source_col: int = 0        # source tile col
-        self.link_source_row: int = 0        # source tile row
-        self.link_source_map: str = ""       # source map address
-
-        # Link manager overlay (Shift+L)
-        self.link_manager: bool = False
-        self.link_mgr_cursor: int = 0       # index into display list
-        self.link_mgr_scroll: int = 0       # scroll offset
-        self.link_mgr_items: List = []      # cached display items
-        # New-link creation sub-state
-        self.link_mgr_creating: bool = False
-        # Phases: "source_map" → "source_pos" → "target_map" → "target_pos"
-        self.link_mgr_phase: str = ""
-        self.link_mgr_map_cursor: int = 0
-        self.link_mgr_new_source_map: str = ""
-        self.link_mgr_new_source_col: int = 0
-        self.link_mgr_new_source_row: int = 0
-        self.link_mgr_new_target_map: str = ""
-        self.link_mgr_new_target_col: int = 0
-        self.link_mgr_new_target_row: int = 0
-        # Position input: which field ("col" or "row") and its buffer
-        self.link_mgr_pos_field: str = "col"
-        self.link_mgr_pos_buffer: str = ""
 
         # Centre camera on cursor
         if config.grid_type == GRID_SCROLLABLE:
@@ -441,12 +378,6 @@ class MapEditorState:
                 td = {"tile_id": brush.tile_id, "name": brush.name}
                 if brush.path:
                     td["path"] = brush.path
-                # Preserve existing link fields
-                old = self.tiles.get(f"{col},{row}", {})
-                if isinstance(old, dict):
-                    for lk in ("interior", "to_overworld", "to_town"):
-                        if lk in old:
-                            td[lk] = old[lk]
                 self.set_tile(col, row, td)
 
     def _paint_object(self, brush: 'Brush', origin_c: int, origin_r: int):
@@ -485,198 +416,8 @@ class MapEditorState:
                     td = dict(td_src)
                 else:
                     td = {"tile_id": td_src}
-                # Preserve existing link fields
-                old = self.tiles.get(f"{tc},{tr}", {})
-                if isinstance(old, dict):
-                    for lk in ("interior", "to_overworld", "to_town"):
-                        if lk in old:
-                            td[lk] = old[lk]
                 self.set_tile(tc, tr, td)
 
-    # -- Connecting-link helpers (L key workflow) --
-
-    def start_connecting_link(self, col: int, row: int) -> None:
-        """Begin the click-to-link workflow: store the source tile."""
-        self.link_pending = True
-        self.link_source_col = col
-        self.link_source_row = row
-        self.link_source_map = self.config.map_address
-
-    def complete_connecting_link(self, col: int, row: int) -> bool:
-        """Finish the pending link to target (col, row) on current map.
-
-        Creates a bidirectional LinkRecord pair via the registry.
-        Returns True on success, False if no registry or no pending link.
-        """
-        from src.link_registry import LinkEndpoint
-
-        reg = self.config.link_registry
-        if reg is None or not self.link_pending:
-            return False
-
-        source = LinkEndpoint(
-            map_address=self.link_source_map,
-            col=self.link_source_col,
-            row=self.link_source_row,
-        )
-        target = LinkEndpoint(
-            map_address=self.config.map_address,
-            col=col,
-            row=row,
-        )
-        # Use the registry's pending-link workflow
-        reg.start_link(source)
-        reg.complete_link(target, bidirectional=True)
-
-        self.link_pending = False
-        self.dirty = True
-        return True
-
-    def open_link_manager(self) -> None:
-        """Open the link manager overlay, refreshing the display list."""
-        reg = self.config.link_registry
-        self.link_manager = True
-        self.link_mgr_creating = False
-        self.link_mgr_cursor = 0
-        self.link_mgr_scroll = 0
-        # Build display items: each is a dict with type + data
-        items: List = [{"type": "header", "label": "[+] Create New Link"}]
-        if reg:
-            for rec in reg.get_all():
-                # Only show forward links (skip partner duplicates)
-                if rec.partner_id:
-                    partner = reg.get_by_id(rec.partner_id)
-                    if partner and partner.link_id < rec.link_id:
-                        continue  # skip the "later" partner
-                items.append({
-                    "type": "link",
-                    "record": rec,
-                    "label": (
-                        f"{rec.source.map_address} "
-                        f"({rec.source.col},{rec.source.row}) → "
-                        f"{rec.target.map_address} "
-                        f"({rec.target.col},{rec.target.row})"
-                    ),
-                })
-        self.link_mgr_items = items
-
-    def _start_link_creation(self) -> None:
-        """Enter the new-link creation sub-flow."""
-        self.link_mgr_creating = True
-        self.link_mgr_phase = "source_map"
-        self.link_mgr_map_cursor = 0
-        # Default source to current editor map + cursor
-        self.link_mgr_new_source_map = self.config.map_address
-        self.link_mgr_new_source_col = self.cursor_col
-        self.link_mgr_new_source_row = self.cursor_row
-
-    def _finish_link_creation(self) -> None:
-        """Complete the new-link creation, adding records to registry."""
-        from src.link_registry import LinkEndpoint
-
-        reg = self.config.link_registry
-        if reg is None:
-            return
-        source = LinkEndpoint(
-            map_address=self.link_mgr_new_source_map,
-            col=self.link_mgr_new_source_col,
-            row=self.link_mgr_new_source_row,
-        )
-        target = LinkEndpoint(
-            map_address=self.link_mgr_new_target_map,
-            col=self.link_mgr_new_target_col,
-            row=self.link_mgr_new_target_row,
-        )
-        reg.start_link(source)
-        reg.complete_link(target, bidirectional=True)
-        self.dirty = True
-        # Return to main list view
-        self.link_mgr_creating = False
-        self.open_link_manager()  # refresh list
-
-    def cancel_connecting_link(self) -> None:
-        """Discard a pending connecting link."""
-        self.link_pending = False
-        reg = self.config.link_registry
-        if reg and reg.has_pending():
-            reg.cancel_pending()
-
-    def remove_connecting_link(self, col: int, row: int) -> bool:
-        """Remove a connecting link at (col, row) from the registry.
-
-        Also removes its bidirectional partner.  Returns True if a
-        link was found and removed.
-        """
-        reg = self.config.link_registry
-        if reg is None:
-            return False
-        rec = reg.get_at(self.config.map_address, col, row)
-        if rec is None:
-            return False
-        reg.remove(rec.link_id, remove_partner=True)
-        self.dirty = True
-        return True
-
-    # -- Link helpers (overview map) --
-
-    def get_tile_link(self, col: int, row: int) -> Optional[Dict]:
-        return self.tile_links.get(f"{col},{row}")
-
-    def set_tile_link(self, col: int, row: int, link: Optional[Dict]):
-        pos_key = f"{col},{row}"
-        if link is None:
-            if pos_key in self.tile_links:
-                del self.tile_links[pos_key]
-                self.dirty = True
-        else:
-            self.tile_links[pos_key] = link
-            self.dirty = True
-
-    # -- Interior tile link helpers (sparse interiors) --
-
-    def set_interior_link(self, col: int, row: int,
-                          link_type: Optional[str],
-                          link_value: Any = None):
-        """Set/clear an interior or to_overworld/to_town link on a sparse tile.
-
-        When tile_context is "town", the exit link uses ``to_town`` so the
-        town gameplay code recognises it as a "return to town" marker.
-        Otherwise it stores ``to_overworld`` for dungeon-style interiors.
-        """
-        pos_key = f"{col},{row}"
-        td = self.tiles.get(pos_key)
-        if td is None or not isinstance(td, dict):
-            return  # need a tile to attach link to
-
-        # Clear existing link types (both variants)
-        for lk in ("interior", "to_overworld", "to_town"):
-            td.pop(lk, None)
-
-        if link_type == "to_overworld":
-            td["to_overworld"] = True
-            self.dirty = True
-        elif link_type == "to_town":
-            td["to_town"] = True
-            self.dirty = True
-        elif link_type == "interior" and link_value:
-            td["interior"] = link_value
-            self.dirty = True
-        else:
-            self.dirty = True  # cleared links
-
-    def remove_interior_link(self, col: int, row: int):
-        """Remove any interior/to_overworld link from tile at (col, row)."""
-        pos_key = f"{col},{row}"
-        td = self.tiles.get(pos_key)
-        if td is None or not isinstance(td, dict):
-            return
-        changed = False
-        for lk in ("interior", "to_overworld", "to_town"):
-            if lk in td:
-                del td[lk]
-                changed = True
-        if changed:
-            self.dirty = True
 
     # -- Replace all (sparse interiors) --
 
@@ -756,48 +497,13 @@ class MapEditorState:
             "painting": self.painting,
             "dirty": self.dirty,
             "save_flash": self.save_flash,
-            "tile_links": self.tile_links,
             "party_start": self.party_start,
             "tile_context": cfg.tile_context,
-            # Overlay states
-            "int_picking": self.int_picking,
-            "int_pick_cursor": self.int_pick_cursor,
-            "int_pick_scroll": self.int_pick_scroll,
-            "int_pick_list": self.interior_list,
-            "int_link_picking": self.int_link_picking,
-            "int_link_pick_list": self.int_link_pick_list,
-            "int_link_pick_cursor": self.int_link_pick_cursor,
-            "int_link_exit_options": self.int_link_exit_options,
             "replacing": self.replacing,
             "replace_src_tile": self.replace_src_tile,
             "replace_src_name": self.replace_src_name,
             "replace_src_empty": self.replace_src_empty,
             "replace_dst_idx": self.replace_dst_idx,
-            # Connecting-link state
-            "link_pending": self.link_pending,
-            "link_source_col": self.link_source_col,
-            "link_source_row": self.link_source_row,
-            "link_source_map": self.link_source_map,
-            "link_registry": self.config.link_registry,
-            "map_address": self.config.map_address,
-            "supports_connecting_links": self.config.supports_connecting_links,
-            # Link manager overlay
-            "link_manager": self.link_manager,
-            "link_mgr_cursor": self.link_mgr_cursor,
-            "link_mgr_scroll": self.link_mgr_scroll,
-            "link_mgr_items": self.link_mgr_items,
-            "link_mgr_creating": self.link_mgr_creating,
-            "link_mgr_phase": self.link_mgr_phase,
-            "link_mgr_map_cursor": self.link_mgr_map_cursor,
-            "link_mgr_pos_field": self.link_mgr_pos_field,
-            "link_mgr_pos_buffer": self.link_mgr_pos_buffer,
-            "link_mgr_new_source_map": self.link_mgr_new_source_map,
-            "link_mgr_new_source_col": self.link_mgr_new_source_col,
-            "link_mgr_new_source_row": self.link_mgr_new_source_row,
-            "link_mgr_new_target_map": self.link_mgr_new_target_map,
-            "link_mgr_new_target_col": self.link_mgr_new_target_col,
-            "link_mgr_new_target_row": self.link_mgr_new_target_row,
-            "module_maps": self.config.module_maps,
         }
 
 
@@ -834,21 +540,11 @@ class MapEditorInputHandler:
         cfg = st.config
 
         # ── Overlay intercepts ──
-        if st.link_manager:
-            return self._handle_link_manager(event)
-        if st.int_picking:
-            return self._handle_int_picker(event)
-        if st.int_link_picking:
-            return self._handle_int_link_picker(event)
         if st.replacing:
             return self._handle_replace_overlay(event)
 
         # ── Escape ──
         if event.key == pygame.K_ESCAPE:
-            # If a connecting link is pending, cancel it instead of exiting
-            if st.link_pending:
-                st.cancel_connecting_link()
-                return None
             if st.dirty and cfg.on_save:
                 cfg.on_save(st)
             if cfg.on_exit:
@@ -928,30 +624,6 @@ class MapEditorInputHandler:
                 st.paint()
             return None
 
-        # ── Link interior (I key) — overview map ──
-        if event.key == pygame.K_i and cfg.supports_tile_links:
-            st.int_picking = True
-            st.int_pick_scroll = 0
-            # Pre-select existing link if present
-            existing = st.get_tile_link(st.cursor_col, st.cursor_row)
-            if existing and existing.get("interior"):
-                link_name = existing["interior"]
-                link_sub = existing.get("sub_interior", "")
-                for pi, intr in enumerate(st.interior_list):
-                    if (intr.get("name") == link_name
-                            and intr.get("sub_interior", "") == link_sub):
-                        st.int_pick_cursor = 1 + pi
-                        break
-                else:
-                    st.int_pick_cursor = 0
-            else:
-                st.int_pick_cursor = 0
-            return None
-
-        # ── Link interior (I key) — interior editor ──
-        if event.key == pygame.K_i and cfg.supports_interior_links:
-            self._open_interior_link_picker()
-            return None
 
         # ── Place party start (P key) — overview map ──
         if event.key == pygame.K_p and cfg.supports_party_start:
@@ -966,35 +638,7 @@ class MapEditorInputHandler:
             st.dirty = True
             return None
 
-        # ── Link manager (Shift+L) ──
-        if event.key == pygame.K_l and cfg.supports_connecting_links:
-            mods = getattr(event, 'mod', 0) or pygame.key.get_mods()
-            if mods & pygame.KMOD_SHIFT:
-                st.open_link_manager()
-                return None
 
-        # ── Connecting link (L key) ──
-        if event.key == pygame.K_l and cfg.supports_connecting_links:
-            if st.link_pending:
-                # Second press: complete the link to current cursor tile
-                st.complete_connecting_link(st.cursor_col, st.cursor_row)
-            else:
-                # First press: start a pending link from current cursor tile
-                st.start_connecting_link(st.cursor_col, st.cursor_row)
-            return None
-
-        # ── Remove link (X key) ──
-        if event.key == pygame.K_x:
-            if st.link_pending:
-                # Cancel pending connecting link
-                st.cancel_connecting_link()
-            elif cfg.supports_connecting_links:
-                st.remove_connecting_link(st.cursor_col, st.cursor_row)
-            elif cfg.supports_tile_links:
-                st.set_tile_link(st.cursor_col, st.cursor_row, None)
-            elif cfg.supports_interior_links:
-                st.remove_interior_link(st.cursor_col, st.cursor_row)
-            return None
 
         # ── Replace tile (R key) — sparse only ──
         if event.key == pygame.K_r and cfg.supports_replace:
@@ -1011,126 +655,6 @@ class MapEditorInputHandler:
 
         return None
 
-    # ── Interior picker (overview map: pick which interior to link) ──
-
-    def _handle_int_picker(self, event) -> Optional[str]:
-        st = self.state
-        interiors = st.interior_list
-        n_options = 1 + len(interiors)
-
-        if event.key == pygame.K_ESCAPE:
-            st.int_picking = False
-            return None
-        if event.key == pygame.K_UP:
-            st.int_pick_cursor = max(0, st.int_pick_cursor - 1)
-        elif event.key == pygame.K_DOWN:
-            st.int_pick_cursor = min(n_options - 1, st.int_pick_cursor + 1)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            col, row = st.cursor_col, st.cursor_row
-            if st.int_pick_cursor == 0:
-                # "(none)" — remove link
-                st.set_tile_link(col, row, None)
-            else:
-                idx = st.int_pick_cursor - 1
-                if idx < len(interiors):
-                    entry = interiors[idx]
-                    link_data = {
-                        "interior": entry.get("name",
-                                              f"Interior {idx}"),
-                        "type": entry.get("type", "town"),
-                    }
-                    sub = entry.get("sub_interior", "")
-                    if sub:
-                        link_data["sub_interior"] = sub
-                    st.set_tile_link(col, row, link_data)
-            st.int_picking = False
-        return None
-
-    # ── Interior link picker (inside interior: link to sibling/overworld) ──
-
-    def _open_interior_link_picker(self):
-        st = self.state
-        # Build pick list: sibling interiors (exclude current)
-        current_name = st.config.title  # interior name stored in title
-        st.int_link_pick_list = [
-            intr for intr in st.interior_list
-            if intr.get("name", "") != current_name
-        ]
-
-        # Build exit options.  If the config provides explicit exit types,
-        # use those; otherwise fall back to a default based on tile_context.
-        if st.config.interior_exit_types:
-            st.int_link_exit_options = list(st.config.interior_exit_types)
-        else:
-            st.int_link_exit_options = [{
-                "label": u"\u2190 Return to Overworld",
-                "link_type": "to_overworld",
-            }]
-
-        st.int_link_picking = True
-        # Pre-select based on current tile's link
-        n_exits = len(st.int_link_exit_options)
-        td = st.get_tile(st.cursor_col, st.cursor_row)
-        if isinstance(td, dict):
-            if td.get("to_town"):
-                # Find the "to_town" exit option
-                for ei, eo in enumerate(st.int_link_exit_options):
-                    if eo["link_type"] == "to_town":
-                        st.int_link_pick_cursor = 1 + ei
-                        return
-                st.int_link_pick_cursor = 0
-            elif td.get("to_overworld"):
-                for ei, eo in enumerate(st.int_link_exit_options):
-                    if eo["link_type"] == "to_overworld":
-                        st.int_link_pick_cursor = 1 + ei
-                        return
-                st.int_link_pick_cursor = 0
-            elif td.get("interior"):
-                iname = td["interior"]
-                for pi, intr in enumerate(st.int_link_pick_list):
-                    if intr.get("name") == iname:
-                        st.int_link_pick_cursor = 1 + n_exits + pi
-                        return
-                st.int_link_pick_cursor = 0
-            else:
-                st.int_link_pick_cursor = 0
-        else:
-            st.int_link_pick_cursor = 0
-
-    def _handle_int_link_picker(self, event) -> Optional[str]:
-        st = self.state
-        pick_list = st.int_link_pick_list
-        exit_opts = getattr(st, "int_link_exit_options", [])
-        n_exits = len(exit_opts)
-        # Options: (none) + exit_opts + sibling interiors
-        n_options = 1 + n_exits + len(pick_list)
-
-        if event.key == pygame.K_ESCAPE:
-            st.int_link_picking = False
-            return None
-        if event.key == pygame.K_UP:
-            st.int_link_pick_cursor = max(0, st.int_link_pick_cursor - 1)
-        elif event.key == pygame.K_DOWN:
-            st.int_link_pick_cursor = min(n_options - 1,
-                                          st.int_link_pick_cursor + 1)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            idx = st.int_link_pick_cursor
-            col, row = st.cursor_col, st.cursor_row
-            if idx == 0:
-                # (none) — clear link
-                st.set_interior_link(col, row, None)
-            elif idx <= n_exits:
-                # One of the exit options
-                eo = exit_opts[idx - 1]
-                st.set_interior_link(col, row, eo["link_type"])
-            else:
-                # Sibling interior
-                pi = idx - 1 - n_exits
-                if pi < len(pick_list):
-                    st.set_interior_link(col, row, "interior",
-                                         pick_list[pi]["name"])
-            st.int_link_picking = False
-        return None
 
     # ── Replace overlay ──
 
@@ -1180,160 +704,6 @@ class MapEditorInputHandler:
             st.replacing = False
         return None
 
-    # ── Link manager overlay ──
-
-    def _handle_link_manager(self, event) -> Optional[str]:
-        """Handle input for the link manager overlay.
-
-        Main view: scrollable list of existing links with Create / Delete.
-        Creation sub-flow: four phases — source_map → source_pos →
-        target_map → target_pos — then creates the bidirectional link.
-        """
-        st = self.state
-
-        if st.link_mgr_creating:
-            return self._handle_link_mgr_creation(event)
-
-        # ── Main list view ──
-        items = st.link_mgr_items
-        n = len(items)
-
-        if event.key == pygame.K_ESCAPE:
-            st.link_manager = False
-            return None
-        if event.key == pygame.K_UP:
-            st.link_mgr_cursor = max(0, st.link_mgr_cursor - 1)
-        elif event.key == pygame.K_DOWN:
-            st.link_mgr_cursor = min(n - 1, st.link_mgr_cursor + 1)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            if n > 0 and st.link_mgr_cursor < n:
-                item = items[st.link_mgr_cursor]
-                if item["type"] == "header":
-                    # "Create New Link"
-                    st._start_link_creation()
-                # Selecting an existing link does nothing (just view)
-        elif event.key == pygame.K_DELETE or event.key == pygame.K_x:
-            # Delete the selected link
-            if n > 0 and st.link_mgr_cursor < n:
-                item = items[st.link_mgr_cursor]
-                if item["type"] == "link":
-                    rec = item["record"]
-                    reg = st.config.link_registry
-                    if reg:
-                        reg.remove(rec.link_id, remove_partner=True)
-                        st.dirty = True
-                        st.open_link_manager()  # refresh list
-        return None
-
-    def _handle_link_mgr_creation(self, event) -> Optional[str]:
-        """Handle input during new-link creation phases."""
-        st = self.state
-        phase = st.link_mgr_phase
-        maps = st.config.module_maps
-        n_maps = len(maps)
-
-        if event.key == pygame.K_ESCAPE:
-            # Back up one phase, or cancel entirely
-            if phase == "source_map":
-                st.link_mgr_creating = False
-            elif phase == "source_pos":
-                st.link_mgr_phase = "source_map"
-            elif phase == "target_map":
-                st.link_mgr_phase = "source_pos"
-            elif phase == "target_pos":
-                st.link_mgr_phase = "target_map"
-            return None
-
-        # ── Map selection phases ──
-        if phase in ("source_map", "target_map"):
-            if event.key == pygame.K_UP:
-                st.link_mgr_map_cursor = max(0, st.link_mgr_map_cursor - 1)
-            elif event.key == pygame.K_DOWN:
-                st.link_mgr_map_cursor = min(n_maps - 1,
-                                              st.link_mgr_map_cursor + 1)
-            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                if 0 <= st.link_mgr_map_cursor < n_maps:
-                    addr, _ = maps[st.link_mgr_map_cursor]
-                    if phase == "source_map":
-                        st.link_mgr_new_source_map = addr
-                        st.link_mgr_phase = "source_pos"
-                        st.link_mgr_pos_field = "col"
-                        # Default position: current cursor if same map
-                        if addr == st.config.map_address:
-                            st.link_mgr_pos_buffer = str(st.cursor_col)
-                        else:
-                            st.link_mgr_pos_buffer = "0"
-                    else:
-                        st.link_mgr_new_target_map = addr
-                        st.link_mgr_phase = "target_pos"
-                        st.link_mgr_pos_field = "col"
-                        if addr == st.config.map_address:
-                            st.link_mgr_pos_buffer = str(st.cursor_col)
-                        else:
-                            st.link_mgr_pos_buffer = "0"
-            return None
-
-        # ── Position input phases ──
-        if phase in ("source_pos", "target_pos"):
-            if event.key == pygame.K_BACKSPACE:
-                st.link_mgr_pos_buffer = st.link_mgr_pos_buffer[:-1]
-            elif event.key == pygame.K_UP:
-                # Increment value
-                try:
-                    v = int(st.link_mgr_pos_buffer) if st.link_mgr_pos_buffer else 0
-                    st.link_mgr_pos_buffer = str(v + 1)
-                except ValueError:
-                    pass
-            elif event.key == pygame.K_DOWN:
-                # Decrement value
-                try:
-                    v = int(st.link_mgr_pos_buffer) if st.link_mgr_pos_buffer else 0
-                    st.link_mgr_pos_buffer = str(max(0, v - 1))
-                except ValueError:
-                    pass
-            elif event.key in (pygame.K_RETURN, pygame.K_TAB):
-                # Confirm this field and advance
-                try:
-                    val = int(st.link_mgr_pos_buffer) if st.link_mgr_pos_buffer else 0
-                except ValueError:
-                    val = 0
-
-                if st.link_mgr_pos_field == "col":
-                    if phase == "source_pos":
-                        st.link_mgr_new_source_col = val
-                    else:
-                        st.link_mgr_new_target_col = val
-                    st.link_mgr_pos_field = "row"
-                    # Default row
-                    if phase == "source_pos":
-                        src_map = st.link_mgr_new_source_map
-                        if src_map == st.config.map_address:
-                            st.link_mgr_pos_buffer = str(st.cursor_row)
-                        else:
-                            st.link_mgr_pos_buffer = "0"
-                    else:
-                        tgt_map = st.link_mgr_new_target_map
-                        if tgt_map == st.config.map_address:
-                            st.link_mgr_pos_buffer = str(st.cursor_row)
-                        else:
-                            st.link_mgr_pos_buffer = "0"
-                else:
-                    # Row confirmed — advance to next phase or finish
-                    if phase == "source_pos":
-                        st.link_mgr_new_source_row = val
-                        st.link_mgr_phase = "target_map"
-                        st.link_mgr_map_cursor = 0
-                    else:
-                        st.link_mgr_new_target_row = val
-                        st._finish_link_creation()
-            else:
-                # Number key input
-                c = getattr(event, 'unicode', '')
-                if c and c.isdigit():
-                    st.link_mgr_pos_buffer += c
-            return None
-
-        return None
 
     # ── Mouse input ──────────────────────────────────────────────
 
@@ -1343,7 +713,7 @@ class MapEditorInputHandler:
         st = self.state
 
         # Overlays active — ignore mouse
-        if st.link_manager or st.int_picking or st.int_link_picking or st.replacing:
+        if st.replacing:
             return
 
         if event.type == pygame.MOUSEWHEEL:

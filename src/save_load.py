@@ -529,17 +529,6 @@ def load_game(slot, game):
                 if game.module_manifest else None)
         game.camera = Camera(game.tile_map.width, game.tile_map.height)
 
-        # ── Restore link registry ──────────────────────────────
-        # The link registry must be reloaded from the module so
-        # tile-to-tile links (ship tiles, town entrances, etc.)
-        # are populated on the freshly-loaded tile map.
-        if game.active_module_path:
-            from src.link_registry import LinkRegistry
-            game.link_registry = LinkRegistry()
-            game.link_registry.load(game.active_module_path)
-            game.link_registry.populate_tile_map(
-                game.tile_map, "overworld")
-
         # ── Restore the party ───────────────────────────────────
         game.party = _deserialize_party(save_data["party"])
 

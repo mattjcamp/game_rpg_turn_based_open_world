@@ -1,7 +1,4 @@
 {
-  "me_overview": [],
-  "me_dungeon": [],
-  "me_examine": [],
   "me_enclosure": [
     {
       "label": "General Shop Interior",
@@ -10234,7 +10231,5 @@
         }
       }
     }
-  ],
-  "me_battle": [],
-  "me_object": []
+  ]
 }

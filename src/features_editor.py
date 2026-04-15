@@ -59,18 +59,8 @@ class FeaturesEditor:
         # Values are plain dicts; the actual STORAGE_*/GRID_* constants are
         # resolved in _meh_folder_default_config() at runtime.
         self._MEH_FOLDER_DEFAULTS = {
-            "me_overview":  {"storage": "dense",  "grid": "scrollable",
-                             "ctx": "overworld", "w": 16, "h": 12},
-            "me_dungeon":   {"storage": "dense",  "grid": "scrollable",
-                             "ctx": "dungeon",   "w": 32, "h": 32},
-            "me_examine":   {"storage": "sparse", "grid": "fixed",
-                             "ctx": "dungeon",   "w": 12, "h": 10},
             "me_enclosure": {"storage": "sparse", "grid": "fixed",
                              "ctx": "town",      "w": 16, "h": 14},
-            "me_battle":    {"storage": "sparse", "grid": "fixed",
-                             "ctx": "dungeon",   "w": 20, "h": 16},
-            "me_object":    {"storage": "sparse", "grid": "fixed",
-                             "ctx": "town",      "w": 8,  "h": 8},
         }
 
         # --- Spell editor state ---
@@ -642,7 +632,6 @@ class FeaturesEditor:
             height=h,
             tile_context="town",
             brushes=brushes,
-            supports_interior_links=True,
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
@@ -3467,53 +3456,13 @@ class FeaturesEditor:
 
         # Define folder metadata: (folder_key, label, default_children)
         folder_defs = [
-            ("me_overview", "Overview Templates", [
-                {"label": "Overworld Template",
-                 "subtitle": "A base layout for the overworld map",
-                 "map_config": {"storage": STORAGE_DENSE,
-                                "grid_type": GRID_FIXED,
-                                "tile_context": "overworld",
-                                "width": 16, "height": 12}},
-            ]),
-            ("me_dungeon", "Dungeon Templates", [
-                {"label": "Goblin Cavern Floor 1",
-                 "subtitle": "A winding cave system",
-                 "map_config": {"storage": STORAGE_DENSE,
-                                "grid_type": GRID_SCROLLABLE,
-                                "tile_context": "dungeon",
-                                "width": 32, "height": 32}},
-            ]),
-            ("me_examine", "Examine Templates", [
-                {"label": "Ancient Shrine",
-                 "subtitle": "Vignette for examining a tile",
-                 "map_config": {"storage": STORAGE_SPARSE,
-                                "grid_type": GRID_FIXED,
-                                "tile_context": "dungeon",
-                                "width": 12, "height": 10}},
-            ]),
-            ("me_enclosure", "Enclosure Templates", [
+            ("me_enclosure", "Templates", [
                 {"label": "Blacksmith Shop",
                  "subtitle": "Interior space for a town building",
                  "map_config": {"storage": STORAGE_SPARSE,
                                 "grid_type": GRID_FIXED,
                                 "tile_context": "dungeon",
                                 "width": 16, "height": 14}},
-            ]),
-            ("me_battle", "Battle Templates", [
-                {"label": "Forest Clearing",
-                 "subtitle": "Battle arena with trees and obstacles",
-                 "map_config": {"storage": STORAGE_SPARSE,
-                                "grid_type": GRID_FIXED,
-                                "tile_context": "dungeon",
-                                "width": 20, "height": 16}},
-            ]),
-            ("me_object", "Object Templates", [
-                {"label": "Stone Foundation",
-                 "subtitle": "Reusable building foundation",
-                 "map_config": {"storage": STORAGE_SPARSE,
-                                "grid_type": GRID_FIXED,
-                                "tile_context": "all",
-                                "width": 8, "height": 8}},
             ]),
         ]
 
@@ -3644,8 +3593,6 @@ class FeaturesEditor:
             height=h,
             brushes=brushes,
             tile_context=ctx,
-            supports_tile_links=False,
-            supports_interior_links=(storage == STORAGE_SPARSE),
             supports_replace=(storage == STORAGE_SPARSE),
             on_save=_on_save,
             on_exit=_on_exit,

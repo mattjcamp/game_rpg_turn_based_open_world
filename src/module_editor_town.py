@@ -23,18 +23,6 @@ class ModuleTownEditorMixin:
             FieldEntry("Name", "name", town.get("name", ""), "text", True),
             FieldEntry("Description", "description",
                        town.get("description", ""), "text", True),
-            FieldEntry("", "", "", "section", False),
-            FieldEntry("Width", "width",
-                       str(town.get("width", 18)), "int", True),
-            FieldEntry("Height", "height",
-                       str(town.get("height", 19)), "int", True),
-            FieldEntry("", "", "", "section", False),
-            FieldEntry("Style", "town_style",
-                       town.get("town_style", "medieval"), "text", True),
-            FieldEntry("Entry Col", "entry_col",
-                       str(town.get("entry_col", 0)), "int", True),
-            FieldEntry("Entry Row", "entry_row",
-                       str(town.get("entry_row", 0)), "int", True),
             FieldEntry("Map Generation", "", "", "section", False),
             FieldEntry("Import Town Template",
                        "_action_import", map_status, "action", True),
@@ -254,18 +242,9 @@ class ModuleTownEditorMixin:
             height=h,
             tile_context="town",
             brushes=brushes,
-            supports_interior_links=True,
-            supports_connecting_links=True,
-            map_address=f"town:{town_name}",
-            link_registry=getattr(self, 'link_registry', None),
-            module_maps=getattr(self, '_mod_module_maps', []),
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
-            interior_exit_types=[
-                {"label": u"\u2190 Return to Overworld",
-                 "link_type": "to_overworld"},
-            ],
         )
         existing_tiles = dict(town.get("tiles", {}))
         # Build interior_list from the live enclosure list so the "I" key
@@ -935,11 +914,6 @@ class ModuleTownEditorMixin:
             self._mod_town_map_editor_handler = None
 
         enc_display = enc.get("name", "Unnamed")
-        # Determine parent town name for map address
-        _parent_town = ""
-        if 0 <= self._mod_town_cursor < len(self._mod_town_list):
-            _parent_town = self._mod_town_list[
-                self._mod_town_cursor].get("name", "")
         config = MapEditorConfig(
             title=f"Enclosure: {enc_display}",
             storage=STORAGE_SPARSE,
@@ -948,20 +922,9 @@ class ModuleTownEditorMixin:
             height=h,
             tile_context="town",
             brushes=brushes,
-            supports_interior_links=True,
-            supports_connecting_links=True,
-            map_address=f"building:{_parent_town}:{enc_display}",
-            link_registry=getattr(self, 'link_registry', None),
-            module_maps=getattr(self, '_mod_module_maps', []),
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
-            interior_exit_types=[
-                {"label": u"\u2190 Return to Town",
-                 "link_type": "to_town"},
-                {"label": u"\u2190 Return to Overworld",
-                 "link_type": "to_overworld"},
-            ],
         )
         existing_tiles = dict(enc.get("tiles", {}))
         # Build interior_list from sibling enclosures (excluding current)

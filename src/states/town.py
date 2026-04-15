@@ -705,55 +705,18 @@ class TownState(InventoryMixin, BaseState):
         """Check if the party stepped on a special tile."""
         party = self.game.party
 
-        # If inside an interior, check for "to_town" / "to_overworld" exits
+        # If inside an interior, check for exits
         if getattr(self, "_in_interior", False):
             # Skip exit check on the first move after entering so the player
             # isn't immediately ejected when spawning on an exit tile.
             if getattr(self, "_interior_entry_grace", False):
                 self._interior_entry_grace = False
             else:
-                # "to_overworld" exits leave the town entirely
-                ow_exits = getattr(self, "_interior_overworld_exits", set())
-                if (party.col, party.row) in ow_exits:
-                    # Restore town-level state before exiting so the
-                    # TownData object isn't left pointing at an interior map.
-                    stack = getattr(self, "_interior_stack", [])
-                    if stack:
-                        bottom = stack[0]
-                        stack.clear()
-                        self.town_data.tile_map = bottom["tile_map"]
-                        self.town_data.npcs = bottom["npcs"]
-                        self.town_data.interior_links = bottom["interior_links"]
-                        self.town_data.overworld_exits = bottom.get(
-                            "overworld_exits", set())
-                    self._in_interior = False
-                    self._exit_town()
-                    return
-                # "to_town" exits return all the way to the town level
+                # Exits return to town level
                 exit_positions = getattr(self, "_interior_exit_positions", set())
                 if (party.col, party.row) in exit_positions:
                     self._exit_to_town()
                     return
-            # Check for interior-to-interior links while inside
-            links = getattr(self.town_data, "interior_links", {})
-            interior_name = links.get((party.col, party.row))
-            if interior_name:
-                self._enter_interior(interior_name, party.col, party.row)
-                return
-            # Also check registry-based links on the current tile map
-            link = self.town_data.tile_map.get_link(party.col, party.row)
-            if link and link.get("target_map"):
-                self._follow_registry_link(link)
-                return
-
-        # Check for interior links first (editor-defined door → interior).
-        # This must happen before tile-type checks because the linked tile
-        # could be any tile type (Machine, Door, etc.).
-        links = getattr(self.town_data, "interior_links", {})
-        interior_name = links.get((party.col, party.row))
-        if interior_name:
-            self._enter_interior(interior_name, party.col, party.row)
-            return
 
         tile_id = self.town_data.tile_map.get_tile(
             party.col, party.row
@@ -763,21 +726,6 @@ class TownState(InventoryMixin, BaseState):
             return
         elif tile_id == TILE_MACHINE:
             self._interact_machine()
-            return
-
-        # Check for overworld exit (custom layout "Return to Overworld")
-        ow_exits = getattr(self.town_data, "overworld_exits", set())
-        if (party.col, party.row) in ow_exits:
-            self._exit_town()
-            return
-
-        # ── Check for registry-based links on the tile map ──
-        # Links created via the link manager are merged into
-        # tile_map.links by populate_tile_map().  Handle them here
-        # so the player can follow links that originate in a town.
-        link = self.town_data.tile_map.get_link(party.col, party.row)
-        if link and link.get("target_map"):
-            self._follow_registry_link(link)
             return
 
         # Check for walkable tile interactions (e.g. signs the player
@@ -839,15 +787,10 @@ class TownState(InventoryMixin, BaseState):
                 prev = stack.pop()
                 self.town_data.tile_map = prev["tile_map"]
                 self.town_data.npcs = prev["npcs"]
-                self.town_data.interior_links = prev["interior_links"]
-                self.town_data.overworld_exits = prev.get(
-                    "overworld_exits", set())
                 self.game.party.col = prev["col"]
                 self.game.party.row = prev["row"]
                 self._interior_exit_positions = prev.get(
                     "exit_positions", set())
-                self._interior_overworld_exits = prev.get(
-                    "overworld_exit_positions", set())
                 self._interior_name = prev.get("name", "")
                 if not stack:
                     self._in_interior = False
@@ -887,10 +830,6 @@ class TownState(InventoryMixin, BaseState):
             self.show_message("The door is locked.", 1500)
             return
 
-        # Remember the name of the interior we're leaving so we can find
-        # the back-link tile in the destination and spawn near it.
-        source_interior_name = getattr(self, "_interior_name", "")
-
         # Push current state onto the interior stack so we can return.
         # ``source_map`` records where we came from so the destination
         # interior can find the correct back-link tile without searching
@@ -906,10 +845,7 @@ class TownState(InventoryMixin, BaseState):
             "source_map": source_map_name,
             "tile_map": self.town_data.tile_map,
             "npcs": self.town_data.npcs,
-            "interior_links": getattr(self.town_data, "interior_links", {}),
-            "overworld_exits": getattr(self.town_data, "overworld_exits", set()),
             "exit_positions": getattr(self, "_interior_exit_positions", set()),
-            "overworld_exit_positions": getattr(self, "_interior_overworld_exits", set()),
             "name": getattr(self, "_interior_name", ""),
         })
         self._interior_name = interior_name
@@ -943,44 +879,16 @@ class TownState(InventoryMixin, BaseState):
         self._spawn_interior_quest_collect_items(interior_name, imap)
         self._spawn_interior_quest_monsters(interior_name, imap)
 
-        # Build unified links from the interior tile flags, then derive
-        # the exit/interior-link sets from them.
-        from src.tile_map import TileMap as _TM
-        imap.links = _TM.build_links_from_sparse_tiles(
-            interior.get("tiles", {}), source_map=interior_name,
-            tile_context="town")
-
-        # Merge registry-based links for this interior (building address)
-        if self.game.link_registry:
-            # Try the building:Parent:Interior address format
-            parent_town = getattr(self.town_data, "name", "")
-            self.game.link_registry.populate_tile_map(
-                imap, f"building:{parent_town}:{interior_name}")
-
-        # Derive the legacy sets from unified links
+        # Track exit positions from interior tile flags
         self._interior_exit_positions = set()
-        self._interior_overworld_exits = set()
-        interior_links = {}
         exit_positions = []
-        for pos, lnk in imap.links.items():
-            lt = lnk.get("target_type", "")
-            if lt == "to_town":
-                self._interior_exit_positions.add(pos)
-                exit_positions.append(pos)
-            elif lt == "overworld":
-                self._interior_overworld_exits.add(pos)
-                exit_positions.append(pos)
-            if lt == "interior":
-                interior_links[pos] = lnk["target_map"]
-
-        # Find the tile that links back to the source interior we came
-        # from so we can spawn near the correct door.
-        back_link_pos = None
-        source_name = source_interior_name
-        for pos, tgt in interior_links.items():
-            if source_name and tgt == source_name:
-                back_link_pos = pos
-                break
+        for pos_key, td in interior.get("tiles", {}).items():
+            parts = pos_key.split(",")
+            c, r = int(parts[0]), int(parts[1])
+            tile_flags = td.get("flags", {})
+            if tile_flags.get("to_town"):
+                self._interior_exit_positions.add((c, r))
+                exit_positions.append((c, r))
 
         # Track first walkable tile as fallback spawn point
         first_walkable = None
@@ -996,31 +904,15 @@ class TownState(InventoryMixin, BaseState):
 
         # Place the party on the destination tile.
         # Priority:
-        #   0. Explicit target_pos from the link (connecting tile)
-        #   1. The tile linking back to the source interior we came from
-        #   2. The first to_town exit (coming from town level)
-        #   3. Any exit position
-        #   4. First walkable tile
-        #   5. Center of grid
+        #   1. First exit position
+        #   2. First walkable tile
+        #   3. Center of grid
         # The entry grace flag prevents immediate ejection.
-        # Look up the link on the *source* map (now on the stack)
-        _prev_tmap = (self._interior_stack[-1]["tile_map"]
-                      if self._interior_stack else None)
-        _src_link = _prev_tmap.get_link(door_col, door_row) if _prev_tmap else None
-        _target_pos = (_src_link.get("target_pos")
-                       if _src_link else None)
-        if _target_pos and _target_pos != (0, 0):
-            spawn = _target_pos
-        else:
-            spawn = (back_link_pos
-                     or (exit_positions[0] if exit_positions else None)
-                     or first_walkable
-                     or (iw // 2, ih // 2))
+        spawn = ((exit_positions[0] if exit_positions else None)
+                 or first_walkable
+                 or (iw // 2, ih // 2))
         self.game.party.col = spawn[0]
         self.game.party.row = spawn[1]
-
-        self.town_data.interior_links = interior_links
-        self.town_data.overworld_exits = set()
 
         # Update camera
         self.game.camera.map_width = iw
@@ -2483,112 +2375,6 @@ class TownState(InventoryMixin, BaseState):
             except Exception:
                 pass
 
-    def _follow_registry_link(self, link):
-        """Follow a registry-based link from within a town.
-
-        The *link* dict has ``target_map``, ``target_type``, and
-        ``target_pos`` (a (col, row) tuple or None).
-        """
-        target_type = link.get("target_type", "")
-        target_pos = link.get("target_pos")
-        if target_pos == (0, 0):
-            target_pos = None  # unresolved, use default
-
-        if target_type == "overworld":
-            # Restore interior stack before leaving so TownData is clean
-            if getattr(self, "_in_interior", False):
-                stack = getattr(self, "_interior_stack", [])
-                if stack:
-                    bottom = stack[0]
-                    stack.clear()
-                    self.town_data.tile_map = bottom["tile_map"]
-                    self.town_data.npcs = bottom["npcs"]
-                    self.town_data.interior_links = bottom[
-                        "interior_links"]
-                    self.town_data.overworld_exits = bottom.get(
-                        "overworld_exits", set())
-                self._in_interior = False
-            ow_col = target_pos[0] if target_pos else self.overworld_col
-            ow_row = target_pos[1] if target_pos else self.overworld_row
-            town_name = getattr(self.town_data, "name", None) or "Town"
-
-            def _do_exit_link():
-                self.game.party.col = ow_col
-                self.game.party.row = ow_row
-                # Restore camera for the overworld map
-                self.game.camera.map_width = self.game.tile_map.width
-                self.game.camera.map_height = self.game.tile_map.height
-                self.game.camera.update(
-                    self.game.party.col, self.game.party.row)
-                self.game.change_state("overworld")
-
-            self.game.start_loading_screen(
-                f"Leaving {town_name}", _do_exit_link)
-
-        elif target_type == "town":
-            target_name = link.get("target_map", "")
-            # Find the target town in the game's town_data_map
-            found_td = None
-            for td in self.game.town_data_map.values():
-                if getattr(td, "name", "") == target_name:
-                    found_td = td
-                    break
-            if found_td is not None:
-                ow_col = self.overworld_col
-                ow_row = self.overworld_row
-
-                def _do_enter_town():
-                    town_state = self.game.states["town"]
-                    town_state.enter_town(found_td,
-                                          ow_col, ow_row,
-                                          target_pos=target_pos)
-                    self.game.change_state("town")
-
-                self.game.start_loading_screen(
-                    f"Entering {target_name}", _do_enter_town)
-            else:
-                self.show_message(
-                    f"Cannot find town: {target_name}", 2000)
-
-        elif target_type == "interior":
-            interior_name = link.get("target_map", "")
-            if interior_name:
-                self._enter_interior(interior_name,
-                                     self.game.party.col,
-                                     self.game.party.row)
-            else:
-                self.show_message("Invalid interior link.", 2000)
-
-        else:
-            # Fallback: treat unknown types as overworld exits
-            if getattr(self, "_in_interior", False):
-                stack = getattr(self, "_interior_stack", [])
-                if stack:
-                    bottom = stack[0]
-                    stack.clear()
-                    self.town_data.tile_map = bottom["tile_map"]
-                    self.town_data.npcs = bottom["npcs"]
-                    self.town_data.interior_links = bottom[
-                        "interior_links"]
-                    self.town_data.overworld_exits = bottom.get(
-                        "overworld_exits", set())
-                self._in_interior = False
-            ow_col = target_pos[0] if target_pos else self.overworld_col
-            ow_row = target_pos[1] if target_pos else self.overworld_row
-            town_name = getattr(self.town_data, "name", None) or "Town"
-
-            def _do_exit_fallback():
-                self.game.party.col = ow_col
-                self.game.party.row = ow_row
-                self.game.camera.map_width = self.game.tile_map.width
-                self.game.camera.map_height = self.game.tile_map.height
-                self.game.camera.update(
-                    self.game.party.col, self.game.party.row)
-                self.game.change_state("overworld")
-
-            self.game.start_loading_screen(
-                f"Leaving {town_name}", _do_exit_fallback)
-
     def _exit_town(self):
         """Leave the town (or exit an interior back to the town)."""
         # If inside a building interior, return to the town map
@@ -2621,13 +2407,9 @@ class TownState(InventoryMixin, BaseState):
         stack.clear()
         self.town_data.tile_map = bottom["tile_map"]
         self.town_data.npcs = bottom["npcs"]
-        self.town_data.interior_links = bottom["interior_links"]
-        self.town_data.overworld_exits = bottom.get("overworld_exits", set())
         self.game.party.col = bottom["col"]
         self.game.party.row = bottom["row"]
         self._interior_exit_positions = bottom.get("exit_positions", set())
-        self._interior_overworld_exits = bottom.get(
-            "overworld_exit_positions", set())
         self._interior_name = ""
         self._in_interior = False
         self.game.camera.map_width = self.town_data.tile_map.width
@@ -2645,14 +2427,11 @@ class TownState(InventoryMixin, BaseState):
         prev = stack.pop()
         self.town_data.tile_map = prev["tile_map"]
         self.town_data.npcs = prev["npcs"]
-        self.town_data.interior_links = prev["interior_links"]
-        self.town_data.overworld_exits = prev.get("overworld_exits", set())
         # Place party back at the door tile
         self.game.party.col = prev["col"]
         self.game.party.row = prev["row"]
         # Restore exit positions and interior name from the level we're returning to
         self._interior_exit_positions = prev.get("exit_positions", set())
-        self._interior_overworld_exits = prev.get("overworld_exit_positions", set())
         leaving_name = getattr(self, "_interior_name", "building")
         self._interior_name = prev.get("name", "")
         # If the stack is now empty, we're back at the town level

@@ -1313,85 +1313,7 @@ class OverworldState(InventoryMixin, BaseState):
                 return
             return  # no other tile events inside interiors
 
-        # ── Overworld link check (highest priority) ──
-        # An explicit link overrides any tile-type behaviour so the
-        # designer can place an interior/town entrance on any tile graphic.
-        pcol, prow = party.col, party.row
-        tmap = self.game.tile_map
-        link = tmap.get_link(pcol, prow)
-        if link and link.get("target_map"):
-            link_name = link["target_map"]
-            link_type = link.get("target_type", "")
-
-            # ── Building link — show action screen ──
-            if link_type == "building":
-                building_def = self._find_module_building_by_name(link_name)
-                if building_def is not None:
-                    spaces = building_def.get("spaces", [])
-                    if spaces:
-                        sub = link.get("sub_interior", "")
-                        display_name = (
-                            f"{building_def.get('name', link_name)}"
-                            f" / {sub}" if sub else
-                            building_def.get("name", link_name))
-                        self.building_action_info = {
-                            "name": display_name,
-                            "description": building_def.get("description",
-                                "A structure stands before you."),
-                        }
-                        self.building_action_entry_args = {
-                            "building_def": building_def,
-                            "col": pcol,
-                            "row": prow,
-                            "sub_interior": sub,
-                        }
-                        self.building_action_cursor = 0
-                        self.building_action_active = True
-                        return
-
-            # ── Dungeon link ──
-            if link_type == "dungeon":
-                dungeon_def = self._find_module_dungeon_by_name(link_name)
-                if dungeon_def is not None:
-                    # Show dungeon action screen with module dungeon info
-                    visited = self.game.is_dungeon_visited(pcol, prow)
-                    self.dungeon_action_info = {
-                        "name": dungeon_def.get("name", link_name),
-                        "description": dungeon_def.get("description",
-                            "A dark entrance leads underground."),
-                        "visited": visited,
-                        "cleared": False,
-                        "quest_name": None,
-                    }
-                    self.dungeon_action_entry_args = {
-                        "type": "module_dungeon",
-                        "col": pcol,
-                        "row": prow,
-                        "dungeon_def": dungeon_def,
-                    }
-                    self.dungeon_action_cursor = 0
-                    self.dungeon_action_active = True
-                    return
-
-            # ── Town link (optionally targeting a sub-interior) ──
-            town_match = self._find_town_by_name(link_name)
-            if town_match is not None:
-                # Ensure the town is registered at this tile position
-                # so get_town_at() finds it during _show_town_action.
-                if (pcol, prow) not in self.game.town_data_map:
-                    self.game.town_data_map[(pcol, prow)] = town_match
-                # If the link targets a specific sub-interior, stash
-                # it so _enter_town_confirmed can auto-enter it.
-                sub = link.get("sub_interior", "")
-                if sub:
-                    self._pending_sub_interior = sub
-                else:
-                    self._pending_sub_interior = ""
-                self._show_town_action()
-                return
-            self._enter_overworld_interior(
-                link_name, pcol, prow)
-            return
+        # ── Link system removed ──
 
         tile_id = tmap.get_tile(pcol, prow)
 
@@ -1405,33 +1327,8 @@ class OverworldState(InventoryMixin, BaseState):
                 return
 
         elif tile_id in (TILE_DUNGEON, TILE_DUNGEON_CLEARED):
-            # Check if a unified link points to a module dungeon
-            # (handles dungeon tiles that have an explicit link)
-            link = tmap.get_link(pcol, prow)
-            if link and link.get("target_map"):
-                ddef = self._find_module_dungeon_by_name(
-                    link["target_map"])
-                if ddef is not None:
-                    visited = self.game.is_dungeon_visited(pcol, prow)
-                    self.dungeon_action_info = {
-                        "name": ddef.get("name", link["target_map"]),
-                        "description": ddef.get("description",
-                            "A dark entrance leads underground."),
-                        "visited": visited,
-                        "cleared": (tile_id == TILE_DUNGEON_CLEARED),
-                        "quest_name": None,
-                    }
-                    self.dungeon_action_entry_args = {
-                        "type": "module_dungeon",
-                        "col": pcol,
-                        "row": prow,
-                        "dungeon_def": ddef,
-                    }
-                    self.dungeon_action_cursor = 0
-                    self.dungeon_action_active = True
-                    return
-            # In custom modules, only linked dungeons should trigger entry.
-            # Unlinked dungeon tiles are treated as scenery.
+            # Link system removed — unlinked dungeon tiles treated as scenery
+            # in custom modules. Base game shows dungeon action.
             if not self.game.module_manifest:
                 self._show_dungeon_action(pcol, prow)
             return
@@ -1553,29 +1450,14 @@ class OverworldState(InventoryMixin, BaseState):
 
         self.game.tile_map = imap
 
-        # Build unified links from interior tile flags and derive
-        # exit/interior-link sets from them.
-        from src.tile_map import TileMap as _TM
-        imap.links = _TM.build_links_from_sparse_tiles(
-            interior.get("tiles", {}), source_map=interior_name)
-        self._overworld_interior_exit_positions = imap.get_exit_positions()
-        self._overworld_interior_links = imap.get_interior_links()
-        exit_positions = list(self._overworld_interior_exit_positions)
+        # Link system removed — initialize empty interior state
+        self._overworld_interior_exit_positions = set()
+        self._overworld_interior_links = {}
+        exit_positions = []
         first_walkable = None
         entry_placed = False
 
-        # ── Priority 1: explicit target_pos from link registry ──
-        # If the link that triggered this transition has a target_pos,
-        # use it directly — no guessing.
-        _src_link = tmap.get_link(door_col, door_row) if tmap else None
-        if _src_link:
-            _tp = _src_link.get("target_pos")
-            if _tp and _tp != (0, 0) and _tp is not None:
-                self.game.party.col = _tp[0]
-                self.game.party.row = _tp[1]
-                entry_placed = True
-
-        # ── Priority 2+: BFS / fallback ──
+        # ── Priority 1: BFS from center, fallback ──
         if not entry_placed:
             for pos_key, td in interior.get("tiles", {}).items():
                 parts = pos_key.split(",")
@@ -1668,7 +1550,7 @@ class OverworldState(InventoryMixin, BaseState):
         # If the stack is now empty, we're back on the overworld
         if not stack:
             self._in_overworld_interior = False
-            # Restore the stashed overworld tile map (which has tile_links etc)
+            # Restore the stashed overworld tile map
             if self._stashed_overworld_tile_map is not None:
                 self.game.tile_map = self._stashed_overworld_tile_map
                 self._stashed_overworld_tile_map = None
@@ -1681,7 +1563,7 @@ class OverworldState(InventoryMixin, BaseState):
         self.game.camera.update(self.game.party.col, self.game.party.row)
         self._building_interior_npcs = []
         self._building_name = ""
-        self._exit_grace = True  # don't re-trigger the tile link immediately
+        self._exit_grace = True  # brief grace period before next action
         self.show_message(f"Leaving {leaving_name}...", 1000)
 
     # ── Building interior quest spawning & interaction ─────────
@@ -2411,22 +2293,10 @@ class OverworldState(InventoryMixin, BaseState):
                             if 0 <= c < lw and 0 <= r < lh:
                                 tmap.set_tile(c, r, tile_id)
 
-                    # Build unified links from tile flags
-                    from src.tile_map import TileMap as _TM2
-                    tmap.links = _TM2.build_links_from_sparse_tiles(
-                        lv.get("tiles", {}), source_map=lname)
-                    overworld_exits = tmap.get_exit_positions()
-                    interior_links = tmap.get_interior_links()
-
                     # ── Resolve entry point ──
-                    # For the first level entering from the
-                    # overworld, spawn at a to_overworld tile.
-                    # For other levels, the dungeon state resolves
-                    # spawn from the interior back-link at runtime.
-                    if overworld_exits:
-                        ecol, erow = next(iter(overworld_exits))
-                    elif not _TD.get(tmap.get_tile(ecol, erow),
-                                     {}).get("walkable", False):
+                    # Find a walkable tile if the default isn't walkable.
+                    if not _TD.get(tmap.get_tile(ecol, erow),
+                                   {}).get("walkable", False):
                         for r in range(lh):
                             for c in range(lw):
                                 if _TD.get(tmap.get_tile(c, r),
@@ -2437,13 +2307,7 @@ class OverworldState(InventoryMixin, BaseState):
                                 continue
                             break
 
-                    # ── Store legacy link attributes for backward
-                    # compatibility with dungeon.py code ──
                     tmap._custom_mode = True
-                    if overworld_exits:
-                        tmap._custom_exit_doors = overworld_exits
-                    if interior_links:
-                        tmap._interior_links = interior_links
 
                     dd = DungeonData(
                         tile_map=tmap, rooms=[],
@@ -2473,10 +2337,8 @@ class OverworldState(InventoryMixin, BaseState):
                             walkable = []
                             for _wr in range(lh):
                                 for _wc in range(lw):
-                                    if (_TD.get(tmap.get_tile(_wc, _wr),
-                                                {}).get("walkable", False)
-                                            and (_wc, _wr)
-                                                not in overworld_exits):
+                                    if _TD.get(tmap.get_tile(_wc, _wr),
+                                               {}).get("walkable", False):
                                         walkable.append((_wc, _wr))
                             if walkable:
                                 mc, mr = _rng.choice(walkable)
@@ -2565,41 +2427,16 @@ class OverworldState(InventoryMixin, BaseState):
         # downstream code that reads it, like victory messages)
         self.game.town_data = town_data
 
-        # If a sub-interior was requested (e.g. overworld tile linked
-        # directly to a tunnel inside this town), tell the town state
-        # to auto-enter it once the town loads.
-        sub = getattr(self, "_pending_sub_interior", "")
-        if sub:
-            self._pending_sub_interior = ""
-        # Look up the link to get target_pos for exact placement
-        _link = self.game.tile_map.get_link(pcol, prow)
-        _target_pos = (_link.get("target_pos")
-                       if _link else None)
-        if _target_pos == (0, 0):
-            _target_pos = None  # unresolved, use default
-
-        # If entering via a registry link (has link_id), preserve the
-        # town's existing overworld exit position so that normal exits
-        # still return the party to their original entry point — not
-        # to the registry link's source tile.  This prevents
-        # bidirectional links from "coupling" the exit behaviour.
-        _preserve = False
-        if _link and _link.get("link_id"):
-            town_state = self.game.states["town"]
-            # Only preserve if the party was already in this town
-            # (town_data is set from a prior visit to the same town).
-            if (getattr(town_state, "town_data", None) is not None
-                    and getattr(town_state, "town_data", None) is town_data):
-                _preserve = True
+        # Link system removed
 
         town_name = getattr(town_data, "name", None) or "Town"
 
         def _do_enter():
             town_state = self.game.states["town"]
             town_state.enter_town(town_data, pcol, prow,
-                                  auto_interior=sub or None,
-                                  target_pos=_target_pos,
-                                  preserve_exit=_preserve)
+                                  auto_interior=None,
+                                  target_pos=None,
+                                  preserve_exit=False)
             self.game.change_state("town")
 
         self.game.start_loading_screen(f"Entering {town_name}", _do_enter)

@@ -227,7 +227,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.active_module_name = "No Module"
         self.active_module_version = "0.0.0"
         self.module_manifest = None  # populated on new game start
-        self.link_registry = None   # LinkRegistry – loaded per module
 
         # ── Town Editor (within module) ──
         self._mod_town_list = []          # list of town dicts for current module
@@ -643,15 +642,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             from src.tile_map import validate_module_links
             validate_module_links(self.active_module_path)
 
-        # ── Load link registry and push into tile map ──
-        if self.active_module_path:
-            from src.link_registry import LinkRegistry
-            self.link_registry = LinkRegistry()
-            self.link_registry.load(self.active_module_path)
-            # Sync registry links into the overworld TileMap so runtime
-            # transition code (tmap.get_link()) sees them.
-            self.link_registry.populate_tile_map(
-                self.tile_map, "overworld")
 
         if self.party.members:
             # Player already formed a party - keep roster & active members,
@@ -1151,106 +1141,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if first_town is None:
                 first_town = td
 
-        # ── Register towns at tile_link positions ──
-        # The overview map editor lets the designer link any tile to a
-        # town by name.  If that town wasn't already placed by a landmark
-        # we still need to generate it and register it in town_data_map
-        # so the overworld state can find it at runtime.
-        known_town_names = {
-            getattr(td, "name", ""): td
-            for td in self.town_data_map.values()
-        }
-        # Index module manifest town definitions
-        towns_by_name = {t.get("name", ""): t for t in manifest_towns}
-        # Reuse the pre-loaded towns.json data (loaded before the
-        # landmark loop above).
-        towns_json_by_name = _towns_json_by_name
-        # Merge legacy tile_links AND unified links (from link registry)
-        # into a single dict so the registration loop handles both.
-        _all_links = {}  # (col, row) -> {"interior": name, ...}
-        tile_links = getattr(self.tile_map, "tile_links", {})
-        for pos_key, link_val in tile_links.items():
-            if not isinstance(link_val, dict):
-                continue
-            name = link_val.get("interior", "")
-            if not name:
-                continue
-            if isinstance(pos_key, tuple):
-                _all_links[pos_key] = link_val
-            elif isinstance(pos_key, str) and "," in pos_key:
-                parts = pos_key.split(",")
-                if len(parts) == 2:
-                    _all_links[(int(parts[0]), int(parts[1]))] = link_val
-        # Also include unified links populated from the link registry.
-        for pos_key, link_val in getattr(self.tile_map, "links", {}).items():
-            if not isinstance(link_val, dict):
-                continue
-            name = link_val.get("interior", "") or link_val.get("target_map", "")
-            if not name:
-                continue
-            if isinstance(pos_key, tuple) and pos_key not in _all_links:
-                _all_links[pos_key] = link_val
-
-        for pos_key, link_val in _all_links.items():
-            link_name = (link_val.get("interior", "")
-                         or link_val.get("target_map", ""))
-            if not link_name:
-                continue
-            lcol, lrow = pos_key
-            if (lcol, lrow) in self.town_data_map:
-                continue
-            # If a town with this name was already generated from a
-            # landmark, register the same TownData at this position too.
-            if link_name in known_town_names:
-                self.town_data_map[(lcol, lrow)] = known_town_names[link_name]
-                if first_town is None:
-                    first_town = known_town_names[link_name]
-                continue
-            # Try building from the module's towns.json (user-created
-            # towns with custom tile layouts and NPCs).
-            if link_name in towns_json_by_name:
-                td = self._build_town_from_towns_json(
-                    towns_json_by_name[link_name])
-                if td is not None:
-                    self.town_data_map[(lcol, lrow)] = td
-                    known_town_names[link_name] = td
-                    if first_town is None:
-                        first_town = td
-                    continue
-            # If the name matches a manifest town definition, generate
-            # procedurally.
-            if link_name in towns_by_name:
-                tdef = towns_by_name[link_name]
-                tc = tdef.get("town_config", {})
-                town_seed = hash((link_name, lcol, lrow)) & 0xFFFFFFFF
-                custom_layout = tc.get("layout", "")
-                if custom_layout:
-                    td = self._build_town_from_layout(
-                        custom_layout, link_name,
-                        town_style=tc.get("style", "medieval"))
-                    if td is None:
-                        td = generate_town(
-                            link_name, seed=town_seed,
-                            layout_index=town_ordinal,
-                            has_key_dungeons=bool(self.key_dungeons),
-                            innkeeper_quests=inn_quests,
-                            town_config=tc)
-                else:
-                    td = generate_town(
-                        link_name, seed=town_seed,
-                        layout_index=town_ordinal,
-                        has_key_dungeons=bool(self.key_dungeons),
-                        innkeeper_quests=inn_quests,
-                        town_config=tc)
-                town_ordinal += 1
-                self.town_data_map[(lcol, lrow)] = td
-                known_town_names[link_name] = td
-                if first_town is None:
-                    first_town = td
-
         # ── Overlay custom data from towns.json ──
-        # If the user added enclosures or interior tile links to a town
-        # via the editor, overlay those onto the matching TownData.
+        # If the user added enclosures to a town via the editor,
+        # overlay those onto the matching TownData.
         # This handles cases where a town was generated procedurally
         # from a landmark but the user later added custom content.
         for town_def in getattr(self, "_mod_town_list", []):
@@ -1258,25 +1151,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if not tname:
                 continue
             custom_interiors = town_def.get("interiors", [])
-            # Scan the town's tiles for interior links added in the editor
-            custom_int_links = {}
-            custom_ow_exits = set()
-            for key, td in town_def.get("tiles", {}).items():
-                if td.get("interior"):
-                    try:
-                        parts = key.split(",")
-                        c, r = int(parts[0]), int(parts[1])
-                        custom_int_links[(c, r)] = td["interior"]
-                    except (ValueError, IndexError):
-                        pass
-                if td.get("to_overworld"):
-                    try:
-                        parts = key.split(",")
-                        c, r = int(parts[0]), int(parts[1])
-                        custom_ow_exits.add((c, r))
-                    except (ValueError, IndexError):
-                        pass
-            if not custom_interiors and not custom_int_links:
+            if not custom_interiors:
                 continue
             # Apply to every TownData with matching name
             for td_obj in self.town_data_map.values():
@@ -1284,14 +1159,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     continue
                 if custom_interiors:
                     td_obj.interiors = custom_interiors
-                if custom_int_links:
-                    existing = getattr(td_obj, "interior_links", {})
-                    existing.update(custom_int_links)
-                    td_obj.interior_links = existing
-                if custom_ow_exits:
-                    existing_ow = getattr(td_obj, "overworld_exits", set())
-                    existing_ow.update(custom_ow_exits)
-                    td_obj.overworld_exits = existing_ow
 
         # Set the default town_data to the first town (hub)
         if first_town:
@@ -2106,8 +1973,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         from src.settings import TILE_VOID, TILE_EXIT
         tm = TileMap(w, h, default_tile=TILE_VOID, oob_tile=TILE_VOID)
-        interior_links = {}
-        overworld_exits = set()
         entry_col, entry_row = 0, h - 1
 
         for key, td in tiles_dict.items():
@@ -2121,32 +1986,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             path = td.get("path")
             if path:
                 tm.sprite_overrides[(col, row)] = path
-            if td.get("interior"):
-                interior_links[(col, row)] = td["interior"]
-            if td.get("to_overworld"):
-                overworld_exits.add((col, row))
-                if entry_col == 0 and entry_row == h - 1:
-                    entry_col, entry_row = col, row
             if tile_id == TILE_EXIT:
                 entry_col, entry_row = col, row
-
-        # Populate unified links on the tile_map
-        for pos, iname in interior_links.items():
-            tm.links[pos] = {
-                "target_map": iname,
-                "target_type": "interior",
-                "target_pos": None,
-                "source_map": town_name,
-                "source_pos": pos,
-            }
-        for pos in overworld_exits:
-            tm.links[pos] = {
-                "target_map": "overworld",
-                "target_type": "overworld",
-                "target_pos": None,
-                "source_map": town_name,
-                "source_pos": pos,
-            }
 
         return TownData(
             tile_map=tm,
@@ -2155,8 +1996,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             entry_col=entry_col,
             entry_row=entry_row,
             town_style=town_style,
-            interior_links=interior_links,
-            overworld_exits=overworld_exits,
+            interior_links={},
+            overworld_exits=set(),
         )
 
     def _build_town_from_towns_json(self, town_def):
@@ -2178,11 +2019,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             return None
 
         tm = TileMap(w, h, default_tile=TILE_VOID, oob_tile=TILE_VOID)
-        interior_links = {}
-        overworld_exits = set()
         entry_col = town_def.get("entry_col", w // 2)
         entry_row = town_def.get("entry_row", h - 1)
-        overworld_door = None  # first to_overworld tile found
 
         for key, td in tiles_dict.items():
             try:
@@ -2195,21 +2033,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             path = td.get("path")
             if path:
                 tm.sprite_overrides[(col, row)] = path
-            if td.get("interior"):
-                interior_links[(col, row)] = td["interior"]
-            if td.get("to_overworld"):
-                overworld_exits.add((col, row))
-                if overworld_door is None:
-                    overworld_door = (col, row)
             if tile_id == TILE_EXIT:
-                overworld_exits.add((col, row))
-                if overworld_door is None:
-                    overworld_door = (col, row)
-
-        # Spawn the party at the overworld exit door if one exists,
-        # since that's the door they enter through from the overview map.
-        if overworld_door is not None:
-            entry_col, entry_row = overworld_door
+                # Mark exit positions for NPC placement avoidance
+                pass
 
         # Build NPC objects from the town definition
         npcs = []
@@ -2239,12 +2065,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             for wx in range(w):
                 if tm.is_walkable(wx, wy):
                     walkable.add((wx, wy))
-        # Remove the entry tile and interior-link tiles
+        # Remove the entry tile
         walkable.discard((entry_col, entry_row))
-        for pos in interior_links:
-            walkable.discard(pos)
-        for pos in overworld_exits:
-            walkable.discard(pos)
 
         occupied = set()
         rng = _rng.Random(hash(name) & 0xFFFFFFFF)
@@ -2264,31 +2086,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 npc.home_row = nr
                 occupied.add((nc, nr))
 
-        # Populate unified links on the tile_map
-        for pos, iname in interior_links.items():
-            tm.links[pos] = {
-                "target_map": iname,
-                "target_type": "interior",
-                "target_pos": None,
-                "source_map": name,
-                "source_pos": pos,
-            }
-        for pos in overworld_exits:
-            tm.links[pos] = {
-                "target_map": "overworld",
-                "target_type": "overworld",
-                "target_pos": None,
-                "source_map": name,
-                "source_pos": pos,
-            }
-
-        # ── Merge registry-based links into the town TileMap ──
-        # The link registry stores links created via the link manager.
-        # Without this call, links originating from this town (e.g. back
-        # to the overworld or to another town) would never trigger at
-        # runtime because the town's TileMap wouldn't know about them.
-        if self.link_registry:
-            self.link_registry.populate_tile_map(tm, f"town:{name}")
 
         return TownData(
             tile_map=tm,
@@ -2297,8 +2094,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             entry_col=entry_col,
             entry_row=entry_row,
             town_style=town_def.get("town_style", "medieval"),
-            interior_links=interior_links,
-            overworld_exits=overworld_exits,
+            interior_links={},
+            overworld_exits=set(),
             custom=True,
             interiors=town_def.get("interiors", []),
             description=town_def.get("description", ""),
@@ -3097,7 +2894,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         """Return to the active game, or load the most recent save."""
         if self._game_started:
             # Game already running - just dismiss the title screen.
-            # Refresh overworld interiors & tile_links from disk in case the
+            # Refresh overworld interiors from disk in case the
             # module editor changed them since the game was started.
             self._refresh_overworld_interior_data()
             # Clear dungeon cache so edited dungeon layouts are rebuilt
@@ -3120,10 +2917,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.showing_title = False
 
     def _refresh_overworld_interior_data(self):
-        """Reload overworld interiors & tile_links from disk.
+        """Reload overworld interiors from disk.
 
         Called when returning to a running game so that any changes made in
-        the module editor (add/delete/rename interiors, re-link tiles) are
+        the module editor (add/delete/rename interiors) are
         picked up without requiring a full new-game restart.
 
         Checks two sources in priority order:
@@ -3162,19 +2959,13 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         # If the player is inside an overworld interior, the current
         # tile_map is the interior map.  Update the stashed overworld
-        # map instead so tile_links survive the exit.
+        # map instead.
         ow_state = self.states.get("overworld")
         stashed = (getattr(ow_state, "_stashed_overworld_tile_map", None)
                    if ow_state else None)
         tmap = stashed if stashed is not None else self.tile_map
 
-        from src.tile_map import TileMap
-        tmap.tile_links = TileMap.normalize_tile_links(
-            sdata.get("tile_links", {}))
         tmap.overworld_interiors = sdata.get("interiors", [])
-        # Refresh unified links from legacy tile_links
-        tmap.links = TileMap.tile_links_to_unified(
-            tmap.tile_links, source_map="overworld")
 
         # Re-validate links after editor changes
         from src.tile_map import validate_module_links
@@ -3401,11 +3192,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._load_module_buildings(mod["path"])
         self._build_module_maps()
 
-        # ── Ensure link registry exists ──
-        if self.link_registry is None and self.active_module_path:
-            from src.link_registry import LinkRegistry
-            self.link_registry = LinkRegistry()
-            self.link_registry.load(self.active_module_path)
         self._module_edit_folder_label = ""
 
     def _next_editable_field(self, direction):
@@ -3967,38 +3753,21 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                             "sub_interior": spname,
                         })
 
-        # ── Ensure link registry exists ──
-        if self.link_registry is None and self.active_module_path:
-            from src.link_registry import LinkRegistry
-            self.link_registry = LinkRegistry()
-            self.link_registry.load(self.active_module_path)
-
-        # ── Build module maps list for link manager ──
+        # ── Build module maps list ──
         module_maps = self._build_module_maps()
-
-        # ── Load existing tile links ──
-        tile_links = self._mod_overview_map.get("tile_links", {})
 
         # ── Load existing party start position ──
         party_start = self._mod_overview_map.get("party_start")
 
         def _on_save(st):
             self._mod_overview_map["tiles"] = st.tiles
-            self._mod_overview_map["tile_links"] = st.tile_links
             self._mod_overview_map["party_start"] = st.party_start
             self._save_module_overview_map()
-            # Persist link registry changes
-            if self.link_registry and self.link_registry.dirty:
-                self.link_registry.save(self.active_module_path)
 
         def _on_exit(st):
             self._mod_overview_map["tiles"] = st.tiles
-            self._mod_overview_map["tile_links"] = st.tile_links
             self._mod_overview_map["party_start"] = st.party_start
             self._save_module_overview_map()
-            # Persist link registry changes
-            if self.link_registry and self.link_registry.dirty:
-                self.link_registry.save(self.active_module_path)
             self.showing_features = False
             self.showing_modules = True
             self.module_edit_mode = True
@@ -4012,11 +3781,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             height=h,
             brushes=brushes,
             tile_context="overworld",
-            supports_tile_links=True,
-            supports_connecting_links=True,
-            map_address="overworld",
-            link_registry=self.link_registry,
-            module_maps=module_maps,
             supports_replace=True,
             supports_party_start=True,
             on_save=_on_save,
@@ -4024,7 +3788,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         )
 
         state = MapEditorState(config, tiles=tiles,
-                               tile_links=tile_links,
                                interior_list=interior_list,
                                party_start=party_start)
         handler = MapEditorInputHandler(
@@ -4078,10 +3841,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     ["Label", "label",
                      self._mod_overview_map.get("label", ""),
                      "text", True],
-                    ["Width", "width",
-                     str(mc.get("width", 16)), "text", True],
-                    ["Height", "height",
-                     str(mc.get("height", 12)), "text", True],
                 ]
                 self.module_edit_field = 0
                 self.module_edit_scroll = 0

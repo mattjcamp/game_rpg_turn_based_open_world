@@ -3408,7 +3408,8 @@
             "path": "game/terrain/town_counter.png"
           }
         },
-        "template_label": "General Shop Interior"
+        "template_label": "General Shop Interior",
+        "npcs": []
       }
     ]
   }

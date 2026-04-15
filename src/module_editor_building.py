@@ -344,18 +344,9 @@ class ModuleBuildingEditorMixin:
             height=h,
             tile_context="town",
             brushes=brushes,
-            supports_interior_links=True,
-            supports_connecting_links=True,
-            map_address=f"building:{building_name}:{space_name}",
-            link_registry=getattr(self, 'link_registry', None),
-            module_maps=getattr(self, '_mod_module_maps', []),
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
-            interior_exit_types=[
-                {"label": u"\u2190 Return to Overworld",
-                 "link_type": "to_overworld"},
-            ],
         )
         existing_tiles = dict(space.get("tiles", {}))
         state = MapEditorState(config, tiles=existing_tiles,
