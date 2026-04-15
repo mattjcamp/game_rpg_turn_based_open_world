@@ -3892,7 +3892,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_overworld_brushes,
-            STORAGE_DENSE, GRID_FIXED,
+            STORAGE_DENSE, GRID_FIXED, GRID_SCROLLABLE,
         )
 
         mc = self._mod_overview_map.get("map_config", {})
@@ -4007,7 +4007,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         config = MapEditorConfig(
             title=self._mod_overview_map.get("label", "Overview Map"),
             storage=STORAGE_DENSE,
-            grid_type=GRID_FIXED,
+            grid_type=GRID_SCROLLABLE,
             width=w,
             height=h,
             brushes=brushes,

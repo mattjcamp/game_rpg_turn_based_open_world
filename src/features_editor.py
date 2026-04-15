@@ -59,7 +59,7 @@ class FeaturesEditor:
         # Values are plain dicts; the actual STORAGE_*/GRID_* constants are
         # resolved in _meh_folder_default_config() at runtime.
         self._MEH_FOLDER_DEFAULTS = {
-            "me_overview":  {"storage": "dense",  "grid": "fixed",
+            "me_overview":  {"storage": "dense",  "grid": "scrollable",
                              "ctx": "overworld", "w": 16, "h": 12},
             "me_dungeon":   {"storage": "dense",  "grid": "scrollable",
                              "ctx": "dungeon",   "w": 32, "h": 32},
@@ -3983,6 +3983,24 @@ class FeaturesEditor:
         Uses active_editor to dispatch to the correct data
         structures while sharing the same level-1/level-2 navigation logic.
         """
+        # ── Route mouse events to map editors that support them ──
+        _MAP_EDITORS = {
+            "mod_overview_map": "_mod_map_editor",
+            "mod_town_map": "_mod_town_map_editor",
+            "mod_dungeon_map": "_mod_dungeon_map_editor",
+            "mod_building_map": "_mod_building_map_editor",
+        }
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
+                          pygame.MOUSEWHEEL, pygame.MOUSEMOTION):
+            prefix = _MAP_EDITORS.get(self.active_editor)
+            if prefix:
+                game = self.game
+                handler = getattr(game, f"{prefix}_handler", None)
+                state = getattr(game, f"{prefix}_state", None)
+                if handler and state:
+                    handler.handle_mouse(event)
+            return
+
         if event.type != pygame.KEYDOWN:
             return
 

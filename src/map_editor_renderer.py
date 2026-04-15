@@ -120,6 +120,12 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     # ── Right panel: tile grid ──
     _draw_tile_grid(renderer, data)
 
+    # ── Minimap (scrollable dense grids only) ──
+    if (data["storage"] == STORAGE_DENSE
+            and data.get("grid_type") == "scrollable"
+            and (data["width"] > 20 or data["height"] > 20)):
+        _draw_minimap(renderer, data)
+
     # ── Overlays ──
     if data.get("link_manager"):
         _draw_link_manager_overlay(renderer, data)
@@ -541,6 +547,86 @@ def _draw_party_start_marker(renderer, data, screen, ox, oy, ts,
                 else renderer.font_small)
         psf = tiny.render("P", True, (255, 255, 255))
         screen.blit(psf, (bx + 1, by))
+
+
+def _draw_minimap(renderer, data: Dict):
+    """Draw a minimap in the bottom-right corner showing the full map
+    with a viewport rectangle and cursor dot."""
+    screen = renderer.screen
+    tiles = data["tiles"]
+    map_w, map_h = data["width"], data["height"]
+    ts = data.get("tile_size", TILE_SIZE)
+
+    # Minimap sizing: fit into a box in the bottom-right of the grid area
+    max_mini_w = min(160, GRID_W // 3)
+    max_mini_h = min(120, GRID_H // 3)
+    scale = min(max_mini_w / max(map_w, 1), max_mini_h / max(map_h, 1))
+    mini_w = max(int(map_w * scale), 20)
+    mini_h = max(int(map_h * scale), 15)
+
+    margin = 6
+    mx = GRID_X + GRID_W - mini_w - margin
+    my = GRID_Y + GRID_H - mini_h - margin
+
+    # Semi-transparent background
+    bg = pygame.Surface((mini_w + 4, mini_h + 4), pygame.SRCALPHA)
+    bg.fill((0, 0, 0, 180))
+    screen.blit(bg, (mx - 2, my - 2))
+
+    # Draw tile colours at 1-pixel-per-cell resolution, then scale up
+    from src.settings import TILE_DEFS
+    _MINI_COLOURS = {
+        "grass": (60, 140, 40),
+        "water": (40, 80, 180),
+        "forest": (30, 90, 30),
+        "mountain": (140, 120, 100),
+        "sand": (200, 180, 120),
+        "path": (160, 140, 100),
+        "town": (200, 200, 60),
+        "dungeon": (180, 60, 60),
+        "bridge": (140, 100, 60),
+    }
+    mini_surf = pygame.Surface((map_w, map_h))
+    mini_surf.fill((20, 20, 30))
+    for r in range(map_h):
+        row = tiles[r]
+        for c in range(map_w):
+            tid = row[c]
+            tdef = TILE_DEFS.get(tid, {})
+            tname = tdef.get("name", "").lower()
+            colour = None
+            for key, col in _MINI_COLOURS.items():
+                if key in tname:
+                    colour = col
+                    break
+            if colour is None:
+                # Fallback: walkable = dark grey, unwalkable = darker
+                colour = (50, 50, 60) if tdef.get("walkable") else (25, 25, 35)
+            mini_surf.set_at((c, r), colour)
+
+    scaled = pygame.transform.scale(mini_surf, (mini_w, mini_h))
+    screen.blit(scaled, (mx, my))
+
+    # Draw viewport rectangle
+    vis_cols = GRID_W // ts
+    vis_rows = GRID_H // ts
+    cam_c = data.get("cam_col", 0)
+    cam_r = data.get("cam_row", 0)
+    vx = mx + int(cam_c * scale)
+    vy = my + int(cam_r * scale)
+    vw = max(int(min(vis_cols, map_w) * scale), 2)
+    vh = max(int(min(vis_rows, map_h) * scale), 2)
+    pygame.draw.rect(screen, (255, 255, 255), (vx, vy, vw, vh), 1)
+
+    # Cursor dot
+    cur_c, cur_r = data["cursor_col"], data["cursor_row"]
+    cx = mx + int((cur_c + 0.5) * scale)
+    cy = my + int((cur_r + 0.5) * scale)
+    pygame.draw.circle(screen, (255, 200, 60), (cx, cy), max(int(scale), 2))
+
+    # Border
+    pygame.draw.rect(screen, (100, 100, 120), (mx - 2, my - 2,
+                                                 mini_w + 4, mini_h + 4), 1)
 
 
 def _draw_sparse_grid(renderer, data: Dict):
@@ -1078,10 +1164,11 @@ def _draw_footer(renderer, data: Dict):
         hint = "[Up/Dn] Select  [Enter] Confirm  [Esc] Cancel"
     elif data["storage"] == STORAGE_DENSE:
         lk = "[L] Connect  [Shift+L] Manage  " if data.get("supports_connecting_links") else ""
-        hint = ("[Arrows] Move  [Enter/Space] Paint  "
-                f"[Tab] Brush  [I] Link  {lk}[P] Party Start  "
+        hint = ("[Arrows] Move  [Shift+Arrows] Fast  "
+                "[Wheel] Scroll  [Click] Paint  "
+                f"[Tab] Brush  [I] Link  {lk}[P] Party  "
                 "[R] Replace  [X] Unlink  "
-                "[Ctrl+S] Save  [Esc] Save & Exit")
+                "[Ctrl+S] Save  [Esc] Exit")
     else:
         lk = "[L] Connect  [Shift+L] Manage  " if data.get("supports_connecting_links") else ""
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "

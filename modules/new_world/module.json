@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "id": "new_world",
+    "name": "New World",
+    "author": "",
+    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ashmoor.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 64,
+    "map_height": 48,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "base_tile": "grass"
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "base_tile": "grass"
+    }
+  },
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "ashmoor",
+        "name": "Ashmoor",
+        "description": "A walled outpost on the frontier, always on guard against the wilds."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_fountain"
+    },
+    "starting_quests": [
+      "purify"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Flooded Barrow",
+        "key_name": "Moonstone Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "The air around Flooded Barrow shimmers with faint heat. Strange runes glow along the doorframe.",
+        "quest_type": "retrieve",
+        "quest_objective": "Slay the guardian of Flooded Barrow and claim the Moonstone Key",
+        "quest_hint": "A fearsome creature guards the prize.",
+        "kill_target": "",
+        "kill_count": 0
+      }
+    ]
+  }
+}

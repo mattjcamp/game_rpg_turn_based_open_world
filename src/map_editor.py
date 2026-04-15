@@ -188,6 +188,11 @@ class MapEditorState:
         # Continuous paint mode — when True, moving the cursor also paints
         self.painting: bool = False
 
+        # Mouse drag state (set by handle_mouse)
+        self._mouse_dragging: bool = False
+        self._middle_drag_start = None
+        self._middle_drag_cam = None
+
         # Brush folder collapse state (group name → is_open)
         # All folders start open by default
         self.brush_folders: Dict[str, bool] = {}
@@ -333,6 +338,39 @@ class MapEditorState:
                                   self.config.width - vis_cols))
         self.cam_row = max(0, min(self.cursor_row - vis_rows // 2,
                                   self.config.height - vis_rows))
+
+    def scroll_camera(self, dc: int, dr: int):
+        """Nudge camera by (dc, dr) tiles, clamped to map bounds."""
+        header_h, footer_h, left_w = 36, 28, 180
+        right_w = SCREEN_WIDTH - left_w - 4 - 4
+        grid_w = right_w - 8
+        grid_h = SCREEN_HEIGHT - header_h - footer_h - 4 - 8
+        ts = self.tile_size
+        vis_cols = grid_w // ts
+        vis_rows = grid_h // ts
+        self.cam_col = max(0, min(self.cam_col + dc,
+                                  self.config.width - vis_cols))
+        self.cam_row = max(0, min(self.cam_row + dr,
+                                  self.config.height - vis_rows))
+
+    def pixel_to_grid(self, px: int, py: int):
+        """Convert screen pixel (px, py) to grid (col, row) or None."""
+        from src.map_editor_renderer import GRID_X, GRID_Y, GRID_W, GRID_H
+        ts = self.tile_size
+        map_w, map_h = self.config.width, self.config.height
+        vis_cols = GRID_W // ts
+        vis_rows = GRID_H // ts
+        total_w = min(map_w, vis_cols) * ts
+        total_h = min(map_h, vis_rows) * ts
+        ox = GRID_X + (GRID_W - total_w) // 2
+        oy = GRID_Y + (GRID_H - total_h) // 2
+        if px < ox or py < oy:
+            return None
+        gc = (px - ox) // ts + self.cam_col
+        gr = (py - oy) // ts + self.cam_row
+        if 0 <= gc < map_w and 0 <= gr < map_h:
+            return (gc, gr)
+        return None
 
     # -- Tile access (works for both storage types) --
 
@@ -817,7 +855,7 @@ class MapEditorInputHandler:
                 cfg.on_exit(st)
             return "exit"
 
-        # ── Cursor movement ──
+        # ── Cursor movement (Shift = fast-scroll 8 tiles) ──
         dc, dr = 0, 0
         if event.key in (pygame.K_UP, pygame.K_w):
             dr = -1
@@ -837,10 +875,21 @@ class MapEditorInputHandler:
             dc = 1
 
         if dc or dr:
-            st.move_cursor(dc, dr)
-            # Continuous paint: auto-paint after each move
-            if st.painting:
-                st.paint()
+            mods = getattr(event, 'mod', 0) or pygame.key.get_mods()
+            if mods & pygame.KMOD_SHIFT:
+                # Fast-scroll: jump 8 tiles at a time
+                dc *= 8
+                dr *= 8
+            for _ in range(abs(dc) + abs(dr)):
+                step_c = min(max(dc, -1), 1) if dc else 0
+                step_r = min(max(dr, -1), 1) if dr else 0
+                st.move_cursor(step_c, step_r)
+                if st.painting:
+                    st.paint()
+                if step_c:
+                    dc -= step_c
+                if step_r:
+                    dr -= step_r
             return None
 
         # ── Brush cycling (cancels painting mode) ──
@@ -1285,6 +1334,57 @@ class MapEditorInputHandler:
             return None
 
         return None
+
+    # ── Mouse input ──────────────────────────────────────────────
+
+    def handle_mouse(self, event):
+        """Process mouse events: click to place cursor, wheel to scroll,
+        drag to paint.  Called from the features_editor dispatch."""
+        st = self.state
+
+        # Overlays active — ignore mouse
+        if st.link_manager or st.int_picking or st.int_link_picking or st.replacing:
+            return
+
+        if event.type == pygame.MOUSEWHEEL:
+            # Scroll the camera (vertical: y, horizontal: x if available)
+            scroll_speed = 3
+            st.scroll_camera(-event.x * scroll_speed if event.x else 0,
+                             -event.y * scroll_speed)
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            pos = st.pixel_to_grid(*event.pos)
+            if pos:
+                st.cursor_col, st.cursor_row = pos
+                if st.config.grid_type == GRID_SCROLLABLE:
+                    st.scroll_to_cursor()
+                st._mouse_dragging = True
+                # Single-click paints current brush
+                st.paint()
+            return
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            st._mouse_dragging = False
+            return
+
+        if event.type == pygame.MOUSEMOTION:
+            if getattr(st, '_mouse_dragging', False):
+                pos = st.pixel_to_grid(*event.pos)
+                if pos and (pos[0] != st.cursor_col or pos[1] != st.cursor_row):
+                    st.cursor_col, st.cursor_row = pos
+                    st.paint()
+            return
+
+        # Middle-click drag: pan the camera
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:
+            st._middle_drag_start = event.pos
+            st._middle_drag_cam = (st.cam_col, st.cam_row)
+            return
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 2:
+            st._middle_drag_start = None
+            return
 
 
 def _object_origin(obj: Dict) -> Tuple[int, int]:
