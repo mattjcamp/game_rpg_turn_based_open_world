@@ -35,7 +35,7 @@
       "character_can_equip": true,
       "melee": false,
       "throwable": false,
-      "durability": 2,
+      "durability": 20,
       "indestructible": false
     },
     "Crossbow": {
@@ -307,7 +307,9 @@
       "party_can_equip": false,
       "character_can_equip": true,
       "durability": 80,
-      "indestructible": false
+      "indestructible": false,
+      "melee": false,
+      "throwable": false
     }
   },
   "armors": {

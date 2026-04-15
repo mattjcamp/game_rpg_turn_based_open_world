@@ -1157,10 +1157,15 @@ class PartyMember:
         """Move an item from personal inventory to the party shared stash.
 
         Returns True if the item was returned, False otherwise.
+        Durability is preserved across the transfer.
         """
         if item_name not in self.inventory:
             return False
         self.inventory.remove(item_name)
+        # Transfer durability: character inventory → party stash
+        saved_dur = self.inventory_durability.pop(item_name, None)
+        if saved_dur is not None:
+            party.shared_inventory_durability[item_name] = saved_dur
         party.shared_inventory.append(item_name)
         return True
 
@@ -1168,13 +1173,16 @@ class PartyMember:
         """Unequip an item and send it to the party shared stash.
 
         Returns True if something was returned, False if slot was at default.
+        Durability is preserved across the transfer.
         """
         current = self.equipped.get(slot)
         default = self._SLOT_DEFAULTS.get(slot)
         if current is None or current == default:
             return False
-        # Save durability before sending to party stash
-        self._save_slot_durability_to_inventory(slot, current)
+        # Transfer durability: equipped slot → party stash
+        cur_dur = self.equipped_durability.get(slot)
+        if cur_dur is not None:
+            party.shared_inventory_durability[current] = cur_dur
         party.shared_inventory.append(current)
         self.equipped[slot] = default
         self.equipped_durability[slot] = None
@@ -1433,6 +1441,10 @@ class Party:
         self.members = []           # The active party (up to 4, refs into roster)
         self.gold = 100  # Shared party gold
         self.shared_inventory = []  # Party-wide item pool
+        # Per-item durability for stash items (item_name → remaining uses).
+        # Mirrors PartyMember.inventory_durability so durability survives
+        # transfers between character inventory and party stash.
+        self.shared_inventory_durability = {}
 
         # Party-level equipment: utility slots + light (shown in effects)
         self.equipped = {s: None for s in self.PARTY_SLOTS}
@@ -1608,6 +1620,7 @@ class Party:
         """Move an item from shared inventory to a party member's inventory.
 
         Charged items are given as their name only (members don't track charges).
+        Durability is preserved across the transfer.
         Returns True if successful, False otherwise.
         """
         if item_index < 0 or item_index >= len(self.shared_inventory):
@@ -1615,7 +1628,13 @@ class Party:
         if member_index < 0 or member_index >= len(self.members):
             return False
         entry = self.shared_inventory.pop(item_index)
-        self.members[member_index].inventory.append(self.item_name(entry))
+        item_name = self.item_name(entry)
+        member = self.members[member_index]
+        member.inventory.append(item_name)
+        # Transfer durability: party stash → character inventory
+        saved_dur = self.shared_inventory_durability.pop(item_name, None)
+        if saved_dur is not None:
+            member.inventory_durability[item_name] = saved_dur
         return True
 
     def add_member(self, member):

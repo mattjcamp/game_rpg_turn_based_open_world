@@ -698,5 +698,16 @@
     "context": "spawns",
     "sprite": "overworld/dungeon",
     "interaction_type": "spawn"
+  },
+  "70": {
+    "name": "Light Sand",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "overworld",
+    "sprite": "overworld/light_sand"
   }
 }

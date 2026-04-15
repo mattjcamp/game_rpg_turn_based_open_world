@@ -344,6 +344,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
     Parameters
     ----------
     torch_density : str
+        ``"none"`` — no torches; dungeon is completely dark.
         ``"high"`` — well-lit; torches on most walls, party rarely
         needs light spells.  ``"medium"`` — moderate lighting (default).
         ``"low"`` — a few torches here and there, mostly dark.
@@ -352,7 +353,11 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
     # --- Torch density parameters ---
     # min_spacing: minimum Manhattan distance between torches
     # max_torches: cap as a multiplier of room count
-    if torch_density == "high":
+    if torch_density == "none":
+        # No torches at all — dungeon stays dark
+        min_spacing = 999
+        max_multiplier = 0
+    elif torch_density == "high":
         min_spacing = 2
         max_multiplier = 5  # up to 5 per room
     elif torch_density == "low":
@@ -362,7 +367,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
         min_spacing = 4
         max_multiplier = 2  # up to 2 per room
 
-    max_torches = max(1, int(len(rooms) * max_multiplier))
+    max_torches = int(len(rooms) * max_multiplier)
 
     # --- Wall torches: place on wall tiles that border a floor tile ---
     torch_candidates = []

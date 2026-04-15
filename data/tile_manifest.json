@@ -173,6 +173,14 @@
       "usable_in": [
         "unassigned"
       ]
+    },
+    "light_sand": {
+      "path": "src/assets/game/terrain/sand_copy.png",
+      "usable_in": [
+        "overworld",
+        "town"
+      ],
+      "tile_id": 70
     }
   },
   "town": {

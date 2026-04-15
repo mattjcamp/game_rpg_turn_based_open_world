@@ -15970,6 +15970,14 @@ class Renderer(CombatEffectRendererMixin):
                 display = item_name
                 if item_ch is not None:
                     display = f"{item_name} ({item_ch})"
+                # Show durability if the item has wear in the stash
+                stash_dur = getattr(party, 'shared_inventory_durability', {})
+                _sdur = stash_dur.get(item_name)
+                if _sdur is not None:
+                    from src.party import PartyMember as _PM
+                    _mxd, _indest = _PM._get_item_max_durability(item_name)
+                    if not _indest and _mxd > 0:
+                        display += f"  [{_sdur}/{_mxd}]"
                 self._u3_text(f"{prefix}{display}", tx, ty, name_color, fm)
 
                 # Type hint on the right

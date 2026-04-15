@@ -910,8 +910,14 @@ class InventoryMixin:
                         self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen == "Examine":
                     self.examining_item = item_name
-                    # No per-instance durability for party stash items
-                    self.examining_durability = None
+                    # Look up per-instance durability from stash
+                    from src.party import PartyMember
+                    max_dur, indestructible = PartyMember._get_item_max_durability(item_name)
+                    stash_dur = party.shared_inventory_durability.get(item_name)
+                    if indestructible or stash_dur is None:
+                        self.examining_durability = None
+                    else:
+                        self.examining_durability = (stash_dur, max_dur)
                 elif chosen == "Apply to weapon":
                     # Start poison application workflow
                     self.applying_poison_item = item_name

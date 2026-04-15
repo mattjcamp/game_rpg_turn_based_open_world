@@ -96,6 +96,12 @@ def _serialize_member(member):
         "sprite": member.sprite,
         "weapon_poison": dict(getattr(member, "weapon_poison",
                                        {"right_hand": None, "left_hand": None})),
+        # Durability state for equipped and inventory items
+        "equipped_durability": {s: v for s, v in
+                                getattr(member, "equipped_durability", {}).items()
+                                if v is not None},
+        "inventory_durability": dict(
+            getattr(member, "inventory_durability", {})),
     }
 
 
@@ -110,6 +116,8 @@ def _serialize_party(party):
         # Legacy "members" kept for backward compat with older saves
         "members": [_serialize_member(m) for m in party.members],
         "shared_inventory": list(party.shared_inventory),
+        "shared_inventory_durability": dict(
+            getattr(party, "shared_inventory_durability", {})),
         "equipped": dict(party.equipped),
         "effects": dict(party.effects),
         "clock": party.clock.to_dict(),
@@ -251,6 +259,21 @@ def _deserialize_member(data):
     member.weapon_poison = data.get("weapon_poison",
                                      {"right_hand": None, "left_hand": None})
 
+    # Durability state for equipped items
+    saved_eq_dur = data.get("equipped_durability", {})
+    for slot, val in saved_eq_dur.items():
+        member.equipped_durability[slot] = val
+    # For equipped slots without saved durability, initialize from item data
+    for slot in ("right_hand", "left_hand", "body", "head"):
+        if slot not in saved_eq_dur:
+            item_name = member.equipped.get(slot)
+            if item_name:
+                member._init_slot_durability(slot, item_name)
+
+    # Durability state for personal inventory items
+    member.inventory_durability = dict(
+        data.get("inventory_durability", {}))
+
     return member
 
 
@@ -276,6 +299,8 @@ def _deserialize_party(data):
 
     # Shared inventory (already in correct format — strings and dicts)
     party.shared_inventory = list(data.get("shared_inventory", []))
+    party.shared_inventory_durability = dict(
+        data.get("shared_inventory_durability", {}))
 
     # Party-level equipment slots (includes "light" which is rendered in Effects)
     saved_eq = data.get("equipped", {})
