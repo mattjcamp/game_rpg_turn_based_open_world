@@ -326,7 +326,8 @@ class MonsterSpellEffect(_TimerEffect):
         "breath_fire":  (255, 120,  30),
     }
 
-    def __init__(self, col, row, spell_type="sleep", label="", success=True):
+    def __init__(self, col, row, spell_type="sleep", label="", success=True,
+                 source_col=None, source_row=None):
         super().__init__()
         self.col = col
         self.row = row
@@ -334,6 +335,9 @@ class MonsterSpellEffect(_TimerEffect):
         self.color = self.COLORS.get(spell_type, (200, 200, 200))
         self.label = label
         self.success = success
+        # Source position (monster casting the spell) for directional effects
+        self.source_col = source_col
+        self.source_row = source_row
 
 
 class ShatterEffect(_TimerEffect):

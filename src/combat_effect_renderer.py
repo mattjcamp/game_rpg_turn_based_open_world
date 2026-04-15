@@ -759,13 +759,18 @@ class CombatEffectRendererMixin:
         """Draw a monster spell-like ability effect.
 
         Colour-coded by spell type with a pulsing glow and label text.
-        Supports: sleep (purple), curse (red), heal (green), poison (sickly green).
+        breath_fire gets a special directional fire stream from the caster.
         """
         cx = int(ax + fx.col * ts + ts // 2)
         cy = int(ay + fx.row * ts + ts // 2)
         p = fx.progress  # 0 → 1
         ticks = pygame.time.get_ticks()
         r, g, b = fx.color
+
+        # ── Special: breath_fire draws a fire stream from monster ──
+        if fx.spell_type == "breath_fire" and fx.source_col is not None:
+            self._u3_draw_breath_fire_stream(ax, ay, ts, fx, cx, cy, p, ticks)
+            return
 
         if p < 0.3:
             # Phase 1: expanding ring
@@ -820,6 +825,128 @@ class CombatEffectRendererMixin:
             txt = font.render(label, True, (r, g, b))
             lx = cx - txt.get_width() // 2
             ly = cy - ts // 2 - 12 - int(p * 8)
+            self.screen.blit(txt, (lx, ly))
+
+    def _u3_draw_breath_fire_stream(self, ax, ay, ts, fx, tx, ty, p, ticks):
+        """Draw a fire breath stream from the monster to the target.
+
+        The fire cone travels from the source (monster) toward the target,
+        widening as it goes, with flickering particles and a burst on impact.
+        """
+        # Source pixel position (monster's mouth)
+        src_x = int(ax + fx.source_col * ts + ts // 2)
+        src_y = int(ay + fx.source_row * ts + ts // 2)
+
+        # Direction vector
+        dx = tx - src_x
+        dy = ty - src_y
+        length = math.sqrt(dx * dx + dy * dy) or 1.0
+        nx, ny = dx / length, dy / length  # normalized direction
+        # Perpendicular for cone width
+        px, py = -ny, nx
+
+        # ── Phase 1 (0-60%): fire stream travels from monster to target ──
+        if p < 0.6:
+            stream_p = p / 0.6  # 0→1 over this phase
+            # How far the stream head has traveled
+            head_dist = stream_p * length
+
+            # Draw the cone: wide particles from source to stream head
+            n_particles = int(20 + 15 * stream_p)
+            for i in range(n_particles):
+                # Position along the stream (0=source, 1=head)
+                t = (i / max(1, n_particles - 1))
+                d = t * head_dist
+                # Cone widens from 2px at source to ~ts/2 at head
+                spread = 2 + t * ts * 0.5
+                # Jitter for organic fire look
+                jitter_x = spread * math.sin(ticks * 0.015 + i * 2.7)
+                jitter_y = spread * math.cos(ticks * 0.018 + i * 3.1)
+
+                fire_x = int(src_x + nx * d + px * jitter_x * 0.4)
+                fire_y = int(src_y + ny * d + py * jitter_x * 0.4
+                             + jitter_y * 0.15)
+
+                # Color: bright yellow at source, deep orange/red at head
+                cr = 255
+                cg = max(30, int(255 - 200 * t))
+                cb = max(0, int(80 - 80 * t))
+                size = max(2, int(3 + 4 * t * (0.7 + 0.3
+                           * math.sin(ticks * 0.02 + i))))
+                pygame.draw.circle(self.screen, (cr, cg, cb),
+                                   (fire_x, fire_y), size)
+
+            # Bright core along the center line
+            core_pts = 8
+            for i in range(core_pts):
+                t = i / max(1, core_pts - 1)
+                d = t * head_dist
+                flicker = 0.8 + 0.2 * math.sin(ticks * 0.025 + i * 1.5)
+                core_x = int(src_x + nx * d)
+                core_y = int(src_y + ny * d)
+                cg = int(220 * flicker)
+                pygame.draw.circle(self.screen, (255, cg, 50),
+                                   (core_x, core_y),
+                                   max(1, int(2 * (1.0 - t * 0.5))))
+
+        # ── Phase 2 (60-100%): impact burst on target + fade ──
+        else:
+            fade_p = (p - 0.6) / 0.4  # 0→1 over this phase
+            alpha = 1.0 - fade_p
+
+            # Shrinking fire stream (still visible, fading)
+            n_particles = max(3, int(15 * alpha))
+            for i in range(n_particles):
+                t = i / max(1, n_particles - 1)
+                d = t * length
+                spread = (2 + t * ts * 0.5) * alpha
+                jitter_x = spread * math.sin(ticks * 0.015 + i * 2.7)
+                fire_x = int(src_x + nx * d + px * jitter_x * 0.4)
+                fire_y = int(src_y + ny * d + py * jitter_x * 0.15)
+                cr = int(255 * alpha)
+                cg = max(0, int((255 - 200 * t) * alpha))
+                cb = 0
+                size = max(1, int((3 + 3 * t) * alpha))
+                if cr > 10:
+                    pygame.draw.circle(self.screen, (cr, cg, cb),
+                                       (fire_x, fire_y), size)
+
+            # Explosion burst at the target
+            burst_r = int(ts * 0.6 * (0.5 + 0.5 * fade_p) * alpha)
+            if burst_r > 2:
+                burst_surf = pygame.Surface(
+                    (burst_r * 2, burst_r * 2), pygame.SRCALPHA)
+                ba = int(120 * alpha)
+                pygame.draw.circle(burst_surf, (255, 100, 20, ba),
+                                   (burst_r, burst_r), burst_r)
+                pygame.draw.circle(burst_surf, (255, 200, 50, ba),
+                                   (burst_r, burst_r),
+                                   max(1, burst_r // 2))
+                self.screen.blit(burst_surf,
+                                 (tx - burst_r, ty - burst_r))
+
+            # Scattered embers around impact
+            n_embers = max(2, int(6 * alpha))
+            for i in range(n_embers):
+                angle = ticks * 0.01 + i * 1.05 + fade_p * 3
+                dist = int(ts * 0.3 * fade_p + ts * 0.15)
+                ex = tx + int(math.cos(angle) * dist)
+                ey = ty + int(math.sin(angle) * dist)
+                ec = max(0, int(255 * alpha))
+                eg = max(0, int(120 * alpha))
+                if ec > 10:
+                    pygame.draw.circle(self.screen, (ec, eg, 0),
+                                       (ex, ey), max(1, int(2 * alpha)))
+
+        # Draw spell label above the target
+        if p < 0.85:
+            label = fx.label
+            if not fx.success:
+                label += " - Resisted!"
+            font = self.font_small
+            txt = font.render(label, True, (255, 120, 30))
+            lx = tx - txt.get_width() // 2
+            ly = ty - ts // 2 - 12 - int(p * 8)
             self.screen.blit(txt, (lx, ly))
 
     def _u3_draw_heal_effect(self, ax, ay, ts, fx):

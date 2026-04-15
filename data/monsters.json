@@ -104,7 +104,8 @@
           "damage_bonus": 0,
           "save_dc": 13
         }
-      ]
+      ],
+      "battle_scale": 2
     },
     "Giant Rat": {
       "description": "A large rat. Weak but fast.Gross.Meh",

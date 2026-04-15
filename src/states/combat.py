@@ -98,6 +98,7 @@ PHASE_CURSE = "curse"                    # curse debuff animation on enemy
 PHASE_MONSTER_SPELL = "monster_spell"    # monster casting a spell-like ability
 PHASE_SMITE       = "smite"             # DEBUG: flash + kill-all animation
 PHASE_SHADOW_STEP = "shadow_step"       # Thief L7+: post-attack movement
+PHASE_MONSTER_MOVE = "monster_move"     # stepping a monster one tile at a time
 PHASE_LOOT        = "loot"              # post-victory: free movement to pick up loot
 PHASE_VICTORY     = "victory"
 PHASE_DEFEAT      = "defeat"
@@ -288,23 +289,46 @@ class CombatState(BaseState):
         """True if the tile is part of the arena perimeter wall."""
         return col <= 0 or col >= ARENA_COLS - 1 or row <= 0 or row >= ARENA_ROWS - 1
 
+    @staticmethod
+    def _monster_occupied_tiles(monster, mc, mr):
+        """Return set of (col, row) tiles occupied by a monster.
+
+        For battle_scale=1 this is just {(mc, mr)}.
+        For battle_scale=N it's the NxN block with top-left at (mc, mr).
+        """
+        s = getattr(monster, 'battle_scale', 1)
+        if s <= 1:
+            return {(mc, mr)}
+        tiles = set()
+        for dc in range(s):
+            for dr in range(s):
+                tiles.add((mc + dc, mr + dr))
+        return tiles
+
     def _is_adjacent_to_any_monster(self, col, row):
-        """True if (col, row) is adjacent to any alive monster (Chebyshev dist 1)."""
+        """True if (col, row) is adjacent to any alive monster (Chebyshev dist 1).
+
+        Checks adjacency against every tile a multi-tile monster occupies.
+        """
         for m in self.monsters:
             if not m.is_alive():
                 continue
             mc, mr = self.monster_positions.get(m, (-99, -99))
-            if max(abs(col - mc), abs(row - mr)) == 1:
-                return True
+            for tc, tr in self._monster_occupied_tiles(m, mc, mr):
+                if (tc, tr) != (col, row) and max(abs(col - tc), abs(row - tr)) == 1:
+                    return True
         return False
 
     def _get_monster_at(self, col, row):
-        """Return the alive monster occupying (col, row), or None."""
+        """Return the alive monster occupying (col, row), or None.
+
+        Checks all tiles a multi-tile monster occupies.
+        """
         for m in self.monsters:
             if not m.is_alive():
                 continue
             mc, mr = self.monster_positions.get(m, (-99, -99))
-            if mc == col and mr == row:
+            if (col, row) in self._monster_occupied_tiles(m, mc, mr):
                 return m
         return None
 
@@ -335,6 +359,51 @@ class CombatState(BaseState):
     def _is_obstacle(self, col, row):
         """True if an arena obstacle occupies (col, row)."""
         return (col, row) in self.arena_obstacles
+
+    def _can_place_monster(self, monster, col, row, used):
+        """Check if a monster (possibly multi-tile) can be placed at (col, row).
+
+        Returns True if all NxN tiles are free of walls, obstacles, and used positions.
+        """
+        s = getattr(monster, 'battle_scale', 1)
+        for dc in range(s):
+            for dr in range(s):
+                tc, tr = col + dc, row + dr
+                if self._is_arena_wall(tc, tr):
+                    return False
+                if (tc, tr) in used:
+                    return False
+        return True
+
+    def _reserve_monster_tiles(self, monster, col, row, used):
+        """Add all tiles occupied by a monster to the used set."""
+        s = getattr(monster, 'battle_scale', 1)
+        for dc in range(s):
+            for dr in range(s):
+                used.add((col + dc, row + dr))
+
+    def _can_monster_move_to(self, monster, col, row):
+        """Check if a monster can move to (col, row), accounting for multi-tile size."""
+        s = getattr(monster, 'battle_scale', 1)
+        for dc in range(s):
+            for dr in range(s):
+                tc, tr = col + dc, row + dr
+                if self._is_arena_wall(tc, tr):
+                    return False
+                if self._is_obstacle(tc, tr):
+                    return False
+                # Check for other monsters in the way
+                for other in self.monsters:
+                    if other is monster or not other.is_alive():
+                        continue
+                    if (tc, tr) in self._monster_occupied_tiles(
+                            other, *self.monster_positions.get(other, (-99, -99))):
+                        return False
+                # Check for party members in the way
+                for member, (fc, fr) in self.fighter_positions.items():
+                    if member.is_alive() and fc == tc and fr == tr:
+                        return False
+        return True
 
     def _spawn_arena_obstacles(self, terrain_tile, used_positions):
         """Place terrain-appropriate obstacles in the arena interior.
@@ -545,15 +614,17 @@ class CombatState(BaseState):
                     used.add((col, row))
                     break
 
-        # Place each monster near the top, randomly spread out
+        # Place each monster near the top, randomly spread out.
+        # Multi-tile monsters (battle_scale > 1) reserve an NxN area.
         self.monster_positions = {}
         for mon in self.monsters:
-            for _attempt in range(30):
-                mc = random.randint(3, ARENA_COLS - 4)
-                mr = random.randint(2, 5)
-                if (mc, mr) not in used:
+            s = getattr(mon, 'battle_scale', 1)
+            for _attempt in range(50):
+                mc = random.randint(2, ARENA_COLS - 2 - s)
+                mr = random.randint(2, max(2, 6 - s))
+                if self._can_place_monster(mon, mc, mr, used):
                     self.monster_positions[mon] = (mc, mr)
-                    used.add((mc, mr))
+                    self._reserve_monster_tiles(mon, mc, mr, used)
                     break
 
         # Spawn terrain obstacles — custom battle screen overrides default
@@ -4100,7 +4171,9 @@ class CombatState(BaseState):
             self.phase_timer = 600
             return
 
-        # Find closest alive, visible fighter
+        # Find closest alive, visible fighter.
+        # Multi-tile monsters measure distance from their nearest tile.
+        mon_tiles = self._monster_occupied_tiles(mon, mc, mr)
         best_dist = 999
         best_target = None
         for member in self.fighters:
@@ -4110,7 +4183,8 @@ class CombatState(BaseState):
             if member in self.invisibility_buffs:
                 continue
             col, row = self.fighter_positions[member]
-            dist = max(abs(col - mc), abs(row - mr))
+            dist = min(max(abs(col - tc), abs(row - tr))
+                       for tc, tr in mon_tiles)
             if dist < best_dist:
                 best_dist = dist
                 best_target = member
@@ -4124,7 +4198,9 @@ class CombatState(BaseState):
             self.phase_timer = 500
             return
 
-        # Check adjacency to any alive, visible fighter
+        # Check adjacency to any alive, visible fighter.
+        # Multi-tile monsters check adjacency from all occupied tiles.
+        mon_tiles = self._monster_occupied_tiles(mon, mc, mr)
         adjacent_targets = []
         for member in self.fighters:
             if not member.is_alive():
@@ -4132,8 +4208,10 @@ class CombatState(BaseState):
             if member in self.invisibility_buffs:
                 continue
             col, row = self.fighter_positions[member]
-            if max(abs(col - mc), abs(row - mr)) == 1:
-                adjacent_targets.append(member)
+            for tc, tr in mon_tiles:
+                if max(abs(col - tc), abs(row - tr)) == 1:
+                    adjacent_targets.append(member)
+                    break
 
         if adjacent_targets:
             # Try spell even when adjacent (heal_self, curse, etc.)
@@ -4150,61 +4228,69 @@ class CombatState(BaseState):
         else:
             self._monster_move_toward(mon, best_target)
             self.combat_log.append(f"{mon.name} moves closer...")
-            self.phase = PHASE_MONSTER_ACT
-            self.phase_timer = 500
 
     def _monster_move_toward(self, monster, target):
-        """Step monster up to *move_range* tiles toward *target* (Chebyshev)."""
+        """Begin stepping a monster toward *target*, one tile at a time.
+
+        Instead of moving all steps instantly, this stores the movement
+        context and enters PHASE_MONSTER_MOVE, which advances one tile
+        per tick with a short visual delay between steps.
+        """
         steps = getattr(monster, "move_range", 1) or 1
-        for _ in range(steps):
-            mc, mr = self.monster_positions.get(monster, (0, 0))
-            tc, tr = self.fighter_positions[target]
+        # Store context for the step-by-step phase
+        self._move_monster = monster
+        self._move_target = target
+        self._move_steps_left = steps
+        # Take the first step immediately
+        moved = self._monster_move_one_step(monster, target)
+        self._move_steps_left -= 1
+        if moved and self._move_steps_left > 0:
+            # More steps remain — enter the stepping phase
+            self.phase = PHASE_MONSTER_MOVE
+            self.phase_timer = 150  # ms delay between each tile
+        else:
+            # Done moving (stuck or only 1 step)
+            self.phase = PHASE_MONSTER_ACT
+            self.phase_timer = 350
 
-            cur_dist = max(abs(mc - tc), abs(mr - tr))
-            if cur_dist <= 1:
-                break  # already adjacent — stop
+    def _monster_move_one_step(self, monster, target):
+        """Move *monster* exactly one tile toward *target*.
 
-            best_dist = cur_dist
-            candidates = []
+        Returns True if the monster actually moved, False if stuck or
+        already adjacent.
+        """
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        tc, tr = self.fighter_positions.get(target, (0, 0))
 
-            for dcol, drow in [
-                (0, -1), (0, 1), (-1, 0), (1, 0),
-                (-1, -1), (-1, 1), (1, -1), (1, 1),
-            ]:
-                nc, nr = mc + dcol, mr + drow
-                # Check occupied by fighter
-                occupied = False
-                for m in self.fighters:
-                    if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
-                        occupied = True
-                        break
-                if occupied:
-                    continue
-                # Check occupied by another alive monster
-                for other in self.monsters:
-                    if other is monster or not other.is_alive():
-                        continue
-                    if self.monster_positions.get(other) == (nc, nr):
-                        occupied = True
-                        break
-                if occupied:
-                    continue
-                if self._is_arena_wall(nc, nr):
-                    continue
-                if self._is_obstacle(nc, nr):
-                    continue
-                dist = max(abs(nc - tc), abs(nr - tr))
-                if dist < best_dist:
-                    candidates = [(nc, nr)]
-                    best_dist = dist
-                elif dist == best_dist:
-                    candidates.append((nc, nr))
+        tiles = self._monster_occupied_tiles(monster, mc, mr)
+        cur_dist = min(max(abs(c - tc), abs(r - tr)) for c, r in tiles)
+        if cur_dist <= 1:
+            return False  # already adjacent
 
-            if candidates:
-                nc, nr = random.choice(candidates)
-                self.monster_positions[monster] = (nc, nr)
-            else:
-                break  # stuck — stop early
+        best_dist = cur_dist
+        candidates = []
+
+        for dcol, drow in [
+            (0, -1), (0, 1), (-1, 0), (1, 0),
+            (-1, -1), (-1, 1), (1, -1), (1, 1),
+        ]:
+            nc, nr = mc + dcol, mr + drow
+            if not self._can_monster_move_to(monster, nc, nr):
+                continue
+            new_tiles = self._monster_occupied_tiles(monster, nc, nr)
+            dist = min(max(abs(c - tc), abs(r - tr))
+                       for c, r in new_tiles)
+            if dist < best_dist:
+                candidates = [(nc, nr)]
+                best_dist = dist
+            elif dist == best_dist:
+                candidates.append((nc, nr))
+
+        if candidates:
+            nc, nr = random.choice(candidates)
+            self.monster_positions[monster] = (nc, nr)
+            return True
+        return False  # stuck
 
     def _monster_attack_player(self, monster, target):
         """A specific monster attacks a specific party member."""
@@ -4343,37 +4429,27 @@ class CombatState(BaseState):
                         f"from {target.name}!")
 
     def _monster_retreat(self, monster, target, steps):
-        """Move *monster* up to *steps* tiles away from *target*."""
+        """Move *monster* up to *steps* tiles away from *target*.
+
+        Multi-tile monsters check their full NxN footprint before moving.
+        """
         tc, tr = self.fighter_positions.get(target, (0, 0))
         for _ in range(steps):
             mc, mr = self.monster_positions.get(monster, (0, 0))
-            best_dist = max(abs(mc - tc), abs(mr - tr))
+            mon_tiles = self._monster_occupied_tiles(monster, mc, mr)
+            best_dist = min(max(abs(c - tc), abs(r - tr))
+                            for c, r in mon_tiles)
             candidates = []
             for dcol, drow in [
                 (0, -1), (0, 1), (-1, 0), (1, 0),
                 (-1, -1), (-1, 1), (1, -1), (1, 1),
             ]:
                 nc, nr = mc + dcol, mr + drow
-                occupied = False
-                for m in self.fighters:
-                    if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
-                        occupied = True
-                        break
-                if occupied:
+                if not self._can_monster_move_to(monster, nc, nr):
                     continue
-                for other in self.monsters:
-                    if other is monster or not other.is_alive():
-                        continue
-                    if self.monster_positions.get(other) == (nc, nr):
-                        occupied = True
-                        break
-                if occupied:
-                    continue
-                if self._is_arena_wall(nc, nr):
-                    continue
-                if self._is_obstacle(nc, nr):
-                    continue
-                dist = max(abs(nc - tc), abs(nr - tr))
+                new_tiles = self._monster_occupied_tiles(monster, nc, nr)
+                dist = min(max(abs(c - tc), abs(r - tr))
+                           for c, r in new_tiles)
                 if dist > best_dist:
                     candidates = [(nc, nr)]
                     best_dist = dist
@@ -4827,6 +4903,12 @@ class CombatState(BaseState):
         """
         name = spell.get("name", "Fire Breath")
         save_dc = spell.get("save_dc", 13)
+        # Monster source position for directional fire stream
+        _src_c, _src_r = self.monster_positions.get(monster, (0, 0))
+        # For multi-tile monsters, use the center of their footprint
+        _bs = getattr(monster, 'battle_scale', 1) or 1
+        _src_c_center = _src_c + (_bs - 1) / 2.0
+        _src_r_center = _src_r + (_bs - 1) / 2.0
         dice = spell.get("damage_dice", 3)
         sides = spell.get("damage_sides", 6)
         bonus = spell.get("damage_bonus", 0)
@@ -4865,7 +4947,9 @@ class CombatState(BaseState):
                         f"{save_total} vs DC {save_dc}) — {dmg} damage!")
                 self.monster_spell_effects.append(
                     MonsterSpellEffect(tc, tr, "breath_fire", name,
-                                       success=False))
+                                       success=False,
+                                       source_col=_src_c_center,
+                                       source_row=_src_r_center))
             else:
                 # Failed — full damage
                 dmg = total_damage
@@ -4880,7 +4964,9 @@ class CombatState(BaseState):
                         f"{save_total} vs DC {save_dc}) — {dmg} damage!")
                 self.monster_spell_effects.append(
                     MonsterSpellEffect(tc, tr, "breath_fire", name,
-                                       success=True))
+                                       success=True,
+                                       source_col=_src_c_center,
+                                       source_row=_src_r_center))
 
             target.hp = max(0, target.hp - dmg)
             self.hit_effects.append(HitEffect(tc, tr, dmg))
@@ -4951,7 +5037,9 @@ class CombatState(BaseState):
         mc, mr = self.monster_positions.get(monster, (0, 0))
         tc, tr = self.monster_positions.get(target_monster, (0, 0))
 
-        best_dist = max(abs(mc - tc), abs(mr - tr))
+        mon_tiles = self._monster_occupied_tiles(monster, mc, mr)
+        best_dist = min(max(abs(c - tc), abs(r - tr))
+                        for c, r in mon_tiles)
         candidates = []
 
         for dcol, drow in [
@@ -4959,28 +5047,11 @@ class CombatState(BaseState):
             (-1, -1), (-1, 1), (1, -1), (1, 1),
         ]:
             nc, nr = mc + dcol, mr + drow
-            # Check occupied by fighter
-            occupied = False
-            for m in self.fighters:
-                if m.is_alive() and self.fighter_positions.get(m) == (nc, nr):
-                    occupied = True
-                    break
-            if occupied:
+            if not self._can_monster_move_to(monster, nc, nr):
                 continue
-            # Check occupied by another alive monster (can't stack)
-            for other in self.monsters:
-                if other is monster or not other.is_alive():
-                    continue
-                if self.monster_positions.get(other) == (nc, nr):
-                    occupied = True
-                    break
-            if occupied:
-                continue
-            if self._is_arena_wall(nc, nr):
-                continue
-            if self._is_obstacle(nc, nr):
-                continue
-            dist = max(abs(nc - tc), abs(nr - tr))
+            new_tiles = self._monster_occupied_tiles(monster, nc, nr)
+            dist = min(max(abs(c - tc), abs(r - tr))
+                       for c, r in new_tiles)
             if dist < best_dist:
                 candidates = [(nc, nr)]
                 best_dist = dist
@@ -5181,6 +5252,24 @@ class CombatState(BaseState):
             self.phase_timer = 600
         elif self.phase == PHASE_MONSTER:
             self._monster_turn()
+        elif self.phase == PHASE_MONSTER_MOVE:
+            # Step-by-step monster movement: take the next step
+            mon = getattr(self, '_move_monster', None)
+            tgt = getattr(self, '_move_target', None)
+            left = getattr(self, '_move_steps_left', 0)
+            if mon and tgt and left > 0:
+                moved = self._monster_move_one_step(mon, tgt)
+                self._move_steps_left -= 1
+                if moved and self._move_steps_left > 0:
+                    self.phase = PHASE_MONSTER_MOVE
+                    self.phase_timer = 150
+                else:
+                    # Done stepping
+                    self.phase = PHASE_MONSTER_ACT
+                    self.phase_timer = 350
+            else:
+                self.phase = PHASE_MONSTER_ACT
+                self.phase_timer = 350
         elif self.phase == PHASE_MONSTER_ACT:
             # Advance to next monster
             self.active_monster_idx += 1
