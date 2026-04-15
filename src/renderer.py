@@ -371,7 +371,8 @@ class Renderer(CombatEffectRendererMixin):
         cy = rect.centery
 
         from src.settings import (
-            TILE_FOREST, TILE_MOUNTAIN, TILE_TOWN, TILE_DUNGEON, TILE_BRIDGE
+            TILE_FOREST, TILE_MOUNTAIN, TILE_TOWN, TILE_DUNGEON, TILE_BRIDGE,
+            TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
         )
 
         if tile_id == TILE_FOREST:
@@ -457,6 +458,57 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.polygon(self.screen, (40, 200, 40), points)
             text = self.font_small.render("EXIT", True, COLOR_WHITE)
             self.screen.blit(text, (cx - 10, cy - 12))
+
+        elif tile_id == TILE_SPAWN_CAMPFIRE:
+            # Campfire: logs at the base, flames above
+            import time as _tt, math as _mm
+            _flicker = 0.7 + 0.3 * _mm.sin(_tt.time() * 5 + rect.x * 3)
+            # Stone ring
+            pygame.draw.ellipse(self.screen, (80, 75, 65),
+                                pygame.Rect(cx - 10, cy + 2, 20, 10), 2)
+            # Logs (crossed brown sticks)
+            pygame.draw.line(self.screen, (100, 60, 20),
+                             (cx - 7, cy + 8), (cx + 7, cy + 2), 3)
+            pygame.draw.line(self.screen, (90, 55, 18),
+                             (cx + 7, cy + 8), (cx - 7, cy + 2), 3)
+            # Outer flame (orange, flickering)
+            fr = int(220 * _flicker)
+            fg = int(120 * _flicker)
+            flame_pts = [(cx, cy - 10), (cx - 5, cy + 2), (cx + 5, cy + 2)]
+            pygame.draw.polygon(self.screen, (fr, fg, 10), flame_pts)
+            # Inner flame (yellow, bright)
+            inner_pts = [(cx, cy - 6), (cx - 3, cy + 1), (cx + 3, cy + 1)]
+            pygame.draw.polygon(self.screen, (255, int(220 * _flicker), 50),
+                                inner_pts)
+            # Spark tip
+            pygame.draw.circle(self.screen, (255, 255, 180),
+                               (cx, cy - 9), 2)
+
+        elif tile_id == TILE_SPAWN_GRAVEYARD:
+            # Tombstone with eerie glow
+            import time as _tt, math as _mm
+            _pulse = 0.6 + 0.4 * _mm.sin(_tt.time() * 2.5 + rect.x * 2)
+            # Tombstone body
+            pygame.draw.rect(self.screen, (140, 135, 125),
+                             pygame.Rect(cx - 5, cy - 4, 10, 14))
+            # Rounded top
+            pygame.draw.ellipse(self.screen, (140, 135, 125),
+                                pygame.Rect(cx - 5, cy - 10, 10, 10))
+            # Cross on tombstone
+            pygame.draw.line(self.screen, (90, 85, 75),
+                             (cx, cy - 7), (cx, cy + 3), 1)
+            pygame.draw.line(self.screen, (90, 85, 75),
+                             (cx - 3, cy - 4), (cx + 3, cy - 4), 1)
+            # Ground mound
+            pygame.draw.rect(self.screen, (70, 55, 35),
+                             pygame.Rect(cx - 8, cy + 8, 16, 4))
+            # Eerie green glow
+            glow_a = int(40 * _pulse)
+            glow_surf = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf,
+                               (80, 200, 80, glow_a),
+                               (TILE_SIZE // 2, TILE_SIZE // 2), 10)
+            self.screen.blit(glow_surf, (rect.x, rect.y))
 
         elif tile_id == TILE_DWALL:
             # Dark stone blocks
@@ -2761,6 +2813,7 @@ class Renderer(CombatEffectRendererMixin):
             TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
             TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
             TILE_MACHINE, TILE_KEYSLOT, TILE_DUNGEON_CLEARED,
+            TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
         )
 
         # Check sprite_overrides on the tile_map (used by interiors)
@@ -2773,9 +2826,10 @@ class Renderer(CombatEffectRendererMixin):
                     self.screen.blit(sprite, (px, py))
                     return
 
-        # Try sprite sheet first
+        # Try sprite sheet first (skip for animated tiles that need custom rendering)
+        _animated_tiles = (TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD)
         sprite = self._get_tile_sprite(tile_id)
-        if sprite:
+        if sprite and tile_id not in _animated_tiles:
             sw, sh = sprite.get_size()
             if sw != ts or sh != ts:
                 cache = getattr(self, '_scaled_tile_cache', None)
@@ -2918,6 +2972,117 @@ class Renderer(CombatEffectRendererMixin):
 
         elif tile_id == TILE_KEYSLOT:
             self._draw_keyslot_tile(px, py, ts, wc, wr, 0)
+            return
+
+        elif tile_id == TILE_SPAWN_CAMPFIRE:
+            # Animated campfire spawn — configurable background with fire
+            import time as _tt, math as _mm
+            _t = _tt.time()
+            # Draw background tile (configurable via spawn data)
+            from src.party import SPAWN_POINTS
+            _sp = SPAWN_POINTS.get(tile_id, {})
+            _bg_tid = _sp.get("background_tile", 0)
+            if _bg_tid != tile_id:  # avoid infinite recursion
+                self._u3_draw_overworld_tile(
+                    _bg_tid, px, py, ts, wc, wr, tile_map)
+            else:
+                pygame.draw.rect(self.screen, (20, 100, 15), rect)
+
+            # Try blitting the campfire sprite with transparency
+            sprite = self._get_tile_sprite(tile_id)
+            if sprite:
+                sw, sh = sprite.get_size()
+                if sw != ts or sh != ts:
+                    cache = getattr(self, '_scaled_tile_cache', None)
+                    if cache is None:
+                        cache = self._scaled_tile_cache = {}
+                    key = (tile_id, ts)
+                    scaled = cache.get(key)
+                    if scaled is None:
+                        scaled = pygame.transform.scale(sprite, (ts, ts))
+                        cache[key] = scaled
+                    sprite = scaled
+                self.screen.blit(sprite, (px, py))
+
+            # Flickering glow overlay beneath/around the fire
+            _flicker = 0.6 + 0.4 * _mm.sin(_t * 5.0 + wc * 3.7)
+            glow_r = int(255 * _flicker)
+            glow_g = int(140 * _flicker)
+            glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+            glow_alpha = int(50 * _flicker)
+            pygame.draw.circle(glow_surf, (glow_r, glow_g, 10, glow_alpha),
+                               (ts // 2, ts // 2), ts // 3)
+            self.screen.blit(glow_surf, (px, py))
+
+            # Animated flame tips (procedural on top of sprite)
+            _flick2 = 0.7 + 0.3 * _mm.sin(_t * 7.0 + wr * 5.1)
+            fr = int(240 * _flick2)
+            fg = int(160 * _flick2)
+            # Small dancing flame particles
+            for i in range(3):
+                phase = _t * (4.0 + i * 1.5) + seed + i * 2.3
+                dx = int(3 * _mm.sin(phase))
+                dy = int(-2 - 3 * abs(_mm.sin(phase * 0.7)))
+                spark_x = cx + dx + (i - 1) * 3
+                spark_y = cy + dy - 4
+                pygame.draw.circle(self.screen, (fr, fg, 30),
+                                   (spark_x, spark_y), 2)
+            # Bright core spark
+            spark_alpha = 0.5 + 0.5 * _mm.sin(_t * 9.0 + seed)
+            if spark_alpha > 0.7:
+                pygame.draw.circle(self.screen, (255, 255, 180),
+                                   (cx, cy - 6), 1)
+            return
+
+        elif tile_id == TILE_SPAWN_GRAVEYARD:
+            # Animated graveyard spawn — configurable background + tombstone
+            import time as _tt, math as _mm
+            _t = _tt.time()
+            # Draw background tile (configurable via spawn data)
+            from src.party import SPAWN_POINTS
+            _sp = SPAWN_POINTS.get(tile_id, {})
+            _bg_tid = _sp.get("background_tile", 0)
+            if _bg_tid != tile_id:
+                self._u3_draw_overworld_tile(
+                    _bg_tid, px, py, ts, wc, wr, tile_map)
+            else:
+                pygame.draw.rect(self.screen, (20, 100, 15), rect)
+
+            # Blit the graveyard sprite with transparency
+            sprite = self._get_tile_sprite(tile_id)
+            if sprite:
+                sw, sh = sprite.get_size()
+                if sw != ts or sh != ts:
+                    cache = getattr(self, '_scaled_tile_cache', None)
+                    if cache is None:
+                        cache = self._scaled_tile_cache = {}
+                    key = (tile_id, ts)
+                    scaled = cache.get(key)
+                    if scaled is None:
+                        scaled = pygame.transform.scale(sprite, (ts, ts))
+                        cache[key] = scaled
+                    sprite = scaled
+                self.screen.blit(sprite, (px, py))
+
+            # Eerie pulsing green glow around the tombstone
+            _pulse = 0.5 + 0.5 * _mm.sin(_t * 2.5 + wc * 2.1 + wr * 1.7)
+            glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+            glow_alpha = int(40 * _pulse)
+            pygame.draw.circle(glow_surf,
+                               (60, 180, 60, glow_alpha),
+                               (ts // 2, ts // 2), ts // 3)
+            self.screen.blit(glow_surf, (px, py))
+
+            # Drifting spirit wisps
+            for i in range(2):
+                wisp_phase = _t * (1.5 + i * 0.8) + seed + i * 4.1
+                wx = cx + int(6 * _mm.sin(wisp_phase))
+                wy = cy - 6 + int(4 * _mm.cos(wisp_phase * 0.6 + i))
+                wisp_a = int(80 * (0.4 + 0.6 * abs(_mm.sin(wisp_phase * 0.5))))
+                wisp_surf = pygame.Surface((6, 6), pygame.SRCALPHA)
+                pygame.draw.circle(wisp_surf,
+                                   (120, 220, 120, wisp_a), (3, 3), 3)
+                self.screen.blit(wisp_surf, (wx - 3, wy - 3))
             return
 
         else:
@@ -4990,11 +5155,36 @@ class Renderer(CombatEffectRendererMixin):
             path = os.path.join(self._assets_dir, filename)
             if os.path.exists(path):
                 raw = pygame.image.load(path).convert_alpha()
+                # Make black pixels transparent for character / item sprites
+                _transparent_dirs = ("characters/", "npcs/", "dungeon/",
+                                     "monsters/", "u4_tiles/", "items/")
+                if any(d in filename for d in _transparent_dirs):
+                    raw = self._make_black_transparent(raw)
                 self._unique_tile_sprites[key] = pygame.transform.scale(
                     raw, (size, size))
             else:
                 self._unique_tile_sprites[key] = None
         return self._unique_tile_sprites[key]
+
+    @staticmethod
+    def _make_black_transparent(surface):
+        """Replace fully-black pixels with transparent."""
+        surf = surface.copy()
+        try:
+            arr = pygame.surfarray.pixels3d(surf)
+            alpha = pygame.surfarray.pixels_alpha(surf)
+            mask = ((arr[:, :, 0] == 0) & (arr[:, :, 1] == 0)
+                    & (arr[:, :, 2] == 0))
+            alpha[mask] = 0
+            del arr, alpha
+        except (AttributeError, Exception):
+            w, h = surf.get_size()
+            for px in range(w):
+                for py in range(h):
+                    r, g, b, a = surf.get_at((px, py))
+                    if r == 0 and g == 0 and b == 0:
+                        surf.set_at((px, py), (0, 0, 0, 0))
+        return surf
 
     # ── dungeon monster sprite ─────────────────────────────
 

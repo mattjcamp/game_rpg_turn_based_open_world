@@ -209,6 +209,7 @@ def load_spawn_points(data_dir=None):
             "xp_reward": entry.get("xp_reward", 50),
             "gold_reward": entry.get("gold_reward", 25),
             "loot": list(entry.get("loot", [])),
+            "background_tile": entry.get("background_tile", 0),
         }
     return points
 

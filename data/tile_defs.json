@@ -662,5 +662,41 @@
     "context": "spawns",
     "sprite": "dungeon/wall_torch",
     "interaction_type": "spawn"
+  },
+  "67": {
+    "name": "Campfire Spawn",
+    "walkable": true,
+    "color": [
+      200,
+      120,
+      30
+    ],
+    "context": "spawns",
+    "sprite": "items/campfire",
+    "interaction_type": "spawn"
+  },
+  "68": {
+    "name": "Graveyard Spawn",
+    "walkable": true,
+    "color": [
+      120,
+      115,
+      105
+    ],
+    "context": "spawns",
+    "sprite": "items/graveyard",
+    "interaction_type": "spawn"
+  },
+  "69": {
+    "name": "Dragon",
+    "walkable": true,
+    "color": [
+      180,
+      40,
+      40
+    ],
+    "context": "spawns",
+    "sprite": "overworld/dungeon",
+    "interaction_type": "spawn"
   }
 }

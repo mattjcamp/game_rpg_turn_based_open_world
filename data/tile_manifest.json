@@ -1146,7 +1146,15 @@
       "path": "src/assets/game/items/icons_32/campfire.png",
       "usable_in": [
         "items"
-      ]
+      ],
+      "tile_id": 67
+    },
+    "graveyard": {
+      "path": "src/assets/game/items/icons_32/graveyard.png",
+      "usable_in": [
+        "items"
+      ],
+      "tile_id": 68
     },
     "dagger": {
       "path": "src/assets/game/items/icons_32/dagger.png",

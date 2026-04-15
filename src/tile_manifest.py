@@ -137,7 +137,7 @@ class TileManifest:
         # Make black pixels transparent for U4-origin tiles (characters,
         # NPCs, dungeon, monsters) and any remaining u4_tiles references.
         _transparent_dirs = ("characters/", "npcs/", "dungeon/", "monsters/",
-                             "u4_tiles/")
+                             "u4_tiles/", "items/")
         if any(d in rel_path for d in _transparent_dirs):
             raw = self._make_black_transparent(raw)
 

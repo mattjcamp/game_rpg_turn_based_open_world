@@ -983,6 +983,7 @@ class FeaturesEditor:
 
     def build_tile_fields(self, tile):
         """Build editable field list for a single tile type."""
+        from src.settings import TILE_DEFS
         FE = FieldEntry
         color = tile.get("color", [128, 128, 128])
         color_str = f"{color[0]}, {color[1]}, {color[2]}" \
@@ -1020,6 +1021,12 @@ class FeaturesEditor:
             sp = self.spawn_data.get(tid, {})
             fields.append(
                 FE("-- Spawn Config --", "_hdr_sp1", "", "section", False))
+            # Background tile — which terrain to draw behind the spawn
+            bg_tid = sp.get("background_tile", 0)
+            bg_name = TILE_DEFS.get(bg_tid, {}).get("name", "Grass")
+            fields.append(
+                FE("Background", "_sp_background_tile",
+                   bg_name, "choice"))
             fields.append(
                 FE("Description", "_sp_description",
                    sp.get("description", "A monster lair.")))
@@ -1081,6 +1088,7 @@ class FeaturesEditor:
 
     def save_tile_fields(self):
         """Apply edited fields back to the tile dict."""
+        from src.settings import TILE_DEFS
         real_idx = self.tile_real_index()
         if real_idx >= len(self.tile_list):
             return
@@ -1148,6 +1156,14 @@ class FeaturesEditor:
                         sp[field_name] = int(sval)
                     except ValueError:
                         pass
+                elif field_name == "background_tile":
+                    # Convert tile name back to tile ID
+                    bg_id = 0  # default to grass
+                    for _tid, _td in TILE_DEFS.items():
+                        if _td.get("name") == sval:
+                            bg_id = _tid
+                            break
+                    sp[field_name] = bg_id
                 else:
                     sp[field_name] = sval
 
@@ -1177,6 +1193,7 @@ class FeaturesEditor:
 
     def get_tile_choices(self, key):
         """Return choice options for a tile field."""
+        from src.settings import TILE_DEFS
         if key == "_sprite":
             from src import data_registry as DR
             # Use sprites from the category matching the tile's context
@@ -1221,6 +1238,11 @@ class FeaturesEditor:
                     return ["general", "reagent", "weapon", "armor",
                             "magic", "inn", "guild"]
             return []
+        # Background tile choice — overworld terrain tiles
+        if key == "_sp_background_tile":
+            return [td["name"] for tid, td in sorted(TILE_DEFS.items())
+                    if self.TILE_CONTEXT.get(tid) == "overworld"
+                    and td.get("walkable", False)]
         # Sub-list launchers — no cycling, Enter/Right opens the list
         if key in ("_sp_edit_monsters", "_sp_edit_loot", "_sp_edit_boss"):
             return []  # handled by level intercept, not choice cycling

@@ -54,7 +54,11 @@
           "attack_penalty": 2
         }
       ],
-      "terrain": "land"
+      "terrain": "land",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Dragon": {
       "description": "A younger dragon",
@@ -122,7 +126,12 @@
       ],
       "spawn_weight": 40,
       "tile": "game/monsters/giant_rat.png",
-      "terrain": "land"
+      "terrain": "land",
+      "move_range": 10,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Goblin": {
       "description": "A small, sneaky goblin. Attacks in groups.",
@@ -158,7 +167,12 @@
         "projectile_symbol": ".",
         "label": "thrown rock"
       },
-      "terrain": "land"
+      "terrain": "land",
+      "move_range": 6,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Orc": {
       "description": "A brutal orc. Tough fight.",
@@ -193,7 +207,13 @@
         ],
         "projectile_symbol": "/",
         "label": "javelin"
-      }
+      },
+      "move_range": 4,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Orc Shaman": {
       "description": "An orc witch doctor who bolsters allies and curses foes.",
@@ -217,6 +237,14 @@
       "tile": "game/monsters/orc.png",
       "spells": [
         {
+          "type": "heal_self",
+          "name": "Self Heal",
+          "cast_chance": 40,
+          "heal_dice": 1,
+          "heal_sides": 8,
+          "heal_bonus": 2
+        },
+        {
           "type": "heal_ally",
           "name": "Mend Wounds",
           "range": 6,
@@ -227,7 +255,7 @@
         },
         {
           "type": "poison",
-          "name": "Poison Spit",
+          "name": "Poison",
           "range": 5,
           "cast_chance": 30,
           "save_dc": 11,
@@ -235,7 +263,11 @@
           "duration": 4
         }
       ],
-      "terrain": "land"
+      "terrain": "land",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Skeleton": {
       "description": "An undead skeleton warrior. Medium difficulty.",
@@ -256,7 +288,13 @@
         200
       ],
       "spawn_weight": 35,
-      "tile": "game/monsters/skeleton.png"
+      "tile": "game/monsters/skeleton.png",
+      "move_range": 3,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Skeleton Archer": {
       "description": "A skeletal bowman that fires arrows from a distance.",
@@ -291,11 +329,17 @@
         ],
         "projectile_symbol": "-",
         "label": "bone arrow"
-      }
+      },
+      "move_range": 2,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Super Zombie": {
       "description": "A new creature. A Super Zombie",
-      "hp": 15,
+      "hp": 25,
       "ac": 10,
       "attack_bonus": 1,
       "damage_dice": 1,
@@ -310,10 +354,15 @@
         50
       ],
       "spawn_weight": 20,
-      "undead": false,
+      "undead": true,
       "humanoid": false,
       "terrain": "land",
-      "tile": "game/monsters/super_zombie.png"
+      "tile": "game/monsters/super_zombie.png",
+      "move_range": 6,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Troll": {
       "description": "A massive brute with thick hide. Hits hard and regenerates.",
@@ -366,7 +415,13 @@
         160
       ],
       "spawn_weight": 35,
-      "tile": "game/monsters/wolf.png"
+      "tile": "game/monsters/wolf.png",
+      "move_range": 4,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Zombie": {
       "description": "A shambling corpse. Slow but durable.",
@@ -387,7 +442,13 @@
         80
       ],
       "spawn_weight": 30,
-      "tile": "game/monsters/zombie.png"
+      "tile": "game/monsters/zombie.png",
+      "move_range": 3,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     }
   },
   "spawn_tables": {

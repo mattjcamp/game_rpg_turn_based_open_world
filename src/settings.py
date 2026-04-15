@@ -63,6 +63,8 @@ TILE_VOID      = 36  # Black empty space (non-walkable, for interior edges)
 
 # ----- Spawn tile IDs -----
 TILE_SPAWN     = 66  # Monster spawn point (overworld)
+TILE_SPAWN_CAMPFIRE = 67  # Campfire spawn point (overworld)
+TILE_SPAWN_GRAVEYARD = 68  # Graveyard spawn point (overworld)
 
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
@@ -104,6 +106,8 @@ TILE_DEFS = {
     TILE_VOID:       {"color": (0, 0, 0),       "walkable": False, "name": "Void"},
     # Spawn tiles
     TILE_SPAWN:      {"color": (180, 40, 40),    "walkable": True,  "name": "Monster Spawn"},
+    TILE_SPAWN_CAMPFIRE: {"color": (200, 120, 30), "walkable": True, "name": "Campfire Spawn"},
+    TILE_SPAWN_GRAVEYARD: {"color": (120, 115, 105), "walkable": True, "name": "Graveyard Spawn"},
 }
 
 # ----- Colors (UI) -----

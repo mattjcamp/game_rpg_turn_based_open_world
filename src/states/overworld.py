@@ -14,7 +14,7 @@ from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
-    TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED, TILE_SPAWN,
+    TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED, TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_OVERWORLD, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
     NPC_WANDER_RANGE, ORC_RESPAWN_CHANCE,
 )
@@ -297,14 +297,19 @@ class OverworldState(InventoryMixin, BaseState):
         # Spawn tile monsters are handled separately in _try_spawn_tile_monsters()
 
     def _spawn_from_spawn_tiles(self):
-        """Spawn roaming monsters from nearby Monster Spawn tiles."""
+        """Spawn roaming monsters from nearby Monster Spawn tiles.
+
+        Each spawn tile in range rolls independently using its own
+        configured spawn_chance percentage — so a tile set to 8%
+        has an 8% chance of producing a monster each step.
+        """
         from src.party import SPAWN_POINTS
 
         if not SPAWN_POINTS:
             return
         tile_map = self.game.tile_map
         party = self.game.party
-        scan_dist = 16  # only check spawn tiles near the party
+        scan_dist = 10  # only check spawn tiles near the party
 
         for dr in range(-scan_dist, scan_dist + 1):
             for dc in range(-scan_dist, scan_dist + 1):
@@ -320,7 +325,7 @@ class OverworldState(InventoryMixin, BaseState):
 
                 sp = SPAWN_POINTS[tid]
 
-                # ── Spawn chance: percentage chance PER call ──
+                # ── Spawn chance: percentage chance per step ──
                 chance = sp.get("spawn_chance", 20)
                 if random.randint(1, 100) > chance:
                     continue
