@@ -2515,6 +2515,11 @@ class TownState(InventoryMixin, BaseState):
             def _do_exit_link():
                 self.game.party.col = ow_col
                 self.game.party.row = ow_row
+                # Restore camera for the overworld map
+                self.game.camera.map_width = self.game.tile_map.width
+                self.game.camera.map_height = self.game.tile_map.height
+                self.game.camera.update(
+                    self.game.party.col, self.game.party.row)
                 self.game.change_state("overworld")
 
             self.game.start_loading_screen(
@@ -2575,6 +2580,10 @@ class TownState(InventoryMixin, BaseState):
             def _do_exit_fallback():
                 self.game.party.col = ow_col
                 self.game.party.row = ow_row
+                self.game.camera.map_width = self.game.tile_map.width
+                self.game.camera.map_height = self.game.tile_map.height
+                self.game.camera.update(
+                    self.game.party.col, self.game.party.row)
                 self.game.change_state("overworld")
 
             self.game.start_loading_screen(
@@ -2593,6 +2602,10 @@ class TownState(InventoryMixin, BaseState):
         def _do_exit():
             self.game.party.col = ow_col
             self.game.party.row = ow_row
+            # Restore camera for the overworld map
+            self.game.camera.map_width = self.game.tile_map.width
+            self.game.camera.map_height = self.game.tile_map.height
+            self.game.camera.update(self.game.party.col, self.game.party.row)
             self.game.change_state("overworld")
 
         self.game.start_loading_screen(f"Leaving {town_name}", _do_exit)

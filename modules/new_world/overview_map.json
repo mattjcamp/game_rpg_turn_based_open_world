@@ -2613,6 +2613,10 @@
     "7,10": {
       "interior": "Dank Pit",
       "type": "dungeon"
+    },
+    "10,14": {
+      "interior": "New Haven",
+      "type": "town"
     }
   },
   "party_start": {

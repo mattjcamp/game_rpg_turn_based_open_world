@@ -12,8 +12,7 @@ class ModuleDungeonEditorMixin:
 
     # Valid options for choice fields
     _DUNGEON_MODE_OPTIONS = ["procedural", "custom"]
-    _DUNGEON_STYLE_OPTIONS = ["cave", "crypt", "sewer", "mine", "ruins",
-                              "temple", "fortress"]
+    _DUNGEON_STYLE_OPTIONS = ["cave", "ruins"]
     _DUNGEON_SIZE_OPTIONS = ["small", "medium", "large"]
     _DUNGEON_DIFFICULTY_OPTIONS = ["easy", "normal", "hard", "deadly"]
     _DUNGEON_TORCH_OPTIONS = ["none", "sparse", "moderate", "abundant"]

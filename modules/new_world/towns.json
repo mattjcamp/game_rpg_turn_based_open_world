@@ -312,7 +312,8 @@
       "11,2": {
         "tile_id": 13,
         "name": "Door",
-        "path": "game/terrain/town_door.png"
+        "path": "game/terrain/town_door.png",
+        "to_overworld": true
       },
       "12,2": {
         "tile_id": 49,
@@ -3215,7 +3216,8 @@
           "9,2": {
             "tile_id": 26,
             "name": "Door",
-            "path": "game/dungeon/dungeon_door.png"
+            "path": "game/dungeon/dungeon_door.png",
+            "to_town": true
           },
           "9,3": {
             "tile_id": 21,
@@ -3328,14 +3330,12 @@
             "path": "game/dungeon/stone_floor.png"
           },
           "1,1": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 57,
+            "name": "Weapon Counter"
           },
           "1,2": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 58,
+            "name": "Armor Counter"
           },
           "2,2": {
             "tile_id": 20,
