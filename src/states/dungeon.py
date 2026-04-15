@@ -55,6 +55,14 @@ class DungeonState(InventoryMixin, BaseState):
         self.door_interact_cursor = 0
         self.door_interact_options = []  # list of (label, action_key)
 
+        # ── Encounter action screen (Fight / Flee) ──
+        self.encounter_action_active = False
+        self.encounter_action_cursor = 0   # 0=Engage, 1=Flee
+        self.encounter_action_monster = None
+        self.encounter_action_result = None   # None, "fled", "fled_far", "failed"
+        self.encounter_result_timer = 0
+        self._encounter_flee_distance = 0
+
         # ── Help overlay ──
         self.showing_help = False
 
@@ -494,6 +502,11 @@ class DungeonState(InventoryMixin, BaseState):
                         self.log_scroll = max(0, self.log_scroll - 3)
                     return
 
+                # ── Encounter action screen input ──
+                if self.encounter_action_active:
+                    self._handle_encounter_action_input(event)
+                    return
+
                 # ── Door interaction prompt input ──
                 if self.door_interact_active:
                     self._handle_door_interact_input(event)
@@ -616,10 +629,11 @@ class DungeonState(InventoryMixin, BaseState):
                         self.party_inv_member = 0
                         return
 
-        # If showing party screen, character detail, party inventory, or door prompt, block movement
+        # If showing party screen, character detail, party inventory,
+        # door prompt, or encounter action, block movement
         if (self.showing_party or self.showing_char_detail is not None
                 or self.showing_party_inv or self.door_interact_active
-                or self.door_unlock_anim):
+                or self.door_unlock_anim or self.encounter_action_active):
             return
 
         # Movement
@@ -657,10 +671,10 @@ class DungeonState(InventoryMixin, BaseState):
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
-        # Check for monster at target position (bump-to-fight)
+        # Check for monster at target position (bump-to-encounter)
         monster = self._get_monster_at(target_col, target_row)
         if monster:
-            self._start_combat(monster)
+            self._show_encounter_action(monster)
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
@@ -677,10 +691,14 @@ class DungeonState(InventoryMixin, BaseState):
             self.move_cooldown = MOVE_REPEAT_DELAY
             self._check_tile_events()
             self._attempt_trap_detection()
-            # After party moves, let every alive monster take a step
-            self._move_monsters()
-            # A monster may have walked adjacent — check for contact
+            # Check contact BEFORE monsters move so the player only
+            # enters combat with monsters they could see as adjacent
+            # (matches overworld behaviour).
             self._check_monster_contact()
+            if not self.encounter_action_active:
+                self._move_monsters()
+                # A monster may have walked adjacent — check again
+                self._check_monster_contact()
             # Burn torch after each successful step
             self._tick_torch()
             # Tick Galadriel's Light step counter
@@ -1009,9 +1027,11 @@ class DungeonState(InventoryMixin, BaseState):
                             self.dungeon_data.tile_map,
                             occupied)
                     # Otherwise stay put
-            elif self._has_line_of_sight(monster.col, monster.row,
-                                       party.col, party.row):
-                # Monster can see the player — pursue
+            elif (abs(monster.col - party.col)
+                      + abs(monster.row - party.row) <= 6
+                  and self._has_line_of_sight(monster.col, monster.row,
+                                              party.col, party.row)):
+                # Monster can see the player within 6 tiles — pursue
                 monster.try_move_toward(
                     party.col, party.row,
                     self.dungeon_data.tile_map,
@@ -1054,8 +1074,10 @@ class DungeonState(InventoryMixin, BaseState):
             mon.col, mon.row = best
 
     def _check_monster_contact(self):
-        """If a monster moved adjacent to (or onto) the party, start combat."""
+        """If a monster is adjacent to (or onto) the party, show encounter screen."""
         if not self.dungeon_data:
+            return
+        if self.encounter_action_active:
             return
         party = self.game.party
         for monster in self.dungeon_data.monsters:
@@ -1064,8 +1086,111 @@ class DungeonState(InventoryMixin, BaseState):
             dc = abs(monster.col - party.col)
             dr = abs(monster.row - party.row)
             if dc + dr <= 1:  # Same tile or cardinal-adjacent
-                self._start_combat(monster)
+                self._show_encounter_action(monster)
                 return
+
+    # ── Encounter action screen (Fight / Flee) ─────────────────
+
+    def _show_encounter_action(self, monster):
+        """Show the encounter prompt for a dungeon monster."""
+        self.encounter_action_monster = monster
+        self.encounter_action_cursor = 0
+        self.encounter_action_result = None
+        self.encounter_result_timer = 0
+        self.encounter_action_active = True
+
+    def _handle_encounter_action_input(self, event):
+        """Handle input for the monster encounter action screen."""
+        # While showing a flee result message, consume any key to dismiss
+        if self.encounter_action_result is not None:
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
+                if self.encounter_action_result in ("fled", "fled_far"):
+                    # Successful flee — push monster away
+                    flee_dist = self._encounter_flee_distance
+                    mon = self.encounter_action_monster
+                    if mon and self.dungeon_data:
+                        party = self.game.party
+                        dx = mon.col - party.col
+                        dy = mon.row - party.row
+                        step_x = (1 if dx > 0 else -1 if dx < 0
+                                  else (1 if dy == 0 else 0))
+                        step_y = (1 if dy > 0 else -1 if dy < 0
+                                  else (0 if dx != 0 else 1))
+                        tmap = self.dungeon_data.tile_map
+                        for _ in range(flee_dist):
+                            nc = mon.col + step_x
+                            nr = mon.row + step_y
+                            if (0 <= nc < tmap.width
+                                    and 0 <= nr < tmap.height
+                                    and tmap.is_walkable(nc, nr)):
+                                mon.col, mon.row = nc, nr
+                            else:
+                                break
+                    self.encounter_action_active = False
+                else:
+                    # Failed flee — enter combat
+                    self._encounter_engage()
+            return
+
+        n_options = 2  # Engage, Flee
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.encounter_action_cursor = (
+                self.encounter_action_cursor - 1) % n_options
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.encounter_action_cursor = (
+                self.encounter_action_cursor + 1) % n_options
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if self.encounter_action_cursor == 0:
+                self._encounter_engage()
+            elif self.encounter_action_cursor == 1:
+                self._encounter_flee()
+        elif event.key == pygame.K_ESCAPE:
+            self._encounter_flee()
+
+    def _encounter_engage(self):
+        """Confirm engagement — start combat with the contacted monster."""
+        mon = self.encounter_action_monster
+        self.encounter_action_active = False
+        if mon:
+            self._start_combat(mon)
+
+    def _encounter_flee(self):
+        """Attempt to flee using a DEX saving throw.
+
+        Party average DEX modifier vs. monster effective DEX.
+        Roll d20 + party_avg_dex_mod >= 10 + monster_dex_mod to escape.
+        """
+        import random as _rng
+        party = self.game.party
+        mon = self.encounter_action_monster
+
+        alive = [m for m in party.members if m.is_alive()]
+        if alive:
+            avg_dex_mod = sum(m.dex_mod for m in alive) / len(alive)
+        else:
+            avg_dex_mod = 0
+
+        monster_dex_mod = max(0, (getattr(mon, 'ac', 10) - 10) // 2)
+        roll = _rng.randint(1, 20)
+        dc = 10 + monster_dex_mod
+        total = roll + int(avg_dex_mod)
+
+        if total >= dc:
+            dist_roll = _rng.randint(1, 20) + int(avg_dex_mod)
+            if dist_roll >= dc:
+                flee_dist = 4
+                self.encounter_action_result = "fled_far"
+            else:
+                flee_dist = 2
+                self.encounter_action_result = "fled"
+            self._encounter_flee_distance = flee_dist
+            self.encounter_result_timer = 1500
+            self.game.sfx.play("chirp")
+        else:
+            self.encounter_action_result = "failed"
+            self._encounter_flee_distance = 0
+            self.encounter_result_timer = 1500
+            self.game.sfx.play("hit")
 
     def _get_monster_at(self, col, row):
         """Return the monster at (col, row) if any, else None."""
@@ -1733,6 +1858,10 @@ class DungeonState(InventoryMixin, BaseState):
             if self.artifact_pickup_anim["timer"] <= 0:
                 self.artifact_pickup_anim = None
 
+        # Tick encounter result timer
+        if self.encounter_result_timer > 0:
+            self.encounter_result_timer -= dt_ms
+
     def draw(self, renderer):
         """Draw the dungeon in Ultima III style."""
         if self.showing_party_inv:
@@ -1812,6 +1941,11 @@ class DungeonState(InventoryMixin, BaseState):
         )
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
+        if self.encounter_action_active:
+            renderer.draw_encounter_action_screen(
+                self.encounter_action_monster,
+                self.encounter_action_cursor,
+                self.encounter_action_result)
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
         if self.showing_help:
