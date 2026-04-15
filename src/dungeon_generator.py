@@ -17,9 +17,13 @@ from src.tile_map import TileMap
 from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
-    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
+    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH, TILE_CAVE_TORCH, TILE_MOUNTAIN,
 )
 from src.monster import create_encounter, create_monster
+
+# All tile IDs that count as "wall" for dungeon generation purposes
+# (door placement, torch placement, decoration adjacency checks).
+_WALL_TILES = frozenset({TILE_DWALL, TILE_MOUNTAIN})
 
 
 class Room:
@@ -57,12 +61,13 @@ class DungeonData:
     """Holds everything about a generated dungeon."""
 
     def __init__(self, tile_map, rooms, entry_col, entry_row, name="The Depths",
-                 monsters=None):
+                 monsters=None, style=None):
         self.tile_map = tile_map
         self.rooms = rooms
         self.entry_col = entry_col
         self.entry_row = entry_row
         self.name = name
+        self.style = style  # "cave", "crypt", etc. — drives rendering palette
         # Track which chests have been opened (keyed by (col, row))
         self.opened_chests = set()
         # Track which traps have been triggered
@@ -115,6 +120,7 @@ class DungeonData:
             "detected_traps": [list(pos) for pos in self.detected_traps],
             "explored_tiles": [list(pos) for pos in self.explored_tiles],
             "monsters": monsters_data,
+            "style": self.style,
         }
 
     @classmethod
@@ -149,7 +155,8 @@ class DungeonData:
         # We don't need to restore rooms — they're only used during
         # generation.  Pass an empty list.
         dd = cls(tmap, [], data["entry_col"], data["entry_row"],
-                 name=data.get("name", "The Depths"), monsters=monsters)
+                 name=data.get("name", "The Depths"), monsters=monsters,
+                 style=data.get("style"))
         dd.opened_chests = {tuple(p) for p in data.get("opened_chests", [])}
         dd.triggered_traps = {tuple(p) for p in data.get("triggered_traps", [])}
         dd.detected_traps = {tuple(p) for p in data.get("detected_traps", [])}
@@ -164,30 +171,47 @@ def _carve_room(tmap, room):
             tmap.set_tile(col, row, TILE_DFLOOR)
 
 
-def _carve_h_tunnel(tmap, x1, x2, y):
-    """Carve a horizontal tunnel."""
+def _carve_h_tunnel(tmap, x1, x2, y, width=1):
+    """Carve a horizontal tunnel of the given *width* (centred on *y*)."""
+    half = width // 2
     for col in range(min(x1, x2), max(x1, x2) + 1):
-        tmap.set_tile(col, y, TILE_DFLOOR)
+        for dy in range(-half, -half + width):
+            r = y + dy
+            if 1 <= r < tmap.height - 1:
+                tmap.set_tile(col, r, TILE_DFLOOR)
 
 
-def _carve_v_tunnel(tmap, y1, y2, x):
-    """Carve a vertical tunnel."""
+def _carve_v_tunnel(tmap, y1, y2, x, width=1):
+    """Carve a vertical tunnel of the given *width* (centred on *x*)."""
+    half = width // 2
     for row in range(min(y1, y2), max(y1, y2) + 1):
-        tmap.set_tile(x, row, TILE_DFLOOR)
+        for dx in range(-half, -half + width):
+            c = x + dx
+            if 1 <= c < tmap.width - 1:
+                tmap.set_tile(c, row, TILE_DFLOOR)
 
 
 def _connect_rooms(tmap, room_a, room_b):
-    """Connect two rooms with an L-shaped corridor."""
+    """Connect two rooms with an L-shaped corridor.
+
+    Tunnel width varies randomly: most corridors are 1 tile wide,
+    some are 2, and occasionally 3 — giving the dungeon a more
+    organic feel with narrow passages opening into wider stretches.
+    """
     ax, ay = room_a.center
     bx, by = room_b.center
 
+    # Pick a random width for each segment — weighted toward narrow
+    w1 = random.choices([1, 2, 3], weights=[5, 3, 1])[0]
+    w2 = random.choices([1, 2, 3], weights=[5, 3, 1])[0]
+
     # Randomly choose horizontal-first or vertical-first
     if random.random() < 0.5:
-        _carve_h_tunnel(tmap, ax, bx, ay)
-        _carve_v_tunnel(tmap, ay, by, bx)
+        _carve_h_tunnel(tmap, ax, bx, ay, width=w1)
+        _carve_v_tunnel(tmap, ay, by, bx, width=w2)
     else:
-        _carve_v_tunnel(tmap, ay, by, ax)
-        _carve_h_tunnel(tmap, ax, bx, by)
+        _carve_v_tunnel(tmap, ay, by, ax, width=w1)
+        _carve_h_tunnel(tmap, ax, bx, by, width=w2)
 
 
 def _place_doors(tmap, rooms):
@@ -244,10 +268,10 @@ def _place_doors(tmap, rooms):
                 continue
 
             # Must have wall on both perpendicular sides (1-wide opening)
-            h_walls = (tmap.get_tile(wc - 1, wr) == TILE_DWALL and
-                       tmap.get_tile(wc + 1, wr) == TILE_DWALL)
-            v_walls = (tmap.get_tile(wc, wr - 1) == TILE_DWALL and
-                       tmap.get_tile(wc, wr + 1) == TILE_DWALL)
+            h_walls = (tmap.get_tile(wc - 1, wr) in _WALL_TILES and
+                       tmap.get_tile(wc + 1, wr) in _WALL_TILES)
+            v_walls = (tmap.get_tile(wc, wr - 1) in _WALL_TILES and
+                       tmap.get_tile(wc, wr + 1) in _WALL_TILES)
 
             if h_walls or v_walls:
                 tmap.set_tile(wc, wr, TILE_DDOOR)
@@ -376,7 +400,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
         for x in range(room.x - 1, room.x + room.w + 1):
             for y in [room.y - 1, room.y + room.h]:
                 if 0 <= x < width and 0 <= y < height:
-                    if tmap.get_tile(x, y) == TILE_DWALL:
+                    if tmap.get_tile(x, y) in _WALL_TILES:
                         # Must have a floor neighbor (so the light has
                         # somewhere to shine)
                         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
@@ -387,7 +411,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
         for y in range(room.y - 1, room.y + room.h + 1):
             for x in [room.x - 1, room.x + room.w]:
                 if 0 <= x < width and 0 <= y < height:
-                    if tmap.get_tile(x, y) == TILE_DWALL:
+                    if tmap.get_tile(x, y) in _WALL_TILES:
                         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                             nx, ny = x + dx, y + dy
                             if tmap.get_tile(nx, ny) == TILE_DFLOOR:
@@ -398,7 +422,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
     if torch_density == "high":
         for y in range(height):
             for x in range(width):
-                if tmap.get_tile(x, y) == TILE_DWALL and (x, y) not in torch_candidates:
+                if tmap.get_tile(x, y) in _WALL_TILES and (x, y) not in torch_candidates:
                     for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < width and 0 <= ny < height:
@@ -434,7 +458,11 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
                 break
         if adjacent_door:
             continue
-        tmap.set_tile(tc, tr, TILE_WALL_TORCH)
+        # Use cave torch if the wall being replaced is a mountain tile
+        torch_tile = (TILE_CAVE_TORCH
+                      if tmap.get_tile(tc, tr) == TILE_MOUNTAIN
+                      else TILE_WALL_TORCH)
+        tmap.set_tile(tc, tr, torch_tile)
         placed_torches.append((tc, tr))
         if len(placed_torches) >= max_torches:
             break
@@ -455,7 +483,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
         # Prefer tiles that have at least 2 wall neighbors (corners, corridors)
         wall_count = sum(
             1 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]
-            if tmap.get_tile(fx + dx, fy + dy) == TILE_DWALL
+            if tmap.get_tile(fx + dx, fy + dy) in _WALL_TILES
         )
         if wall_count >= 1 and random.random() < 0.4:
             tmap.set_tile(fx, fy, TILE_PUDDLE)
@@ -472,7 +500,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
             continue  # may have been turned into puddle
         wall_count = sum(
             1 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]
-            if tmap.get_tile(fx + dx, fy + dy) in (TILE_DWALL, TILE_WALL_TORCH)
+            if tmap.get_tile(fx + dx, fy + dy) in (_WALL_TILES | {TILE_WALL_TORCH, TILE_CAVE_TORCH})
         )
         if wall_count >= 1 and random.random() < 0.35:
             tmap.set_tile(fx, fy, TILE_MOSS)
@@ -490,7 +518,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      encounter_max_level=None,
                      custom_encounters=None,
                      include_random_encounters=True,
-                     torch_density="medium"):
+                     torch_density="medium",
+                     style=None):
     """
     Generate a procedural dungeon.
 
@@ -526,7 +555,9 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     BUFFER = 3
     total_height = height + BUFFER
 
-    tmap = TileMap(width, total_height, default_tile=TILE_DWALL)
+    # Cave-style dungeons use the mountain tile for walls
+    wall_tile = TILE_MOUNTAIN if style == "cave" else TILE_DWALL
+    tmap = TileMap(width, total_height, default_tile=wall_tile)
 
     rooms = []
     num_rooms = random.randint(min_rooms, max_rooms)
@@ -688,7 +719,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     entry_row = stairs_row
 
     return DungeonData(tmap, rooms, entry_col, entry_row, name,
-                       monsters=monsters)
+                       monsters=monsters, style=style)
 
 
 def generate_house_dungeon(name="Elara's House"):

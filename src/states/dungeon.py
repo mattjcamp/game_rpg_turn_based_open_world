@@ -14,7 +14,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
-    TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
+    TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH, TILE_CAVE_TORCH,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
 )
 
@@ -885,7 +885,7 @@ class DungeonState(InventoryMixin, BaseState):
 
         for wr in range(tile_map.height):
             for wc in range(tile_map.width):
-                if tile_map.get_tile(wc, wr) == TILE_WALL_TORCH:
+                if tile_map.get_tile(wc, wr) in (TILE_WALL_TORCH, TILE_CAVE_TORCH):
                     lit = {(wc, wr)}
                     for xx, xy, yx, yy in octants:
                         self._cast_light(lit, tile_map, wc, wr,

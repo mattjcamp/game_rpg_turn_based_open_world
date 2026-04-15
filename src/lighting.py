@@ -512,7 +512,7 @@ def scan_light_sources(tile_map, off_c: int, off_r: int,
     - torch_positions: list of TorchTile screen coords for glow rendering
     """
     from src.settings import (
-        TILE_WALL_TORCH, TILE_DOOR, TILE_ALTAR, TILE_EXIT,
+        TILE_WALL_TORCH, TILE_CAVE_TORCH, TILE_DOOR, TILE_ALTAR, TILE_EXIT,
     )
 
     torch_lights: list = []
@@ -526,7 +526,7 @@ def scan_light_sources(tile_map, off_c: int, off_r: int,
             tid = tile_map.get_tile(wc, wr)
             ssc = sc + pad_sc
             ssr = sr + pad_sr
-            if tid == TILE_WALL_TORCH:
+            if tid in (TILE_WALL_TORCH, TILE_CAVE_TORCH):
                 torch_lights.append((ssc, ssr, 5.0, 3.0))
                 torch_positions.append((sc, sr))
             elif tid == TILE_DOOR:

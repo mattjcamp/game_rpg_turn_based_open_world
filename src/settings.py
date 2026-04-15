@@ -57,6 +57,7 @@ TILE_KEYSLOT = 31
 TILE_PUDDLE    = 32
 TILE_MOSS      = 33
 TILE_WALL_TORCH = 34
+TILE_CAVE_TORCH = 37  # Torch set in a mountain/cave wall
 # Town-interior special tiles
 TILE_ALTAR     = 35
 TILE_VOID      = 36  # Black empty space (non-walkable, for interior edges)
@@ -102,6 +103,7 @@ TILE_DEFS = {
     TILE_PUDDLE:     {"color": (30, 50, 70),   "walkable": True,  "name": "Puddle"},
     TILE_MOSS:       {"color": (25, 55, 22),   "walkable": True,  "name": "Moss"},
     TILE_WALL_TORCH: {"color": (160, 120, 40), "walkable": False, "name": "Wall Torch"},
+    TILE_CAVE_TORCH: {"color": (160, 120, 40), "walkable": False, "name": "Cave Torch"},
     TILE_ALTAR:      {"color": (200, 160, 100), "walkable": False, "name": "Altar"},
     TILE_VOID:       {"color": (0, 0, 0),       "walkable": False, "name": "Void"},
     # Spawn tiles

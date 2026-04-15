@@ -2368,7 +2368,8 @@ class OverworldState(InventoryMixin, BaseState):
                     seed=seed_base + li,
                     place_stairs_down=(li < num_levels - 1),
                     place_doors=doors,
-                    torch_density=td)
+                    torch_density=td,
+                    style=style)
                 gen_levels.append(dd)
 
             cache[(pcol, prow)] = gen_levels
