@@ -595,7 +595,12 @@ class OverworldState(InventoryMixin, BaseState):
                             return
 
             # Bump-to-talk: check if a quest NPC is on the target tile
-            ow_npc = self._get_ow_npc_at(target_col, target_row)
+            # Only check overworld quest NPCs when NOT inside a building
+            # interior — their coordinates belong to the overworld map and
+            # would otherwise collide with interior tile positions (e.g.
+            # Lucian at overworld (14,5) matching a building interior cell).
+            ow_npc = (self._get_ow_npc_at(target_col, target_row)
+                       if not self._in_overworld_interior else None)
             if ow_npc:
                 if getattr(ow_npc, "npc_type", "") == "quest_item":
                     self._collect_overworld_quest_item(ow_npc)
@@ -2089,6 +2094,22 @@ class OverworldState(InventoryMixin, BaseState):
 
             anchor = getattr(npc, "_guardian_anchor", None)
             if not anchor:
+                # Non-guardian quest monsters (e.g. goblins from kill
+                # quests) wander randomly so they feel alive instead of
+                # standing frozen in place.
+                if _rng.random() < 0.3:
+                    dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+                    _rng.shuffle(dirs)
+                    for dc, dr in dirs:
+                        nc, nr = npc.col + dc, npc.row + dr
+                        if (nc, nr) in occupied:
+                            continue
+                        if not self.game.tile_map.is_walkable(nc, nr):
+                            continue
+                        occupied.discard((npc.col, npc.row))
+                        npc.col, npc.row = nc, nr
+                        occupied.add((nc, nr))
+                        break
                 continue
 
             leash = getattr(npc, "_guardian_leash", GUARDIAN_LEASH)
