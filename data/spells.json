@@ -10,7 +10,7 @@
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
-      "mp_cost": 3,
+      "mp_cost": 6,
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
@@ -20,7 +20,7 @@
         "dice_count": 1,
         "dice_sides": 6
       },
-      "range": 99,
+      "range": 10,
       "targeting": "directional_projectile",
       "usable_in": [
         "battle"
@@ -140,13 +140,15 @@
       ],
       "casting_type": "sorcerer",
       "min_level": 3,
-      "mp_cost": 8,
+      "mp_cost": 12,
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
-        "dice": "3d8",
+        "dice": "2d8",
         "stat_bonus": "intelligence",
-        "min_damage": 1
+        "min_damage": 1,
+        "dice_count": 2,
+        "dice_sides": 8
       },
       "range": 99,
       "targeting": "select_enemy",
@@ -154,7 +156,8 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": ""
     },
     {
       "id": "invisibility",
@@ -231,14 +234,15 @@
       ],
       "casting_type": "sorcerer",
       "min_level": 5,
-      "mp_cost": 15,
+      "mp_cost": 25,
       "duration": "instant",
       "effect_type": "lightning_bolt",
       "effect_value": {
         "dice_count": 6,
         "dice_sides": 6,
         "stat_bonus": "intelligence",
-        "min_damage": 1
+        "min_damage": 1,
+        "dice": "6d6"
       },
       "range": 99,
       "targeting": "directional_projectile",
@@ -246,7 +250,8 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": ""
     },
     {
       "id": "animate_dead",
@@ -285,7 +290,7 @@
       ],
       "casting_type": "sorcerer",
       "min_level": 7,
-      "mp_cost": 25,
+      "mp_cost": 30,
       "duration": "instant",
       "effect_type": "aoe_fireball",
       "effect_value": {
@@ -293,7 +298,8 @@
         "dice_sides": 8,
         "stat_bonus": "intelligence",
         "min_damage": 1,
-        "radius": 3
+        "radius": 3,
+        "dice": "5d8"
       },
       "range": 99,
       "targeting": "select_tile",
@@ -301,7 +307,8 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": ""
     },
     {
       "id": "light",
@@ -396,7 +403,7 @@
       ],
       "casting_type": "priest",
       "min_level": 2,
-      "mp_cost": 8,
+      "mp_cost": 0,
       "duration": "instant",
       "effect_type": "undead_damage",
       "effect_value": {
@@ -408,7 +415,8 @@
         "battle"
       ],
       "sfx": "turn_undead",
-      "hit_sfx": null
+      "hit_sfx": "",
+      "icon": ""
     },
     {
       "id": "bless",

@@ -2,7 +2,7 @@
   {
     "name": "Remove the Troll",
     "description": "",
-    "giver_npc": "",
+    "giver_npc": "Eager",
     "giver_sprite": "src/assets/game/npcs/shopkeep.png",
     "giver_location": "town:New Haven",
     "giver_dialogue": "So... the dank dungeon to our north has a very bad smelling troll.... Do you think you can take care of that for us? I don't want to know the details, but our town treasurer has set aside a reward for you if you can clean that up.",
@@ -10,7 +10,7 @@
     "reward_gold": 100,
     "steps": [
       {
-        "description": "New Step",
+        "description": "Remove the Troll",
         "step_type": "kill",
         "monster": "Troll",
         "collect_item": "",
@@ -21,6 +21,34 @@
         "target_count": 1,
         "optional": "no"
       }
-    ]
+    ],
+    "giver_col": 20,
+    "giver_row": 10
+  },
+  {
+    "name": "Rat's In the General Store",
+    "description": "",
+    "giver_npc": "Shiela",
+    "giver_sprite": "src/assets/game/characters/alchemist.png",
+    "giver_location": "town:New Haven",
+    "giver_dialogue": "Can you help me? I'm the owner of the General Store, and the basement is infected with rats.Can you deal with them? They might be Giant Rats, I'm not sure. I'm a little scared of rats...",
+    "reward_xp": 50,
+    "reward_gold": 50,
+    "steps": [
+      {
+        "description": "Kill the Rats",
+        "step_type": "kill",
+        "monster": "Giant Rat",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "interior:New Haven/Tunnel Short",
+        "target": "",
+        "target_count": 10,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 6,
+    "giver_row": 9
   }
 ]

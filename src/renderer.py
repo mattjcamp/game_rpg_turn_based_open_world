@@ -1101,6 +1101,14 @@ class Renderer(CombatEffectRendererMixin):
                 if sprite:
                     self.screen.blit(sprite, (px, py))
                     return
+            # Building interiors often mix town + dungeon tiles
+            # (e.g. stone walls, torches as decor).  Fall back to any
+            # sprite already loaded under this tile_id from the dungeon
+            # manifest so users can decorate interiors freely.
+            sprite = self._tile_sprites.get(tile_id)
+            if sprite:
+                self.screen.blit(sprite, (px, py))
+                return
 
         # Procedural fallback for unmapped / unloaded tiles
         BLACK = (0, 0, 0)

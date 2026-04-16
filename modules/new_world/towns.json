@@ -1468,9 +1468,8 @@
         "path": "game/terrain/path.png"
       },
       "23,11": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "24,11": {
         "tile_id": 46,
@@ -1488,9 +1487,8 @@
         "path": "game/terrain/sand.png"
       },
       "2,12": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "3,12": {
         "tile_id": 46,
@@ -1593,9 +1591,8 @@
         "path": "game/terrain/path.png"
       },
       "23,12": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "24,12": {
         "tile_id": 46,
@@ -2883,9 +2880,8 @@
         "path": "unassigned/brick_wall_brown.png"
       },
       "6,23": {
-        "tile_id": 49,
-        "name": "Brown Brick Wall",
-        "path": "unassigned/brick_wall_brown.png"
+        "tile_id": 47,
+        "name": "Sand Floor"
       },
       "7,23": {
         "tile_id": 49,
@@ -3150,59 +3146,48 @@
         "height": 14,
         "tiles": {
           "0,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 34,
+            "name": "Wall Torch"
           },
           "1,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "2,0": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "3,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "4,0": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "5,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "6,0": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "7,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "8,0": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "9,0": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "9,1": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "9,2": {
             "tile_id": 26,
@@ -3211,74 +3196,60 @@
             "to_town": true
           },
           "9,3": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "9,4": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 34,
+            "name": "Wall Torch"
           },
           "8,4": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "7,4": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "6,4": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "5,4": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "4,4": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "3,4": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "2,4": {
-            "tile_id": 34,
-            "name": "Wall Torch",
-            "path": "game/dungeon/wall_torch.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "1,4": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "0,4": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 34,
+            "name": "Wall Torch"
           },
           "0,3": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "0,2": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "0,1": {
-            "tile_id": 21,
-            "name": "Stone Wall",
-            "path": "game/dungeon/stone_wall.png"
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
           },
           "8,2": {
             "tile_id": 20,
@@ -3286,9 +3257,8 @@
             "path": "game/dungeon/stone_floor.png"
           },
           "8,1": {
-            "tile_id": 20,
-            "name": "Stone Floor",
-            "path": "game/dungeon/stone_floor.png"
+            "tile_id": 25,
+            "name": "Stairs Down"
           },
           "7,1": {
             "tile_id": 20,
@@ -3407,6 +3377,543 @@
             "link_map": "town:New Haven",
             "link_x": "7",
             "link_y": "7"
+          },
+          "8,1": {
+            "linked": true,
+            "link_map": "interior:New Haven/Tunnel Short"
+          }
+        }
+      },
+      {
+        "name": "Tunnel Short",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "0,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "0,1": {
+            "tile_id": 26,
+            "name": "Door",
+            "path": "game/dungeon/dungeon_door.png"
+          },
+          "0,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "2,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "5,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,3": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "7,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,3": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,3": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,3": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,3": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "12,3": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "13,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "14,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "14,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "15,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "15,1": {
+            "tile_id": 11,
+            "name": "Wall"
+          },
+          "15,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "14,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "13,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "12,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "11,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "10,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "7,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "5,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "2,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "5,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "1,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "14,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "13,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "13,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "12,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "12,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "8,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "7,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "7,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "6,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "5,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "4,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "3,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "2,2": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "2,1": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "8,4": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "7,4": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "7,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "6,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "6,4": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "5,4": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "4,4": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "4,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "4,6": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "5,6": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "5,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "8,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,5": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,6": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,6": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,7": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,8": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,8": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,7": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,7": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,8": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,9": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "10,9": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "11,9": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "12,9": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "12,8": {
+            "tile_id": 47,
+            "name": "Sand Floor"
+          },
+          "9,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "10,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "11,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "12,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "13,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "11,5": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "12,5": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "12,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "12,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "13,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "13,8": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "13,9": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "13,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "12,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "11,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "10,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "9,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "8,10": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "8,9": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "8,8": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "8,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "8,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "9,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "7,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "6,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "5,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "4,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,7": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,6": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,5": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          },
+          "3,4": {
+            "tile_id": 49,
+            "name": "Brown Brick Wall"
+          }
+        },
+        "template_label": "Tunnel Short",
+        "tile_properties": {
+          "0,1": {
+            "linked": true,
+            "link_map": "interior:New Haven/General Shop Interior",
+            "link_x": "8",
+            "link_y": "1"
           }
         }
       }

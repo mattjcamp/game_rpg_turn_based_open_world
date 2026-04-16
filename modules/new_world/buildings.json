@@ -498,24 +498,29 @@
             "name": "Path Floor"
           },
           "11,10": {
-            "tile_id": 37,
-            "name": "Brick"
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
           },
           "11,9": {
-            "tile_id": 37,
-            "name": "Brick"
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
           },
           "11,8": {
-            "tile_id": 37,
-            "name": "Brick"
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
           },
           "11,7": {
-            "tile_id": 37,
-            "name": "Brick"
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
           },
           "5,11": {
-            "tile_id": 37,
-            "name": "Brick"
+            "tile_id": 34,
+            "name": "Wall Torch",
+            "path": "game/dungeon/wall_torch.png"
           }
         },
         "encounters": [],

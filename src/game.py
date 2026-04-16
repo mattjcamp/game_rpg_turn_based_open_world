@@ -1442,58 +1442,95 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if already:
                 continue
 
-            # Find an open walkable tile in the town's largest connected
-            # region.  Custom towns may have the entry door walled off
-            # from the interior (the player passes through it during the
-            # transition), so a plain BFS from the entry can fail.
-            # Instead, find ALL walkable connected components and use the
-            # biggest one — that's the playable interior.
             tmap = target_td.tile_map
             occupied = {(n.col, n.row) for n in target_td.npcs}
             occupied.add((target_td.entry_col, target_td.entry_row))
 
-            from collections import deque
-            visited = set()
-            best_component = []
-            for sy in range(tmap.height):
-                for sx in range(tmap.width):
-                    if (sx, sy) in visited or not tmap.is_walkable(sx, sy):
-                        continue
-                    # BFS to find this connected component
-                    component = []
-                    queue = deque([(sx, sy)])
-                    visited.add((sx, sy))
-                    while queue:
-                        cx, cy = queue.popleft()
-                        component.append((cx, cy))
-                        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-                            nx, ny = cx + dx, cy + dy
-                            if ((nx, ny) not in visited
-                                    and 0 <= nx < tmap.width
-                                    and 0 <= ny < tmap.height
-                                    and tmap.is_walkable(nx, ny)):
-                                visited.add((nx, ny))
-                                queue.append((nx, ny))
-                    if len(component) > len(best_component):
-                        best_component = component
-
-            all_floor = [p for p in best_component if p not in occupied]
-
+            # If the designer set explicit giver_col / giver_row in the
+            # quest editor, honor them.  Coordinates are interpreted in
+            # the town's interior coordinate space (the playable region
+            # inside the walls), with (0, 0) being the top-left interior
+            # tile.  This matches what the user sees in the editor.
+            explicit_col = qdef.get("giver_col")
+            explicit_row = qdef.get("giver_row")
             placed = None
-            if all_floor:
-                if occupied:
-                    def _min_dist(pos):
-                        return min(abs(pos[0] - ox) + abs(pos[1] - oy)
-                                   for ox, oy in occupied)
-                    all_floor.sort(key=_min_dist, reverse=True)
-                    top_n = max(1, len(all_floor) // 4)
-                    import random as _rng
-                    _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
-                    placed = _r.choice(all_floor[:top_n])
+            if (isinstance(explicit_col, int)
+                    and isinstance(explicit_row, int)):
+                # Translate interior-relative coords to absolute tile
+                # coords using the town's interior origin if available.
+                ix = getattr(target_td, "interior_origin_x", None)
+                iy = getattr(target_td, "interior_origin_y", None)
+                if ix is None or iy is None:
+                    # Fall back to absolute coords if interior origin
+                    # isn't tracked on this town.
+                    abs_col, abs_row = explicit_col, explicit_row
                 else:
-                    import random as _rng
-                    _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
-                    placed = _r.choice(all_floor)
+                    abs_col = ix + explicit_col
+                    abs_row = iy + explicit_row
+                if (0 <= abs_col < tmap.width
+                        and 0 <= abs_row < tmap.height
+                        and tmap.is_walkable(abs_col, abs_row)):
+                    placed = (abs_col, abs_row)
+
+            if placed is None:
+                # Find an open walkable tile in the town's largest
+                # connected region.  Custom towns may have the entry door
+                # walled off from the interior (the player passes through
+                # it during the transition), so a plain BFS from the
+                # entry can fail.  Instead, find ALL walkable connected
+                # components and use the one that contains the entry tile
+                # (the playable interior) — falling back to the largest
+                # component if the entry isn't walkable.
+                from collections import deque
+                visited = set()
+                best_component = []
+                entry_component = []
+                entry_pos = (target_td.entry_col, target_td.entry_row)
+                for sy in range(tmap.height):
+                    for sx in range(tmap.width):
+                        if ((sx, sy) in visited
+                                or not tmap.is_walkable(sx, sy)):
+                            continue
+                        # BFS to find this connected component
+                        component = []
+                        queue = deque([(sx, sy)])
+                        visited.add((sx, sy))
+                        while queue:
+                            cx, cy = queue.popleft()
+                            component.append((cx, cy))
+                            for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                                nx, ny = cx + dx, cy + dy
+                                if ((nx, ny) not in visited
+                                        and 0 <= nx < tmap.width
+                                        and 0 <= ny < tmap.height
+                                        and tmap.is_walkable(nx, ny)):
+                                    visited.add((nx, ny))
+                                    queue.append((nx, ny))
+                        if entry_pos in component:
+                            entry_component = component
+                        if len(component) > len(best_component):
+                            best_component = component
+
+                # Prefer the component containing the entry tile so the
+                # quest giver is always in the same playable area as the
+                # player.  Fall back to the largest component otherwise.
+                preferred = entry_component or best_component
+                all_floor = [p for p in preferred if p not in occupied]
+
+                if all_floor:
+                    if occupied:
+                        def _min_dist(pos):
+                            return min(abs(pos[0] - ox) + abs(pos[1] - oy)
+                                       for ox, oy in occupied)
+                        all_floor.sort(key=_min_dist, reverse=True)
+                        top_n = max(1, len(all_floor) // 4)
+                        import random as _rng
+                        _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
+                        placed = _r.choice(all_floor[:top_n])
+                    else:
+                        import random as _rng
+                        _r = _rng.Random(hash(qname) & 0xFFFFFFFF)
+                        placed = _r.choice(all_floor)
             if placed is None:
                 placed = (target_td.entry_col, target_td.entry_row)
 

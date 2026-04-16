@@ -12,7 +12,7 @@
       "damage_bonus": 1,
       "xp_reward": 45,
       "gold_min": 10,
-      "gold_max": 35,
+      "gold_max": 25,
       "color": [
         100,
         40,
@@ -58,19 +58,20 @@
       "move_range": 2,
       "post_attack_move": 0,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1
     },
     "Dragon": {
       "description": "A younger dragon",
-      "hp": 100,
+      "hp": 150,
       "ac": 18,
       "attack_bonus": 6,
       "damage_dice": 4,
       "damage_sides": 8,
       "damage_bonus": 0,
       "xp_reward": 35,
-      "gold_min": 10,
-      "gold_max": 25,
+      "gold_min": 20,
+      "gold_max": 50,
       "color": [
         200,
         50,
@@ -98,8 +99,8 @@
           "type": "breath_fire",
           "name": "Fire Breath",
           "cast_chance": 50,
-          "range": 4,
-          "damage_dice": 4,
+          "range": 6,
+          "damage_dice": 6,
           "damage_sides": 6,
           "damage_bonus": 0,
           "save_dc": 13
@@ -186,8 +187,8 @@
       "damage_sides": 8,
       "damage_bonus": 2,
       "xp_reward": 50,
-      "gold_min": 10,
-      "gold_max": 30,
+      "gold_min": 5,
+      "gold_max": 15,
       "color": [
         80,
         140,
@@ -214,7 +215,8 @@
       "terrain": "land",
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1
     },
     "Orc Shaman": {
       "description": "An orc witch doctor who bolsters allies and curses foes.",
@@ -227,8 +229,8 @@
       "damage_sides": 4,
       "damage_bonus": 0,
       "xp_reward": 55,
-      "gold_min": 12,
-      "gold_max": 35,
+      "gold_min": 5,
+      "gold_max": 18,
       "color": [
         80,
         140,
@@ -268,7 +270,8 @@
       "move_range": 2,
       "post_attack_move": 0,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1
     },
     "Skeleton": {
       "description": "An undead skeleton warrior. Medium difficulty.",
@@ -282,7 +285,7 @@
       "damage_bonus": 1,
       "xp_reward": 30,
       "gold_min": 5,
-      "gold_max": 20,
+      "gold_max": 15,
       "color": [
         220,
         220,
@@ -295,7 +298,8 @@
       "terrain": "land",
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1
     },
     "Skeleton Archer": {
       "description": "A skeletal bowman that fires arrows from a distance.",
@@ -336,34 +340,8 @@
       "terrain": "land",
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
-    },
-    "Super Zombie": {
-      "description": "A new creature. A Super Zombie",
-      "hp": 25,
-      "ac": 10,
-      "attack_bonus": 1,
-      "damage_dice": 1,
-      "damage_sides": 4,
-      "damage_bonus": 0,
-      "xp_reward": 20,
-      "gold_min": 3,
-      "gold_max": 10,
-      "color": [
-        200,
-        50,
-        50
-      ],
-      "spawn_weight": 20,
-      "undead": true,
-      "humanoid": false,
-      "terrain": "land",
-      "tile": "game/monsters/super_zombie.png",
-      "move_range": 6,
-      "post_attack_move": 0,
-      "spells": null,
-      "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1
     },
     "Troll": {
       "description": "A massive brute with thick hide. Hits hard and regenerates.",
@@ -376,8 +354,8 @@
       "damage_sides": 6,
       "damage_bonus": 2,
       "xp_reward": 75,
-      "gold_min": 15,
-      "gold_max": 40,
+      "gold_min": 10,
+      "gold_max": 25,
       "color": [
         80,
         100,
@@ -388,14 +366,28 @@
       "spells": [
         {
           "type": "heal_self",
-          "name": "Regenerate",
+          "name": "Self Heal",
           "cast_chance": 40,
           "heal_dice": 1,
           "heal_sides": 6,
-          "heal_bonus": 2
+          "heal_bonus": 1
+        },
+        {
+          "type": "heal_ally",
+          "name": "Mend Wounds",
+          "range": 5,
+          "cast_chance": 35,
+          "heal_dice": 1,
+          "heal_sides": 6,
+          "heal_bonus": 1
         }
       ],
-      "terrain": "land"
+      "terrain": "land",
+      "battle_scale": 1,
+      "move_range": 1,
+      "post_attack_move": 0,
+      "on_hit_effects": null,
+      "passives": null
     },
     "Wolf": {
       "description": "A fierce grey wolf. Fast and cunning.",
@@ -422,7 +414,8 @@
       "terrain": "land",
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1
     },
     "Zombie": {
       "description": "A shambling corpse. Slow but durable.",

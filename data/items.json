@@ -35,7 +35,7 @@
       "character_can_equip": true,
       "melee": false,
       "throwable": false,
-      "durability": 20,
+      "durability": 12,
       "indestructible": false
     },
     "Crossbow": {
