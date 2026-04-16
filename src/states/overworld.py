@@ -1313,7 +1313,16 @@ class OverworldState(InventoryMixin, BaseState):
                 return
             return  # no other tile events inside interiors
 
-        # ── Link system removed ──
+        pcol, prow = party.col, party.row
+        tmap = self.game.tile_map
+
+        # ── Check tile link (universal linking system) ──
+        # If the tile at the party's position has a link configured
+        # in tile_properties, follow it to the target map.
+        tile_props = self._get_overworld_tile_props(pcol, prow)
+        if tile_props.get("linked"):
+            self._follow_tile_link(tile_props, pcol, prow)
+            return
 
         tile_id = tmap.get_tile(pcol, prow)
 
@@ -2364,6 +2373,89 @@ class OverworldState(InventoryMixin, BaseState):
 
         self.game.mark_dungeon_visited(pcol, prow)
         self.game.change_state("dungeon")
+
+    # ── Tile link system (universal) ─────────────────────────────
+
+    def _get_overworld_tile_props(self, col, row):
+        """Return tile instance properties for (col, row) on the overworld.
+
+        Reads from the module's overview_map.json tile_properties dict.
+        Returns empty dict if no properties are set.
+        """
+        ow_map = getattr(self.game, '_mod_overview_map', None)
+        if not ow_map:
+            return {}
+        props = ow_map.get("tile_properties", {})
+        return props.get(f"{col},{row}", {})
+
+    def _follow_tile_link(self, tile_props, pcol, prow):
+        """Follow a tile link to its target map and position.
+
+        Parses the link_map string to determine the destination type
+        and dispatches to the appropriate entry handler.
+        """
+        link_map = tile_props.get("link_map", "")
+        link_x = int(tile_props.get("link_x", 0))
+        link_y = int(tile_props.get("link_y", 0))
+
+        if not link_map:
+            return
+
+        # ── Town links: "town:TownName" ──
+        if link_map.startswith("town:"):
+            town_name = link_map[5:]
+            td = self._find_town_by_name(town_name)
+            if td:
+                if (pcol, prow) not in self.game.town_data_map:
+                    self.game.town_data_map[(pcol, prow)] = td
+                self._show_town_action()
+            return
+
+        # ── Building links: "building:Name" or "building:Name:Space" ──
+        if link_map.startswith("building:"):
+            parts = link_map[9:].split(":", 1)
+            bldg_name = parts[0]
+            sub_space = parts[1] if len(parts) > 1 else ""
+            building_def = self._find_module_building_by_name(bldg_name)
+            if building_def and building_def.get("spaces"):
+                self.building_action_info = {
+                    "name": bldg_name,
+                    "description": building_def.get("description", ""),
+                }
+                self.building_action_entry_args = {
+                    "building_def": building_def,
+                    "col": pcol, "row": prow,
+                    "sub_interior": sub_space,
+                }
+                self.building_action_cursor = 0
+                self.building_action_active = True
+            return
+
+        # ── Dungeon links: "dungeon:Name" or "dungeon:Name:Level" ──
+        if link_map.startswith("dungeon:"):
+            parts = link_map[8:].split(":", 1)
+            dung_name = parts[0]
+            dungeon_def = self._find_module_dungeon_by_name(dung_name)
+            if dungeon_def:
+                self.dungeon_action_info = {
+                    "name": dung_name,
+                    "description": dungeon_def.get("description", ""),
+                    "visited": self.game.is_dungeon_visited(pcol, prow),
+                    "dungeon_def": dungeon_def,
+                }
+                self.dungeon_action_entry_args = {
+                    "dungeon_def": dungeon_def,
+                    "col": pcol, "row": prow,
+                }
+                self.dungeon_action_cursor = 0
+                self.dungeon_action_active = True
+            return
+
+        # ── Interior links (overworld interiors) ──
+        if link_map.startswith("interior:"):
+            interior_name = link_map[9:].split("/")[-1]
+            self._enter_overworld_interior(interior_name, pcol, prow)
+            return
 
     def _show_town_action(self):
         """Show the town entry action screen."""

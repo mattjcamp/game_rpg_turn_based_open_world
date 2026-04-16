@@ -107,6 +107,11 @@ class MapEditorConfig:
     # -- Exit callback --
     on_exit: Optional[Callable] = None
 
+    # -- Map hierarchy for tile link picker --
+    # List of (map_id, display_label, indent_level) tuples.
+    # Built by the caller from module data.
+    map_hierarchy: List = field(default_factory=list)
+
 
 # ─── State ────────────────────────────────────────────────────────────
 
@@ -171,6 +176,24 @@ class MapEditorState:
         for b in config.brushes:
             if b.is_folder_header and b.name not in self.brush_folders:
                 self.brush_folders[b.name] = True
+
+        # Per-tile instance properties (dense maps).
+        # Maps "col,row" → dict of editable properties for that tile.
+        # Example: {"10,14": {"label": "New Haven", "target": "town:New Haven"}}
+        # Tiles without an entry use defaults from TILE_DEFS.
+        self.tile_properties: Dict[str, Dict] = {}
+        if hasattr(config, '_initial_tile_properties'):
+            self.tile_properties = dict(config._initial_tile_properties)
+
+        # Tile inspector editing state
+        self.inspector_editing: bool = False
+        self.inspector_field_idx: int = 0
+        self.inspector_buffer: str = ""
+
+        # Map picker overlay (for choosing link target map)
+        self.map_picker_active: bool = False
+        self.map_picker_cursor: int = 0
+        self.map_picker_scroll: int = 0
 
         # Replace tile overlay
         self.replacing: bool = False         # replace tile overlay
@@ -419,6 +442,139 @@ class MapEditorState:
                 self.set_tile(tc, tr, td)
 
 
+    # -- Tile instance properties --
+
+    def get_tile_props(self, col: int, row: int) -> Dict:
+        """Return per-instance properties for tile at (col, row).
+        Returns empty dict if no custom properties are set."""
+        return self.tile_properties.get(f"{col},{row}", {})
+
+    def set_tile_prop(self, col: int, row: int, key: str, value):
+        """Set a single instance property on the tile at (col, row)."""
+        pos_key = f"{col},{row}"
+        if pos_key not in self.tile_properties:
+            self.tile_properties[pos_key] = {}
+        self.tile_properties[pos_key][key] = value
+        self.dirty = True
+
+    def remove_tile_prop(self, col: int, row: int, key: str):
+        """Remove a single instance property. Cleans up empty dicts."""
+        pos_key = f"{col},{row}"
+        props = self.tile_properties.get(pos_key)
+        if props and key in props:
+            del props[key]
+            if not props:
+                del self.tile_properties[pos_key]
+            self.dirty = True
+
+    def get_cursor_tile_info(self) -> Dict:
+        """Build a dict describing the tile under the cursor for the inspector.
+
+        Returns a list of fields: (label, key, value, editable).
+        Read-only fields have keys starting with '_'.
+        Editable fields use plain keys that map into tile_properties.
+        """
+        from src.settings import (
+            TILE_TOWN, TILE_DUNGEON, TILE_DUNGEON_CLEARED,
+            TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
+        )
+        col, row = self.cursor_col, self.cursor_row
+        tile_id = None
+
+        if self.config.storage == STORAGE_DENSE:
+            if 0 <= row < self.config.height and 0 <= col < self.config.width:
+                tile_id = self.tiles[row][col]
+        else:
+            td = self.tiles.get(f"{col},{row}")
+            if isinstance(td, dict):
+                tile_id = td.get("tile_id")
+            elif td is not None:
+                tile_id = td
+
+        tdef = TILE_DEFS.get(tile_id, {}) if tile_id is not None else {}
+        tile_name = tdef.get("name", f"Tile {tile_id}" if tile_id is not None else "Empty")
+        walkable = tdef.get("walkable", False)
+        interaction = tdef.get("interaction_type", "")
+
+        # Per-instance properties (user-edited overrides for this tile)
+        props = self.get_tile_props(col, row)
+
+        # Build fields list: (label, key, value, editable)
+        fields = []
+        if tile_id is None:
+            return {"tile_id": None, "tile_name": "Empty",
+                    "walkable": False, "fields": [], "props": {},
+                    "col": col, "row": row}
+
+        # ── Header: always show type ──
+        fields.append(("Type", "_type", tile_name, False))
+
+        # ── Spawn tiles: show all spawn attributes ──
+        _SPAWN_IDS = {TILE_SPAWN, TILE_SPAWN_CAMPFIRE,
+                      TILE_SPAWN_GRAVEYARD}
+        # Also check tile_id 69 (Dragon) which may not have a constant
+        if interaction == "spawn" or tile_id in _SPAWN_IDS:
+            fields.append(("Monsters", "spawn_monsters",
+                           props.get("spawn_monsters", ""), True))
+            fields.append(("Spawn %", "spawn_chance",
+                           props.get("spawn_chance", "20"), True))
+            fields.append(("Radius", "spawn_radius",
+                           props.get("spawn_radius", "3"), True))
+            fields.append(("Max Spawned", "max_spawned",
+                           props.get("max_spawned", "2"), True))
+
+        # ── Town tile: which town does this connect to ──
+        elif tile_id == TILE_TOWN:
+            fields.append(("Town Name", "target",
+                           props.get("target", ""), True))
+
+        # ── Dungeon tile: which dungeon ──
+        elif tile_id in (TILE_DUNGEON, TILE_DUNGEON_CLEARED):
+            fields.append(("Dungeon Name", "target",
+                           props.get("target", ""), True))
+
+        # ── Sign tiles ──
+        elif interaction == "sign":
+            fields.append(("Sign Text", "sign_text",
+                           props.get("sign_text",
+                                     tdef.get("interaction_data", "")),
+                           True))
+
+        # ── Shop tiles ──
+        elif interaction == "shop":
+            fields.append(("Shop Type", "shop_type",
+                           props.get("shop_type",
+                                     tdef.get("interaction_data", "")),
+                           True))
+
+        # ── Any other tile: just show a label field ──
+        else:
+            fields.append(("Label", "label",
+                           props.get("label", ""), True))
+
+        # ── Universal: tile link (any tile can link to another map) ──
+        is_linked = props.get("linked", False)
+        # "toggle" type: press Enter to flip True/False
+        fields.append(("Linked", "linked",
+                       "yes" if is_linked else "no", "toggle"))
+        if is_linked:
+            fields.append(("Target Map", "link_map",
+                           props.get("link_map", ""), "map_picker"))
+            fields.append(("Target X", "link_x",
+                           props.get("link_x", "0"), True))
+            fields.append(("Target Y", "link_y",
+                           props.get("link_y", "0"), True))
+
+        return {
+            "tile_id": tile_id,
+            "tile_name": tile_name,
+            "walkable": walkable,
+            "fields": fields,
+            "props": props,
+            "col": col,
+            "row": row,
+        }
+
     # -- Replace all (sparse interiors) --
 
     def replace_all_tiles(self, src_tile_id: Optional[int],
@@ -504,6 +660,16 @@ class MapEditorState:
             "replace_src_name": self.replace_src_name,
             "replace_src_empty": self.replace_src_empty,
             "replace_dst_idx": self.replace_dst_idx,
+            # Tile inspector
+            "tile_inspector": self.get_cursor_tile_info(),
+            "inspector_editing": self.inspector_editing,
+            "inspector_field_idx": self.inspector_field_idx,
+            "inspector_buffer": self.inspector_buffer,
+            "tile_properties": self.tile_properties,
+            "map_picker_active": self.map_picker_active,
+            "map_picker_cursor": self.map_picker_cursor,
+            "map_picker_scroll": self.map_picker_scroll,
+            "map_hierarchy": self.config.map_hierarchy,
         }
 
 
@@ -540,6 +706,9 @@ class MapEditorInputHandler:
         cfg = st.config
 
         # ── Overlay intercepts ──
+        if st.inspector_editing:
+            return self._handle_inspector_input(event)
+
         if st.replacing:
             return self._handle_replace_overlay(event)
 
@@ -640,6 +809,18 @@ class MapEditorInputHandler:
 
 
 
+        # ── Edit tile properties (E key) ──
+        if event.key == pygame.K_e:
+            info = st.get_cursor_tile_info()
+            editable = [(i, f) for i, f in enumerate(info["fields"])
+                        if f[3]]  # f[3] = editable flag
+            if editable:
+                first_idx = editable[0][0]
+                st.inspector_editing = True
+                st.inspector_field_idx = first_idx
+                st.inspector_buffer = info["fields"][first_idx][2]
+            return None
+
         # ── Replace tile (R key) — sparse only ──
         if event.key == pygame.K_r and cfg.supports_replace:
             self._open_replace_overlay()
@@ -705,6 +886,149 @@ class MapEditorInputHandler:
         return None
 
 
+    # ── Tile inspector editing ─────────────────────────────────
+
+    def _handle_inspector_input(self, event) -> Optional[str]:
+        """Handle keyboard input while editing a tile inspector field."""
+        st = self.state
+
+        # ── Map picker sub-overlay ──
+        if st.map_picker_active:
+            return self._handle_map_picker_input(event)
+
+        info = st.get_cursor_tile_info()
+        fields = info["fields"]
+        idx = st.inspector_field_idx
+        cur_field = fields[idx] if 0 <= idx < len(fields) else None
+        field_type = cur_field[3] if cur_field else None
+
+        if event.key == pygame.K_ESCAPE:
+            st.inspector_editing = False
+            return None
+
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            # Navigate between editable fields (skip read-only _fields)
+            editable = [i for i, f in enumerate(fields)
+                        if f[3] and f[3] is not False]
+            if not editable:
+                return None
+            try:
+                pos = editable.index(idx)
+            except ValueError:
+                pos = 0
+            if event.key == pygame.K_UP:
+                pos = (pos - 1) % len(editable)
+            else:
+                pos = (pos + 1) % len(editable)
+            self._commit_inspector_field(info)
+            st.inspector_field_idx = editable[pos]
+            new_field = fields[editable[pos]]
+            st.inspector_buffer = new_field[2]
+            return None
+
+        # ── Toggle fields (Linked checkbox): Enter/Space flips ──
+        if field_type == "toggle":
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                col, row = info["col"], info["row"]
+                key = cur_field[1]
+                current = st.get_tile_props(col, row).get(key, False)
+                new_val = not current
+                if new_val:
+                    st.set_tile_prop(col, row, key, True)
+                else:
+                    st.remove_tile_prop(col, row, key)
+                    # Also clear link fields when unlinking
+                    if key == "linked":
+                        for lk in ("link_map", "link_x", "link_y"):
+                            st.remove_tile_prop(col, row, lk)
+                # Refresh field display
+                new_info = st.get_cursor_tile_info()
+                new_fields = new_info["fields"]
+                st.inspector_buffer = (new_fields[st.inspector_field_idx][2]
+                                       if st.inspector_field_idx < len(new_fields)
+                                       else "")
+            return None
+
+        # ── Map picker fields: Enter opens the picker overlay ──
+        if field_type == "map_picker":
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                hierarchy = st.config.map_hierarchy
+                if hierarchy:
+                    st.map_picker_active = True
+                    st.map_picker_cursor = 0
+                    st.map_picker_scroll = 0
+                    # Try to pre-select current value
+                    current_map = cur_field[2]
+                    for i, (mid, _, _) in enumerate(hierarchy):
+                        if mid == current_map:
+                            st.map_picker_cursor = i
+                            break
+            return None
+
+        # ── Text/number fields: type to edit ──
+        if event.key == pygame.K_RETURN:
+            self._commit_inspector_field(info)
+            st.inspector_editing = False
+            return None
+
+        if event.key == pygame.K_BACKSPACE:
+            st.inspector_buffer = st.inspector_buffer[:-1]
+            return None
+
+        c = getattr(event, 'unicode', '')
+        if c and c.isprintable():
+            st.inspector_buffer += c
+        return None
+
+    def _handle_map_picker_input(self, event) -> Optional[str]:
+        """Handle input for the map hierarchy picker overlay."""
+        st = self.state
+        hierarchy = st.config.map_hierarchy
+        n = len(hierarchy)
+        if not n:
+            st.map_picker_active = False
+            return None
+
+        if event.key == pygame.K_ESCAPE:
+            st.map_picker_active = False
+            return None
+
+        if event.key == pygame.K_UP:
+            st.map_picker_cursor = (st.map_picker_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            st.map_picker_cursor = (st.map_picker_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Select this map as the link target
+            map_id, label, indent = hierarchy[st.map_picker_cursor]
+            info = st.get_cursor_tile_info()
+            col, row = info["col"], info["row"]
+            st.set_tile_prop(col, row, "link_map", map_id)
+            st.map_picker_active = False
+            # Update buffer to show the selection
+            st.inspector_buffer = map_id
+
+        return None
+
+    def _commit_inspector_field(self, info):
+        """Write the current inspector buffer back to tile_properties."""
+        st = self.state
+        fields = info["fields"]
+        idx = st.inspector_field_idx
+        if idx < 0 or idx >= len(fields):
+            return
+        label, key, old_val, field_type = fields[idx]
+        # Skip non-text fields (toggle/map_picker handle their own commits)
+        if field_type in (False, "toggle", "map_picker"):
+            return
+        if key.startswith("_"):
+            return  # read-only
+        new_val = st.inspector_buffer.strip()
+        col, row = info["col"], info["row"]
+        if new_val:
+            st.set_tile_prop(col, row, key, new_val)
+        else:
+            st.remove_tile_prop(col, row, key)
+
     # ── Mouse input ──────────────────────────────────────────────
 
     def handle_mouse(self, event):
@@ -713,7 +1037,7 @@ class MapEditorInputHandler:
         st = self.state
 
         # Overlays active — ignore mouse
-        if st.replacing:
+        if st.replacing or st.inspector_editing:
             return
 
         if event.type == pygame.MOUSEWHEEL:

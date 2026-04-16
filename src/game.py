@@ -3670,6 +3670,56 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_module_maps = module_maps
         return module_maps
 
+    def _build_map_hierarchy(self):
+        """Build the map hierarchy tree for the tile link picker.
+
+        Returns a list of (map_id, display_label, indent_level) tuples
+        representing the full module map tree:
+          Overview Map
+            Towns → Town Interiors
+            Buildings → Building Spaces
+            Dungeons → Dungeon Levels
+        """
+        hierarchy = [("overworld", "Overview Map", 0)]
+
+        # Towns and their interiors
+        for town in getattr(self, '_mod_town_list', []):
+            tname = town.get("name", "")
+            if not tname:
+                continue
+            hierarchy.append((f"town:{tname}", f"Town: {tname}", 0))
+            for interior in town.get("interiors", []):
+                iname = interior.get("name", "")
+                if iname:
+                    hierarchy.append(
+                        (f"interior:{tname}/{iname}", iname, 1))
+
+        # Buildings and their spaces
+        for bldg in getattr(self, '_mod_building_list', []):
+            bname = bldg.get("name", "")
+            if not bname:
+                continue
+            hierarchy.append((f"building:{bname}", f"Building: {bname}", 0))
+            for space in bldg.get("spaces", []):
+                sname = space.get("name", "")
+                if sname:
+                    hierarchy.append(
+                        (f"building:{bname}:{sname}", sname, 1))
+
+        # Dungeons and their levels
+        for dung in getattr(self, '_mod_dungeon_list', []):
+            dname = dung.get("name", "")
+            if not dname:
+                continue
+            hierarchy.append((f"dungeon:{dname}", f"Dungeon: {dname}", 0))
+            for level in dung.get("levels", []):
+                lname = level.get("name", "")
+                if lname:
+                    hierarchy.append(
+                        (f"dungeon:{dname}:{lname}", lname, 1))
+
+        return hierarchy
+
     def _launch_module_overview_editor(self):
         """Launch the shared map editor for the module's overview map."""
         if self._mod_overview_map is None:
@@ -3762,11 +3812,13 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         def _on_save(st):
             self._mod_overview_map["tiles"] = st.tiles
             self._mod_overview_map["party_start"] = st.party_start
+            self._mod_overview_map["tile_properties"] = st.tile_properties
             self._save_module_overview_map()
 
         def _on_exit(st):
             self._mod_overview_map["tiles"] = st.tiles
             self._mod_overview_map["party_start"] = st.party_start
+            self._mod_overview_map["tile_properties"] = st.tile_properties
             self._save_module_overview_map()
             self.showing_features = False
             self.showing_modules = True
@@ -3785,11 +3837,16 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             supports_party_start=True,
             on_save=_on_save,
             on_exit=_on_exit,
+            map_hierarchy=self._build_map_hierarchy(),
         )
 
         state = MapEditorState(config, tiles=tiles,
                                interior_list=interior_list,
                                party_start=party_start)
+        # Restore per-tile instance properties from saved data
+        saved_props = self._mod_overview_map.get("tile_properties", {})
+        if saved_props:
+            state.tile_properties = dict(saved_props)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
 

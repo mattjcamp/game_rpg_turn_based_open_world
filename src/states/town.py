@@ -718,6 +718,22 @@ class TownState(InventoryMixin, BaseState):
                     self._exit_to_town()
                     return
 
+        # ── Check tile link (universal linking system) ──
+        # Town tiles can link to overworld or other maps via the
+        # tile_properties dict stored on the TownData.
+        tp = getattr(self.town_data, 'tile_properties', {})
+        tile_key = f"{party.col},{party.row}"
+        tile_props = tp.get(tile_key, {})
+        if tile_props.get("linked"):
+            link_map = tile_props.get("link_map", "")
+            if link_map == "overworld":
+                link_x = int(tile_props.get("link_x", self.overworld_col))
+                link_y = int(tile_props.get("link_y", self.overworld_row))
+                self.overworld_col = link_x
+                self.overworld_row = link_y
+                self._exit_town()
+                return
+
         tile_id = self.town_data.tile_map.get_tile(
             party.col, party.row
         )

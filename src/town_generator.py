@@ -96,6 +96,8 @@ class TownData:
         # These towns have hand-placed NPCs and should not receive
         # auto-injected quest givers or other procedural content.
         self.custom = custom
+        # Per-tile instance properties (for tile linking, etc.)
+        self.tile_properties = {}
 
     def get_npc_at(self, col, row):
         """Return the NPC at the given position, or None."""

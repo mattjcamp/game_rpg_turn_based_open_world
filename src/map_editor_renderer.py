@@ -105,6 +105,9 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     # ── Left panel: brush palette ──
     _draw_brush_palette(renderer, data)
 
+    # ── Left panel bottom: tile inspector ──
+    _draw_tile_inspector(renderer, data)
+
     # ── Right panel: tile grid ──
     _draw_tile_grid(renderer, data)
 
@@ -161,11 +164,15 @@ def _visible_brush_indices(brushes, brush_folders):
     return visible
 
 
+_INSPECTOR_H = 220  # height reserved for the tile inspector at bottom
+_BRUSH_PANEL_H = PANEL_H - _INSPECTOR_H - 4  # brush palette gets the rest
+
+
 def _draw_brush_palette(renderer, data: Dict):
     screen = renderer.screen
     fs = renderer.font_small
 
-    panel_h = PANEL_H
+    panel_h = _BRUSH_PANEL_H
     pygame.draw.rect(screen, _COL_PANEL_BG,
                      (LEFT_X, PANEL_Y, LEFT_W, panel_h))
     pygame.draw.rect(screen, _COL_PANEL_BORDER,
@@ -334,6 +341,160 @@ def _draw_sparse_brush_icon(renderer, brush, icon_x, by, icon_sz) -> int:
 
 
 # ─── Tile grid (right panel) ─────────────────────────────────────────
+
+def _draw_tile_inspector(renderer, data: Dict):
+    """Draw the tile properties inspector panel below the brush palette."""
+    screen = renderer.screen
+    fs = renderer.font_small
+
+    ix = LEFT_X
+    iy = PANEL_Y + _BRUSH_PANEL_H + 4
+    iw = LEFT_W
+    ih = _INSPECTOR_H
+    pad = 8
+
+    pygame.draw.rect(screen, _COL_PANEL_BG, (ix, iy, iw, ih))
+    pygame.draw.rect(screen, _COL_PANEL_BORDER, (ix, iy, iw, ih), 1)
+
+    info = data.get("tile_inspector", {})
+    fields = info.get("fields", [])
+    tile_id = info.get("tile_id")
+    editing = data.get("inspector_editing", False)
+    edit_idx = data.get("inspector_field_idx", -1)
+    edit_buf = data.get("inspector_buffer", "")
+
+    renderer._u3_text("TILE PROPERTIES", ix + pad, iy + 4, _COL_LABEL, fs)
+
+    ty = iy + 20
+
+    if tile_id is None:
+        renderer._u3_text("(empty)", ix + pad, ty, (100, 100, 120), fs)
+        return
+
+    bottom = iy + ih - 16  # reserve space for hint
+
+    for fi, (label, key, value, field_type) in enumerate(fields):
+        if ty + 14 > bottom:
+            break
+
+        is_active = editing and fi == edit_idx
+
+        # Highlight bar
+        if is_active:
+            bar_h = 14 if field_type is False else 28
+            bar = pygame.Surface((iw - 4, bar_h), pygame.SRCALPHA)
+            bar.fill((255, 200, 60, 30))
+            screen.blit(bar, (ix + 2, ty - 1))
+
+        # ── Read-only ──
+        if field_type is False:
+            text = f"{label}: {value}" if value else label
+            renderer._u3_text(text, ix + pad, ty, (220, 220, 230), fs)
+            ty += 16
+            continue
+
+        # ── Toggle (checkbox) ──
+        if field_type == "toggle":
+            checked = value == "yes"
+            box = "[x]" if checked else "[ ]"
+            col = _COL_ORANGE if is_active else (
+                (120, 255, 120) if checked else (140, 140, 160))
+            renderer._u3_text(f"{box} {label}", ix + pad, ty, col, fs)
+            ty += 16
+            continue
+
+        # ── Map picker ──
+        if field_type == "map_picker":
+            lbl_col = _COL_ORANGE if is_active else (140, 140, 160)
+            renderer._u3_text(label, ix + pad, ty, lbl_col, fs)
+            ty += 13
+            if ty + 14 > bottom:
+                break
+            display = value if value else "(none)"
+            if len(display) > 20:
+                display = "..." + display[-17:]
+            val_col = (255, 255, 200) if is_active else (
+                (200, 200, 210) if value else (80, 80, 100))
+            if is_active:
+                display += " >"
+            renderer._u3_text(f" {display}", ix + pad, ty, val_col, fs)
+            ty += 18
+            continue
+
+        # ── Text / number ──
+        lbl_col = _COL_ORANGE if is_active else (140, 140, 160)
+        renderer._u3_text(label, ix + pad, ty, lbl_col, fs)
+        ty += 13
+        if ty + 14 > bottom:
+            break
+        if is_active:
+            ticks = pygame.time.get_ticks()
+            cursor_ch = "_" if (ticks // 400) % 2 == 0 else " "
+            display = edit_buf + cursor_ch
+            val_col = (255, 255, 200)
+        else:
+            display = value if value else "--"
+            val_col = (200, 200, 210) if value else (80, 80, 100)
+        renderer._u3_text(f" {display}", ix + pad, ty, val_col, fs)
+        ty += 18
+
+    # Footer hint
+    if editing:
+        hint = "[Up/Dn] [Enter] Done [Esc] Cancel"
+    else:
+        hint = "[E] Edit tile"
+    renderer._u3_text(hint, ix + pad, bottom, (80, 80, 100), fs)
+
+    # Map picker overlay
+    if data.get("map_picker_active"):
+        _draw_map_picker_overlay(renderer, data)
+
+
+def _draw_map_picker_overlay(renderer, data: Dict):
+    """Draw the map hierarchy picker as a centered overlay."""
+    screen = renderer.screen
+    fs = renderer.font_small
+    fm = renderer.font_med
+
+    hierarchy = data.get("map_hierarchy", [])
+    cursor = data.get("map_picker_cursor", 0)
+    if not hierarchy:
+        return
+
+    pw, ph = 400, 340
+    px = (SCREEN_WIDTH - pw) // 2
+    py = (SCREEN_HEIGHT - ph) // 2
+
+    pygame.draw.rect(screen, (20, 20, 30), (px, py, pw, ph))
+    pygame.draw.rect(screen, _COL_ORANGE, (px, py, pw, ph), 2)
+
+    renderer._u3_text("SELECT TARGET MAP", px + 16, py + 10,
+                      _COL_ORANGE, fm)
+
+    row_h = 20
+    list_y = py + 36
+    list_h = ph - 70
+    max_vis = list_h // row_h
+
+    scroll = max(0, min(cursor - max_vis // 2,
+                        len(hierarchy) - max_vis))
+
+    for vi in range(scroll, min(scroll + max_vis, len(hierarchy))):
+        map_id, label, indent = hierarchy[vi]
+        is_sel = (vi == cursor)
+        ly = list_y + (vi - scroll) * row_h
+
+        if is_sel:
+            bar = pygame.Surface((pw - 20, row_h), pygame.SRCALPHA)
+            bar.fill((255, 200, 60, 40))
+            screen.blit(bar, (px + 10, ly))
+
+        indent_str = "  " * indent
+        prefix = "> " if is_sel else "  "
+        col = (255, 255, 230) if is_sel else (180, 180, 200)
+        renderer._u3_text(f"{prefix}{indent_str}{label}",
+                          px + 14, ly + 2, col, fs)
+
 
 def _draw_tile_grid(renderer, data: Dict):
     screen = renderer.screen
@@ -733,12 +894,14 @@ def _draw_footer(renderer, data: Dict):
     if data.get("replacing"):
         hint = ("[Up/Dn] Select Destination  "
                 "[Enter] Replace All  [Esc] Cancel")
+    elif data.get("inspector_editing"):
+        hint = ("[Up/Dn] Field  [Type] Edit  "
+                "[Enter] Save  [Esc] Cancel")
     elif data["storage"] == STORAGE_DENSE:
         hint = ("[Arrows] Move  [Shift+Arrows] Fast  "
                 "[Wheel] Scroll  [Click] Paint  "
-                "[Tab] Brush  [P] Party  "
-                "[R] Replace  "
-                "[Ctrl+S] Save  [Esc] Exit")
+                "[Tab] Brush  [E] Edit Tile  [P] Party  "
+                "[R] Replace  [Ctrl+S] Save  [Esc] Exit")
     else:
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "
                 "[R] Replace  "
