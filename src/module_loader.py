@@ -84,8 +84,8 @@ _DUNGEON_NOUNS = [
 ]
 
 # ── Quest types ────────────────────────────────────────────────────
-QUEST_TYPE_NAMES = ["Retrieve Artifact", "Kill Monsters", "Gnome Machine"]
-QUEST_TYPE_KEYS = ["retrieve", "kill", "gnome_machine"]  # internal keys
+QUEST_TYPE_NAMES = ["Retrieve Artifact", "Kill Monsters"]
+QUEST_TYPE_KEYS = ["retrieve", "kill"]  # internal keys
 
 # Monster and item lists — derived from data files via data_registry
 # so that adding new entries to JSON automatically makes them available
@@ -166,7 +166,7 @@ _QUEST_OBJECTIVES = [
     },
 ]
 
-# Quest themes — each defines a narrative arc different from the gnome quest.
+# Quest themes — each defines a narrative arc with its own flavour.
 # The win_condition remains "collect_keys" for now, but the flavour changes.
 _QUEST_THEMES = [
     {
@@ -303,14 +303,12 @@ def _generate_dungeon_entries(count, key_materials=None):
     return entries
 
 
-def _generate_overworld_json(map_w, map_h, towns, key_dungeons,
-                             deliver_to="town_altar"):
+def _generate_overworld_json(map_w, map_h, towns, key_dungeons):
     """Build an overworld.json dict with procedurally placed landmarks.
 
     Landmarks are arranged radially:
     - Towns near the map center
     - Dungeons fanning outward in order of dungeon_number
-    - A delivery-point landmark beside the first town
 
     Also generates paths from the start position to the first town,
     from each town to nearby dungeons, etc.
@@ -344,22 +342,6 @@ def _generate_overworld_json(map_w, map_h, towns, key_dungeons,
             "tile": "TILE_TOWN",
             "clear_radius": 3,
         })
-
-    # ── Place delivery point next to first town ──
-    if town_positions:
-        dc = town_positions[0][0] + 2
-        dr = town_positions[0][1]
-        dc, dr = _clamp(dc, dr)
-    else:
-        dc, dr = cx + 2, cy
-    landmarks.append({
-        "id": deliver_to,
-        "type": "machine",
-        "col": dc,
-        "row": dr,
-        "tile": "TILE_MACHINE",
-        "clear_radius": 1,
-    })
 
     # ── Place dungeons in an outer ring ──
     dungeon_radius_base = min(map_w, map_h) // 4
@@ -551,7 +533,6 @@ def create_module(name, author="Unknown", description="",
     overworld = _generate_overworld_json(
         dims["map_width"], dims["map_height"],
         towns, key_dungeons,
-        deliver_to=theme["deliver_to"],
     )
     overworld_path = os.path.join(mod_dir, "overworld.json")
     with open(overworld_path, "w") as f:

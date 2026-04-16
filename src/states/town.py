@@ -14,7 +14,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_EXIT, TILE_DUNGEON,
     TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
-    TILE_TOWN, TILE_MACHINE,
+    TILE_TOWN,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR, NPC_WANDER_RANGE,
 )
 from src.dungeon_generator import generate_innkeeper_quest_dungeon
@@ -113,101 +113,6 @@ class TempleHealEffect:
             self.alive = False
 
 
-class MachineShutdownEffect:
-    """Multi-phase animation when the gnome machine is shut down.
-
-    Phase 1 (0.0 – 1.5s): Machine overload — screen shakes, red/orange pulsing,
-                            energy arcs radiate from center.
-    Phase 2 (1.5 – 3.0s): Machine dies — shockwave ring expands, colour cools
-                            from red to blue, arcs fade.
-    Phase 3 (3.0 – 4.5s): Light returns — golden light expands from center,
-                            darkness alpha fades to zero.
-    Phase 4 (4.5 – 6.0s): Victory banner — "QUEST COMPLETE" with reward text
-                            and sparkles.
-    """
-    DURATION = 6.0
-
-    def __init__(self):
-        self.timer = 0.0
-        self.alive = True
-
-        # Pre-generate energy arc data (Phase 1-2)
-        self.arcs = []
-        for _ in range(12):
-            angle = random.uniform(0, 2 * math.pi)
-            length = random.uniform(80, 220)
-            self.arcs.append({
-                "angle": angle,
-                "length": length,
-                "width": random.randint(1, 3),
-                "phase_offset": random.uniform(0, 2 * math.pi),
-                "speed": random.uniform(3, 8),
-            })
-
-        # Pre-generate shockwave sparks (Phase 2)
-        self.sparks = []
-        for _ in range(30):
-            angle = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(100, 300)
-            self.sparks.append({
-                "vx": math.cos(angle) * speed,
-                "vy": math.sin(angle) * speed,
-                "color": random.choice([
-                    (100, 160, 255), (140, 200, 255), (200, 220, 255),
-                    (80, 120, 220), (255, 255, 255),
-                ]),
-                "size": random.randint(2, 4),
-                "lifetime": random.uniform(0.8, 1.4),
-            })
-
-        # Pre-generate light rays (Phase 3)
-        self.rays = []
-        for _ in range(16):
-            angle = random.uniform(0, 2 * math.pi)
-            self.rays.append({
-                "angle": angle,
-                "width": random.uniform(0.04, 0.12),
-                "alpha_mult": random.uniform(0.6, 1.0),
-            })
-
-        # Pre-generate banner sparkles (Phase 4)
-        self.sparkles = []
-        for _ in range(20):
-            self.sparkles.append({
-                "x": random.randint(50, 750),
-                "y": random.randint(50, 650),
-                "phase": random.uniform(0, 2 * math.pi),
-                "speed": random.uniform(2, 5),
-            })
-
-        # Pre-generate screen shake offsets (Phase 1)
-        self.shake_offsets = []
-        for _ in range(60):
-            self.shake_offsets.append((
-                random.randint(-6, 6),
-                random.randint(-6, 6),
-            ))
-
-    def update(self, dt):
-        self.timer += dt
-        if self.timer >= self.DURATION:
-            self.alive = False
-
-    @property
-    def progress(self):
-        return min(1.0, self.timer / self.DURATION)
-
-    @property
-    def shake_offset(self):
-        """Return current screen shake (x, y) offset — only active in Phase 1."""
-        if self.timer > 1.5:
-            return (0, 0)
-        intensity = 1.0 - self.timer / 1.5  # fade out shake
-        idx = int(self.timer * 40) % len(self.shake_offsets)
-        sx, sy = self.shake_offsets[idx]
-        return (int(sx * intensity), int(sy * intensity))
-
-
 class TownState(InventoryMixin, BaseState):
     """Handles exploration inside a town."""
 
@@ -240,9 +145,6 @@ class TownState(InventoryMixin, BaseState):
         self.quest_complete_effect = None
         # Module quest visual effects
         self.quest_effects = []
-        # Machine shutdown animation (Keys of Shadow victory)
-        self.machine_shutdown_effect = None
-        self._pending_victory = False  # deferred until dialogue dismissed
 
         # Temple service menu
         self.showing_temple_service = False
@@ -373,9 +275,6 @@ class TownState(InventoryMixin, BaseState):
             return
         quest = self.game.get_quest()
         kd_map = getattr(self.game, "key_dungeons", {})
-        inserted = getattr(self.game, "keys_inserted", 0)
-        total = len(kd_map) if kd_map else 0
-        gnome_accepted = getattr(self.game, "_gnome_quest_accepted", False)
 
         for npc in self.town_data.npcs:
             npc.quest_highlight = False
@@ -390,19 +289,6 @@ class TownState(InventoryMixin, BaseState):
                     npc.quest_highlight = True
                 elif quest and quest.get("status") == "completed" and inn_quests:
                     # Repeatable innkeeper — highlight to signal new quest ready
-                    npc.quest_highlight = True
-
-            elif npc.npc_type == "gnome":
-                # Highlight when quest not accepted, or keys still needed
-                gnome_total = sum(
-                    1 for kd in kd_map.values()
-                    if kd.get("quest_type") == "gnome_machine")
-                # Keys of Shadow: all quests count
-                if total > 0 and gnome_total == 0:
-                    gnome_total = total  # KoS compat
-                if npc.quest_dialogue and not gnome_accepted:
-                    npc.quest_highlight = True
-                elif kd_map and inserted < gnome_total:
                     npc.quest_highlight = True
 
             elif npc.npc_type == "quest_giver":
@@ -431,8 +317,7 @@ class TownState(InventoryMixin, BaseState):
                 # Highlight only when the elder has something actionable:
                 # quest turn-ins or active quests to give hints about.
                 # Undiscovered quests are the quest_giver NPCs' job.
-                elder_kds = [kd for kd in kd_map.values()
-                             if kd.get("quest_type") != "gnome_machine"]
+                elder_kds = list(kd_map.values())
                 has_turnin = any(
                     kd.get("status") == "artifact_found"
                     for kd in elder_kds)
@@ -463,8 +348,8 @@ class TownState(InventoryMixin, BaseState):
 
     def handle_input(self, events, keys_pressed):
         """Handle movement and NPC interaction."""
-        # Block all input during quest celebration or machine shutdown
-        if self.quest_complete_effect or self.machine_shutdown_effect:
+        # Block all input during quest celebration
+        if self.quest_complete_effect:
             return
 
         for event in events:
@@ -787,9 +672,6 @@ class TownState(InventoryMixin, BaseState):
         )
         if tile_id == TILE_EXIT:
             self._exit_town()
-            return
-        elif tile_id == TILE_MACHINE:
-            self._interact_machine()
             return
 
         # Check for walkable tile interactions (e.g. signs the player
@@ -1297,86 +1179,6 @@ class TownState(InventoryMixin, BaseState):
             npc.quest_highlight = True
             self.town_data.npcs.append(npc)
 
-    # ── Machine interaction (Keys of Shadow) ──────────────────
-
-    def _interact_machine(self):
-        """Handle stepping on the gnome machine tile."""
-        kd = getattr(self.game, "key_dungeons", {})
-        if not kd:
-            self.show_message("A strange machine hums ominously.", 2000)
-            return
-
-        # Filter to only gnome_machine quest keys (or all for KoS)
-        mod_id = ""
-        if self.game.module_manifest:
-            mod_id = self.game.module_manifest.get(
-                "metadata", {}).get("id", "")
-        if mod_id == "keys_of_shadow":
-            gnome_kds = kd
-        else:
-            gnome_kds = {k: v for k, v in kd.items()
-                         if v.get("quest_type") == "gnome_machine"}
-        if not gnome_kds:
-            self.show_message("A strange machine hums ominously.", 2000)
-            return
-
-        party = self.game.party
-        key_names = [d["key_name"] for d in gnome_kds.values()]
-        held_keys = [k for k in key_names if party.inv_count(k) > 0]
-
-        total = len(gnome_kds)
-        inserted = self.game.get_keys_inserted()
-
-        if held_keys:
-            for key in held_keys:
-                party.inv_remove(key)
-                inserted = self.game.insert_key()
-                # Mark the matching key dungeon as completed
-                for gkd in gnome_kds.values():
-                    if (gkd.get("key_name") == key
-                            and gkd.get("status") != "completed"):
-                        gkd["status"] = "completed"
-                        break
-            names = ", ".join(held_keys)
-            self.show_message(
-                f"Inserted {names}! ({inserted}/{total} keys placed)", 3500)
-            if inserted >= total:
-                self._trigger_victory()
-        elif inserted >= total:
-            self.show_message(
-                "The machine is deactivated. Sunlight bathes the land!", 3000)
-        elif inserted > 0:
-            remaining = total - inserted
-            self.show_message(
-                f"The machine hums... {inserted}/{total} keys inserted. "
-                f"{remaining} more needed.", 3000)
-        else:
-            self.show_message(
-                f"A massive gnomish machine hums with power! "
-                f"It has {total} empty keyhole slots.", 3500)
-
-    def _trigger_victory(self):
-        """Called when all keys are inserted — quest complete!"""
-        # Award rewards immediately (behind the animation)
-        for m in self.game.party.alive_members():
-            if m.is_alive():
-                m.exp += 500
-                msgs = m.check_level_up()
-                for msg in msgs:
-                    self.game.game_log.append(msg)
-        self.game.party.gold += 1000
-        town_name = getattr(self.game, "town_data", None)
-        town_name = town_name.name if town_name else "the realm"
-        self.game.game_log.append("*** Quest complete! ***")
-        self.game.game_log.append("Peace returns to the land!")
-        self.game.game_log.append(f"The people of {town_name} are saved!")
-        self.game.game_log.append("Victory! +500 XP, +1000 Gold")
-
-        # Launch the machine shutdown animation — darkness_active is
-        # cleared when the animation finishes (in update()).
-        self.machine_shutdown_effect = MachineShutdownEffect()
-        self.game.sfx.play("quest_complete")
-
     # ── Pickpocket targeting ──────────────────────────────────
 
     def _start_pickpocket_targeting(self):
@@ -1589,87 +1391,6 @@ class TownState(InventoryMixin, BaseState):
                 self._set_dialogue(f"{npc.name}: {done_text}")
                 return
 
-        # Gnome (Fizzwick) — Keys of Shadow quest-giver
-        if npc.npc_type == "gnome":
-            kd = getattr(self.game, "key_dungeons", {})
-            inserted = getattr(self.game, "keys_inserted", 0)
-            # Count gnome_machine quests (or all for KoS)
-            mod_id = ""
-            if self.game.module_manifest:
-                mod_id = self.game.module_manifest.get(
-                    "metadata", {}).get("id", "")
-            if mod_id == "keys_of_shadow":
-                gnome_kds = kd
-            else:
-                gnome_kds = {k: v for k, v in kd.items()
-                             if v.get("quest_type") == "gnome_machine"}
-            total = len(gnome_kds) if gnome_kds else 8
-
-            if gnome_kds:
-                # Check for held keys and auto-insert them
-                party = self.game.party
-                key_names = [d["key_name"] for d in gnome_kds.values()]
-                held_keys = [k for k in key_names if party.inv_count(k) > 0]
-
-                if held_keys:
-                    for key in held_keys:
-                        party.inv_remove(key)
-                        inserted = self.game.insert_key()
-                        # Mark the matching key dungeon as completed
-                        for gkd in gnome_kds.values():
-                            if (gkd.get("key_name") == key
-                                    and gkd.get("status") != "completed"):
-                                gkd["status"] = "completed"
-                                break
-                    n = len(held_keys)
-                    names = ", ".join(held_keys)
-                    self._refresh_quest_highlights()
-                    self.npc_dialogue_active = True
-                    self.npc_speaking = npc
-                    if inserted >= total:
-                        self._set_dialogue(
-                            f"{npc.name}: The {names}! That's the last one! "
-                            f"Stand back — I'm shutting it down!")
-                        # Defer the machine animation until the player
-                        # dismisses this dialogue (see _advance_dialogue).
-                        self._pending_victory = True
-                    else:
-                        self._set_dialogue(
-                            f"{npc.name}: Wonderful! You found the {names}! "
-                            f"That's {inserted}/{total} keys. Keep going!")
-                    return
-
-                # No keys held — give progress dialogue
-                if inserted >= total:
-                    self.npc_dialogue_active = True
-                    self.npc_speaking = npc
-                    town_nm = getattr(self.game, "town_data", None)
-                    town_nm = town_nm.name if town_nm else "the realm"
-                    self._set_dialogue(
-                        f"{npc.name}: The quest is complete! "
-                        f"I can never thank you enough. {town_nm} is saved!")
-                    return
-                elif inserted > 0:
-                    self.npc_dialogue_active = True
-                    self.npc_speaking = npc
-                    remaining = total - inserted
-                    self._set_dialogue(
-                        f"{npc.name}: {inserted} keys inserted so far... "
-                        f"{remaining} more to go! Try the next dungeon!")
-                    return
-
-            # No keys inserted yet — offer the quest or cycle dialogue
-            if npc.quest_dialogue and not getattr(self.game, "_gnome_quest_accepted", False):
-                self.npc_dialogue_active = True
-                self.npc_speaking = npc
-                self.quest_dialogue_lines = list(npc.quest_dialogue)
-                self.quest_dialogue_index = 0
-                self._set_dialogue(f"{npc.name}: {self.quest_dialogue_lines[0]}")
-                return
-
-            # Fall through to normal cycling dialogue
-            pass
-
         # Module quest giver — user-created quests from the module editor
         if npc.npc_type == "module_quest_giver":
             mqname = getattr(npc, "_module_quest_name", "")
@@ -1834,15 +1555,13 @@ class TownState(InventoryMixin, BaseState):
             # Quest completed — fall through to normal dialogue
 
         # Elder — gives progress hints about remaining quests
-        # (individual quest_giver NPCs handle quest discovery now;
-        #  gnome_machine quests are handled by the gnome)
+        # (individual quest_giver NPCs handle quest discovery now)
         if npc.npc_type == "elder":
             kd_map = getattr(self.game, "key_dungeons", {})
             # Check for quests ready to turn in (artifact_found status)
             # Elder can still accept completed quests as a fallback
             found = [kd for kd in kd_map.values()
-                     if kd.get("status") == "artifact_found"
-                     and kd.get("quest_type") != "gnome_machine"]
+                     if kd.get("status") == "artifact_found"]
             if found:
                 party = self.game.party
                 turned_in = []
@@ -1889,11 +1608,10 @@ class TownState(InventoryMixin, BaseState):
                     return
 
             # Active quests still in progress — give progress hint
-            non_gnome = [kd for kd in kd_map.values()
-                         if kd.get("quest_type") != "gnome_machine"]
-            active = [kd for kd in non_gnome
+            all_kds = list(kd_map.values())
+            active = [kd for kd in all_kds
                       if kd.get("status") == "active"]
-            undiscovered = [kd for kd in non_gnome
+            undiscovered = [kd for kd in all_kds
                            if kd.get("status") == "undiscovered"]
             if active:
                 self.npc_dialogue_active = True
@@ -1954,12 +1672,6 @@ class TownState(InventoryMixin, BaseState):
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
 
-        # If the gnome's final dialogue was just dismissed, fire the
-        # machine shutdown animation now.
-        if self._pending_victory:
-            self._pending_victory = False
-            self._trigger_victory()
-
     # ── Quest ─────────────────────────────────────────────────────
 
     def _handle_quest_choice(self):
@@ -1967,9 +1679,7 @@ class TownState(InventoryMixin, BaseState):
         npc = self.npc_speaking
         if self.quest_choice_cursor == 0:
             # Accepted
-            if npc and npc.npc_type == "gnome":
-                self._accept_gnome_quest()
-            elif npc and npc.npc_type == "module_quest_giver":
+            if npc and npc.npc_type == "module_quest_giver":
                 self._accept_module_quest()
             elif npc and npc.npc_type == "quest_giver":
                 self._accept_quest_giver_quest()
@@ -2043,31 +1753,6 @@ class TownState(InventoryMixin, BaseState):
         self.quest_choices = []
         self.quest_dialogue_lines = []
         self.quest_dialogue_index = 0
-
-    def _accept_gnome_quest(self):
-        """Accept the gnome's machine quest (Keys of Shadow or custom)."""
-        npc = self.npc_speaking
-        self.game.set_gnome_quest_accepted()
-        # Reveal only gnome_machine key dungeons (KoS reveals all)
-        mod_id = ""
-        if self.game.module_manifest:
-            mod_id = self.game.module_manifest.get(
-                "metadata", {}).get("id", "")
-        if mod_id == "keys_of_shadow":
-            self.game.discover_key_dungeons()
-        else:
-            self.game.discover_key_dungeons(
-                only_types={"gnome_machine"})
-        total = self.game.get_total_keys()
-        self._set_dialogue(
-            f"{npc.name}: Thank you! The {total} dungeons are scattered "
-            f"across the land. Start with the closest one — it's the "
-            f"easiest. Bring the keys back to me!")
-        self.quest_choice_active = False
-        self.quest_choices = []
-        self.quest_dialogue_lines = []
-        self.quest_dialogue_index = 0
-        self._refresh_quest_highlights()
 
     def _accept_elder_quest(self):
         """Legacy fallback — elder no longer gives quests directly.
@@ -2527,14 +2212,6 @@ class TownState(InventoryMixin, BaseState):
                 self.quest_complete_effect = None
             return
 
-        # Machine shutdown animation — when it finishes, lift the darkness
-        if self.machine_shutdown_effect:
-            self.machine_shutdown_effect.update(dt)
-            if not self.machine_shutdown_effect.alive:
-                self.game.set_darkness(False)
-                self.machine_shutdown_effect = None
-            return
-
         if self.message_timer > 0:
             self.message_timer -= dt_ms
             if self.message_timer <= 0:
@@ -2586,7 +2263,7 @@ class TownState(InventoryMixin, BaseState):
     def _update_npc_wandering(self, dt):
         """Move wandering NPCs around the town at random intervals.
 
-        Stationary NPC types (shopkeepers, innkeepers, priests, gnomes)
+        Stationary NPC types (shopkeepers, innkeepers, priests)
         stay in place.  Everyone else drifts randomly within a few tiles
         of their starting position, avoiding walls, other NPCs, and the
         player.
@@ -2785,40 +2462,7 @@ class TownState(InventoryMixin, BaseState):
         quest_complete = (quest.get("artifact_name", "Shadow Crystal")
                           if quest and quest.get("status") == "completed"
                           else False)
-        # Screen shake offset during machine shutdown Phase 1
-        shake_x, shake_y = (0, 0)
-        if self.machine_shutdown_effect:
-            shake_x, shake_y = self.machine_shutdown_effect.shake_offset
-
-        # Town is dark if global darkness is on (KoS) OR if THIS town
-        # is the gnome machine town and the quest is still incomplete.
-        # Keep darkness active while the shutdown animation is playing
-        # so the town doesn't light up before the cinematic transition.
         town_dark = getattr(self.game, "darkness_active", False)
-        if self.machine_shutdown_effect:
-            town_dark = True
-        elif not town_dark:
-            kd_map = getattr(self.game, "key_dungeons", {})
-            inserted = getattr(self.game, "keys_inserted", 0)
-            current_name = self.town_data.name if self.town_data else ""
-            gnome_total = sum(
-                1 for kd in kd_map.values()
-                if kd.get("quest_type") == "gnome_machine")
-            # Only darken the specific town chosen for the gnome quest
-            gnome_town_name = ""
-            for kd in kd_map.values():
-                if kd.get("quest_type") == "gnome_machine":
-                    gnome_town_name = kd.get("gnome_town", "")
-                    if gnome_town_name:
-                        break
-            if gnome_total > 0 and inserted < gnome_total:
-                if gnome_town_name:
-                    town_dark = (current_name == gnome_town_name)
-                else:
-                    # No town specified — fall back to darkening
-                    # the first/hub town (which has the machine)
-                    town_dark = self.town_data == getattr(
-                        self.game, "town_data", None)
 
         _int_dark = getattr(self, "_in_interior", False)
         renderer.draw_town_u3(
@@ -2827,9 +2471,6 @@ class TownState(InventoryMixin, BaseState):
             message=msg,
             quest_complete=quest_complete,
             darkness_active=town_dark,
-            keys_inserted=getattr(self.game, "keys_inserted", 0),
-            total_keys=self.game.get_total_keys(),
-            shake_offset=(shake_x, shake_y),
             interior_darkness=_int_dark,
         )
         # Pickpocket targeting overlay
@@ -2837,14 +2478,6 @@ class TownState(InventoryMixin, BaseState):
             renderer.draw_pickpocket_targeting(
                 self.game.party, self.town_data,
                 self.pickpocket_targets, self.pickpocket_cursor)
-
-        # Machine shutdown animation overlay
-        if self.machine_shutdown_effect:
-            _td = getattr(self.game, "town_data", None)
-            _tn = _td.name if _td else "the realm"
-            renderer.draw_machine_shutdown_effect(
-                self.machine_shutdown_effect, town_name=_tn)
-            return  # blocks dialogue rendering during animation
 
         # Quest completion celebration overlay
         if self.quest_complete_effect:

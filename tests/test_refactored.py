@@ -393,9 +393,7 @@ def started_game(game):
     game.house_quest = None
     game.visited_dungeons = set()
     game.key_dungeons = {}
-    game.keys_inserted = 0
     game.darkness_active = False
-    game._gnome_quest_accepted = False
     return game
 
 
@@ -429,26 +427,6 @@ class TestGameAccessors:
         result = started_game.get_key_dungeon(1, 2)
         assert result is not None
         assert result["name"] == "Test Dungeon"
-
-    # ── Keys inserted ──
-
-    def test_keys_inserted_starts_at_zero(self, started_game):
-        assert started_game.get_keys_inserted() == 0
-
-    def test_insert_key_increments(self, started_game):
-        count = started_game.insert_key()
-        assert count == 1
-        assert started_game.get_keys_inserted() == 1
-
-    def test_insert_key_twice(self, started_game):
-        started_game.insert_key()
-        count = started_game.insert_key()
-        assert count == 2
-
-    # ── Total keys ──
-
-    def test_total_keys_matches_key_dungeons(self, started_game):
-        assert started_game.get_total_keys() == len(started_game.key_dungeons)
 
     # ── Darkness ──
 
@@ -504,8 +482,3 @@ class TestGameAccessors:
         second = game.consume_combat_rewards()
         assert second is None
 
-    # ── Gnome quest ──
-
-    def test_set_gnome_quest_accepted(self, started_game):
-        started_game.set_gnome_quest_accepted()
-        assert started_game._gnome_quest_accepted is True

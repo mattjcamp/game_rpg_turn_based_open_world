@@ -82,72 +82,36 @@ class Renderer(CombatEffectRendererMixin):
         dst_ts = 32  # destination tile size
 
         # ── Always initialise sprite caches ──
-        self._tile_sprites = {}       # tile_id -> 32x32 surface
+        # Single unified sprite registry: tile_id -> 32x32 surface.
+        # Manifest categories ("overworld", "town", "dungeon", ...) are
+        # purely organisational metadata in tile_manifest.json; rendering
+        # code looks up sprites by tile_id alone, regardless of which
+        # context the tile was originally designed for.
+        self._tile_sprites = {}
         self._chest_tile = None
         self._town_gate_tile = None
         self._monster_tiles = {}      # filename -> 32x32 surface
         self._npc_sprites = {}        # npc_type -> 32x32 surface
         self._villager_sprites = []   # list of 32x32 surfaces
-        self._dungeon_tiles = {}      # tile_id -> 32x32 surface (NEW)
         self._unique_tile_sprites = {}
         self._assets_dir = assets_dir
 
-        from src.settings import (
-            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
-            TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
-            TILE_DFLOOR, TILE_DWALL, TILE_CHEST,
-        )
-
-        # ── Backward-compat tile maps (overworld_tile_map still keyed
-        #    by tile_id but now maps to tile_id itself for _get_tile_sprite) ──
-        self._overworld_tile_map = {
-            TILE_WATER: TILE_WATER, TILE_GRASS: TILE_GRASS,
-            TILE_FOREST: TILE_FOREST, TILE_MOUNTAIN: TILE_MOUNTAIN,
-            TILE_DUNGEON: TILE_DUNGEON,
-            TILE_DUNGEON_CLEARED: TILE_DUNGEON,  # same sprite
-            TILE_TOWN: TILE_TOWN, TILE_PATH: TILE_PATH,
-            TILE_CHEST: TILE_CHEST,
-        }
-        self._town_tile_map = {
-            TILE_FLOOR: TILE_FLOOR, TILE_WALL: TILE_WALL,
-            TILE_CHEST: TILE_CHEST, TILE_EXIT: TILE_EXIT,
-        }
-
         m = self._manifest
 
-        # ── Load overworld terrain tiles from manifest ──
-        for name in m.names_in("overworld"):
-            entry = m.get_entry_by_name("overworld", name)
-            if entry and "tile_id" in entry:
+        # ── Load all tile-bearing manifest sections into _tile_sprites ──
+        # Any category whose entries carry a ``tile_id`` is a source of
+        # placeable tile sprites.  Categories are scanned in a stable
+        # order; collisions are validated at the manifest layer (audited
+        # to be empty), so load order is irrelevant.
+        for cat in ("overworld", "town", "dungeon"):
+            for name in m.names_in(cat):
+                entry = m.get_entry_by_name(cat, name)
+                if not (entry and "tile_id" in entry):
+                    continue
                 tid = entry["tile_id"]
-                sprite = m.get_sprite(tid, dst_ts)
+                sprite = m.get_sprite_by_name(cat, name, dst_ts)
                 if sprite:
                     self._tile_sprites[tid] = sprite
-                    if tid not in self._overworld_tile_map:
-                        self._overworld_tile_map[tid] = tid
-
-        # ── Load town interior tiles from manifest ──
-        for name in m.names_in("town"):
-            entry = m.get_entry_by_name("town", name)
-            if entry and "tile_id" in entry:
-                tid = entry["tile_id"]
-                sprite = m.get_sprite(tid, dst_ts)
-                if sprite:
-                    self._tile_sprites[tid] = sprite
-                    # Ensure custom/user tiles are in the town tile map
-                    # so _u3_draw_town_tile can find them
-                    if tid not in self._town_tile_map:
-                        self._town_tile_map[tid] = tid
-
-        # ── Load dungeon base tiles from manifest ──
-        for name in m.names_in("dungeon"):
-            entry = m.get_entry_by_name("dungeon", name)
-            if entry and "tile_id" in entry:
-                sprite = m.get_sprite_by_name("dungeon", name, dst_ts)
-                if sprite:
-                    self._dungeon_tiles[entry["tile_id"]] = sprite
-                    self._tile_sprites[entry["tile_id"]] = sprite
 
         # ── Load special object tiles from manifest ──
         self._chest_tile = m.get_sprite_by_name("objects", "chest", dst_ts)
@@ -203,8 +167,6 @@ class Renderer(CombatEffectRendererMixin):
                         sprite = self._get_unique_tile_sprite(p, dst_ts)
                         if sprite:
                             self._tile_sprites[_tid] = sprite
-                            # Also add to town tile map so lookup works
-                            self._town_tile_map[_tid] = _tid
         except (OSError, ValueError):
             pass
 
@@ -269,9 +231,8 @@ class Renderer(CombatEffectRendererMixin):
         self._unique_tile_sprites.clear()
 
     def _get_tile_sprite(self, tile_id):
-        """Return the sprite surface for an overworld/town tile, or None."""
-        mapped_id = self._overworld_tile_map.get(tile_id, tile_id)
-        return self._tile_sprites.get(mapped_id)
+        """Return the sprite surface for *tile_id*, or None."""
+        return self._tile_sprites.get(tile_id)
 
     def _load_class_sprites(self):
         """Load character class sprites from the tile manifest.
@@ -598,7 +559,6 @@ class Renderer(CombatEffectRendererMixin):
 
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False, darkness_active=False,
-                      keys_inserted=0, total_keys=8,
                       shake_offset=(0, 0),
                       interior_darkness=False):
         """
@@ -607,7 +567,7 @@ class Renderer(CombatEffectRendererMixin):
         """
         self.screen.fill((0, 0, 0))
 
-        # Apply screen shake offset (used during machine shutdown animation)
+        # Apply screen shake offset
         if shake_offset != (0, 0):
             self._shake_offset = shake_offset
         else:
@@ -632,16 +592,11 @@ class Renderer(CombatEffectRendererMixin):
             off_r = party.row - rows // 2
             off_r = max(0, min(off_r, tile_map.height - rows))
 
-        # ── Build keyslot lookup: (col,row) → slot_index ──
-        self._keyslot_index = {}
-        for idx, pos in enumerate(getattr(town_data, "keyslot_positions", [])):
-            self._keyslot_index[pos] = idx
-
         # ── 1. draw map tiles ──
+        # Tile rendering is uniform — sprite-driven via _draw_tile.
+        # ``town_style`` only influences building-sign text colour now.
         town_style = getattr(town_data, "town_style", "medieval")
-        palette = self._get_town_palette(town_style)
         sx, sy = self._shake_offset
-        sprite_overrides = getattr(tile_map, "sprite_overrides", {})
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
@@ -649,18 +604,13 @@ class Renderer(CombatEffectRendererMixin):
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts + sx
                 py = sr * ts + sy
-                override_path = sprite_overrides.get((wc, wr))
-                self._u3_draw_town_tile(tid, px, py, ts, wc, wr,
-                                        keys_inserted=keys_inserted,
-                                        palette=palette,
-                                        town_style=town_style,
-                                        sprite_path=override_path)
+                self._draw_tile(tid, px, py, ts, wc, wr, tile_map=tile_map)
 
         # ── 1b. Building name signs ──
         # Render building names on the top wall row of each building.
         # Text is painted *on* the bricks so it appears under NPCs.
         self._draw_building_signs(town_data, off_c, off_r, ts, cols, rows,
-                                  palette, sx, sy)
+                                  town_style, sx, sy)
 
         # ── 2. NPC sprites ──
         for npc in town_data.npcs:
@@ -721,11 +671,8 @@ class Renderer(CombatEffectRendererMixin):
             cy = psr * ts + ts // 2 + sy
             self._u3_draw_overworld_party(cx, cy, party)
 
-        # ── 3b. darkness overlay (Keys of Shadow / nighttime / interior) ──
-        # After all keys are inserted and darkness_active is cleared,
-        # the town is permanently lit — skip even normal night darkness.
+        # ── 3b. darkness overlay (nighttime / interior) ──
         clock = party.clock
-        darkness_lifted = (keys_inserted >= total_keys and not darkness_active)
         has_infravision = party.has_effect("Infravision")
         has_galadriels = (party.has_effect("Galadriel's Light")
                           and party.galadriels_light_steps > 0)
@@ -757,16 +704,8 @@ class Renderer(CombatEffectRendererMixin):
             )
             render_lighting(self.screen, lctx)
 
-        elif (not clock.is_day or darkness_active) and not darkness_lifted:
-            # Build extra light sources from filled keyslots
+        elif not clock.is_day or darkness_active:
             extra = list(torch_lights + feature_lights)
-            if keys_inserted > 0 and self._keyslot_index:
-                for (kc, kr), si in self._keyslot_index.items():
-                    if si < keys_inserted:
-                        ksc = kc - off_c
-                        ksr = kr - off_r
-                        ks_radius = 1.5 + 0.3 * keys_inserted
-                        extra.append((ksc, ksr, ks_radius, 1.5))
 
             lctx = LightingContext(
                 mode=LightingMode.CLOCK_DARKNESS,
@@ -972,7 +911,7 @@ class Renderer(CombatEffectRendererMixin):
     _SIGN_SPACING = 1    # 1-pixel gap between glyphs
 
     def _draw_building_signs(self, town_data, off_c, off_r, ts,
-                              cols, rows, palette, sx, sy):
+                              cols, rows, town_style, sx, sy):
         """Overlay building names on the top wall row of each building.
 
         Each sign is rendered using the tiny bitmap font so it looks
@@ -982,9 +921,9 @@ class Renderer(CombatEffectRendererMixin):
         if not signs:
             return
 
-        # Sign text colour — pick a warm highlight from the palette
-        # that contrasts with the wall base.  Fall back to gold.
-        text_col = palette.get("sign_text", (220, 190, 100))
+        # Sign text colour — picked per town style for visual variety
+        # against the (sprite-rendered) wall.  Fall back to gold.
+        text_col = self._TOWN_SIGN_COLORS.get(town_style, (220, 190, 100))
         shadow_col = (0, 0, 0)
 
         gw = self._SIGN_GLYPH_W
@@ -1038,487 +977,294 @@ class Renderer(CombatEffectRendererMixin):
                             pygame.draw.rect(self.screen, text_col,
                                              (px, py, scale, scale))
 
-    def _u3_draw_town_tile(self, tile_id, px, py, ts, wc, wr,
-                            keys_inserted=0, palette=None,
-                            town_style="medieval",
-                            sprite_path=None):
-        """Draw a single town tile using sprite sheet art when available.
-
-        *palette* is a dict from ``_TOWN_PALETTES`` that supplies all
-        colours for the procedural fallback.  When *None*, the medieval
-        palette is used.
-
-        When *town_style* is not ``"medieval"``, interior tiles (floor,
-        wall, door, counter, exit) skip the sprite lookup so the
-        palette-coloured procedural art is used instead — this makes
-        each town style visually distinct.
-
-        *sprite_path*, when set, is a per-tile sprite override from a
-        custom layout — it takes priority over the manifest/gate lookup
-        so runtime rendering matches the editor.
-        """
+    # ── Unified tile rendering ────────────────────────────────────
+    # Phase 2 of the rendering refactor.  All tiles render through a
+    # single entry point (`_draw_tile`) regardless of whether they're
+    # placed in an overworld map, a town interior, a procedurally
+    # generated dungeon, or a custom designer dungeon.  The rendering
+    # path is determined by the tile_id alone — never by "context".
+    #
+    # Sprites come from `_tile_sprites` (the unified registry built in
+    # Phase 1).  A handful of tiles get small post-blit overlays:
+    #   - TILE_VOID            → always rendered as a black square
+    #   - sprite_overrides     → per-cell custom sprite path (editor)
+    #   - TILE_SPAWN_CAMPFIRE  → bg tile + sprite + animated flames
+    #   - TILE_SPAWN_GRAVEYARD → bg tile + sprite + animated wisps
+    #   - TILE_EXIT            → uses the town_gate sprite when loaded
+    #   - TILE_DUNGEON_CLEARED → dark tint + ✕ mark on top of sprite
+    #
+    # Per-level dungeon atmosphere (moss, lava, ice, void detailing) is
+    # applied as a separate overlay via `_draw_dungeon_atmosphere` so
+    # the per-tile rendering itself stays context-free.
+    def _draw_tile(self, tile_id, px, py, ts, wc, wr, *, tile_map=None):
+        """Render *tile_id* at (px, py) using the unified sprite registry."""
         from src.settings import (
-            TILE_FLOOR, TILE_WALL, TILE_COUNTER, TILE_DOOR, TILE_EXIT,
-            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_MACHINE, TILE_KEYSLOT, TILE_ALTAR, TILE_VOID,
+            TILE_VOID, TILE_EXIT, TILE_DUNGEON_CLEARED,
+            TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
+            TILE_ALTAR, TILE_DEFS,
         )
-        if palette is None:
-            palette = self._TOWN_PALETTES["medieval"]
 
-        # ── TILE_VOID always renders as black (border / unpainted cells) ──
+        # 1. TILE_VOID — always invisible (border / unpainted cells)
         if tile_id == TILE_VOID:
             pygame.draw.rect(self.screen, (0, 0, 0),
                              pygame.Rect(px, py, ts, ts))
             return
 
-        # ── Custom layout sprite override (highest priority) ──
-        if sprite_path:
-            sprite = self._get_unique_tile_sprite(sprite_path, ts)
-            if sprite:
-                self.screen.blit(sprite, (px, py))
-                return
-
-        # Tiles whose look should change per town style — skip sprites
-        # for non-default styles so the palette procedural path is used.
-        _PALETTE_SENSITIVE = {
-            TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_COUNTER, TILE_EXIT,
-        }
-        use_sprites = (town_style == "medieval"
-                       or tile_id not in _PALETTE_SENSITIVE)
-
-        # Use extracted town gate tile for exit
-        if tile_id == TILE_EXIT and self._town_gate_tile and use_sprites:
-            self.screen.blit(self._town_gate_tile, (px, py))
-            return
-
-        # Try town tile map first, then overworld tile map
-        if use_sprites:
-            mapped_id = self._town_tile_map.get(tile_id)
-            if mapped_id is None:
-                mapped_id = self._overworld_tile_map.get(tile_id)
-            if mapped_id is not None:
-                sprite = self._tile_sprites.get(mapped_id)
+        # 2. Per-cell sprite_overrides on the tile_map (custom layouts,
+        #    interior buildings, designer-set art).  Highest priority.
+        if tile_map is not None:
+            override = getattr(tile_map, "sprite_overrides", {}).get(
+                (wc, wr))
+            if override:
+                sprite = self._get_unique_tile_sprite(override, ts)
                 if sprite:
                     self.screen.blit(sprite, (px, py))
                     return
-            # Building interiors often mix town + dungeon tiles
-            # (e.g. stone walls, torches as decor).  Fall back to any
-            # sprite already loaded under this tile_id from the dungeon
-            # manifest so users can decorate interiors freely.
-            sprite = self._tile_sprites.get(tile_id)
-            if sprite:
-                self.screen.blit(sprite, (px, py))
-                return
 
-        # Procedural fallback for unmapped / unloaded tiles
-        BLACK = (0, 0, 0)
+        # 3. Animated tiles render via dedicated helpers
+        #    (these fully replace the sprite — they paint their own base).
+        if tile_id == TILE_SPAWN_CAMPFIRE:
+            self._draw_animated_campfire_spawn(
+                tile_id, px, py, ts, wc, wr, tile_map)
+            return
+        if tile_id == TILE_SPAWN_GRAVEYARD:
+            self._draw_animated_graveyard_spawn(
+                tile_id, px, py, ts, wc, wr, tile_map)
+            return
+        if tile_id == TILE_ALTAR:
+            # Animated temple altar with candles, holy symbol, aura.
+            self._draw_altar_tile(px, py, ts)
+            return
 
-        rect = pygame.Rect(px, py, ts, ts)
+        # 4. TILE_EXIT prefers the loaded town_gate sprite (gate art is
+        #    its own asset rather than the generic exit graphic).
+        if tile_id == TILE_EXIT and self._town_gate_tile:
+            self.screen.blit(self._town_gate_tile, (px, py))
+            return
+
+        # 5. Standard sprite lookup with auto-scaling cache.
+        sprite = self._tile_sprites.get(tile_id)
+        if sprite:
+            sw, sh = sprite.get_size()
+            if sw != ts or sh != ts:
+                cache = getattr(self, '_scaled_tile_cache', None)
+                if cache is None:
+                    cache = self._scaled_tile_cache = {}
+                key = (tile_id, ts)
+                scaled = cache.get(key)
+                if scaled is None:
+                    scaled = pygame.transform.scale(sprite, (ts, ts))
+                    cache[key] = scaled
+                sprite = scaled
+            self.screen.blit(sprite, (px, py))
+
+            # Post-blit overlay: cleared dungeon mark.
+            if tile_id == TILE_DUNGEON_CLEARED:
+                overlay = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 120))
+                self.screen.blit(overlay, (px, py))
+                cx = px + ts // 2
+                cy = py + ts // 2
+                pygame.draw.line(self.screen, (160, 140, 100),
+                                 (cx - 5, cy - 5), (cx + 5, cy + 5), 2)
+                pygame.draw.line(self.screen, (160, 140, 100),
+                                 (cx + 5, cy - 5), (cx - 5, cy + 5), 2)
+            return
+
+        # 6. Fallback: TILE_DEFS colour rect, then black.
+        td = TILE_DEFS.get(tile_id)
+        if td:
+            pygame.draw.rect(self.screen, td["color"],
+                             pygame.Rect(px, py, ts, ts))
+        else:
+            pygame.draw.rect(self.screen, (0, 0, 0),
+                             pygame.Rect(px, py, ts, ts))
+
+    def _draw_dungeon_atmosphere(self, tile_id, px, py, ts, wc, wr,
+                                 palette):
+        """Apply per-level dungeon overlay (moss/lava/ice/void).
+
+        Called AFTER `_draw_tile` so the atmospheric detail (small moss
+        patches, lava cracks, frost crystals, void wisps) sits on top of
+        the standard tile sprite.  Only walls and floors carry overlays;
+        all other tile_ids pass through untouched.
+        """
+        from src.settings import TILE_DWALL, TILE_DFLOOR
+        if tile_id not in (TILE_DWALL, TILE_DFLOOR):
+            return
+        env = palette.get("env_type", "stone")
+        if env == "stone":
+            return  # Level-1 stone has no atmospheric overlay.
+        seed = wc * 31 + wr * 17
+
+        if tile_id == TILE_DWALL:
+            if env == "moss" and seed % 3 == 0:
+                mx = (seed * 7) % (ts - 8) + 2
+                my = ts - 4
+                for i in range(3):
+                    gx = px + mx + i * 3 - 3
+                    gy = py + my - (seed + i) % 3
+                    pygame.draw.rect(self.screen, (40, 90, 35),
+                                     pygame.Rect(gx, gy, 2, 2))
+            elif env == "lava" and seed % 4 == 0:
+                lx = px + (seed * 3) % (ts - 6) + 3
+                pygame.draw.line(self.screen, (200, 80, 20),
+                                 (lx, py + ts - 2),
+                                 (lx + 3, py + ts - 8), 1)
+            elif env == "ice" and seed % 3 == 0:
+                fx = px + (seed * 5) % (ts - 8) + 4
+                fy = py + (seed * 3) % (ts - 8) + 4
+                pygame.draw.line(self.screen, (160, 200, 240),
+                                 (fx, fy), (fx + 4, fy - 3), 1)
+                pygame.draw.line(self.screen, (160, 200, 240),
+                                 (fx, fy), (fx - 2, fy - 4), 1)
+            elif env == "void" and seed % 5 == 0:
+                import math as _m
+                t = pygame.time.get_ticks() * 0.003 + seed
+                vx = px + ts // 2 + int(_m.sin(t) * 4)
+                vy = py + ts // 2 + int(_m.cos(t * 0.7) * 3)
+                pygame.draw.circle(self.screen, (120, 50, 160),
+                                   (vx, vy), 2)
+        else:  # TILE_DFLOOR
+            if env == "moss" and seed % 5 == 0:
+                mx = (seed * 11) % (ts - 4) + 2
+                my = (seed * 7) % (ts - 4) + 2
+                pygame.draw.rect(self.screen, (25, 55, 22),
+                                 pygame.Rect(px + mx, py + my, 3, 2))
+            elif env == "lava" and seed % 6 < 2:
+                lx = (seed * 9) % (ts - 8) + 4
+                ly = (seed * 5) % (ts - 6) + 3
+                glow_c = (140 + (seed % 40), 40 + (seed % 20), 10)
+                pygame.draw.line(self.screen, glow_c,
+                                 (px + lx, py + ly),
+                                 (px + lx + 5, py + ly + 2), 1)
+            elif env == "ice" and seed % 4 == 0:
+                shine = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                shine.fill((100, 150, 220, 12))
+                self.screen.blit(shine, (px, py))
+            elif env == "void" and seed % 7 < 2:
+                vx = (seed * 3) % (ts - 6) + 3
+                vy = (seed * 11) % (ts - 6) + 3
+                pygame.draw.circle(self.screen, (60, 20, 70),
+                                   (px + vx, py + vy), 2)
+
+    def _draw_animated_campfire_spawn(self, tile_id, px, py, ts, wc, wr,
+                                      tile_map=None):
+        """Render TILE_SPAWN_CAMPFIRE: bg tile + sprite + animated flames."""
+        import time as _tt, math as _mm
+        from src.party import SPAWN_POINTS
+        _t = _tt.time()
         cx = px + ts // 2
         cy = py + ts // 2
         seed = wc * 31 + wr * 17
-
-        if tile_id == TILE_FLOOR:
-            # Indoor floor — styled stone
-            fb = palette["floor_base"]
-            jitter = seed % 15
-            col = (fb[0] + jitter, fb[1] + jitter, fb[2] + jitter)
-            pygame.draw.rect(self.screen, col, rect)
-            fl = palette["floor_line"]
-            pygame.draw.line(self.screen, fl,
-                             (px, py + ts // 2), (px + ts, py + ts // 2), 1)
-            pygame.draw.line(self.screen, fl,
-                             (px + ts // 2, py), (px + ts // 2, py + ts), 1)
-
-        elif tile_id == TILE_WALL:
-            # Brick wall
-            pygame.draw.rect(self.screen, palette["wall_base"], rect)
-            mortar = palette["wall_mortar"]
-            for iy in range(0, ts, 8):
-                offset = 6 if (iy // 8) % 2 else 0
-                for ix in range(offset, ts, 12):
-                    brick = pygame.Rect(px + ix, py + iy, 10, 6)
-                    pygame.draw.rect(self.screen, mortar, brick, 1)
-
-        elif tile_id == TILE_EXIT:
-            # Gate / exit
-            pygame.draw.rect(self.screen, palette["grass_base"], rect)
-            arch_w = ts - 8
-            pygame.draw.rect(self.screen, palette["exit_arch"],
-                             pygame.Rect(px + 4, py + 6, arch_w, ts - 6))
-            pygame.draw.rect(self.screen, palette["exit_inner"],
-                             pygame.Rect(px + 8, py + 10, arch_w - 8, ts - 10))
-
-        elif tile_id == TILE_GRASS:
-            gb = palette["grass_base"]
-            jitter = seed % 30
-            col = (gb[0], gb[1] + jitter, gb[2])
-            pygame.draw.rect(self.screen, col, rect)
-
-        elif tile_id == TILE_WATER:
-            pygame.draw.rect(self.screen, (15, 30, 120), rect)
-
-        elif tile_id == TILE_COUNTER:
-            pygame.draw.rect(self.screen, BLACK, rect)
-            top = pygame.Rect(px + 3, py + 8, ts - 6, ts - 14)
-            pygame.draw.rect(self.screen, palette["counter_top"], top)
-            pygame.draw.rect(self.screen, palette["counter_edge"], top, 1)
-            pygame.draw.circle(self.screen, palette["counter_dot"],
-                               (cx, cy), 3)
-
-        elif tile_id == TILE_DOOR:
-            pygame.draw.rect(self.screen, BLACK, rect)
-            door_rect = pygame.Rect(px + 7, py + 2, ts - 14, ts - 4)
-            pygame.draw.rect(self.screen, palette["door_panel"], door_rect)
-            pygame.draw.rect(self.screen, palette["door_outline"],
-                             door_rect, 1)
-            pygame.draw.circle(self.screen, palette["door_knob"],
-                               (cx + 3, cy), 2)
-            # ── Torches flanking the door ──
-            import time as _tt, math as _mm
-            _flicker = 0.8 + 0.2 * _mm.sin(
-                _tt.time() * 6 + wc * 7 + wr * 13)
-            tw = palette["torch_warm"]
-            tc = palette["torch_core"]
-            for tx in (px + 2, px + ts - 4):
-                # Bracket
-                pygame.draw.rect(self.screen, palette["torch_bracket"],
-                                 pygame.Rect(tx, py + 4, 3, 10))
-                # Flame (colour shifts with flicker)
-                fr = int(tw[0] * _flicker)
-                fg = int(tw[1] * _flicker)
-                fb_c = int(tw[2] * _flicker)
-                pygame.draw.circle(self.screen, (fr, fg, fb_c),
-                                   (tx + 1, py + 3), 3)
-                # Bright core
-                pygame.draw.circle(self.screen, tc,
-                                   (tx + 1, py + 2), 1)
-
-        elif tile_id == TILE_MACHINE:
-            self._draw_machine_tile(px, py, ts, wc, wr)
-
-        elif tile_id == TILE_KEYSLOT:
-            self._draw_keyslot_tile(px, py, ts, wc, wr, keys_inserted)
-
-        elif tile_id == TILE_ALTAR:
-            self._draw_altar_tile(px, py, ts)
-
-        elif tile_id in (TILE_DFLOOR, TILE_DWALL, TILE_DDOOR, TILE_STAIRS,
-                         TILE_STAIRS_DOWN, TILE_TRAP,
-                         TILE_PORTAL, TILE_ARTIFACT):
-            # Interior/dungeon tiles — delegate to the dungeon renderer
-            # so they get proper textured rendering instead of flat color.
-            self._u3_draw_dungeon_tile(tile_id, px, py, ts, wc, wr)
-
-        else:
-            # Unknown tile — use TILE_DEFS color if available
-            tile_def = TILE_DEFS.get(tile_id)
-            if tile_def:
-                pygame.draw.rect(self.screen, tile_def["color"], rect)
-            else:
-                pygame.draw.rect(self.screen, BLACK, rect)
-
-    def _draw_machine_tile(self, px, py, ts, wc, wr):
-        """Draw one tile of the gnomish machine (part of a 3×3 structure).
-
-        Uses a deterministic seed from the world coordinates so each of
-        the 9 tiles gets a unique mechanical part: gears, boilers,
-        gauges, pipes, vents, or the central energy core.
-        """
-        import math as _math
-        import time as _time
-
-        t = _time.time()
         rect = pygame.Rect(px, py, ts, ts)
+
+        # Background tile (configurable per spawn definition).
+        _sp = SPAWN_POINTS.get(tile_id, {})
+        _bg_tid = _sp.get("background_tile", 0)
+        if _bg_tid != tile_id:
+            self._draw_tile(_bg_tid, px, py, ts, wc, wr, tile_map=tile_map)
+        else:
+            pygame.draw.rect(self.screen, (20, 100, 15), rect)
+
+        # Campfire sprite.
+        sprite = self._get_tile_sprite(tile_id)
+        if sprite:
+            sw, sh = sprite.get_size()
+            if sw != ts or sh != ts:
+                cache = getattr(self, '_scaled_tile_cache', None)
+                if cache is None:
+                    cache = self._scaled_tile_cache = {}
+                key = (tile_id, ts)
+                scaled = cache.get(key)
+                if scaled is None:
+                    scaled = pygame.transform.scale(sprite, (ts, ts))
+                    cache[key] = scaled
+                sprite = scaled
+            self.screen.blit(sprite, (px, py))
+
+        # Flickering fire glow.
+        _flicker = 0.6 + 0.4 * _mm.sin(_t * 5.0 + wc * 3.7)
+        glow_r = int(255 * _flicker)
+        glow_g = int(140 * _flicker)
+        glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        glow_alpha = int(50 * _flicker)
+        pygame.draw.circle(glow_surf, (glow_r, glow_g, 10, glow_alpha),
+                           (ts // 2, ts // 2), ts // 3)
+        self.screen.blit(glow_surf, (px, py))
+
+        # Dancing flame sparks.
+        _flick2 = 0.7 + 0.3 * _mm.sin(_t * 7.0 + wr * 5.1)
+        fr = int(240 * _flick2)
+        fg = int(160 * _flick2)
+        for i in range(3):
+            phase = _t * (4.0 + i * 1.5) + seed + i * 2.3
+            dx = int(3 * _mm.sin(phase))
+            dy = int(-2 - 3 * abs(_mm.sin(phase * 0.7)))
+            spark_x = cx + dx + (i - 1) * 3
+            spark_y = cy + dy - 4
+            pygame.draw.circle(self.screen, (fr, fg, 30),
+                               (spark_x, spark_y), 2)
+        spark_alpha = 0.5 + 0.5 * _mm.sin(_t * 9.0 + seed)
+        if spark_alpha > 0.7:
+            pygame.draw.circle(self.screen, (255, 255, 180),
+                               (cx, cy - 6), 1)
+
+    def _draw_animated_graveyard_spawn(self, tile_id, px, py, ts, wc, wr,
+                                       tile_map=None):
+        """Render TILE_SPAWN_GRAVEYARD: bg tile + sprite + spirit wisps."""
+        import time as _tt, math as _mm
+        from src.party import SPAWN_POINTS
+        _t = _tt.time()
         cx = px + ts // 2
         cy = py + ts // 2
-
-        # Palette
-        METAL = (55, 55, 65)
-        METAL_LIGHT = (80, 80, 95)
-        METAL_DARK = (35, 35, 42)
-        RIVET = (120, 120, 130)
-        COPPER = (180, 100, 40)
-        COPPER_DARK = (130, 70, 25)
-        ENERGY = (160, 80, 200)
-        ENERGY_BRIGHT = (220, 140, 255)
-
-        # Base metal plate
-        pygame.draw.rect(self.screen, METAL, rect)
-        pygame.draw.rect(self.screen, METAL_DARK, rect, 1)
-
-        # Determine which part to draw via a stable seed from world pos
-        seed = (wc + wr * 3) % 9
-
-        if seed == 0:
-            # ── Energy core: pulsing orb with arcs ──
-            core_rect = pygame.Rect(px + 2, py + 2, ts - 4, ts - 4)
-            pygame.draw.rect(self.screen, (25, 15, 35), core_rect)
-            pygame.draw.rect(self.screen, COPPER, core_rect, 2)
-            # Pulsing orb
-            orb_r = int(7 + 2 * _math.sin(t * 2.5))
-            orb_a = int(160 + 60 * _math.sin(t * 3.0))
-            orb_s = pygame.Surface((orb_r * 2 + 8, orb_r * 2 + 8),
-                                   pygame.SRCALPHA)
-            pygame.draw.circle(orb_s,
-                               (ENERGY[0], ENERGY[1], ENERGY[2], orb_a // 3),
-                               (orb_r + 4, orb_r + 4), orb_r + 4)
-            pygame.draw.circle(orb_s,
-                               (ENERGY_BRIGHT[0], ENERGY_BRIGHT[1],
-                                ENERGY_BRIGHT[2], orb_a),
-                               (orb_r + 4, orb_r + 4), orb_r)
-            pygame.draw.circle(orb_s,
-                               (255, 220, 255, min(255, orb_a + 40)),
-                               (orb_r + 4, orb_r + 4), max(1, orb_r // 2))
-            self.screen.blit(orb_s, (cx - orb_r - 4, cy - orb_r - 4))
-            # Energy arcs
-            for i in range(4):
-                angle = t * 2.0 + i * _math.pi / 2
-                arc_len = 6 + int(3 * _math.sin(t * 4 + i))
-                x1 = cx + int(5 * _math.cos(angle))
-                y1 = cy + int(5 * _math.sin(angle))
-                x2 = cx + int(arc_len * _math.cos(angle))
-                y2 = cy + int(arc_len * _math.sin(angle))
-                arc_c = min(255, int(220 + 35 * _math.sin(t * 5 + i)))
-                pygame.draw.line(self.screen, (arc_c, 100, 255),
-                                 (x1, y1), (x2, y2), 1)
-            # Corner bolts
-            for bx, by in ((px + 4, py + 4), (px + ts - 5, py + 4),
-                           (px + 4, py + ts - 5), (px + ts - 5, py + ts - 5)):
-                pygame.draw.circle(self.screen, RIVET, (bx, by), 2)
-                pygame.draw.circle(self.screen, METAL_DARK, (bx, by), 1)
-
-        elif seed in (1, 5):
-            # ── Rotating gear ──
-            direction = 1.0 if seed == 1 else -1.0
-            gear_r = 9
-            pygame.draw.circle(self.screen, COPPER, (cx, cy), gear_r, 2)
-            teeth = 8
-            for i in range(teeth):
-                angle = direction * t * 1.2 + i * (2 * _math.pi / teeth)
-                tx = cx + int((gear_r + 2) * _math.cos(angle))
-                ty = cy + int((gear_r + 2) * _math.sin(angle))
-                pygame.draw.circle(self.screen, COPPER_DARK, (tx, ty), 2)
-            pygame.draw.circle(self.screen, METAL_LIGHT, (cx, cy), 4)
-            pygame.draw.circle(self.screen, METAL_DARK, (cx, cy), 2)
-            # Spokes
-            for i in range(4):
-                angle = direction * t * 1.2 + i * _math.pi / 2
-                sx = cx + int(gear_r * _math.cos(angle))
-                sy = cy + int(gear_r * _math.sin(angle))
-                pygame.draw.line(self.screen, COPPER_DARK, (cx, cy), (sx, sy), 1)
-
-        elif seed in (2, 6):
-            # ── Boiler with pressure gauge ──
-            boiler = pygame.Rect(px + 4, py + 4, ts - 8, ts - 8)
-            pygame.draw.rect(self.screen, METAL_LIGHT, boiler)
-            pygame.draw.rect(self.screen, METAL_DARK, boiler, 1)
-            # Horizontal bands
-            for band_y in (py + 8, py + ts // 2, py + ts - 9):
-                pygame.draw.line(self.screen, COPPER_DARK,
-                                 (px + 4, band_y), (px + ts - 5, band_y), 1)
-            # Gauge
-            g_cx = cx + (4 if seed == 2 else -4)
-            g_cy = cy - 2
-            pygame.draw.circle(self.screen, (20, 20, 20), (g_cx, g_cy), 5)
-            pygame.draw.circle(self.screen, RIVET, (g_cx, g_cy), 5, 1)
-            # Animated needle
-            angle = t * 1.5 + seed * 0.7
-            nx = g_cx + int(3 * _math.cos(angle))
-            ny = g_cy + int(3 * _math.sin(angle))
-            pygame.draw.line(self.screen, (255, 60, 60),
-                             (g_cx, g_cy), (nx, ny), 1)
-            # Rivets
-            for rx, ry in ((px + 3, py + 3), (px + ts - 4, py + 3),
-                           (px + 3, py + ts - 4), (px + ts - 4, py + ts - 4)):
-                pygame.draw.circle(self.screen, RIVET, (rx, ry), 1)
-
-        elif seed in (3, 7):
-            # ── Exhaust vents with steam ──
-            for vx in range(px + 4, px + ts - 3, 6):
-                vent = pygame.Rect(vx, py + 3, 4, ts - 6)
-                pygame.draw.rect(self.screen, METAL_DARK, vent)
-                pygame.draw.rect(self.screen, METAL_LIGHT, vent, 1)
-            # Animated steam puffs
-            steam_a = int(70 + 40 * _math.sin(t * 3 + seed))
-            steam_s = pygame.Surface((14, 10), pygame.SRCALPHA)
-            pygame.draw.ellipse(steam_s, (200, 200, 220, steam_a),
-                                (0, 0, 14, 10))
-            sx = cx - 7 + int(3 * _math.sin(t * 2 + seed))
-            sy = py - 3 + int(2 * _math.cos(t * 1.5))
-            self.screen.blit(steam_s, (sx, sy))
-            # Pipe across one edge
-            pygame.draw.line(self.screen, COPPER,
-                             (px, py + ts - 3), (px + ts, py + ts - 3), 2)
-
-        elif seed == 4:
-            # ── Key slots panel (4 glowing slots) ──
-            base = pygame.Rect(px + 2, py + 2, ts - 4, ts - 4)
-            pygame.draw.rect(self.screen, METAL_DARK, base)
-            pygame.draw.rect(self.screen, RIVET, base, 1)
-            for i in range(4):
-                kx = px + 4 + i * 7
-                slot = pygame.Rect(kx, cy - 3, 5, 7)
-                pulse = int(60 + 50 * _math.sin(t * 2 + i * 0.8))
-                pygame.draw.rect(self.screen, (pulse, 25, pulse + 30), slot)
-                pygame.draw.rect(self.screen, RIVET, slot, 1)
-            # Label "KEYS" in tiny text
-            label = self.font_small.render("KEYS", True, ENERGY)
-            lrect = label.get_rect(center=(cx, py + 6))
-            self.screen.blit(label, lrect)
-            # Pipe across top
-            pygame.draw.line(self.screen, COPPER,
-                             (px, py + 2), (px + ts, py + 2), 2)
-
-        else:
-            # ── Conduit / pipe junction ──
-            # Horizontal pipe
-            pygame.draw.line(self.screen, COPPER,
-                             (px, cy), (px + ts, cy), 3)
-            pygame.draw.line(self.screen, COPPER_DARK,
-                             (px, cy - 2), (px + ts, cy - 2), 1)
-            # Vertical pipe
-            pygame.draw.line(self.screen, COPPER,
-                             (cx, py), (cx, py + ts), 3)
-            pygame.draw.line(self.screen, COPPER_DARK,
-                             (cx - 2, py), (cx - 2, py + ts), 1)
-            # Junction plate
-            junct = pygame.Rect(cx - 5, cy - 5, 10, 10)
-            pygame.draw.rect(self.screen, METAL_LIGHT, junct)
-            pygame.draw.rect(self.screen, COPPER, junct, 1)
-            # Animated flow indicator
-            flow_x = px + int((t * 20 + seed * 10) % ts)
-            pygame.draw.circle(self.screen, ENERGY, (flow_x, cy), 2)
-            flow_y = py + int((t * 15 + seed * 7) % ts)
-            pygame.draw.circle(self.screen, ENERGY, (cx, flow_y), 2)
-
-    def _draw_keyslot_tile(self, px, py, ts, wc, wr, keys_inserted):
-        """Draw a single keyslot pedestal around the gnome machine.
-
-        Empty slots show a dark stone pedestal with an empty keyhole.
-        Filled slots glow and pulse with golden-white light, and emit
-        a small radial light bloom to push back the darkness.
-        """
-        import math as _math
-        import time as _time
-
-        t = _time.time()
+        seed = wc * 31 + wr * 17
         rect = pygame.Rect(px, py, ts, ts)
-        cx = px + ts // 2
-        cy = py + ts // 2
 
-        # Determine this slot's index (0-7)
-        slot_idx = getattr(self, "_keyslot_index", {}).get((wc, wr), -1)
-        filled = slot_idx >= 0 and slot_idx < keys_inserted
-
-        # Palette
-        STONE = (50, 45, 55)
-        STONE_LIGHT = (70, 65, 75)
-        STONE_DARK = (30, 28, 35)
-
-        # Key colours — each slot gets a unique hue
-        KEY_HUES = [
-            (255, 200, 60),   # 0: gold
-            (60, 200, 255),   # 1: ice blue
-            (255, 80, 80),    # 2: crimson
-            (80, 255, 120),   # 3: emerald
-            (200, 120, 255),  # 4: violet
-            (255, 160, 40),   # 5: amber
-            (40, 255, 220),   # 6: teal
-            (255, 255, 180),  # 7: pale sun
-        ]
-        hue = KEY_HUES[slot_idx % 8] if slot_idx >= 0 else (100, 100, 100)
-
-        # ── Base: stone pedestal ──
-        pygame.draw.rect(self.screen, STONE, rect)
-        pygame.draw.rect(self.screen, STONE_DARK, rect, 1)
-        # Inner raised platform
-        plat = pygame.Rect(px + 3, py + 3, ts - 6, ts - 6)
-        pygame.draw.rect(self.screen, STONE_LIGHT, plat)
-        pygame.draw.rect(self.screen, STONE_DARK, plat, 1)
-
-        if filled:
-            # ── Filled slot: glowing key with pulse and light bloom ──
-
-            # Outer glow bloom (alpha-blended circle)
-            pulse = 0.5 + 0.5 * _math.sin(t * 2.5 + slot_idx * 0.9)
-            bloom_r = int(ts * 0.7 + 4 * pulse)
-            bloom_alpha = int(60 + 50 * pulse)
-            bloom_s = pygame.Surface((bloom_r * 2, bloom_r * 2),
-                                     pygame.SRCALPHA)
-            br, bg, bb = hue
-            pygame.draw.circle(bloom_s,
-                               (br, bg, bb, bloom_alpha // 3),
-                               (bloom_r, bloom_r), bloom_r)
-            pygame.draw.circle(bloom_s,
-                               (br, bg, bb, bloom_alpha),
-                               (bloom_r, bloom_r), bloom_r // 2)
-            self.screen.blit(bloom_s,
-                             (cx - bloom_r, cy - bloom_r))
-
-            # Key shape: vertical bar + crossbar (T-shape)
-            key_bright = tuple(min(255, int(c * (0.8 + 0.2 * pulse)))
-                               for c in hue)
-            # Vertical shaft
-            pygame.draw.line(self.screen, key_bright,
-                             (cx, cy - 6), (cx, cy + 5), 3)
-            # Key head (circle at top)
-            pygame.draw.circle(self.screen, key_bright, (cx, cy - 6), 3)
-            pygame.draw.circle(self.screen,
-                               (255, 255, 255), (cx, cy - 6), 1)
-            # Key teeth (small nubs at bottom)
-            pygame.draw.line(self.screen, key_bright,
-                             (cx, cy + 4), (cx + 3, cy + 4), 2)
-            pygame.draw.line(self.screen, key_bright,
-                             (cx, cy + 2), (cx + 2, cy + 2), 1)
-
-            # Central sparkle
-            sparkle_a = int(180 + 75 * _math.sin(t * 4.0 + slot_idx))
-            sparkle_s = pygame.Surface((8, 8), pygame.SRCALPHA)
-            pygame.draw.circle(sparkle_s,
-                               (255, 255, 240, sparkle_a), (4, 4), 3)
-            pygame.draw.circle(sparkle_s,
-                               (255, 255, 255, min(255, sparkle_a + 40)),
-                               (4, 4), 1)
-            self.screen.blit(sparkle_s, (cx - 4, cy - 8))
-
-            # Corner rune marks (tiny glowing dots)
-            for corner_x, corner_y in ((px + 4, py + 4),
-                                        (px + ts - 5, py + 4),
-                                        (px + 4, py + ts - 5),
-                                        (px + ts - 5, py + ts - 5)):
-                dot_a = int(120 + 80 * _math.sin(
-                    t * 3.0 + corner_x * 0.1 + corner_y * 0.1))
-                dot_s = pygame.Surface((4, 4), pygame.SRCALPHA)
-                pygame.draw.circle(dot_s,
-                                   (br, bg, bb, dot_a), (2, 2), 2)
-                self.screen.blit(dot_s, (corner_x - 2, corner_y - 2))
+        # Background tile.
+        _sp = SPAWN_POINTS.get(tile_id, {})
+        _bg_tid = _sp.get("background_tile", 0)
+        if _bg_tid != tile_id:
+            self._draw_tile(_bg_tid, px, py, ts, wc, wr, tile_map=tile_map)
         else:
-            # ── Empty slot: dark keyhole waiting for a key ──
+            pygame.draw.rect(self.screen, (20, 100, 15), rect)
 
-            # Keyhole shape: circle + triangle
-            pygame.draw.circle(self.screen, STONE_DARK, (cx, cy - 2), 4)
-            pygame.draw.circle(self.screen, (20, 15, 25), (cx, cy - 2), 3)
-            # Keyhole slit
-            pygame.draw.polygon(self.screen, (20, 15, 25), [
-                (cx - 2, cy + 1),
-                (cx + 2, cy + 1),
-                (cx + 1, cy + 6),
-                (cx - 1, cy + 6),
-            ])
+        # Tombstone sprite.
+        sprite = self._get_tile_sprite(tile_id)
+        if sprite:
+            sw, sh = sprite.get_size()
+            if sw != ts or sh != ts:
+                cache = getattr(self, '_scaled_tile_cache', None)
+                if cache is None:
+                    cache = self._scaled_tile_cache = {}
+                key = (tile_id, ts)
+                scaled = cache.get(key)
+                if scaled is None:
+                    scaled = pygame.transform.scale(sprite, (ts, ts))
+                    cache[key] = scaled
+                sprite = scaled
+            self.screen.blit(sprite, (px, py))
 
-            # Faint pulse to indicate it's interactive
-            faint = int(20 + 15 * _math.sin(t * 1.5 + slot_idx * 0.7))
-            faint_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
-            pygame.draw.circle(faint_s,
-                               (hue[0], hue[1], hue[2], faint),
-                               (ts // 2, ts // 2), ts // 3)
-            self.screen.blit(faint_s, (px, py))
+        # Pulsing green glow.
+        _pulse = 0.5 + 0.5 * _mm.sin(_t * 2.5 + wc * 2.1 + wr * 1.7)
+        glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        glow_alpha = int(40 * _pulse)
+        pygame.draw.circle(glow_surf, (60, 180, 60, glow_alpha),
+                           (ts // 2, ts // 2), ts // 3)
+        self.screen.blit(glow_surf, (px, py))
 
-            # Corner rivets
-            for rx, ry in ((px + 4, py + 4), (px + ts - 5, py + 4),
-                           (px + 4, py + ts - 5), (px + ts - 5, py + ts - 5)):
-                pygame.draw.circle(self.screen, (80, 75, 85), (rx, ry), 1)
+        # Drifting spirit wisps.
+        for i in range(2):
+            wisp_phase = _t * (1.5 + i * 0.8) + seed + i * 4.1
+            wx = cx + int(6 * _mm.sin(wisp_phase))
+            wy = cy - 6 + int(4 * _mm.cos(wisp_phase * 0.6 + i))
+            wisp_a = int(80 * (0.4 + 0.6 * abs(_mm.sin(wisp_phase * 0.5))))
+            wisp_surf = pygame.Surface((6, 6), pygame.SRCALPHA)
+            pygame.draw.circle(wisp_surf,
+                               (120, 220, 120, wisp_a), (3, 3), 3)
+            self.screen.blit(wisp_surf, (wx - 3, wy - 3))
+
+
 
     def _draw_altar_tile(self, px, py, ts):
         """Animated temple altar with candles, holy symbol, and pulsing aura."""
@@ -1608,11 +1354,6 @@ class Renderer(CombatEffectRendererMixin):
         """Draw an NPC on the town map using per-type VGA sprites."""
         import math as _math
         import time as _time
-
-        # ── Animated gnome (Fizzwick) ──
-        if npc.npc_type == "gnome":
-            self._draw_gnome_sprite(npc, cx, cy)
-            return
 
         # Quest collectible item NPCs: draw glow and artifact sprite
         if npc.npc_type == "quest_item":
@@ -1707,96 +1448,6 @@ class Renderer(CombatEffectRendererMixin):
             self.screen.blit(ex_surf, (name_rect.right + 2, name_rect.y))
         self.screen.blit(name_surf, name_rect)
 
-    def _draw_gnome_sprite(self, npc, cx, cy):
-        """Draw an animated gnome NPC — short, pointy hat, bobbing, with glow."""
-        import math as _math
-        import time as _time
-
-        t = _time.time()
-
-        # Bobbing offset (gentle float up and down)
-        bob = int(2 * _math.sin(t * 2.5))
-
-        # Subtle pulsing glow around the gnome
-        glow_r = int(14 + 3 * _math.sin(t * 1.8))
-        glow_a = int(35 + 20 * _math.sin(t * 2.0))
-        glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
-        pygame.draw.circle(
-            glow_surf, (180, 120, 255, glow_a),
-            (glow_r, glow_r), glow_r)
-        self.screen.blit(glow_surf, (cx - glow_r, cy + bob - glow_r))
-
-        # --- Body (shorter than regular NPCs) ---
-        body_color = (120, 80, 40)     # brown tunic
-        skin = (220, 180, 140)
-        hat_color = (160, 60, 200)     # purple pointy hat
-
-        # Head (round, slightly larger for gnome proportions)
-        head_y = cy + bob - 7
-        pygame.draw.circle(self.screen, skin, (cx, head_y), 5)
-        # Eyes
-        pygame.draw.circle(self.screen, (40, 40, 40), (cx - 2, head_y - 1), 1)
-        pygame.draw.circle(self.screen, (40, 40, 40), (cx + 2, head_y - 1), 1)
-
-        # Pointy hat
-        hat_tip_y = head_y - 14
-        hat_base_y = head_y - 4
-        hat_pts = [
-            (cx, hat_tip_y),           # tip
-            (cx - 6, hat_base_y),      # left brim
-            (cx + 6, hat_base_y),      # right brim
-        ]
-        pygame.draw.polygon(self.screen, hat_color, hat_pts)
-        pygame.draw.polygon(self.screen, (200, 100, 255), hat_pts, 1)
-        # Hat star/sparkle at tip (animated)
-        sparkle_a = int(200 + 55 * _math.sin(t * 4))
-        sparkle_col = (255, 255, min(255, sparkle_a))
-        pygame.draw.circle(self.screen, sparkle_col, (cx, hat_tip_y), 2)
-
-        # Torso (short, squat)
-        torso_top = cy + bob - 2
-        torso_bot = cy + bob + 5
-        pygame.draw.line(self.screen, body_color, (cx, torso_top), (cx, torso_bot), 3)
-
-        # Arms (slightly waving)
-        arm_wave = int(2 * _math.sin(t * 3.0))
-        pygame.draw.line(self.screen, body_color,
-                         (cx - 6, torso_top + 1 - arm_wave),
-                         (cx, torso_top + 2), 2)
-        pygame.draw.line(self.screen, body_color,
-                         (cx + 6, torso_top + 1 + arm_wave),
-                         (cx, torso_top + 2), 2)
-
-        # Legs (short, stubby)
-        pygame.draw.line(self.screen, body_color,
-                         (cx, torso_bot), (cx - 3, cy + bob + 11), 2)
-        pygame.draw.line(self.screen, body_color,
-                         (cx, torso_bot), (cx + 3, cy + bob + 11), 2)
-
-        # Beard (white, small)
-        beard_y = head_y + 3
-        pygame.draw.line(self.screen, (220, 220, 220),
-                         (cx - 2, beard_y), (cx, beard_y + 4), 1)
-        pygame.draw.line(self.screen, (220, 220, 220),
-                         (cx + 2, beard_y), (cx, beard_y + 4), 1)
-
-        # Name tag above — pulsing gold with glow if quest-active
-        if npc.quest_highlight:
-            pulse = 0.6 + 0.4 * _math.sin(t * 4.0)
-            name_color = (255, int(200 * pulse + 55), 0)
-        else:
-            name_color = (255, 255, 255)
-        name_surf = self.font_small.render(npc.name, True, name_color)
-        name_rect = name_surf.get_rect(center=(cx, cy + bob - 24))
-        bg = name_rect.inflate(4, 2)
-        if npc.quest_highlight:
-            glow_rect = bg.inflate(4, 4)
-            pygame.draw.rect(self.screen, (200, 160, 0), glow_rect, 1)
-        pygame.draw.rect(self.screen, (0, 0, 0), bg)
-        if npc.quest_highlight:
-            ex_surf = self.font_small.render("!", True, (255, 220, 0))
-            self.screen.blit(ex_surf, (name_rect.right + 2, name_rect.y))
-        self.screen.blit(name_surf, name_rect)
 
     def draw_dialogue_box(self, message):
         """Draw an NPC dialogue box at the top of the screen with word wrap."""
@@ -1852,266 +1503,6 @@ class Renderer(CombatEffectRendererMixin):
         hint_surface = self.font_small.render(hint, True, self._U3_HINT)
         self.screen.blit(hint_surface, (box_x + text_pad, cur_y + 4))
 
-    def draw_machine_shutdown_effect(self, effect, town_name="the realm"):
-        """Draw the quest-complete shutdown animation overlay.
-
-        Four phases:
-        1. Machine overload — red/orange pulsing, energy arcs, screen shake
-        2. Machine dies — shockwave ring expands, colour cools to blue
-        3. Light returns — golden light expands, darkness fades away
-        4. Victory banner — QUEST COMPLETE with rewards
-        """
-        t = effect.timer
-        cx = SCREEN_WIDTH // 2
-        cy = SCREEN_HEIGHT // 2
-
-        # ── Phase 1 (0.0 - 1.5s): Machine Overload ──
-        if t < 1.5:
-            phase = t / 1.5  # 0..1
-
-            # Red/orange pulsing overlay — intensifies over time
-            pulse = 0.5 + 0.5 * math.sin(t * 12)
-            overlay_alpha = int((40 + 80 * pulse) * phase)
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                     pygame.SRCALPHA)
-            r = int(200 + 55 * pulse)
-            g = int(60 + 40 * pulse)
-            overlay.fill((r, g, 0, overlay_alpha))
-            self.screen.blit(overlay, (0, 0))
-
-            # Bright glow at machine center
-            glow_r = int(30 + 60 * phase + 20 * pulse)
-            glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
-            ga = int(120 + 100 * pulse * phase)
-            pygame.draw.circle(glow, (255, 160, 40, ga),
-                               (glow_r, glow_r), glow_r)
-            # Inner bright core
-            core_r = glow_r // 2
-            pygame.draw.circle(glow, (255, 240, 200, min(255, ga + 60)),
-                               (glow_r, glow_r), core_r)
-            self.screen.blit(glow, (cx - glow_r, cy - glow_r))
-
-            # Energy arcs radiating from center
-            for arc in effect.arcs:
-                # Flicker each arc on/off
-                flicker = math.sin(t * arc["speed"] + arc["phase_offset"])
-                if flicker < 0.1:
-                    continue
-                a = arc["angle"] + t * 0.5  # slow rotation
-                length = arc["length"] * phase * flicker
-                ex = cx + int(math.cos(a) * length)
-                ey = cy + int(math.sin(a) * length)
-                # Lightning jag — single segment with midpoint offset
-                mid_x = (cx + ex) // 2 + int(8 * math.sin(t * 15 + arc["phase_offset"]))
-                mid_y = (cy + ey) // 2 + int(8 * math.cos(t * 15 + arc["phase_offset"]))
-                brightness = int(200 + 55 * flicker)
-                color = (brightness, int(brightness * 0.5), 0)
-                w = arc["width"]
-                pygame.draw.line(self.screen, color, (cx, cy), (mid_x, mid_y), w)
-                pygame.draw.line(self.screen, color, (mid_x, mid_y), (ex, ey), w)
-
-        # ── Phase 2 (1.5 - 3.0s): Machine Dies — Shockwave ──
-        elif t < 3.0:
-            phase = (t - 1.5) / 1.5  # 0..1
-
-            # Bright flash at the start of the shockwave
-            if phase < 0.1:
-                flash_a = int(255 * (1.0 - phase / 0.1))
-                flash = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                       pygame.SRCALPHA)
-                flash.fill((255, 255, 255, flash_a))
-                self.screen.blit(flash, (0, 0))
-
-            # Expanding shockwave ring
-            max_radius = int(math.sqrt(cx * cx + cy * cy))  # corner distance
-            ring_radius = int(phase * max_radius)
-            ring_width = max(2, int(6 * (1.0 - phase)))
-            # Colour shifts from warm white → cool blue
-            rb = int(200 * (1.0 - phase) + 80 * phase)
-            gb = int(200 * (1.0 - phase) + 140 * phase)
-            bb = int(220 * (1.0 - phase) + 255 * phase)
-            ring_alpha = int(200 * (1.0 - phase * 0.7))
-            ring_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                       pygame.SRCALPHA)
-            pygame.draw.circle(ring_surf, (rb, gb, bb, ring_alpha),
-                               (cx, cy), ring_radius, ring_width)
-            self.screen.blit(ring_surf, (0, 0))
-
-            # Sparks along the shockwave front
-            elapsed = t - 1.5
-            for spark in effect.sparks:
-                if elapsed > spark["lifetime"]:
-                    continue
-                sp = elapsed / spark["lifetime"]
-                sx = cx + int(spark["vx"] * elapsed)
-                sy = cy + int(spark["vy"] * elapsed)
-                fade = 1.0 - sp
-                if (0 <= sx < SCREEN_WIDTH and 0 <= sy < SCREEN_HEIGHT
-                        and fade > 0):
-                    sc = spark["color"]
-                    fc = (int(sc[0] * fade), int(sc[1] * fade),
-                          int(sc[2] * fade))
-                    s = spark["size"]
-                    pygame.draw.rect(self.screen, fc, (sx, sy, s, s))
-
-            # Fading residual energy arcs (dimming)
-            arc_fade = max(0.0, 1.0 - phase * 2)
-            if arc_fade > 0:
-                for arc in effect.arcs:
-                    a = arc["angle"] + t * 0.3
-                    length = arc["length"] * 0.5 * arc_fade
-                    ex = cx + int(math.cos(a) * length)
-                    ey = cy + int(math.sin(a) * length)
-                    c = int(100 * arc_fade)
-                    pygame.draw.line(self.screen, (c, c, int(c * 1.5)),
-                                     (cx, cy), (ex, ey), 1)
-
-        # ── Phase 3 (3.0 - 4.5s): Light Returns ──
-        elif t < 4.5:
-            phase = (t - 3.0) / 1.5  # 0..1
-
-            # Expanding golden light circle from center
-            max_radius = int(math.sqrt(cx * cx + cy * cy)) + 50
-            light_radius = int(phase * max_radius)
-
-            # Golden glow overlay
-            light_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                        pygame.SRCALPHA)
-            # Warm golden tint that intensifies
-            ga = int(60 * phase)
-            light_surf.fill((255, 220, 100, ga))
-            self.screen.blit(light_surf, (0, 0))
-
-            # Bright expanding circle
-            glow_alpha = int(140 * (1.0 - phase * 0.5))
-            glow_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                       pygame.SRCALPHA)
-            pygame.draw.circle(glow_surf, (255, 240, 180, glow_alpha),
-                               (cx, cy), light_radius)
-            # Inner brighter core
-            inner_r = max(1, light_radius // 2)
-            pygame.draw.circle(glow_surf, (255, 255, 230, min(255, glow_alpha + 40)),
-                               (cx, cy), inner_r)
-            self.screen.blit(glow_surf, (0, 0))
-
-            # Light rays
-            for ray in effect.rays:
-                ray_len = light_radius * 1.2
-                a = ray["angle"]
-                half_w = ray["width"]
-                ra = int(glow_alpha * ray["alpha_mult"])
-                if ra < 10:
-                    continue
-                # Triangle ray from center outward
-                tip_x = cx + int(math.cos(a) * ray_len)
-                tip_y = cy + int(math.sin(a) * ray_len)
-                perp_a = a + math.pi / 2
-                hw = int(half_w * ray_len)
-                base_l = (cx + int(math.cos(perp_a) * hw),
-                          cy + int(math.sin(perp_a) * hw))
-                base_r = (cx - int(math.cos(perp_a) * hw),
-                          cy - int(math.sin(perp_a) * hw))
-                ray_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                          pygame.SRCALPHA)
-                pygame.draw.polygon(ray_surf,
-                                    (255, 240, 180, ra // 2),
-                                    [base_l, (tip_x, tip_y), base_r])
-                self.screen.blit(ray_surf, (0, 0))
-
-            # "Sunlight returns!" text rising
-            text = "SUNLIGHT RETURNS!"
-            text_alpha = min(255, int(phase * 500))
-            if text_alpha > 50:
-                tc = min(255, text_alpha)
-                tw = len(text) * 10
-                self._u3_text(text, cx - tw // 2,
-                              cy - 60 - int(phase * 30),
-                              (tc, tc, int(tc * 0.5)), self.font)
-
-        # ── Phase 4 (4.5 - 6.0s): Victory Banner ──
-        else:
-            phase = (t - 4.5) / 1.5  # 0..1
-
-            # Warm ambient glow (sustained from Phase 3)
-            warm = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
-                                  pygame.SRCALPHA)
-            warm.fill((255, 220, 100, 30))
-            self.screen.blit(warm, (0, 0))
-
-            # Banner fade in
-            banner_alpha = min(1.0, phase * 2)
-
-            # Banner background
-            banner_w = 520
-            banner_h = 130
-            bx = (SCREEN_WIDTH - banner_w) // 2
-            by = (SCREEN_HEIGHT - banner_h) // 2 - 40
-
-            banner_surf = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
-            ba = int(210 * banner_alpha)
-            banner_surf.fill((10, 5, 30, ba))
-            self.screen.blit(banner_surf, (bx, by))
-
-            # Ornate double border
-            bc = int(220 * banner_alpha)
-            border_color = (bc, int(bc * 0.85), int(bc * 0.2))
-            pygame.draw.rect(self.screen, border_color,
-                             (bx, by, banner_w, banner_h), 2)
-            pygame.draw.rect(self.screen, border_color,
-                             (bx + 4, by + 4, banner_w - 8, banner_h - 8), 1)
-
-            # "QUEST COMPLETE!" text
-            title = "QUEST COMPLETE!"
-            pulse = 0.1 * math.sin(t * 3)
-            tr = min(255, int(255 * banner_alpha * (1 + pulse)))
-            tg = min(255, int(220 * banner_alpha * (1 + pulse)))
-            tb = min(255, int(60 * banner_alpha * (1 + pulse)))
-            tw = len(title) * 10
-            self._u3_text(title, cx - tw // 2, by + 14,
-                          (tr, tg, tb), self.font)
-
-            # Quest subtitle
-            qname = "QUEST COMPLETE"
-            qw = len(qname) * 8
-            qc = int(180 * banner_alpha)
-            self._u3_text(qname, cx - qw // 2, by + 44,
-                          (qc, qc, int(qc * 1.2)), self.font_med)
-
-            # Reward summary
-            reward_text = "+1000 Gold   +500 XP"
-            rw = len(reward_text) * 7
-            rc = int(200 * banner_alpha)
-            self._u3_text(reward_text, cx - rw // 2, by + 70,
-                          (rc, rc, int(rc * 0.4)), self.font_med)
-
-            # Flavour text
-            flavour = f"The people of {town_name} are saved!"
-            fw = len(flavour) * 6
-            fc = int(160 * banner_alpha)
-            self._u3_text(flavour, cx - fw // 2, by + 98,
-                          (fc, int(fc * 0.9), fc), self.font_small)
-
-            # Celebration sparkles
-            for sparkle in effect.sparkles:
-                sp_x = sparkle["x"]
-                sp_y = sparkle["y"]
-                sp_phase = sparkle["phase"] + t * sparkle["speed"]
-                brightness = int(
-                    (0.5 + 0.5 * math.sin(sp_phase)) * 255 * banner_alpha)
-                if brightness > 30:
-                    sc = (brightness, int(brightness * 0.85),
-                          int(brightness * 0.3))
-                    if 0 <= sp_x < SCREEN_WIDTH and 0 <= sp_y < SCREEN_HEIGHT:
-                        self.screen.set_at((sp_x, sp_y), sc)
-                        if brightness > 150:
-                            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                                nx, ny = sp_x + dx, sp_y + dy
-                                if (0 <= nx < SCREEN_WIDTH
-                                        and 0 <= ny < SCREEN_HEIGHT):
-                                    self.screen.set_at(
-                                        (nx, ny),
-                                        (brightness // 2, brightness // 2,
-                                         brightness // 3))
 
     def draw_quest_complete_effect(self, effect):
         """Draw the quest completion celebration animation overlay.
@@ -2407,8 +1798,8 @@ class Renderer(CombatEffectRendererMixin):
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts + pad_x
                 py = sr * ts + pad_y
-                self._u3_draw_overworld_tile(tid, px, py, ts, wc, wr,
-                                            tile_map=tile_map)
+                self._draw_tile(tid, px, py, ts, wc, wr,
+                                tile_map=tile_map)
 
         # ── 1b. draw unique tile sprites (tiles with a graphic) ──
         for (uc, ur), utile in tile_map.unique_tiles.items():
@@ -2813,294 +2204,6 @@ class Renderer(CombatEffectRendererMixin):
 
     # ── overworld tile rendering ─────────────────────────────
 
-    def _u3_draw_overworld_tile(self, tile_id, px, py, ts, wc, wr,
-                                tile_map=None):
-        """Draw a single overworld tile using sprite sheet art when available,
-        falling back to procedural drawing for tiles without sprites."""
-        from src.settings import (
-            TILE_GRASS, TILE_WATER, TILE_FOREST, TILE_MOUNTAIN,
-            TILE_TOWN, TILE_DUNGEON, TILE_PATH, TILE_SAND, TILE_BRIDGE,
-            TILE_MACHINE, TILE_KEYSLOT, TILE_DUNGEON_CLEARED,
-            TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
-        )
-
-        # Check sprite_overrides on the tile_map (used by interiors)
-        if tile_map is not None:
-            override_path = getattr(tile_map, "sprite_overrides", {}).get(
-                (wc, wr))
-            if override_path:
-                sprite = self._get_unique_tile_sprite(override_path, ts)
-                if sprite:
-                    self.screen.blit(sprite, (px, py))
-                    return
-
-        # Try sprite sheet first (skip for animated tiles that need custom rendering)
-        _animated_tiles = (TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD)
-        sprite = self._get_tile_sprite(tile_id)
-        if sprite and tile_id not in _animated_tiles:
-            sw, sh = sprite.get_size()
-            if sw != ts or sh != ts:
-                cache = getattr(self, '_scaled_tile_cache', None)
-                if cache is None:
-                    cache = self._scaled_tile_cache = {}
-                key = (tile_id, ts)
-                scaled = cache.get(key)
-                if scaled is None:
-                    scaled = pygame.transform.scale(sprite, (ts, ts))
-                    cache[key] = scaled
-                sprite = scaled
-            self.screen.blit(sprite, (px, py))
-            # Cleared dungeons get a dark tint overlay + "X" mark
-            if tile_id == TILE_DUNGEON_CLEARED:
-                overlay = pygame.Surface((ts, ts), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 120))
-                self.screen.blit(overlay, (px, py))
-                cx = px + ts // 2
-                cy = py + ts // 2
-                pygame.draw.line(self.screen, (160, 140, 100),
-                                 (cx - 5, cy - 5), (cx + 5, cy + 5), 2)
-                pygame.draw.line(self.screen, (160, 140, 100),
-                                 (cx + 5, cy - 5), (cx - 5, cy + 5), 2)
-            return
-
-        # Fallback: procedural drawing when sprites are unavailable
-        BLACK = (0, 0, 0)
-        BROWN = (140, 100, 50)
-        SAND_C = (180, 160, 80)
-
-        rect = pygame.Rect(px, py, ts, ts)
-        cx = px + ts // 2
-        cy = py + ts // 2
-        seed = wc * 31 + wr * 17
-
-        if tile_id == TILE_GRASS:
-            # Green field with subtle variation
-            base_g = 100 + (seed % 30)
-            pygame.draw.rect(self.screen, (20, base_g, 15), rect)
-            # A few darker grass tufts
-            for i in range(3):
-                s = seed + i * 37
-                gx = px + (s * 7) % (ts - 4) + 2
-                gy = py + (s * 13) % (ts - 4) + 2
-                pygame.draw.line(self.screen, (10, base_g + 30, 10),
-                                 (gx, gy + 3), (gx, gy), 1)
-
-        elif tile_id == TILE_WATER:
-            # Blue water with wave highlights
-            pygame.draw.rect(self.screen, (15, 30, 120), rect)
-            t = pygame.time.get_ticks()
-            for i in range(2):
-                s = seed + i * 23
-                wx = px + (s * 11) % (ts - 8) + 4
-                wy = py + (s * 7) % (ts - 8) + 4
-                phase = (t * 0.002 + s) % 6.28
-                shimmer = int(30 + 20 * math.sin(phase))
-                pygame.draw.line(self.screen, (40 + shimmer, 80 + shimmer, 180),
-                                 (wx, wy), (wx + 6, wy), 1)
-
-        elif tile_id == TILE_FOREST:
-            # Dark green ground with tree shapes
-            pygame.draw.rect(self.screen, (10, 60, 10), rect)
-            # Simple tree: triangle crown + trunk
-            points = [(cx, cy - 10), (cx - 7, cy + 3), (cx + 7, cy + 3)]
-            pygame.draw.polygon(self.screen, (0, 100 + (seed % 30), 0), points)
-            pygame.draw.line(self.screen, (80, 50, 20),
-                             (cx, cy + 3), (cx, cy + 8), 2)
-
-        elif tile_id == TILE_MOUNTAIN:
-            # Grey mountain peak
-            pygame.draw.rect(self.screen, (60, 50, 40), rect)
-            points = [(cx, cy - 12), (cx - 10, cy + 8), (cx + 10, cy + 8)]
-            pygame.draw.polygon(self.screen, (140, 140, 140), points)
-            # Snow cap
-            snow = [(cx, cy - 12), (cx - 4, cy - 4), (cx + 4, cy - 4)]
-            pygame.draw.polygon(self.screen, (230, 230, 255), snow)
-
-        elif tile_id == TILE_TOWN:
-            # Green field with small house
-            pygame.draw.rect(self.screen, (20, 100, 15), rect)
-            roof = [(cx, cy - 9), (cx - 8, cy - 1), (cx + 8, cy - 1)]
-            pygame.draw.polygon(self.screen, (160, 60, 40), roof)
-            walls = pygame.Rect(cx - 6, cy - 1, 12, 9)
-            pygame.draw.rect(self.screen, (200, 180, 140), walls)
-            door = pygame.Rect(cx - 2, cy + 2, 4, 6)
-            pygame.draw.rect(self.screen, (80, 50, 20), door)
-
-        elif tile_id == TILE_DUNGEON:
-            # Dark ground with cave entrance
-            pygame.draw.rect(self.screen, (30, 25, 20), rect)
-            pygame.draw.circle(self.screen, (40, 10, 30), (cx, cy), 10)
-            pygame.draw.circle(self.screen, (20, 0, 15), (cx, cy), 6)
-            text = self.font_small.render("!", True, (255, 255, 0))
-            self.screen.blit(text, (cx - 3, cy - 6))
-
-        elif tile_id == TILE_DUNGEON_CLEARED:
-            # Collapsed / cleared cave entrance — muted colours, "X" mark
-            pygame.draw.rect(self.screen, (40, 35, 30), rect)
-            pygame.draw.circle(self.screen, (55, 45, 40), (cx, cy), 10)
-            pygame.draw.circle(self.screen, (35, 30, 25), (cx, cy), 6)
-            # Draw an "X" to indicate cleared
-            pygame.draw.line(self.screen, (100, 90, 70),
-                             (cx - 5, cy - 5), (cx + 5, cy + 5), 2)
-            pygame.draw.line(self.screen, (100, 90, 70),
-                             (cx + 5, cy - 5), (cx - 5, cy + 5), 2)
-
-        elif tile_id == TILE_PATH:
-            # Dirt path
-            base_g = 80 + (seed % 20)
-            pygame.draw.rect(self.screen, (base_g, base_g - 20, base_g - 40), rect)
-            # Pebble details
-            for i in range(3):
-                s = seed + i * 41
-                gx = px + (s * 9) % (ts - 4) + 2
-                gy = py + (s * 11) % (ts - 4) + 2
-                pygame.draw.circle(self.screen, (base_g + 20, base_g, base_g - 20),
-                                   (gx, gy), 1)
-
-        elif tile_id == TILE_SAND:
-            pygame.draw.rect(self.screen, (25, 20, 5), rect)
-            for i in range(4):
-                s = seed + i * 19
-                dx = (s * 7) % (ts - 6) + 3
-                dy = (s * 13) % (ts - 6) + 3
-                c = SAND_C if s % 2 else (150, 130, 60)
-                pygame.draw.rect(self.screen, c,
-                                 pygame.Rect(px + dx, py + dy, 2, 2))
-
-        elif tile_id == TILE_BRIDGE:
-            pygame.draw.rect(self.screen, (0, 0, 60), rect)
-            for i in range(3):
-                plank = pygame.Rect(px + 2, py + 6 + i * 10, ts - 4, 5)
-                pygame.draw.rect(self.screen, BROWN, plank)
-                pygame.draw.rect(self.screen, (80, 60, 30), plank, 1)
-
-        elif tile_id == TILE_MACHINE:
-            self._draw_machine_tile(px, py, ts, wc, wr)
-            return
-
-        elif tile_id == TILE_KEYSLOT:
-            self._draw_keyslot_tile(px, py, ts, wc, wr, 0)
-            return
-
-        elif tile_id == TILE_SPAWN_CAMPFIRE:
-            # Animated campfire spawn — configurable background with fire
-            import time as _tt, math as _mm
-            _t = _tt.time()
-            # Draw background tile (configurable via spawn data)
-            from src.party import SPAWN_POINTS
-            _sp = SPAWN_POINTS.get(tile_id, {})
-            _bg_tid = _sp.get("background_tile", 0)
-            if _bg_tid != tile_id:  # avoid infinite recursion
-                self._u3_draw_overworld_tile(
-                    _bg_tid, px, py, ts, wc, wr, tile_map)
-            else:
-                pygame.draw.rect(self.screen, (20, 100, 15), rect)
-
-            # Try blitting the campfire sprite with transparency
-            sprite = self._get_tile_sprite(tile_id)
-            if sprite:
-                sw, sh = sprite.get_size()
-                if sw != ts or sh != ts:
-                    cache = getattr(self, '_scaled_tile_cache', None)
-                    if cache is None:
-                        cache = self._scaled_tile_cache = {}
-                    key = (tile_id, ts)
-                    scaled = cache.get(key)
-                    if scaled is None:
-                        scaled = pygame.transform.scale(sprite, (ts, ts))
-                        cache[key] = scaled
-                    sprite = scaled
-                self.screen.blit(sprite, (px, py))
-
-            # Flickering glow overlay beneath/around the fire
-            _flicker = 0.6 + 0.4 * _mm.sin(_t * 5.0 + wc * 3.7)
-            glow_r = int(255 * _flicker)
-            glow_g = int(140 * _flicker)
-            glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
-            glow_alpha = int(50 * _flicker)
-            pygame.draw.circle(glow_surf, (glow_r, glow_g, 10, glow_alpha),
-                               (ts // 2, ts // 2), ts // 3)
-            self.screen.blit(glow_surf, (px, py))
-
-            # Animated flame tips (procedural on top of sprite)
-            _flick2 = 0.7 + 0.3 * _mm.sin(_t * 7.0 + wr * 5.1)
-            fr = int(240 * _flick2)
-            fg = int(160 * _flick2)
-            # Small dancing flame particles
-            for i in range(3):
-                phase = _t * (4.0 + i * 1.5) + seed + i * 2.3
-                dx = int(3 * _mm.sin(phase))
-                dy = int(-2 - 3 * abs(_mm.sin(phase * 0.7)))
-                spark_x = cx + dx + (i - 1) * 3
-                spark_y = cy + dy - 4
-                pygame.draw.circle(self.screen, (fr, fg, 30),
-                                   (spark_x, spark_y), 2)
-            # Bright core spark
-            spark_alpha = 0.5 + 0.5 * _mm.sin(_t * 9.0 + seed)
-            if spark_alpha > 0.7:
-                pygame.draw.circle(self.screen, (255, 255, 180),
-                                   (cx, cy - 6), 1)
-            return
-
-        elif tile_id == TILE_SPAWN_GRAVEYARD:
-            # Animated graveyard spawn — configurable background + tombstone
-            import time as _tt, math as _mm
-            _t = _tt.time()
-            # Draw background tile (configurable via spawn data)
-            from src.party import SPAWN_POINTS
-            _sp = SPAWN_POINTS.get(tile_id, {})
-            _bg_tid = _sp.get("background_tile", 0)
-            if _bg_tid != tile_id:
-                self._u3_draw_overworld_tile(
-                    _bg_tid, px, py, ts, wc, wr, tile_map)
-            else:
-                pygame.draw.rect(self.screen, (20, 100, 15), rect)
-
-            # Blit the graveyard sprite with transparency
-            sprite = self._get_tile_sprite(tile_id)
-            if sprite:
-                sw, sh = sprite.get_size()
-                if sw != ts or sh != ts:
-                    cache = getattr(self, '_scaled_tile_cache', None)
-                    if cache is None:
-                        cache = self._scaled_tile_cache = {}
-                    key = (tile_id, ts)
-                    scaled = cache.get(key)
-                    if scaled is None:
-                        scaled = pygame.transform.scale(sprite, (ts, ts))
-                        cache[key] = scaled
-                    sprite = scaled
-                self.screen.blit(sprite, (px, py))
-
-            # Eerie pulsing green glow around the tombstone
-            _pulse = 0.5 + 0.5 * _mm.sin(_t * 2.5 + wc * 2.1 + wr * 1.7)
-            glow_surf = pygame.Surface((ts, ts), pygame.SRCALPHA)
-            glow_alpha = int(40 * _pulse)
-            pygame.draw.circle(glow_surf,
-                               (60, 180, 60, glow_alpha),
-                               (ts // 2, ts // 2), ts // 3)
-            self.screen.blit(glow_surf, (px, py))
-
-            # Drifting spirit wisps
-            for i in range(2):
-                wisp_phase = _t * (1.5 + i * 0.8) + seed + i * 4.1
-                wx = cx + int(6 * _mm.sin(wisp_phase))
-                wy = cy - 6 + int(4 * _mm.cos(wisp_phase * 0.6 + i))
-                wisp_a = int(80 * (0.4 + 0.6 * abs(_mm.sin(wisp_phase * 0.5))))
-                wisp_surf = pygame.Surface((6, 6), pygame.SRCALPHA)
-                pygame.draw.circle(wisp_surf,
-                                   (120, 220, 120, wisp_a), (3, 3), 3)
-                self.screen.blit(wisp_surf, (wx - 3, wy - 3))
-            return
-
-        else:
-            # Unknown tile — use TILE_DEFS color if available
-            tile_def = TILE_DEFS.get(tile_id)
-            if tile_def:
-                pygame.draw.rect(self.screen, tile_def["color"], rect)
-            else:
-                pygame.draw.rect(self.screen, BLACK, rect)
-
     def _u3_draw_overworld_party(self, cx, cy, party=None):
         """Party map sprite — white-tinted fighter tile with torch effect."""
         sprite = self._party_map_sprite
@@ -3181,110 +2284,18 @@ class Renderer(CombatEffectRendererMixin):
     _U3_DG_MAP_W = _U3_DG_COLS * _U3_DG_TS   # 960
     _U3_DG_MAP_H = _U3_DG_ROWS * _U3_DG_TS   # 640
 
-    # ── town style palettes ─────────────────────────────────
-    # Each palette defines the visual theme for a town style.
-    # Keys match the procedural drawing in _u3_draw_town_tile.
-    _TOWN_PALETTES = {
-        "medieval": {
-            "floor_base":     (45, 42, 40),    # grey stone
-            "floor_line":     (35, 32, 30),     # slab outlines
-            "wall_base":      (120, 80, 50),    # warm brick
-            "wall_mortar":    (100, 65, 40),     # darker mortar
-            "door_panel":     (100, 65, 30),     # brown wood
-            "door_outline":   (60, 40, 15),      # dark trim
-            "door_knob":      (255, 255, 0),     # gold handle
-            "counter_top":    (140, 100, 50),     # oak counter
-            "counter_edge":   (100, 70, 30),      # edge shadow
-            "counter_dot":    (255, 255, 0),      # gold accent
-            "torch_bracket":  (80, 60, 30),       # iron bracket
-            "torch_warm":     (255, 160, 30),     # flame orange
-            "torch_core":     (255, 240, 150),    # flame core
-            "grass_base":     (20, 100, 15),      # outside green
-            "exit_arch":      (130, 130, 130),     # stone arch
-            "exit_inner":     (60, 60, 60),        # arch opening
-            "sign_text":      (220, 190, 100),     # gold lettering
-        },
-        "desert": {
-            "floor_base":     (70, 60, 42),    # sandy stone
-            "floor_line":     (58, 48, 32),
-            "wall_base":      (170, 140, 90),  # sandstone
-            "wall_mortar":    (140, 115, 72),
-            "door_panel":     (120, 90, 50),   # weathered wood
-            "door_outline":   (80, 55, 25),
-            "door_knob":      (200, 170, 60),  # brass
-            "counter_top":    (160, 130, 80),   # light wood
-            "counter_edge":   (120, 95, 55),
-            "counter_dot":    (200, 170, 60),
-            "torch_bracket":  (100, 80, 40),
-            "torch_warm":     (255, 140, 20),  # warm amber
-            "torch_core":     (255, 220, 120),
-            "grass_base":     (160, 140, 80),  # sand outside
-            "exit_arch":      (180, 160, 110),  # sandstone arch
-            "exit_inner":     (100, 80, 50),
-            "sign_text":      (60, 30, 10),      # dark burnt umber
-        },
-        "coastal": {
-            "floor_base":     (55, 60, 65),    # grey-blue stone
-            "floor_line":     (42, 48, 55),
-            "wall_base":      (100, 110, 130), # sea-weathered stone
-            "wall_mortar":    (75, 85, 105),
-            "door_panel":     (70, 85, 95),    # driftwood blue
-            "door_outline":   (45, 60, 70),
-            "door_knob":      (180, 220, 255), # sea-glass blue
-            "counter_top":    (110, 120, 130),  # grey-blue wood
-            "counter_edge":   (80, 90, 100),
-            "counter_dot":    (180, 220, 255),
-            "torch_bracket":  (60, 75, 85),
-            "torch_warm":     (200, 220, 255), # cool blue-white
-            "torch_core":     (220, 240, 255),
-            "grass_base":     (40, 100, 90),   # sea-green
-            "exit_arch":      (130, 140, 150),  # sea-worn stone
-            "exit_inner":     (50, 65, 75),
-            "sign_text":      (240, 250, 255),   # white chalk
-        },
-        "forest": {
-            "floor_base":     (38, 45, 32),    # mossy stone
-            "floor_line":     (28, 35, 22),
-            "wall_base":      (70, 90, 55),    # mossy wood-green
-            "wall_mortar":    (50, 65, 38),
-            "door_panel":     (80, 60, 35),    # dark oak
-            "door_outline":   (50, 35, 18),
-            "door_knob":      (180, 200, 80),  # leaf-green
-            "counter_top":    (100, 80, 50),    # dark wood
-            "counter_edge":   (70, 55, 30),
-            "counter_dot":    (180, 200, 80),
-            "torch_bracket":  (55, 70, 35),
-            "torch_warm":     (200, 255, 80),  # greenish firefly
-            "torch_core":     (230, 255, 150),
-            "grass_base":     (15, 80, 20),    # deep forest green
-            "exit_arch":      (90, 100, 70),    # moss-covered stone
-            "exit_inner":     (40, 50, 30),
-            "sign_text":      (200, 220, 140),   # pale leaf-green
-        },
-        "mountain": {
-            "floor_base":     (52, 50, 55),    # dark granite
-            "floor_line":     (40, 38, 42),
-            "wall_base":      (90, 85, 95),    # granite
-            "wall_mortar":    (65, 60, 72),
-            "door_panel":     (85, 70, 55),    # heavy timber
-            "door_outline":   (55, 42, 30),
-            "door_knob":      (220, 200, 160), # pale gold
-            "counter_top":    (120, 110, 100),  # stone slab
-            "counter_edge":   (85, 78, 68),
-            "counter_dot":    (220, 200, 160),
-            "torch_bracket":  (70, 65, 75),
-            "torch_warm":     (255, 180, 80),  # amber
-            "torch_core":     (255, 230, 170),
-            "grass_base":     (50, 70, 45),    # alpine scrub
-            "exit_arch":      (140, 135, 145),  # pale granite
-            "exit_inner":     (70, 65, 75),
-            "sign_text":      (220, 200, 160),   # pale gold
-        },
+    # ── town style → building sign text colour ──────────────
+    # Procedural town tile drawing was removed when rendering became
+    # sprite-driven (see _draw_tile / _tile_sprites).  The one piece
+    # of per-style aesthetic still applied is the colour of building
+    # name signs painted on top of the wall sprite.
+    _TOWN_SIGN_COLORS = {
+        "medieval": (220, 190, 100),  # gold lettering
+        "desert":   (60, 30, 10),     # dark burnt umber
+        "coastal":  (240, 250, 255),  # white chalk
+        "forest":   (200, 220, 140),  # pale leaf-green
+        "mountain": (220, 200, 160),  # pale gold
     }
-
-    def _get_town_palette(self, style):
-        """Return the palette dict for the given town style key."""
-        return self._TOWN_PALETTES.get(style, self._TOWN_PALETTES["medieval"])
 
     # ── dungeon level palettes ──────────────────────────────
     # Each palette defines the visual theme for a dungeon depth.
@@ -3379,10 +2390,15 @@ class Renderer(CombatEffectRendererMixin):
                 tid = tile_map.get_tile(wc, wr)
                 px = sc * ts
                 py = sr * ts
-                if _is_custom:
-                    self._draw_custom_dungeon_tile(tid, px, py, ts)
-                else:
-                    self._u3_draw_dungeon_tile(tid, px, py, ts, wc, wr, palette)
+                # Custom and procedurally generated dungeons render via
+                # the same unified path; the per-level palette atmosphere
+                # (moss/lava/ice/void detail) is then layered on top of
+                # the standard tile sprite for procedural runs.
+                self._draw_tile(tid, px, py, ts, wc, wr,
+                                tile_map=tile_map)
+                if not _is_custom:
+                    self._draw_dungeon_atmosphere(
+                        tid, px, py, ts, wc, wr, palette)
 
         # ── 1b. red glow on detected traps ──
         if detected_traps:
@@ -4693,461 +3709,6 @@ class Renderer(CombatEffectRendererMixin):
             hint_surf = hint_font.render(
                 "[ENTER] Select  [ESC] Flee", True, self._U3_HINT)
             self.screen.blit(hint_surf, (panel_x + pad, y))
-
-    def _draw_custom_dungeon_tile(self, tile_id, px, py, ts):
-        """Draw a tile in a custom (designer-built) dungeon.
-
-        Uses the same sprites as the map editor — no procedural
-        reinterpretation.  Falls back to TILE_DEFS colour, then black.
-        """
-        sprite = self._tile_sprites.get(tile_id)
-        if sprite:
-            self.screen.blit(sprite, (px, py))
-        else:
-            from src.settings import TILE_DEFS as _TD_C
-            td = _TD_C.get(tile_id)
-            if td:
-                pygame.draw.rect(self.screen, td["color"],
-                                 pygame.Rect(px, py, ts, ts))
-            else:
-                pygame.draw.rect(self.screen, (0, 0, 0),
-                                 pygame.Rect(px, py, ts, ts))
-
-    def _u3_draw_dungeon_tile(self, tile_id, px, py, ts, wc, wr, palette=None):
-        """Draw a single dungeon tile in Ultima III style."""
-        BLACK  = (0, 0, 0)
-        WHITE  = (255, 255, 255)
-        BLUE   = (68, 68, 255)
-        GRAY   = (136, 136, 136)
-        DKGRAY = (60, 55, 65)
-        PURPLE = (102, 51, 85)
-        DKPUR  = (68, 34, 68)
-        BROWN  = (140, 100, 50)
-        ORANGE = (255, 170, 85)
-        YELLOW = (255, 255, 0)
-
-        # Default palette (level 1 stone) if none provided
-        if palette is None:
-            palette = self._DUNGEON_PALETTES[0]
-
-        rect = pygame.Rect(px, py, ts, ts)
-        cx = px + ts // 2
-        cy = py + ts // 2
-        seed = wc * 31 + wr * 17
-
-        # ── Blit base tile sprite from manifest (if available) ──
-        # Procedural overlays below will draw on top of this.
-        base_sprite = self._dungeon_tiles.get(tile_id)
-        if base_sprite:
-            self.screen.blit(base_sprite, (px, py))
-
-        if tile_id == TILE_DWALL:
-            # Stone blocks — colors from level palette
-            pygame.draw.rect(self.screen, palette["wall_base"], rect)
-            bricks = palette["wall_bricks"]
-            mortar = palette["wall_mortar"]
-            for iy in range(0, ts, 8):
-                offset = 5 if (iy // 8) % 2 else 0
-                for ix in range(offset, ts, 11):
-                    s = (wc * 7 + wr * 13 + ix + iy) % 5
-                    if s < 2:
-                        bc = bricks[0]
-                    elif s < 4:
-                        bc = bricks[1]
-                    else:
-                        bc = bricks[2]
-                    brick = pygame.Rect(px + ix, py + iy, 9, 6)
-                    pygame.draw.rect(self.screen, bc, brick)
-                    pygame.draw.rect(self.screen, mortar, brick, 1)
-
-            # Environmental details on walls
-            env = palette["env_type"]
-            if env == "moss":
-                # Moss patches on some wall tiles
-                if seed % 3 == 0:
-                    mx = (seed * 7) % (ts - 8) + 2
-                    my = ts - 4
-                    for i in range(3):
-                        gx = px + mx + i * 3 - 3
-                        gy = py + my - (seed + i) % 3
-                        pygame.draw.rect(self.screen, (40, 90, 35),
-                                         pygame.Rect(gx, gy, 2, 2))
-            elif env == "lava":
-                # Glowing cracks in walls
-                if seed % 4 == 0:
-                    lx = px + (seed * 3) % (ts - 6) + 3
-                    pygame.draw.line(self.screen, (200, 80, 20),
-                                     (lx, py + ts - 2), (lx + 3, py + ts - 8), 1)
-            elif env == "ice":
-                # Frost crystals on walls
-                if seed % 3 == 0:
-                    fx = px + (seed * 5) % (ts - 8) + 4
-                    fy = py + (seed * 3) % (ts - 8) + 4
-                    pygame.draw.line(self.screen, (160, 200, 240),
-                                     (fx, fy), (fx + 4, fy - 3), 1)
-                    pygame.draw.line(self.screen, (160, 200, 240),
-                                     (fx, fy), (fx - 2, fy - 4), 1)
-            elif env == "void":
-                # Faint purple energy wisps
-                if seed % 5 == 0:
-                    import math as _m
-                    t = pygame.time.get_ticks() * 0.003 + seed
-                    vx = px + ts // 2 + int(_m.sin(t) * 4)
-                    vy = py + ts // 2 + int(_m.cos(t * 0.7) * 3)
-                    pygame.draw.circle(self.screen, (120, 50, 160),
-                                       (vx, vy), 2)
-
-        elif tile_id == TILE_MOUNTAIN:
-            # Cave wall — draw using the overworld mountain tile renderer
-            self._u3_draw_overworld_tile(TILE_MOUNTAIN, px, py, ts, wc, wr)
-
-        elif tile_id == TILE_DFLOOR:
-            # Floor — colors from level palette
-            pygame.draw.rect(self.screen, palette["floor_base"], rect)
-            detail_col = palette["floor_detail"]
-            for i in range(2):
-                s = seed + i * 41
-                if s % 4 < 2:
-                    dx = (s * 7) % (ts - 6) + 3
-                    dy = (s * 13) % (ts - 6) + 3
-                    pygame.draw.rect(self.screen, detail_col,
-                                     pygame.Rect(px + dx, py + dy, 2, 1))
-
-            # Environmental floor details
-            env = palette["env_type"]
-            if env == "moss":
-                # Small moss spots on floor
-                if seed % 5 == 0:
-                    mx = (seed * 11) % (ts - 4) + 2
-                    my = (seed * 7) % (ts - 4) + 2
-                    pygame.draw.rect(self.screen, (25, 55, 22),
-                                     pygame.Rect(px + mx, py + my, 3, 2))
-            elif env == "lava":
-                # Lava glow seeping through floor cracks
-                if seed % 6 < 2:
-                    lx = (seed * 9) % (ts - 8) + 4
-                    ly = (seed * 5) % (ts - 6) + 3
-                    glow_c = (140 + (seed % 40), 40 + (seed % 20), 10)
-                    pygame.draw.line(self.screen, glow_c,
-                                     (px + lx, py + ly),
-                                     (px + lx + 5, py + ly + 2), 1)
-            elif env == "ice":
-                # Ice sheen on floor
-                if seed % 4 == 0:
-                    shine = pygame.Surface((ts, ts), pygame.SRCALPHA)
-                    shine.fill((100, 150, 220, 12))
-                    self.screen.blit(shine, (px, py))
-            elif env == "void":
-                # Dark energy tendrils on floor
-                if seed % 7 < 2:
-                    vx = (seed * 3) % (ts - 6) + 3
-                    vy = (seed * 11) % (ts - 6) + 3
-                    pygame.draw.circle(self.screen, (60, 20, 70),
-                                       (px + vx, py + vy), 2)
-
-        elif tile_id == TILE_WALL:
-            # Town-interior walls reused in dungeon — same stone style
-            pygame.draw.rect(self.screen, (30, 28, 40), rect)
-            for iy in range(0, ts, 8):
-                offset = 5 if (iy // 8) % 2 else 0
-                for ix in range(offset, ts, 11):
-                    s = (wc * 7 + wr * 13 + ix + iy) % 5
-                    bc = (75, 70, 90) if s < 2 else (60, 58, 78)
-                    brick = pygame.Rect(px + ix, py + iy, 9, 6)
-                    pygame.draw.rect(self.screen, bc, brick)
-                    pygame.draw.rect(self.screen, (40, 38, 55), brick, 1)
-
-        elif tile_id == TILE_FLOOR:
-            # Town-interior floor — same as dungeon floor
-            pygame.draw.rect(self.screen, BLACK, rect)
-            if seed % 5 < 2:
-                dx = (seed * 7) % (ts - 6) + 3
-                dy = (seed * 13) % (ts - 6) + 3
-                pygame.draw.rect(self.screen, (30, 28, 35),
-                                 pygame.Rect(px + dx, py + dy, 2, 1))
-
-        elif tile_id == TILE_STAIRS:
-            # Stairs up — stone steps with blue-white highlight
-            pygame.draw.rect(self.screen, BLACK, rect)
-            for i in range(4):
-                step_y = py + 4 + i * 7
-                step_w = ts - 8 - i * 3
-                step_x = px + 4 + i
-                sc = 90 + i * 15  # gradually lighter
-                step_rect = pygame.Rect(step_x, step_y, step_w, 5)
-                pygame.draw.rect(self.screen, (sc, sc, sc + 20), step_rect)
-                pygame.draw.rect(self.screen, (50, 50, 60), step_rect, 1)
-            # Up arrow
-            arrow = [(cx, py + 2), (cx - 4, py + 6), (cx + 4, py + 6)]
-            pygame.draw.polygon(self.screen, BLUE, arrow)
-
-        elif tile_id == TILE_CHEST:
-            # Treasure chest — use reference tile image
-            if self._chest_tile:
-                self.screen.blit(self._chest_tile, (rect.x, rect.y))
-            else:
-                # Fallback procedural
-                pygame.draw.rect(self.screen, BLACK, rect)
-                body = pygame.Rect(cx - 7, cy - 2, 14, 9)
-                pygame.draw.rect(self.screen, BROWN, body)
-                pygame.draw.rect(self.screen, (100, 70, 30), body, 1)
-                lid = pygame.Rect(cx - 7, cy - 6, 14, 5)
-                pygame.draw.rect(self.screen, (160, 115, 40), lid)
-                pygame.draw.rect(self.screen, (100, 70, 30), lid, 1)
-                pygame.draw.circle(self.screen, YELLOW, (cx, cy), 2)
-
-        elif tile_id == TILE_TRAP:
-            # Trap — looks like floor but with faint red X
-            pygame.draw.rect(self.screen, BLACK, rect)
-            pygame.draw.line(self.screen, (60, 20, 20),
-                             (cx - 5, cy - 5), (cx + 5, cy + 5), 1)
-            pygame.draw.line(self.screen, (60, 20, 20),
-                             (cx + 5, cy - 5), (cx - 5, cy + 5), 1)
-
-        elif tile_id == TILE_COUNTER:
-            # Counter/table
-            pygame.draw.rect(self.screen, BLACK, rect)
-            top = pygame.Rect(px + 3, py + 8, ts - 6, ts - 14)
-            pygame.draw.rect(self.screen, BROWN, top)
-            pygame.draw.rect(self.screen, (100, 70, 30), top, 1)
-            pygame.draw.circle(self.screen, YELLOW, (cx, cy), 3)
-
-        elif tile_id == TILE_DOOR:
-            # Wooden door
-            pygame.draw.rect(self.screen, BLACK, rect)
-            door_rect = pygame.Rect(px + 7, py + 2, ts - 14, ts - 4)
-            pygame.draw.rect(self.screen, (100, 65, 30), door_rect)
-            pygame.draw.rect(self.screen, (60, 40, 15), door_rect, 1)
-            pygame.draw.circle(self.screen, YELLOW, (cx + 3, cy), 2)
-
-        elif tile_id == TILE_EXIT:
-            # Exit marker — green arrow on black
-            pygame.draw.rect(self.screen, BLACK, rect)
-            arrow = [(cx, cy + 8), (cx - 6, cy - 2), (cx + 6, cy - 2)]
-            pygame.draw.polygon(self.screen, (0, 170, 0), arrow)
-
-        elif tile_id == TILE_STAIRS_DOWN:
-            # Stairs down — darker steps with down arrow
-            pygame.draw.rect(self.screen, BLACK, rect)
-            for i in range(4):
-                step_y = py + 4 + i * 7
-                step_w = ts - 8 - (3 - i) * 3
-                step_x = px + 4 + (3 - i)
-                sc = 90 - i * 12  # gradually darker
-                step_rect = pygame.Rect(step_x, step_y, step_w, 5)
-                pygame.draw.rect(self.screen, (sc, sc - 10, sc - 5), step_rect)
-                pygame.draw.rect(self.screen, (40, 35, 45), step_rect, 1)
-            # Down arrow
-            arrow = [(cx, py + ts - 3), (cx - 4, py + ts - 7), (cx + 4, py + ts - 7)]
-            pygame.draw.polygon(self.screen, ORANGE, arrow)
-
-        elif tile_id == TILE_DDOOR:
-            # Dungeon door — brown planks
-            pygame.draw.rect(self.screen, BLACK, rect)
-            door_rect = pygame.Rect(px + 6, py + 2, ts - 12, ts - 4)
-            pygame.draw.rect(self.screen, (90, 55, 25), door_rect)
-            # Plank lines
-            for dy in range(4, ts - 6, 6):
-                pygame.draw.line(self.screen, (60, 35, 15),
-                                 (px + 7, py + dy), (px + ts - 7, py + dy), 1)
-            # Handle
-            pygame.draw.circle(self.screen, YELLOW, (cx + 4, cy), 2)
-            pygame.draw.rect(self.screen, (60, 35, 15), door_rect, 1)
-
-        elif tile_id == TILE_LOCKED_DOOR:
-            # Locked dungeon door — iron-bound dark planks with keyhole
-            pygame.draw.rect(self.screen, BLACK, rect)
-            door_rect = pygame.Rect(px + 5, py + 2, ts - 10, ts - 4)
-            pygame.draw.rect(self.screen, (60, 38, 18), door_rect)
-            # Iron bands
-            for dy in (4, ts // 2, ts - 8):
-                pygame.draw.line(self.screen, (100, 100, 110),
-                                 (px + 5, py + dy), (px + ts - 5, py + dy), 2)
-            # Keyhole
-            pygame.draw.circle(self.screen, (180, 170, 50), (cx, cy), 3)
-            pygame.draw.circle(self.screen, (30, 20, 10), (cx, cy), 2)
-            pygame.draw.line(self.screen, (30, 20, 10),
-                             (cx, cy), (cx, cy + 4), 1)
-            # Border
-            pygame.draw.rect(self.screen, (80, 80, 90), door_rect, 1)
-
-        elif tile_id == TILE_ARTIFACT:
-            # Glowing crystal on pedestal
-            pygame.draw.rect(self.screen, BLACK, rect)
-            # Pedestal
-            ped = pygame.Rect(cx - 5, cy + 4, 10, 6)
-            pygame.draw.rect(self.screen, GRAY, ped)
-            pygame.draw.rect(self.screen, (100, 100, 110), ped, 1)
-            # Crystal — diamond shape
-            crystal = [
-                (cx, cy - 8),       # top
-                (cx + 5, cy),       # right
-                (cx, cy + 4),       # bottom
-                (cx - 5, cy),       # left
-            ]
-            pygame.draw.polygon(self.screen, (180, 60, 200), crystal)
-            pygame.draw.polygon(self.screen, (220, 100, 255), crystal, 1)
-            # Glow effect
-            glow = pygame.Surface((16, 16), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (200, 100, 255, 50), (8, 8), 8)
-            self.screen.blit(glow, (cx - 8, cy - 8))
-
-        elif tile_id == TILE_PORTAL:
-            # Swirling portal doorway — distinct cyan/blue energy arch
-            pygame.draw.rect(self.screen, BLACK, rect)
-            # Stone archway frame
-            arch_color = (100, 100, 120)
-            # Left pillar
-            pygame.draw.rect(self.screen, arch_color,
-                             pygame.Rect(px + 3, py + 6, 5, ts - 8))
-            # Right pillar
-            pygame.draw.rect(self.screen, arch_color,
-                             pygame.Rect(px + ts - 8, py + 6, 5, ts - 8))
-            # Top arch
-            pygame.draw.rect(self.screen, arch_color,
-                             pygame.Rect(px + 3, py + 3, ts - 6, 5))
-            # Swirling energy fill inside the arch
-            inner = pygame.Surface((ts - 14, ts - 12), pygame.SRCALPHA)
-            inner.fill((0, 180, 255, 80))
-            self.screen.blit(inner, (px + 7, py + 7))
-            # Energy swirl lines
-            import math as _math
-            for i in range(3):
-                sy = py + 10 + i * 7
-                for sx_off in range(1, ts - 15, 2):
-                    wave = int(_math.sin(sx_off * 0.5 + i * 2.0) * 2)
-                    c_val = 150 + (sx_off * 7 + i * 30) % 105
-                    pygame.draw.rect(self.screen, (0, c_val, 255),
-                                     pygame.Rect(px + 8 + sx_off, sy + wave, 2, 1))
-            # Bright glow around the portal
-            glow = pygame.Surface((ts, ts), pygame.SRCALPHA)
-            pygame.draw.rect(glow, (0, 180, 255, 40),
-                             pygame.Rect(0, 0, ts, ts))
-            self.screen.blit(glow, (px, py))
-            # Pillar highlights
-            pygame.draw.rect(self.screen, (140, 140, 160),
-                             pygame.Rect(px + 3, py + 3, ts - 6, 5), 1)
-
-        elif tile_id == TILE_PUDDLE:
-            # Dark water puddle on dungeon floor
-            pygame.draw.rect(self.screen, palette["floor_base"], rect)
-            # Puddle shape — irregular oval
-            puddle_w = ts - 8 + (seed % 5)
-            puddle_h = ts - 14 + (seed % 4)
-            puddle_rect = pygame.Rect(cx - puddle_w // 2, cy - puddle_h // 2,
-                                      puddle_w, puddle_h)
-            # Dark blue water
-            pygame.draw.ellipse(self.screen, (20, 35, 60), puddle_rect)
-            pygame.draw.ellipse(self.screen, (30, 50, 80), puddle_rect, 1)
-            # Animated shimmer highlight
-            import math as _mp
-            t = pygame.time.get_ticks()
-            shimmer = 0.5 + 0.5 * _mp.sin(t * 0.003 + seed)
-            sh_x = cx - 3 + int(shimmer * 4)
-            sh_y = cy - 2
-            sh_alpha = int(40 + 40 * shimmer)
-            sh_surf = pygame.Surface((6, 2), pygame.SRCALPHA)
-            sh_surf.fill((120, 160, 220, sh_alpha))
-            self.screen.blit(sh_surf, (sh_x, sh_y))
-
-        elif tile_id == TILE_MOSS:
-            # Mossy stone floor
-            pygame.draw.rect(self.screen, palette["floor_base"], rect)
-            # Floor texture underneath
-            detail_col = palette["floor_detail"]
-            if seed % 3 == 0:
-                dx = (seed * 7) % (ts - 6) + 3
-                dy = (seed * 13) % (ts - 6) + 3
-                pygame.draw.rect(self.screen, detail_col,
-                                 pygame.Rect(px + dx, py + dy, 2, 1))
-            # Moss patches — several small green clumps
-            moss_colors = [(30, 70, 25), (20, 55, 18), (40, 80, 30),
-                           (25, 60, 20)]
-            for i in range(4 + seed % 3):
-                s = seed * 7 + i * 37
-                mx = (s * 11) % (ts - 6) + 3
-                my = (s * 17) % (ts - 6) + 3
-                mw = 2 + s % 3
-                mh = 1 + s % 2
-                mc = moss_colors[i % len(moss_colors)]
-                pygame.draw.rect(self.screen, mc,
-                                 pygame.Rect(px + mx, py + my, mw, mh))
-            # Occasional tiny tendril
-            if seed % 4 == 0:
-                tx = px + (seed * 3) % (ts - 4) + 2
-                ty = py + (seed * 9) % (ts - 8) + 4
-                pygame.draw.line(self.screen, (35, 75, 28),
-                                 (tx, ty), (tx + 2, ty - 3), 1)
-
-        elif tile_id == TILE_WALL_TORCH:
-            # Wall tile with mounted torch — animated flame
-            # Draw the wall base first (same as DWALL)
-            pygame.draw.rect(self.screen, palette["wall_base"], rect)
-            bricks = palette["wall_bricks"]
-            mortar = palette["wall_mortar"]
-            for iy in range(0, ts, 8):
-                offset = 5 if (iy // 8) % 2 else 0
-                for ix in range(offset, ts, 11):
-                    s = (wc * 7 + wr * 13 + ix + iy) % 5
-                    if s < 2:
-                        bc = bricks[0]
-                    elif s < 4:
-                        bc = bricks[1]
-                    else:
-                        bc = bricks[2]
-                    brick = pygame.Rect(px + ix, py + iy, 9, 6)
-                    pygame.draw.rect(self.screen, bc, brick)
-                    pygame.draw.rect(self.screen, mortar, brick, 1)
-            # Torch bracket — small brown mounting
-            bracket_x = cx - 2
-            bracket_y = cy + 2
-            pygame.draw.rect(self.screen, (100, 70, 30),
-                             pygame.Rect(bracket_x, bracket_y, 4, 6))
-            pygame.draw.rect(self.screen, (70, 45, 15),
-                             pygame.Rect(bracket_x, bracket_y, 4, 6), 1)
-            # Animated flame
-            import math as _mt
-            t = pygame.time.get_ticks()
-            flicker = _mt.sin(t * 0.012 + wc * 3.7 + wr * 5.3)
-            flicker2 = _mt.sin(t * 0.019 + wc * 2.1 + wr * 7.1)
-            # Outer flame (orange-red, larger)
-            flame_h = 8 + int(flicker * 2)
-            flame_w = 5 + int(flicker2)
-            flame_top = bracket_y - flame_h
-            flame_pts = [
-                (cx, flame_top),                        # tip
-                (cx - flame_w // 2, bracket_y),         # bottom-left
-                (cx + flame_w // 2, bracket_y),         # bottom-right
-            ]
-            pygame.draw.polygon(self.screen, (220, 120, 30), flame_pts)
-            # Inner flame (bright yellow, smaller)
-            inner_h = flame_h - 3
-            inner_w = max(1, flame_w - 3)
-            inner_pts = [
-                (cx + int(flicker), flame_top + 2),
-                (cx - inner_w // 2, bracket_y - 1),
-                (cx + inner_w // 2, bracket_y - 1),
-            ]
-            pygame.draw.polygon(self.screen, (255, 230, 80), inner_pts)
-            # Tiny bright core
-            pygame.draw.circle(self.screen, (255, 255, 200),
-                               (cx, bracket_y - 2), 2)
-
-        else:
-            # Non-dungeon tile (town/building/editor tile placed
-            # in a custom dungeon).  Use TILE_DEFS colour when
-            # available (designed for visibility), otherwise fall
-            # back to the sprite sheet for extended tiles.
-            from src.settings import TILE_DEFS as _TD_FB
-            td = _TD_FB.get(tile_id)
-            if td:
-                pygame.draw.rect(self.screen, td["color"], rect)
-            else:
-                sprite = self._tile_sprites.get(tile_id)
-                if sprite:
-                    self.screen.blit(sprite, (px, py))
-                else:
-                    pygame.draw.rect(self.screen, BLACK, rect)
 
     # ── unique tile sprite ─────────────────────────────────
 
@@ -12519,14 +11080,15 @@ class Renderer(CombatEffectRendererMixin):
                             return pygame.transform.scale(
                                 sprite.copy(), (size, size))
                         return sprite.copy()
-                    # Last resort: procedural
+                    # Last resort: render via the unified entry point.
                     self.screen = surf
-                    self._u3_draw_overworld_tile(
-                        tile_id, 0, 0, ts, 5, 5)
+                    self._draw_tile(tile_id, 0, 0, ts, 5, 5)
             elif category == "dungeon" and tile_id is not None:
-                palette = self._get_dungeon_palette(0)
-                self._u3_draw_dungeon_tile(
-                    tile_id, 0, 0, ts, 5, 5, palette=palette)
+                # Tile gallery preview — show the sprite without the
+                # per-level atmospheric overlay (the gallery has no
+                # palette context).
+                self.screen = surf
+                self._draw_tile(tile_id, 0, 0, ts, 5, 5)
             else:
                 # Non-tile categories (monsters, characters, etc.)
                 # use the raw manifest sprite directly from disk

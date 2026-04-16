@@ -285,7 +285,7 @@ class FeaturesEditor:
         # Save flash
         self.town_save_flash = 0.0
         # NPC type/shop type options
-        self._NPC_TYPES = ["villager", "shopkeep", "innkeeper", "priest", "elder", "gnome"]
+        self._NPC_TYPES = ["villager", "shopkeep", "innkeeper", "priest", "elder"]
         self._SHOP_TYPES = ["general", "weapons", "armor", "reagent", "potion", "book", "map"]
 
         # Gallery render modes
@@ -322,8 +322,6 @@ class FeaturesEditor:
             ("dungeon", "stairs"): "procedural",
             ("dungeon", "stairs_down"): "procedural",
             ("dungeon", "trap"): "procedural",
-            ("town", "machine"): "procedural",
-            ("town", "keyslot"): "procedural",
         }
 
         # Town template defaults

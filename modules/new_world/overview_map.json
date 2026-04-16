@@ -796,7 +796,7 @@
       7,
       7,
       7,
-      9,
+      5,
       0,
       0,
       6,
@@ -2636,7 +2636,7 @@
     },
     "7,15": {
       "linked": true,
-      "link_map": "building:Goulag",
+      "link_map": "dungeon:Dank Pit",
       "link_x": "0",
       "link_y": "1"
     }

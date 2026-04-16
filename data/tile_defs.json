@@ -291,28 +291,6 @@
     "context": "dungeon",
     "sprite": "dungeon/locked_door"
   },
-  "30": {
-    "name": "Machine",
-    "walkable": true,
-    "color": [
-      160,
-      80,
-      200
-    ],
-    "context": "town",
-    "sprite": "town/machine"
-  },
-  "31": {
-    "name": "Key Slot",
-    "walkable": false,
-    "color": [
-      100,
-      60,
-      160
-    ],
-    "context": "town",
-    "sprite": "town/keyslot"
-  },
   "32": {
     "name": "Puddle",
     "walkable": true,

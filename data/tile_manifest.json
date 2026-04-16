@@ -226,20 +226,6 @@
       ],
       "tile_id": 35
     },
-    "machine": {
-      "path": "src/assets/game/dungeon/machine.png",
-      "usable_in": [
-        "town"
-      ],
-      "tile_id": 30
-    },
-    "keyslot": {
-      "path": "src/assets/game/dungeon/keyslot.png",
-      "usable_in": [
-        "town"
-      ],
-      "tile_id": 31
-    },
     "brick_wall_brown": {
       "path": "src/assets/unassigned/brick_wall_brown.png",
       "usable_in": [

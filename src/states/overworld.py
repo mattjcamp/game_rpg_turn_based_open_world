@@ -14,7 +14,7 @@ from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
-    TILE_WATER, TILE_MACHINE, TILE_DUNGEON_CLEARED, TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
+    TILE_WATER, TILE_DUNGEON_CLEARED, TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_OVERWORLD, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
     NPC_WANDER_RANGE, ORC_RESPAWN_CHANCE,
 )
@@ -162,67 +162,6 @@ class OverworldState(InventoryMixin, BaseState):
             self.message_timer = 3000
             # Spawn initial orcs
             self._spawn_orcs()
-
-    def _interact_machine(self):
-        """Handle stepping on the gnome machine tile (Keys of Shadow)."""
-        kd = self.game.get_key_dungeons()
-        if not kd:
-            self.show_message("A strange machine hums ominously.", 2000)
-            return
-
-        # Count keys the party currently holds
-        party = self.game.party
-        key_names = [d["key_name"] for d in kd.values()]
-        held_keys = [k for k in key_names if party.inv_count(k) > 0]
-
-        total = self.game.get_total_keys()
-        inserted = self.game.get_keys_inserted()
-
-        if held_keys:
-            # Insert all held keys
-            for key in held_keys:
-                party.inv_remove(key)
-                inserted = self.game.insert_key()
-            n = len(held_keys)
-            names = ", ".join(held_keys)
-            self.show_message(
-                f"Inserted {names}! ({inserted}/{total} keys placed)", 3500)
-
-            # Check victory
-            if inserted >= total:
-                self._trigger_victory()
-        elif inserted >= total:
-            self.show_message(
-                "The machine is deactivated. Sunlight bathes the land!", 3000)
-        elif inserted > 0:
-            remaining = total - inserted
-            self.show_message(
-                f"The machine hums... {inserted}/{total} keys inserted. "
-                f"{remaining} more needed.", 3000)
-        else:
-            self.show_message(
-                "A massive gnomish machine blocks the sun! "
-                "It has 8 empty keyhole slots.", 3500)
-
-    def _trigger_victory(self):
-        """Called when all keys are inserted — quest complete!"""
-        self.game.set_darkness(False)
-        # Award XP and gold to all alive party members
-        for m in self.game.party.alive_members():
-            if m.is_alive():
-                m.exp += 500
-                msgs = m.check_level_up()
-                for msg in msgs:
-                    self.game.game_log.append(msg)
-        self.game.party.gold += 1000
-        town_name = getattr(self.game, "town_data", None)
-        town_name = town_name.name if town_name else "the realm"
-        self.game.game_log.append("*** Quest complete! ***")
-        self.game.game_log.append("Peace returns to the land!")
-        self.game.game_log.append(f"The people of {town_name} are saved!")
-        self.game.game_log.append("Victory! +500 XP, +1000 Gold")
-        self.show_message(
-            "Quest complete! Peace returns! Victory!", 6000)
 
     # ── Equipment management ─────────────────────────────────────
 
@@ -1364,10 +1303,6 @@ class OverworldState(InventoryMixin, BaseState):
                 self._show_dungeon_action(pcol, prow)
             return
 
-        elif tile_id == TILE_MACHINE:
-            self._interact_machine()
-            return
-
         elif tile_id == TILE_CHEST:
             self._open_chest()
             # Restore the original tile that was under the chest
@@ -1997,7 +1932,7 @@ class OverworldState(InventoryMixin, BaseState):
         for npc in self._building_interior_npcs:
             # Random wandering for quest givers and non-guardian NPCs.
             # Quest items, quest monsters (guardians), and stationary
-            # types (shopkeep, innkeeper, priest, gnome) stay in place.
+            # types (shopkeep, innkeeper, priest) stay in place.
             wr = getattr(npc, "wander_range", 0)
             stationary = getattr(_NPCClass, "STATIONARY_TYPES", set())
             if wr and npc.npc_type not in stationary and npc.npc_type != "quest_monster":
@@ -2175,7 +2110,6 @@ class OverworldState(InventoryMixin, BaseState):
 
     _TOWN_DESCRIPTIONS = {
         "Thornwall": "A sturdy frontier town nestled against the hills. Merchants, healers, and townsfolk go about their daily lives within its wooden walls.",
-        "Duskhollow": "A shadowed settlement cloaked in perpetual twilight. Strange lights flicker in the windows and whispered rumors fill the streets.",
     }
 
     def _find_town_by_name(self, name):
@@ -2592,23 +2526,6 @@ class OverworldState(InventoryMixin, BaseState):
             desc = self._TOWN_DESCRIPTIONS.get(name,
                 f"The town of {name} rises from the landscape. "
                 "Smoke drifts from chimneys and voices carry on the wind.")
-
-        # After a gnome machine quest is complete, darkness lifts
-        has_gnome_machine = any(
-            kd.get("quest_type") == "gnome_machine"
-            for kd in getattr(self.game, "key_dungeons", {}).values())
-        mod_id = ""
-        if self.game.module_manifest:
-            mod_id = self.game.module_manifest.get(
-                "metadata", {}).get("id", "")
-        if mod_id == "keys_of_shadow":
-            has_gnome_machine = True
-        if (has_gnome_machine
-                and not getattr(self.game, "darkness_active", False)
-                and getattr(self.game, "keys_inserted", 0) > 0):
-            desc = (f"Once shrouded in eternal darkness, {name} now basks "
-                    f"in warm sunlight. The townsfolk celebrate their freedom "
-                    f"as life returns to normal.")
 
         self.town_action_info = {
             "name": name,

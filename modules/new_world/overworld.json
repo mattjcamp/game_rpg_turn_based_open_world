@@ -17,14 +17,6 @@
       "clear_radius": 3
     },
     {
-      "id": "town_fountain",
-      "type": "machine",
-      "col": 34,
-      "row": 16,
-      "tile": "TILE_MACHINE",
-      "clear_radius": 1
-    },
-    {
       "id": "dungeon_1",
       "type": "dungeon",
       "col": 44,

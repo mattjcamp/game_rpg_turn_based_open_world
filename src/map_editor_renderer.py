@@ -4,7 +4,7 @@ Unified map editor renderer.
 Provides ``draw_map_editor()`` — a single entry point that reads a
 :class:`MapEditorState` (via ``to_data_dict()``) and draws the
 appropriate editor UI.  The function delegates to the host
-:class:`Renderer` for sprite helpers (``_u3_draw_overworld_tile``,
+:class:`Renderer` for sprite helpers (``_draw_tile``,
 ``_get_unique_tile_sprite``, font references, etc.).
 
 This module does **not** subclass Renderer — it takes a renderer
@@ -306,7 +306,7 @@ def _draw_dense_brush_icon(renderer, brush, icon_x, by, icon_sz):
         tmp.fill(_COL_BG)
         saved = renderer.screen
         renderer.screen = tmp
-        renderer._u3_draw_overworld_tile(brush.tile_id, 0, 0, TILE_SIZE, 0, 0)
+        renderer._draw_tile(brush.tile_id, 0, 0, TILE_SIZE, 0, 0)
         renderer.screen = saved
         scaled = pygame.transform.scale(tmp, (icon_sz, icon_sz))
         screen.blit(scaled, (icon_x, by + 4))
@@ -557,7 +557,7 @@ def _draw_dense_grid(renderer, data: Dict):
             tile_id = tiles[mr][mc]
             px = ox + (mc - cam_c) * ts
             py = oy + (mr - cam_r) * ts
-            renderer._u3_draw_overworld_tile(tile_id, px, py, ts, mc, mr)
+            renderer._draw_tile(tile_id, px, py, ts, mc, mr)
 
     # Object stamp preview (ghost overlay on dense grid)
     brushes = data.get("brushes", [])

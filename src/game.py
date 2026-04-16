@@ -29,7 +29,7 @@ from src.states.town import TownState
 from src.states.dungeon import DungeonState
 from src.states.combat import CombatState
 from src.states.examine import ExamineState
-from src.town_generator import generate_town, generate_duskhollow
+from src.town_generator import generate_town
 from src.music import SoundEffects, MusicManager
 from src.save_load import (save_game, load_game, get_save_info,
                            delete_save, quick_save,
@@ -93,9 +93,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # None when no quest active; dict when quest is in progress
         self.quest = None
         self.house_quest = None
-        self._gnome_quest_accepted = False
         self.key_dungeons = {}
-        self.keys_inserted = 0
         self.visited_dungeons = set()
         # Module quest system - user-created quests from quests.json
         self.module_quest_states = {}  # {quest_name: {status, step_progress}}
@@ -105,8 +103,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.quest_dungeon_monsters = {}   # {dungeon_name: [{monster_key, ...}]}
         self.quest_collect_items = {}      # {location_key: [{item_info, ...}]}
         self.dungeon_cache = {}
-        self.machine_col = None
-        self.machine_row = None
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
         self.pending_combat_location = ""
@@ -600,7 +596,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.darkness_active = False
         self.town_data = generate_town("Thornwall")  # safe default
         self.town_data_map = {}
-        self._gnome_quest_accepted = False
         self.module_quest_states = {}
         self.overworld_quest_npcs = []
         self.quest_spawned_monsters = {}
@@ -795,27 +790,17 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         # ── Module key-dungeon quests ──
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
-        self.keys_inserted = 0  # how many keys placed in the machine
         self.pending_combat_rewards = None  # set by combat victory, consumed by source state
         self.pending_killed_monsters = []   # monster names killed in last combat
         self.pending_combat_location = ""   # where the combat took place
-        self.machine_col = None  # overworld position of the machine
-        self.machine_row = None
         self.town_data_map = {}
         if self.module_manifest:
-            mod_id = self.module_manifest.get(
-                "metadata", {}).get("id", "")
             prog = self.module_manifest.get("progression", {})
             kd_list = prog.get("key_dungeons", [])
             if kd_list:
                 self._init_key_dungeons(kd_list)
-            if mod_id == "keys_of_shadow":
-                # Duskhollow is unique to Keys of Shadow
-                self.darkness_active = True
-                self.town_data = generate_duskhollow()
-            else:
-                # Generate all towns from the manifest
-                self._init_module_towns()
+            # Generate all towns from the manifest
+            self._init_module_towns()
 
         # Inject module quest giver NPCs into towns
         self._inject_module_quest_npcs()
@@ -931,26 +916,13 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         overworld (col, row) position.  The dungeon levels are generated
         lazily on first entry.
 
-        For the Keys of Shadow module, dungeons start as ``"active"``
-        (the gnome quest acceptance gates visibility).  For all other
-        modules, dungeons start as ``"undiscovered"`` - the quest
-        objective is hidden until the town elder reveals them.
+        Dungeons start as ``"undiscovered"`` - the quest objective is
+        hidden until the town elder reveals them.
         """
         from src.dungeon_generator import generate_keys_dungeon
 
         overworld_cfg = self.module_manifest.get("_overworld_cfg", {})
         landmarks = {lm["id"]: lm for lm in overworld_cfg.get("landmarks", [])}
-
-        # Determine starting status based on module
-        mod_id = self.module_manifest.get("metadata", {}).get("id", "")
-        initial_status = "active" if mod_id == "keys_of_shadow" else "undiscovered"
-
-        # Find the machine landmark
-        for lm in overworld_cfg.get("landmarks", []):
-            if lm.get("type") == "machine":
-                self.machine_col = lm["col"]
-                self.machine_row = lm["row"]
-                break
 
         for kd in kd_list:
             lm_id = kd.get("landmark_id", "")
@@ -970,8 +942,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             # specs drive the floor count and monster placement.
             # Kill quests don't need an artifact tile - the portal
             # spawns when enough monsters are killed instead.
-            # Gnome machine quests ARE retrieve quests (collect a key)
-            # so they need an artifact tile.
             needs_artifact = (quest_type != "kill")
             kt = kd.get("kill_target", "") if quest_type == "kill" else None
             kc = int(kd.get("kill_count", 0)) if quest_type == "kill" else 0
@@ -992,7 +962,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 "key_name": key_name,
                 "levels": levels,
                 "current_level": 0,
-                "status": initial_status,  # undiscovered → active → artifact_found → completed
+                "status": "undiscovered",  # undiscovered → active → artifact_found → completed
                 "dungeon_col": col,
                 "dungeon_row": row,
                 "artifact_name": key_name,
@@ -1005,8 +975,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 "kill_progress": 0,  # runtime kill counter
                 "module_levels": module_levels,  # original specs
                 "exit_portal": kd.get("exit_portal", True),
-                "keys_needed": int(kd.get("keys_needed", 1)),
-                "gnome_town": kd.get("gnome_town", ""),
             }
 
     def discover_key_dungeons(self, only_types=None, exclude_types=None):
@@ -1052,34 +1020,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         prog = self.module_manifest.get("progression", {})
         inn_quests = prog.get("innkeeper_quests", False)
 
-        # Check if any quest uses gnome_machine type
-        # (per-quest field, not module-level)
-        has_gnome_machine = any(
-            kd.get("quest_type") == "gnome_machine"
-            for kd in self.key_dungeons.values())
-        # Also check Keys of Shadow (always gnome machine)
-        mod_id = self.module_manifest.get("metadata", {}).get("id", "")
-        if mod_id == "keys_of_shadow":
-            has_gnome_machine = True
-        # Sum up keys_needed from all gnome_machine quests
-        gnome_keys_needed = sum(
-            kd.get("keys_needed", 1)
-            for kd in self.key_dungeons.values()
-            if kd.get("quest_type") == "gnome_machine")
-        if mod_id == "keys_of_shadow":
-            gnome_keys_needed = max(gnome_keys_needed,
-                                    len(self.key_dungeons))
-        # Determine which town the gnome machine should be placed in.
-        # The user can choose via the "Gnome Town" quest field.
-        # For KoS, it always goes in the first town.
-        gnome_town_name = ""
-        if has_gnome_machine and mod_id != "keys_of_shadow":
-            for kd in self.key_dungeons.values():
-                if kd.get("quest_type") == "gnome_machine":
-                    gnome_town_name = kd.get("gnome_town", "")
-                    if gnome_town_name:
-                        break
-
         self.town_data_map = {}
         first_town = None
         town_ordinal = 0  # guarantees each town gets a different layout
@@ -1102,15 +1042,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             col, row = lm["col"], lm["row"]
             # Unique seed per town so NPCs and dialogue vary
             town_seed = hash((tname, col, row, i)) & 0xFFFFFFFF
-            # Place the gnome machine in the chosen town, or the first
-            # town if none was explicitly chosen.
-            if has_gnome_machine:
-                if gnome_town_name:
-                    place_machine = (tname == gnome_town_name)
-                else:
-                    place_machine = (first_town is None)
-            else:
-                place_machine = False
             tc = town_configs.get(tid, {})
             # Prefer user-edited town from towns.json over layout
             # templates or procedural generation - this is the map the
@@ -1133,8 +1064,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         layout_index=town_ordinal,
                         has_key_dungeons=bool(self.key_dungeons),
                         innkeeper_quests=inn_quests,
-                        gnome_machine=place_machine,
-                        keys_needed=gnome_keys_needed,
                         town_config=tc)
             town_ordinal += 1
             self.town_data_map[(col, row)] = td
@@ -1193,11 +1122,11 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         if first_town:
             self.town_data = first_town
 
-        # Distribute non-gnome quests as individual NPCs across towns
+        # Distribute key dungeon quests as individual NPCs across towns
         self._assign_quest_npcs()
 
     def _assign_quest_npcs(self):
-        """Distribute non-gnome key dungeon quests across towns as NPCs.
+        """Distribute key dungeon quests across towns as NPCs.
 
         Each quest gets its own quest_giver NPC placed in a randomly
         chosen town.  The mapping is stored in
@@ -1206,12 +1135,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         """
         from src.town_generator import add_quest_giver_npc, _QUEST_GIVER_POOL
 
-        # Collect non-gnome quests that need distributing
-        quests_to_assign = []
-        for pos_key, kd in self.key_dungeons.items():
-            if kd.get("quest_type") == "gnome_machine":
-                continue
-            quests_to_assign.append((pos_key, kd))
+        # Collect quests that need distributing
+        quests_to_assign = list(self.key_dungeons.items())
 
         if not quests_to_assign or not self.town_data_map:
             self.quest_npc_assignments = {}
@@ -2205,28 +2130,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         """Return key-dungeon info at (col, row), or None."""
         return self.key_dungeons.get((col, row))
 
-    def get_keys_inserted(self):
-        """Return how many Keys of Shadow have been inserted."""
-        return self.keys_inserted
-
-    def insert_key(self):
-        """Increment keys_inserted by one.  Returns the new count."""
-        self.keys_inserted += 1
-        return self.keys_inserted
-
-    def get_total_keys(self):
-        """Return the total number of keys needed for the gnome machine.
-
-        For Keys of Shadow (all quests are gnome-style), this is the
-        total number of key dungeons.  For custom modules, it counts
-        only dungeons whose quest_type is ``"gnome_machine"``.  Falls
-        back to all dungeons if none are explicitly gnome_machine.
-        """
-        gnome_count = sum(
-            1 for kd in self.key_dungeons.values()
-            if kd.get("quest_type") == "gnome_machine")
-        return gnome_count if gnome_count else len(self.key_dungeons)
-
     def set_darkness(self, active):
         """Enable or disable the darkness overlay."""
         self.darkness_active = active
@@ -2264,10 +2167,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
     def save_examined_tile(self, col, row, data):
         """Store examine layout data for overworld tile (col, row)."""
         self.examined_tiles[(col, row)] = data
-
-    def set_gnome_quest_accepted(self):
-        """Mark the gnome quest as accepted."""
-        self._gnome_quest_accepted = True
 
     def _build_quest_log(self):
         """Build a list of quest entries for the quest log screen.
@@ -2326,20 +2225,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # ── Key dungeon quests (one entry per dungeon) ──
         kd_map = self.key_dungeons
         if kd_map:
-            gnome_accepted = self._gnome_quest_accepted
-            inserted = self.keys_inserted
-
-            # Check if any quest uses gnome_machine type
-            is_gnome_machine = any(
-                kd.get("quest_type") == "gnome_machine"
-                for kd in kd_map.values())
-            # Keys of Shadow is always gnome_machine style
-            if self.module_manifest:
-                mod_id = self.module_manifest.get(
-                    "metadata", {}).get("id", "")
-                if mod_id == "keys_of_shadow":
-                    is_gnome_machine = True
-
             for pos, kd in kd_map.items():
                 kd_status = kd.get("status", "undiscovered")
                 if kd_status == "undiscovered":
@@ -2348,11 +2233,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 dname = kd.get("name", "Key Dungeon")
                 qtype = kd.get("quest_type", "retrieve")
 
-                # Per-quest return destination
-                if qtype == "gnome_machine":
-                    return_dest = "the Gnome"
-                else:
-                    return_dest = "the Elder"
+                return_dest = "the Elder"
 
                 if qtype == "kill":
                     # Kill quest: track monster kills
@@ -2377,7 +2258,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     ]
                     quest_title = f"{dname}: {kd.get('quest_objective', key_name)}"
                 else:
-                    # Retrieve / gnome_machine quest: find the artifact/key
+                    # Retrieve quest: find the artifact/key
                     steps = [
                         {"description": f"Enter {dname}",
                          "done": kd_status in ("active", "artifact_found",
@@ -2398,28 +2279,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     "name": quest_title,
                     "status": kd_status,
                     "steps": steps,
-                })
-
-            # ── Final goal (Gnome Machine modules) ──
-            # Show the meta-quest when the module uses gnome machine
-            # quest style.  For elder modules, each dungeon quest is
-            # handled individually - no separate end-goal needed.
-            gnome_kds = [kd for kd in kd_map.values()
-                         if kd.get("quest_type") == "gnome_machine"]
-            if is_gnome_machine and (gnome_accepted or any(
-                    kd.get("status") != "undiscovered"
-                    for kd in gnome_kds)):
-                total = len(gnome_kds) if gnome_kds else len(kd_map)
-                all_done = inserted >= total
-                quests.append({
-                    "name": "Activate the Ancient Machine",
-                    "status": "completed" if all_done else "active",
-                    "steps": [
-                        {"description": f"Collect all {total} keys ({inserted}/{total} delivered)",
-                         "done": all_done},
-                        {"description": "Insert all keys into the machine",
-                         "done": all_done},
-                    ],
                 })
 
         # ── Module quests (user-created via the quest editor) ──

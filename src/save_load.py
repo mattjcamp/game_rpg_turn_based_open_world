@@ -184,7 +184,6 @@ def _serialize_key_dungeons(game):
             "module_levels": kd.get("module_levels"),
             "exit_portal": kd.get("exit_portal", True),
             "keys_needed": kd.get("keys_needed", 1),
-            "gnome_town": kd.get("gnome_town", ""),
             "levels": _serialize_dungeon_levels(kd.get("levels", [])),
         })
     return result
@@ -424,11 +423,6 @@ def save_game(slot, game):
             "module_version": getattr(game, "active_module_version", None),
             # ── Quest state ──
             "key_dungeons": _serialize_key_dungeons(game),
-            "keys_inserted": getattr(game, "keys_inserted", 0),
-            "machine_col": getattr(game, "machine_col", None),
-            "machine_row": getattr(game, "machine_row", None),
-            "gnome_quest_accepted": getattr(
-                game, "_gnome_quest_accepted", False),
             "darkness_active": getattr(game, "darkness_active", False),
             "quest_npc_assignments": getattr(
                 game, "quest_npc_assignments", {}),
@@ -540,13 +534,6 @@ def load_game(slot, game):
         # ── Restore darkness effect ─────────────────────────────
         game.darkness_active = save_data.get("darkness_active", False)
 
-        # ── Restore Keys of Shadow module state ─────────────────
-        game.keys_inserted = save_data.get("keys_inserted", 0)
-        game.machine_col = save_data.get("machine_col")
-        game.machine_row = save_data.get("machine_row")
-        game._gnome_quest_accepted = save_data.get(
-            "gnome_quest_accepted", False)
-
         # Restore key dungeon levels and quest statuses from save
         _restore_key_dungeons(game, save_data)
 
@@ -597,17 +584,11 @@ def load_game(slot, game):
 
         # ── Restore towns (module-specific) ─────────────────────
         if game.module_manifest:
-            mod_id = game.module_manifest.get(
-                "metadata", {}).get("id", "")
             prog = game.module_manifest.get("progression", {})
             kd_list = prog.get("key_dungeons", [])
             if kd_list:
-                if mod_id == "keys_of_shadow":
-                    from src.town_generator import generate_duskhollow
-                    game.town_data = generate_duskhollow()
-                else:
-                    # Regenerate all towns from the manifest
-                    game._init_module_towns()
+                # Regenerate all towns from the manifest
+                game._init_module_towns()
 
         # ── Re-inject quest-giver NPCs into towns ──────────────
         # (Must run after _init_module_towns so town data exists)
@@ -696,7 +677,6 @@ def _restore_key_dungeons(game, save_data):
             "kill_progress": int(skd.get("kill_progress", 0)),
             "exit_portal": skd.get("exit_portal", True),
             "keys_needed": int(skd.get("keys_needed", 1)),
-            "gnome_town": skd.get("gnome_town", ""),
         }
 
 
