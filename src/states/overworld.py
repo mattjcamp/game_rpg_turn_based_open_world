@@ -1311,6 +1311,28 @@ class OverworldState(InventoryMixin, BaseState):
                     interior_name, party.col, party.row,
                     building_name=self._building_name)
                 return
+            # Check tile link inside building interior
+            int_props = self._get_interior_tile_props(
+                party.col, party.row)
+            if int_props.get("linked"):
+                # Exit the interior first, then follow the link
+                # from the overworld position where the building is.
+                ow_col = getattr(self, '_stashed_overworld_party_col',
+                                 party.col)
+                ow_row = getattr(self, '_stashed_overworld_party_row',
+                                 party.row)
+                link_map = int_props.get("link_map", "")
+                # Exit the interior, restore overworld state, then
+                # follow the link directly (no action screen popup).
+                self._exit_overworld_interior()
+                self.game.party.col = ow_col
+                self.game.party.row = ow_row
+                self.game.camera.map_width = self.game.tile_map.width
+                self.game.camera.map_height = self.game.tile_map.height
+                self.game.camera.update(ow_col, ow_row)
+                self._follow_tile_link(int_props, ow_col, ow_row,
+                                       direct=True)
+                return
             return  # no other tile events inside interiors
 
         pcol, prow = party.col, party.row
@@ -1435,6 +1457,10 @@ class OverworldState(InventoryMixin, BaseState):
             self._stashed_overworld_tile_map = tmap
             self._stashed_overworld_monsters = list(self.overworld_monsters)
             self.overworld_monsters = []  # no roaming orcs in interiors
+            # Remember where the party was on the overworld so links
+            # from inside interiors can return to the correct position.
+            self._stashed_overworld_party_col = door_col
+            self._stashed_overworld_party_row = door_row
 
         self._overworld_interior_name = interior_name
         self._in_overworld_interior = True
@@ -1456,6 +1482,9 @@ class OverworldState(InventoryMixin, BaseState):
                 path = td.get("path")
                 if path:
                     imap.sprite_overrides[(c, r)] = path
+
+        # Store tile_properties on the interior map so links work at runtime
+        imap.tile_properties = interior.get("tile_properties", {})
 
         self.game.tile_map = imap
 
@@ -1516,6 +1545,13 @@ class OverworldState(InventoryMixin, BaseState):
         if not entry_placed:
             self.game.party.col = iw // 2
             self.game.party.row = ih // 2
+
+        # Override with explicit target position from a tile link
+        _tp = getattr(self, '_pending_link_target_pos', None)
+        if _tp and _tp != (0, 0):
+            self.game.party.col = _tp[0]
+            self.game.party.row = _tp[1]
+            self._pending_link_target_pos = None
 
         # Update camera
         self.game.camera.map_width = iw
@@ -2376,6 +2412,16 @@ class OverworldState(InventoryMixin, BaseState):
 
     # ── Tile link system (universal) ─────────────────────────────
 
+    def _get_interior_tile_props(self, col, row):
+        """Return tile instance properties for (col, row) in the current
+        interior map (building space, etc.).
+
+        Reads directly from the active tile map's tile_properties,
+        which is populated when the interior is entered.
+        """
+        props = getattr(self.game.tile_map, 'tile_properties', {})
+        return props.get(f"{col},{row}", {})
+
     def _get_overworld_tile_props(self, col, row):
         """Return tile instance properties for (col, row) on the overworld.
 
@@ -2386,11 +2432,15 @@ class OverworldState(InventoryMixin, BaseState):
         props = getattr(self.game.tile_map, 'tile_properties', {})
         return props.get(f"{col},{row}", {})
 
-    def _follow_tile_link(self, tile_props, pcol, prow):
+    def _follow_tile_link(self, tile_props, pcol, prow, direct=False):
         """Follow a tile link to its target map and position.
 
-        Parses the link_map string to determine the destination type
-        and dispatches to the appropriate entry handler.
+        Simple dispatch: resolve the target map, switch to the right
+        game state, place the party at the link's X/Y coordinates.
+
+        If *direct* is False (overworld), shows an action screen for
+        towns/dungeons.  If True (from inside a building/town), enters
+        immediately.
         """
         link_map = tile_props.get("link_map", "")
         link_x = int(tile_props.get("link_x", 0))
@@ -2399,25 +2449,69 @@ class OverworldState(InventoryMixin, BaseState):
         if not link_map:
             return
 
-        # ── Town links: "town:TownName" ──
+        # ── Overworld ──
+        if link_map == "overworld":
+            if link_x or link_y:
+                self.game.party.col = link_x
+                self.game.party.row = link_y
+            self.game.camera.map_width = self.game.tile_map.width
+            self.game.camera.map_height = self.game.tile_map.height
+            self.game.camera.update(
+                self.game.party.col, self.game.party.row)
+            self._exit_grace = True
+            return
+
+        # ── Town ──
         if link_map.startswith("town:"):
             town_name = link_map[5:]
             td = self._find_town_by_name(town_name)
-            if td:
-                if (pcol, prow) not in self.game.town_data_map:
-                    self.game.town_data_map[(pcol, prow)] = td
-                # Stash target position so _enter_town_confirmed uses it
-                self._pending_link_target_pos = (link_x, link_y)
+            if not td:
+                return
+            if (pcol, prow) not in self.game.town_data_map:
+                self.game.town_data_map[(pcol, prow)] = td
+            target_pos = (link_x, link_y) if (link_x or link_y) else None
+            if direct:
+                self._enter_town_direct(td, pcol, prow, target_pos)
+            else:
+                self._pending_link_target_pos = target_pos
                 self._show_town_action()
             return
 
-        # ── Building links: "building:Name" or "building:Name:Space" ──
+        # ── Town interior ──
+        if link_map.startswith("interior:"):
+            remainder = link_map[9:]
+            town_name, interior_name = (remainder.split("/", 1)
+                                        if "/" in remainder
+                                        else ("", remainder))
+            td = self._find_town_by_name(town_name) if town_name else None
+            if not td:
+                return
+            if (pcol, prow) not in self.game.town_data_map:
+                self.game.town_data_map[(pcol, prow)] = td
+            target_pos = (link_x, link_y) if (link_x or link_y) else None
+            self._enter_town_direct(td, pcol, prow, target_pos=None,
+                                    auto_interior=interior_name,
+                                    interior_pos=target_pos)
+            return
+
+        # ── Building / building space ──
         if link_map.startswith("building:"):
             parts = link_map[9:].split(":", 1)
             bldg_name = parts[0]
             sub_space = parts[1] if len(parts) > 1 else ""
             building_def = self._find_module_building_by_name(bldg_name)
-            if building_def and building_def.get("spaces"):
+            if not building_def or not building_def.get("spaces"):
+                return
+            if link_x or link_y:
+                self._pending_link_target_pos = (link_x, link_y)
+            if direct:
+                self.building_action_entry_args = {
+                    "building_def": building_def,
+                    "col": pcol, "row": prow,
+                    "sub_interior": sub_space,
+                }
+                self._enter_building_confirmed()
+            else:
                 self.building_action_info = {
                     "name": bldg_name,
                     "description": building_def.get("description", ""),
@@ -2431,12 +2525,19 @@ class OverworldState(InventoryMixin, BaseState):
                 self.building_action_active = True
             return
 
-        # ── Dungeon links: "dungeon:Name" or "dungeon:Name:Level" ──
+        # ── Dungeon ──
         if link_map.startswith("dungeon:"):
             parts = link_map[8:].split(":", 1)
             dung_name = parts[0]
             dungeon_def = self._find_module_dungeon_by_name(dung_name)
-            if dungeon_def:
+            if not dungeon_def:
+                return
+            if direct:
+                def _do():
+                    self._enter_module_dungeon(dungeon_def, pcol, prow)
+                self.game.start_loading_screen(
+                    f"Entering {dung_name}", _do)
+            else:
                 self.dungeon_action_info = {
                     "name": dung_name,
                     "description": dungeon_def.get("description", ""),
@@ -2444,6 +2545,7 @@ class OverworldState(InventoryMixin, BaseState):
                     "dungeon_def": dungeon_def,
                 }
                 self.dungeon_action_entry_args = {
+                    "type": "module_dungeon",
                     "dungeon_def": dungeon_def,
                     "col": pcol, "row": prow,
                 }
@@ -2451,11 +2553,30 @@ class OverworldState(InventoryMixin, BaseState):
                 self.dungeon_action_active = True
             return
 
-        # ── Interior links (overworld interiors) ──
-        if link_map.startswith("interior:"):
-            interior_name = link_map[9:].split("/")[-1]
-            self._enter_overworld_interior(interior_name, pcol, prow)
-            return
+    def _enter_town_direct(self, td, pcol, prow, target_pos=None,
+                           auto_interior=None, interior_pos=None):
+        """Enter a town directly (no action screen).
+
+        Places the party at *target_pos* in the town, or at the
+        town's default entry point.  If *auto_interior* is set,
+        immediately enters that interior and places the party at
+        *interior_pos*.
+        """
+        self.game.town_data = td
+        if (pcol, prow) not in self.game.town_data_map:
+            self.game.town_data_map[(pcol, prow)] = td
+        town_name = getattr(td, "name", "Town")
+
+        def _do():
+            ts = self.game.states["town"]
+            if interior_pos:
+                ts._pending_interior_target_pos = interior_pos
+            ts.enter_town(td, pcol, prow,
+                          target_pos=target_pos,
+                          auto_interior=auto_interior)
+            self.game.change_state("town")
+
+        self.game.start_loading_screen(f"Entering {town_name}", _do)
 
     def _show_town_action(self):
         """Show the town entry action screen."""
@@ -2770,6 +2891,7 @@ class OverworldState(InventoryMixin, BaseState):
                 "entry_row": sp.get("entry_row", 0),
                 "tiles": sp.get("tiles", {}),
                 "npcs": sp.get("npcs", []),
+                "tile_properties": sp.get("tile_properties", {}),
             }
             # Replace existing entry or append new one
             replaced = False

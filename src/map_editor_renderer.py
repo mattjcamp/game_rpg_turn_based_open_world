@@ -138,6 +138,10 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     # ── Footer ──
     _draw_footer(renderer, data)
 
+    # ── Map picker overlay (must be last — drawn on top of everything) ──
+    if data.get("map_picker_active"):
+        _draw_map_picker_overlay(renderer, data)
+
 
 # ─── Brush palette (left panel) ──────────────────────────────────────
 
@@ -164,7 +168,7 @@ def _visible_brush_indices(brushes, brush_folders):
     return visible
 
 
-_INSPECTOR_H = 220  # height reserved for the tile inspector at bottom
+_INSPECTOR_H = 260  # height reserved for the tile inspector at bottom
 _BRUSH_PANEL_H = PANEL_H - _INSPECTOR_H - 4  # brush palette gets the rest
 
 
@@ -445,10 +449,6 @@ def _draw_tile_inspector(renderer, data: Dict):
         hint = "[E] Edit tile"
     renderer._u3_text(hint, ix + pad, bottom, (80, 80, 100), fs)
 
-    # Map picker overlay
-    if data.get("map_picker_active"):
-        _draw_map_picker_overlay(renderer, data)
-
 
 def _draw_map_picker_overlay(renderer, data: Dict):
     """Draw the map hierarchy picker as a centered overlay."""
@@ -461,7 +461,8 @@ def _draw_map_picker_overlay(renderer, data: Dict):
     if not hierarchy:
         return
 
-    pw, ph = 400, 340
+    pw = min(SCREEN_WIDTH - 40, 600)
+    ph = min(SCREEN_HEIGHT - 60, 500)
     px = (SCREEN_WIDTH - pw) // 2
     py = (SCREEN_HEIGHT - ph) // 2
 
@@ -470,10 +471,12 @@ def _draw_map_picker_overlay(renderer, data: Dict):
 
     renderer._u3_text("SELECT TARGET MAP", px + 16, py + 10,
                       _COL_ORANGE, fm)
+    renderer._u3_text(f"{len(hierarchy)} maps available",
+                      px + 16, py + 28, (100, 100, 120), fs)
 
-    row_h = 20
-    list_y = py + 36
-    list_h = ph - 70
+    row_h = 22
+    list_y = py + 46
+    list_h = ph - 80
     max_vis = list_h // row_h
 
     scroll = max(0, min(cursor - max_vis // 2,
@@ -489,11 +492,27 @@ def _draw_map_picker_overlay(renderer, data: Dict):
             bar.fill((255, 200, 60, 40))
             screen.blit(bar, (px + 10, ly))
 
-        indent_str = "  " * indent
+        indent_str = "    " * indent
         prefix = "> " if is_sel else "  "
         col = (255, 255, 230) if is_sel else (180, 180, 200)
-        renderer._u3_text(f"{prefix}{indent_str}{label}",
-                          px + 14, ly + 2, col, fs)
+        # Indent children; show category icon for top-level items
+        if indent == 0:
+            renderer._u3_text(f"{prefix}{label}",
+                              px + 14, ly + 3, col, fs)
+        else:
+            renderer._u3_text(f"{prefix}  {indent_str}{label}",
+                              px + 14, ly + 3,
+                              (200, 200, 220) if is_sel else (150, 150, 170),
+                              fs)
+
+    # Show selected map ID at the bottom
+    if 0 <= cursor < len(hierarchy):
+        sel_id = hierarchy[cursor][0]
+        renderer._u3_text(f"ID: {sel_id}", px + 16, py + ph - 34,
+                          (120, 120, 140), fs)
+
+    renderer._u3_text("[Up/Dn] Navigate  [Enter] Select  [Esc] Cancel",
+                      px + 16, py + ph - 18, (100, 100, 120), fs)
 
 
 def _draw_tile_grid(renderer, data: Dict):

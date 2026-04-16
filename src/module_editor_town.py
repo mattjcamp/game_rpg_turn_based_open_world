@@ -900,6 +900,7 @@ class ModuleTownEditorMixin:
             enc["tiles"] = state.tiles
             enc["width"] = state.config.width
             enc["height"] = state.config.height
+            enc["tile_properties"] = state.tile_properties
             state.dirty = False
             self._mod_town_save_enclosures()
             self._save_module_towns()
@@ -907,6 +908,7 @@ class ModuleTownEditorMixin:
 
         def on_exit(st):
             enc["tiles"] = st.tiles
+            enc["tile_properties"] = st.tile_properties
             self._mod_town_save_enclosures()
             self._save_module_towns()
             self.showing_features = False
@@ -928,17 +930,18 @@ class ModuleTownEditorMixin:
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
+            map_hierarchy=self._build_map_hierarchy(),
         )
         existing_tiles = dict(enc.get("tiles", {}))
-        # Build interior_list from sibling enclosures (excluding current)
-        # so the "I" key picker lets this enclosure link to siblings or
-        # back to the parent town.
         enc_name = enc.get("name", "")
         sibling_list = [{"name": e.get("name", "?")}
                         for e in self._mod_town_enclosures
                         if e.get("name", "") != enc_name]
         state = MapEditorState(config, tiles=existing_tiles,
                                interior_list=sibling_list)
+        saved_props = enc.get("tile_properties", {})
+        if saved_props:
+            state.tile_properties = dict(saved_props)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
         self._mod_town_map_editor_state = state

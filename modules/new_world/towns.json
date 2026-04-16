@@ -903,12 +903,6 @@
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "7,7": {
-        "tile_id": 13,
-        "name": "Door",
-        "path": "game/terrain/town_door.png",
-        "interior": "General Shop Interior"
-      },
       "8,7": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
@@ -1028,11 +1022,6 @@
         "tile_id": 46,
         "name": "Path Floor",
         "path": "game/terrain/path.png"
-      },
-      "7,8": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
       },
       "8,8": {
         "tile_id": 52,
@@ -1154,15 +1143,9 @@
         "name": "Path Floor",
         "path": "game/terrain/path.png"
       },
-      "7,9": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
-      },
       "8,9": {
         "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "name": "Sand Floor"
       },
       "9,9": {
         "tile_id": 47,
@@ -3126,6 +3109,18 @@
       "11,2": {
         "tile_id": 13,
         "name": "Door"
+      },
+      "7,9": {
+        "tile_id": 47,
+        "name": "Sand Floor"
+      },
+      "7,8": {
+        "tile_id": 47,
+        "name": "Sand Floor"
+      },
+      "7,7": {
+        "tile_id": 13,
+        "name": "Door"
       }
     },
     "description": "",
@@ -3405,7 +3400,15 @@
           }
         },
         "template_label": "General Shop Interior",
-        "npcs": []
+        "npcs": [],
+        "tile_properties": {
+          "9,2": {
+            "linked": true,
+            "link_map": "town:New Haven",
+            "link_x": "7",
+            "link_y": "7"
+          }
+        }
       }
     ],
     "tile_properties": {
@@ -3414,6 +3417,12 @@
         "link_map": "overworld",
         "link_x": "10",
         "link_y": "14"
+      },
+      "7,7": {
+        "linked": true,
+        "link_x": "9",
+        "link_y": "2",
+        "link_map": "interior:New Haven/General Shop Interior"
       }
     }
   }

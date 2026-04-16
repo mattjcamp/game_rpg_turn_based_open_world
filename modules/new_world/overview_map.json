@@ -796,7 +796,7 @@
       7,
       7,
       7,
-      7,
+      9,
       0,
       0,
       6,
@@ -2629,6 +2629,16 @@
       "link_map": "town:New Haven",
       "link_x": "11",
       "link_y": "2"
+    },
+    "7,10": {
+      "linked": true,
+      "link_map": "dungeon:Dank Pit:Level 1"
+    },
+    "7,15": {
+      "linked": true,
+      "link_map": "building:Goulag",
+      "link_x": "0",
+      "link_y": "1"
     }
   }
 }

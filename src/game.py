@@ -2126,7 +2126,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             description=town_def.get("description", ""),
         )
         # Load per-tile instance properties (links, etc.)
-        td.tile_properties = town_def.get("tile_properties", {})
+        tp = town_def.get("tile_properties", {})
+        td.tile_properties = tp
+        td.tile_map.tile_properties = tp
         return td
 
     def discover_single_key_dungeon(self, dungeon_key_str):
@@ -3708,6 +3710,20 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             Buildings → Building Spaces
             Dungeons → Dungeon Levels
         """
+        # Ensure all module data is loaded so the hierarchy is complete
+        mod_path = None
+        if self.module_list and self.module_cursor < len(self.module_list):
+            mod_path = self.module_list[self.module_cursor].get("path")
+        elif self.active_module_path:
+            mod_path = self.active_module_path
+        if mod_path:
+            if not getattr(self, '_mod_town_list', []):
+                self._load_module_towns(mod_path)
+            if not getattr(self, '_mod_building_list', []):
+                self._load_module_buildings(mod_path)
+            if not getattr(self, '_mod_dungeon_list', []):
+                self._load_module_dungeons(mod_path)
+
         hierarchy = [("overworld", "Overview Map", 0)]
 
         # Towns and their interiors

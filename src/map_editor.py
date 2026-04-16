@@ -558,12 +558,18 @@ class MapEditorState:
         fields.append(("Linked", "linked",
                        "yes" if is_linked else "no", "toggle"))
         if is_linked:
+            link_map = props.get("link_map", "")
             fields.append(("Target Map", "link_map",
-                           props.get("link_map", ""), "map_picker"))
-            fields.append(("Target X", "link_x",
-                           props.get("link_x", "0"), True))
-            fields.append(("Target Y", "link_y",
-                           props.get("link_y", "0"), True))
+                           link_map, "map_picker"))
+            # Procedural dungeons don't have meaningful coordinates —
+            # the entry point is determined at generation time.
+            # Only show X/Y for non-dungeon targets.
+            _needs_coords = not link_map.startswith("dungeon:")
+            if _needs_coords:
+                fields.append(("Target X", "link_x",
+                               props.get("link_x", "0"), True))
+                fields.append(("Target Y", "link_y",
+                               props.get("link_y", "0"), True))
 
         return {
             "tile_id": tile_id,
