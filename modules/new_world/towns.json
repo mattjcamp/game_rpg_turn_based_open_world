@@ -309,12 +309,6 @@
         "name": "Brown Brick Wall",
         "path": "unassigned/brick_wall_brown.png"
       },
-      "11,2": {
-        "tile_id": 13,
-        "name": "Door",
-        "path": "game/terrain/town_door.png",
-        "to_overworld": true
-      },
       "12,2": {
         "tile_id": 49,
         "name": "Brown Brick Wall",
@@ -434,11 +428,6 @@
         "tile_id": 46,
         "name": "Path Floor",
         "path": "game/terrain/path.png"
-      },
-      "11,3": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
       },
       "12,3": {
         "tile_id": 46,
@@ -561,9 +550,8 @@
         "path": "game/terrain/path.png"
       },
       "11,4": {
-        "tile_id": 47,
-        "name": "Sand Floor",
-        "path": "game/terrain/sand.png"
+        "tile_id": 46,
+        "name": "Path Floor"
       },
       "12,4": {
         "tile_id": 46,
@@ -3130,6 +3118,14 @@
         "tile_id": 47,
         "name": "Sand Floor",
         "path": "game/terrain/sand.png"
+      },
+      "11,3": {
+        "tile_id": 46,
+        "name": "Path Floor"
+      },
+      "11,2": {
+        "tile_id": 13,
+        "name": "Door"
       }
     },
     "description": "",
@@ -3411,6 +3407,14 @@
         "template_label": "General Shop Interior",
         "npcs": []
       }
-    ]
+    ],
+    "tile_properties": {
+      "11,2": {
+        "linked": true,
+        "link_map": "overworld",
+        "link_x": "10",
+        "link_y": "14"
+      }
+    }
   }
 ]

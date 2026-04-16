@@ -403,12 +403,14 @@ class ModuleDungeonEditorMixin:
             level["tiles"] = state.tiles
             level["width"] = state.config.width
             level["height"] = state.config.height
+            level["tile_properties"] = state.tile_properties
             state.dirty = False
             self._save_module_dungeons()
             self._mod_dungeon_save_flash = 1.5
 
         def on_exit(st):
             level["tiles"] = st.tiles
+            level["tile_properties"] = st.tile_properties
             self._save_module_dungeons()
             self.showing_features = False
             self.showing_modules = True
@@ -428,10 +430,14 @@ class ModuleDungeonEditorMixin:
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
+            map_hierarchy=self._build_map_hierarchy(),
         )
         existing_tiles = dict(level.get("tiles", {}))
         state = MapEditorState(config, tiles=existing_tiles,
                                interior_list=level_list)
+        saved_props = level.get("tile_properties", {})
+        if saved_props:
+            state.tile_properties = dict(saved_props)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
         self._mod_dungeon_map_editor_state = state

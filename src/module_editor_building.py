@@ -322,12 +322,14 @@ class ModuleBuildingEditorMixin:
             space["tiles"] = state.tiles
             space["width"] = state.config.width
             space["height"] = state.config.height
+            space["tile_properties"] = state.tile_properties
             state.dirty = False
             self._save_module_buildings()
             self._mod_building_save_flash = 1.5
 
         def on_exit(st):
             space["tiles"] = st.tiles
+            space["tile_properties"] = st.tile_properties
             self._save_module_buildings()
             self.showing_features = False
             self.showing_modules = True
@@ -347,10 +349,14 @@ class ModuleBuildingEditorMixin:
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
+            map_hierarchy=self._build_map_hierarchy(),
         )
         existing_tiles = dict(space.get("tiles", {}))
         state = MapEditorState(config, tiles=existing_tiles,
                                interior_list=space_list)
+        saved_props = space.get("tile_properties", {})
+        if saved_props:
+            state.tile_properties = dict(saved_props)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
         self._mod_building_map_editor_state = state

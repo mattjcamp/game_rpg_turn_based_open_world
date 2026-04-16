@@ -2379,13 +2379,11 @@ class OverworldState(InventoryMixin, BaseState):
     def _get_overworld_tile_props(self, col, row):
         """Return tile instance properties for (col, row) on the overworld.
 
-        Reads from the module's overview_map.json tile_properties dict.
+        Reads from the tile_map's tile_properties dict (loaded from
+        overview_map.json at startup).
         Returns empty dict if no properties are set.
         """
-        ow_map = getattr(self.game, '_mod_overview_map', None)
-        if not ow_map:
-            return {}
-        props = ow_map.get("tile_properties", {})
+        props = getattr(self.game.tile_map, 'tile_properties', {})
         return props.get(f"{col},{row}", {})
 
     def _follow_tile_link(self, tile_props, pcol, prow):
@@ -2408,6 +2406,8 @@ class OverworldState(InventoryMixin, BaseState):
             if td:
                 if (pcol, prow) not in self.game.town_data_map:
                     self.game.town_data_map[(pcol, prow)] = td
+                # Stash target position so _enter_town_confirmed uses it
+                self._pending_link_target_pos = (link_x, link_y)
                 self._show_town_action()
             return
 
@@ -2519,7 +2519,9 @@ class OverworldState(InventoryMixin, BaseState):
         # downstream code that reads it, like victory messages)
         self.game.town_data = town_data
 
-        # Link system removed
+        # Use stashed target position from tile link if available
+        _target_pos = getattr(self, '_pending_link_target_pos', None)
+        self._pending_link_target_pos = None
 
         town_name = getattr(town_data, "name", None) or "Town"
 
@@ -2527,7 +2529,7 @@ class OverworldState(InventoryMixin, BaseState):
             town_state = self.game.states["town"]
             town_state.enter_town(town_data, pcol, prow,
                                   auto_interior=None,
-                                  target_pos=None,
+                                  target_pos=_target_pos,
                                   preserve_exit=False)
             self.game.change_state("town")
 

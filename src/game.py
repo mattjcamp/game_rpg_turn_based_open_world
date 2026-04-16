@@ -1141,6 +1141,35 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             if first_town is None:
                 first_town = td
 
+        # ── Register maps from tile_properties links ──
+        # Tiles on the overview map can link to towns, buildings, or
+        # dungeons via the tile_properties system.  Register any linked
+        # towns/dungeons that aren't already in the data maps.
+        tile_props = getattr(self.tile_map, 'tile_properties', {})
+        for pos_key, props in tile_props.items():
+            if not props.get("linked"):
+                continue
+            link_map = props.get("link_map", "")
+            if not link_map:
+                continue
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            col, row = int(parts[0]), int(parts[1])
+            if (col, row) in self.town_data_map:
+                continue  # already registered
+
+            # Town links
+            if link_map.startswith("town:"):
+                town_name = link_map[5:]
+                if town_name in _towns_json_by_name:
+                    td = self._build_town_from_towns_json(
+                        _towns_json_by_name[town_name])
+                    if td is not None:
+                        self.town_data_map[(col, row)] = td
+                        if first_town is None:
+                            first_town = td
+
         # ── Overlay custom data from towns.json ──
         # If the user added enclosures to a town via the editor,
         # overlay those onto the matching TownData.
@@ -1996,8 +2025,6 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             entry_col=entry_col,
             entry_row=entry_row,
             town_style=town_style,
-            interior_links={},
-            overworld_exits=set(),
         )
 
     def _build_town_from_towns_json(self, town_def):
@@ -2087,19 +2114,20 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 occupied.add((nc, nr))
 
 
-        return TownData(
+        td = TownData(
             tile_map=tm,
             npcs=npcs,
             name=name,
             entry_col=entry_col,
             entry_row=entry_row,
             town_style=town_def.get("town_style", "medieval"),
-            interior_links={},
-            overworld_exits=set(),
             custom=True,
             interiors=town_def.get("interiors", []),
             description=town_def.get("description", ""),
         )
+        # Load per-tile instance properties (links, etc.)
+        td.tile_properties = town_def.get("tile_properties", {})
+        return td
 
     def discover_single_key_dungeon(self, dungeon_key_str):
         """Reveal a single key dungeon by its ``'col,row'`` string key."""

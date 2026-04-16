@@ -141,6 +141,7 @@ def load_static_overworld(module_path):
                         tmap.place_unique(c, r, uid, udef)
 
                 tmap.overworld_interiors = data.get("interiors", [])
+                tmap.tile_properties = data.get("tile_properties", {})
                 return tmap
 
     # ── 2. Try overview_map.json (module editor format) ──
@@ -165,6 +166,7 @@ def load_static_overworld(module_path):
                 # procedural regeneration regardless of seed.
                 tmap.seed = data.get("seed", mc.get("seed", 0))
                 tmap.overworld_interiors = data.get("interiors", [])
+                tmap.tile_properties = data.get("tile_properties", {})
                 return tmap
 
     return None

@@ -218,12 +218,14 @@ class ModuleTownEditorMixin:
             town["tiles"] = state.tiles
             town["width"] = state.config.width
             town["height"] = state.config.height
+            town["tile_properties"] = state.tile_properties
             state.dirty = False
             self._save_module_towns()
             self._mod_town_save_flash = 1.5
 
         def on_exit(st):
             town["tiles"] = st.tiles
+            town["tile_properties"] = st.tile_properties
             self._save_module_towns()
             # Return to module screen, town sub-selector
             self.showing_features = False
@@ -245,16 +247,17 @@ class ModuleTownEditorMixin:
             supports_replace=True,
             on_save=on_save,
             on_exit=on_exit,
+            map_hierarchy=self._build_map_hierarchy(),
         )
         existing_tiles = dict(town.get("tiles", {}))
-        # Build interior_list from the live enclosure list so the "I" key
-        # picker can offer them as link targets.  Use _mod_town_enclosures
-        # (the in-memory copy) rather than town["interiors"] which may
-        # not have been synced yet.
         enc_list = [{"name": e.get("name", "?")}
                     for e in self._mod_town_enclosures]
         state = MapEditorState(config, tiles=existing_tiles,
                                interior_list=enc_list)
+        # Restore per-tile properties (links, etc.)
+        saved_props = town.get("tile_properties", {})
+        if saved_props:
+            state.tile_properties = dict(saved_props)
         handler = MapEditorInputHandler(
             state, is_save_shortcut=self._is_save_shortcut)
         self._mod_town_map_editor_state = state
