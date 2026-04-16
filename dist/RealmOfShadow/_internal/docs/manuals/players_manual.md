@@ -157,9 +157,9 @@ Wizards command the most diverse and powerful spell list in the game. From Fireb
 
 **Class Abilities:**
 
-- **Turn Undead** *(Level 2+)* — Channels holy energy that strips 50% of HP from all undead enemies on the battlefield. Devastating against skeletons and zombies.
+- **Turn Undead** *(Level 2+, Cleric only)* — Channels holy energy at every undead on the battlefield. Each undead makes a Wisdom save against the Cleric's DC — on a failure it is destroyed completely, on a success it still takes 50% of its max HP as holy damage. Devastating against skeletons and zombies.
 
-Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead. Every party should have one.
+Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and annihilate undead with Turn Undead — a signature ability reserved for Clerics alone. Every party should have one.
 
 ---
 
@@ -203,9 +203,8 @@ The Thief has the longest combat range of any class (6 tiles), making them effec
 **Class Abilities:**
 
 - **Holy Smite** — Attacks against undead deal double damage dice (melee and ranged).
-- **Turn Undead** *(Free, once per rest)* — Can cast Turn Undead once per rest without spending MP. Additional casts cost MP normally.
 
-Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — and their free Turn Undead means they can open any undead encounter with a powerful holy blast at no cost. They are a strong choice for parties that want a tanky frontliner with healing versatility and anti-undead power.
+Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — which keeps them potent on the anti-undead front line, even though Turn Undead itself is reserved for Clerics. They are a strong choice for parties that want a tanky frontliner with healing versatility and anti-undead power.
 
 ---
 
@@ -276,7 +275,7 @@ Alchemists have modest combat ability but provide unique value through potion cr
 | Wizard | 4 | 15 | 2 | Sorcerer | Cloth | 100% INT | Arcane Focus |
 | Cleric | 6 | 10 | 2 | Priest | Chain | 100% WIS | Turn Undead |
 | Thief | 5 | 0 | 6 | None | Leather | — | Pick Locks, Backstab, Shadow Step |
-| Paladin | 10 | 5 | 4 | Priest | Plate | 50% WIS | Holy Smite, Turn Undead |
+| Paladin | 10 | 5 | 4 | Priest | Plate | 50% WIS | Holy Smite |
 | Ranger | 10 | 3 | 4 | Priest | Chain | 50% WIS | — |
 | Druid | 5 | 12 | 2 | Both | Cloth | 50% INT/WIS | 2× MP regen |
 | Alchemist | 4 | 8 | 4 | Sorcerer | Cloth | 50% INT | Brew Potions |
@@ -504,7 +503,7 @@ These spells are available to Clerics, Paladins, Rangers, and Druids.
 | **Minor Heal** | 1 | 3 | Heals 1d6 + WIS mod HP (can target self) | 6 | Battle, Overworld, Town, Dungeon |
 | **Light** | 1 | 3 | Illuminates dungeon corridors for 100 turns | Self | Dungeon only |
 | **Cure Poison** | 2 | 5 | Removes poison from target | 99 | Battle only |
-| **Turn Undead** | 2 | 8 | Strips 50% HP from all undead on the battlefield | 99 | Battle only |
+| **Turn Undead** | 2 | 8 | Cleric only. Each undead saves vs WIS — fail = destroyed, pass = 50% HP damage | 99 | Battle only |
 | **Bless** | 3 | 10 | +2 attack bonus to all allies for 4 turns | Self | Battle only |
 | **Curse** | 3 | 10 | −2 AC and −2 attack penalty on target for 4 turns | 99 | Battle only |
 | **Major Heal** | 4 | 15 | Heals 4d8 + WIS mod HP (can target self) | 10 | Battle only |

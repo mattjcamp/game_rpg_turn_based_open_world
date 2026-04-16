@@ -236,9 +236,9 @@ Wizards command the most diverse and powerful spell list in the game. From Fireb
 **Weapons:** Fists, Club, Mace, Sling
 **Armor:** Cloth, Leather, Chain
 
-Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead. Every party should have one.
+Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead — a signature ability no other class (not even other priest classes like Paladins) can use. Every party should have one.
 
-**Turn Undead** (Level 2+) — Channels holy energy that strips 50% of HP from all undead enemies on the battlefield.
+**Turn Undead** (Level 2+, Cleric only) — Channels holy energy at every undead on the battlefield. Each undead makes a Wisdom save against the Cleric's DC. On a failed save, the undead is destroyed completely; on a success it still takes 50% of its max HP as holy damage.
 
 ---
 
@@ -270,9 +270,9 @@ The Thief has the longest combat range of any class (6 tiles), making them effec
 **Weapons:** All weapons
 **Armor:** Cloth, Leather, Chain, Plate
 
-Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — and their free Turn Undead means they can open any undead encounter with a powerful holy blast at no cost.
+Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — so they remain a reliable anti-undead class even though Turn Undead itself is reserved for Clerics.
 
-**Holy Smite** — Double damage against undead. **Turn Undead** (free) — Strips 50% HP from all undead on the battlefield at no MP cost.
+**Holy Smite** — Double damage against undead.
 
 ---
 
@@ -563,7 +563,7 @@ These spells are available to Clerics, Paladins, Rangers, and Druids. Priest mag
 | **Minor Heal**  |  1  |  3 | Heals 1d6 + WIS mod HP (usable outside combat)      |
 | **Light**       |  1  |  3 | Illuminates dungeon corridors for 100 turns          |
 | **Cure Poison** |  2  |  5 | Removes poison from target                           |
-| **Turn Undead** |  2  |  8 | Strips 50% HP from all undead on the battlefield     |
+| **Turn Undead** |  2  |  8 | Cleric only. Each undead saves vs WIS — fail = destroyed, pass = 50% HP damage |
 | **Bless**       |  3  | 10 | +2 attack bonus to all allies for 4 turns            |
 | **Curse**       |  3  | 10 | −2 AC and −2 attack on target for 4 turns            |
 | **Major Heal**  |  4  | 15 | Heals 4d8 + WIS mod HP                              |

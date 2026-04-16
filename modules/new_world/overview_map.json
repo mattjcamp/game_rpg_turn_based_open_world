@@ -953,7 +953,7 @@
       7,
       0,
       0,
-      0,
+      68,
       0,
       0,
       0,
@@ -2643,6 +2643,11 @@
     "16,23": {
       "linked": true,
       "link_map": "dungeon:Deep Abyss"
+    },
+    "8,17": {
+      "spawn_chance": "20",
+      "max_spawned": "2",
+      "spawn_radius": "3"
     }
   }
 }

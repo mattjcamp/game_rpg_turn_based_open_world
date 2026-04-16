@@ -712,5 +712,17 @@
     ],
     "context": "overworld",
     "sprite": "overworld/light_sand"
+  },
+  "71": {
+    "name": "Wyvern",
+    "walkable": true,
+    "color": [
+      180,
+      40,
+      40
+    ],
+    "context": "spawns",
+    "sprite": "overworld/dungeon",
+    "interaction_type": "spawn"
   }
 }

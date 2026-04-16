@@ -100,6 +100,26 @@
       "gold_reward": 25,
       "loot": [],
       "background_tile": 0
+    },
+    "71": {
+      "name": "Wyvern",
+      "description": "A monster lair.",
+      "spawn_monsters": [
+        "Wyvern"
+      ],
+      "spawn_chance": 20,
+      "spawn_radius": 3,
+      "max_spawned": 2,
+      "boss_monster": "",
+      "boss_monsters": [
+        "Wyvern",
+        "Wyvern",
+        "Dark Mage"
+      ],
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [],
+      "background_tile": 0
     }
   }
 }

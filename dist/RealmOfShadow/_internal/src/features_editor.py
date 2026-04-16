@@ -2622,7 +2622,11 @@ class FeaturesEditor:
             key, val = entry.key, entry.value
             if key.startswith("_") and key not in ("_name", "_color"):
                 continue
-            if key == "_color":
+            if key == "_name":
+                new_name = val.strip()
+                if new_name:
+                    mon["_name"] = new_name
+            elif key == "_color":
                 try:
                     parts = [int(p.strip()) for p in val.split(",")]
                     if len(parts) == 3:

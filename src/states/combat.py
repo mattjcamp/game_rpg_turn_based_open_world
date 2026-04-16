@@ -3571,7 +3571,13 @@ class CombatState(BaseState):
     # ── Turn Undead casting ────────────────────────────────────────
 
     def _cast_turn_undead(self):
-        """Cast Turn Undead — deals 75% HP damage to ALL undead monsters."""
+        """Cast Turn Undead — Cleric-only holy blast.
+
+        Each undead monster rolls a Wisdom save against the caster's
+        DC (base + Wisdom modifier). Failure = destroyed completely
+        (HP set to 0). Success = takes the spell's normal damage
+        (``hp_percent`` of max HP, default 50%).
+        """
         f = self.active_fighter
         if not f:
             return
@@ -3579,20 +3585,21 @@ class CombatState(BaseState):
         spell = SPELLS_DATA["turn_undead"]
         mp_cost = spell["mp_cost"]
 
-        # Check if character can cast priest spells
-        if not f.can_cast_priest():
-            self.combat_log.append(f"{f.name} cannot cast priest spells!")
+        # Cleric-only: refuse to cast for any other class (even if
+        # allowable_classes in spells.json is edited to include others,
+        # the save-or-destroy mechanic is a Cleric-specific feature).
+        caster_class = getattr(f, "char_class", "").lower()
+        if caster_class != "cleric":
+            self.combat_log.append(
+                f"Only Clerics can channel Turn Undead!")
             self.phase = PHASE_PLAYER
             self.selected_spell = None
             return
 
-        # Paladin free Turn Undead (once per rest)
-        is_paladin = getattr(f, "char_class", "").lower() == "paladin"
-        free_cast = is_paladin and getattr(f, "turn_undead_free_use", False)
-
-        # Check MP (skip for free Paladin cast)
-        if not free_cast and f.current_mp < mp_cost:
-            self.combat_log.append(f"{f.name} doesn't have enough MP! (need {mp_cost})")
+        # Check MP
+        if f.current_mp < mp_cost:
+            self.combat_log.append(
+                f"{f.name} doesn't have enough MP! (need {mp_cost})")
             self.phase = PHASE_PLAYER
             self.selected_spell = None
             return
@@ -3602,7 +3609,6 @@ class CombatState(BaseState):
                          if m.is_alive() and getattr(m, "undead", False)]
 
         if not undead_targets:
-            # Check if there are any alive monsters at all for the message
             alive = [m for m in self.monsters if m.is_alive()]
             if alive:
                 self.combat_log.append(
@@ -3613,40 +3619,64 @@ class CombatState(BaseState):
             self.selected_spell = None
             return
 
-        # Deduct MP (or consume free use)
-        if free_cast:
-            f.turn_undead_free_use = False
-        else:
-            f.current_mp -= mp_cost
+        # Deduct MP
+        f.current_mp -= mp_cost
 
-        hp_pct = spell["effect_value"].get("hp_percent", 0.75)
+        # ── Compute save DC from spell data ──
+        ev = spell.get("effect_value", {})
+        hp_pct = ev.get("hp_percent", 0.5)
+        dc_base = ev.get("save_dc_base", 10)
+        dc_stat = ev.get("save_dc_stat", "wisdom")
+        if dc_stat == "wisdom":
+            save_dc = dc_base + f.wis_mod
+        elif dc_stat == "intelligence":
+            save_dc = dc_base + f.int_mod
+        else:
+            save_dc = dc_base
+
         caster_col, caster_row = self.fighter_positions.get(f, (3, 5))
-        total_damage = 0
+
+        self.combat_log.append(
+            f"{f.name} channels TURN UNDEAD! (-{mp_cost} MP)")
 
         for target in undead_targets:
-            damage = max(1, int(target.hp * hp_pct))
-            target.hp = max(0, target.hp - damage)
-            total_damage += damage
-
             mc, mr = self.monster_positions.get(target, (0, 0))
-            self.turn_undead_effects.append(
-                TurnUndeadEffect(caster_col, caster_row, mc, mr, damage))
-            self.hit_effects.append(HitEffect(mc, mr, damage))
 
-            self.combat_log.append(
-                f"Holy light sears {target.name} for {damage} damage!"
-            )
+            # Each undead rolls a Wisdom save (reusing the engine's
+            # standard monster-save convention: d20 + rough save bonus).
+            save_roll = roll_d20()
+            save_bonus = max(0, target.attack_bonus - 2)
+            save_total = save_roll + save_bonus
+
+            if save_total < save_dc:
+                # FAIL → destroyed completely
+                damage = target.hp
+                target.hp = 0
+                self.turn_undead_effects.append(
+                    TurnUndeadEffect(
+                        caster_col, caster_row, mc, mr, damage))
+                self.hit_effects.append(HitEffect(mc, mr, damage))
+                self.combat_log.append(
+                    f"{target.name} fails its save "
+                    f"({save_roll}+{save_bonus}={save_total} vs DC "
+                    f"{save_dc}) — DESTROYED!"
+                )
+            else:
+                # PASS → takes standard damage
+                damage = max(1, int(target.max_hp * hp_pct))
+                target.hp = max(0, target.hp - damage)
+                self.turn_undead_effects.append(
+                    TurnUndeadEffect(
+                        caster_col, caster_row, mc, mr, damage))
+                self.hit_effects.append(HitEffect(mc, mr, damage))
+                self.combat_log.append(
+                    f"{target.name} resists "
+                    f"({save_roll}+{save_bonus}={save_total} vs DC "
+                    f"{save_dc}) — seared for {damage} damage!"
+                )
 
         self.phase = PHASE_TURN_UNDEAD
         self.game.sfx.play("turn_undead")
-        if free_cast:
-            self.combat_log.append(
-                f"{f.name} channels TURN UNDEAD! (FREE \u2014 once per rest)"
-            )
-        else:
-            self.combat_log.append(
-                f"{f.name} channels TURN UNDEAD! (-{mp_cost} MP)"
-            )
 
         # Check all undead targets for death
         for target in undead_targets:

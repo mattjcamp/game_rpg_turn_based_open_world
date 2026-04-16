@@ -414,10 +414,9 @@
     {
       "id": "turn_undead",
       "name": "Turn Undead",
-      "description": "Channels holy energy that sears undead creatures, stripping 50% of their life force.",
+      "description": "Channels holy energy at every undead on the battlefield. Each one must make a Wisdom save or be destroyed outright; those that succeed are still seared for 50% of their HP.",
       "allowable_classes": [
-        "Cleric",
-        "Paladin"
+        "Cleric"
       ],
       "casting_type": "priest",
       "min_level": 2,
@@ -425,7 +424,9 @@
       "duration": "instant",
       "effect_type": "undead_damage",
       "effect_value": {
-        "hp_percent": 0.5
+        "hp_percent": 0.5,
+        "save_dc_base": 10,
+        "save_dc_stat": "wisdom"
       },
       "range": 99,
       "targeting": "auto_monster",
