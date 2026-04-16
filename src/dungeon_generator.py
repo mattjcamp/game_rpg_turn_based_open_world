@@ -17,7 +17,7 @@ from src.tile_map import TileMap
 from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
-    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH, TILE_CAVE_TORCH, TILE_MOUNTAIN,
+    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH, TILE_MOUNTAIN,
 )
 from src.monster import create_encounter, create_monster
 
@@ -458,11 +458,9 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
                 break
         if adjacent_door:
             continue
-        # Use cave torch if the wall being replaced is a mountain tile
-        torch_tile = (TILE_CAVE_TORCH
-                      if tmap.get_tile(tc, tr) == TILE_MOUNTAIN
-                      else TILE_WALL_TORCH)
-        tmap.set_tile(tc, tr, torch_tile)
+        # All torches use TILE_WALL_TORCH now — the renderer picks
+        # the right sprite/background from the underlying wall context.
+        tmap.set_tile(tc, tr, TILE_WALL_TORCH)
         placed_torches.append((tc, tr))
         if len(placed_torches) >= max_torches:
             break
@@ -500,7 +498,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
             continue  # may have been turned into puddle
         wall_count = sum(
             1 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]
-            if tmap.get_tile(fx + dx, fy + dy) in (_WALL_TILES | {TILE_WALL_TORCH, TILE_CAVE_TORCH})
+            if tmap.get_tile(fx + dx, fy + dy) in (_WALL_TILES | {TILE_WALL_TORCH})
         )
         if wall_count >= 1 and random.random() < 0.35:
             tmap.set_tile(fx, fy, TILE_MOSS)

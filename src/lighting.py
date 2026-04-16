@@ -510,10 +510,17 @@ def scan_light_sources(tile_map, off_c: int, off_r: int,
     - torch_lights: list of LightSource for distance-darkness extra_lights
     - feature_lights: list of LightSource for doors/altars/exits
     - torch_positions: list of TorchTile screen coords for glow rendering
+
+    Light behavior is data-driven via the ``flags`` block in
+    ``tile_defs.json``:
+    - ``flags.light_source: true`` (with optional ``light_radius`` and
+      ``light_intensity``) marks a tile as a torch — contributes to
+      ``torch_lights`` and gets a glow overlay.
+    - ``flags.feature_light: true`` (with ``feature_radius`` and
+      ``feature_intensity``) marks a tile as a feature emitter (doors,
+      altars, exits, etc.) — contributes to ``feature_lights`` only.
     """
-    from src.settings import (
-        TILE_WALL_TORCH, TILE_CAVE_TORCH, TILE_DOOR, TILE_ALTAR, TILE_EXIT,
-    )
+    from src.settings import TILE_DEFS
 
     torch_lights: list = []
     feature_lights: list = []
@@ -526,14 +533,15 @@ def scan_light_sources(tile_map, off_c: int, off_r: int,
             tid = tile_map.get_tile(wc, wr)
             ssc = sc + pad_sc
             ssr = sr + pad_sr
-            if tid in (TILE_WALL_TORCH, TILE_CAVE_TORCH):
-                torch_lights.append((ssc, ssr, 5.0, 3.0))
+            flags = TILE_DEFS.get(tid, {}).get("flags", {})
+            if flags.get("light_source"):
+                radius = flags.get("light_radius", 5.0)
+                intensity = flags.get("light_intensity", 3.0)
+                torch_lights.append((ssc, ssr, radius, intensity))
                 torch_positions.append((sc, sr))
-            elif tid == TILE_DOOR:
-                feature_lights.append((ssc, ssr, 2.5, 2.0))
-            elif tid == TILE_ALTAR:
-                feature_lights.append((ssc, ssr, 3.0, 2.5))
-            elif tid == TILE_EXIT:
-                feature_lights.append((ssc, ssr, 2.0, 1.5))
+            elif flags.get("feature_light"):
+                radius = flags.get("feature_radius", 2.5)
+                intensity = flags.get("feature_intensity", 2.0)
+                feature_lights.append((ssc, ssr, radius, intensity))
 
     return torch_lights, feature_lights, torch_positions

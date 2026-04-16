@@ -30,7 +30,7 @@ from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
     TILE_DUNGEON_CLEARED,
-    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH, TILE_CAVE_TORCH,
+    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
 from src.monster import MONSTERS
 from src.party import (
@@ -3478,13 +3478,18 @@ class Renderer(CombatEffectRendererMixin):
                         pygame.draw.circle(self.screen, col_mote, (mx, my), 1)
 
         # ── 1e. animated torch light glow (via unified lighting) ──
-        # Scan for wall torches visible to the party; filter by LOS set
+        # Scan for wall torches visible to the party; filter by LOS set.
+        # A "torch" is any tile whose tile_defs.json entry has
+        # ``flags.light_source: true``.
+        from src.settings import TILE_DEFS as _TD_TORCH
         _dg_torch_positions = []
         for sr2 in range(rows):
             for sc2 in range(cols):
                 wc2 = sc2 + off_c
                 wr2 = sr2 + off_r
-                if tile_map.get_tile(wc2, wr2) in (TILE_WALL_TORCH, TILE_CAVE_TORCH):
+                _tid = tile_map.get_tile(wc2, wr2)
+                if _TD_TORCH.get(_tid, {}).get(
+                        "flags", {}).get("light_source"):
                     if visible_tiles and (wc2, wr2) not in visible_tiles:
                         continue
                     _dg_torch_positions.append((sc2, sr2))
@@ -5125,42 +5130,6 @@ class Renderer(CombatEffectRendererMixin):
             ]
             pygame.draw.polygon(self.screen, (255, 230, 80), inner_pts)
             # Tiny bright core
-            pygame.draw.circle(self.screen, (255, 255, 200),
-                               (cx, bracket_y - 2), 2)
-
-        elif tile_id == TILE_CAVE_TORCH:
-            # Torch set in a mountain/cave wall — draw mountain first,
-            # then torch bracket and flame on top.
-            self._u3_draw_overworld_tile(TILE_MOUNTAIN, px, py, ts, wc, wr)
-            # Torch bracket
-            bracket_x = cx - 2
-            bracket_y = cy + 2
-            pygame.draw.rect(self.screen, (100, 70, 30),
-                             pygame.Rect(bracket_x, bracket_y, 4, 6))
-            pygame.draw.rect(self.screen, (70, 45, 15),
-                             pygame.Rect(bracket_x, bracket_y, 4, 6), 1)
-            # Animated flame (same as TILE_WALL_TORCH)
-            import math as _mt
-            t = pygame.time.get_ticks()
-            flicker = _mt.sin(t * 0.012 + wc * 3.7 + wr * 5.3)
-            flicker2 = _mt.sin(t * 0.019 + wc * 2.1 + wr * 7.1)
-            flame_h = 8 + int(flicker * 2)
-            flame_w = 5 + int(flicker2)
-            flame_top = bracket_y - flame_h
-            flame_pts = [
-                (cx, flame_top),
-                (cx - flame_w // 2, bracket_y),
-                (cx + flame_w // 2, bracket_y),
-            ]
-            pygame.draw.polygon(self.screen, (220, 120, 30), flame_pts)
-            inner_h = flame_h - 3
-            inner_w = max(1, flame_w - 3)
-            inner_pts = [
-                (cx + int(flicker), flame_top + 2),
-                (cx - inner_w // 2, bracket_y - 1),
-                (cx + inner_w // 2, bracket_y - 1),
-            ]
-            pygame.draw.polygon(self.screen, (255, 230, 80), inner_pts)
             pygame.draw.circle(self.screen, (255, 255, 200),
                                (cx, bracket_y - 2), 2)
 

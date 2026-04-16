@@ -675,6 +675,12 @@ class FeaturesEditor:
                 idata = entry.get("interaction_data", "")
                 if idata:
                     tdef["interaction_data"] = idata
+            # Carry behavior flags (light_source, feature_light, etc.)
+            # so engine subsystems can do data-driven dispatch instead
+            # of hardcoded tile_id checks.
+            flags = entry.get("flags")
+            if flags:
+                tdef["flags"] = dict(flags)
             settings.TILE_DEFS[tid] = tdef
             ctx = entry.get("context")
             if ctx:
@@ -724,6 +730,12 @@ class FeaturesEditor:
                 idata = entry.get("interaction_data", "")
                 if idata:
                     tdef["interaction_data"] = idata
+            # Carry behavior flags (light_source, feature_light, etc.)
+            # so engine subsystems can do data-driven dispatch instead
+            # of hardcoded tile_id checks.
+            flags = entry.get("flags")
+            if flags:
+                tdef["flags"] = dict(flags)
             settings.TILE_DEFS[tid] = tdef
             ctx = entry.get("context")
             if ctx:
@@ -874,6 +886,13 @@ class FeaturesEditor:
                 idata = tile.get("interaction_data", "")
                 if idata:
                     entry_data["interaction_data"] = idata
+            # Preserve behavior flags (light_source, feature_light, etc.).
+            # These aren't editable in the in-game tile editor yet, so we
+            # carry them through from the in-memory TILE_DEFS so a
+            # re-save doesn't strip them.
+            existing_flags = settings.TILE_DEFS.get(tid, {}).get("flags")
+            if existing_flags:
+                entry_data["flags"] = dict(existing_flags)
             disk_data[str(tid)] = entry_data
 
         # Write to data/tile_defs.json

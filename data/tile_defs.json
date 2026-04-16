@@ -153,7 +153,12 @@
       40
     ],
     "context": "town",
-    "sprite": "town/door"
+    "sprite": "town/door",
+    "flags": {
+      "feature_light": true,
+      "feature_radius": 2.5,
+      "feature_intensity": 2.0
+    }
   },
   "14": {
     "name": "Exit",
@@ -164,7 +169,12 @@
       60
     ],
     "context": "town",
-    "sprite": "town/exit"
+    "sprite": "town/exit",
+    "flags": {
+      "feature_light": true,
+      "feature_radius": 2.0,
+      "feature_intensity": 1.5
+    }
   },
   "20": {
     "name": "Stone Floor",
@@ -241,7 +251,12 @@
       40
     ],
     "context": "dungeon",
-    "sprite": "dungeon/ddoor"
+    "sprite": "dungeon/ddoor",
+    "flags": {
+      "feature_light": true,
+      "feature_radius": 2.5,
+      "feature_intensity": 2.0
+    }
   },
   "27": {
     "name": "Artifact",
@@ -329,7 +344,12 @@
       40
     ],
     "context": "dungeon",
-    "sprite": "dungeon/wall_torch"
+    "sprite": "dungeon/wall_torch",
+    "flags": {
+      "light_source": true,
+      "light_radius": 5.0,
+      "light_intensity": 3.0
+    }
   },
   "35": {
     "name": "Altar",
@@ -340,7 +360,12 @@
       100
     ],
     "context": "town",
-    "sprite": "town/altar"
+    "sprite": "town/altar",
+    "flags": {
+      "feature_light": true,
+      "feature_radius": 3.0,
+      "feature_intensity": 2.5
+    }
   },
   "36": {
     "name": "Void",
