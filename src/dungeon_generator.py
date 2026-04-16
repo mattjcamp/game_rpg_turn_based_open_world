@@ -26,6 +26,34 @@ from src.monster import create_encounter, create_monster
 _WALL_TILES = frozenset({TILE_DWALL, TILE_MOUNTAIN})
 
 
+# ── Debug switch: suppress random encounters in newly generated dungeons ──
+# Quest-registered monsters (injected at runtime by
+# states.dungeon._inject_quest_dungeon_monsters) and module-defined
+# ``custom_encounters`` are unaffected — only the per-room random
+# encounters in ``generate_dungeon`` are skipped when this is True.
+# Toggled by the DM-mode-only "QUEST MONSTERS ONLY" Settings entry via
+# ``Game._toggle_quest_monsters_only``; also re-applied at Game init
+# from the persisted config.
+_DEBUG_QUEST_MONSTERS_ONLY = False
+
+
+def set_quest_monsters_only_debug(enabled):
+    """Enable/disable the debug flag that suppresses random dungeon encounters.
+
+    When enabled, calls to :func:`generate_dungeon` behave as if
+    ``include_random_encounters=False`` was passed, regardless of the
+    caller's argument. Custom/module encounters and quest monsters are
+    unaffected.
+    """
+    global _DEBUG_QUEST_MONSTERS_ONLY
+    _DEBUG_QUEST_MONSTERS_ONLY = bool(enabled)
+
+
+def is_quest_monsters_only_debug():
+    """Return whether the quest-monsters-only debug flag is active."""
+    return _DEBUG_QUEST_MONSTERS_ONLY
+
+
 class Room:
     """A rectangular room in the dungeon."""
 
@@ -660,7 +688,10 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             monster.encounter_template = tmpl
             monsters.append(monster)
 
-    if include_random_encounters:
+    # Debug: suppress random encounters entirely when the debug flag is on.
+    # Custom/module encounters above and quest monsters injected by the
+    # dungeon state at entry time are unaffected.
+    if include_random_encounters and not _DEBUG_QUEST_MONSTERS_ONLY:
         # ── Random encounters from encounters.json ──
         # Skip entrance room and any rooms already used by custom encounters
         for room in rooms[1:]:

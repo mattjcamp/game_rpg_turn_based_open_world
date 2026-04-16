@@ -176,7 +176,21 @@ class OverworldState(InventoryMixin, BaseState):
         Also prunes any existing monster that has somehow ended up on a
         non-walkable tile (safety net for movement edge-cases, map edits,
         or legacy state).
+
+        When the DM-mode ``quest_monsters_only`` debug flag is on, no new
+        roaming monsters are spawned — quest monsters are placed via
+        :meth:`Game._spawn_quest_monsters_overworld` on a separate path
+        and are unaffected.
         """
+        if getattr(self.game, "quest_monsters_only", False):
+            # Still prune any non-alive / off-map monsters so the list
+            # stays healthy, but do not top up.
+            self.overworld_monsters = [
+                m for m in self.overworld_monsters
+                if m.is_alive()
+                and self.game.tile_map.is_walkable(m.col, m.row)
+            ]
+            return
         tile_map = self.game.tile_map
         party = self.game.party
 
@@ -241,7 +255,12 @@ class OverworldState(InventoryMixin, BaseState):
         Each spawn tile in range rolls independently using its own
         configured spawn_chance percentage — so a tile set to 8%
         has an 8% chance of producing a monster each step.
+
+        Suppressed entirely when the DM-mode ``quest_monsters_only``
+        debug flag is on.
         """
+        if getattr(self.game, "quest_monsters_only", False):
+            return
         from src.party import SPAWN_POINTS
 
         if not SPAWN_POINTS:

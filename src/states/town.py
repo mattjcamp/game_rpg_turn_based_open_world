@@ -638,41 +638,45 @@ class TownState(InventoryMixin, BaseState):
 
         # ── Check tile link (universal linking system) ──
         # Any tile in a town can link to any map in the module.
-        # Check both TownData and the tile map for properties.
-        tp = getattr(self.town_data, 'tile_properties', {})
-        if not tp:
-            tp = getattr(self.town_data.tile_map, 'tile_properties', {})
-        tile_key = f"{party.col},{party.row}"
-        tile_props = tp.get(tile_key, {})
-        if tile_props.get("linked"):
-            link_map = tile_props.get("link_map", "")
-            link_x = int(tile_props.get("link_x", 0))
-            link_y = int(tile_props.get("link_y", 0))
-            if link_map == "overworld":
-                self.overworld_col = link_x or self.overworld_col
-                self.overworld_row = link_y or self.overworld_row
-                self._exit_town()
-                return
-            elif link_map.startswith("interior:"):
-                # Link to a town interior (e.g. "interior:New Haven/Shop")
-                interior_name = link_map.split("/", 1)[-1] if "/" in link_map else link_map[9:]
-                if link_x or link_y:
-                    self._pending_interior_target_pos = (link_x, link_y)
-                self._enter_interior(interior_name,
-                                     party.col, party.row)
-                return
-            elif link_map:
-                # Any other link (dungeon, building, etc.) — exit town
-                # to overworld, then let overworld handle it.
-                self._exit_town()
-                return
+        # Only run this on the TOWN level — inside an interior,
+        # town_data.tile_properties still refers to the town map,
+        # and would otherwise leak town-level links onto interior
+        # tiles that share the same (col,row).
+        if not getattr(self, "_in_interior", False):
+            tp = getattr(self.town_data, 'tile_properties', {})
+            if not tp:
+                tp = getattr(self.town_data.tile_map, 'tile_properties', {})
+            tile_key = f"{party.col},{party.row}"
+            tile_props = tp.get(tile_key, {})
+            if tile_props.get("linked"):
+                link_map = tile_props.get("link_map", "")
+                link_x = int(tile_props.get("link_x", 0))
+                link_y = int(tile_props.get("link_y", 0))
+                if link_map == "overworld":
+                    self.overworld_col = link_x or self.overworld_col
+                    self.overworld_row = link_y or self.overworld_row
+                    self._exit_town()
+                    return
+                elif link_map.startswith("interior:"):
+                    # Link to a town interior (e.g. "interior:New Haven/Shop")
+                    interior_name = link_map.split("/", 1)[-1] if "/" in link_map else link_map[9:]
+                    if link_x or link_y:
+                        self._pending_interior_target_pos = (link_x, link_y)
+                    self._enter_interior(interior_name,
+                                         party.col, party.row)
+                    return
+                elif link_map:
+                    # Any other link (dungeon, building, etc.) — exit town
+                    # to overworld, then let overworld handle it.
+                    self._exit_town()
+                    return
 
-        tile_id = self.town_data.tile_map.get_tile(
-            party.col, party.row
-        )
-        if tile_id == TILE_EXIT:
-            self._exit_town()
-            return
+            tile_id = self.town_data.tile_map.get_tile(
+                party.col, party.row
+            )
+            if tile_id == TILE_EXIT:
+                self._exit_town()
+                return
 
         # Check for walkable tile interactions (e.g. signs the player
         # steps onto rather than bumps into).

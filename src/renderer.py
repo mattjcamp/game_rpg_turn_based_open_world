@@ -990,7 +990,6 @@ class Renderer(CombatEffectRendererMixin):
     #   - sprite_overrides     → per-cell custom sprite path (editor)
     #   - TILE_SPAWN_CAMPFIRE  → bg tile + sprite + animated flames
     #   - TILE_SPAWN_GRAVEYARD → bg tile + sprite + animated wisps
-    #   - TILE_EXIT            → uses the town_gate sprite when loaded
     #   - TILE_DUNGEON_CLEARED → dark tint + ✕ mark on top of sprite
     #
     # Per-level dungeon atmosphere (moss, lava, ice, void detailing) is
@@ -999,7 +998,7 @@ class Renderer(CombatEffectRendererMixin):
     def _draw_tile(self, tile_id, px, py, ts, wc, wr, *, tile_map=None):
         """Render *tile_id* at (px, py) using the unified sprite registry."""
         from src.settings import (
-            TILE_VOID, TILE_EXIT, TILE_DUNGEON_CLEARED,
+            TILE_VOID, TILE_DUNGEON_CLEARED,
             TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
             TILE_ALTAR, TILE_DEFS,
         )
@@ -1036,13 +1035,9 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_altar_tile(px, py, ts)
             return
 
-        # 4. TILE_EXIT prefers the loaded town_gate sprite (gate art is
-        #    its own asset rather than the generic exit graphic).
-        if tile_id == TILE_EXIT and self._town_gate_tile:
-            self.screen.blit(self._town_gate_tile, (px, py))
-            return
-
-        # 5. Standard sprite lookup with auto-scaling cache.
+        # 4. Standard sprite lookup with auto-scaling cache.
+        #    (TILE_EXIT previously had a global town_gate override here;
+        #    removed so painted sprites / per-cell overrides always win.)
         sprite = self._tile_sprites.get(tile_id)
         if sprite:
             sw, sh = sprite.get_size()

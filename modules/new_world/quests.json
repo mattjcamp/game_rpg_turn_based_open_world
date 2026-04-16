@@ -50,5 +50,55 @@
     ],
     "giver_col": 6,
     "giver_row": 9
+  },
+  {
+    "name": "Find the Sword of Kings",
+    "description": "",
+    "giver_npc": "",
+    "giver_sprite": "src/assets/unassigned/cleric_f1.png",
+    "giver_location": "space:Goulag/Shrine",
+    "giver_dialogue": "The realm is in dire need of ones like yourselves. We have monsters roaming the countryside and the Sword of Kings has been buried deep in the Abyss in the mountains. Can you help the realm? Our people will reward you with great treasure.",
+    "reward_xp": 200,
+    "reward_gold": 250,
+    "steps": [
+      {
+        "description": "Hunt the Orc Horde",
+        "step_type": "kill",
+        "monster": "Orc",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "overview",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "But the Skeletons to Rest",
+        "step_type": "kill",
+        "monster": "Skeleton Archer",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "overview",
+        "target": "",
+        "target_count": 10,
+        "optional": "no"
+      },
+      {
+        "description": "Retrieve the Sword of Kings",
+        "step_type": "collect",
+        "monster": "",
+        "collect_item": "King's Sword",
+        "has_guardian": "yes",
+        "guardian_monster": "Dragon",
+        "spawn_location": "dungeon:Deep Abyss",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 8
   }
 ]

@@ -121,6 +121,16 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.smite_enabled = self._config.get("smite_enabled", False)
         self.start_with_equipment = self._config.get("start_with_equipment", True)
         self.start_level = max(1, min(10, self._config.get("start_level", 1)))
+        # DM-mode-only debug toggle: when on, roaming overworld monsters
+        # (orcs and spawn-tile monsters) are not spawned, and procedurally
+        # generated dungeons skip their random per-room encounters. Quest
+        # monsters and module-defined custom encounters are unaffected.
+        # Only has an effect while dm_mode is on.
+        self.quest_monsters_only = bool(
+            self._config.get("quest_monsters_only", False)) and self.dm_mode
+        # Keep the dungeon generator's debug switch aligned with the config.
+        from src.dungeon_generator import set_quest_monsters_only_debug
+        set_quest_monsters_only_debug(self.quest_monsters_only)
 
         # --- Sound Effects ---
         self.sfx = SoundEffects()
@@ -500,20 +510,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Quick Save HUD flash
         self.quick_save_message = None
         self.quick_save_msg_timer = 0.0
-        self.settings_options = [
-            {"label": "MUSIC VOLUME",
-             "value": self._format_volume(self.music.volume),
-             "type": "choice", "action": self._change_music_volume},
-            {"label": "MUSIC",
-             "value": not self.music.muted,
-             "type": "toggle", "action": self._toggle_music_mute},
-            {"label": "SFX",
-             "value": not self.sfx.muted,
-             "type": "toggle", "action": self._toggle_sfx_mute},
-            {"label": "DUNGEON MASTER MODE",
-             "value": self._config.get("dm_mode", False),
-             "type": "toggle", "action": self._toggle_dm_mode},
-        ]
+        self.settings_options = []
+        self._rebuild_settings_options()
 
         # --- Quest log screen ---
         self.showing_quest_log = False
@@ -5266,23 +5264,83 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
     # ── Settings helpers ─────────────────────────────────────────
 
+    def _rebuild_settings_options(self):
+        """(Re)build ``self.settings_options`` based on current mode.
+
+        The first four entries are always present.  DM-mode-only debug
+        toggles (e.g. QUEST MONSTERS ONLY) are appended only while
+        ``self.dm_mode`` is True so they stay hidden from normal players.
+        Indices 0–3 remain stable so the existing index-based updates
+        in the audio and DM-mode handlers keep working.
+        """
+        opts = [
+            {"label": "MUSIC VOLUME",
+             "value": self._format_volume(self.music.volume),
+             "type": "choice", "action": self._change_music_volume},
+            {"label": "MUSIC",
+             "value": not self.music.muted,
+             "type": "toggle", "action": self._toggle_music_mute},
+            {"label": "SFX",
+             "value": not self.sfx.muted,
+             "type": "toggle", "action": self._toggle_sfx_mute},
+            {"label": "DUNGEON MASTER MODE",
+             "value": self.dm_mode,
+             "type": "toggle", "action": self._toggle_dm_mode},
+        ]
+        if self.dm_mode:
+            opts.append({
+                "label": "QUEST MONSTERS ONLY",
+                "value": self.quest_monsters_only,
+                "type": "toggle",
+                "action": self._toggle_quest_monsters_only,
+            })
+        self.settings_options = opts
+        # Keep cursor in range if the list shrank (e.g. DM mode turned off
+        # while the cursor was on the DM-only row).
+        if self.settings_cursor >= len(self.settings_options):
+            self.settings_cursor = max(0, len(self.settings_options) - 1)
+
     def _toggle_dm_mode(self):
         """Toggle Dungeon Master mode on/off.
 
-        When DM mode is on, Smite is available in combat and the
-        Edit Game option appears on the title screen.  When off,
-        these features are hidden and the player sees only normal
-        gameplay options.
+        When DM mode is on, Smite is available in combat, the Edit Game
+        option appears on the title screen, and DM-only debug toggles
+        appear in Settings.  Turning DM mode off clears those debug
+        toggles so normal play is never affected by a leftover flag.
         """
         self.dm_mode = not self.dm_mode
-        # DM mode is the 4th settings option (index 3)
-        self.settings_options[3]["value"] = self.dm_mode
         self._config["dm_mode"] = self.dm_mode
         # Smite tracks DM mode
         self.smite_enabled = self.dm_mode
         self._config["smite_enabled"] = self.dm_mode
-        # Rebuild title menu to show/hide Edit Game
+        # Debug toggles are DM-only — clear when leaving DM mode so they
+        # can't silently alter normal play.
+        if not self.dm_mode and self.quest_monsters_only:
+            self.quest_monsters_only = False
+            self._config["quest_monsters_only"] = False
+            from src.dungeon_generator import set_quest_monsters_only_debug
+            set_quest_monsters_only_debug(False)
+        # Rebuild menus that change shape with DM mode.
+        self._rebuild_settings_options()
         self._rebuild_title_options()
+        save_config(self._config)
+
+    def _toggle_quest_monsters_only(self):
+        """DM-mode debug: suppress free-roaming overworld monsters and
+        random dungeon encounters. Quest monsters and module-defined
+        custom encounters still spawn.  Only meaningful while
+        ``self.dm_mode`` is True (the option is only shown in that case)."""
+        self.quest_monsters_only = not self.quest_monsters_only
+        self._config["quest_monsters_only"] = self.quest_monsters_only
+        # Keep the dungeon generator's switch in sync.
+        from src.dungeon_generator import set_quest_monsters_only_debug
+        set_quest_monsters_only_debug(self.quest_monsters_only)
+        # Update the settings row's displayed value (last entry when DM
+        # mode is on — which it must be for this toggle to exist).
+        for opt in self.settings_options:
+            if opt.get("label") == "QUEST MONSTERS ONLY":
+                opt["value"] = self.quest_monsters_only
+                break
         save_config(self._config)
 
     # ── Audio settings helpers ────────────────────────────────────

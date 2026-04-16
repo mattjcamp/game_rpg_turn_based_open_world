@@ -528,8 +528,8 @@
           "0,1": {
             "linked": true,
             "link_map": "overworld",
-            "link_x": "7",
-            "link_y": "15"
+            "link_x": "3",
+            "link_y": "29"
           },
           "8,9": {
             "linked": true,

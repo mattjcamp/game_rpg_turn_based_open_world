@@ -6,5 +6,6 @@
   "music_enabled": false,
   "soundtrack_style": "Classic",
   "start_level": 1,
-  "music_muted": true
+  "music_muted": true,
+  "quest_monsters_only": true
 }
