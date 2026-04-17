@@ -2664,9 +2664,6 @@
       "link_x": "0",
       "link_y": "0",
       "link_map": "building:The Deep:Main Hall"
-    },
-    "11,17": {
-      "encounter": "Goblin Ambush"
     }
   }
 }

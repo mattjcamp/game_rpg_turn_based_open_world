@@ -1534,6 +1534,29 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             return None
         return monster_key
 
+    def _resolve_quest_encounter(self, encounter_display):
+        """Resolve a quest step's encounter name to (template, rep_key).
+
+        ``template`` is the raw encounters.json dict (with ``monsters``
+        and ``monster_party_tile``), or ``None`` if the name is unknown.
+        ``rep_key`` is the MONSTERS key to use for the representative
+        quest-marker NPC on the map — preferring ``monster_party_tile``
+        so the sprite matches how the encounter is normally shown, and
+        falling back to the first monster in the list.
+        """
+        from src.monster import find_encounter_template
+        if not encounter_display or encounter_display == "(none)":
+            return (None, None)
+        tmpl = find_encounter_template(encounter_display)
+        if tmpl is None:
+            return (None, None)
+        rep_name = tmpl.get("monster_party_tile") or ""
+        if not rep_name:
+            mons = tmpl.get("monsters") or []
+            rep_name = mons[0] if mons else ""
+        rep_key = self._resolve_monster_key(rep_name) if rep_name else None
+        return (tmpl, rep_key)
+
     def _parse_spawn_location(self, spawn_loc):
         """Parse a spawn_location string into (type, name) tuple.
 
@@ -1596,8 +1619,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             loc_type, loc_name = self._parse_spawn_location(spawn_loc)
 
             if step_type == "kill":
-                monster_key = self._resolve_monster_key(
-                    step.get("monster", ""))
+                enc_name = step.get("encounter", "")
+                tmpl, monster_key = self._resolve_quest_encounter(enc_name)
                 if not monster_key:
                     continue
                 target_count = max(1, step.get("target_count", 1))
@@ -1605,25 +1628,30 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 if loc_type == "overview":
                     self._spawn_quest_monsters_overworld(
                         quest_name, step_idx, monster_key,
-                        target_count, spawned)
+                        target_count, spawned,
+                        encounter_name=enc_name)
                 elif loc_type == "town":
                     self._spawn_quest_monsters_town(
                         quest_name, step_idx, monster_key,
-                        target_count, loc_name, spawned)
+                        target_count, loc_name, spawned,
+                        encounter_name=enc_name)
                 elif loc_type == "interior":
                     self._register_quest_interior_monster(
                         quest_name, step_idx, monster_key,
-                        target_count, loc_name)
+                        target_count, loc_name,
+                        encounter_name=enc_name)
                 elif loc_type == "dungeon":
                     self._register_quest_dungeon_monster(
                         quest_name, step_idx, monster_key,
-                        target_count, loc_name)
+                        target_count, loc_name,
+                        encounter_name=enc_name)
                 elif loc_type == "building":
                     # Register under building key for deferred spawning
                     self._register_quest_interior_monster(
                         quest_name, step_idx, monster_key,
                         target_count, loc_name,
-                        key_prefix="building")
+                        key_prefix="building",
+                        encounter_name=enc_name)
                 elif loc_type == "space":
                     # "space:BuildingName/SpaceName" → register under
                     # the building name so it spawns in that building,
@@ -1631,7 +1659,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     self._register_quest_interior_monster(
                         quest_name, step_idx, monster_key,
                         target_count, loc_name,
-                        key_prefix="space")
+                        key_prefix="space",
+                        encounter_name=enc_name)
 
             elif step_type == "collect":
                 collect_item = step.get("collect_item", "")
@@ -1639,9 +1668,12 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     continue
                 has_guardian = step.get("has_guardian", "no") == "yes"
                 guardian_key = None
+                guardian_encounter_name = ""
                 if has_guardian:
-                    guardian_key = self._resolve_monster_key(
-                        step.get("guardian_monster", ""))
+                    guardian_encounter_name = step.get(
+                        "guardian_encounter", "")
+                    _gtmpl, guardian_key = self._resolve_quest_encounter(
+                        guardian_encounter_name)
 
                 # Look up the artifact tile sprite for this item
                 artifact_sprite = ""
@@ -1687,20 +1719,23 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     if guardian_key:
                         self._spawn_quest_monsters_overworld(
                             quest_name, step_idx, guardian_key,
-                            1, spawned, guardian_anchor=item_pos)
+                            1, spawned, guardian_anchor=item_pos,
+                            encounter_name=guardian_encounter_name)
                 elif loc_type == "town":
                     self._register_quest_town_collect(
                         item_info, loc_name)
                     if guardian_key:
                         self._spawn_quest_monsters_town(
                             quest_name, step_idx, guardian_key,
-                            1, loc_name, spawned)
+                            1, loc_name, spawned,
+                            encounter_name=guardian_encounter_name)
                 elif loc_type == "interior":
                     # Store guardian anchor info for deferred spawning
                     if guardian_key:
                         self._register_quest_interior_monster(
                             quest_name, step_idx, guardian_key,
-                            1, loc_name, is_guardian=True)
+                            1, loc_name, is_guardian=True,
+                            encounter_name=guardian_encounter_name)
                 elif loc_type == "dungeon":
                     # Guardian for dungeon collect items is spawned by
                     # _inject_quest_dungeon_collect_items directly next
@@ -1712,7 +1747,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         self._register_quest_interior_monster(
                             quest_name, step_idx, guardian_key,
                             1, loc_name, is_guardian=True,
-                            key_prefix="building")
+                            key_prefix="building",
+                            encounter_name=guardian_encounter_name)
                 elif loc_type == "space":
                     # Register guardian for deferred spawning in a
                     # specific building space.
@@ -1720,22 +1756,42 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         self._register_quest_interior_monster(
                             quest_name, step_idx, guardian_key,
                             1, loc_name, is_guardian=True,
-                            key_prefix="space")
+                            key_prefix="space",
+                            encounter_name=guardian_encounter_name)
 
         self.quest_spawned_monsters[quest_name] = spawned
 
     def _spawn_quest_monsters_overworld(self, quest_name, step_idx,
                                          monster_key, count, spawned,
-                                         guardian_anchor=None):
+                                         guardian_anchor=None,
+                                         encounter_name=""):
         """Place quest monsters on the overworld near the party.
 
         If *guardian_anchor* is a ``(col, row)`` tuple the monsters are
         placed near that position instead of the party and are tagged as
         guardians so the movement AI keeps them leashed to the artifact.
+
+        If *encounter_name* is given, the spawned monster's
+        ``encounter_template`` uses the full monster list from that
+        encounter so combat pits the party against the whole group.
         """
         import random as _rng
-        from src.monster import create_monster
+        from src.monster import create_monster, find_encounter_template
         from src.settings import TILE_GRASS, TILE_PATH
+
+        # Resolve the encounter template once so each spawn uses the
+        # same monster list / party-tile identity.
+        enc_tmpl = find_encounter_template(encounter_name) \
+            if encounter_name else None
+        if enc_tmpl:
+            enc_monster_names = list(enc_tmpl.get("monsters", []))
+            enc_party_tile = (
+                enc_tmpl.get("monster_party_tile") or monster_key)
+            display_enc_name = enc_tmpl.get("name", encounter_name)
+        else:
+            enc_monster_names = [monster_key]
+            enc_party_tile = monster_key
+            display_enc_name = ""
 
         party = self.party
         ow_state = self.states.get("overworld")
@@ -1781,11 +1837,22 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             # Tag monster for quest tracking
             mon._quest_name = quest_name
             mon._quest_step_idx = step_idx
+            if encounter_name:
+                mon._quest_encounter_name = encounter_name
 
             # Tag as guardian with anchor position
             if guardian_anchor:
                 mon._guardian_anchor = guardian_anchor
                 mon._guardian_leash = 4  # max tiles from artifact
+
+            # Build the encounter template once per monster so combat
+            # pulls the full group (not just the representative).
+            enc_display = display_enc_name or f"Quest: {mon.name}"
+            enc_template = {
+                "name": enc_display,
+                "monster_names": list(enc_monster_names),
+                "monster_party_tile": enc_party_tile,
+            }
 
             # Place near the anchor point (artifact or party)
             placed = False
@@ -1807,12 +1874,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     col, row = rng.choice(candidates)
                     mon.col = col
                     mon.row = row
-                    # Set encounter template so combat works
-                    mon.encounter_template = {
-                        "name": f"Quest: {mon.name}",
-                        "monster_names": [monster_key],
-                        "monster_party_tile": monster_key,
-                    }
+                    mon.encounter_template = enc_template
                     monster_list.append(mon)
                     occupied.add((col, row))
                     spawned.append(mon)
@@ -1825,11 +1887,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 if guardian_anchor:
                     mon._guardian_anchor = guardian_anchor
                     mon._guardian_leash = 4
-                mon.encounter_template = {
-                    "name": f"Quest: {mon.name}",
-                    "monster_names": [monster_key],
-                    "monster_party_tile": monster_key,
-                }
+                mon.encounter_template = enc_template
                 monster_list.append(mon)
                 spawned.append(mon)
 
@@ -1918,7 +1976,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
     def _spawn_quest_monsters_town(self, quest_name, step_idx,
                                     monster_key, count, town_name,
-                                    spawned):
+                                    spawned, encounter_name=""):
         """Place quest monsters in a specific town."""
         # Register them so they appear when the player enters the town.
         # The town state will read quest_interior_monsters and spawn
@@ -1933,13 +1991,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             "quest_name": quest_name,
             "step_idx": step_idx,
             "count": count,
+            "encounter_name": encounter_name,
         })
 
     def _register_quest_interior_monster(self, quest_name, step_idx,
                                           monster_key, count,
                                           interior_name,
                                           is_guardian=False,
-                                          key_prefix="interior"):
+                                          key_prefix="interior",
+                                          encounter_name=""):
         """Register quest monsters to spawn when the player enters an interior."""
         if not hasattr(self, "quest_interior_monsters"):
             self.quest_interior_monsters = {}
@@ -1952,12 +2012,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             "step_idx": step_idx,
             "count": count,
             "is_guardian": is_guardian,
+            "encounter_name": encounter_name,
         })
 
     def _register_quest_dungeon_monster(self, quest_name, step_idx,
                                          monster_key, count,
                                          dungeon_name,
-                                         is_guardian=False):
+                                         is_guardian=False,
+                                         encounter_name=""):
         """Register quest monsters to spawn when the player enters a dungeon."""
         if not hasattr(self, "quest_dungeon_monsters"):
             self.quest_dungeon_monsters = {}
@@ -1970,6 +2032,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             "step_idx": step_idx,
             "count": count,
             "is_guardian": is_guardian,
+            "encounter_name": encounter_name,
         })
 
     def _build_town_from_layout(self, layout_name, town_name,
@@ -5224,8 +5287,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._load_module_towns(mod["path"])
         self._load_module_dungeons(mod["path"])
         self._load_module_buildings(mod["path"])
-        # Reset cached monster names so they reload fresh
+        # Reset cached monster / encounter names so they reload fresh
         self._mod_quest_monster_names = None
+        self._mod_quest_encounter_names = None
         # Update section subtitle
         for sec in self.module_edit_sections:
             if sec.get("_quests"):
@@ -6189,6 +6253,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "level": max(0, self.module_edit_level - 20),
                         "sprite_map": getattr(self, "_mod_quest_sprite_name_to_file", {}),
                         "monster_tile_map": getattr(self, "_mod_quest_monster_tiles", {}),
+                        "encounter_tile_map": getattr(self, "_mod_quest_encounter_tiles", {}),
                         "artifact_sprite_map": getattr(self, "_mod_quest_artifact_sprites", {}),
                     })
                 if self._unsaved_dialog_active:

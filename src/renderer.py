@@ -9727,6 +9727,7 @@ class Renderer(CombatEffectRendererMixin):
         field_buffer = qd.get("step_field_buffer", "")
         field_scroll = qd.get("step_field_scroll", 0)
         monster_tile_map = qd.get("monster_tile_map", {})
+        encounter_tile_map = qd.get("encounter_tile_map", {})
         row_h = 38
         max_visible = (rh - 70) // row_h
 
@@ -9747,16 +9748,16 @@ class Renderer(CombatEffectRendererMixin):
         py_pos = ry + 8
 
         if step_type == "kill":
-            # Show monster sprite preview
-            monster_display = ""
+            # Show encounter party-tile preview
+            encounter_display = ""
             for fe in fields:
-                if fe.key == "monster":
-                    monster_display = fe.value
+                if fe.key == "encounter":
+                    encounter_display = fe.value
                     break
-            monster_tile = monster_tile_map.get(monster_display, "")
-            if monster_tile:
+            encounter_tile = encounter_tile_map.get(encounter_display, "")
+            if encounter_tile:
                 preview = self._load_monster_tile_preview(
-                    monster_tile, preview_size)
+                    encounter_tile, preview_size)
                 if preview:
                     bg_rect = pygame.Rect(px - 4, py_pos - 4,
                                           preview_size + 8, preview_size + 8)
@@ -9788,14 +9789,14 @@ class Renderer(CombatEffectRendererMixin):
                     self.screen.blit(sprite, (px, py_pos))
                     preview_drawn = True
 
-        # Show guardian monster preview below item if applicable
+        # Show guardian encounter preview below item if applicable
         if step_type == "collect":
             guardian_display = ""
             for fe in fields:
-                if fe.key == "guardian_monster":
+                if fe.key == "guardian_encounter":
                     guardian_display = fe.value
                     break
-            guardian_tile = monster_tile_map.get(guardian_display, "")
+            guardian_tile = encounter_tile_map.get(guardian_display, "")
             if guardian_tile:
                 guardian_preview = self._load_monster_tile_preview(
                     guardian_tile, preview_size)

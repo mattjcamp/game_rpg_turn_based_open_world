@@ -239,6 +239,67 @@ class ModuleQuestEditorMixin:
             except (OSError, json.JSONDecodeError):
                 continue
 
+    def _mod_quest_load_encounter_names(self):
+        """Load encounter names from the module's encounters.json for the
+        quest step editor's encounter picker.
+
+        Populates two attributes:
+          * ``_mod_quest_encounter_names`` — ``["(none)", "Rat Pack", ...]``
+          * ``_mod_quest_encounter_tiles`` — ``{"Rat Pack": "rats.png"}``
+            mapping each encounter's display name to its
+            ``monster_party_tile`` so the renderer can show a preview.
+
+        Encounters from all buckets (dungeon / overworld / house / …)
+        are flattened into one picker list.
+        """
+        import json, os
+        if getattr(self, "_mod_quest_encounter_names", None) is not None:
+            return
+        self._mod_quest_encounter_names = ["(none)"]
+        self._mod_quest_encounter_tiles = {}
+        mod_path = None
+        if self.module_list:
+            mod = self.module_list[self.module_cursor]
+            mod_path = mod.get("path")
+        paths_to_try = []
+        if mod_path:
+            paths_to_try.append(
+                os.path.join(mod_path, "encounters.json"))
+        paths_to_try.append(os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "encounters.json"))
+        for p in paths_to_try:
+            if not os.path.isfile(p):
+                continue
+            try:
+                with open(p, "r") as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            buckets = data.get("encounters", {})
+            if not isinstance(buckets, dict):
+                break
+            # Flatten every bucket into one sorted list (stable
+            # across sessions).
+            entries = []
+            for cat in sorted(buckets.keys()):
+                bucket = buckets.get(cat) or []
+                if not isinstance(bucket, list):
+                    continue
+                for entry in bucket:
+                    if isinstance(entry, dict):
+                        entries.append(entry)
+            for entry in sorted(entries,
+                                key=lambda e: e.get("name", "").lower()):
+                name = entry.get("name", "")
+                if not name or name in self._mod_quest_encounter_names:
+                    continue
+                self._mod_quest_encounter_names.append(name)
+                tile = entry.get("monster_party_tile", "")
+                if tile:
+                    self._mod_quest_encounter_tiles[name] = tile
+            break  # use first found file
+
     def _mod_quest_load_artifact_tiles(self):
         """Load artifact tile names for the quest step editor's item picker.
 
@@ -294,8 +355,11 @@ class ModuleQuestEditorMixin:
             return
         step = self._mod_quest_step_list[self._mod_quest_step_cursor]
 
-        # Ensure monster names and artifact tiles are loaded
+        # Ensure encounter names and artifact tiles are loaded.
+        # (Monster names are still loaded for legacy previews, but the
+        # pickers below now use encounters.)
         self._mod_quest_load_monster_names()
+        self._mod_quest_load_encounter_names()
         self._mod_quest_load_artifact_tiles()
 
         step_type = step.get("step_type", "collect")
@@ -321,20 +385,20 @@ class ModuleQuestEditorMixin:
         common_bottom = []
 
         if step_type == "kill":
-            # Kill: Monster, Spawn Location, Target Count
-            current_monster = step.get("monster", "")
-            if not current_monster:
-                current_monster = "(none)"
+            # Kill: Encounter, Spawn Location, Target Count
+            current_encounter = step.get("encounter", "")
+            if not current_encounter:
+                current_encounter = "(none)"
             type_fields = [
-                FieldEntry("Monster", "monster",
-                           current_monster, "choice", True),
+                FieldEntry("Encounter", "encounter",
+                           current_encounter, "choice", True),
                 FieldEntry("Spawn Location", "spawn_location",
                            spawn_loc_display, "choice", True),
                 FieldEntry("Target Count", "target_count",
                            str(step.get("target_count", 1)), "int", True),
             ]
         else:
-            # Collect: Item, Spawn Location, Guardian, Guardian Monster
+            # Collect: Item, Spawn Location, Guardian, Guardian Encounter
             current_item = step.get("collect_item", "")
             if not current_item:
                 current_item = "(none)"
@@ -351,20 +415,20 @@ class ModuleQuestEditorMixin:
                            has_guardian, "choice", True),
             ]
             if has_guardian == "yes":
-                guardian_monster = step.get("guardian_monster", "")
-                if not guardian_monster:
-                    guardian_monster = "(none)"
+                guardian_encounter = step.get("guardian_encounter", "")
+                if not guardian_encounter:
+                    guardian_encounter = "(none)"
                 type_fields.append(
-                    FieldEntry("Guardian Monster", "guardian_monster",
-                               guardian_monster, "choice", True))
+                    FieldEntry("Guardian Encounter", "guardian_encounter",
+                               guardian_encounter, "choice", True))
 
         self._mod_quest_step_fields = common_top + type_fields + common_bottom
         self._mod_quest_step_choice_map = {
             "step_type": self._QUEST_STEP_TYPES,
-            "monster": getattr(self, "_mod_quest_monster_names",
-                               ["(none)"]),
-            "guardian_monster": getattr(self, "_mod_quest_monster_names",
-                                       ["(none)"]),
+            "encounter": getattr(self, "_mod_quest_encounter_names",
+                                 ["(none)"]),
+            "guardian_encounter": getattr(self, "_mod_quest_encounter_names",
+                                          ["(none)"]),
             "collect_item": getattr(self, "_mod_quest_artifact_names",
                                     ["(none)"]),
             "spawn_location": loc_options,
@@ -410,8 +474,8 @@ class ModuleQuestEditorMixin:
                 except ValueError:
                     val = 0
             # Store "(none)" as empty string for choice fields
-            if key in ("monster", "guardian_monster", "collect_item") \
-                    and val == "(none)":
+            if key in ("encounter", "guardian_encounter",
+                       "collect_item") and val == "(none)":
                 val = ""
             # Convert spawn location display name to stored value
             if key == "spawn_location":
@@ -440,10 +504,10 @@ class ModuleQuestEditorMixin:
         new_step = {
             "description": "New Step",
             "step_type": "collect",
-            "monster": "",
+            "encounter": "",
             "collect_item": "",
             "has_guardian": "no",
-            "guardian_monster": "",
+            "guardian_encounter": "",
             "spawn_location": "",
             "target": "",
             "target_count": 1,

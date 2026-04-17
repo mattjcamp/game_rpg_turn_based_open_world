@@ -1,98 +1,22 @@
 [
   {
-    "name": "Remove the Troll",
+    "name": "Rats",
     "description": "",
-    "giver_npc": "Eager",
-    "giver_sprite": "src/assets/game/npcs/shopkeep.png",
+    "giver_npc": "test",
+    "giver_sprite": "src/assets/game/npcs/vga_mage.png",
     "giver_location": "town:New Haven",
-    "giver_dialogue": "So... the dank dungeon to our north has a very bad smelling troll.... Do you think you can take care of that for us? I don't want to know the details, but our town treasurer has set aside a reward for you if you can clean that up.",
+    "giver_dialogue": "Rats, kill all rats",
     "reward_xp": 100,
     "reward_gold": 100,
     "steps": [
       {
-        "description": "Remove the Troll",
+        "description": "New Step",
         "step_type": "kill",
-        "monster": "Troll",
+        "encounter": "Rat Infestation",
         "collect_item": "",
         "has_guardian": "no",
-        "guardian_monster": "",
-        "spawn_location": "dungeon:Dank Pit",
-        "target": "",
-        "target_count": 1,
-        "optional": "no"
-      }
-    ],
-    "giver_col": 20,
-    "giver_row": 10
-  },
-  {
-    "name": "Rat's In the General Store",
-    "description": "",
-    "giver_npc": "Shiela",
-    "giver_sprite": "src/assets/game/characters/alchemist.png",
-    "giver_location": "town:New Haven",
-    "giver_dialogue": "Can you help me? I'm the owner of the General Store, and the basement is infected with rats.Can you deal with them? They might be Giant Rats, I'm not sure. I'm a little scared of rats...",
-    "reward_xp": 50,
-    "reward_gold": 50,
-    "steps": [
-      {
-        "description": "Kill the Rats",
-        "step_type": "kill",
-        "monster": "Giant Rat",
-        "collect_item": "",
-        "has_guardian": "no",
-        "guardian_monster": "",
-        "spawn_location": "interior:New Haven/Tunnel Short",
-        "target": "",
-        "target_count": 10,
-        "optional": "no"
-      }
-    ],
-    "giver_col": 6,
-    "giver_row": 9
-  },
-  {
-    "name": "Find the Sword of Kings",
-    "description": "",
-    "giver_npc": "",
-    "giver_sprite": "src/assets/unassigned/cleric_f1.png",
-    "giver_location": "space:Goulag/Shrine",
-    "giver_dialogue": "The realm is in dire need of ones like yourselves. We have monsters roaming the countryside and the Sword of Kings has been buried deep in the Abyss in the mountains. Can you help the realm? Our people will reward you with great treasure.",
-    "reward_xp": 200,
-    "reward_gold": 250,
-    "steps": [
-      {
-        "description": "Hunt the Orc Horde",
-        "step_type": "kill",
-        "monster": "Orc",
-        "collect_item": "",
-        "has_guardian": "no",
-        "guardian_monster": "",
+        "guardian_encounter": "",
         "spawn_location": "overview",
-        "target": "",
-        "target_count": 3,
-        "optional": "no"
-      },
-      {
-        "description": "But the Skeletons to Rest",
-        "step_type": "kill",
-        "monster": "Skeleton Archer",
-        "collect_item": "",
-        "has_guardian": "no",
-        "guardian_monster": "",
-        "spawn_location": "overview",
-        "target": "",
-        "target_count": 10,
-        "optional": "no"
-      },
-      {
-        "description": "Retrieve the Sword of Kings",
-        "step_type": "collect",
-        "monster": "",
-        "collect_item": "King's Sword",
-        "has_guardian": "yes",
-        "guardian_monster": "Dragon",
-        "spawn_location": "dungeon:Deep Abyss",
         "target": "",
         "target_count": 1,
         "optional": "no"
@@ -100,31 +24,5 @@
     ],
     "giver_col": 8,
     "giver_row": 8
-  },
-  {
-    "name": "Destroy the Goblin Horde",
-    "description": "",
-    "giver_npc": "",
-    "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
-    "giver_location": "town:New Haven",
-    "giver_dialogue": "A  goblin horde is hiding out in the mountains to our North and East. These little trash eaters threaten our way of life. Deal with them and reap the reward!",
-    "reward_xp": 100,
-    "reward_gold": 100,
-    "steps": [
-      {
-        "description": "Neutralize the Goblin Threat",
-        "step_type": "kill",
-        "monster": "Goblin",
-        "collect_item": "",
-        "has_guardian": "no",
-        "guardian_monster": "",
-        "spawn_location": "dungeon:Goblin Stronghold",
-        "target": "",
-        "target_count": 25,
-        "optional": "no"
-      }
-    ],
-    "giver_col": 8,
-    "giver_row": 12
   }
 ]

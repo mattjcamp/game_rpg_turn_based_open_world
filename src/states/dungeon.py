@@ -212,7 +212,8 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         """
         import random as _rng
         import re
-        from src.monster import create_monster, MONSTERS
+        from src.monster import (
+            create_monster, MONSTERS, find_encounter_template)
 
         # Only place quest monsters on the lowest floor
         if self.quest_levels:
@@ -254,6 +255,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             step_idx = entry["step_idx"]
             monster_key = entry["monster_key"]
             count = entry.get("count", 1)
+            enc_name = entry.get("encounter_name", "")
 
             # Skip if quest is no longer active
             qstate = mq_states.get(qname, {})
@@ -271,10 +273,26 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             if already:
                 continue
 
+            # Build encounter template once per registration so each
+            # spawned marker pulls the full monster list into combat.
+            enc_tmpl = find_encounter_template(enc_name) \
+                if enc_name else None
+            if enc_tmpl:
+                enc_monster_names = list(enc_tmpl.get("monsters", []))
+                enc_party_tile = (
+                    enc_tmpl.get("monster_party_tile") or monster_key)
+                enc_display_name = enc_tmpl.get("name", enc_name)
+            else:
+                enc_monster_names = [monster_key]
+                enc_party_tile = monster_key
+                enc_display_name = ""
+
             for i in range(count):
                 mon = create_monster(monster_key)
                 mon._quest_name = qname
                 mon._quest_step_idx = step_idx
+                if enc_name:
+                    mon._quest_encounter_name = enc_name
 
                 free = [p for p in walkable if p not in occupied]
                 if free:
@@ -285,9 +303,9 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 mon.col = col
                 mon.row = row
                 mon.encounter_template = {
-                    "name": f"Quest: {mon.name}",
-                    "monster_names": [monster_key],
-                    "monster_party_tile": monster_key,
+                    "name": enc_display_name or f"Quest: {mon.name}",
+                    "monster_names": list(enc_monster_names),
+                    "monster_party_tile": enc_party_tile,
                 }
                 self.dungeon_data.monsters.append(mon)
                 occupied.add((col, row))

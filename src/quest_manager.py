@@ -117,12 +117,20 @@ def check_quest_kills(game):
     kill steps **only when the combat location matches the step's
     spawn_location**, updates progress, and clears the pending list.
 
+    Kill steps now target an *encounter* (a named group from
+    encounters.json). A step gets ``+1`` credit per combat in which
+    any monster from that encounter's roster is defeated at the
+    matching location — i.e. one completed encounter battle = one
+    step credit, regardless of how many monsters were in the group.
+
     Args:
         game: The Game instance
 
     Returns:
         str or None: Completion message, or None if no progress
     """
+    from src.monster import find_encounter_template
+
     killed = getattr(game, "pending_killed_monsters", [])
     if not killed:
         return None
@@ -135,11 +143,9 @@ def check_quest_kills(game):
     # Build a lookup of killed monster names using all common variants
     # so that e.g. "Giant Rat", "giant_rat", and "giant rat" all match.
     killed_name_sets = [_normalize_monster_name(n) for n in killed]
-    # Flatten: map each variant -> count of kills
-    killed_counts = {}
+    killed_variants = set()
     for name_set in killed_name_sets:
-        for variant in name_set:
-            killed_counts[variant] = killed_counts.get(variant, 0) + 1
+        killed_variants.update(name_set)
 
     messages = []
 
@@ -165,8 +171,8 @@ def check_quest_kills(game):
                 continue
             if step.get("step_type") != "kill":
                 continue
-            monster_display = step.get("monster", "")
-            if not monster_display:
+            encounter_name = step.get("encounter", "")
+            if not encounter_name:
                 continue
 
             # Only credit kills that happened at the right location
@@ -174,19 +180,27 @@ def check_quest_kills(game):
             if not _location_matches(step_location, combat_location):
                 continue
 
-            target_count = max(1, step.get("target_count", 1))
-
-            # Match against all name variants for the quest monster
-            monster_variants = _normalize_monster_name(monster_display)
-            match_count = 0
-            for variant in monster_variants:
-                match_count = max(match_count,
-                                  killed_counts.get(variant, 0))
-
-            if match_count <= 0:
+            # Resolve the encounter's roster; a kill counts if any of
+            # those monsters shows up in pending_killed_monsters.
+            enc_tmpl = find_encounter_template(encounter_name)
+            if enc_tmpl:
+                roster = enc_tmpl.get("monsters", [])
+            else:
+                # Template missing (e.g. module removed an encounter
+                # after the quest was authored) — nothing to credit.
                 continue
 
-            kills_so_far = state.get(f"step_{i}_kills", 0) + match_count
+            roster_hit = False
+            for mname in roster:
+                if _normalize_monster_name(mname) & killed_variants:
+                    roster_hit = True
+                    break
+            if not roster_hit:
+                continue
+
+            # One encounter cleared = one credit toward target_count.
+            target_count = max(1, step.get("target_count", 1))
+            kills_so_far = state.get(f"step_{i}_kills", 0) + 1
             state[f"step_{i}_kills"] = kills_so_far
 
             if kills_so_far >= target_count:
@@ -196,10 +210,8 @@ def check_quest_kills(game):
                     f"Quest '{qname}': {desc} - Complete!")
                 game.sfx.play("treasure")
             else:
-                # Show progress toward completing this step
-                display_name = monster_display.replace("_", " ").title()
                 messages.append(
-                    f"{display_name} defeated! "
+                    f"{encounter_name} defeated! "
                     f"({kills_so_far}/{target_count})")
 
         if all(progress) and progress:

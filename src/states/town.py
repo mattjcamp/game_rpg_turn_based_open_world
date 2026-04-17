@@ -1118,6 +1118,7 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             step_idx = entry["step_idx"]
             monster_key = entry["monster_key"]
             count = entry.get("count", 1)
+            enc_name = entry.get("encounter_name", "")
 
             # Skip if quest is no longer active
             qstate = mq_states.get(qname, {})
@@ -1148,6 +1149,8 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 npc._quest_name = qname
                 npc._quest_step_idx = step_idx
                 npc._monster_key = monster_key
+                if enc_name:
+                    npc._quest_encounter_name = enc_name
                 npc.wander_range = NPC_WANDER_RANGE
                 self.town_data.npcs.append(npc)
 
@@ -1187,6 +1190,7 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             monster_key = entry["monster_key"]
             count = entry.get("count", 1)
             is_guardian = entry.get("is_guardian", False)
+            enc_name = entry.get("encounter_name", "")
 
             # Skip if quest is no longer active
             qstate = mq_states.get(qname, {})
@@ -1245,6 +1249,8 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 npc._quest_name = qname
                 npc._quest_step_idx = step_idx
                 npc._monster_key = monster_key
+                if enc_name:
+                    npc._quest_encounter_name = enc_name
                 npc.wander_range = NPC_WANDER_RANGE
                 if is_guardian and anchor_pos:
                     npc._guardian_anchor = anchor_pos
@@ -1357,7 +1363,7 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
 
     def _start_quest_monster_combat(self, npc):
         """Initiate combat with a quest monster NPC inside a town or interior."""
-        from src.monster import create_monster
+        from src.monster import create_monster, create_encounter_from_template
 
         monster_key = getattr(npc, "_monster_key", "skeleton")
         combat_state = self.game.states.get("combat")
@@ -1372,8 +1378,17 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
         if not fighter:
             return
 
-        monsters = [create_monster(monster_key)]
-        enc_name = f"Quest: {npc.name}"
+        # If the NPC carries a quest encounter tag, pit the party against
+        # the full encounter group. Otherwise fall back to a single
+        # monster (legacy / missing template).
+        enc_tag = getattr(npc, "_quest_encounter_name", "")
+        enc = create_encounter_from_template(enc_tag) if enc_tag else None
+        if enc:
+            monsters = enc["monsters"]
+            enc_name = enc["name"]
+        else:
+            monsters = [create_monster(monster_key)]
+            enc_name = f"Quest: {npc.name}"
 
         self.game.sfx.play("encounter")
         terrain_tile = self.town_data.tile_map.get_tile(
