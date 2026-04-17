@@ -12,6 +12,7 @@ Requirements:
 
 Controls:
     Arrow keys or WASD - Move the party
+    Shift + Arrow keys - Scroll the map / review explored tiles
     ESC - Quit
 """
 

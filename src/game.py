@@ -77,12 +77,23 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Party start position is defined in data/party.json
         self.party = create_default_party()
 
-        # Camera follows the party
-        self.camera = Camera(self.tile_map.width, self.tile_map.height)
+        # Camera follows the party.
+        # Viewport dims match the renderer's map area (30x20 tiles;
+        # the bottom ~96px of the screen is reserved for the HUD), so
+        # free-look panning (Shift + arrows) clamps to exactly what
+        # the renderer will display.
+        self.camera = Camera(
+            self.tile_map.width, self.tile_map.height,
+            viewport_cols=30, viewport_rows=20,
+        )
         self.camera.update(self.party.col, self.party.row)
 
         # Renderer
         self.renderer = Renderer(self.screen)
+        # Give the renderer a back-reference to the camera so its
+        # map-drawing methods pick up free-look pan offsets instead
+        # of always re-centering on the party.
+        self.renderer.camera = self.camera
 
         # --- Town data ---
         # Pre-generate the town so it persists across visits
@@ -645,7 +656,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             self.tile_map = create_test_map(
                 overworld_cfg=overworld_cfg,
                 data_dir=self.active_module_path)
-        self.camera = Camera(self.tile_map.width, self.tile_map.height)
+        self.camera = Camera(
+            self.tile_map.width, self.tile_map.height,
+            viewport_cols=30, viewport_rows=20,
+        )
+        # Re-wire the renderer's camera reference since we just
+        # replaced the camera instance.
+        if getattr(self, "renderer", None) is not None:
+            self.renderer.camera = self.camera
 
         # ── Validate bidirectional links ──
         if self.active_module_path:

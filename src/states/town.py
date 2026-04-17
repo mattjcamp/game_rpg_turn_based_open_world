@@ -603,6 +603,19 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
         if self.door_interact_active or self.door_unlock_anim:
             return
 
+        # ── Free-look / map-scroll mode (Shift + arrows) ──────
+        # Holding Shift detaches the camera from the party so the
+        # player can pan across the town/interior map and review
+        # previously explored tiles under the fog-of-war mask.
+        # Panning does NOT advance game time. Releasing Shift
+        # snaps the camera back to the party on the next frame.
+        mods = pygame.key.get_mods()
+        shift_held = bool(mods & pygame.KMOD_SHIFT)
+        if shift_held and not self.game.camera.free_look:
+            self.game.camera.enter_free_look()
+        elif not shift_held and self.game.camera.free_look:
+            self.game.camera.exit_free_look()
+
         # Movement
         if self.move_cooldown > 0:
             return
@@ -621,6 +634,14 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                          & (pygame.KMOD_CTRL | pygame.KMOD_META
                             | getattr(pygame, "KMOD_GUI", 0)))):
             drow = 1
+
+        # In free-look mode, arrow keys pan the camera instead of
+        # moving the party.
+        if shift_held:
+            if dcol != 0 or drow != 0:
+                self.game.camera.pan(dcol, drow)
+                self.move_cooldown = MOVE_REPEAT_DELAY
+            return
 
         if dcol != 0 or drow != 0:
             self._try_move_or_interact(dcol, drow)

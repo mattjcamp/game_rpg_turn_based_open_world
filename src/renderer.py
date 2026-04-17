@@ -49,6 +49,10 @@ class Renderer(CombatEffectRendererMixin):
 
     def __init__(self, screen):
         self.screen = screen
+        # Camera reference (assigned by Game after both are constructed).
+        # When set and in free-look mode, the map-drawing methods read
+        # the camera's pan offset instead of auto-centering on the party.
+        self.camera = None
         self.font = pygame.font.SysFont("liberationsans", 18)
         self.font_med = pygame.font.SysFont("liberationsans", 16)
         self.font_small = pygame.font.SysFont("liberationsans", 14)
@@ -582,15 +586,26 @@ class Renderer(CombatEffectRendererMixin):
         # ── compute camera offset ──
         # When the map is smaller than the viewport, center it;
         # otherwise clamp so we don't scroll past the edges.
+        # In free-look mode (Shift + arrows) the detached camera
+        # takes over so the player can pan across the map — but
+        # we still honor the "small map centered" logic since there
+        # is nothing to scroll to in that case.
+        free_look = self.camera is not None and self.camera.free_look
         if tile_map.width <= cols:
             off_c = -(cols - tile_map.width) // 2
         else:
-            off_c = party.col - cols // 2
+            if free_look:
+                off_c = self.camera.offset_col
+            else:
+                off_c = party.col - cols // 2
             off_c = max(0, min(off_c, tile_map.width - cols))
         if tile_map.height <= rows:
             off_r = -(rows - tile_map.height) // 2
         else:
-            off_r = party.row - rows // 2
+            if free_look:
+                off_r = self.camera.offset_row
+            else:
+                off_r = party.row - rows // 2
             off_r = max(0, min(off_r, tile_map.height - rows))
 
         # ── 1. draw map tiles ──
@@ -1776,10 +1791,18 @@ class Renderer(CombatEffectRendererMixin):
         rows = self._U3_OW_ROWS
 
         # ── compute camera offset ──
-        off_c = party.col - cols // 2
-        off_r = party.row - rows // 2
-        off_c = max(0, min(off_c, tile_map.width - cols))
-        off_r = max(0, min(off_r, tile_map.height - rows))
+        # When the player holds Shift + arrows we enter "free-look" and
+        # the camera detaches from the party to let the user scroll
+        # across the map (the fog of war shows where they've been).
+        # See src/camera.py for details.
+        if self.camera is not None and self.camera.free_look:
+            off_c = self.camera.offset_col
+            off_r = self.camera.offset_row
+        else:
+            off_c = party.col - cols // 2
+            off_r = party.row - rows // 2
+        off_c = max(0, min(off_c, max(0, tile_map.width - cols)))
+        off_r = max(0, min(off_r, max(0, tile_map.height - rows)))
 
         # ── pixel offset to center small maps ──
         # When the map is smaller than the viewport, center it on screen
@@ -2401,10 +2424,16 @@ class Renderer(CombatEffectRendererMixin):
         tile_map = dungeon_data.tile_map
 
         # ── compute camera offset ──
-        off_c = party.col - cols // 2
-        off_r = party.row - rows // 2
-        off_c = max(0, min(off_c, tile_map.width - cols))
-        off_r = max(0, min(off_r, tile_map.height - rows))
+        # Free-look (Shift + arrows) lets the player pan across the
+        # dungeon to review previously explored tiles — see camera.py.
+        if self.camera is not None and self.camera.free_look:
+            off_c = self.camera.offset_col
+            off_r = self.camera.offset_row
+        else:
+            off_c = party.col - cols // 2
+            off_r = party.row - rows // 2
+        off_c = max(0, min(off_c, max(0, tile_map.width - cols)))
+        off_r = max(0, min(off_r, max(0, tile_map.height - rows)))
 
         # ── 1. draw map tiles ──
         palette = self._get_dungeon_palette(dungeon_level)
@@ -16610,6 +16639,7 @@ class Renderer(CombatEffectRendererMixin):
         lines_left = [
             ("[W/A/S/D]", "Move on the map"),
             ("[ARROWS]", "Move on the map"),
+            ("[SHIFT+ARROWS]", "Scroll map / view fog of war"),
         ]
         for key, desc in lines_left:
             ks = f.render(key, True, (255, 255, 255))
@@ -17204,6 +17234,7 @@ class Renderer(CombatEffectRendererMixin):
             col1_x, y, "MOVEMENT", [
                 ("[W/A/S/D]", "Move through the dungeon"),
                 ("[ARROWS]", "Move through the dungeon"),
+                ("[SHIFT+ARROWS]", "Scroll map / view explored tiles"),
             ], sf, f, lh, key_w)
 
         y += 10
@@ -17253,6 +17284,7 @@ class Renderer(CombatEffectRendererMixin):
             col1_x, y, "MOVEMENT", [
                 ("[W/A/S/D]", "Move around town"),
                 ("[ARROWS]", "Move around town"),
+                ("[SHIFT+ARROWS]", "Scroll map / view explored tiles"),
             ], sf, f, lh, key_w)
 
         y += 10

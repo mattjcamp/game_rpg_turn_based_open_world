@@ -624,6 +624,20 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 or self.door_interact_active or self.door_unlock_anim):
             return
 
+        # ── Free-look / map-scroll mode (Shift + arrows) ──────
+        # Holding Shift detaches the camera from the party so the
+        # player can pan across the map and review previously
+        # explored tiles under the fog-of-war mask. Panning does
+        # NOT advance the turn counter. Releasing Shift snaps the
+        # camera back to the party on the next frame (the main
+        # loop calls camera.update() every frame — see game.run).
+        mods = pygame.key.get_mods()
+        shift_held = bool(mods & pygame.KMOD_SHIFT)
+        if shift_held and not self.game.camera.free_look:
+            self.game.camera.enter_free_look()
+        elif not shift_held and self.game.camera.free_look:
+            self.game.camera.exit_free_look()
+
         # Movement only if cooldown has elapsed
         if self.move_cooldown > 0:
             return
@@ -642,6 +656,14 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                          & (pygame.KMOD_CTRL | pygame.KMOD_META
                             | getattr(pygame, "KMOD_GUI", 0)))):
             drow = 1
+
+        # In free-look mode, arrow keys pan the camera instead of
+        # moving the party and the turn counter does NOT advance.
+        if shift_held:
+            if dcol != 0 or drow != 0:
+                self.game.camera.pan(dcol, drow)
+                self.move_cooldown = MOVE_REPEAT_DELAY
+            return
 
         if dcol != 0 or drow != 0:
             party = self.game.party

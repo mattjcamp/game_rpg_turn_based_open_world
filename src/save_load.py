@@ -521,7 +521,14 @@ def load_game(slot, game):
                 overworld_cfg=overworld_cfg,
                 data_dir=game.active_module_path
                 if game.module_manifest else None)
-        game.camera = Camera(game.tile_map.width, game.tile_map.height)
+        game.camera = Camera(
+            game.tile_map.width, game.tile_map.height,
+            viewport_cols=30, viewport_rows=20,
+        )
+        # Re-wire the renderer's camera reference since loading a
+        # save replaces the camera instance.
+        if getattr(game, "renderer", None) is not None:
+            game.renderer.camera = game.camera
 
         # ── Restore the party ───────────────────────────────────
         game.party = _deserialize_party(save_data["party"])
