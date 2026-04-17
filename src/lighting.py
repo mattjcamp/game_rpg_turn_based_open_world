@@ -134,6 +134,11 @@ class LightingContext:
 
     # ── Rendering surface info (for fog-of-war blit target) ──
     fog_surface_size: Optional[Tuple[int, int]] = None  # (w, h) override
+    # Pixel offset applied when blitting the fog surface to the screen.
+    # Needed when the caller draws tiles with a pad_x/pad_y centering
+    # offset (e.g. the overworld renderer for small maps) so the fog's
+    # transparent "visible" holes line up with the actual tiles.
+    screen_offset: Tuple[int, int] = (0, 0)
 
 
 # ─── Main render entry point ──────────────────────────────────────
@@ -398,7 +403,7 @@ def _render_fog_of_war(screen: pygame.Surface, ctx: LightingContext) -> None:
                 rect = pygame.Rect(sc * ts, sr * ts, ts, ts)
                 fog.fill((0, 0, 0, alpha), rect)
 
-    screen.blit(fog, (0, 0))
+    screen.blit(fog, ctx.screen_offset)
 
 
 # ─── Infravision tint ─────────────────────────────────────────────

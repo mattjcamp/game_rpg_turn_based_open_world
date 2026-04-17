@@ -3168,8 +3168,8 @@
             "name": "Brown Brick Wall"
           },
           "3,0": {
-            "tile_id": 49,
-            "name": "Brown Brick Wall"
+            "tile_id": 28,
+            "name": "Portal"
           },
           "4,0": {
             "tile_id": 49,
@@ -3391,6 +3391,9 @@
           "8,1": {
             "linked": true,
             "link_map": "interior:New Haven/Tunnel Short"
+          },
+          "3,0": {
+            "light_source": true
           }
         }
       },

@@ -2754,13 +2754,67 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                           else False)
         town_dark = getattr(self.game, "darkness_active", False)
 
-        # NOTE: interior_darkness now means "suppress all darkness in
-        # building interiors" (both the old INTERIOR_DARKNESS mode and
-        # night-time CLOCK_DARKNESS). Interiors have no sky and the
-        # distance-based darkness produced broken islands of light.
-        # Torches and light spells can be reintroduced later via a
-        # purpose-built interior lighting system. — Apr 2026
+        # Building interior lighting — fog-of-war driven by
+        # src/interior_lighting.py.  Outside a building the flag is
+        # False and no visibility sets are computed, so the town map
+        # itself still follows the normal outdoor day/night rules.
         _int_dark = getattr(self, "_in_interior", False)
+        _vis_tiles = None
+        _exp_tiles = None
+        if _int_dark:
+            try:
+                from src.interior_lighting import (
+                    compute_visible_tiles, party_has_light,
+                )
+                tmap = self.town_data.tile_map
+                # Per-tile-map caches travel with the interior map
+                # through the interior stack, so re-entering a
+                # still-stashed building retains its fog of war.
+                # Fresh tile_maps (new interior builds) start with
+                # empty caches automatically.
+                if not hasattr(tmap, "_interior_light_cache"):
+                    tmap._interior_light_cache = {}
+                if not hasattr(tmap, "explored_tiles"):
+                    tmap.explored_tiles = set()
+                pcol = self.game.party.col
+                prow = self.game.party.row
+                _vis_tiles, tmap._interior_light_cache = compute_visible_tiles(
+                    tmap, pcol, prow,
+                    has_party_light=party_has_light(self.game.party),
+                    light_cache=tmap._interior_light_cache,
+                )
+                # Safety: if the party's own tile somehow isn't
+                # visible (bad coords, corrupted tile_map, etc.),
+                # fall back to "no fog" so the player isn't stuck
+                # staring at pitch black.  One-shot warn.
+                if (pcol, prow) not in _vis_tiles:
+                    if not getattr(self, "_interior_fog_warned", False):
+                        import sys
+                        print(
+                            f"[interior-fog] WARNING: party ({pcol},"
+                            f"{prow}) not in visible set "
+                            f"({len(_vis_tiles)} tiles). tile_map="
+                            f"{tmap.width}x{tmap.height}. Disabling "
+                            f"fog for this frame.",
+                            file=sys.stderr,
+                        )
+                        self._interior_fog_warned = True
+                    _vis_tiles = None
+                    _exp_tiles = None
+                else:
+                    tmap.explored_tiles.update(_vis_tiles)
+                    _exp_tiles = tmap.explored_tiles
+            except Exception as e:
+                # Never let a fog bug lock the player out of seeing
+                # the interior.  Log once and fall back to fully lit.
+                if not getattr(self, "_interior_fog_warned", False):
+                    import sys, traceback
+                    print(f"[interior-fog] ERROR: {e}", file=sys.stderr)
+                    traceback.print_exc()
+                    self._interior_fog_warned = True
+                _vis_tiles = None
+                _exp_tiles = None
+
         renderer.draw_town_u3(
             self.game.party,
             self.town_data,
@@ -2768,6 +2822,8 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             quest_complete=quest_complete,
             darkness_active=town_dark,
             interior_darkness=_int_dark,
+            visible_tiles=_vis_tiles,
+            explored_tiles=_exp_tiles,
         )
         # Pickpocket targeting overlay
         if self.pickpocket_targeting and self.pickpocket_targets:

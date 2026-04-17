@@ -629,6 +629,19 @@ class MapEditorState:
         fields.append(("Locked", "locked",
                        "yes" if is_locked else "no", "toggle"))
 
+        # ── Universal: light source (emits light in a radius) ──
+        # light_source is a toggle; light_range (in tiles) only appears
+        # when the tile is marked as a light source. Stored as a string
+        # in tile_properties to match the existing numeric-field
+        # convention (see spawn_chance / spawn_radius above) — the
+        # consuming lighting code is responsible for parsing it.
+        is_light = props.get("light_source", False)
+        fields.append(("Light Source", "light_source",
+                       "yes" if is_light else "no", "toggle"))
+        if is_light:
+            fields.append(("Light Range", "light_range",
+                           props.get("light_range", "5"), True))
+
         return {
             "tile_id": tile_id,
             "tile_name": tile_name,
@@ -1015,6 +1028,10 @@ class MapEditorInputHandler:
                     if key == "linked":
                         for lk in ("link_map", "link_x", "link_y"):
                             st.remove_tile_prop(col, row, lk)
+                    # Clear light_range when disabling light_source so
+                    # stale range values don't persist invisibly.
+                    elif key == "light_source":
+                        st.remove_tile_prop(col, row, "light_range")
                 # Refresh field display
                 new_info = st.get_cursor_tile_info()
                 new_fields = new_info["fields"]

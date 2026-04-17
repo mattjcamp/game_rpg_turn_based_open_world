@@ -560,7 +560,8 @@ class Renderer(CombatEffectRendererMixin):
     def draw_town_u3(self, party, town_data, message="",
                       quest_complete=False, darkness_active=False,
                       shake_offset=(0, 0),
-                      interior_darkness=False):
+                      interior_darkness=False,
+                      visible_tiles=None, explored_tiles=None):
         """
         Full Ultima III-style town screen — full-width map with bottom info bar.
         Uses sprite sheet tiles where available, procedural fallback otherwise.
@@ -697,13 +698,24 @@ class Renderer(CombatEffectRendererMixin):
             tint = TintEffect.NONE
 
         if interior_darkness:
-            # Building interior — skip all darkness overlays entirely.
-            # No INTERIOR_DARKNESS (the dungeon-style distance falloff
-            # produced broken islands of light in small rooms) and no
-            # night-time CLOCK_DARKNESS (indoors has no sky, so the
-            # outdoor day/night cycle shouldn't apply). A proper
-            # interior lighting system can be introduced later.
-            pass
+            # Building interior — fog-of-war driven by the interior
+            # lighting module (see src/interior_lighting.py).  The
+            # caller computes visible/explored tile sets from the
+            # party position + any equipped light + in-world lights
+            # and passes them here.  If no sets were passed (older
+            # caller or interior with no darkness authored), leave
+            # the interior fully lit — no darkness overlay applied.
+            if visible_tiles is not None:
+                lctx = LightingContext(
+                    mode=LightingMode.FOG_OF_WAR,
+                    tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+                    party_screen_pos=(psc, psr),
+                    visible_tiles=visible_tiles,
+                    explored_tiles=explored_tiles,
+                    camera_offset=(off_c, off_r),
+                    tint=tint,
+                )
+                render_lighting(self.screen, lctx)
 
         elif not clock.is_day or darkness_active:
             extra = list(torch_lights + feature_lights)
@@ -1742,7 +1754,8 @@ class Renderer(CombatEffectRendererMixin):
                           push_anim=None, repel_effect=None,
                           darkness_active=False, overworld_npcs=None,
                           quest_effects=None, interior_darkness=False,
-                          spawn_effects=None):
+                          spawn_effects=None,
+                          visible_tiles=None, explored_tiles=None):
         """
         Full Ultima III-style overworld screen — full-width map with bottom info bar.
 
@@ -2055,10 +2068,29 @@ class Renderer(CombatEffectRendererMixin):
             tint = TintEffect.NONE
 
         if interior_darkness:
-            # Building interior — skip all darkness overlays entirely.
-            # Matches the same change in draw_town_u3. See that method
-            # for the full rationale.
-            pass
+            # Building interior — fog-of-war driven by the interior
+            # lighting module.  See draw_town_u3 for the full
+            # rationale; same pattern applies here for overworld
+            # building interiors (huts, cabins, etc.).
+            #
+            # screen_offset=(pad_x, pad_y) keeps the fog's
+            # transparent holes aligned with the padded tile
+            # positions when the interior map is smaller than the
+            # viewport.  Without this, the fog covers the drawn
+            # tiles and the "visible" area shows up as empty space
+            # to the side of the map.
+            if visible_tiles is not None:
+                lctx = LightingContext(
+                    mode=LightingMode.FOG_OF_WAR,
+                    tile_size=ts, viewport_cols=cols, viewport_rows=rows,
+                    party_screen_pos=(psc_dark, psr_dark),
+                    visible_tiles=visible_tiles,
+                    explored_tiles=explored_tiles,
+                    camera_offset=(off_c, off_r),
+                    screen_offset=(pad_x, pad_y),
+                    tint=tint,
+                )
+                render_lighting(self.screen, lctx)
 
         elif not clock.is_day or darkness_active:
             lctx = LightingContext(

@@ -3306,6 +3306,60 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             npc._quest_status = mq_states.get(mqn, {}).get(
                 "status", "available")
 
+        # Building interior lighting — same model as town interiors.
+        # Outside a building the flag is False and no visibility sets
+        # are computed, so the overworld still follows normal outdoor
+        # day/night rules. See src/states/town.py for the matching
+        # block and src/interior_lighting.py for the algorithm.
+        _ow_int = getattr(self, "_in_overworld_interior", False)
+        _vis_tiles = None
+        _exp_tiles = None
+        if _ow_int:
+            try:
+                from src.interior_lighting import (
+                    compute_visible_tiles, party_has_light,
+                )
+                tmap = self.game.tile_map
+                if not hasattr(tmap, "_interior_light_cache"):
+                    tmap._interior_light_cache = {}
+                if not hasattr(tmap, "explored_tiles"):
+                    tmap.explored_tiles = set()
+                pcol = self.game.party.col
+                prow = self.game.party.row
+                _vis_tiles, tmap._interior_light_cache = compute_visible_tiles(
+                    tmap, pcol, prow,
+                    has_party_light=party_has_light(self.game.party),
+                    light_cache=tmap._interior_light_cache,
+                )
+                # Safety + diagnostic — see src/states/town.py for
+                # rationale.  If something's wrong, fall back to
+                # fully lit rather than lock the player out.
+                if (pcol, prow) not in _vis_tiles:
+                    if not getattr(self, "_ow_int_fog_warned", False):
+                        import sys
+                        print(
+                            f"[ow-interior-fog] WARNING: party "
+                            f"({pcol},{prow}) not in visible set "
+                            f"({len(_vis_tiles)} tiles). tile_map="
+                            f"{tmap.width}x{tmap.height}. Disabling "
+                            f"fog for this frame.",
+                            file=sys.stderr,
+                        )
+                        self._ow_int_fog_warned = True
+                    _vis_tiles = None
+                    _exp_tiles = None
+                else:
+                    tmap.explored_tiles.update(_vis_tiles)
+                    _exp_tiles = tmap.explored_tiles
+            except Exception as e:
+                if not getattr(self, "_ow_int_fog_warned", False):
+                    import sys, traceback
+                    print(f"[ow-interior-fog] ERROR: {e}", file=sys.stderr)
+                    traceback.print_exc()
+                    self._ow_int_fog_warned = True
+                _vis_tiles = None
+                _exp_tiles = None
+
         renderer.draw_overworld_u3(
             self.game.party,
             self.game.tile_map,
@@ -3319,11 +3373,9 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             darkness_active=getattr(self.game, "darkness_active", False),
             overworld_npcs=ow_npcs,
             quest_effects=self.quest_effects,
-            # NOTE: interior_darkness now means "suppress all darkness
-            # in building interiors" (see src/states/town.py for full
-            # rationale). Applies to overworld building interiors like
-            # huts and cabins. — Apr 2026
-            interior_darkness=getattr(self, "_in_overworld_interior", False),
+            interior_darkness=_ow_int,
+            visible_tiles=_vis_tiles,
+            explored_tiles=_exp_tiles,
             spawn_effects=self._spawn_effects,
         )
         # ── Overworld NPC quest choice overlay ──
