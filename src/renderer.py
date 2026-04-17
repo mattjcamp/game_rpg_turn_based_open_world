@@ -612,6 +612,11 @@ class Renderer(CombatEffectRendererMixin):
         self._draw_building_signs(town_data, off_c, off_r, ts, cols, rows,
                                   town_style, sx, sy)
 
+        # ── 1c. placed ground items (items editor → tile_properties) ──
+        self._draw_ground_items_on_tilemap(
+            tile_map, ts, cols, rows, off_c, off_r,
+            pad_x=sx, pad_y=sy)
+
         # ── 2. NPC sprites ──
         for npc in town_data.npcs:
             nsc = npc.col - off_c
@@ -1809,6 +1814,11 @@ class Renderer(CombatEffectRendererMixin):
                     py = usr * ts + pad_y
                     self.screen.blit(sprite, (px, py))
 
+        # ── 1b2. placed ground items (items editor → tile_properties) ──
+        self._draw_ground_items_on_tilemap(
+            tile_map, ts, cols, rows, off_c, off_r,
+            pad_x=pad_x, pad_y=pad_y)
+
         # ── 1c. seasonal snow overlay (winter months) ──
         clock = party.clock
         if clock.month_index in (0, 1, 11):  # Jan, Feb, Dec
@@ -2394,6 +2404,10 @@ class Renderer(CombatEffectRendererMixin):
                 if not _is_custom:
                     self._draw_dungeon_atmosphere(
                         tid, px, py, ts, wc, wr, palette)
+
+        # ── 1a2. placed ground items (items editor → tile_properties) ──
+        self._draw_ground_items_on_tilemap(
+            tile_map, ts, cols, rows, off_c, off_r)
 
         # ── 1b. red glow on detected traps ──
         if detected_traps:
@@ -15279,6 +15293,60 @@ class Renderer(CombatEffectRendererMixin):
     # SEASONAL WEATHER OVERLAYS
     # ═══════════════════════════════════════════════════════════════
 
+    # ═══════════════════════════════════════════════════════════════
+    #  GROUND ITEMS ON TILEMAP
+    # ═══════════════════════════════════════════════════════════════
+
+    def _draw_ground_items_on_tilemap(self, tile_map, ts, cols, rows,
+                                       off_c, off_r,
+                                       pad_x=0, pad_y=0):
+        """Overlay item icons for tile_properties[pos]["item"] entries.
+
+        Used by the overworld, town, and dungeon draw paths so placed
+        items (from the map editor's Attributes panel) show up in the
+        world. Uses the same ITEM_INFO lookup the examine / shop UIs
+        use so the icon matches exactly what the player sees elsewhere.
+        """
+        tprops = getattr(tile_map, "tile_properties", None)
+        if not tprops:
+            return
+        from src.party import ITEM_INFO
+        icon_sz = max(8, int(ts * 0.9))
+        for pos_key, props in tprops.items():
+            if not isinstance(props, dict):
+                continue
+            item_name = props.get("item")
+            if not item_name:
+                continue
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            try:
+                wc, wr = int(parts[0]), int(parts[1])
+            except ValueError:
+                continue
+            sc = wc - off_c
+            sr = wr - off_r
+            if not (0 <= sc < cols and 0 <= sr < rows):
+                continue
+            # ITEM_INFO is the source of truth for icons/tints across
+            # every item category (weapons, armors, general).
+            info = ITEM_INFO.get(item_name, {})
+            icon_type = info.get("icon", "tool")
+            tint = self._potion_tint(info) if info else None
+            px = sc * ts + pad_x
+            py = sr * ts + pad_y
+            # Subtle dark background so the item pops off busy tiles.
+            bg = pygame.Surface((ts, ts), pygame.SRCALPHA)
+            pygame.draw.rect(
+                bg, (0, 0, 0, 80),
+                pygame.Rect(2, 2, ts - 4, ts - 4),
+                border_radius=4)
+            self.screen.blit(bg, (px, py))
+            self._draw_item_icon(
+                px + ts // 2, py + ts // 2,
+                icon_type, icon_sz, tint=tint)
+
     # Tile types that receive snow coverage
     _SNOW_TILES = None  # lazily populated from settings on first call
 
@@ -15808,7 +15876,16 @@ class Renderer(CombatEffectRendererMixin):
 
     @staticmethod
     def _potion_tint(info):
-        """Return an RGB tint tuple for a consumable item, or None."""
+        """Return an RGB tint tuple for an item icon, or None.
+
+        Items may supply an explicit ``icon_color`` list/tuple which
+        overrides the type-based default (used for the keys of shadow
+        so each one renders in its canonical colour).
+        """
+        # Explicit per-item tint wins.
+        c = info.get("icon_color")
+        if isinstance(c, (list, tuple)) and len(c) >= 3:
+            return tuple(int(x) for x in c[:3])
         itype = info.get("item_type", "")
         effect = info.get("effect", "")
         if itype == "poison_potion":
@@ -16194,6 +16271,85 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.circle(self.screen, PURPLE, (cx, cy - 4), 10)
             pygame.draw.circle(self.screen, (200, 140, 255), (cx - 3, cy - 7), 3)
             pygame.draw.circle(self.screen, (220, 200, 255), (cx, cy - 4), 10, 2)
+
+        elif icon_type == "club":
+            # Wooden club — thick tapered shape with bark-like grain.
+            # Narrow grip at the bottom, bulbous head at the top.
+            # Head (wide oval) — filled brown with dark outline.
+            head_rect = pygame.Rect(cx - 10, cy - hs + 6, 20, 24)
+            pygame.draw.ellipse(self.screen, BROWN, head_rect)
+            pygame.draw.ellipse(self.screen, DARK_BROWN, head_rect, 2)
+            # Shaft/grip — tapering down from the head to the bottom.
+            # Drawn as a filled polygon so it can flare slightly.
+            shaft_pts = [
+                (cx - 5, cy - hs + 26),  # top-left (meets head)
+                (cx + 5, cy - hs + 26),  # top-right
+                (cx + 3, cy + hs - 8),   # bottom-right (grip)
+                (cx - 3, cy + hs - 8),   # bottom-left (grip)
+            ]
+            pygame.draw.polygon(self.screen, BROWN, shaft_pts)
+            pygame.draw.polygon(self.screen, DARK_BROWN, shaft_pts, 2)
+            # Wood grain — a few short dark strokes on the head/shaft.
+            pygame.draw.line(self.screen, DARK_BROWN,
+                             (cx - 6, cy - hs + 14),
+                             (cx + 6, cy - hs + 12), 1)
+            pygame.draw.line(self.screen, DARK_BROWN,
+                             (cx - 4, cy - hs + 22),
+                             (cx + 6, cy - hs + 20), 1)
+            pygame.draw.line(self.screen, DARK_BROWN,
+                             (cx - 2, cy + 4), (cx + 2, cy + 12), 1)
+            # A couple of small knots for a hand-hewn feel.
+            pygame.draw.circle(self.screen, DARK_BROWN,
+                               (cx + 4, cy - hs + 18), 2)
+            pygame.draw.circle(self.screen, DARK_BROWN,
+                               (cx - 3, cy - 2), 1)
+            # Leather grip wrap at the bottom — 3 thin bands.
+            for i, gy in enumerate(
+                    (cy + hs - 18, cy + hs - 13, cy + hs - 8)):
+                pygame.draw.line(self.screen, DARK_BROWN,
+                                 (cx - 4, gy), (cx + 4, gy), 1)
+
+        elif icon_type == "key":
+            # Real key shape — bow (ring) at the top, long shaft down,
+            # and two teeth jutting from the bit at the bottom.
+            # A caller-supplied *tint* recolors the metal so different
+            # keys (Bronze/Silver/Gold/Ruby/etc.) can share one icon.
+            metal = tint if tint else GOLD
+            metal_dark = tuple(max(0, c - 50) for c in metal)
+            # Bow (circular head, with a hole)
+            bow_cy = cy - hs + 14
+            pygame.draw.circle(self.screen, metal, (cx, bow_cy), 10)
+            pygame.draw.circle(self.screen, metal_dark,
+                               (cx, bow_cy), 10, 2)
+            pygame.draw.circle(self.screen, (20, 20, 24),
+                               (cx, bow_cy), 4)
+            # Shaft (vertical rod from the bow down toward the bit)
+            shaft_top = bow_cy + 10
+            shaft_bot = cy + hs - 8
+            pygame.draw.line(self.screen, metal,
+                             (cx, shaft_top), (cx, shaft_bot), 4)
+            pygame.draw.line(self.screen, metal_dark,
+                             (cx - 2, shaft_top),
+                             (cx - 2, shaft_bot), 1)
+            # Bit (rectangular block just above the tip)
+            bit_top = shaft_bot - 10
+            pygame.draw.rect(self.screen, metal,
+                             (cx, bit_top, 8, 10))
+            pygame.draw.rect(self.screen, metal_dark,
+                             (cx, bit_top, 8, 10), 1)
+            # Teeth (two small rectangles along the bottom of the bit)
+            pygame.draw.rect(self.screen, metal,
+                             (cx + 3, shaft_bot, 3, 4))
+            pygame.draw.rect(self.screen, metal_dark,
+                             (cx + 3, shaft_bot, 3, 4), 1)
+            pygame.draw.rect(self.screen, metal,
+                             (cx + 7, shaft_bot - 3, 3, 7))
+            pygame.draw.rect(self.screen, metal_dark,
+                             (cx + 7, shaft_bot - 3, 3, 7), 1)
+            # Specular highlight on the bow for a polished metal feel
+            hi = tuple(min(255, c + 50) for c in metal)
+            pygame.draw.circle(self.screen, hi,
+                               (cx - 3, bow_cy - 3), 2)
 
         else:
             # Unknown — draw a question mark box

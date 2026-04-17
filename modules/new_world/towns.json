@@ -3129,7 +3129,19 @@
         "col": 12,
         "row": 12,
         "dialogue": [
-          "Hello there!"
+          "Don't be hasty, gather some experience with thy sword before venturing too deep"
+        ],
+        "god_name": "The Divine",
+        "wander_range": 4
+      },
+      {
+        "name": "Aerina",
+        "npc_type": "villager",
+        "sprite": "src/assets/game/characters/alchemist.png",
+        "col": 10,
+        "row": 12,
+        "dialogue": [
+          "I keep hearing rumors of a weapon of great power hidden deep in a dungeon. This weapon is stronger than any human made weapon and it does not break or wear."
         ],
         "god_name": "The Divine",
         "wander_range": 4

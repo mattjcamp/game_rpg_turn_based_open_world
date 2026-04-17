@@ -1530,6 +1530,16 @@ class DungeonState(InventoryMixin, BaseState):
         row = self.game.party.row
         tile_id = self.dungeon_data.tile_map.get_tile(col, row)
 
+        # Pick up placed ground items (items editor → tile_properties)
+        from src.states.overworld import _try_pickup_ground_item
+        _try_pickup_ground_item(
+            self.game,
+            self.dungeon_data.tile_map,
+            col, row,
+            log_sink=self.game.game_log.append,
+            msg_sink=self.show_message,
+        )
+
         if tile_id == TILE_STAIRS:
             self.show_message("Stairs up! Press ESC to leave.", 2000)
 

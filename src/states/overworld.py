@@ -29,6 +29,52 @@ _SPAWN_MIN_DIST = 8
 _SPAWN_MAX_DIST = 14
 
 
+def _try_pickup_ground_item(game, tile_map, col, row,
+                             log_sink=None, msg_sink=None):
+    """Pick up any ground item at (col, row) on *tile_map*.
+
+    Uses ``TileMap.pop_ground_item`` so the item is removed from the
+    map (and therefore disappears visually) and added to the party's
+    shared stash via ``party.inv_add``.
+
+    *log_sink*  — optional callable taking a string (game log append)
+    *msg_sink*  — optional callable taking (str, duration_ms) for an
+                 on-screen pickup message
+
+    Returns the item name that was picked up, or None.
+    """
+    if tile_map is None:
+        return None
+    item_name = tile_map.pop_ground_item(col, row)
+    if not item_name:
+        return None
+    try:
+        game.party.inv_add(item_name)
+    except Exception:
+        # Don't let a bad item name crash the game — put it back so it
+        # can be picked up after the fix / investigated.
+        props = getattr(tile_map, "tile_properties", None)
+        if props is not None:
+            props.setdefault(f"{col},{row}", {})["item"] = item_name
+        return None
+    message = f"Picked up {item_name}!"
+    if callable(log_sink):
+        try:
+            log_sink(message)
+        except Exception:
+            pass
+    if callable(msg_sink):
+        try:
+            msg_sink(message, 2000)
+        except Exception:
+            pass
+    try:
+        game.sfx.play("chirp")
+    except Exception:
+        pass
+    return item_name
+
+
 class OverworldState(InventoryMixin, BaseState):
     """Handles overworld exploration."""
 
@@ -1253,6 +1299,13 @@ class OverworldState(InventoryMixin, BaseState):
 
         # ── If inside an overworld interior, check exits and links ──
         if self._in_overworld_interior:
+            # Placed ground item pickup (inside building interiors)
+            _try_pickup_ground_item(
+                self.game, self.game.tile_map,
+                party.col, party.row,
+                log_sink=self.game.game_log.append,
+                msg_sink=self.show_message,
+            )
             # Skip exit check on the first move after entering so the
             # player isn't immediately ejected when spawning on an exit.
             if self._overworld_interior_entry_grace:
@@ -1295,6 +1348,11 @@ class OverworldState(InventoryMixin, BaseState):
 
         pcol, prow = party.col, party.row
         tmap = self.game.tile_map
+
+        # ── Placed ground item pickup (items editor → tile_properties) ──
+        _try_pickup_ground_item(self.game, tmap, pcol, prow,
+                                log_sink=self.game.game_log.append,
+                                msg_sink=self.show_message)
 
         # ── Check tile link (universal linking system) ──
         # If the tile at the party's position has a link configured

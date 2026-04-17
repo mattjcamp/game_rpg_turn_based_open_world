@@ -27,7 +27,7 @@
         "left_hand"
       ],
       "description": "A simple wooden club. Cheap but sturdy.",
-      "icon": "mace",
+      "icon": "club",
       "item_type": "club",
       "buy": 20,
       "sell": 10,
@@ -456,11 +456,16 @@
     },
     "Bronze Key": {
       "description": "A tarnished bronze key with intricate gnomish gearwork. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        170,
+        110,
+        50
+      ]
     },
     "Camping Supplies": {
       "description": "A bedroll, flint, and dried rations. Lets the party rest safely in the wilderness.",
@@ -478,19 +483,29 @@
     },
     "Crystal Key": {
       "description": "A translucent key carved from a single crystal, humming with magical energy. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        170,
+        220,
+        240
+      ]
     },
     "Diamond Key": {
       "description": "A flawless diamond key that refracts light into rainbows. The final Key of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        240,
+        240,
+        255
+      ]
     },
     "Elixir of Strength": {
       "description": "A thick crimson brew. Grants +2 STR for the next combat.",
@@ -550,11 +565,16 @@
     },
     "Gold Key": {
       "description": "A solid gold key shaped like a miniature war hammer. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        220,
+        180,
+        60
+      ]
     },
     "Healing Herb": {
       "description": "A fragrant herb that restores a small amount of HP.",
@@ -590,11 +610,16 @@
     },
     "Iron Key": {
       "description": "A heavy iron key etched with gnomish runes. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        120,
+        130,
+        140
+      ]
     },
     "Lingering Venom": {
       "description": "A potent toxin that persists far longer than ordinary poisons.",
@@ -647,11 +672,16 @@
     },
     "Obsidian Key": {
       "description": "A key of polished volcanic glass, cold to the touch. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        60,
+        50,
+        70
+      ]
     },
     "Paralytic Poison": {
       "description": "A nerve toxin that drains magical energy. Apply to a weapon or throw at enemies.",
@@ -696,11 +726,16 @@
     },
     "Ruby Key": {
       "description": "A blood-red key that pulses with warmth. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        200,
+        60,
+        60
+      ]
     },
     "Scroll of Fire": {
       "description": "A single-use scroll containing a fire spell.",
@@ -730,11 +765,16 @@
     },
     "Silver Key": {
       "description": "A gleaming silver key inscribed with arcane formulae. One of the 8 Keys of Shadow.",
-      "icon": "artifact",
+      "icon": "key",
       "item_type": "quest_item",
       "quest_item": true,
       "party_can_equip": false,
-      "character_can_equip": false
+      "character_can_equip": false,
+      "icon_color": [
+        210,
+        210,
+        220
+      ]
     },
     "Smoke Bomb": {
       "description": "A small bomb that creates a blinding cloud.",

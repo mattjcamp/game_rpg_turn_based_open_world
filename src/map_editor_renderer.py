@@ -120,6 +120,8 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     # ── Overlays ──
     if data.get("replacing"):
         _draw_replace_overlay(renderer, data)
+    if data.get("item_picker_active"):
+        _draw_item_picker_overlay(renderer, data)
 
     # ── Save flash ──
     save_flash = data.get("save_flash", 0)
@@ -515,6 +517,133 @@ def _draw_map_picker_overlay(renderer, data: Dict):
                       px + 16, py + ph - 18, (100, 100, 120), fs)
 
 
+def _draw_item_picker_overlay(renderer, data: Dict):
+    """Modal item picker — a scrollable grid of item icons + names.
+
+    Users see each item's real icon (the same one that shows in the
+    shop / examine / inventory) so there's no guesswork about what
+    they'll place on the map.
+    """
+    screen = renderer.screen
+    fs = renderer.font_small
+    fm = renderer.font_med
+
+    names = data.get("item_list", []) or []
+    if not names:
+        return
+    cursor = data.get("item_picker_cursor", 0)
+    cursor = max(0, min(cursor, len(names) - 1))
+
+    # Import item data once for icon + tint lookup.
+    try:
+        from src.party import ITEM_INFO
+    except Exception:
+        ITEM_INFO = {}
+
+    pw = min(SCREEN_WIDTH - 40, 720)
+    ph = min(SCREEN_HEIGHT - 60, 520)
+    px = (SCREEN_WIDTH - pw) // 2
+    py = (SCREEN_HEIGHT - ph) // 2
+
+    # Dim everything behind the modal.
+    dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    dim.fill((0, 0, 0, 160))
+    screen.blit(dim, (0, 0))
+
+    pygame.draw.rect(screen, (16, 14, 28), (px, py, pw, ph))
+    pygame.draw.rect(screen, _COL_ORANGE, (px, py, pw, ph), 2)
+
+    renderer._u3_text("PLACE ITEM", px + 16, py + 10, _COL_ORANGE, fm)
+    renderer._u3_text(
+        f"{len(names)} items",
+        px + 16, py + 32, (130, 130, 150), fs)
+
+    # Grid layout
+    pad_in = 14
+    list_top = py + 56
+    list_bottom = py + ph - 60
+    cell_w = 64
+    cell_h = 72
+    cols = max(1, (pw - 2 * pad_in) // cell_w)
+    rows_vis = max(1, (list_bottom - list_top) // cell_h)
+
+    row_of_cursor = cursor // cols
+    # Scroll so cursor stays visible, with a small lead.
+    scroll = data.get("item_picker_scroll", 0)
+    if row_of_cursor < scroll:
+        scroll = row_of_cursor
+    elif row_of_cursor >= scroll + rows_vis:
+        scroll = row_of_cursor - rows_vis + 1
+    data["item_picker_scroll"] = scroll  # cache for next frame
+
+    # Draw visible cells
+    for i, name in enumerate(names):
+        r = i // cols
+        c = i % cols
+        if r < scroll or r >= scroll + rows_vis:
+            continue
+        x = px + pad_in + c * cell_w
+        y = list_top + (r - scroll) * cell_h
+
+        is_sel = (i == cursor)
+        if is_sel:
+            bar = pygame.Surface((cell_w - 2, cell_h - 2),
+                                 pygame.SRCALPHA)
+            bar.fill((255, 200, 60, 40))
+            screen.blit(bar, (x + 1, y + 1))
+            pygame.draw.rect(screen, _COL_ORANGE,
+                             (x + 1, y + 1, cell_w - 2, cell_h - 2), 1)
+
+        # Icon
+        info = ITEM_INFO.get(name, {})
+        icon_type = info.get("icon", "tool")
+        tint = renderer._potion_tint(info) if info else None
+        icx = x + cell_w // 2
+        icy = y + 26
+        icon_sz = 40
+        bg = pygame.Surface((icon_sz, icon_sz), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (20, 20, 28, 200),
+                         pygame.Rect(0, 0, icon_sz, icon_sz),
+                         border_radius=4)
+        screen.blit(bg, (icx - icon_sz // 2, icy - icon_sz // 2))
+        renderer._draw_item_icon(icx, icy, icon_type, icon_sz, tint=tint)
+
+        # Name (truncated if too long for the cell)
+        lbl = name
+        max_w = cell_w - 4
+        while fs.size(lbl)[0] > max_w and len(lbl) > 2:
+            lbl = lbl[:-1]
+        if lbl != name:
+            lbl = lbl[:-1] + "…"
+        name_col = (255, 255, 230) if is_sel else (200, 200, 215)
+        tw = fs.size(lbl)[0]
+        renderer._u3_text(lbl, x + (cell_w - tw) // 2,
+                          y + cell_h - 14, name_col, fs)
+
+    # Selection readout and controls hint at the bottom
+    sel_name = names[cursor] if names else ""
+    sel_info = ITEM_INFO.get(sel_name, {})
+    sel_desc = sel_info.get("desc", "") if sel_info else ""
+    footer_y = py + ph - 44
+    renderer._u3_text(f"Selected: {sel_name}", px + 16, footer_y,
+                      (255, 220, 120), fs)
+    if sel_desc:
+        # Truncate the description to fit
+        maxw = pw - 32
+        desc = sel_desc
+        while fs.size(desc)[0] > maxw and len(desc) > 3:
+            desc = desc[:-1]
+        if desc != sel_desc:
+            desc = desc[:-1] + "…"
+        renderer._u3_text(desc, px + 16, footer_y + 14,
+                          (160, 160, 180), fs)
+
+    renderer._u3_text(
+        "[Arrows/PgUp/PgDn/Home/End] Browse  "
+        "[Enter] Place  [Backspace] Clear  [Esc] Cancel",
+        px + 16, py + ph - 18, (110, 110, 135), fs)
+
+
 def _draw_tile_grid(renderer, data: Dict):
     screen = renderer.screen
 
@@ -558,6 +687,10 @@ def _draw_dense_grid(renderer, data: Dict):
             px = ox + (mc - cam_c) * ts
             py = oy + (mr - cam_r) * ts
             renderer._draw_tile(tile_id, px, py, ts, mc, mr)
+
+    # Ground-item overlay (tiles with tile_properties[...]["item"] set)
+    _draw_ground_items(renderer, data, ox, oy, ts,
+                       cam_c, cam_r, end_c, end_r)
 
     # Object stamp preview (ghost overlay on dense grid)
     brushes = data.get("brushes", [])
@@ -781,6 +914,9 @@ def _draw_sparse_grid(renderer, data: Dict):
             pygame.draw.rect(screen, (40, 35, 30),
                              pygame.Rect(px, py, ts, ts), 1)
 
+    # Ground-item overlay for sparse grids
+    _draw_ground_items(renderer, data, gx, gy, ts, 0, 0, tw, th)
+
     # Object stamp preview (ghost outline)
     brushes = data.get("brushes", [])
     bidx = data.get("brush_idx", 0)
@@ -913,6 +1049,9 @@ def _draw_footer(renderer, data: Dict):
     if data.get("replacing"):
         hint = ("[Up/Dn] Select Destination  "
                 "[Enter] Replace All  [Esc] Cancel")
+    elif data.get("item_picker_active"):
+        hint = ("[Arrows/PgUp/PgDn] Browse  [Enter] Place  "
+                "[Backspace] Clear Item  [Esc] Cancel")
     elif data.get("inspector_editing"):
         hint = ("[Up/Dn] Field  [Type] Edit  "
                 "[Enter] Save  [Esc] Cancel")
@@ -923,7 +1062,7 @@ def _draw_footer(renderer, data: Dict):
                 "[R] Replace  [Ctrl+S] Save  [Esc] Exit")
     else:
         hint = ("[Arrows/WASD] Move  [Enter] Paint  "
-                "[R] Replace  "
+                "[R] Replace  [E] Edit Tile  "
                 "[Tab] Brush  [Ctrl+S] Save  [Esc] Save & Exit")
 
     hw = fs.size(hint)[0]
@@ -931,6 +1070,84 @@ def _draw_footer(renderer, data: Dict):
                       SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - FOOTER_H + 4,
                       _COL_HINT, fs)
+
+
+def _draw_ground_items(renderer, data: Dict,
+                        ox: int, oy: int, ts: int,
+                        cam_c: int, cam_r: int,
+                        end_c: int, end_r: int):
+    """Overlay item icons on any tile with tile_properties[pos]["item"].
+
+    Works for both dense and sparse grids by clamping to (cam_c..end_c,
+    cam_r..end_r). Also flashes the item being painted under the cursor
+    when the editor is in items mode.
+    """
+    tprops = data.get("tile_properties") or {}
+    if not tprops:
+        return
+    # Scale icons to mostly fill the tile.
+    icon_sz = max(8, int(ts * 0.9))
+
+    for pos_key, props in tprops.items():
+        if not isinstance(props, dict):
+            continue
+        item_name = props.get("item")
+        if not item_name:
+            continue
+        parts = pos_key.split(",")
+        if len(parts) != 2:
+            continue
+        try:
+            c, r = int(parts[0]), int(parts[1])
+        except ValueError:
+            continue
+        if not (cam_c <= c < end_c and cam_r <= r < end_r):
+            continue
+        px = ox + (c - cam_c) * ts
+        py = oy + (r - cam_r) * ts
+        _draw_item_on_tile(renderer, item_name, px, py, ts, icon_sz)
+
+
+def _draw_item_on_tile(renderer, item_name: str,
+                        px: int, py: int, tile_size: int,
+                        icon_size: int):
+    """Render a single item icon centered in the (px, py, ts, ts) tile.
+
+    Uses the item's ``icon`` field from ITEM_INFO (the source of truth
+    for display icons across every category — weapons, armors, general)
+    with the per-item ``icon_color`` tint honored by _potion_tint. Falls
+    back to a plain marker if the item is unknown.
+    """
+    try:
+        from src.party import ITEM_INFO
+    except Exception:
+        ITEM_INFO = {}
+
+    info = ITEM_INFO.get(item_name, {})
+    icon_type = info.get("icon", "tool") if info else "tool"
+    tint = None
+    if hasattr(renderer, "_potion_tint"):
+        try:
+            tint = renderer._potion_tint(info)
+        except Exception:
+            tint = None
+    cx = px + tile_size // 2
+    cy = py + tile_size // 2
+    # Soft dark rounded square behind the icon for legibility.
+    bg = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
+    pygame.draw.rect(bg, (0, 0, 0, 90),
+                     pygame.Rect(2, 2, tile_size - 4, tile_size - 4),
+                     border_radius=4)
+    renderer.screen.blit(bg, (px, py))
+    try:
+        renderer._draw_item_icon(cx, cy, icon_type, icon_size, tint=tint)
+    except Exception:
+        # Graceful fallback — draw a small "?" so the tile isn't empty.
+        if hasattr(renderer, "_u3_text"):
+            renderer._u3_text("?", cx - 4, cy - 6,
+                              (240, 240, 240),
+                              getattr(renderer, "font", None)
+                              or getattr(renderer, "font_small", None))
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────

@@ -202,6 +202,17 @@ class MapEditorState:
         self.replace_src_empty: bool = False
         self.replace_dst_idx: int = 0
 
+        # ── Item picker overlay state ──
+        # When ``item_picker_active`` is True, a modal overlay lets the
+        # user choose an item to place on the cursor tile. The choice
+        # is written into tile_properties[pos]["item"]. Driven from the
+        # Attributes panel's Item field (type "item_picker"), not a
+        # global shortcut.
+        self.item_list: List[str] = []       # item names (lazy-loaded)
+        self.item_picker_active: bool = False
+        self.item_picker_cursor: int = 0
+        self.item_picker_scroll: int = 0
+
         # Centre camera on cursor
         if config.grid_type == GRID_SCROLLABLE:
             self.scroll_to_cursor()
@@ -467,6 +478,42 @@ class MapEditorState:
                 del self.tile_properties[pos_key]
             self.dirty = True
 
+    # -- Items placement helpers (driven by the Attributes panel) --
+
+    def _load_item_names(self) -> List[str]:
+        """Collect every known item name from party data (lazy, cached).
+
+        The picker shows every item ever defined in items.json, grouped
+        by category via party.WEAPONS / ARMORS / ITEM_INFO. Uses a set
+        union so names unique to any one table are still offered.
+        """
+        if self.item_list:
+            return self.item_list
+        try:
+            from src.party import WEAPONS, ARMORS, ITEM_INFO
+            names = sorted(set(list(WEAPONS.keys())
+                               + list(ARMORS.keys())
+                               + list(ITEM_INFO.keys())))
+        except Exception:
+            names = []
+        self.item_list = names
+        return names
+
+    def place_item_at_cursor(self, name: str):
+        """Write *name* into tile_properties[cursor]["item"]."""
+        if not name:
+            return
+        self.set_tile_prop(self.cursor_col, self.cursor_row, "item", name)
+
+    def clear_item_at_cursor(self):
+        """Remove a placed item at the cursor position, if any."""
+        self.remove_tile_prop(self.cursor_col, self.cursor_row, "item")
+
+    def cursor_item_name(self) -> Optional[str]:
+        """Return the item currently placed at the cursor, or None."""
+        return self.get_tile_props(self.cursor_col,
+                                   self.cursor_row).get("item")
+
     def get_cursor_tile_info(self) -> Dict:
         """Build a dict describing the tile under the cursor for the inspector.
 
@@ -570,6 +617,12 @@ class MapEditorState:
                                props.get("link_x", "0"), True))
                 fields.append(("Target Y", "link_y",
                                props.get("link_y", "0"), True))
+
+        # ── Universal: placed item (opens a visual item picker) ──
+        placed_item = props.get("item", "")
+        fields.append(("Item", "item",
+                       placed_item if placed_item else "(none)",
+                       "item_picker"))
 
         return {
             "tile_id": tile_id,
@@ -676,6 +729,12 @@ class MapEditorState:
             "map_picker_cursor": self.map_picker_cursor,
             "map_picker_scroll": self.map_picker_scroll,
             "map_hierarchy": self.config.map_hierarchy,
+            # Item picker overlay (opened from the Attributes panel)
+            "item_picker_active": self.item_picker_active,
+            "item_picker_cursor": self.item_picker_cursor,
+            "item_picker_scroll": self.item_picker_scroll,
+            "item_list": self.item_list,
+            "cursor_item": self.cursor_item_name(),
         }
 
 
@@ -902,6 +961,10 @@ class MapEditorInputHandler:
         if st.map_picker_active:
             return self._handle_map_picker_input(event)
 
+        # ── Item picker sub-overlay ──
+        if st.item_picker_active:
+            return self._handle_item_picker_input(event)
+
         info = st.get_cursor_tile_info()
         fields = info["fields"]
         idx = st.inspector_field_idx
@@ -971,6 +1034,30 @@ class MapEditorInputHandler:
                             break
             return None
 
+        # ── Item picker: Enter opens the picker, Backspace clears ──
+        if field_type == "item_picker":
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                names = st._load_item_names()
+                if not names:
+                    return None
+                st.item_picker_active = True
+                st.item_picker_scroll = 0
+                # Pre-select current value if one is placed
+                cur_name = st.cursor_item_name() or ""
+                st.item_picker_cursor = 0
+                if cur_name in names:
+                    st.item_picker_cursor = names.index(cur_name)
+                return None
+            if event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
+                st.clear_item_at_cursor()
+                # Refresh the buffer so the field immediately shows "(none)"
+                new_info = st.get_cursor_tile_info()
+                new_fields = new_info["fields"]
+                if st.inspector_field_idx < len(new_fields):
+                    st.inspector_buffer = new_fields[st.inspector_field_idx][2]
+                return None
+            return None
+
         # ── Text/number fields: type to edit ──
         if event.key == pygame.K_RETURN:
             self._commit_inspector_field(info)
@@ -1015,6 +1102,52 @@ class MapEditorInputHandler:
 
         return None
 
+    def _handle_item_picker_input(self, event) -> Optional[str]:
+        """Handle input for the visual item picker overlay."""
+        st = self.state
+        names = st._load_item_names()
+        n = len(names)
+        if not n:
+            st.item_picker_active = False
+            return None
+
+        if event.key == pygame.K_ESCAPE:
+            st.item_picker_active = False
+            return None
+
+        if event.key == pygame.K_UP:
+            st.item_picker_cursor = (st.item_picker_cursor - 1) % n
+        elif event.key == pygame.K_DOWN:
+            st.item_picker_cursor = (st.item_picker_cursor + 1) % n
+        elif event.key == pygame.K_LEFT:
+            # Jump by a column width (6) for grid navigation
+            st.item_picker_cursor = max(0, st.item_picker_cursor - 1)
+        elif event.key == pygame.K_RIGHT:
+            st.item_picker_cursor = min(n - 1, st.item_picker_cursor + 1)
+        elif event.key == pygame.K_PAGEUP:
+            st.item_picker_cursor = max(0, st.item_picker_cursor - 10)
+        elif event.key == pygame.K_PAGEDOWN:
+            st.item_picker_cursor = min(n - 1, st.item_picker_cursor + 10)
+        elif event.key == pygame.K_HOME:
+            st.item_picker_cursor = 0
+        elif event.key == pygame.K_END:
+            st.item_picker_cursor = n - 1
+        elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
+            # Clear the item on the cursor tile and close the picker.
+            st.clear_item_at_cursor()
+            st.item_picker_active = False
+            new_info = st.get_cursor_tile_info()
+            new_fields = new_info["fields"]
+            if st.inspector_field_idx < len(new_fields):
+                st.inspector_buffer = new_fields[st.inspector_field_idx][2]
+            return None
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            name = names[st.item_picker_cursor]
+            st.place_item_at_cursor(name)
+            st.item_picker_active = False
+            st.inspector_buffer = name
+        return None
+
     def _commit_inspector_field(self, info):
         """Write the current inspector buffer back to tile_properties."""
         st = self.state
@@ -1023,8 +1156,8 @@ class MapEditorInputHandler:
         if idx < 0 or idx >= len(fields):
             return
         label, key, old_val, field_type = fields[idx]
-        # Skip non-text fields (toggle/map_picker handle their own commits)
-        if field_type in (False, "toggle", "map_picker"):
+        # Skip non-text fields (toggle/map_picker/item_picker handle their own commits)
+        if field_type in (False, "toggle", "map_picker", "item_picker"):
             return
         if key.startswith("_"):
             return  # read-only

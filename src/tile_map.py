@@ -101,6 +101,39 @@ class TileMap:
         for key in expired:
             del self.unique_cooldowns[key]
 
+    # ── Ground items (placed via the map editor's Items mode) ────
+
+    def get_ground_item(self, col, row):
+        """Return the item name placed on (col, row), or None.
+
+        Items are stored in ``tile_properties["col,row"]["item"]`` so the
+        existing save/load plumbing persists them alongside tile data.
+        """
+        props = getattr(self, "tile_properties", None) or {}
+        entry = props.get(f"{col},{row}")
+        if isinstance(entry, dict):
+            return entry.get("item")
+        return None
+
+    def pop_ground_item(self, col, row):
+        """Remove and return the item at (col, row), or None.
+
+        Cleans up the tile's property dict if it becomes empty.
+        """
+        props = getattr(self, "tile_properties", None)
+        if props is None:
+            return None
+        pos_key = f"{col},{row}"
+        entry = props.get(pos_key)
+        if not isinstance(entry, dict):
+            return None
+        name = entry.pop("item", None)
+        if name is None:
+            return None
+        if not entry:
+            del props[pos_key]
+        return name
+
 
 # ── Static overworld loader ────────────────────────────────────
 

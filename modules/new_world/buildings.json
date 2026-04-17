@@ -1692,5 +1692,332 @@
         }
       }
     ]
+  },
+  {
+    "name": "The Deep",
+    "description": "A small entrance beckons you, almost as if the deep itelf had a very dark soul. You feel drawn toward it's secret places.",
+    "spaces": [
+      {
+        "name": "Main Hall",
+        "width": 16,
+        "height": 14,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {
+          "0,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "0,1": {
+            "tile_id": 26,
+            "name": "Door",
+            "path": "game/dungeon/dungeon_door.png"
+          },
+          "0,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "2,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "5,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "7,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "10,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "11,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "12,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "13,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "14,3": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "14,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "15,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "15,1": {
+            "tile_id": 26,
+            "name": "Door",
+            "path": "game/dungeon/dungeon_door.png"
+          },
+          "15,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "14,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "13,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "12,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "11,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "10,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "7,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "5,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "2,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,0": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "3,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "4,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "5,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "6,1": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "8,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "9,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "10,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "11,2": {
+            "tile_id": 21,
+            "name": "Stone Wall",
+            "path": "game/dungeon/stone_wall.png"
+          },
+          "1,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "14,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "13,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "13,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "12,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "12,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "11,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "10,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "9,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "8,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "7,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "6,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "5,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "4,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "3,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,2": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          },
+          "2,1": {
+            "tile_id": 20,
+            "name": "Stone Floor",
+            "path": "game/dungeon/stone_floor.png"
+          }
+        },
+        "encounters": [],
+        "tile_properties": {}
+      }
+    ]
   }
 ]

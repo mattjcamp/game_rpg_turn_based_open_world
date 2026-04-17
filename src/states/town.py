@@ -611,6 +611,17 @@ class TownState(InventoryMixin, BaseState):
         """Check if the party stepped on a special tile."""
         party = self.game.party
 
+        # Pick up placed ground items (items editor → tile_properties)
+        # on whichever tile map is currently active (town or interior).
+        from src.states.overworld import _try_pickup_ground_item
+        _try_pickup_ground_item(
+            self.game,
+            self.town_data.tile_map,
+            party.col, party.row,
+            log_sink=self.game.game_log.append,
+            msg_sink=self.show_message,
+        )
+
         # If inside an interior, check for exits and links
         if getattr(self, "_in_interior", False):
             # Skip exit check on the first move after entering so the player

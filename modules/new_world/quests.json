@@ -100,5 +100,31 @@
     ],
     "giver_col": 8,
     "giver_row": 8
+  },
+  {
+    "name": "Destroy the Goblin Horde",
+    "description": "",
+    "giver_npc": "",
+    "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
+    "giver_location": "town:New Haven",
+    "giver_dialogue": "A  goblin horde is hiding out in the mountains to our North and East. These little trash eaters threaten our way of life. Deal with them and reap the reward!",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "steps": [
+      {
+        "description": "Neutralize the Goblin Threat",
+        "step_type": "kill",
+        "monster": "Goblin",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_monster": "",
+        "spawn_location": "dungeon:Goblin Stronghold",
+        "target": "",
+        "target_count": 25,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 12
   }
 ]
