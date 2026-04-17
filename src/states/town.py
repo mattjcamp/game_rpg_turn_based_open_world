@@ -5,6 +5,7 @@ The party walks around inside a town, talks to NPCs by bumping into them,
 and can leave through the exit gate to return to the overworld.
 """
 
+import math
 import random
 
 import pygame
@@ -153,6 +154,13 @@ class TownState(InventoryMixin, BaseState):
         self.temple_heal_effect = None
         self.temple_message = ""
         self.temple_message_timer = 0
+
+        # Healing Counter menu (service-kind counter tile)
+        self.showing_healing_counter = False
+        self.healing_counter_data = None   # service counter config dict
+        self.healing_counter_cursor = 0
+        self.healing_counter_message = ""
+        self.healing_counter_message_timer = 0
 
         # Pickpocket targeting mode
         self.pickpocket_targeting = False
@@ -341,6 +349,8 @@ class TownState(InventoryMixin, BaseState):
         self.quest_dialogue_index = 0
         self.showing_shop = False
         self.showing_temple_service = False
+        self.showing_healing_counter = False
+        self.healing_counter_data = None
         self.showing_log = False
         self.showing_party = False
         self.showing_party_inv = False
@@ -373,6 +383,11 @@ class TownState(InventoryMixin, BaseState):
                 # ── Temple service menu input ──
                 if self.showing_temple_service:
                     self._handle_temple_service_input(event)
+                    return
+
+                # ── Healing Counter menu input ──
+                if self.showing_healing_counter:
+                    self._handle_healing_counter_input(event)
                     return
 
                 # ── Shop screen input ──
@@ -515,7 +530,8 @@ class TownState(InventoryMixin, BaseState):
         # If showing party screen, character detail, inventory, dialogue, or shop, block movement
         if self.showing_party or self.showing_char_detail is not None or self.showing_party_inv:
             return
-        if self.showing_shop or self.showing_temple_service:
+        if (self.showing_shop or self.showing_temple_service
+                or self.showing_healing_counter):
             return
         if self.npc_dialogue_active:
             return
@@ -711,13 +727,21 @@ class TownState(InventoryMixin, BaseState):
         idata = tdef.get("interaction_data", "")
 
         if itype == "shop":
+            counter_key = idata or "general"
+            # Service-kind counters (e.g. the Healing Counter) open a
+            # dedicated service menu instead of the buy/sell shop UI.
+            from src.party import get_service_counter
+            svc_cfg = get_service_counter(counter_key)
+            if svc_cfg is not None:
+                self._open_healing_counter(svc_cfg)
+                return
             self.showing_shop = True
             self.shop_mode = "buy"
             self.shop_cursor = 0
             self.shop_sell_cursor = 0
             self.shop_message = ""
             self.shop_message_timer = 0
-            self.shop_type = idata or "general"
+            self.shop_type = counter_key
         elif itype == "sign":
             if idata:
                 self.show_message(idata, 4000)
@@ -1289,13 +1313,20 @@ class TownState(InventoryMixin, BaseState):
     def _start_dialogue(self, npc):
         """Begin talking to an NPC, or open the shop for shopkeepers."""
         if npc.npc_type == "shopkeep":
+            shop_type = getattr(npc, "shop_type", "general")
+            # Shopkeeper associated with a service counter → healing menu
+            from src.party import get_service_counter
+            svc_cfg = get_service_counter(shop_type)
+            if svc_cfg is not None:
+                self._open_healing_counter(svc_cfg)
+                return
             self.showing_shop = True
             self.shop_mode = "buy"
             self.shop_cursor = 0
             self.shop_sell_cursor = 0
             self.shop_message = ""
             self.shop_message_timer = 0
-            self.shop_type = getattr(npc, "shop_type", "general")
+            self.shop_type = shop_type
             return
 
         # Priest — open the temple service menu
@@ -2137,6 +2168,154 @@ class TownState(InventoryMixin, BaseState):
             except Exception:
                 pass
 
+    # ── Healing Counter service menu (counters.json, kind == "service") ──
+
+    def _open_healing_counter(self, svc_cfg):
+        """Open the Healing Counter menu for *svc_cfg* (service counter)."""
+        self.showing_healing_counter = True
+        self.healing_counter_data = svc_cfg
+        self.healing_counter_cursor = 0
+        self.healing_counter_message = ""
+        self.healing_counter_message_timer = 0
+
+    def _handle_healing_counter_input(self, event):
+        """Handle input while the Healing Counter menu is open."""
+        if event.key == pygame.K_ESCAPE:
+            self.showing_healing_counter = False
+            self.healing_counter_data = None
+            return
+        services = (self.healing_counter_data or {}).get("services", [])
+        n = len(services)
+        if n == 0:
+            return
+        if event.key in (pygame.K_UP, pygame.K_w):
+            self.healing_counter_cursor = (
+                self.healing_counter_cursor - 1) % n
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.healing_counter_cursor = (
+                self.healing_counter_cursor + 1) % n
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self._process_healing_counter_service()
+
+    def _process_healing_counter_service(self):
+        """Apply the currently selected healing counter service."""
+        party = self.game.party
+        cfg = self.healing_counter_data or {}
+        services = cfg.get("services", [])
+        if not (0 <= self.healing_counter_cursor < len(services)):
+            return
+        svc = services[self.healing_counter_cursor]
+        svc_id = svc.get("id", "")
+        cost = int(svc.get("cost", 0))
+        counter_name = cfg.get("name", "Healing Counter")
+
+        if party.gold < cost:
+            self.healing_counter_message = "Not enough gold."
+            self.healing_counter_message_timer = 2500
+            return
+
+        def _charge_and_heal_fx():
+            party.gold -= cost
+            self.temple_heal_effect = TempleHealEffect()
+            try:
+                self.game.sfx.play("heal")
+            except Exception:
+                pass
+
+        if svc_id == "heal_all_hp":
+            needs = any(m.hp < m.max_hp for m in party.members
+                        if m.is_alive())
+            if not needs:
+                self.healing_counter_message = (
+                    "No one needs healing.")
+                self.healing_counter_message_timer = 2500
+                return
+            _charge_and_heal_fx()
+            for m in party.members:
+                if m.is_alive():
+                    m.hp = m.max_hp
+            self.healing_counter_message = (
+                "Wounds close — party fully healed.")
+            self.healing_counter_message_timer = 3000
+            self.game.game_log.append(
+                f"{counter_name}: All HP restored for {cost} gold.")
+
+        elif svc_id == "restore_all_mp":
+            needs = any(m.current_mp < m.max_mp for m in party.members
+                        if m.is_alive())
+            if not needs:
+                self.healing_counter_message = (
+                    "Magic reserves are already full.")
+                self.healing_counter_message_timer = 2500
+                return
+            _charge_and_heal_fx()
+            for m in party.members:
+                if m.is_alive():
+                    m.current_mp = m.max_mp
+            self.healing_counter_message = (
+                "Arcane power flows back to the party.")
+            self.healing_counter_message_timer = 3000
+            self.game.game_log.append(
+                f"{counter_name}: All MP restored for {cost} gold.")
+
+        elif svc_id == "cure_all_poisons":
+            poisoned_members = [
+                m for m in party.members
+                if getattr(m, "poisoned", False)
+                or getattr(m, "poisoned_mp", False)
+                or getattr(m, "poisoned_debilitate", False)
+            ]
+            if not poisoned_members:
+                self.healing_counter_message = (
+                    "No one is poisoned.")
+                self.healing_counter_message_timer = 2500
+                return
+            _charge_and_heal_fx()
+            for m in poisoned_members:
+                # Clear every poison-related flag/counter on the member
+                m.poisoned = False
+                m.poison_damage = 0
+                m.poison_turns = 0
+                if hasattr(m, "poisoned_mp"):
+                    m.poisoned_mp = False
+                    m.poison_mp_drain = 0
+                    m.poison_mp_turns = 0
+                if hasattr(m, "poisoned_debilitate"):
+                    m.poisoned_debilitate = False
+                    m.poison_debilitate_amount = 0
+                    m.poison_debilitate_turns = 0
+            self.healing_counter_message = (
+                "Venom is drawn from your veins.")
+            self.healing_counter_message_timer = 3000
+            self.game.game_log.append(
+                f"{counter_name}: Poison cured for {cost} gold.")
+
+        elif svc_id == "raise_dead":
+            # Find first dead (non-ash) party member
+            target = None
+            for m in party.members:
+                if m.hp <= 0 and not getattr(m, "is_ash", False):
+                    target = m
+                    break
+            if target is None:
+                self.healing_counter_message = (
+                    "No fallen allies to raise.")
+                self.healing_counter_message_timer = 2500
+                return
+            _charge_and_heal_fx()
+            target.hp = target.max_hp
+            target.current_mp = target.max_mp
+            self.healing_counter_message = (
+                f"{target.name} is returned to life!")
+            self.healing_counter_message_timer = 3000
+            self.game.game_log.append(
+                f"{counter_name}: {target.name} raised "
+                f"from the dead for {cost} gold.")
+        else:
+            self.healing_counter_message = (
+                f"Unknown service: {svc_id}")
+            self.healing_counter_message_timer = 2500
+
     def _exit_town(self):
         """Leave the town (or exit an interior back to the town)."""
         # If inside a building interior, return to the town map
@@ -2240,6 +2419,13 @@ class TownState(InventoryMixin, BaseState):
                 self.temple_message = ""
                 self.temple_message_timer = 0
 
+        # Healing counter message timer
+        if self.healing_counter_message_timer > 0:
+            self.healing_counter_message_timer -= dt_ms
+            if self.healing_counter_message_timer <= 0:
+                self.healing_counter_message = ""
+                self.healing_counter_message_timer = 0
+
         if self.move_cooldown > 0:
             self.move_cooldown -= dt_ms
             if self.move_cooldown < 0:
@@ -2277,6 +2463,7 @@ class TownState(InventoryMixin, BaseState):
         # Don't move NPCs while the player is in dialogue or a menu
         if (self.npc_dialogue_active or self.quest_choice_active
                 or self.showing_shop or self.showing_temple_service
+                or self.showing_healing_counter
                 or self.pickpocket_targeting):
             return
 
@@ -2391,6 +2578,16 @@ class TownState(InventoryMixin, BaseState):
 
     def draw(self, renderer):
         """Draw the town in Ultima III style."""
+        if self.showing_healing_counter:
+            renderer.draw_healing_counter_menu(
+                self.game.party,
+                self.healing_counter_cursor,
+                self.healing_counter_data or {},
+                self.healing_counter_message,
+            )
+            if self.temple_heal_effect:
+                renderer.draw_temple_heal_effect(self.temple_heal_effect)
+            return
         if self.showing_temple_service:
             npc = self.temple_npc
             renderer.draw_temple_service_menu(

@@ -1526,9 +1526,8 @@
         "path": "game/terrain/path.png"
       },
       "10,12": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 61,
+        "name": "Healing Counter"
       },
       "11,12": {
         "tile_id": 47,
@@ -1546,9 +1545,8 @@
         "path": "game/terrain/path.png"
       },
       "14,12": {
-        "tile_id": 46,
-        "name": "Path Floor",
-        "path": "game/terrain/path.png"
+        "tile_id": 10,
+        "name": "Floor"
       },
       "15,12": {
         "tile_id": 46,
@@ -3930,6 +3928,9 @@
         "link_x": "9",
         "link_y": "2",
         "link_map": "interior:New Haven/General Shop Interior"
+      },
+      "14,12": {
+        "shop_type": "guild"
       }
     }
   }

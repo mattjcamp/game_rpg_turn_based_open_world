@@ -275,7 +275,11 @@
       "party_can_equip": false,
       "character_can_equip": true,
       "durability": 70,
-      "indestructible": false
+      "indestructible": false,
+      "melee": false,
+      "throwable": false,
+      "buy": 50,
+      "sell": 60
     },
     "Sun Sword": {
       "power": 10,
@@ -302,7 +306,7 @@
       "description": "A well-balanced longsword. Standard fighter fare.",
       "icon": "sword",
       "item_type": "sword",
-      "buy": 120,
+      "buy": 70,
       "sell": 60,
       "party_can_equip": false,
       "character_can_equip": true,

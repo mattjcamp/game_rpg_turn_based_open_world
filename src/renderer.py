@@ -18339,6 +18339,144 @@ class Renderer(CombatEffectRendererMixin):
                       10, sh - 22, self._U3_HINT, fs)
 
     # ════════════════════════════════════════════════════════════════
+    #  HEALING COUNTER MENU (service-kind counter placed on a map)
+    # ════════════════════════════════════════════════════════════════
+
+    def draw_healing_counter_menu(self, party, cursor, counter_cfg,
+                                   message=""):
+        """Full-screen Healing Counter service UI.
+
+        ``counter_cfg`` is the service counter config loaded from
+        counters.json: ``{"name", "description", "services": [...]}``.
+        Each service dict has ``id``, ``name``, ``description``, ``cost``.
+        """
+        import math as _math
+        import time as _time
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+        fm = self.font_med
+        fs = self.font_small
+        t = _time.time()
+
+        services = counter_cfg.get("services", []) or []
+
+        self.screen.fill(self._U3_BLACK)
+
+        # ── Title bar ──
+        self._u3_panel(0, 0, sw, 34)
+        title = (counter_cfg.get("name", "HEALING COUNTER")
+                 or "HEALING COUNTER").upper()
+        self._u3_text(title, 10, 9, (255, 220, 120), fm)
+
+        # ── Main panel (services) ──
+        panel_y = 40
+        panel_h = 280
+        self._u3_panel(4, panel_y, sw - 8, panel_h)
+
+        # Decorative pulsing chalice/cross symbol
+        sym_x = sw // 2
+        sym_y = panel_y + 34
+        pulse = 0.5 + 0.5 * _math.sin(t * 2.0)
+        glow_a = int(40 + 30 * pulse)
+        glow_s = pygame.Surface((44, 44), pygame.SRCALPHA)
+        pygame.draw.circle(glow_s, (120, 220, 160, glow_a), (22, 22), 20)
+        self.screen.blit(glow_s, (sym_x - 22, sym_y - 22))
+        gc = (180, 255, 200)
+        pygame.draw.line(self.screen, gc, (sym_x, sym_y - 10),
+                         (sym_x, sym_y + 10), 2)
+        pygame.draw.line(self.screen, gc, (sym_x - 8, sym_y),
+                         (sym_x + 8, sym_y), 2)
+
+        # Flavor description near the top
+        desc = counter_cfg.get("description", "")
+        if desc:
+            self._u3_text(desc, 30, panel_y + 64, (180, 180, 200), fs)
+
+        # ── Service options ──
+        sy = panel_y + 90
+        for idx, svc in enumerate(services):
+            selected = (idx == cursor)
+            row_rect = pygame.Rect(20, sy, sw - 40, 44)
+
+            if selected:
+                hl_s = pygame.Surface((row_rect.w, row_rect.h),
+                                      pygame.SRCALPHA)
+                hl_s.fill((90, 180, 255, 40))
+                self.screen.blit(hl_s, row_rect.topleft)
+                pygame.draw.rect(self.screen, self._U3_LTBLUE, row_rect, 1)
+                self._u3_text(">", 10, sy + 8, self._U3_ORANGE, fm)
+
+            name_col = self._U3_WHITE if selected else self._U3_GRAY
+            svc_name = svc.get("name", svc.get("id", "—")).upper()
+            self._u3_text(svc_name, 30, sy + 4, name_col, fm)
+            sdesc = svc.get("description", "")
+            if sdesc:
+                self._u3_text(sdesc, 30, sy + 24, (180, 180, 200), fs)
+
+            cost_str = f"{int(svc.get('cost', 0))} GOLD"
+            cost_w = fm.size(cost_str)[0]
+            cost_col = self._U3_ORANGE if selected else (180, 150, 80)
+            self._u3_text(cost_str, sw - 30 - cost_w, sy + 4,
+                          cost_col, fm)
+            sy += 54
+
+        # ── Party status panel ──
+        status_y = panel_y + panel_h + 8
+        status_h = sh - status_y - 38
+        self._u3_panel(4, status_y, sw - 8, status_h)
+        self._u3_text("PARTY STATUS", 14, status_y + 6,
+                      self._U3_ORANGE, fm)
+
+        # Gold display
+        gold_str = f"GOLD: {party.gold}"
+        gold_w = fm.size(gold_str)[0]
+        self._u3_text(gold_str, sw - 14 - gold_w, status_y + 6,
+                      (255, 220, 80), fm)
+
+        my = status_y + 30
+        row_h = 22
+        for m in party.members:
+            alive = m.is_alive()
+            nc = self._U3_WHITE if alive else self._U3_RED
+            self._u3_text(m.name, 20, my, nc, fm)
+
+            if alive:
+                hp_label = f"HP {m.hp}/{m.max_hp}"
+                self._u3_text(hp_label, 200, my, self._U3_GREEN, fs)
+                mp_label = f"MP {m.current_mp}/{m.max_mp}"
+                self._u3_text(mp_label, 340, my, self._U3_LTBLUE, fs)
+                if getattr(m, "poisoned", False):
+                    self._u3_text("POISONED", 480, my,
+                                  (120, 220, 120), fs)
+                elif (m.hp < m.max_hp or m.current_mp < m.max_mp):
+                    self._u3_text("WOUNDED", 480, my,
+                                  (220, 180, 60), fs)
+                else:
+                    self._u3_text("HEALTHY", 480, my,
+                                  (100, 200, 100), fs)
+            else:
+                self._u3_text("FALLEN", 200, my, self._U3_RED, fs)
+
+            my += row_h
+
+        # ── Message area ──
+        if message:
+            msg_surf = fm.render(message, True, self._U3_ORANGE)
+            mx = sw // 2 - msg_surf.get_width() // 2
+            msg_alpha = int(200 + 55 * _math.sin(t * 4))
+            msg_a_surf = pygame.Surface(msg_surf.get_size(), pygame.SRCALPHA)
+            msg_a_surf.fill((255, 255, 255, msg_alpha))
+            msg_surf_copy = msg_surf.copy()
+            msg_surf_copy.blit(msg_a_surf, (0, 0),
+                               special_flags=pygame.BLEND_RGBA_MULT)
+            self.screen.blit(msg_surf_copy, (mx, sh - 56))
+
+        # ── Controls hint ──
+        self._u3_text("[UP/DOWN] SELECT  [ENTER] CONFIRM  [ESC] LEAVE",
+                      10, sh - 22, self._U3_HINT, fs)
+
+    # ════════════════════════════════════════════════════════════════
     #  TEMPLE HEAL EFFECT (celestial animation overlay)
     # ════════════════════════════════════════════════════════════════
 

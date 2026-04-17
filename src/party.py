@@ -13,7 +13,10 @@ touching this code.
 import json
 import os
 
-from src.data_loader import load_items, load_races, load_counters, _load_json
+from src.data_loader import (
+    load_items, load_races, load_counters, load_service_counters,
+    _load_json,
+)
 
 # ── Default data directory ────────────────────────────────────────
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,6 +33,20 @@ RACE_INFO = load_races()
 
 # ── Load counter inventories from data/counters.json ──────────────
 COUNTER_DATA = load_counters()
+
+# ── Load service-kind counters (e.g. "healing") — maps counter_key
+# to {name, description, services:[{id, name, description, cost}]} ──
+SERVICE_COUNTER_DATA = load_service_counters()
+
+
+def get_service_counter(counter_key):
+    """Return the service counter config for *counter_key* (or None)."""
+    return SERVICE_COUNTER_DATA.get(counter_key)
+
+
+def is_service_counter(counter_key):
+    """True if *counter_key* identifies a service-kind counter."""
+    return counter_key in SERVICE_COUNTER_DATA
 
 # ── Load spawn point definitions from data/spawn_points.json ──────
 from src.data_loader import load_spawn_points
@@ -157,6 +174,7 @@ def reload_module_data(module_data_dir=None):
     module directory.
     """
     global WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY, COUNTER_DATA
+    global SERVICE_COUNTER_DATA
     global RACE_INFO, EFFECTS_DATA, SPELLS_DATA, POTIONS_DATA
     global VALID_RACES, _module_data_dir, SPAWN_POINTS
 
@@ -166,6 +184,7 @@ def reload_module_data(module_data_dir=None):
     WEAPONS, ARMORS, ITEM_INFO, SHOP_INVENTORY = load_items(module_data_dir)
     RACE_INFO = load_races(module_data_dir)
     COUNTER_DATA = load_counters(module_data_dir)
+    SERVICE_COUNTER_DATA = load_service_counters(module_data_dir)
     SPAWN_POINTS = load_spawn_points(module_data_dir)
     VALID_RACES = tuple(k for k in RACE_INFO.keys() if not k.startswith("_"))
 

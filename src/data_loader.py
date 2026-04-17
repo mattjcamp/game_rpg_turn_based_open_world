@@ -220,6 +220,10 @@ def load_counters(data_dir=None):
     Looks in *data_dir* first (if given), then falls back to ``data/``.
     Each key in the JSON is a shop type (e.g. "general", "weapon")
     and the value contains a "items" list of item names sold there.
+
+    Service-kind counters (``kind == "service"``) are excluded from this
+    mapping so the regular buy/sell shop UI never tries to show their
+    (empty) item list as a real store.
     """
     try:
         raw = _load_json("counters.json", data_dir)
@@ -227,8 +231,42 @@ def load_counters(data_dir=None):
         return {}
     counters = {}
     for key, entry in raw.items():
+        if entry.get("kind") == "service":
+            continue
         counters[key] = list(entry.get("items", []))
     return counters
+
+
+def load_service_counters(data_dir=None):
+    """Load service-kind counters from counters.json.
+
+    Returns a dict mapping counter_key → {"name", "description", "services"}
+    where each service is a dict with ``id``, ``name``, ``description``, ``cost``.
+    Non-service counters are excluded. This is the source of truth for
+    healing counters and any other interactive service stalls placed on maps.
+    """
+    try:
+        raw = _load_json("counters.json", data_dir)
+    except (OSError, ValueError):
+        return {}
+    services = {}
+    for key, entry in raw.items():
+        if entry.get("kind") != "service":
+            continue
+        services[key] = {
+            "name": entry.get("name", key),
+            "description": entry.get("description", ""),
+            "services": [
+                {
+                    "id": s.get("id", ""),
+                    "name": s.get("name", s.get("id", "")),
+                    "description": s.get("description", ""),
+                    "cost": int(s.get("cost", 0)),
+                }
+                for s in entry.get("services", [])
+            ],
+        }
+    return services
 
 
 def load_races(data_dir=None):

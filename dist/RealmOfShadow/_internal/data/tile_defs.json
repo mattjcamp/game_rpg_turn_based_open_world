@@ -605,7 +605,7 @@
     "context": "town",
     "sprite": "town/altar",
     "interaction_type": "shop",
-    "interaction_data": "guild"
+    "interaction_data": "healing"
   },
   "62": {
     "name": "Floor Copy",

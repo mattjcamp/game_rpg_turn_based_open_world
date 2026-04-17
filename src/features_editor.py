@@ -2065,8 +2065,11 @@ class FeaturesEditor:
             counters.append({
                 "_key": key,
                 "_name": entry.get("name", key),
+                "kind": entry.get("kind", "shop"),
                 "description": entry.get("description", ""),
                 "items": list(entry.get("items", [])),
+                # Preserve services verbatim; empty list for shop counters.
+                "services": [dict(s) for s in entry.get("services", [])],
             })
         self.counter_list = counters
         self.counter_cursor = 0
@@ -2081,11 +2084,17 @@ class FeaturesEditor:
         data = {}
         for counter in self.counter_list:
             key = counter["_key"]
-            data[key] = {
+            kind = counter.get("kind", "shop")
+            entry = {
                 "name": counter["_name"],
                 "description": counter.get("description", ""),
                 "items": list(counter.get("items", [])),
             }
+            if kind == "service":
+                entry["kind"] = "service"
+                entry["services"] = [dict(s)
+                                     for s in counter.get("services", [])]
+            data[key] = entry
         try:
             with open(path, "w") as f:
                 json.dump(data, f, indent=2)
@@ -2096,21 +2105,39 @@ class FeaturesEditor:
     def build_counter_fields(self, counter):
         """Build editable field list for a single counter type.
 
-        Only includes counter-type settings (name, description).
-        Items are managed in a dedicated sub-list at level 3.
+        Shop counters show a read-only "Items (N)" entry that opens the
+        item sub-list editor at level 3.
+
+        Service counters (``kind == "service"``) show the service list
+        inline with an editable cost per service so the user can tune
+        prices from this screen without leaving the Counters area.
         """
         FE = FieldEntry
+        kind = counter.get("kind", "shop")
         n_items = len(counter.get("items", []))
         fields = [
             FE("-- Counter Type --", "_hdr1", "", "section", False),
             FE("Key", "_key", counter.get("_key", ""), "text", False),
             FE("Name", "_name", counter.get("_name", "")),
+            FE("Kind", "_kind", kind, "choice"),
             FE("Description", "description",
                counter.get("description", "")),
-            FE("-- Items for Sale --", "_hdr2", "", "section", False),
-            FE(f"Items ({n_items})", "_edit_items",
-               "Enter to edit >", "text", True),
         ]
+        if kind == "service":
+            fields.append(
+                FE("-- Services --", "_hdr_services", "", "section", False))
+            for i, svc in enumerate(counter.get("services", [])):
+                svc_name = svc.get("name", svc.get("id", f"Service {i+1}"))
+                cost = svc.get("cost", 0)
+                fields.append(
+                    FE(f"{svc_name} Cost", f"_svc_cost_{i}",
+                       str(cost), "int"))
+        else:
+            fields.append(
+                FE("-- Items for Sale --", "_hdr2", "", "section", False))
+            fields.append(
+                FE(f"Items ({n_items})", "_edit_items",
+                   "Enter to edit >", "text", True))
         self.counter_fields = fields
         idx, buf = self.finalize_fields(fields)
         self.counter_field = idx
@@ -2125,16 +2152,59 @@ class FeaturesEditor:
         if self.counter_fields:
             entry = self.counter_fields[self.counter_field]
             entry.value = self.counter_buffer
+        old_kind = counter.get("kind", "shop")
         for entry in self.counter_fields:
             key, val = entry.key, entry.value
             if key.startswith("_"):
                 if key == "_name":
                     counter["_name"] = val
+                elif key == "_kind":
+                    counter["kind"] = val
+                elif key.startswith("_svc_cost_"):
+                    try:
+                        idx = int(key[len("_svc_cost_"):])
+                    except ValueError:
+                        continue
+                    services = counter.get("services", [])
+                    if 0 <= idx < len(services):
+                        try:
+                            services[idx]["cost"] = max(0, int(val))
+                        except (TypeError, ValueError):
+                            pass
                 continue
             counter[key] = val
+        # If the user just flipped Kind → service and no services exist
+        # yet, seed the default set so the services list is meaningful.
+        new_kind = counter.get("kind", "shop")
+        if (new_kind == "service" and old_kind != "service"
+                and not counter.get("services")):
+            counter["services"] = self._default_service_list()
+            # Rebuild fields so the new service cost rows appear.
+            self.build_counter_fields(counter)
+
+    @staticmethod
+    def _default_service_list():
+        """Canonical service set used to seed a new service counter."""
+        return [
+            {"id": "heal_all_hp", "name": "Heal All HP",
+             "description": "Restore every living member to full hit points.",
+             "cost": 100},
+            {"id": "restore_all_mp", "name": "Restore All MP",
+             "description": "Refill every living member's magic points.",
+             "cost": 75},
+            {"id": "cure_all_poisons", "name": "Cure All Poisons",
+             "description": "Cleanse poison from every party member.",
+             "cost": 50},
+            {"id": "raise_dead", "name": "Raise Dead",
+             "description":
+                 "Return a fallen ally to full health. Costly miracle.",
+             "cost": 1000},
+        ]
 
     def get_counter_choices(self, key):
         """Return choice options for a counter field."""
+        if key == "_kind":
+            return ["shop", "service"]
         if key == "_edit_items":
             # Not a real choice — handled by entering the item sub-list
             return []
@@ -2217,8 +2287,10 @@ class FeaturesEditor:
         new_counter = {
             "_key": key,
             "_name": f"New Counter {len(self.counter_list) + 1}",
+            "kind": "shop",
             "description": "A new shop counter.",
             "items": [],
+            "services": [],
         }
         self.counter_list.append(new_counter)
         self.counter_cursor = len(self.counter_list) - 1
