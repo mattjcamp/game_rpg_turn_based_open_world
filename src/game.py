@@ -90,6 +90,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
 
         # Renderer
         self.renderer = Renderer(self.screen)
+        # Give the renderer a back-reference to the Game so it can read
+        # transient UI state (e.g. party.on_boat for sail animation)
+        # without plumbing every flag through every draw call.
+        self.renderer.game = self
         # Give the renderer a back-reference to the camera so its
         # map-drawing methods pick up free-look pan offsets instead
         # of always re-centering on the party.
@@ -118,6 +122,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.pending_killed_monsters = []
         self.pending_combat_location = ""
         self.examined_tiles = {}
+
+        # --- Boat / sailing state ---
+        # on_boat: party is currently aboard the boat (allows water crossing)
+        # boat_anim_frame: toggles 0/1 for sail animation while sailing
+        # boat_anim_accum: accumulator (ms) advancing the animation timer
+        self.on_boat = False
+        self.boat_anim_frame = 0
+        self.boat_anim_accum = 0
 
         # --- Darkness effect (Keys of Shadow module) ---
         self.darkness_active = False
@@ -543,6 +555,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.pending_combat_location = ""
         # Examine tile persistence (must exist before examine state enter())
         self.examined_tiles = {}
+        # Boat / sailing state
+        self.on_boat = False
+        self.boat_anim_frame = 0
+        self.boat_anim_accum = 0
 
         # --- State machine ---
         self.states = {

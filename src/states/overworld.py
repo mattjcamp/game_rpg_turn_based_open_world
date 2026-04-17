@@ -15,7 +15,7 @@ from src.states.inventory_mixin import InventoryMixin
 from src.states.lock_mixin import LockInteractionMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
-    TILE_WATER, TILE_DUNGEON_CLEARED, TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
+    TILE_WATER, TILE_BOAT, TILE_DUNGEON_CLEARED, TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_OVERWORLD, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
     NPC_WANDER_RANGE, ORC_RESPAWN_CHANCE,
 )
@@ -372,6 +372,53 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.overworld_monsters.append(orc)
 
         # Spawn tile monsters are handled separately in _try_spawn_tile_monsters()
+
+    def _spawn_sea_encounter(self):
+        """Spawn a terrain=\"sea\" encounter on water near the party.
+
+        Called each step while the party is sailing.  Mirrors
+        :meth:`_spawn_orcs` but targets water tiles and uses the sea
+        encounter pool from ``encounters.json``.  Sea monsters already
+        stay confined to water via :meth:`Monster._can_enter`, so the
+        existing pursuit / bump-to-fight pipeline handles combat.
+        """
+        if getattr(self.game, "quest_monsters_only", False):
+            return
+        tile_map = self.game.tile_map
+        party = self.game.party
+
+        # Cap concurrent sea creatures to avoid flooding the water.
+        sea_mons = [m for m in self.overworld_monsters
+                    if m.is_alive() and getattr(m, "terrain", "land") == "sea"]
+        if len(sea_mons) >= _MAX_OVERWORLD_ORCS:
+            return
+
+        for _attempt in range(60):
+            c = party.col + random.randint(-_SPAWN_MAX_DIST, _SPAWN_MAX_DIST)
+            r = party.row + random.randint(-_SPAWN_MAX_DIST, _SPAWN_MAX_DIST)
+            dist = max(abs(c - party.col), abs(r - party.row))
+            if dist < _SPAWN_MIN_DIST:
+                continue
+            if not (0 <= c < tile_map.width and 0 <= r < tile_map.height):
+                continue
+            # Only spawn on open water — skip boat markers and land.
+            if tile_map.get_tile(c, r) != TILE_WATER:
+                continue
+
+            enc = create_encounter("overworld", terrain="sea")
+            if enc is None:
+                return  # no sea encounters defined — stop trying
+
+            leader = create_monster(enc["monster_party_tile"])
+            leader.encounter_template = {
+                "name": enc["name"],
+                "monster_names": [m.name for m in enc["monsters"]],
+                "monster_party_tile": enc["monster_party_tile"],
+            }
+            leader.col = c
+            leader.row = r
+            self.overworld_monsters.append(leader)
+            return
 
     def _spawn_placed_encounters(self):
         """Materialize designer-placed encounter templates as monsters.
@@ -823,7 +870,19 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
 
-            moved = party.try_move(dcol, drow, self.game.tile_map)
+            # Boat / sailing takes over movement when relevant. If the
+            # handler returns True, it has already moved the party (or
+            # blocked the step) and the outer pipeline should treat the
+            # turn as consumed.
+            boat_handled = self._try_boat_move(
+                target_col, target_row, dcol, drow)
+            if boat_handled is True:
+                moved = True
+            elif boat_handled is False:
+                moved = False
+            else:
+                # Not a boat-related move — run the normal movement path.
+                moved = party.try_move(dcol, drow, self.game.tile_map)
 
             if moved:
                 self.move_cooldown = MOVE_REPEAT_DELAY
@@ -843,6 +902,11 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     # Occasionally respawn orcs that were killed
                     if random.random() < ORC_RESPAWN_CHANCE:
                         self._spawn_orcs()
+                    # While sailing, also roll for sea encounters so
+                    # the open water isn't a safe empty lane.
+                    if getattr(self.game, "on_boat", False) \
+                            and random.random() < ORC_RESPAWN_CHANCE:
+                        self._spawn_sea_encounter()
                     # Check spawn tiles every step — the spawn_chance
                     # percentage is the per-step probability
                     self._spawn_from_spawn_tiles()
@@ -856,6 +920,74 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             else:
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 self.show_message("Blocked!", 800)
+
+    # ── Boat / sailing ───────────────────────────────────────────
+
+    def _try_boat_move(self, target_col, target_row, dcol, drow):
+        """Handle boat boarding, sailing, and disembarking.
+
+        Returns:
+            True  — this handler moved the party (treat the turn as
+                    spent, do not call party.try_move afterwards)
+            False — the move is boat-related but blocked (e.g. trying
+                    to sail into a non-water, non-walkable tile)
+            None  — not a boat-related move; caller should fall through
+                    to the regular movement path
+        """
+        game = self.game
+        tile_map = game.tile_map
+        party = game.party
+
+        if not (0 <= target_col < tile_map.width
+                and 0 <= target_row < tile_map.height):
+            return None  # out of bounds — fall through
+
+        target_tile = tile_map.get_tile(target_col, target_row)
+
+        # ── Boarding: party is on land and steps onto a boat tile ──
+        if not game.on_boat and target_tile == TILE_BOAT:
+            party.col = target_col
+            party.row = target_row
+            game.on_boat = True
+            game.boat_anim_frame = 0
+            game.boat_anim_accum = 0
+            try:
+                game.sfx.play("encounter")
+            except Exception:
+                pass
+            self.show_message("You board the boat!", 1500)
+            return True
+
+        # ── Not on a boat — nothing to do for this handler. ──
+        if not game.on_boat:
+            return None
+
+        # ── Sailing: already aboard, moving onto water ──
+        if target_tile == TILE_WATER:
+            # Move the boat marker: old tile reverts to water, new tile
+            # becomes the boat. Party coordinates track the boat.
+            tile_map.set_tile(party.col, party.row, TILE_WATER)
+            tile_map.set_tile(target_col, target_row, TILE_BOAT)
+            party.col = target_col
+            party.row = target_row
+            return True
+
+        # ── Disembark: moving onto walkable land ──
+        # The boat stays behind on its current water tile (already
+        # TILE_BOAT) and the party steps off onto the land tile.
+        if tile_map.is_walkable(target_col, target_row) \
+                and target_tile != TILE_BOAT:
+            party.col = target_col
+            party.row = target_row
+            game.on_boat = False
+            game.boat_anim_frame = 0
+            self.show_message("You disembark.", 1200)
+            return True
+
+        # ── Still aboard, trying to sail into a blocked tile ──
+        # (mountain in the water, closed bridge, etc.) — treat as a
+        # blocked move so the caller shows "Blocked!".
+        return False
 
     # ── Galadriel's Light step tracking ─────────────────────────
 
@@ -3355,6 +3487,15 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             self.move_cooldown -= dt_ms
             if self.move_cooldown < 0:
                 self.move_cooldown = 0
+
+        # Tick boat sail animation while the party is aboard.
+        # Flips the frame index every 350ms so the renderer can draw
+        # a subtle bob/shift on the boat sprite.
+        if getattr(self.game, "on_boat", False):
+            self.game.boat_anim_accum += dt_ms
+            if self.game.boat_anim_accum >= 350:
+                self.game.boat_anim_accum = 0
+                self.game.boat_anim_frame = 1 - self.game.boat_anim_frame
 
         # Tick use-item animation
         if self.use_item_anim and self.use_item_anim["timer"] > 0:

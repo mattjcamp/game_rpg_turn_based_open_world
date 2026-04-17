@@ -33,6 +33,13 @@ TILE_SAND     = 7
 TILE_BRIDGE   = 8
 TILE_DUNGEON_CLEARED = 9
 
+# Boat tile — painted on water in the map editor. When the party walks
+# onto this tile they board; while aboard they can cross water, and the
+# boat tile follows them until they step onto walkable land.
+# ID matches the existing "Ship" entry in data/tile_defs.json so the
+# sprite (ship_frigate.png) renders without additional configuration.
+TILE_BOAT     = 64
+
 # ----- Town-interior tile IDs -----
 TILE_FLOOR    = 10
 TILE_WALL     = 11

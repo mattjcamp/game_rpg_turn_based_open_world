@@ -424,6 +424,10 @@ def save_game(slot, game):
             # ── Quest state ──
             "key_dungeons": _serialize_key_dungeons(game),
             "darkness_active": getattr(game, "darkness_active", False),
+            # ── Sailing state ──
+            # Boat tile position persists with the tile_map itself, so
+            # only the transient "party is aboard" flag needs saving.
+            "on_boat": bool(getattr(game, "on_boat", False)),
             "quest_npc_assignments": getattr(
                 game, "quest_npc_assignments", {}),
             "module_quest_states": getattr(
@@ -540,6 +544,9 @@ def load_game(slot, game):
 
         # ── Restore darkness effect ─────────────────────────────
         game.darkness_active = save_data.get("darkness_active", False)
+        game.on_boat = bool(save_data.get("on_boat", False))
+        game.boat_anim_frame = 0
+        game.boat_anim_accum = 0
 
         # Restore key dungeon levels and quest statuses from save
         _restore_key_dungeons(game, save_data)

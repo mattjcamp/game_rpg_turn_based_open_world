@@ -1028,7 +1028,7 @@ class Renderer(CombatEffectRendererMixin):
         from src.settings import (
             TILE_VOID, TILE_DUNGEON_CLEARED,
             TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
-            TILE_ALTAR, TILE_DEFS,
+            TILE_ALTAR, TILE_BOAT, TILE_WATER, TILE_DEFS,
         )
 
         # 1. TILE_VOID — always invisible (border / unpainted cells)
@@ -1079,6 +1079,43 @@ class Renderer(CombatEffectRendererMixin):
                     scaled = pygame.transform.scale(sprite, (ts, ts))
                     cache[key] = scaled
                 sprite = scaled
+
+            # Boat tiles: when the party is aboard, paint a water base
+            # under the sprite (so a boat that has moved onto a tile
+            # painted over water still sits correctly) and apply a
+            # subtle vertical bob to sell the sail animation.
+            if tile_id == TILE_BOAT:
+                game = getattr(self, "game", None)
+                on_boat = bool(getattr(game, "on_boat", False))
+                # Underlay water so the boat always floats on water
+                # pixels, even if the cell's underlying tile data was
+                # just rewritten from water → boat.
+                water_sprite = self._tile_sprites.get(TILE_WATER)
+                if water_sprite:
+                    wsw, wsh = water_sprite.get_size()
+                    if wsw != ts or wsh != ts:
+                        wcache = getattr(
+                            self, '_scaled_tile_cache', None)
+                        if wcache is None:
+                            wcache = self._scaled_tile_cache = {}
+                        wkey = (TILE_WATER, ts)
+                        wscaled = wcache.get(wkey)
+                        if wscaled is None:
+                            wscaled = pygame.transform.scale(
+                                water_sprite, (ts, ts))
+                            wcache[wkey] = wscaled
+                        water_sprite = wscaled
+                    self.screen.blit(water_sprite, (px, py))
+                # Animation: when aboard, offset vertically by ±1px
+                # alternating frames (frame 0 → -1, frame 1 → +1) so
+                # the sails appear to bob with the water.
+                y_off = 0
+                if on_boat:
+                    frame = int(getattr(game, "boat_anim_frame", 0))
+                    y_off = -1 if frame == 0 else 1
+                self.screen.blit(sprite, (px, py + y_off))
+                return
+
             self.screen.blit(sprite, (px, py))
 
             # Post-blit overlay: cleared dungeon mark.
