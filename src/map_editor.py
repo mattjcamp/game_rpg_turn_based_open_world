@@ -624,6 +624,11 @@ class MapEditorState:
                        placed_item if placed_item else "(none)",
                        "item_picker"))
 
+        # ── Universal: locked flag (bumping opens pick-lock dialog) ──
+        is_locked = props.get("locked", False)
+        fields.append(("Locked", "locked",
+                       "yes" if is_locked else "no", "toggle"))
+
         return {
             "tile_id": tile_id,
             "tile_name": tile_name,

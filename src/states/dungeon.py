@@ -11,6 +11,7 @@ import pygame
 
 from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
+from src.states.lock_mixin import LockInteractionMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
@@ -19,7 +20,7 @@ from src.settings import (
 )
 
 
-class DungeonState(InventoryMixin, BaseState):
+class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
     """Handles exploration inside a dungeon."""
 
     def __init__(self, game):
@@ -29,6 +30,10 @@ class DungeonState(InventoryMixin, BaseState):
         self.message_timer = 0
         self.move_cooldown = 0
         self._init_inventory_state()
+        # Pick-lock / Knock dialog state lives on the mixin so the
+        # same UX works for legacy TILE_LOCKED_DOOR tiles AND any
+        # designer-placed tile with tile_properties['locked']=True.
+        self._init_lock_interaction()
 
         # Torch lighting system
         self.torch_active = False
@@ -48,13 +53,6 @@ class DungeonState(InventoryMixin, BaseState):
         # Track if we've already entered (so re-entry from combat doesn't reset position)
         self._entered = False
 
-        # ── Locked door interaction prompt ──
-        self.door_interact_active = False
-        self.door_interact_col = 0
-        self.door_interact_row = 0
-        self.door_interact_cursor = 0
-        self.door_interact_options = []  # list of (label, action_key)
-
         # ── Encounter action screen (Fight / Flee) ──
         self.encounter_action_active = False
         self.encounter_action_cursor = 0   # 0=Engage, 1=Flee
@@ -66,11 +64,42 @@ class DungeonState(InventoryMixin, BaseState):
         # ── Help overlay ──
         self.showing_help = False
 
-        # ── Door unlock animation ──
-        self.door_unlock_anim = None  # {"col", "row", "timer", "duration"}
-
         # ── Artifact pickup animation ──
         self.artifact_pickup_anim = None  # {"col", "row", "timer", "duration", "name"}
+        # (door_unlock_anim is managed by LockInteractionMixin; see
+        # self._init_lock_interaction() above.)
+
+    def reset_for_new_game(self):
+        """Drop all dungeon-local state so a fresh game doesn't inherit
+        torch timers, queued combat messages, or door/encounter overlays
+        from a previous session. The state instance is cached on the
+        Game so it must be explicitly scrubbed on new-game."""
+        self.dungeon_data = None
+        self.message = ""
+        self.message_timer = 0
+        self.move_cooldown = 0
+        self.torch_active = False
+        self.torch_steps = 0
+        self.overworld_col = 0
+        self.overworld_row = 0
+        self.quest_levels = None
+        self.current_level = 0
+        self._torch_lit_cache = None
+        self.pending_combat_message = None
+        self._entered = False
+        # Lock-dialog + unlock-animation state is owned by the mixin.
+        if hasattr(self, "_init_lock_interaction"):
+            self._init_lock_interaction()
+        self.encounter_action_active = False
+        self.encounter_action_cursor = 0
+        self.encounter_action_monster = None
+        self.encounter_action_result = None
+        self.encounter_result_timer = 0
+        self._encounter_flee_distance = 0
+        self.showing_help = False
+        self.artifact_pickup_anim = None
+        if hasattr(self, "_init_inventory_state"):
+            self._init_inventory_state()
 
     def enter_dungeon(self, dungeon_data, overworld_col, overworld_row):
         """
@@ -509,7 +538,7 @@ class DungeonState(InventoryMixin, BaseState):
 
                 # ── Door interaction prompt input ──
                 if self.door_interact_active:
-                    self._handle_door_interact_input(event)
+                    self._handle_lock_interact_input(event)
                     return
 
                 # ── Party inventory screen input ──
@@ -678,10 +707,11 @@ class DungeonState(InventoryMixin, BaseState):
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
-        # Check for locked door — show interaction prompt
-        tile_id = self.dungeon_data.tile_map.get_tile(target_col, target_row)
-        if tile_id == TILE_LOCKED_DOOR:
-            self._show_door_interact(target_col, target_row)
+        # Check for locked door — legacy TILE_LOCKED_DOOR OR any tile
+        # with tile_properties['locked']=True. The mixin routes both
+        # through the same Pick Lock / Cast Knock dialog.
+        if self._try_open_locked(self.dungeon_data.tile_map,
+                                  target_col, target_row):
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
@@ -1246,245 +1276,12 @@ class DungeonState(InventoryMixin, BaseState):
             self.game.change_state("combat")
 
     # ── Locked door interaction ─────────────────────────────────────
-
-    def _show_door_interact(self, col, row):
-        """Show an interaction prompt when the party encounters a locked door."""
-        party = self.game.party
-
-        self.door_interact_col = col
-        self.door_interact_row = row
-        self.door_interact_cursor = 0
-
-        # Build available options based on party state
-        options = []
-
-        # Check if there's an alive Thief with lockpicks
-        thief = None
-        for m in party.members:
-            if m.is_alive() and m.char_class == "Thief":
-                thief = m
-                break
-
-        picks = party.inv_get_charges("Lockpick")
-        if thief and picks > 0:
-            options.append((f"Pick Lock ({thief.name}, {picks} picks)", "pick"))
-        elif thief and picks <= 0:
-            options.append(("Pick Lock (no lockpicks!)", "no_picks"))
-        elif thief is None:
-            options.append(("Pick Lock (no thief!)", "no_thief"))
-
-        # Check if there's a caster who can cast Knock
-        knock_caster = self._find_knock_caster()
-        if knock_caster:
-            from src.party import SPELLS_DATA
-            knock_spell = SPELLS_DATA.get("knock", {})
-            mp_cost = knock_spell.get("mp_cost", 7)
-            if knock_caster.current_mp >= mp_cost:
-                options.append(
-                    (f"Cast Knock ({knock_caster.name}, {mp_cost} MP)", "knock"))
-            else:
-                options.append(
-                    ("Cast Knock (insufficient MP)", "no_knock_mp"))
-
-        # TODO: could add "Use Key" option if keys are implemented
-
-        options.append(("Leave", "leave"))
-
-        self.door_interact_options = options
-        self.door_interact_active = True
-
-    def _handle_door_interact_input(self, event):
-        """Handle UP/DOWN/ENTER navigation of the door interaction prompt."""
-        if event.key in (pygame.K_UP, pygame.K_w):
-            self.door_interact_cursor = (
-                (self.door_interact_cursor - 1)
-                % len(self.door_interact_options)
-            )
-        elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self.door_interact_cursor = (
-                (self.door_interact_cursor + 1)
-                % len(self.door_interact_options)
-            )
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            _, action = self.door_interact_options[self.door_interact_cursor]
-            self._resolve_door_interact(action)
-        elif event.key == pygame.K_ESCAPE:
-            self._close_door_interact()
-
-    def _resolve_door_interact(self, action):
-        """Execute the chosen door interaction action."""
-        if action == "pick":
-            self._close_door_interact()
-            self._attempt_lock_pick(self.door_interact_col,
-                                    self.door_interact_row)
-        elif action == "no_picks":
-            self._close_door_interact()
-            thief = self._find_thief()
-            self.show_message(
-                f"{thief.name} has no lockpicks left!", 2000)
-        elif action == "no_thief":
-            self._close_door_interact()
-            self.show_message("You need a thief to pick the lock!", 2000)
-        elif action == "knock":
-            self._close_door_interact()
-            self._attempt_knock_spell(self.door_interact_col,
-                                      self.door_interact_row)
-        elif action == "no_knock_mp":
-            self._close_door_interact()
-            caster = self._find_knock_caster()
-            name = caster.name if caster else "Caster"
-            self.show_message(
-                f"{name} doesn't have enough MP to cast Knock!", 2000)
-        else:
-            # "leave" or unknown
-            self._close_door_interact()
-
-    def _close_door_interact(self):
-        """Dismiss the door interaction prompt."""
-        self.door_interact_active = False
-        self.door_interact_options = []
-        self.door_interact_cursor = 0
-
-    def _get_door_interact_state(self):
-        """Return the current door interaction state for the renderer, or None."""
-        if not self.door_interact_active:
-            return None
-        return {
-            "col": self.door_interact_col,
-            "row": self.door_interact_row,
-            "cursor": self.door_interact_cursor,
-            "options": self.door_interact_options,
-        }
-
-    def _find_thief(self):
-        """Return the first alive Thief in the party, or None."""
-        for m in self.game.party.members:
-            if m.is_alive() and m.char_class == "Thief":
-                return m
-        return None
-
-    def _find_knock_caster(self):
-        """Return the first alive party member who can cast Knock, or None.
-
-        Reads allowable_classes and min_level from the Knock spell config
-        so nothing is hardcoded here.
-        """
-        from src.party import SPELLS_DATA
-        knock = SPELLS_DATA.get("knock")
-        if knock is None:
-            return None
-        allowed = [c.lower() for c in knock.get("allowable_classes", [])]
-        min_lvl = knock.get("min_level", 1)
-        for m in self.game.party.members:
-            if (m.is_alive()
-                    and m.char_class.lower() in allowed
-                    and m.level >= min_lvl):
-                return m
-        return None
-
-    def _attempt_knock_spell(self, col, row):
-        """Caster attempts to magically unlock a door via Knock spell.
-
-        INT saving throw: d20 + INT mod >= save_dc.
-        Consumes MP on every attempt (success or failure).
-        """
-        from src.party import SPELLS_DATA
-        caster = self._find_knock_caster()
-        if caster is None:
-            self.show_message("No one in your party can cast Knock!", 2000)
-            return
-
-        knock = SPELLS_DATA.get("knock", {})
-        mp_cost = knock.get("mp_cost", 7)
-        ev = knock.get("effect_value", {})
-        save_dc = ev.get("save_dc_base", 12)
-        save_stat = ev.get("save_stat", "intelligence")
-
-        if caster.current_mp < mp_cost:
-            self.show_message(
-                f"{caster.name} doesn't have enough MP! "
-                f"({caster.current_mp}/{mp_cost} MP)", 2000)
-            return
-
-        # Consume MP whether success or failure
-        caster.current_mp -= mp_cost
-
-        # Roll: d20 + INT modifier vs save DC
-        stat_val = getattr(caster, save_stat, 10)
-        modifier = caster.get_modifier(stat_val)
-        roll = random.randint(1, 20)
-        total = roll + modifier
-
-        if total >= save_dc:
-            # Success — play unlock animation, convert to open door
-            self.door_unlock_anim = {
-                "col": col,
-                "row": row,
-                "timer": 1200,
-                "duration": 1200,
-            }
-            self.game.sfx.play("lock_pick_success")
-            self.show_message(
-                f"{caster.name} casts Knock — the lock clicks open! "
-                f"(roll {roll}+{modifier}={total} vs DC {save_dc}, "
-                f"{caster.current_mp} MP left)", 2000)
-            self.game.game_log.append(
-                f"{caster.name} cast Knock and unlocked a door "
-                f"(d20={roll}+{modifier}={total} vs DC {save_dc}).")
-        else:
-            # Failure
-            self.game.sfx.play("lock_pick_fail")
-            self.show_message(
-                f"{caster.name}'s Knock fizzles... "
-                f"(roll {roll}+{modifier}={total} vs DC {save_dc}, "
-                f"{caster.current_mp} MP left)", 2000)
-            self.game.game_log.append(
-                f"{caster.name} failed to cast Knock "
-                f"(d20={roll}+{modifier}={total} vs DC {save_dc}).")
-
-    def _attempt_lock_pick(self, col, row):
-        """Thief attempts to pick a locked door. DEX saving throw: d20 + DEX mod >= 12.
-
-        Consumes one Lockpick from the party's shared inventory on each attempt
-        (success or failure).  If no lockpicks remain the attempt is blocked.
-        """
-        party = self.game.party
-        thief = self._find_thief()
-
-        if thief is None:
-            self.show_message("The door is locked. You need a thief!", 2000)
-            return
-
-        # Check for lockpicks in shared inventory
-        picks_left = party.inv_get_charges("Lockpick")
-        if picks_left <= 0:
-            self.show_message(
-                f"{thief.name} has no lockpicks left!", 2000)
-            return
-
-        # Consume one lockpick (whether the attempt succeeds or fails)
-        party.inv_consume_charge("Lockpick")
-        remaining = party.inv_get_charges("Lockpick")
-
-        roll = random.randint(1, 20) + thief.get_modifier(thief.dexterity)
-        if roll >= 12:
-            # Success — play unlock animation, then convert to open door
-            self.door_unlock_anim = {
-                "col": col,
-                "row": row,
-                "timer": 1200,      # total animation time in ms
-                "duration": 1200,
-            }
-            self.game.sfx.play("lock_pick_success")
-            self.show_message(
-                f"{thief.name} picked the lock! "
-                f"({remaining} picks left)", 1800)
-        else:
-            # Failure
-            self.game.sfx.play("lock_pick_fail")
-            self.show_message(
-                f"{thief.name} failed to pick the lock. "
-                f"({remaining} picks left)", 1500)
+    #
+    # The dialog + dice-rolling + MP consumption + SFX + animation now
+    # live on ``LockInteractionMixin`` (src/states/lock_mixin.py) so
+    # town and overworld interiors get the exact same UX from the same
+    # code path. DungeonState only needs to pass its own tile_map to
+    # the mixin via ``_try_open_locked`` in ``_try_move``.
 
     def _attempt_trap_detection(self):
         """If Detect Traps effect is active, the thief rolls to spot traps in view.
@@ -1778,15 +1575,11 @@ class DungeonState(InventoryMixin, BaseState):
         # Tick level-up animations
         self._update_level_up_queue(dt_ms)
 
-        # Tick door unlock animation
-        if self.door_unlock_anim:
-            self.door_unlock_anim["timer"] -= dt_ms
-            if self.door_unlock_anim["timer"] <= 0:
-                # Animation finished — convert the tile to an open door
-                col = self.door_unlock_anim["col"]
-                row = self.door_unlock_anim["row"]
-                self.dungeon_data.tile_map.set_tile(col, row, TILE_DDOOR)
-                self.door_unlock_anim = None
+        # Tick door unlock animation — the mixin drives the timer and
+        # the per-tile follow-up (legacy TILE_LOCKED_DOOR converts to
+        # TILE_DDOOR; designer-placed locked tiles just have their
+        # 'locked' tile_property removed).
+        self._tick_lock_animation(dt_ms)
 
         # Tick artifact pickup animation
         if self.artifact_pickup_anim:

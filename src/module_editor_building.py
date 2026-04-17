@@ -296,13 +296,15 @@ class ModuleBuildingEditorMixin:
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_town_brushes,
-            STORAGE_SPARSE, GRID_FIXED,
+            STORAGE_SPARSE, GRID_FIXED, GRID_SCROLLABLE,
         )
         space = self._mod_building_get_current_space()
         if not space:
             return
         w = space.get("width", 20)
         h = space.get("height", 20)
+        _grid_type = (GRID_SCROLLABLE if (w > 20 or h > 20)
+                      else GRID_FIXED)
 
         fe = self.features_editor
         saved_all = fe.load_map_templates()
@@ -341,7 +343,7 @@ class ModuleBuildingEditorMixin:
         config = MapEditorConfig(
             title=f"{building_name}: {space_name}",
             storage=STORAGE_SPARSE,
-            grid_type=GRID_FIXED,
+            grid_type=_grid_type,
             width=w,
             height=h,
             tile_context="town",

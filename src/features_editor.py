@@ -3283,6 +3283,15 @@ class FeaturesEditor:
                 tiles = child.get("tiles")
                 if tiles is not None:
                     entry["tiles"] = tiles
+                # Persist per-tile attribute overrides (links, labels,
+                # placed items) so the editor round-trips them.
+                tile_props = child.get("tile_properties")
+                if tile_props:
+                    entry["tile_properties"] = tile_props
+                # Optional party start position for dense templates.
+                party_start = child.get("party_start")
+                if party_start is not None:
+                    entry["party_start"] = party_start
                 templates.append(entry)
             data[folder_key] = templates
 
@@ -3500,6 +3509,16 @@ class FeaturesEditor:
         tiles = data.get("tiles")
         if tiles is not None:
             folder["tiles"] = tiles
+        # Per-tile attribute overrides (item/link/sign/label) and an
+        # optional party-start marker live on the folder dict alongside
+        # tiles so _meh_launch_editor can hand them to the editor state
+        # and _on_save writes them back through save_map_templates.
+        tile_props = data.get("tile_properties")
+        if tile_props:
+            folder["tile_properties"] = tile_props
+        party_start = data.get("party_start")
+        if party_start is not None:
+            folder["party_start"] = party_start
         return folder
 
     def _meh_children_from_saved(self, folder_key, saved_data):
@@ -3531,6 +3550,15 @@ class FeaturesEditor:
             tiles = entry.get("tiles")
             if tiles is not None:
                 data["tiles"] = tiles
+            # Carry per-tile attributes + optional party start through
+            # load so the editor re-opens with links, labels, placed
+            # items, and party marker exactly as they were saved.
+            tile_props = entry.get("tile_properties")
+            if tile_props:
+                data["tile_properties"] = tile_props
+            party_start = entry.get("party_start")
+            if party_start is not None:
+                data["party_start"] = party_start
             children.append(self._meh_wrap_template(data))
         return children
 
@@ -3597,11 +3625,21 @@ class FeaturesEditor:
         return sections
 
     def _meh_launch_editor(self, sec):
-        """Launch the unified map editor for a Map Editor hub template."""
+        """Launch the unified map editor for a Map Editor hub template.
+
+        Templates get the same feature surface as the Overview Map
+        Editor whenever their storage allows: scrolling on large dense
+        maps, the `E`-key tile inspector (with the Item/Link pickers),
+        a minimap preview, `supports_replace`, party-start placement,
+        and the module map hierarchy for cross-map links. Sparse
+        interiors stay as fixed grids — that's the idiomatic UX for
+        small, centered layouts.
+        """
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_overworld_brushes, build_town_brushes,
             STORAGE_DENSE, STORAGE_SPARSE,
+            GRID_SCROLLABLE, GRID_FIXED,
         )
 
         mc = sec["map_config"]
@@ -3610,6 +3648,17 @@ class FeaturesEditor:
         h = mc["height"]
         storage = mc["storage"]
         grid_type = mc["grid_type"]
+
+        # Auto-promote to scrollable for dense maps always, and for
+        # sparse maps whenever the map exceeds ~20 tiles per side. The
+        # camera clamps cleanly when the map fits on screen, so there's
+        # no downside and large maps get the minimap preview and
+        # comfortable 32px tiles instead of being squished to fit.
+        if storage == STORAGE_DENSE and grid_type != GRID_SCROLLABLE:
+            grid_type = GRID_SCROLLABLE
+        elif (storage == STORAGE_SPARSE and grid_type != GRID_SCROLLABLE
+                and (w > 20 or h > 20)):
+            grid_type = GRID_SCROLLABLE
 
         # Load all templates for stamp brush folders
         saved_all = self.load_map_templates()
@@ -3661,22 +3710,50 @@ class FeaturesEditor:
             # Sparse: start with empty dict; store in the section
             tiles = sec.setdefault("tiles", {})
 
+        # ── Preserve per-tile attributes + party start ─────────────
+        # tile_properties is where the universal attribute panel
+        # writes link targets, labels, sign text, and the Item placed
+        # on that tile via the item picker. Templates that omit the
+        # field come back with an empty dict so edits start cleanly.
+        saved_tile_props = dict(sec.get("tile_properties", {}) or {})
+        saved_party_start = sec.get("party_start")
+
         def _on_save(st):
-            # For hub templates we store tiles back into the section
+            # For hub templates we store tiles back into the section.
             if storage == STORAGE_DENSE:
                 sec["tiles"] = st.tiles
-            # Sparse tiles are already the same dict reference
+            # Sparse tiles are already the same dict reference.
+            # Persist per-tile attributes and the optional party
+            # start so placed items + links round-trip on reload.
+            sec["tile_properties"] = dict(st.tile_properties)
+            if st.party_start is not None:
+                sec["party_start"] = st.party_start
+            elif "party_start" in sec:
+                del sec["party_start"]
             st.dirty = False
             # Persist all templates to disk
             self.save_map_templates()
 
         def _on_exit(st):
-            # Save tiles on exit (same as on_save)
+            # Save tiles + attributes on exit (same as on_save).
             if storage == STORAGE_DENSE:
                 sec["tiles"] = st.tiles
+            sec["tile_properties"] = dict(st.tile_properties)
+            if st.party_start is not None:
+                sec["party_start"] = st.party_start
+            elif "party_start" in sec:
+                del sec["party_start"]
             self.save_map_templates()
             self.meh_editor_active = False
             self.game._map_editor_state = None
+
+        # Pull the module map hierarchy so the tile-link picker and the
+        # item placer inside the attribute panel have the full map tree
+        # to choose from — same data the Overview Map Editor uses.
+        try:
+            map_hierarchy = self.game._build_map_hierarchy()
+        except Exception:
+            map_hierarchy = []
 
         config = MapEditorConfig(
             title=sec.get("label", "MAP EDITOR"),
@@ -3686,12 +3763,20 @@ class FeaturesEditor:
             height=h,
             brushes=brushes,
             tile_context=ctx,
-            supports_replace=(storage == STORAGE_SPARSE),
+            supports_replace=True,
+            supports_party_start=(storage == STORAGE_DENSE),
             on_save=_on_save,
             on_exit=_on_exit,
+            map_hierarchy=map_hierarchy,
         )
 
-        state = MapEditorState(config, tiles=tiles)
+        state = MapEditorState(
+            config, tiles=tiles,
+            party_start=saved_party_start,
+        )
+        # Restore per-tile attribute overrides (items, labels, links).
+        if saved_tile_props:
+            state.tile_properties = saved_tile_props
         if storage == STORAGE_SPARSE:
             state.cursor_col = 1
             state.cursor_row = 1

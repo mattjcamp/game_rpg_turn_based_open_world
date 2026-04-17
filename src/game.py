@@ -603,6 +603,23 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.game_log = []
         self.dungeon_cache = {}  # clear persisted dungeon layouts
 
+        # ── Scrub per-state overlays (interior darkness, shop/temple
+        # overlays, dungeon torch timers, etc.) — the state objects are
+        # cached on self.states and reused across games, so any flag
+        # still set from a prior session will bleed into the new game
+        # (e.g. overworld drawn with interior darkness on a fresh map).
+        for _st_name in ("overworld", "town", "dungeon"):
+            _st = self.states.get(_st_name) if hasattr(self, "states") else None
+            if _st is not None and hasattr(_st, "reset_for_new_game"):
+                try:
+                    _st.reset_for_new_game()
+                except Exception:
+                    # Don't let a buggy reset stop the new game — log
+                    # and move on so the player isn't stuck on title.
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "reset_for_new_game failed for %s", _st_name)
+
         # ── Load module data (items, races, monsters, etc.) ──
         if self.active_module_path:
             self.module_manifest = load_module_data(self.active_module_path)
@@ -667,6 +684,13 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self.party.equipped[slot] = None
             for slot in self.party.EFFECT_SLOTS:
                 self.party.effects[slot] = None
+            # Reset the Galadriel's Light step counter + last-day tracker
+            # so the lantern's dungeon-light bonus from the prior game
+            # doesn't bleed into the new one.
+            if hasattr(self.party, "galadriels_light_steps"):
+                self.party.galadriels_light_steps = 0
+            if hasattr(self.party, "last_galadriels_light_day"):
+                self.party.last_galadriels_light_day = -1
 
             # Reset each active member's HP to full and clear personal inv
             for m in self.party.members:
@@ -3594,6 +3618,29 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_module_maps = module_maps
         return module_maps
 
+    @staticmethod
+    def _picker_max_visible():
+        """Rows the enclosure template picker overlay actually draws.
+
+        Kept in sync with ``Renderer._draw_building_enc_picker`` /
+        ``_draw_town_enc_picker`` so the cursor-driven scroll window
+        never desynchronises from the visible row count. Without this,
+        templates past the visible rows get clipped off the bottom of
+        the ADD SPACE dialog (the bug reported for Dungeon 4).
+
+        Renderer constants:
+            panel_h = SCREEN_HEIGHT - 130
+            pad=12   (outer padding)
+            row_h=40 (per-entry height)
+            title_area=42 (title + margin)
+            footer=80 (controls hint + margin)
+        """
+        from src.settings import SCREEN_HEIGHT
+        panel_h = SCREEN_HEIGHT - 130
+        content_h = panel_h - 12 * 2 - 42 - 80
+        # Conservative floor so tiny screens still work.
+        return max(4, content_h // 40)
+
     def _build_map_hierarchy(self):
         """Build the map hierarchy tree for the tile link picker.
 
@@ -4130,18 +4177,24 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         if not n:
             return
 
+        # Match the renderer's actual row count so templates past row N
+        # scroll into view correctly (the picker overlay shows ~11 rows).
+        max_vis = self._picker_max_visible()
+
         if event.key == pygame.K_UP:
             self._mod_town_enc_pick_cursor = (
                 self._mod_town_enc_pick_cursor - 1) % n
             self._mod_town_enc_pick_scroll = fe._adjust_scroll_generic(
                 self._mod_town_enc_pick_cursor,
-                self._mod_town_enc_pick_scroll)
+                self._mod_town_enc_pick_scroll,
+                max_visible=max_vis)
         elif event.key == pygame.K_DOWN:
             self._mod_town_enc_pick_cursor = (
                 self._mod_town_enc_pick_cursor + 1) % n
             self._mod_town_enc_pick_scroll = fe._adjust_scroll_generic(
                 self._mod_town_enc_pick_cursor,
-                self._mod_town_enc_pick_scroll)
+                self._mod_town_enc_pick_scroll,
+                max_visible=max_vis)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             # Select template → show naming overlay to generate instance
             template = templates[self._mod_town_enc_pick_cursor]
@@ -4956,18 +5009,27 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         if not n:
             return
 
+        # Keep the scroll window in sync with what the renderer draws.
+        # Renderer layout (see Renderer._draw_building_enc_picker):
+        #   pad=12, row_h=40, title+margin=42, footer gap=80.
+        # max_vis = (rh - pad*2 - 42 - 80) / row_h
+        # where rh is the module editor panel height (SCREEN_HEIGHT-130).
+        max_vis = self._picker_max_visible()
+
         if event.key == pygame.K_UP:
             self._mod_building_enc_pick_cursor = (
                 self._mod_building_enc_pick_cursor - 1) % n
             self._mod_building_enc_pick_scroll = fe._adjust_scroll_generic(
                 self._mod_building_enc_pick_cursor,
-                self._mod_building_enc_pick_scroll)
+                self._mod_building_enc_pick_scroll,
+                max_visible=max_vis)
         elif event.key == pygame.K_DOWN:
             self._mod_building_enc_pick_cursor = (
                 self._mod_building_enc_pick_cursor + 1) % n
             self._mod_building_enc_pick_scroll = fe._adjust_scroll_generic(
                 self._mod_building_enc_pick_cursor,
-                self._mod_building_enc_pick_scroll)
+                self._mod_building_enc_pick_scroll,
+                max_visible=max_vis)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             template = templates[self._mod_building_enc_pick_cursor]
             if self._mod_building_importing_to_space:

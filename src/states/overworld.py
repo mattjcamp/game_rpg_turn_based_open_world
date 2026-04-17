@@ -12,6 +12,7 @@ import pygame
 
 from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
+from src.states.lock_mixin import LockInteractionMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_TOWN, TILE_DUNGEON, TILE_CHEST, TILE_GRASS,
     TILE_WATER, TILE_DUNGEON_CLEARED, TILE_SPAWN, TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
@@ -75,7 +76,7 @@ def _try_pickup_ground_item(game, tile_map, col, row,
     return item_name
 
 
-class OverworldState(InventoryMixin, BaseState):
+class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
     """Handles overworld exploration."""
 
     def __init__(self, game):
@@ -84,6 +85,8 @@ class OverworldState(InventoryMixin, BaseState):
         self.message_timer = 0  # ms remaining to show message
         self.move_cooldown = 0  # ms until next move allowed
         self._init_inventory_state()
+        # Pick-lock / Knock dialog (shared with dungeon/town).
+        self._init_lock_interaction()
 
         # Help overlay
         self.showing_help = False
@@ -180,6 +183,64 @@ class OverworldState(InventoryMixin, BaseState):
         # ── Quest visual effects ──
         # List of active effects: {type, timer, duration, ...}
         self.quest_effects = []
+
+    def reset_for_new_game(self):
+        """Clear all transient state so a fresh game starts clean.
+
+        The state object is created once and reused across sessions,
+        so any flag that accumulates during play (interior nesting,
+        stashed tile maps, dialogue overlays, quest effects) needs to
+        be cleared explicitly when the player starts a new game.
+        The previous bug: ``_in_overworld_interior`` stayed True after
+        quitting from inside a building, then the renderer drew the
+        new overworld with interior-darkness lighting.
+        """
+        # Interior nesting / stash
+        self._in_overworld_interior = False
+        self._overworld_interior_stack = []
+        self._overworld_interior_exit_positions = set()
+        self._overworld_interior_links = {}
+        self._overworld_interior_name = ""
+        self._overworld_interior_entry_grace = False
+        self._stashed_overworld_tile_map = None
+        self._stashed_overworld_monsters = None
+        for attr in ("_stashed_overworld_party_col",
+                     "_stashed_overworld_party_row"):
+            if hasattr(self, attr):
+                delattr(self, attr)
+        self._building_interior_npcs = []
+        self._building_combat_npc = None
+        self._building_returning_from_combat = False
+        self._building_name = ""
+        # Travel / action popup state
+        self.building_action_active = False
+        self.dungeon_action_active = False
+        self.town_action_active = False
+        self.spawn_action_active = False
+        self._exit_grace = False
+        # Dialogue + message overlays
+        self.ow_npc_dialogue_active = False
+        self.ow_npc_speaking = None
+        self.ow_quest_dialogue_lines = []
+        self.ow_quest_dialogue_index = 0
+        self.ow_quest_choice_active = False
+        self.ow_quest_choice_cursor = 0
+        self.ow_quest_choices = []
+        self.message = ""
+        self.message_timer = 0
+        self.move_cooldown = 0
+        # Visual effects on the overworld surface
+        self.quest_effects = []
+        # Any inventory/party overlays provided by the shared mixin
+        if hasattr(self, "_init_inventory_state"):
+            self._init_inventory_state()
+        # Unique-tile discovery readouts
+        if hasattr(self, "unique_text"):
+            self.unique_text = ""
+        if hasattr(self, "unique_flash"):
+            self.unique_flash = 0.0
+        if hasattr(self, "unique_pos"):
+            self.unique_pos = None
 
     def enter(self):
         self._apply_pending_combat_rewards()
@@ -432,6 +493,11 @@ class OverworldState(InventoryMixin, BaseState):
                     self._handle_encounter_action_input(event)
                     return
 
+                # ── Pick-lock / Knock dialog input (shared mixin) ──
+                if self.door_interact_active:
+                    self._handle_lock_interact_input(event)
+                    return
+
                 # ── Spawn action screen input ──
                 if self.spawn_action_active:
                     self._handle_spawn_action_input(event)
@@ -617,6 +683,14 @@ class OverworldState(InventoryMixin, BaseState):
             orc = self._get_monster_at(target_col, target_row)
             if orc:
                 self._show_encounter_action(orc)
+                self.move_cooldown = MOVE_REPEAT_DELAY
+                return
+
+            # Locked tile (painted via the Attributes panel) — opens the
+            # pick-lock dialog regardless of underlying walkability so a
+            # lock on a normally-walkable tile still acts as a barrier.
+            if self._try_open_locked(self.game.tile_map,
+                                      target_col, target_row):
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
 
@@ -3112,6 +3186,9 @@ class OverworldState(InventoryMixin, BaseState):
 
         dt_ms = dt * 1000  # convert seconds to ms
 
+        # Pick-lock unlock animation (shared mixin).
+        self._tick_lock_animation(dt_ms)
+
         # Tick encounter result display timer
         if self.encounter_result_timer > 0:
             self.encounter_result_timer -= dt_ms
@@ -3260,6 +3337,19 @@ class OverworldState(InventoryMixin, BaseState):
                 self.encounter_action_monster,
                 self.encounter_action_cursor,
                 self.encounter_action_result)
+        # Pick-lock dialog overlay — lock on any painted tile
+        # (overworld or inside an overworld building interior).
+        interact = self._get_door_interact_state()
+        if interact:
+            tile_map = self.game.tile_map
+            ts = renderer._U3_OW_TS
+            cols = renderer._U3_OW_COLS
+            rows = renderer._U3_OW_ROWS
+            off_c = max(0, min(self.game.party.col - cols // 2,
+                               max(0, tile_map.width - cols)))
+            off_r = max(0, min(self.game.party.row - rows // 2,
+                               max(0, tile_map.height - rows)))
+            renderer._u3_draw_door_interact(interact, off_c, off_r, ts)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:

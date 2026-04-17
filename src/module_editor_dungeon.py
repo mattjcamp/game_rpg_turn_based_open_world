@@ -377,7 +377,7 @@ class ModuleDungeonEditorMixin:
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_town_brushes,
-            STORAGE_SPARSE, GRID_FIXED,
+            STORAGE_SPARSE, GRID_FIXED, GRID_SCROLLABLE,
         )
         level = self._mod_dungeon_get_current_level()
         if not level:
@@ -419,10 +419,15 @@ class ModuleDungeonEditorMixin:
             self._mod_dungeon_map_editor_state = None
             self._mod_dungeon_map_editor_handler = None
 
+        # Auto-promote to scrollable for large dungeons so a 40x50
+        # level edits with comfortable 32px tiles and camera panning
+        # (matches the Overview Map Editor UX).
+        _grid_type = (GRID_SCROLLABLE if (w > 20 or h > 20)
+                      else GRID_FIXED)
         config = MapEditorConfig(
             title=f"{dungeon_name}: {level_name}",
             storage=STORAGE_SPARSE,
-            grid_type=GRID_FIXED,
+            grid_type=_grid_type,
             width=w,
             height=h,
             tile_context="town",

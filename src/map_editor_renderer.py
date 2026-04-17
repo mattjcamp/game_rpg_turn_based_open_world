@@ -111,9 +111,10 @@ def draw_map_editor(renderer, data: Dict[str, Any]):
     # ── Right panel: tile grid ──
     _draw_tile_grid(renderer, data)
 
-    # ── Minimap (scrollable dense grids only) ──
-    if (data["storage"] == STORAGE_DENSE
-            and data.get("grid_type") == "scrollable"
+    # ── Minimap (any scrollable grid on a large map) ──
+    # Shows for both dense and sparse maps once they exceed ~20 tiles
+    # per side, matching the Overview Map Editor's preview behaviour.
+    if (data.get("grid_type") == "scrollable"
             and (data["width"] > 20 or data["height"] > 20)):
         _draw_minimap(renderer, data)
 
@@ -814,10 +815,39 @@ def _draw_minimap(renderer, data: Dict):
     }
     mini_surf = pygame.Surface((map_w, map_h))
     mini_surf.fill((20, 20, 30))
-    for r in range(map_h):
-        row = tiles[r]
-        for c in range(map_w):
-            tid = row[c]
+    storage = data.get("storage")
+    if storage == STORAGE_DENSE and isinstance(tiles, list):
+        # Dense: tiles is a 2D array [row][col] = tile_id
+        for r in range(map_h):
+            row = tiles[r]
+            for c in range(map_w):
+                tid = row[c]
+                tdef = TILE_DEFS.get(tid, {})
+                tname = tdef.get("name", "").lower()
+                colour = None
+                for key, col in _MINI_COLOURS.items():
+                    if key in tname:
+                        colour = col
+                        break
+                if colour is None:
+                    # Fallback: walkable = dark grey, unwalkable darker
+                    colour = ((50, 50, 60) if tdef.get("walkable")
+                              else (25, 25, 35))
+                mini_surf.set_at((c, r), colour)
+    elif isinstance(tiles, dict):
+        # Sparse: tiles is {"c,r": {tile_id, ...}} — empty cells stay
+        # at the background colour, painted cells take their tile's hue.
+        for pos_key, td in tiles.items():
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            try:
+                c, r = int(parts[0]), int(parts[1])
+            except ValueError:
+                continue
+            if not (0 <= c < map_w and 0 <= r < map_h):
+                continue
+            tid = td.get("tile_id") if isinstance(td, dict) else td
             tdef = TILE_DEFS.get(tid, {})
             tname = tdef.get("name", "").lower()
             colour = None
@@ -826,8 +856,8 @@ def _draw_minimap(renderer, data: Dict):
                     colour = col
                     break
             if colour is None:
-                # Fallback: walkable = dark grey, unwalkable = darker
-                colour = (50, 50, 60) if tdef.get("walkable") else (25, 25, 35)
+                colour = ((50, 50, 60) if tdef.get("walkable")
+                          else (25, 25, 35))
             mini_surf.set_at((c, r), colour)
 
     scaled = pygame.transform.scale(mini_surf, (mini_w, mini_h))
@@ -856,21 +886,48 @@ def _draw_minimap(renderer, data: Dict):
 
 
 def _draw_sparse_grid(renderer, data: Dict):
-    """Draw fixed-size sparse tile grid (interior style)."""
+    """Draw a sparse tile grid.
+
+    When *grid_type* is ``"fixed"`` the whole map is shown centered in
+    the grid area (interior / small-room style). When it is
+    ``"scrollable"`` the grid is panned with ``cam_col``/``cam_row`` and
+    only the tiles in the visible window are drawn — so large sparse
+    maps (40×50 dungeons, 30×30 town interiors, etc.) can be edited at
+    a comfortable tile size instead of being squished to fit.
+    """
     screen = renderer.screen
     tiles = data["tiles"]
     tw, th = data["width"], data["height"]
     ts = data.get("tile_size", 24)
+    scrollable = data.get("grid_type") == "scrollable"
 
-    total_w = tw * ts
-    total_h = th * ts
-    gx = GRID_X + (GRID_W - total_w) // 2
-    gy = GRID_Y + (GRID_H - total_h) // 2
+    if scrollable:
+        cam_c = data.get("cam_col", 0)
+        cam_r = data.get("cam_row", 0)
+        vis_cols = GRID_W // ts
+        vis_rows = GRID_H // ts
+        cam_c = max(0, min(cam_c, max(0, tw - vis_cols)))
+        cam_r = max(0, min(cam_r, max(0, th - vis_rows)))
+        total_w = min(tw, vis_cols) * ts
+        total_h = min(th, vis_rows) * ts
+        gx = GRID_X + (GRID_W - total_w) // 2
+        gy = GRID_Y + (GRID_H - total_h) // 2
+        start_c, start_r = cam_c, cam_r
+        end_c = min(cam_c + vis_cols, tw)
+        end_r = min(cam_r + vis_rows, th)
+    else:
+        cam_c = cam_r = 0
+        total_w = tw * ts
+        total_h = th * ts
+        gx = GRID_X + (GRID_W - total_w) // 2
+        gy = GRID_Y + (GRID_H - total_h) // 2
+        start_c, start_r = 0, 0
+        end_c, end_r = tw, th
 
-    for r in range(th):
-        for c in range(tw):
-            px = gx + c * ts
-            py = gy + r * ts
+    for r in range(start_r, end_r):
+        for c in range(start_c, end_c):
+            px = gx + (c - cam_c) * ts
+            py = gy + (r - cam_r) * ts
             pos_key = f"{c},{r}"
 
             if pos_key in tiles:
@@ -914,10 +971,11 @@ def _draw_sparse_grid(renderer, data: Dict):
             pygame.draw.rect(screen, (40, 35, 30),
                              pygame.Rect(px, py, ts, ts), 1)
 
-    # Ground-item overlay for sparse grids
-    _draw_ground_items(renderer, data, gx, gy, ts, 0, 0, tw, th)
+    # Ground-item overlay for sparse grids (camera-aware)
+    _draw_ground_items(renderer, data, gx, gy, ts,
+                       cam_c, cam_r, end_c, end_r)
 
-    # Object stamp preview (ghost outline)
+    # Object stamp preview (ghost outline) — clipped to visible window
     brushes = data.get("brushes", [])
     bidx = data.get("brush_idx", 0)
     cur_brush = brushes[bidx] if bidx < len(brushes) else None
@@ -927,7 +985,6 @@ def _draw_sparse_grid(renderer, data: Dict):
         elapsed = pygame.time.get_ticks() / 1000.0
         pulse_a = int(40 + 20 * math.sin(elapsed * 3))
         min_c, min_r = _object_origin(cur_brush.object_data)
-        ghost = pygame.Surface((tw * ts, th * ts), pygame.SRCALPHA)
         for pos_key in cur_brush.object_data:
             parts = pos_key.split(",")
             if len(parts) != 2:
@@ -935,16 +992,21 @@ def _draw_sparse_grid(renderer, data: Dict):
             oc, orow = int(parts[0]), int(parts[1])
             tc = cx + (oc - min_c)
             tr = cy + (orow - min_r)
-            if 0 <= tc < tw and 0 <= tr < th:
-                ghost.fill((120, 180, 220, pulse_a),
-                           pygame.Rect(tc * ts, tr * ts, ts, ts))
-        screen.blit(ghost, (gx, gy))
+            if start_c <= tc < end_c and start_r <= tr < end_r:
+                gpx = gx + (tc - cam_c) * ts
+                gpy = gy + (tr - cam_r) * ts
+                ghost_s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                ghost_s.fill((120, 180, 220, pulse_a))
+                screen.blit(ghost_s, (gpx, gpy))
 
-    # Cursor
-    if cx >= 0 and cy >= 0:
+    # Cursor — camera-aware
+    if start_c <= cx < end_c and start_r <= cy < end_r:
         elapsed = pygame.time.get_ticks() / 1000.0
         pulse = int(80 + 40 * math.sin(elapsed * 4))
-        cursor_rect = pygame.Rect(gx + cx * ts, gy + cy * ts, ts, ts)
+        cursor_rect = pygame.Rect(
+            gx + (cx - cam_c) * ts,
+            gy + (cy - cam_r) * ts,
+            ts, ts)
         pygame.draw.rect(screen, (255, 200, pulse), cursor_rect, 2)
 
 

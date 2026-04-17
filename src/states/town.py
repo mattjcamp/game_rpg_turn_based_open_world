@@ -12,6 +12,7 @@ import pygame
 
 from src.states.base_state import BaseState
 from src.states.inventory_mixin import InventoryMixin
+from src.states.lock_mixin import LockInteractionMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_EXIT, TILE_DUNGEON,
     TILE_GRASS, TILE_FOREST, TILE_PATH, TILE_WATER, TILE_MOUNTAIN,
@@ -114,7 +115,7 @@ class TempleHealEffect:
             self.alive = False
 
 
-class TownState(InventoryMixin, BaseState):
+class TownState(LockInteractionMixin, InventoryMixin, BaseState):
     """Handles exploration inside a town."""
 
     def __init__(self, game):
@@ -126,6 +127,8 @@ class TownState(InventoryMixin, BaseState):
         self.npc_dialogue_active = False
         self.npc_speaking = None
         self._init_inventory_state()
+        # Pick-lock / Knock dialog (shared with dungeon/overworld).
+        self._init_lock_interaction()
 
         # Quest dialogue
         self.quest_choice_active = False
@@ -166,6 +169,58 @@ class TownState(InventoryMixin, BaseState):
         self.pickpocket_targeting = False
         self.pickpocket_targets = []   # list of adjacent NPCs
         self.pickpocket_cursor = 0     # index into pickpocket_targets
+
+    def reset_for_new_game(self):
+        """Clear transient state so a new game doesn't inherit overlays
+        (shop, temple, healing counter, pickpocket) or interior nesting
+        from a prior session. The state instance is cached on the Game
+        so it must be explicitly scrubbed on new-game."""
+        self.town_data = None
+        self.message = ""
+        self.message_timer = 0
+        self.move_cooldown = 0
+        self.npc_dialogue_active = False
+        self.npc_speaking = None
+        self.quest_choice_active = False
+        self.quest_choice_cursor = 0
+        self.quest_choices = []
+        self.quest_dialogue_lines = []
+        self.quest_dialogue_index = 0
+        self.showing_shop = False
+        self.shop_mode = "buy"
+        self.shop_cursor = 0
+        self.shop_sell_cursor = 0
+        self.shop_message = ""
+        self.shop_message_timer = 0
+        self.quest_complete_effect = None
+        self.quest_effects = []
+        self.showing_temple_service = False
+        self.temple_service_cursor = 0
+        self.temple_npc = None
+        self.temple_heal_effect = None
+        self.temple_message = ""
+        self.temple_message_timer = 0
+        self.showing_healing_counter = False
+        self.healing_counter_data = None
+        self.healing_counter_cursor = 0
+        self.healing_counter_message = ""
+        self.healing_counter_message_timer = 0
+        self.pickpocket_targeting = False
+        self.pickpocket_targets = []
+        self.pickpocket_cursor = 0
+        # Interior nesting inside towns
+        if hasattr(self, "_in_interior"):
+            self._in_interior = False
+        if hasattr(self, "_interior_stack"):
+            self._interior_stack = []
+        if hasattr(self, "_interior_exit_positions"):
+            self._interior_exit_positions = set()
+        if hasattr(self, "_interior_name"):
+            self._interior_name = ""
+        if hasattr(self, "_interior_entry_grace"):
+            self._interior_entry_grace = False
+        if hasattr(self, "_init_inventory_state"):
+            self._init_inventory_state()
 
         # ── Help overlay ──
         self.showing_help = False
@@ -390,6 +445,11 @@ class TownState(InventoryMixin, BaseState):
                     self._handle_healing_counter_input(event)
                     return
 
+                # ── Pick-lock / Knock dialog input (shared mixin) ──
+                if self.door_interact_active:
+                    self._handle_lock_interact_input(event)
+                    return
+
                 # ── Shop screen input ──
                 if self.showing_shop:
                     self._handle_shop_input(event)
@@ -576,6 +636,14 @@ class TownState(InventoryMixin, BaseState):
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
             self._start_dialogue(npc)
+            self.move_cooldown = MOVE_REPEAT_DELAY
+            return
+
+        # Locked tile (painted via the Attributes panel) — opens the
+        # pick-lock dialog regardless of underlying walkability so the
+        # barrier persists until the lock is actually picked.
+        if self._try_open_locked(self.town_data.tile_map,
+                                  target_col, target_row):
             self.move_cooldown = MOVE_REPEAT_DELAY
             return
 
@@ -2437,6 +2505,9 @@ class TownState(InventoryMixin, BaseState):
                 self.healing_counter_message = ""
                 self.healing_counter_message_timer = 0
 
+        # Pick-lock unlock animation (shared mixin).
+        self._tick_lock_animation(dt_ms)
+
         if self.move_cooldown > 0:
             self.move_cooldown -= dt_ms
             if self.move_cooldown < 0:
@@ -2703,6 +2774,26 @@ class TownState(InventoryMixin, BaseState):
         # Temple celestial animation overlay (when walking in town after service)
         if self.temple_heal_effect:
             renderer.draw_temple_heal_effect(self.temple_heal_effect)
+
+        # Pick-lock dialog overlay (any tile painted with locked=True,
+        # whether on the town map itself or inside a building interior).
+        interact = self._get_door_interact_state()
+        if interact:
+            tile_map = self.town_data.tile_map
+            ts = renderer._U3_TN_TS
+            cols = renderer._U3_TN_COLS
+            rows = renderer._U3_TN_ROWS
+            if tile_map.width <= cols:
+                off_c = -(cols - tile_map.width) // 2
+            else:
+                off_c = self.game.party.col - cols // 2
+                off_c = max(0, min(off_c, tile_map.width - cols))
+            if tile_map.height <= rows:
+                off_r = -(rows - tile_map.height) // 2
+            else:
+                off_r = self.game.party.row - rows // 2
+                off_r = max(0, min(off_r, tile_map.height - rows))
+            renderer._u3_draw_door_interact(interact, off_c, off_r, ts)
 
         # Dialogue box renders on top if active
         if self.message and self.npc_dialogue_active:

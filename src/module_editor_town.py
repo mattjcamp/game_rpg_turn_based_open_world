@@ -201,13 +201,17 @@ class ModuleTownEditorMixin:
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_town_brushes,
-            STORAGE_SPARSE, GRID_FIXED,
+            STORAGE_SPARSE, GRID_FIXED, GRID_SCROLLABLE,
         )
         town = self._mod_town_get_current()
         if not town:
             return
         w = town.get("width", 18)
         h = town.get("height", 19)
+        # Auto-promote to scrollable for large towns — matches the
+        # Overview Map Editor UX so large maps aren't squished.
+        _grid_type = (GRID_SCROLLABLE if (w > 20 or h > 20)
+                      else GRID_FIXED)
 
         fe = self.features_editor
         saved_all = fe.load_map_templates()
@@ -239,7 +243,7 @@ class ModuleTownEditorMixin:
         config = MapEditorConfig(
             title=f"Town: {town_name}",
             storage=STORAGE_SPARSE,
-            grid_type=GRID_FIXED,
+            grid_type=_grid_type,
             width=w,
             height=h,
             tile_context="town",
@@ -882,7 +886,7 @@ class ModuleTownEditorMixin:
         from src.map_editor import (
             MapEditorConfig, MapEditorState, MapEditorInputHandler,
             build_town_brushes,
-            STORAGE_SPARSE, GRID_FIXED,
+            STORAGE_SPARSE, GRID_FIXED, GRID_SCROLLABLE,
         )
         if not (0 <= self._mod_town_enc_cursor < len(
                 self._mod_town_enclosures)):
@@ -890,6 +894,8 @@ class ModuleTownEditorMixin:
         enc = self._mod_town_enclosures[self._mod_town_enc_cursor]
         w = enc.get("width", 16)
         h = enc.get("height", 14)
+        _grid_type = (GRID_SCROLLABLE if (w > 20 or h > 20)
+                      else GRID_FIXED)
 
         fe = self.features_editor
         saved_all = fe.load_map_templates()
@@ -922,7 +928,7 @@ class ModuleTownEditorMixin:
         config = MapEditorConfig(
             title=f"Enclosure: {enc_display}",
             storage=STORAGE_SPARSE,
-            grid_type=GRID_FIXED,
+            grid_type=_grid_type,
             width=w,
             height=h,
             tile_context="town",
