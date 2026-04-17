@@ -697,17 +697,13 @@ class Renderer(CombatEffectRendererMixin):
             tint = TintEffect.NONE
 
         if interior_darkness:
-            # Interior / torch-lit areas — always dark regardless of time
-            lctx = LightingContext(
-                mode=LightingMode.INTERIOR_DARKNESS,
-                tile_size=ts, viewport_cols=cols, viewport_rows=rows,
-                party_screen_pos=(psc, psr),
-                has_party_light=has_any_light,
-                extra_lights=torch_lights + feature_lights,
-                torch_tiles=torch_positions,
-                tint=tint,
-            )
-            render_lighting(self.screen, lctx)
+            # Building interior — skip all darkness overlays entirely.
+            # No INTERIOR_DARKNESS (the dungeon-style distance falloff
+            # produced broken islands of light in small rooms) and no
+            # night-time CLOCK_DARKNESS (indoors has no sky, so the
+            # outdoor day/night cycle shouldn't apply). A proper
+            # interior lighting system can be introduced later.
+            pass
 
         elif not clock.is_day or darkness_active:
             extra = list(torch_lights + feature_lights)
@@ -2059,17 +2055,10 @@ class Renderer(CombatEffectRendererMixin):
             tint = TintEffect.NONE
 
         if interior_darkness:
-            # Interior / torch-lit areas — always dark regardless of time
-            lctx = LightingContext(
-                mode=LightingMode.INTERIOR_DARKNESS,
-                tile_size=ts, viewport_cols=cols, viewport_rows=rows,
-                party_screen_pos=(psc_dark, psr_dark),
-                has_party_light=has_any_light,
-                extra_lights=torch_lights + feature_lights,
-                torch_tiles=torch_positions,
-                tint=tint,
-            )
-            render_lighting(self.screen, lctx)
+            # Building interior — skip all darkness overlays entirely.
+            # Matches the same change in draw_town_u3. See that method
+            # for the full rationale.
+            pass
 
         elif not clock.is_day or darkness_active:
             lctx = LightingContext(

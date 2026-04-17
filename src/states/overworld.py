@@ -610,12 +610,18 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                         return
 
         # If showing party, character detail, party inventory, NPC dialogue,
-        # or an action screen, block all other input (including movement).
+        # an action screen, the pick-lock dialog, or a pick-lock animation
+        # is playing, block all other input (including movement).
+        # The lock guards prevent bumping the door again before the
+        # unlock animation finishes removing the ``locked`` property —
+        # without them the same door re-opens the dialog and forces the
+        # player to pick it a second time. Matches dungeon.py behaviour.
         if (self.showing_party or self.showing_char_detail is not None
                 or self.showing_party_inv or self.ow_npc_dialogue_active
                 or self.town_action_active or self.dungeon_action_active
                 or self.building_action_active or self.spawn_action_active
-                or self.encounter_action_active):
+                or self.encounter_action_active
+                or self.door_interact_active or self.door_unlock_anim):
             return
 
         # Movement only if cooldown has elapsed
@@ -3313,6 +3319,10 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             darkness_active=getattr(self.game, "darkness_active", False),
             overworld_npcs=ow_npcs,
             quest_effects=self.quest_effects,
+            # NOTE: interior_darkness now means "suppress all darkness
+            # in building interiors" (see src/states/town.py for full
+            # rationale). Applies to overworld building interiors like
+            # huts and cabins. — Apr 2026
             interior_darkness=getattr(self, "_in_overworld_interior", False),
             spawn_effects=self._spawn_effects,
         )

@@ -15199,9 +15199,9 @@
           },
           "20,9": {
             "linked": true,
-            "link_x": "10",
+            "link_x": "1",
             "link_map": "building:The Deep:Dungeon 3",
-            "link_y": "10"
+            "link_y": "1"
           }
         }
       },
@@ -15723,7 +15723,9 @@
           },
           "8,8": {
             "linked": true,
-            "link_map": "building:The Deep:Dungeon 4"
+            "link_map": "building:The Deep:Dungeon 4",
+            "link_x": "1",
+            "link_y": "1"
           }
         }
       },
@@ -17965,14 +17967,12 @@
             "path": "game/terrain/mountain.png"
           },
           "46,5": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "47,5": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "48,5": {
             "tile_id": 3,
@@ -18360,19 +18360,16 @@
             "path": "game/terrain/mountain.png"
           },
           "45,6": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "46,6": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "47,6": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "48,6": {
             "tile_id": 3,
@@ -18760,14 +18757,12 @@
             "path": "game/terrain/sand.png"
           },
           "45,7": {
-            "tile_id": 47,
-            "name": "Sand Floor",
-            "path": "game/terrain/sand.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "46,7": {
-            "tile_id": 47,
-            "name": "Sand Floor",
-            "path": "game/terrain/sand.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "47,7": {
             "tile_id": 47,
@@ -19165,9 +19160,8 @@
             "path": "game/terrain/mountain.png"
           },
           "46,8": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "47,8": {
             "tile_id": 3,
@@ -19565,9 +19559,8 @@
             "path": "game/terrain/mountain.png"
           },
           "46,9": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 37,
+            "name": "Brick"
           },
           "47,9": {
             "tile_id": 3,
@@ -25610,39 +25603,32 @@
             "path": "game/terrain/mountain.png"
           },
           "55,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "56,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "57,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "58,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "59,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 51,
+            "name": "Lighter Bricks"
           },
           "60,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 51,
+            "name": "Lighter Bricks"
           },
           "61,24": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 51,
+            "name": "Lighter Bricks"
           },
           "62,24": {
             "tile_id": 3,
@@ -26005,14 +25991,12 @@
             "path": "game/terrain/sand.png"
           },
           "54,25": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "55,25": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "56,25": {
             "tile_id": 3,
@@ -26025,24 +26009,20 @@
             "path": "game/terrain/mountain.png"
           },
           "58,25": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "59,25": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "60,25": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "61,25": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 51,
+            "name": "Lighter Bricks"
           },
           "62,25": {
             "tile_id": 3,
@@ -26435,9 +26415,8 @@
             "path": "game/terrain/mountain.png"
           },
           "60,26": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "61,26": {
             "tile_id": 3,
@@ -26835,9 +26814,8 @@
             "path": "game/terrain/mountain.png"
           },
           "60,27": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "61,27": {
             "tile_id": 3,
@@ -27235,9 +27213,8 @@
             "path": "game/terrain/mountain.png"
           },
           "60,28": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "61,28": {
             "tile_id": 3,
@@ -27630,29 +27607,24 @@
             "path": "game/terrain/mountain.png"
           },
           "59,29": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "60,29": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "61,29": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "62,29": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "63,29": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "64,29": {
             "tile_id": 3,
@@ -28020,44 +27992,36 @@
             "path": "game/terrain/mountain.png"
           },
           "57,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 53,
+            "name": "Water"
           },
           "58,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 53,
+            "name": "Water"
           },
           "59,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "60,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "61,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "62,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "63,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "64,30": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "65,30": {
             "tile_id": 3,
@@ -28425,44 +28389,36 @@
             "path": "game/terrain/mountain.png"
           },
           "58,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 53,
+            "name": "Water"
           },
           "59,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 53,
+            "name": "Water"
           },
           "60,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 53,
+            "name": "Water"
           },
           "61,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 53,
+            "name": "Water"
           },
           "62,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "63,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "64,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "65,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,31": {
             "tile_id": 3,
@@ -28495,24 +28451,20 @@
             "path": "game/terrain/mountain.png"
           },
           "72,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "75,31": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "76,31": {
             "tile_id": 3,
@@ -28860,9 +28812,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,32": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,32": {
             "tile_id": 3,
@@ -28895,24 +28846,20 @@
             "path": "game/terrain/mountain.png"
           },
           "72,32": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,32": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,32": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "75,32": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "76,32": {
             "tile_id": 3,
@@ -29260,9 +29207,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "66,33": {
             "tile_id": 3,
@@ -29285,34 +29231,28 @@
             "path": "game/terrain/mountain.png"
           },
           "70,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "71,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "72,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "75,33": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "76,33": {
             "tile_id": 3,
@@ -29660,9 +29600,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,34": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,34": {
             "tile_id": 3,
@@ -29680,14 +29619,12 @@
             "path": "game/terrain/mountain.png"
           },
           "69,34": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "70,34": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "71,34": {
             "tile_id": 3,
@@ -29700,14 +29637,12 @@
             "path": "game/terrain/mountain.png"
           },
           "73,34": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,34": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "75,34": {
             "tile_id": 3,
@@ -30060,9 +29995,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,35": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,35": {
             "tile_id": 3,
@@ -30080,9 +30014,8 @@
             "path": "game/terrain/mountain.png"
           },
           "69,35": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "70,35": {
             "tile_id": 3,
@@ -30095,19 +30028,16 @@
             "path": "game/terrain/mountain.png"
           },
           "72,35": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,35": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,35": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "75,35": {
             "tile_id": 3,
@@ -30460,9 +30390,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,36": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,36": {
             "tile_id": 3,
@@ -30480,9 +30409,8 @@
             "path": "game/terrain/mountain.png"
           },
           "69,36": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "70,36": {
             "tile_id": 3,
@@ -30495,14 +30423,12 @@
             "path": "game/terrain/mountain.png"
           },
           "72,36": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,36": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,36": {
             "tile_id": 3,
@@ -30860,29 +30786,24 @@
             "path": "game/terrain/mountain.png"
           },
           "65,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "67,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "68,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "69,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "70,37": {
             "tile_id": 3,
@@ -30895,14 +30816,12 @@
             "path": "game/terrain/mountain.png"
           },
           "72,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,37": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "74,37": {
             "tile_id": 3,
@@ -31260,14 +31179,12 @@
             "path": "game/terrain/mountain.png"
           },
           "65,38": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,38": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "67,38": {
             "tile_id": 3,
@@ -31295,9 +31212,8 @@
             "path": "game/terrain/mountain.png"
           },
           "72,38": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "73,38": {
             "tile_id": 3,
@@ -31650,24 +31566,20 @@
             "path": "game/terrain/mountain.png"
           },
           "63,39": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "64,39": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "65,39": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "66,39": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "67,39": {
             "tile_id": 3,
@@ -32050,9 +31962,8 @@
             "path": "game/terrain/mountain.png"
           },
           "63,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "64,40": {
             "tile_id": 3,
@@ -32060,9 +31971,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,40": {
             "tile_id": 3,
@@ -32105,29 +32015,24 @@
             "path": "game/terrain/mountain.png"
           },
           "74,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,40": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "79,40": {
             "tile_id": 3,
@@ -32450,9 +32355,8 @@
             "path": "game/terrain/mountain.png"
           },
           "63,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "64,41": {
             "tile_id": 3,
@@ -32460,9 +32364,8 @@
             "path": "game/terrain/mountain.png"
           },
           "65,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,41": {
             "tile_id": 3,
@@ -32505,29 +32408,24 @@
             "path": "game/terrain/mountain.png"
           },
           "74,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,41": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "79,41": {
             "tile_id": 3,
@@ -32850,19 +32748,16 @@
             "path": "game/terrain/mountain.png"
           },
           "63,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "64,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "65,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,42": {
             "tile_id": 3,
@@ -32905,29 +32800,24 @@
             "path": "game/terrain/mountain.png"
           },
           "74,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,42": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "79,42": {
             "tile_id": 3,
@@ -33235,19 +33125,16 @@
             "path": "game/terrain/mountain.png"
           },
           "60,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "61,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "62,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "63,43": {
             "tile_id": 3,
@@ -33255,14 +33142,12 @@
             "path": "game/terrain/mountain.png"
           },
           "64,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "65,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "66,43": {
             "tile_id": 3,
@@ -33305,29 +33190,24 @@
             "path": "game/terrain/mountain.png"
           },
           "74,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,43": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "79,43": {
             "tile_id": 3,
@@ -33600,84 +33480,68 @@
             "path": "game/terrain/sand.png"
           },
           "53,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "54,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "55,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "56,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "57,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "58,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "59,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "60,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "61,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "62,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "63,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 48,
+            "name": "Brown Floor"
           },
           "64,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "65,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "66,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "67,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "68,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "69,44": {
             "tile_id": 3,
@@ -33705,24 +33569,20 @@
             "path": "game/terrain/mountain.png"
           },
           "74,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,44": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,44": {
             "tile_id": 3,
@@ -34015,9 +33875,8 @@
             "path": "game/terrain/mountain.png"
           },
           "56,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "57,45": {
             "tile_id": 3,
@@ -34035,14 +33894,12 @@
             "path": "game/terrain/mountain.png"
           },
           "60,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "61,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "62,45": {
             "tile_id": 3,
@@ -34075,19 +33932,16 @@
             "path": "game/terrain/mountain.png"
           },
           "68,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "69,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "70,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "71,45": {
             "tile_id": 3,
@@ -34105,19 +33959,16 @@
             "path": "game/terrain/mountain.png"
           },
           "74,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,45": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,45": {
             "tile_id": 3,
@@ -34415,34 +34266,28 @@
             "path": "game/terrain/mountain.png"
           },
           "56,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "57,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "58,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "59,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "60,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "61,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "62,46": {
             "tile_id": 3,
@@ -34485,9 +34330,8 @@
             "path": "game/terrain/mountain.png"
           },
           "70,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "71,46": {
             "tile_id": 3,
@@ -34505,19 +34349,16 @@
             "path": "game/terrain/mountain.png"
           },
           "74,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,46": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,46": {
             "tile_id": 3,
@@ -34835,9 +34676,8 @@
             "path": "game/terrain/mountain.png"
           },
           "60,47": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "61,47": {
             "tile_id": 3,
@@ -34885,19 +34725,16 @@
             "path": "game/terrain/mountain.png"
           },
           "70,47": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "71,47": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "72,47": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,47": {
             "tile_id": 3,
@@ -34915,9 +34752,8 @@
             "path": "game/terrain/mountain.png"
           },
           "76,47": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,47": {
             "tile_id": 3,
@@ -35235,14 +35071,12 @@
             "path": "game/terrain/mountain.png"
           },
           "60,48": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "61,48": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 46,
+            "name": "Path Floor"
           },
           "62,48": {
             "tile_id": 3,
@@ -35290,14 +35124,12 @@
             "path": "game/terrain/mountain.png"
           },
           "71,48": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "72,48": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,48": {
             "tile_id": 3,
@@ -35315,14 +35147,12 @@
             "path": "game/terrain/mountain.png"
           },
           "76,48": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,48": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,48": {
             "tile_id": 3,
@@ -35690,9 +35520,8 @@
             "path": "game/terrain/mountain.png"
           },
           "71,49": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "72,49": {
             "tile_id": 3,
@@ -35715,14 +35544,12 @@
             "path": "game/terrain/mountain.png"
           },
           "76,49": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,49": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,49": {
             "tile_id": 3,
@@ -36090,14 +35917,12 @@
             "path": "game/terrain/mountain.png"
           },
           "71,50": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "72,50": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,50": {
             "tile_id": 3,
@@ -36115,14 +35940,12 @@
             "path": "game/terrain/mountain.png"
           },
           "76,50": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,50": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,50": {
             "tile_id": 3,
@@ -36495,9 +36318,8 @@
             "path": "game/terrain/mountain.png"
           },
           "72,51": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,51": {
             "tile_id": 3,
@@ -36505,24 +36327,20 @@
             "path": "game/terrain/mountain.png"
           },
           "74,51": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,51": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,51": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,51": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,51": {
             "tile_id": 3,
@@ -36895,9 +36713,8 @@
             "path": "game/terrain/mountain.png"
           },
           "72,52": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,52": {
             "tile_id": 3,
@@ -36905,9 +36722,8 @@
             "path": "game/terrain/mountain.png"
           },
           "74,52": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,52": {
             "tile_id": 3,
@@ -37295,9 +37111,8 @@
             "path": "game/terrain/mountain.png"
           },
           "72,53": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,53": {
             "tile_id": 3,
@@ -37305,9 +37120,8 @@
             "path": "game/terrain/mountain.png"
           },
           "74,53": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,53": {
             "tile_id": 3,
@@ -37695,24 +37509,20 @@
             "path": "game/terrain/mountain.png"
           },
           "72,54": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,54": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "74,54": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,54": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,54": {
             "tile_id": 3,
@@ -38075,59 +37885,48 @@
             "path": "game/terrain/mountain.png"
           },
           "68,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "69,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "70,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "71,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "72,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "74,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "77,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "78,55": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "79,55": {
             "tile_id": 3,
@@ -38495,24 +38294,20 @@
             "path": "game/terrain/mountain.png"
           },
           "72,56": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "73,56": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "74,56": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,56": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "76,56": {
             "tile_id": 3,
@@ -38900,14 +38695,12 @@
             "path": "game/terrain/mountain.png"
           },
           "73,57": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "74,57": {
-            "tile_id": 3,
-            "name": "Mountain",
-            "path": "game/terrain/mountain.png"
+            "tile_id": 47,
+            "name": "Sand Floor"
           },
           "75,57": {
             "tile_id": 3,

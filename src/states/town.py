@@ -595,6 +595,13 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             return
         if self.npc_dialogue_active:
             return
+        # Pick-lock dialog / unlock animation — matches dungeon.py. Without
+        # these guards, bumping the door during the 1200ms unlock animation
+        # re-triggers _try_open_locked (the ``locked`` tile_property hasn't
+        # been removed yet) and re-opens the dialog, forcing the player to
+        # pick the same lock a second time.
+        if self.door_interact_active or self.door_unlock_anim:
+            return
 
         # Movement
         if self.move_cooldown > 0:
@@ -2747,6 +2754,12 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                           else False)
         town_dark = getattr(self.game, "darkness_active", False)
 
+        # NOTE: interior_darkness now means "suppress all darkness in
+        # building interiors" (both the old INTERIOR_DARKNESS mode and
+        # night-time CLOCK_DARKNESS). Interiors have no sky and the
+        # distance-based darkness produced broken islands of light.
+        # Torches and light spells can be reintroduced later via a
+        # purpose-built interior lighting system. — Apr 2026
         _int_dark = getattr(self, "_in_interior", False)
         renderer.draw_town_u3(
             self.game.party,
