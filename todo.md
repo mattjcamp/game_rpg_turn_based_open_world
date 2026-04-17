@@ -7,3 +7,4 @@
 ## Features
 - Create Enounter Template system for placable encounters to populate for all maps
 - Add enounters to Quest Steps
+- Make usable vehicle feature for boats

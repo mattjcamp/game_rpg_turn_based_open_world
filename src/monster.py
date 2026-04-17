@@ -321,6 +321,74 @@ def create_encounter(area="dungeon", terrain="land",
             "monster_party_tile": party_tile, "level": enc_level}
 
 
+def find_encounter_template(name):
+    """Return the raw encounter template dict with ``name`` or None.
+
+    Searches every bucket in ``ENCOUNTERS`` (dungeon / overworld /
+    house_basement / …) so map-editor placements — which only store
+    the encounter's display name — can be resolved regardless of
+    which bucket the template was authored into. Returns the first
+    match; template names should be unique but if they collide the
+    first bucket wins.
+    """
+    if not isinstance(ENCOUNTERS, dict):
+        return None
+    for bucket in ENCOUNTERS.values():
+        if not isinstance(bucket, list):
+            continue
+        for entry in bucket:
+            if isinstance(entry, dict) and entry.get("name") == name:
+                return entry
+    return None
+
+
+def create_encounter_from_template(name):
+    """Build a combat-ready encounter dict from a named template.
+
+    Mirrors the return shape of :func:`create_encounter` so existing
+    code that consumes ``create_encounter()`` (or the
+    ``encounter_template`` attribute set on spawned "party leader"
+    monsters) works unchanged::
+
+        {"name": str,
+         "monsters": [Monster, ...],
+         "monster_party_tile": str,
+         "level": int,
+         "xp_override": int | None,
+         "loot": list[dict] | None}
+
+    Returns None if the template name isn't found. Extra fields
+    (``xp_override``, ``loot``) are forwarded so downstream combat
+    code can honour the template's custom rewards — combat code
+    that doesn't know about them simply ignores the extras.
+    """
+    tmpl = find_encounter_template(name)
+    if tmpl is None:
+        return None
+    enc_name = tmpl.get("name", name)
+    enc_level = tmpl.get("level", 1)
+    monster_names = list(tmpl.get("monsters", []))
+    party_tile = tmpl.get("monster_party_tile")
+    if not party_tile and monster_names:
+        party_tile = monster_names[0]
+    monsters = [create_monster(n) for n in monster_names]
+    # If every monster name was unknown we'd end up with an empty
+    # list — fall back to a single generic monster so combat can
+    # still start rather than crashing on an empty party.
+    if not monsters:
+        monsters = [create_random_monster("dungeon")]
+        if not party_tile:
+            party_tile = monsters[0].name
+    return {
+        "name": enc_name,
+        "monsters": monsters,
+        "monster_party_tile": party_tile,
+        "level": enc_level,
+        "xp_override": tmpl.get("xp_override"),
+        "loot": tmpl.get("loot") or None,
+    }
+
+
 def reload_module_data(module_data_dir=None):
     """Reload monster and encounter data from a module directory.
 

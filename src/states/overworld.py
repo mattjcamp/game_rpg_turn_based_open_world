@@ -100,6 +100,15 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
         # Roaming overworld orcs
         self.overworld_monsters = []
 
+        # Designer-placed encounter tracking.
+        # Every painted encounter in ``tile_map.tile_properties`` spawns
+        # exactly once per session: we remember the (col, row) of every
+        # placement we've already materialised so subsequent
+        # ``enter()`` calls never respawn a defeated or wandered-off
+        # placed encounter. Persistence across saves is a separate
+        # (future) concern handled in save_load.
+        self._spawned_placement_positions = set()
+
         # Track original tiles under placed chests: {(col, row): tile_id}
         self.chest_under_tiles = {}
 
@@ -270,6 +279,15 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             # Spawn initial orcs
             self._spawn_orcs()
 
+        # Materialize designer-placed encounter markers every time we
+        # enter the overworld. The helper is idempotent: placements
+        # already represented by a live monster are skipped, so
+        # repeated entries (e.g. returning from a town) don't stack.
+        # Killed placements will respawn on re-entry, matching the
+        # "acts like any other encounter" behaviour of roaming orcs.
+        if not self._in_overworld_interior:
+            self._spawn_placed_encounters()
+
     # ── Equipment management ─────────────────────────────────────
 
     # ── Orc spawning ──────────────────────────────────────────────
@@ -355,6 +373,82 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.overworld_monsters.append(orc)
 
         # Spawn tile monsters are handled separately in _try_spawn_tile_monsters()
+
+    def _spawn_placed_encounters(self):
+        """Materialize designer-placed encounter templates as monsters.
+
+        The map editor paints encounters by writing the template name
+        into ``tile_map.tile_properties[(col,row)]["encounter"]``. At
+        runtime we convert each placement into a "party leader"
+        Monster at its painted position with ``encounter_template``
+        attached, so the existing bump-to-fight / Attack-Run dialog
+        pipeline (see :meth:`_show_encounter_action` and
+        :meth:`_encounter_engage`) handles combat without any special
+        casing.
+
+        **Spawn-once semantics.** Every placement spawns at most once
+        per session: the painted (col, row) is recorded in
+        ``self._spawned_placement_positions`` as soon as we
+        materialise the monster, and subsequent ``enter()`` calls —
+        including returns from combat, towns, and dungeons — skip
+        any position already in that set. A defeated placement stays
+        defeated for the rest of the session. (Persisting cleared
+        placements across saves is a separate concern.)
+        """
+        from src.monster import find_encounter_template
+        tile_map = self.game.tile_map
+        tprops = getattr(tile_map, "tile_properties", None) or {}
+        if not tprops:
+            return
+
+        for pos_key, props in tprops.items():
+            if not isinstance(props, dict):
+                continue
+            enc_name = props.get("encounter")
+            if not enc_name:
+                continue
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            try:
+                c, r = int(parts[0]), int(parts[1])
+            except ValueError:
+                continue
+            # Spawn-once gate: once a placement has been materialised
+            # (whether it's still alive, has wandered off, or has
+            # been defeated), never spawn it again this session.
+            if (c, r) in self._spawned_placement_positions:
+                continue
+            if not (0 <= c < tile_map.width
+                    and 0 <= r < tile_map.height):
+                continue
+            tmpl = find_encounter_template(enc_name)
+            if tmpl is None:
+                # Unknown template — skip silently rather than crash;
+                # designers can rename/re-paint to recover.
+                continue
+            # Pick the sprite monster. Prefer the template's party
+            # tile; fall back to the first monster in the group.
+            party_tile = (tmpl.get("monster_party_tile")
+                          or (tmpl.get("monsters") or [""])[0])
+            if not party_tile:
+                continue
+            mon = create_monster(party_tile)
+            mon.col = c
+            mon.row = r
+            mon.encounter_template = {
+                "name": tmpl.get("name", enc_name),
+                "monster_names": list(tmpl.get("monsters") or []),
+                "monster_party_tile": party_tile,
+                # Forward custom rewards so combat code can honour
+                # per-encounter XP and loot overrides.
+                "xp_override": tmpl.get("xp_override"),
+                "loot": tmpl.get("loot"),
+            }
+            mon._placement_pos = (c, r)
+            self.overworld_monsters.append(mon)
+            # Mark this placement as materialised — never respawn.
+            self._spawned_placement_positions.add((c, r))
 
     def _spawn_from_spawn_tiles(self):
         """Spawn roaming monsters from nearby Monster Spawn tiles.

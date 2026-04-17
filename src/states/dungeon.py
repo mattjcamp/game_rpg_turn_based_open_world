@@ -437,6 +437,79 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             self.game, qname, step_idx, item_name)
         self.show_message(msg, 3000 if "complete" in msg.lower() else 2500)
 
+    def _spawn_placed_encounters(self):
+        """Materialize designer-placed encounter templates as monsters.
+
+        Matches the overworld pattern: scans the current dungeon
+        level's ``tile_map.tile_properties`` for ``"encounter"``
+        entries and creates one party-leader Monster per placement,
+        attaching ``encounter_template`` so the existing bump-to-
+        fight / Attack-Run dialog (see :meth:`_show_encounter_action`
+        and :meth:`_start_combat`) handles the fight downstream —
+        including the template's custom XP override and loot.
+
+        **Spawn-once semantics.** Every placement materialises at
+        most once per dungeon_data lifetime. The set of spawned
+        positions is stashed on ``dungeon_data`` so it survives
+        state re-entries (returning from combat, descending and
+        ascending levels, exiting and re-entering the dungeon) as
+        long as the same dungeon_data instance is in play. A
+        defeated placement therefore stays defeated — no respawns.
+        """
+        from src.monster import find_encounter_template, create_monster
+        if not self.dungeon_data:
+            return
+        tile_map = self.dungeon_data.tile_map
+        tprops = getattr(tile_map, "tile_properties", None) or {}
+        if not tprops:
+            return
+        # Stash the spawn-once set on dungeon_data so it persists
+        # across state re-entries for this dungeon instance.
+        spawned = getattr(
+            self.dungeon_data, "_spawned_placement_positions", None)
+        if spawned is None:
+            spawned = set()
+            self.dungeon_data._spawned_placement_positions = spawned
+        for pos_key, props in tprops.items():
+            if not isinstance(props, dict):
+                continue
+            enc_name = props.get("encounter")
+            if not enc_name:
+                continue
+            parts = pos_key.split(",")
+            if len(parts) != 2:
+                continue
+            try:
+                c, r = int(parts[0]), int(parts[1])
+            except ValueError:
+                continue
+            # Spawn-once gate.
+            if (c, r) in spawned:
+                continue
+            if not (0 <= c < tile_map.width
+                    and 0 <= r < tile_map.height):
+                continue
+            tmpl = find_encounter_template(enc_name)
+            if tmpl is None:
+                continue
+            party_tile = (tmpl.get("monster_party_tile")
+                          or (tmpl.get("monsters") or [""])[0])
+            if not party_tile:
+                continue
+            mon = create_monster(party_tile)
+            mon.col = c
+            mon.row = r
+            mon.encounter_template = {
+                "name": tmpl.get("name", enc_name),
+                "monster_names": list(tmpl.get("monsters") or []),
+                "monster_party_tile": party_tile,
+                "xp_override": tmpl.get("xp_override"),
+                "loot": tmpl.get("loot"),
+            }
+            mon._placement_pos = (c, r)
+            self.dungeon_data.monsters.append(mon)
+            spawned.add((c, r))
+
     def enter_quest_dungeon(self, levels, overworld_col, overworld_row):
         """
         Set up a multi-level quest dungeon.
@@ -472,6 +545,11 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             # Inject quest monsters and collect items for this dungeon
             self._inject_quest_dungeon_monsters()
             self._inject_quest_dungeon_collect_items()
+            # Materialize designer-placed encounter markers from the
+            # dungeon map's tile_properties so they behave like any
+            # other dungeon monster (bump-to-fight, standard Attack/
+            # Run dialog, template-driven combat).
+            self._spawn_placed_encounters()
             # Try to light the equipped torch automatically
             if self._activate_torch():
                 self.show_message(
