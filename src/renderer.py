@@ -2292,6 +2292,12 @@ class Renderer(CombatEffectRendererMixin):
 
     def _u3_draw_overworld_party(self, cx, cy, party=None):
         """Party map sprite — white-tinted fighter tile with torch effect."""
+        # While aboard the boat, hide the party marker entirely so the
+        # boat sprite + sail animation read cleanly.  The boat tile
+        # itself marks the party's position on the map.
+        if getattr(getattr(self, "game", None), "on_boat", False):
+            return
+
         sprite = self._party_map_sprite
         if sprite:
             sx = cx - sprite.get_width() // 2
