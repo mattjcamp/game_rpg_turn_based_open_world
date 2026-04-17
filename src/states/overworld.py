@@ -100,14 +100,13 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
         # Roaming overworld orcs
         self.overworld_monsters = []
 
-        # Designer-placed encounter tracking.
-        # Every painted encounter in ``tile_map.tile_properties`` spawns
-        # exactly once per session: we remember the (col, row) of every
-        # placement we've already materialised so subsequent
-        # ``enter()`` calls never respawn a defeated or wandered-off
-        # placed encounter. Persistence across saves is a separate
-        # (future) concern handled in save_load.
-        self._spawned_placement_positions = set()
+        # Note on designer-placed encounters: the spawn-once tracking
+        # set is attached to each tile_map (as
+        # ``tile_map._spawned_placement_positions``), not to the
+        # state, so overworld placements, building-interior
+        # placements, and dungeon-level placements don't collide on
+        # identical (col, row) coordinates. See
+        # :meth:`_spawn_placed_encounters`.
 
         # Track original tiles under placed chests: {(col, row): tile_id}
         self.chest_under_tiles = {}
@@ -387,19 +386,29 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
         casing.
 
         **Spawn-once semantics.** Every placement spawns at most once
-        per session: the painted (col, row) is recorded in
-        ``self._spawned_placement_positions`` as soon as we
-        materialise the monster, and subsequent ``enter()`` calls —
-        including returns from combat, towns, and dungeons — skip
-        any position already in that set. A defeated placement stays
-        defeated for the rest of the session. (Persisting cleared
-        placements across saves is a separate concern.)
+        per session. The spawn-once set lives on the *tile_map*
+        itself (as ``_spawned_placement_positions``) so the
+        bookkeeping is scoped correctly: the overworld map has its
+        own set, each building interior has its own, each dungeon
+        level has its own. That avoids the (c,r) collision that
+        would otherwise happen if an overworld placement and an
+        interior placement shared the same coordinates. A defeated
+        placement stays defeated — even after leaving and re-
+        entering the same interior or dungeon — because the
+        tile_map object persists across those transitions.
         """
         from src.monster import find_encounter_template
         tile_map = self.game.tile_map
         tprops = getattr(tile_map, "tile_properties", None) or {}
         if not tprops:
             return
+        # Stash the spawn-once set on the tile_map so it's scoped
+        # correctly per-map and survives state re-entries.
+        spawned = getattr(
+            tile_map, "_spawned_placement_positions", None)
+        if spawned is None:
+            spawned = set()
+            tile_map._spawned_placement_positions = spawned
 
         for pos_key, props in tprops.items():
             if not isinstance(props, dict):
@@ -414,10 +423,8 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 c, r = int(parts[0]), int(parts[1])
             except ValueError:
                 continue
-            # Spawn-once gate: once a placement has been materialised
-            # (whether it's still alive, has wandered off, or has
-            # been defeated), never spawn it again this session.
-            if (c, r) in self._spawned_placement_positions:
+            # Spawn-once gate: once materialised, never spawn again.
+            if (c, r) in spawned:
                 continue
             if not (0 <= c < tile_map.width
                     and 0 <= r < tile_map.height):
@@ -448,7 +455,7 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             mon._placement_pos = (c, r)
             self.overworld_monsters.append(mon)
             # Mark this placement as materialised — never respawn.
-            self._spawned_placement_positions.add((c, r))
+            spawned.add((c, r))
 
     def _spawn_from_spawn_tiles(self):
         """Spawn roaming monsters from nearby Monster Spawn tiles.
@@ -1781,6 +1788,18 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             quest_key_name, imap, space_name=interior_name)
         self._spawn_building_quest_givers(
             quest_key_name, interior_name, imap)
+
+        # Materialize designer-placed encounter templates that live
+        # on this interior's map. ``_spawn_placed_encounters`` scans
+        # ``self.game.tile_map.tile_properties`` — which is now the
+        # interior map — and adds party-leader monsters to
+        # ``self.overworld_monsters``. That list was cleared to ``[]``
+        # when we entered the interior, so the set is fresh per
+        # interior, but the spawn-once bookkeeping on the state
+        # itself still prevents a defeated placement from respawning
+        # if the player exits this interior and re-enters (within
+        # the same session).
+        self._spawn_placed_encounters()
 
         self.show_message(f"Entering {interior_name}...", 1500)
 
