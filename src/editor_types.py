@@ -81,6 +81,27 @@ class MonsterEditorRS:
 
 
 @dataclass
+class EncounterEditorRS:
+    """Render-state for the top-level Encounters editor.
+
+    Encounters are reusable templates (group of monsters + custom
+    XP/loot settings) stored in ``data/encounters.json``. Per-module
+    overrides may live at ``<module>/encounters.json``. The editor
+    displays a flat list — each entry carries a ``_category`` field
+    ("dungeon"/"overworld"/"house_basement"/etc.) that controls which
+    sub-bucket it serialises back into.
+    """
+    list: Optional[List[dict]] = None
+    cursor: int = 0
+    scroll: int = 0
+    editing: bool = False
+    fields: Optional[List[FieldEntry]] = None
+    field: int = 0
+    buffer: str = ""
+    field_scroll: int = 0
+
+
+@dataclass
 class TileEditorRS:
     """Render-state for the Tile Types editor."""
     list: Optional[list] = None
@@ -410,4 +431,5 @@ class FeaturesRenderState:
     dungeon_map_editor_data: Optional[dict] = None
     building_map_editor_data: Optional[dict] = None
     counters: CounterEditorRS = field(default_factory=CounterEditorRS)
+    encounters: EncounterEditorRS = field(default_factory=EncounterEditorRS)
     quests: 'QuestEditorRS' = field(default_factory=lambda: QuestEditorRS())

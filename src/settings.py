@@ -69,6 +69,15 @@ TILE_SPAWN     = 66  # Monster spawn point (overworld)
 TILE_SPAWN_CAMPFIRE = 67  # Campfire spawn point (overworld)
 TILE_SPAWN_GRAVEYARD = 68  # Graveyard spawn point (overworld)
 
+# ----- Encounter placement tile -----
+# One generic tile id carries every painted encounter on any map.
+# The specific encounter template ("Orc Band", "Cellar Rats", etc.)
+# is stored per-tile in tile_properties[(col,row)]["encounter"].
+# The renderer substitutes the template's ``monster_party_tile``
+# sprite at draw time, so every encounter placement shows the
+# right graphic without needing a unique tile id per template.
+TILE_ENCOUNTER = 69
+
 # ----- Tile Definitions -----
 # Each tile has: color (RGB), walkable (bool), name (str)
 TILE_DEFS = {
@@ -109,6 +118,9 @@ TILE_DEFS = {
     TILE_SPAWN:      {"color": (180, 40, 40),    "walkable": True,  "name": "Monster Spawn"},
     TILE_SPAWN_CAMPFIRE: {"color": (200, 120, 30), "walkable": True, "name": "Campfire Spawn"},
     TILE_SPAWN_GRAVEYARD: {"color": (120, 115, 105), "walkable": True, "name": "Graveyard Spawn"},
+    # Generic encounter marker — concrete graphic comes from the
+    # associated encounter template's ``monster_party_tile``.
+    TILE_ENCOUNTER:  {"color": (180, 60, 140),   "walkable": True,  "name": "Encounter"},
 }
 
 # ----- Colors (UI) -----

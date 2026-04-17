@@ -288,9 +288,63 @@ def _draw_brush_palette(renderer, data: Dict):
                       _COL_HINT, fs)
 
 
+def _draw_encounter_brush_icon(renderer, brush, icon_x, by, icon_sz):
+    """Draw the monster-party-tile sprite as this brush's palette icon.
+
+    Looks up the encounter's ``monster_party_tile`` (a monster name)
+    and blits that sprite, falling back to a small purple diamond if
+    the monster isn't registered. Shared by both the dense and sparse
+    brush-icon paths so overworld / town / dungeon / building
+    palettes all look consistent.
+    """
+    screen = renderer.screen
+    # Frame the swatch with the standard panel border first so the
+    # sprite reads as a clickable tile.
+    pygame.draw.rect(screen, (20, 18, 30),
+                     (icon_x, by + 4, icon_sz, icon_sz))
+    party_tile = _get_encounter_party_tile(brush.encounter_name or "")
+    sprite = None
+    if party_tile:
+        try:
+            sprite = renderer._get_monster_sprite_by_name(party_tile)
+        except Exception:
+            sprite = None
+        if sprite is not None and sprite.get_size() != (icon_sz, icon_sz):
+            try:
+                sprite = pygame.transform.smoothscale(
+                    sprite, (icon_sz, icon_sz))
+            except Exception:
+                sprite = pygame.transform.scale(
+                    sprite, (icon_sz, icon_sz))
+        if sprite is None:
+            try:
+                sprite = renderer._get_unique_tile_sprite(
+                    party_tile, icon_sz)
+            except Exception:
+                sprite = None
+    if sprite is not None:
+        screen.blit(sprite, (icon_x, by + 4))
+    else:
+        diamond = pygame.Surface((icon_sz, icon_sz), pygame.SRCALPHA)
+        cx, cy = icon_sz // 2, icon_sz // 2
+        pts = [(cx, 2), (icon_sz - 2, cy),
+               (cx, icon_sz - 2), (2, cy)]
+        pygame.draw.polygon(diamond, (180, 60, 140, 220), pts)
+        pygame.draw.polygon(diamond, (230, 180, 230), pts, 2)
+        screen.blit(diamond, (icon_x, by + 4))
+    pygame.draw.rect(screen, _COL_PANEL_BORDER,
+                     (icon_x, by + 4, icon_sz, icon_sz), 1)
+
+
 def _draw_dense_brush_icon(renderer, brush, icon_x, by, icon_sz):
     """Draw brush icon for dense (overworld) editors."""
     screen = renderer.screen
+    # Encounter brushes have tile_id=None but an encounter_name set —
+    # resolve to the monster sprite so the palette shows an Orc / Rat /
+    # Goblin instead of a black square.
+    if getattr(brush, 'is_encounter', False):
+        _draw_encounter_brush_icon(renderer, brush, icon_x, by, icon_sz)
+        return
     if brush.is_eraser:
         # Eraser X icon
         pygame.draw.rect(screen, (40, 35, 50),
@@ -321,6 +375,11 @@ def _draw_sparse_brush_icon(renderer, brush, icon_x, by, icon_sz) -> int:
     """Draw brush icon for sparse (interior) editors. Returns text_x."""
     screen = renderer.screen
     text_x = icon_x + 4
+
+    # Encounter brushes: draw the monster party-tile sprite.
+    if getattr(brush, 'is_encounter', False):
+        _draw_encounter_brush_icon(renderer, brush, icon_x, by, icon_sz)
+        return icon_x + icon_sz + 6
 
     if brush.path:
         spr = renderer._get_unique_tile_sprite(brush.path, icon_sz)
@@ -693,6 +752,10 @@ def _draw_dense_grid(renderer, data: Dict):
     _draw_ground_items(renderer, data, ox, oy, ts,
                        cam_c, cam_r, end_c, end_r)
 
+    # Encounter overlays (party-tile sprite per placed encounter)
+    _draw_encounter_overlays(renderer, data, ox, oy, ts,
+                             cam_c, cam_r, end_c, end_r)
+
     # Object stamp preview (ghost overlay on dense grid)
     brushes = data.get("brushes", [])
     bidx = data.get("brush_idx", 0)
@@ -975,6 +1038,10 @@ def _draw_sparse_grid(renderer, data: Dict):
     _draw_ground_items(renderer, data, gx, gy, ts,
                        cam_c, cam_r, end_c, end_r)
 
+    # Encounter overlays (party-tile sprite per placed encounter)
+    _draw_encounter_overlays(renderer, data, gx, gy, ts,
+                             cam_c, cam_r, end_c, end_r)
+
     # Object stamp preview (ghost outline) — clipped to visible window
     brushes = data.get("brushes", [])
     bidx = data.get("brush_idx", 0)
@@ -1132,6 +1199,126 @@ def _draw_footer(renderer, data: Dict):
                       SCREEN_WIDTH // 2 - hw // 2,
                       SCREEN_HEIGHT - FOOTER_H + 4,
                       _COL_HINT, fs)
+
+
+def _get_encounter_party_tile(encounter_name: str):
+    """Return the ``monster_party_tile`` sprite name for an encounter.
+
+    Consults the runtime ``src.monster.ENCOUNTERS`` registry first (it
+    is up-to-date because ``save_encounters`` calls ``reload_module_data``
+    after every edit). Falls back to loading encounters.json on miss.
+    Returns an empty string if the encounter isn't found anywhere —
+    callers should fall back to the generic TILE_ENCOUNTER marker.
+    """
+    # Fast path: the live registry
+    try:
+        from src.monster import ENCOUNTERS as _ENC
+        if isinstance(_ENC, dict):
+            for bucket in _ENC.values():
+                if not isinstance(bucket, list):
+                    continue
+                for entry in bucket:
+                    if (isinstance(entry, dict)
+                            and entry.get("name") == encounter_name):
+                        return entry.get("monster_party_tile", "") or ""
+    except Exception:
+        pass
+    # Fallback: read encounters.json directly (covers sessions where
+    # the runtime registry wasn't loaded).
+    try:
+        import json as _json
+        import os as _os
+        path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(__file__)),
+            "data", "encounters.json")
+        with open(path, "r") as f:
+            data = _json.load(f)
+        buckets = data.get("encounters", {})
+        if isinstance(buckets, dict):
+            for bucket in buckets.values():
+                if not isinstance(bucket, list):
+                    continue
+                for entry in bucket:
+                    if (isinstance(entry, dict)
+                            and entry.get("name") == encounter_name):
+                        return entry.get("monster_party_tile", "") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _draw_encounter_overlays(renderer, data: Dict,
+                              ox: int, oy: int, ts: int,
+                              cam_c: int, cam_r: int,
+                              end_c: int, end_r: int):
+    """Overlay the party-tile sprite on every TILE_ENCOUNTER cell.
+
+    The tile grid draws a generic encounter marker for TILE_ENCOUNTER.
+    This pass walks ``tile_properties``, looks up each cell's encounter
+    template name, resolves its ``monster_party_tile`` from the global
+    ENCOUNTERS registry, and blits the correct monster sprite on top —
+    so an Orc Band placement shows an Orc, Cellar Rats show a Giant
+    Rat, etc.
+    """
+    tprops = data.get("tile_properties") or {}
+    if not tprops:
+        return
+    for pos_key, props in tprops.items():
+        if not isinstance(props, dict):
+            continue
+        enc_name = props.get("encounter")
+        if not enc_name:
+            continue
+        parts = pos_key.split(",")
+        if len(parts) != 2:
+            continue
+        try:
+            c, r = int(parts[0]), int(parts[1])
+        except ValueError:
+            continue
+        if not (cam_c <= c < end_c and cam_r <= r < end_r):
+            continue
+        px = ox + (c - cam_c) * ts
+        py = oy + (r - cam_r) * ts
+        party_tile = _get_encounter_party_tile(enc_name)
+        # ``monster_party_tile`` in encounters.json is a monster NAME
+        # (e.g. "Goblin", "Giant Rat"). Resolve it against the monster
+        # registry first — that's the same cache the combat/overworld
+        # renderers use for monster sprites. Fall back to the unique-
+        # tile cache (covers hand-authored party graphics that aren't
+        # a regular monster), then finally a purple-diamond marker.
+        import pygame as _pg
+        sprite = None
+        if party_tile:
+            try:
+                sprite = renderer._get_monster_sprite_by_name(party_tile)
+            except Exception:
+                sprite = None
+            if sprite is not None and sprite.get_size() != (ts, ts):
+                # Monster sprites are cached at 32px; rescale to the
+                # editor's current tile size.
+                try:
+                    sprite = _pg.transform.smoothscale(sprite, (ts, ts))
+                except Exception:
+                    sprite = _pg.transform.scale(sprite, (ts, ts))
+            if sprite is None:
+                try:
+                    sprite = renderer._get_unique_tile_sprite(
+                        party_tile, ts)
+                except Exception:
+                    sprite = None
+        if sprite is not None:
+            renderer.screen.blit(sprite, (px, py))
+        else:
+            # Soft fallback: a purple diamond so the placement is
+            # still visually distinct from plain grass.
+            diamond = _pg.Surface((ts, ts), _pg.SRCALPHA)
+            cx, cy = ts // 2, ts // 2
+            pts = [(cx, 2), (ts - 2, cy),
+                   (cx, ts - 2), (2, cy)]
+            _pg.draw.polygon(diamond, (180, 60, 140, 220), pts)
+            _pg.draw.polygon(diamond, (230, 180, 230), pts, 2)
+            renderer.screen.blit(diamond, (px, py))
 
 
 def _draw_ground_items(renderer, data: Dict,

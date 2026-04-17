@@ -47,14 +47,26 @@ class Brush:
     object_data: Optional[Dict] = None  # sparse tiles dict for object stamps
     object_w: int = 0  # object template width (cells)
     object_h: int = 0  # object template height (cells)
+    # When non-None, this brush paints an *encounter placement*: it
+    # sets the tile to TILE_ENCOUNTER and writes
+    # ``tile_properties[(col,row)]["encounter"] = encounter_name``
+    # so the renderer can look up the template's party-tile sprite.
+    encounter_name: Optional[str] = None
 
     @property
     def is_eraser(self) -> bool:
-        return self.tile_id is None and not self.is_folder_header and self.object_data is None
+        return (self.tile_id is None and not self.is_folder_header
+                and self.object_data is None
+                and self.encounter_name is None)
 
     @property
     def is_object(self) -> bool:
         return self.object_data is not None
+
+    @property
+    def is_encounter(self) -> bool:
+        """True for brushes that place an encounter template."""
+        return self.encounter_name is not None
 
 
 # ─── Configuration ────────────────────────────────────────────────────
@@ -386,6 +398,9 @@ class MapEditorState:
 
         Regular brushes paint a single tile.  Object brushes stamp the
         full object template pattern relative to the cursor origin.
+        Encounter brushes paint a generic ``TILE_ENCOUNTER`` marker and
+        record the template name in ``tile_properties`` so the renderer
+        can look up the correct party-tile sprite.
         Folder headers do nothing.
         """
         brush = self.current_brush
@@ -396,6 +411,20 @@ class MapEditorState:
         # ── Object stamp (multi-tile) ──
         if brush.is_object:
             self._paint_object(brush, col, row)
+            return
+
+        # ── Encounter placement ──
+        # Encounters are PURE overlays: placing one does NOT change the
+        # underlying tile (grass stays grass, dungeon floor stays
+        # dungeon floor). We only record the template name in
+        # ``tile_properties[(col,row)]["encounter"]``; the map-editor
+        # and game renderers layer the party-tile sprite on top of
+        # whatever terrain is already there. Painting a different
+        # brush — or the eraser — on the same cell clears this
+        # metadata via the fall-through below.
+        if brush.is_encounter:
+            self.set_tile_prop(col, row, "encounter",
+                               brush.encounter_name)
             return
 
         if self.config.storage == STORAGE_DENSE:
@@ -413,6 +442,14 @@ class MapEditorState:
                 if brush.path:
                     td["path"] = brush.path
                 self.set_tile(col, row, td)
+
+        # When painting anything non-encounter, clear any stale
+        # encounter metadata on this cell so we don't leave dangling
+        # references to a deleted encounter on a now-unrelated tile.
+        if not brush.is_eraser and not brush.is_encounter:
+            self.remove_tile_prop(col, row, "encounter")
+        elif brush.is_eraser:
+            self.remove_tile_prop(col, row, "encounter")
 
     def _paint_object(self, brush: 'Brush', origin_c: int, origin_r: int):
         """Stamp an object template onto the canvas at *origin_c, origin_r*.
@@ -1386,6 +1423,9 @@ def build_town_brushes(tile_context_map: Dict[int, str],
                          is_folder_header=True))
     brushes.extend(_build_tile_brushes(overworld_ids, grp_ow, resolve))
 
+    # ── Encounters folder (one brush per template in encounters.json) ──
+    _append_encounter_brushes(brushes)
+
     # ── Template stamp folders ──
     if all_templates:
         _append_all_template_brushes(brushes, all_templates)
@@ -1395,14 +1435,81 @@ def build_town_brushes(tile_context_map: Dict[int, str],
     return brushes
 
 
+def _load_encounter_templates() -> List[Dict]:
+    """Return a flat list of encounter templates from encounters.json.
+
+    Each entry is a dict with at least ``name`` and ``_category`` keys;
+    the category is useful later if we want to bucket the palette by
+    area (dungeon / overworld / house_basement). Failures to load
+    return an empty list so the palette still builds — the user can
+    always paint normal tiles.
+    """
+    import json as _json
+    import os as _os
+    path = _os.path.join(
+        _os.path.dirname(_os.path.dirname(__file__)),
+        "data", "encounters.json")
+    try:
+        with open(path, "r") as f:
+            data = _json.load(f)
+    except (OSError, ValueError):
+        return []
+    out: List[Dict] = []
+    buckets = data.get("encounters", {})
+    if isinstance(buckets, dict):
+        for cat in sorted(buckets.keys()):
+            entries = buckets.get(cat) or []
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                name = entry.get("name")
+                if not name:
+                    continue
+                item = dict(entry)
+                item["_category"] = cat
+                out.append(item)
+    return out
+
+
+def _append_encounter_brushes(brushes: List[Brush]) -> None:
+    """Append an Encounters folder header + one brush per template.
+
+    Each encounter brush paints a placement overlay: it writes the
+    template name into ``tile_properties[(col,row)]["encounter"]``
+    without changing the underlying terrain tile. The renderer
+    layers the template's ``monster_party_tile`` sprite on top of
+    whatever terrain is there.
+
+    Brush labels are just the encounter name — the ``_category``
+    bucket in encounters.json ("dungeon" / "overworld" / …) is purely
+    a JSON organisational tag, NOT a map binding, so exposing it in
+    the UI was misleading.
+    """
+    templates = _load_encounter_templates()
+    if not templates:
+        return
+    grp = "Encounters"
+    brushes.append(Brush(name=grp, tile_id=None, is_folder_header=True))
+    for enc in templates:
+        label = enc.get("name", "Encounter")
+        brushes.append(Brush(
+            name=label,
+            tile_id=None,
+            group=grp,
+            encounter_name=label,
+        ))
+
+
 def build_overworld_brushes(tile_context_map: Dict[int, str],
                             object_templates: Optional[List] = None,
                             all_templates: Optional[Dict[str, List[Dict]]] = None,
                             ) -> List[Brush]:
     """Build brush list for the overview map editor.
 
-    Includes folder headers for Tiles and (optionally) template stamp
-    folders.
+    Includes folder headers for Tiles, Spawns, Encounters, and
+    (optionally) template stamp folders.
     """
     ow_ids = sorted(
         tid for tid, ctx in tile_context_map.items()
@@ -1433,6 +1540,9 @@ def build_overworld_brushes(tile_context_map: Dict[int, str],
         for tid in spawn_ids:
             brushes.append(Brush(
                 name=TILE_DEFS[tid]["name"], tile_id=tid, group=sp_grp))
+
+    # ── Encounters folder (one brush per template in encounters.json) ──
+    _append_encounter_brushes(brushes)
 
     # ── Template stamp folders ──
     if all_templates:

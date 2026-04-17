@@ -6928,6 +6928,14 @@ class Renderer(CombatEffectRendererMixin):
         mon_fields = mn.fields; mon_field = mn.field
         mon_buffer = mn.buffer; mon_field_scroll = mn.field_scroll
 
+        # ── Encounters ──
+        en = state.encounters
+        encounter_list = en.list; encounter_cursor = en.cursor
+        encounter_scroll = en.scroll; encounter_editing = en.editing
+        encounter_fields = en.fields; encounter_field = en.field
+        encounter_buffer = en.buffer
+        encounter_field_scroll = en.field_scroll
+
         # ── Tiles ──
         tl = state.tiles
         tile_list = tl.list; tile_folders = tl.folders
@@ -7110,6 +7118,24 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(
                     "Changes are saved to data/monsters.json",
                     right_x + 16, dy, (140, 140, 160), fs)
+            elif selected_cat == "Encounters":
+                self._u3_text("Encounters", right_x + 16,
+                              panel_y + 12, self._U3_WHITE, f)
+                dy = panel_y + 44
+                for line in [
+                    "Build reusable encounter templates",
+                    "— groups of monsters a party will",
+                    "face. Each encounter has Settings",
+                    "for custom XP and loot drops that",
+                    "override the defaults.",
+                ]:
+                    self._u3_text(line, right_x + 16, dy,
+                                  (180, 180, 200), fm)
+                    dy += 22
+                dy += 18
+                self._u3_text(
+                    "Changes are saved to data/encounters.json",
+                    right_x + 16, dy, (140, 140, 160), fs)
             elif selected_cat == "Maps":
                 self._u3_text("Maps", right_x + 16,
                               panel_y + 12, self._U3_WHITE, f)
@@ -7199,6 +7225,23 @@ class Renderer(CombatEffectRendererMixin):
                         right_x, panel_y, right_w, panel_h,
                         mon_fields or [], mon_field, mon_buffer,
                         mon_field_scroll, fm, fs, f)
+            elif ed == "encounters":
+                # Encounters share the same two-level layout as
+                # Monsters/Items: a scrollable list on the left and
+                # a field editor on the right once an entry is
+                # selected. The list groups entries by their
+                # ``_category`` bucket.
+                self._draw_features_generic_list(
+                    left_x, left_w, right_x, right_w, panel_y, panel_h,
+                    encounter_list or [], encounter_cursor,
+                    encounter_scroll,
+                    "Encounters", "_category", fm, fs, f)
+                if level == 2:
+                    self._draw_features_spell_editor(
+                        right_x, panel_y, right_w, panel_h,
+                        encounter_fields or [], encounter_field,
+                        encounter_buffer, encounter_field_scroll,
+                        fm, fs, f)
             elif ed == "tiles":
                 if level == 1:
                     # Folder list

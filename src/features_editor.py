@@ -10,8 +10,8 @@ import pygame
 from collections import Counter
 from src.editor_types import (
     FieldEntry, FeaturesRenderState, SpellEditorRS, ItemEditorRS,
-    MonsterEditorRS, TileEditorRS, GalleryEditorRS, PixelEditorRS,
-    MapEditorHubRS, TownEditorRS, CounterEditorRS,
+    MonsterEditorRS, EncounterEditorRS, TileEditorRS, GalleryEditorRS,
+    PixelEditorRS, MapEditorHubRS, TownEditorRS, CounterEditorRS,
 )
 
 
@@ -118,6 +118,26 @@ class FeaturesEditor:
         self.mon_fields = []
         self.mon_buffer = ""
         self.mon_scroll_f = 0
+
+        # --- Encounters editor state ---
+        # Encounters are reusable monster-group templates (see
+        # data/encounters.json). The editor displays a flat list;
+        # each dict carries a "_category" field that tracks which
+        # bucket in the JSON it came from (dungeon/overworld/etc.)
+        # so we can serialise it back into the same structure.
+        self.encounter_list = []
+        self.encounter_cursor = 0
+        self.encounter_scroll = 0
+        self.encounter_editing = False
+        self.encounter_field = 0
+        self.encounter_fields = []
+        self.encounter_buffer = ""
+        self.encounter_scroll_f = 0
+        # Stash of other top-level keys in encounters.json so we
+        # preserve "_comment" etc. on save.
+        self._encounters_extra_keys = {}
+        # Cached monster name list for the "Monsters" field picker.
+        self._encounter_all_monsters = None
 
         # --- Tile Types editor state ---
         self.tile_list = []                 # all tiles (flat)
@@ -247,6 +267,7 @@ class FeaturesEditor:
             {"label": "Items", "icon": "I"},
             {"label": "Counters", "icon": "C"},
             {"label": "Monsters", "icon": "X"},
+            {"label": "Encounters", "icon": "N"},
             {"label": "Maps", "icon": "E"},
         ]
 
@@ -2891,6 +2912,309 @@ class FeaturesEditor:
                     0, len(self.mon_list) - 1)
 
     # ══════════════════════════════════════════════════════════
+    # ── Encounters Editor Methods ─────────────────────────────
+    # ══════════════════════════════════════════════════════════
+
+    def encounters_path(self):
+        """Path to encounters.json (module dir first, then default).
+
+        Mirrors the monsters_path / items_path pattern: an active
+        module may ship its own encounters.json that shadows the
+        global default.
+        """
+        if self.game.active_module_path:
+            p = os.path.join(
+                self.game.active_module_path, "encounters.json")
+            if os.path.isfile(p):
+                return p
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "encounters.json")
+
+    def load_encounters(self):
+        """Load encounters.json into a flat list.
+
+        The on-disk structure is::
+
+            {
+              "_comment": "...",
+              "encounters": {
+                 "dungeon":   [ {name, level, weight, terrain, ...}, ... ],
+                 "overworld": [...],
+                 "house_basement": [...],
+                 ...
+              }
+            }
+
+        We flatten all sub-buckets into ``self.encounter_list`` and
+        tag each entry with a private ``_category`` field so the
+        save path can route it back to the correct bucket.  All
+        unknown top-level keys (``_comment`` and any future siblings)
+        are stashed in ``_encounters_extra_keys`` and preserved
+        verbatim on save.
+        """
+        path = self.encounters_path()
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        encounters = []
+        buckets = data.get("encounters", {})
+        if isinstance(buckets, dict):
+            # Sort buckets for a stable display order but keep their
+            # original names so we can write them back unchanged.
+            for cat in sorted(buckets.keys()):
+                entries = buckets.get(cat) or []
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    # Copy + tag with the source bucket.
+                    item = dict(entry)
+                    item.setdefault("name", "")
+                    item.setdefault("level", 1)
+                    item.setdefault("weight", 10)
+                    item.setdefault("terrain", "land")
+                    item.setdefault("monster_party_tile", "")
+                    item.setdefault("monsters", [])
+                    item["_category"] = cat
+                    encounters.append(item)
+        self.encounter_list = encounters
+        self.encounter_cursor = 0
+        self.encounter_scroll = 0
+        # Preserve every top-level key that is NOT "encounters" so
+        # we round-trip "_comment" and any future siblings on save.
+        self._encounters_extra_keys = {
+            k: v for k, v in data.items() if k != "encounters"
+        }
+        # Invalidate the monster-name cache (global monsters might
+        # have been edited in a sibling editor session).
+        self._encounter_all_monsters = None
+
+    def save_encounters(self):
+        """Write the flat encounter list back to JSON, re-bucketed.
+
+        The serialized schema is identical to the on-disk format
+        read by ``load_encounters``: entries are grouped by their
+        ``_category`` tag (dungeon / overworld / …). Internal fields
+        starting with ``_`` are stripped. All non-"encounters"
+        top-level keys that were present on load are preserved.
+        """
+        path = self.encounters_path()
+        buckets = {}
+        for enc in self.encounter_list:
+            cat = enc.get("_category") or "dungeon"
+            entry = {k: v for k, v in enc.items()
+                     if not k.startswith("_")}
+            # Ensure a deterministic field order — makes diffs in
+            # version control much easier to review.
+            ordered = {}
+            for k in ("name", "level", "weight", "terrain",
+                      "monster_party_tile", "monsters",
+                      "xp_override", "loot"):
+                if k in entry:
+                    ordered[k] = entry.pop(k)
+            ordered.update(entry)  # any extra fields preserved
+            # Drop empty optional fields so the JSON stays clean.
+            if ordered.get("xp_override") in (None, ""):
+                ordered.pop("xp_override", None)
+            if not ordered.get("loot"):
+                ordered.pop("loot", None)
+            buckets.setdefault(cat, []).append(ordered)
+        data = dict(self._encounters_extra_keys or {})
+        data["encounters"] = buckets
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError:
+            return False
+        # Reload the global ENCOUNTERS registry so running game
+        # code picks up the edits immediately (matches the monsters
+        # editor behavior).
+        try:
+            from src.monster import reload_module_data as _reload
+            _reload(self.game.active_module_path)
+        except Exception:
+            pass
+        return True
+
+    def _encounter_monsters_to_text(self, monsters):
+        """Serialize the monsters list to an editable comma string."""
+        if not monsters:
+            return ""
+        return ", ".join(str(m) for m in monsters)
+
+    def _encounter_text_to_monsters(self, text):
+        """Parse a comma-separated monster list back to a clean list."""
+        if not text:
+            return []
+        return [p.strip() for p in text.split(",") if p.strip()]
+
+    def _encounter_loot_to_text(self, loot):
+        """Serialize the loot list to an editable ``name:weight`` string.
+
+        Example output: ``"Torch:6, Healing Herb:5, Dagger:3"``.
+        """
+        if not loot:
+            return ""
+        parts = []
+        for entry in loot:
+            if not isinstance(entry, dict):
+                continue
+            item = entry.get("item", "")
+            weight = entry.get("weight", 1)
+            parts.append(f"{item}:{weight}")
+        return ", ".join(parts)
+
+    def _encounter_text_to_loot(self, text):
+        """Parse ``"Name:weight, Name2:weight"`` back into loot dicts.
+
+        Entries missing a weight default to 1. Blank names are
+        skipped. Non-integer weights fall back to 1.
+        """
+        loot = []
+        if not text:
+            return loot
+        for chunk in text.split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            if ":" in chunk:
+                name, w = chunk.rsplit(":", 1)
+                name = name.strip()
+                try:
+                    weight = int(w.strip())
+                except ValueError:
+                    weight = 1
+            else:
+                name = chunk
+                weight = 1
+            if not name:
+                continue
+            loot.append({"item": name, "weight": max(1, weight)})
+        return loot
+
+    def build_encounter_fields(self, enc):
+        """Build the FieldEntry list for editing a single encounter."""
+        FE = FieldEntry
+        # Known buckets from data/encounters.json. Users can create
+        # additional category names freely via direct JSON edits, but
+        # the editor exposes these three by default.
+        fields = [
+            FE("-- Identity --", "_hdr_id", "", "section", False),
+            FE("Name", "name", str(enc.get("name", ""))),
+            FE("Category", "_category",
+               enc.get("_category", "dungeon"), "choice"),
+            FE("-- Encounter --", "_hdr_enc", "", "section", False),
+            FE("Level", "level",
+               str(enc.get("level", 1)), "int"),
+            FE("Weight", "weight",
+               str(enc.get("weight", 10)), "int"),
+            FE("Terrain", "terrain",
+               enc.get("terrain", "land"), "choice"),
+            FE("Party Tile", "monster_party_tile",
+               str(enc.get("monster_party_tile", "")), "sprite"),
+            FE("Monsters", "monsters",
+               self._encounter_monsters_to_text(enc.get("monsters"))),
+            FE("-- Settings --", "_hdr_set", "", "section", False),
+            FE("XP Override", "xp_override",
+               "" if enc.get("xp_override") in (None, "")
+               else str(enc.get("xp_override"))),
+            FE("Loot Drops", "loot",
+               self._encounter_loot_to_text(enc.get("loot"))),
+        ]
+        self.encounter_fields = fields
+        idx, buf = self.finalize_fields(fields)
+        self.encounter_field = idx
+        self.encounter_scroll_f = 0
+        self.encounter_buffer = buf
+
+    def save_encounter_fields(self):
+        """Commit field edits back to the selected encounter dict."""
+        if self.encounter_cursor >= len(self.encounter_list):
+            return
+        enc = self.encounter_list[self.encounter_cursor]
+        # Flush the current in-progress buffer into its field first.
+        if self.encounter_fields:
+            active = self.encounter_fields[self.encounter_field]
+            active.value = self.encounter_buffer
+
+        for entry in self.encounter_fields:
+            key, val = entry.key, entry.value
+            if key.startswith("_") and key != "_category":
+                continue
+            if key == "_category":
+                enc["_category"] = val.strip() or "dungeon"
+            elif key in ("level", "weight"):
+                try:
+                    enc[key] = int(val)
+                except ValueError:
+                    pass
+            elif key == "xp_override":
+                val = val.strip()
+                if val == "":
+                    enc.pop("xp_override", None)
+                else:
+                    try:
+                        enc["xp_override"] = int(val)
+                    except ValueError:
+                        pass
+            elif key == "monsters":
+                enc["monsters"] = self._encounter_text_to_monsters(val)
+            elif key == "loot":
+                enc["loot"] = self._encounter_text_to_loot(val)
+            else:
+                enc[key] = val
+
+    def get_encounter_choices(self, key):
+        """Return choice-cycle options for an encounter field."""
+        if key == "_category":
+            # Derive the current set of bucket names from existing
+            # entries so a module that uses "graveyard" shows up too.
+            seen = {e.get("_category", "dungeon")
+                    for e in self.encounter_list}
+            # Include a few common defaults.
+            seen.update({"dungeon", "overworld", "house_basement"})
+            return sorted(seen)
+        if key == "terrain":
+            return ["land", "sea"]
+        return []
+
+    def add_encounter(self):
+        """Append a new blank encounter to the list."""
+        # Seed the category from whatever the user was viewing.
+        cat = "dungeon"
+        if (self.encounter_list
+                and 0 <= self.encounter_cursor
+                < len(self.encounter_list)):
+            cat = (self.encounter_list[self.encounter_cursor]
+                   .get("_category", "dungeon"))
+        new_enc = {
+            "name": f"New Encounter {len(self.encounter_list) + 1}",
+            "level": 1,
+            "weight": 10,
+            "terrain": "land",
+            "monster_party_tile": "",
+            "monsters": [],
+            "_category": cat,
+        }
+        self.encounter_list.append(new_enc)
+        self.encounter_cursor = len(self.encounter_list) - 1
+
+    def remove_encounter(self):
+        """Delete the currently selected encounter."""
+        if not self.encounter_list:
+            return
+        idx = self.encounter_cursor
+        if 0 <= idx < len(self.encounter_list):
+            self.encounter_list.pop(idx)
+            if self.encounter_cursor >= len(self.encounter_list):
+                self.encounter_cursor = max(
+                    0, len(self.encounter_list) - 1)
+
+    # ══════════════════════════════════════════════════════════
     # ── Gallery Editor Methods ────────────────────────────────
     # ══════════════════════════════════════════════════════════
 
@@ -4857,6 +5181,10 @@ class FeaturesEditor:
                 self.active_editor = "monsters"
                 self.load_monsters()
                 self.level = 1
+            elif cat["label"] == "Encounters":
+                self.active_editor = "encounters"
+                self.load_encounters()
+                self.level = 1
             elif cat["label"] == "Maps":
                 self.active_editor = "mapeditor"
                 self.meh_sections = self.build_map_editor_hub_sections()
@@ -5440,6 +5768,43 @@ class FeaturesEditor:
                 "on_discard_exit": None,
                 "on_clean_exit": None,
             }
+        elif ed == "encounters":
+            return {
+                "list": lambda: self.encounter_list,
+                "cursor": lambda: self.encounter_cursor,
+                "set_cursor": lambda v: setattr(
+                    self, "encounter_cursor", v),
+                "adjust_scroll": lambda: setattr(
+                    self, "encounter_scroll",
+                    self._adjust_scroll_generic(
+                        self.encounter_cursor,
+                        self.encounter_scroll)),
+                "fields": lambda: self.encounter_fields,
+                "field_idx": lambda: self.encounter_field,
+                "set_field_idx": lambda v: setattr(
+                    self, "encounter_field", v),
+                "buffer": lambda: self.encounter_buffer,
+                "set_buffer": lambda v: setattr(
+                    self, "encounter_buffer", v),
+                "adjust_field_scroll": lambda: setattr(
+                    self, "encounter_scroll_f",
+                    self._adjust_field_scroll_generic(
+                        self.encounter_field,
+                        self.encounter_scroll_f)),
+                "build_fields": self.build_encounter_fields,
+                "save_fields": self.save_encounter_fields,
+                "save_disk": self.save_encounters,
+                "set_editing": lambda v: setattr(
+                    self, "encounter_editing", v),
+                "add": self.add_encounter,
+                "remove": self.remove_encounter,
+                "get_choices": self.get_encounter_choices,
+                "needs_live_sync": False,
+                "on_choice_change": None,
+                "on_save_exit": None,
+                "on_discard_exit": None,
+                "on_clean_exit": None,
+            }
         elif ed == "tiles":
             return {
                 "list": lambda: self.tile_list,
@@ -5688,6 +6053,16 @@ class FeaturesEditor:
                 field=self.mon_field,
                 buffer=self.mon_buffer,
                 field_scroll=self.mon_scroll_f,
+            ),
+            encounters=EncounterEditorRS(
+                list=self.encounter_list,
+                cursor=self.encounter_cursor,
+                scroll=self.encounter_scroll,
+                editing=self.encounter_editing,
+                fields=self.encounter_fields,
+                field=self.encounter_field,
+                buffer=self.encounter_buffer,
+                field_scroll=self.encounter_scroll_f,
             ),
             tiles=TileEditorRS(
                 list=self.tile_list,

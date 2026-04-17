@@ -646,7 +646,7 @@
       7,
       7,
       0,
-      0,
+      69,
       0,
       0,
       0,
@@ -750,7 +750,7 @@
       4,
       6,
       6,
-      6,
+      0,
       6,
       0,
       0,
@@ -958,7 +958,7 @@
       0,
       0,
       0,
-      0,
+      69,
       0,
       0,
       0,
@@ -998,7 +998,7 @@
     ],
     [
       1,
-      1,
+      69,
       7,
       7,
       7,
@@ -2664,6 +2664,18 @@
       "link_x": "0",
       "link_y": "0",
       "link_map": "building:The Deep:Main Hall"
+    },
+    "1,19": {
+      "encounter": "Goblin Squatters"
+    },
+    "13,12": {
+      "encounter": "Rat Nest"
+    },
+    "13,18": {
+      "encounter": "Cellar Rats"
+    },
+    "9,17": {
+      "encounter": "Stray Goblin"
     }
   }
 }

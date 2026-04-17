@@ -1,6 +1,5 @@
 {
   "_comment": "Encounter templates for Realm of Shadow. Each encounter has a 'level' (1-8) that determines difficulty. Areas select encounters by level range. weight controls spawn probability within a level. monster_party_tile is the sprite shown on the overworld map. terrain is 'land' (default) or 'sea'.",
-
   "encounters": {
     "dungeon": [
       {
@@ -9,7 +8,9 @@
         "weight": 30,
         "terrain": "land",
         "monster_party_tile": "Giant Rat",
-        "monsters": ["Giant Rat"]
+        "monsters": [
+          "Giant Rat"
+        ]
       },
       {
         "name": "Rat Nest",
@@ -17,7 +18,10 @@
         "weight": 30,
         "terrain": "land",
         "monster_party_tile": "Giant Rat",
-        "monsters": ["Giant Rat", "Giant Rat"]
+        "monsters": [
+          "Giant Rat",
+          "Giant Rat"
+        ]
       },
       {
         "name": "Stray Goblin",
@@ -25,7 +29,9 @@
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Goblin",
-        "monsters": ["Goblin"]
+        "monsters": [
+          "Goblin"
+        ]
       },
       {
         "name": "Goblin Squatters",
@@ -33,16 +39,22 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Goblin",
-        "monsters": ["Goblin", "Giant Rat"]
+        "monsters": [
+          "Goblin",
+          "Giant Rat"
+        ]
       },
-
       {
         "name": "Goblin Ambush",
         "level": 2,
         "weight": 30,
         "terrain": "land",
         "monster_party_tile": "Goblin",
-        "monsters": ["Goblin", "Goblin", "Goblin"]
+        "monsters": [
+          "Goblin",
+          "Goblin",
+          "Goblin"
+        ]
       },
       {
         "name": "Wolf Pack",
@@ -50,7 +62,10 @@
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Wolf",
-        "monsters": ["Wolf", "Wolf"]
+        "monsters": [
+          "Wolf",
+          "Wolf"
+        ]
       },
       {
         "name": "Goblin Raiders",
@@ -58,7 +73,11 @@
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Goblin",
-        "monsters": ["Goblin", "Goblin", "Wolf"]
+        "monsters": [
+          "Goblin",
+          "Goblin",
+          "Wolf"
+        ]
       },
       {
         "name": "Rat Swarm",
@@ -66,16 +85,23 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Giant Rat",
-        "monsters": ["Giant Rat", "Giant Rat", "Giant Rat", "Giant Rat"]
+        "monsters": [
+          "Giant Rat",
+          "Giant Rat",
+          "Giant Rat",
+          "Giant Rat"
+        ]
       },
-
       {
         "name": "Skeleton Patrol",
         "level": 3,
         "weight": 30,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton", "Skeleton"]
+        "monsters": [
+          "Skeleton",
+          "Skeleton"
+        ]
       },
       {
         "name": "Shambling Dead",
@@ -83,7 +109,10 @@
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Zombie",
-        "monsters": ["Zombie", "Zombie"]
+        "monsters": [
+          "Zombie",
+          "Zombie"
+        ]
       },
       {
         "name": "Skeleton Archers",
@@ -91,7 +120,10 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton Archer", "Skeleton Archer"]
+        "monsters": [
+          "Skeleton Archer",
+          "Skeleton Archer"
+        ]
       },
       {
         "name": "Wolves and Goblins",
@@ -99,7 +131,12 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Wolf",
-        "monsters": ["Wolf", "Wolf", "Goblin", "Goblin"]
+        "monsters": [
+          "Wolf",
+          "Wolf",
+          "Goblin",
+          "Goblin"
+        ]
       },
       {
         "name": "Shaman's Guard",
@@ -107,16 +144,23 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc Shaman", "Goblin", "Goblin"]
+        "monsters": [
+          "Orc Shaman",
+          "Goblin",
+          "Goblin"
+        ]
       },
-
       {
         "name": "Undead Horde",
         "level": 4,
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton", "Skeleton", "Zombie"]
+        "monsters": [
+          "Skeleton",
+          "Skeleton",
+          "Zombie"
+        ]
       },
       {
         "name": "Undead Warband",
@@ -124,7 +168,11 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton", "Skeleton Archer", "Zombie"]
+        "monsters": [
+          "Skeleton",
+          "Skeleton Archer",
+          "Zombie"
+        ]
       },
       {
         "name": "Orc Scouts",
@@ -132,7 +180,10 @@
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc"]
+        "monsters": [
+          "Orc",
+          "Orc"
+        ]
       },
       {
         "name": "Mixed Patrol",
@@ -140,7 +191,11 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Skeleton", "Wolf"]
+        "monsters": [
+          "Orc",
+          "Skeleton",
+          "Wolf"
+        ]
       },
       {
         "name": "Wild Pack",
@@ -148,16 +203,23 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Wolf",
-        "monsters": ["Wolf", "Wolf", "Wolf"]
+        "monsters": [
+          "Wolf",
+          "Wolf",
+          "Wolf"
+        ]
       },
-
       {
         "name": "Orc Warband",
         "level": 5,
         "weight": 25,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc"]
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc"
+        ]
       },
       {
         "name": "Orc Raiding Party",
@@ -165,7 +227,11 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc Shaman"]
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc Shaman"
+        ]
       },
       {
         "name": "Dark Coven",
@@ -173,7 +239,11 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Skeleton Archer", "Skeleton"]
+        "monsters": [
+          "Dark Mage",
+          "Skeleton Archer",
+          "Skeleton"
+        ]
       },
       {
         "name": "Archer's Nest",
@@ -181,7 +251,11 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton Archer", "Skeleton Archer", "Skeleton Archer"]
+        "monsters": [
+          "Skeleton Archer",
+          "Skeleton Archer",
+          "Skeleton Archer"
+        ]
       },
       {
         "name": "Troll Den",
@@ -189,16 +263,22 @@
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Troll",
-        "monsters": ["Troll"]
+        "monsters": [
+          "Troll"
+        ]
       },
-
       {
         "name": "Orc with Wolves",
         "level": 6,
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Wolf", "Wolf"]
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Wolf",
+          "Wolf"
+        ]
       },
       {
         "name": "Troll and Minions",
@@ -206,7 +286,11 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Goblin", "Goblin"]
+        "monsters": [
+          "Troll",
+          "Goblin",
+          "Goblin"
+        ]
       },
       {
         "name": "Dark Patrol",
@@ -214,7 +298,11 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Orc", "Skeleton Archer"]
+        "monsters": [
+          "Dark Mage",
+          "Orc",
+          "Skeleton Archer"
+        ]
       },
       {
         "name": "Cursed Battalion",
@@ -222,7 +310,13 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton", "Skeleton", "Skeleton Archer", "Zombie", "Zombie"]
+        "monsters": [
+          "Skeleton",
+          "Skeleton",
+          "Skeleton Archer",
+          "Zombie",
+          "Zombie"
+        ]
       },
       {
         "name": "Orc Siege",
@@ -230,16 +324,23 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc", "Orc Shaman"]
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc",
+          "Orc Shaman"
+        ]
       },
-
       {
         "name": "Troll Warband",
         "level": 7,
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Troll"]
+        "monsters": [
+          "Troll",
+          "Troll"
+        ]
       },
       {
         "name": "Dark Conclave",
@@ -247,7 +348,11 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Dark Mage", "Orc Shaman"]
+        "monsters": [
+          "Dark Mage",
+          "Dark Mage",
+          "Orc Shaman"
+        ]
       },
       {
         "name": "Orc Legion",
@@ -255,7 +360,13 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc", "Orc", "Orc Shaman"]
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc",
+          "Orc",
+          "Orc Shaman"
+        ]
       },
       {
         "name": "Necromancer's Guard",
@@ -263,7 +374,13 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Skeleton", "Skeleton", "Skeleton Archer", "Skeleton Archer"]
+        "monsters": [
+          "Dark Mage",
+          "Skeleton",
+          "Skeleton",
+          "Skeleton Archer",
+          "Skeleton Archer"
+        ]
       },
       {
         "name": "Troll Ambush",
@@ -271,16 +388,23 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Orc", "Orc"]
+        "monsters": [
+          "Troll",
+          "Orc",
+          "Orc"
+        ]
       },
-
       {
         "name": "Troll Horde",
         "level": 8,
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Troll", "Troll"]
+        "monsters": [
+          "Troll",
+          "Troll",
+          "Troll"
+        ]
       },
       {
         "name": "Shadow Army",
@@ -288,7 +412,12 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Dark Mage", "Troll", "Orc Shaman"]
+        "monsters": [
+          "Dark Mage",
+          "Dark Mage",
+          "Troll",
+          "Orc Shaman"
+        ]
       },
       {
         "name": "Undead Apocalypse",
@@ -296,7 +425,14 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
-        "monsters": ["Skeleton", "Skeleton", "Skeleton Archer", "Skeleton Archer", "Zombie", "Zombie"]
+        "monsters": [
+          "Skeleton",
+          "Skeleton",
+          "Skeleton Archer",
+          "Skeleton Archer",
+          "Zombie",
+          "Zombie"
+        ]
       },
       {
         "name": "Orc Warchief's Guard",
@@ -304,7 +440,14 @@
         "weight": 15,
         "terrain": "land",
         "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc", "Orc", "Orc Shaman", "Orc Shaman"]
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc",
+          "Orc",
+          "Orc Shaman",
+          "Orc Shaman"
+        ]
       },
       {
         "name": "Troll Kings",
@@ -312,156 +455,14 @@
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Troll", "Orc Shaman", "Dark Mage"]
+        "monsters": [
+          "Troll",
+          "Troll",
+          "Orc Shaman",
+          "Dark Mage"
+        ]
       }
     ],
-
-    "overworld": [
-      {
-        "name": "Stray Wolves",
-        "level": 1,
-        "weight": 30,
-        "terrain": "land",
-        "monster_party_tile": "Wolf",
-        "monsters": ["Wolf"]
-      },
-      {
-        "name": "Goblin Scouts",
-        "level": 1,
-        "weight": 30,
-        "terrain": "land",
-        "monster_party_tile": "Goblin",
-        "monsters": ["Goblin", "Goblin"]
-      },
-      {
-        "name": "Field Rats",
-        "level": 1,
-        "weight": 25,
-        "terrain": "land",
-        "monster_party_tile": "Giant Rat",
-        "monsters": ["Giant Rat", "Giant Rat"]
-      },
-
-      {
-        "name": "Wolf Pack",
-        "level": 2,
-        "weight": 30,
-        "terrain": "land",
-        "monster_party_tile": "Wolf",
-        "monsters": ["Wolf", "Wolf"]
-      },
-      {
-        "name": "Goblin Raiding Party",
-        "level": 2,
-        "weight": 30,
-        "terrain": "land",
-        "monster_party_tile": "Goblin",
-        "monsters": ["Goblin", "Goblin", "Goblin"]
-      },
-
-      {
-        "name": "Orc Scouts",
-        "level": 3,
-        "weight": 30,
-        "terrain": "land",
-        "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc"]
-      },
-      {
-        "name": "Wolves and Goblins",
-        "level": 3,
-        "weight": 25,
-        "terrain": "land",
-        "monster_party_tile": "Wolf",
-        "monsters": ["Wolf", "Wolf", "Goblin"]
-      },
-
-      {
-        "name": "Orc Warband",
-        "level": 4,
-        "weight": 30,
-        "terrain": "land",
-        "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc"]
-      },
-      {
-        "name": "Orc with Wolves",
-        "level": 4,
-        "weight": 25,
-        "terrain": "land",
-        "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Wolf", "Wolf"]
-      },
-
-      {
-        "name": "Orc Raiders",
-        "level": 5,
-        "weight": 25,
-        "terrain": "land",
-        "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc Shaman"]
-      },
-      {
-        "name": "Lone Troll",
-        "level": 5,
-        "weight": 15,
-        "terrain": "land",
-        "monster_party_tile": "Troll",
-        "monsters": ["Troll"]
-      },
-
-      {
-        "name": "Troll and Wolves",
-        "level": 6,
-        "weight": 20,
-        "terrain": "land",
-        "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Wolf", "Wolf"]
-      },
-      {
-        "name": "Dark Riders",
-        "level": 6,
-        "weight": 20,
-        "terrain": "land",
-        "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Orc", "Orc"]
-      },
-
-      {
-        "name": "Troll Warband",
-        "level": 7,
-        "weight": 20,
-        "terrain": "land",
-        "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Troll"]
-      },
-      {
-        "name": "Orc War Host",
-        "level": 7,
-        "weight": 20,
-        "terrain": "land",
-        "monster_party_tile": "Orc",
-        "monsters": ["Orc", "Orc", "Orc", "Orc Shaman"]
-      },
-
-      {
-        "name": "Shadow Vanguard",
-        "level": 8,
-        "weight": 15,
-        "terrain": "land",
-        "monster_party_tile": "Dark Mage",
-        "monsters": ["Dark Mage", "Troll", "Orc", "Orc"]
-      },
-      {
-        "name": "Troll Horde",
-        "level": 8,
-        "weight": 15,
-        "terrain": "land",
-        "monster_party_tile": "Troll",
-        "monsters": ["Troll", "Troll", "Troll"]
-      }
-    ],
-
     "house_basement": [
       {
         "name": "Cellar Rats",
@@ -469,7 +470,9 @@
         "weight": 40,
         "terrain": "land",
         "monster_party_tile": "Giant Rat",
-        "monsters": ["Giant Rat"]
+        "monsters": [
+          "Giant Rat"
+        ]
       },
       {
         "name": "Rat Infestation",
@@ -477,7 +480,10 @@
         "weight": 30,
         "terrain": "land",
         "monster_party_tile": "Giant Rat",
-        "monsters": ["Giant Rat", "Giant Rat"]
+        "monsters": [
+          "Giant Rat",
+          "Giant Rat"
+        ]
       },
       {
         "name": "Stray Goblin",
@@ -485,7 +491,9 @@
         "weight": 20,
         "terrain": "land",
         "monster_party_tile": "Goblin",
-        "monsters": ["Goblin"]
+        "monsters": [
+          "Goblin"
+        ]
       },
       {
         "name": "Goblin Squatters",
@@ -493,7 +501,209 @@
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Goblin",
-        "monsters": ["Goblin", "Giant Rat"]
+        "monsters": [
+          "Goblin",
+          "Giant Rat"
+        ]
+      }
+    ],
+    "overworld": [
+      {
+        "name": "Stray Wolves",
+        "level": 1,
+        "weight": 30,
+        "terrain": "land",
+        "monster_party_tile": "Wolf",
+        "monsters": [
+          "Wolf"
+        ]
+      },
+      {
+        "name": "Goblin Scouts",
+        "level": 1,
+        "weight": 30,
+        "terrain": "land",
+        "monster_party_tile": "Goblin",
+        "monsters": [
+          "Goblin",
+          "Goblin"
+        ]
+      },
+      {
+        "name": "Field Rats",
+        "level": 1,
+        "weight": 25,
+        "terrain": "land",
+        "monster_party_tile": "Giant Rat",
+        "monsters": [
+          "Giant Rat",
+          "Giant Rat"
+        ]
+      },
+      {
+        "name": "Wolf Pack",
+        "level": 2,
+        "weight": 30,
+        "terrain": "land",
+        "monster_party_tile": "Wolf",
+        "monsters": [
+          "Wolf",
+          "Wolf"
+        ]
+      },
+      {
+        "name": "Goblin Raiding Party",
+        "level": 2,
+        "weight": 30,
+        "terrain": "land",
+        "monster_party_tile": "Goblin",
+        "monsters": [
+          "Goblin",
+          "Goblin",
+          "Goblin"
+        ]
+      },
+      {
+        "name": "Orc Scouts",
+        "level": 3,
+        "weight": 30,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": [
+          "Orc",
+          "Orc"
+        ]
+      },
+      {
+        "name": "Wolves and Goblins",
+        "level": 3,
+        "weight": 25,
+        "terrain": "land",
+        "monster_party_tile": "Wolf",
+        "monsters": [
+          "Wolf",
+          "Wolf",
+          "Goblin"
+        ]
+      },
+      {
+        "name": "Orc Warband",
+        "level": 4,
+        "weight": 30,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc"
+        ]
+      },
+      {
+        "name": "Orc with Wolves",
+        "level": 4,
+        "weight": 25,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": [
+          "Orc",
+          "Wolf",
+          "Wolf"
+        ]
+      },
+      {
+        "name": "Orc Raiders",
+        "level": 5,
+        "weight": 25,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc Shaman"
+        ]
+      },
+      {
+        "name": "Lone Troll",
+        "level": 5,
+        "weight": 15,
+        "terrain": "land",
+        "monster_party_tile": "Troll",
+        "monsters": [
+          "Troll"
+        ]
+      },
+      {
+        "name": "Troll and Wolves",
+        "level": 6,
+        "weight": 20,
+        "terrain": "land",
+        "monster_party_tile": "Troll",
+        "monsters": [
+          "Troll",
+          "Wolf",
+          "Wolf"
+        ]
+      },
+      {
+        "name": "Dark Riders",
+        "level": 6,
+        "weight": 20,
+        "terrain": "land",
+        "monster_party_tile": "Dark Mage",
+        "monsters": [
+          "Dark Mage",
+          "Orc",
+          "Orc"
+        ]
+      },
+      {
+        "name": "Troll Warband",
+        "level": 7,
+        "weight": 20,
+        "terrain": "land",
+        "monster_party_tile": "Troll",
+        "monsters": [
+          "Troll",
+          "Troll"
+        ]
+      },
+      {
+        "name": "Orc War Host",
+        "level": 7,
+        "weight": 20,
+        "terrain": "land",
+        "monster_party_tile": "Orc",
+        "monsters": [
+          "Orc",
+          "Orc",
+          "Orc",
+          "Orc Shaman"
+        ]
+      },
+      {
+        "name": "Shadow Vanguard",
+        "level": 8,
+        "weight": 15,
+        "terrain": "land",
+        "monster_party_tile": "Dark Mage",
+        "monsters": [
+          "Dark Mage",
+          "Troll",
+          "Orc",
+          "Orc"
+        ]
+      },
+      {
+        "name": "Troll Horde",
+        "level": 8,
+        "weight": 15,
+        "terrain": "land",
+        "monster_party_tile": "Troll",
+        "monsters": [
+          "Troll",
+          "Troll",
+          "Troll"
+        ]
       }
     ]
   }
