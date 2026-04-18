@@ -301,6 +301,36 @@ def _deserialize_party(data):
     party.shared_inventory_durability = dict(
         data.get("shared_inventory_durability", {}))
 
+    # Legacy migration: older saves stored stash durability in the
+    # name-keyed ``shared_inventory_durability`` dict, which caused all
+    # copies of the same item to share one value. Move each entry onto
+    # the first matching stash item so it lives on the entry going
+    # forward. We only migrate ONE copy per name to preserve the old
+    # (imperfect) behavior — remaining copies default to full.
+    legacy_dur = party.shared_inventory_durability
+    if legacy_dur:
+        from src.party import Party as _P
+        migrated = []
+        for i, entry in enumerate(party.shared_inventory):
+            if not isinstance(entry, dict) \
+                    or entry.get("durability") is not None:
+                # Already carries durability (new format) — skip.
+                if isinstance(entry, dict) \
+                        and entry.get("durability") is not None:
+                    continue
+            nm = _P.item_name(entry)
+            if nm in legacy_dur and nm not in migrated:
+                # Upgrade to dict-entry with durability.
+                charges = _P.item_charges(entry)
+                party.shared_inventory[i] = _P._make_inv_entry(
+                    nm, charges=charges, durability=legacy_dur[nm])
+                migrated.append(nm)
+        # Clear migrated entries from the legacy dict so future loads
+        # are clean. Any entries not matched (e.g. item no longer in
+        # stash) stay behind harmlessly.
+        for nm in migrated:
+            legacy_dur.pop(nm, None)
+
     # Party-level equipment slots (includes "light" which is rendered in Effects)
     saved_eq = data.get("equipped", {})
     for slot in list(party.equipped.keys()):

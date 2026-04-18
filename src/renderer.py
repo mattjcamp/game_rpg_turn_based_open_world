@@ -14695,9 +14695,18 @@ class Renderer(CombatEffectRendererMixin):
                 display = item_name
                 if item_ch is not None:
                     display = f"{item_name} ({item_ch})"
-                # Show durability if the item has wear in the stash
-                stash_dur = getattr(party, 'shared_inventory_durability', {})
-                _sdur = stash_dur.get(item_name)
+                # Show durability if THIS entry has wear.  Durability
+                # is now stored per-entry, so two Chains can wear
+                # independently and display their own values.
+                _sdur = party.item_durability(entry)
+                if _sdur is None:
+                    # Legacy fallback: old saves may still have the
+                    # name-keyed durability dict populated. Read from
+                    # there but only apply it to the first matching
+                    # entry so different stacks don't all light up.
+                    _legacy = getattr(
+                        party, 'shared_inventory_durability', {})
+                    _sdur = _legacy.get(item_name)
                 if _sdur is not None:
                     from src.party import PartyMember as _PM
                     _mxd, _indest = _PM._get_item_max_durability(item_name)

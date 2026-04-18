@@ -1,32 +1,34 @@
 {
   "version": 3,
-  "timestamp": 1776515476.90433,
+  "timestamp": 1776518919.65469,
   "state": "overworld",
   "party": {
-    "col": 6,
-    "row": 13,
-    "gold": 35,
+    "col": 11,
+    "row": 14,
+    "gold": 205,
     "roster": [
       {
         "name": "Roland",
         "class": "Fighter",
         "race": "Dwarf",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
+        "max_hp": 40,
+        "hp": 40,
         "strength": 19,
         "dexterity": 11,
         "intelligence": 10,
         "wisdom": 8,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
           "right_hand": "Sword",
           "left_hand": null,
-          "body": "Leather",
+          "body": "Plate",
           "head": null
         },
-        "inventory": [],
+        "inventory": [
+          "Sword"
+        ],
         "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {},
@@ -36,7 +38,7 @@
           "left_hand": null
         },
         "equipped_durability": {
-          "right_hand": 39,
+          "right_hand": 18,
           "body": 40
         },
         "inventory_durability": {}
@@ -46,14 +48,14 @@
         "class": "Wizard",
         "race": "Elf",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
+        "max_hp": 24,
+        "hp": 24,
         "strength": 11,
         "dexterity": 9,
         "intelligence": 16,
         "wisdom": 12,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -61,8 +63,8 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 18,
-        "bonus_mp": 0,
+        "current_mp": 37,
+        "bonus_mp": 19,
         "ammo": {},
         "sprite": "src/assets/game/characters/wizard.png",
         "weapon_poison": {
@@ -79,18 +81,18 @@
         "class": "Thief",
         "race": "Halfling",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 18,
+        "max_hp": 25,
+        "hp": 25,
         "strength": 12,
         "dexterity": 14,
         "intelligence": 13,
         "wisdom": 10,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
           "right_hand": "Club",
           "left_hand": "Short Bow",
-          "body": "Cloth",
+          "body": "Leather",
           "head": null
         },
         "inventory": [],
@@ -103,8 +105,9 @@
           "left_hand": null
         },
         "equipped_durability": {
-          "right_hand": 4,
-          "left_hand": 25
+          "right_hand": 2,
+          "left_hand": 6,
+          "body": 39
         },
         "inventory_durability": {}
       },
@@ -113,23 +116,23 @@
         "class": "Cleric",
         "race": "Human",
         "gender": "Female",
-        "max_hp": 20,
-        "hp": 20,
+        "max_hp": 26,
+        "hp": 26,
         "strength": 11,
         "dexterity": 9,
         "intelligence": 12,
         "wisdom": 18,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
-          "right_hand": "Club",
-          "left_hand": null,
+          "right_hand": "Mace",
+          "left_hand": "Sling",
           "body": "Cloth",
           "head": null
         },
         "inventory": [],
-        "current_mp": 18,
-        "bonus_mp": 0,
+        "current_mp": 32,
+        "bonus_mp": 14,
         "ammo": {},
         "sprite": "src/assets/game/characters/cleric.png",
         "weapon_poison": {
@@ -137,7 +140,8 @@
           "left_hand": null
         },
         "equipped_durability": {
-          "right_hand": 8
+          "right_hand": 38,
+          "left_hand": 40
         },
         "inventory_durability": {}
       },
@@ -220,21 +224,23 @@
         "class": "Fighter",
         "race": "Dwarf",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
+        "max_hp": 40,
+        "hp": 40,
         "strength": 19,
         "dexterity": 11,
         "intelligence": 10,
         "wisdom": 8,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
           "right_hand": "Sword",
           "left_hand": null,
-          "body": "Leather",
+          "body": "Plate",
           "head": null
         },
-        "inventory": [],
+        "inventory": [
+          "Sword"
+        ],
         "current_mp": 0,
         "bonus_mp": 0,
         "ammo": {},
@@ -244,7 +250,7 @@
           "left_hand": null
         },
         "equipped_durability": {
-          "right_hand": 39,
+          "right_hand": 18,
           "body": 40
         },
         "inventory_durability": {}
@@ -254,14 +260,14 @@
         "class": "Wizard",
         "race": "Elf",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 20,
+        "max_hp": 24,
+        "hp": 24,
         "strength": 11,
         "dexterity": 9,
         "intelligence": 16,
         "wisdom": 12,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
           "right_hand": "Club",
           "left_hand": null,
@@ -269,8 +275,8 @@
           "head": null
         },
         "inventory": [],
-        "current_mp": 18,
-        "bonus_mp": 0,
+        "current_mp": 37,
+        "bonus_mp": 19,
         "ammo": {},
         "sprite": "src/assets/game/characters/wizard.png",
         "weapon_poison": {
@@ -287,18 +293,18 @@
         "class": "Thief",
         "race": "Halfling",
         "gender": "Male",
-        "max_hp": 20,
-        "hp": 18,
+        "max_hp": 25,
+        "hp": 25,
         "strength": 12,
         "dexterity": 14,
         "intelligence": 13,
         "wisdom": 10,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
           "right_hand": "Club",
           "left_hand": "Short Bow",
-          "body": "Cloth",
+          "body": "Leather",
           "head": null
         },
         "inventory": [],
@@ -311,8 +317,9 @@
           "left_hand": null
         },
         "equipped_durability": {
-          "right_hand": 4,
-          "left_hand": 25
+          "right_hand": 2,
+          "left_hand": 6,
+          "body": 39
         },
         "inventory_durability": {}
       },
@@ -321,23 +328,23 @@
         "class": "Cleric",
         "race": "Human",
         "gender": "Female",
-        "max_hp": 20,
-        "hp": 20,
+        "max_hp": 26,
+        "hp": 26,
         "strength": 11,
         "dexterity": 9,
         "intelligence": 12,
         "wisdom": 18,
-        "level": 1,
-        "exp": 395,
+        "level": 2,
+        "exp": 1060,
         "equipped": {
-          "right_hand": "Club",
-          "left_hand": null,
+          "right_hand": "Mace",
+          "left_hand": "Sling",
           "body": "Cloth",
           "head": null
         },
         "inventory": [],
-        "current_mp": 18,
-        "bonus_mp": 0,
+        "current_mp": 32,
+        "bonus_mp": 14,
         "ammo": {},
         "sprite": "src/assets/game/characters/cleric.png",
         "weapon_poison": {
@@ -345,13 +352,23 @@
           "left_hand": null
         },
         "equipped_durability": {
-          "right_hand": 8
+          "right_hand": 38,
+          "left_hand": 40
         },
         "inventory_durability": {}
       }
     ],
     "shared_inventory": [
-      "Rock",
+      {
+        "name": "Lockpick",
+        "charges": 27
+      },
+      {
+        "name": "Arrows",
+        "charges": 40
+      },
+      "Antidote",
+      "Antidote",
       {
         "name": "Torch",
         "charges": 150
@@ -360,47 +377,85 @@
         "name": "Torch",
         "charges": 150
       },
+      "Antidote",
       {
-        "name": "Camping Supplies",
-        "charges": 2
+        "name": "Torch",
+        "charges": 150
+      },
+      "Healing Herb",
+      {
+        "name": "Torch",
+        "charges": 150
+      },
+      {
+        "name": "Torch",
+        "charges": 150
+      },
+      "Healing Herb",
+      {
+        "name": "Torch",
+        "charges": 150
+      },
+      {
+        "name": "Torch",
+        "charges": 150
+      },
+      "Healing Herb",
+      {
+        "name": "Torch",
+        "charges": 150
       },
       {
         "name": "Camping Supplies",
         "charges": 3
       },
       {
-        "name": "Torch",
-        "charges": 150
+        "name": "Camping Supplies",
+        "charges": 3
       },
       {
-        "name": "Lockpick",
-        "charges": 10
+        "name": "Camping Supplies",
+        "charges": 3
       },
       {
-        "name": "Arrows",
-        "charges": 48
+        "name": "Camping Supplies",
+        "charges": 3
       },
-      "Dagger",
-      "Antidote"
+      {
+        "name": "Camping Supplies",
+        "charges": 3
+      },
+      {
+        "name": "Bolts",
+        "charges": 30
+      },
+      {
+        "name": "Stones",
+        "charges": 30
+      },
+      "Healing Herb",
+      "Healing Herb",
+      "Healing Herb"
     ],
-    "shared_inventory_durability": {},
+    "shared_inventory_durability": {
+      "Leather": 37,
+      "Club": 8,
+      "Chain": 41
+    },
     "equipped": {
       "navigation": null,
       "camping": null,
       "special": null,
-      "light": {
-        "name": "Torch",
-        "charges": 150
-      }
+      "light": null
     },
     "effects": {
-      "effect_1": "Torch",
-      "effect_2": null,
+      "effect_1": null,
+      "effect_2": "Detect Traps",
       "effect_3": null,
       "effect_4": null
     },
     "clock": {
-      "total_minutes": 204835
+      "total_minutes": 208165
     },
     "last_pickpocket_day": -1,
     "last_tinker_day": -1,
@@ -1251,9 +1306,10 @@
     "Goblin Horde": {
       "status": "active",
       "step_progress": [
-        false,
+        true,
         false
-      ]
+      ],
+      "step_0_kills": 5
     }
   },
   "quest_dungeon_monsters": {
@@ -1378,9 +1434,121 @@
     "The party rests using Camping Supplies...",
     "  Restored 0 HP and 5 MP across the party!",
     "Rested! +0 HP, +5 MP",
-    "The party defeated Wolf."
+    "The party defeated Wolf.",
+    "Roland picked up: 1 gold",
+    "The party defeated Wolf Pack.",
+    "You descend into Goblin Stronghold  - Floor 1... Torch lit!",
+    "The party opened a treasure chest and found 14 gold and Antidote.",
+    "Merry spotted a trap!",
+    "Merry spotted a trap!",
+    "Merry spotted a trap!",
+    "The party opened a treasure chest and found 23 gold and Torch.",
+    "Merry spotted a trap!",
+    "The party opened a treasure chest and found 21 gold and Chain.",
+    "The party opened a treasure chest and found 12 gold and Torch.",
+    "You descend deeper... (Floor 2/4)",
+    "Merry spotted a trap!",
+    "Merry spotted a trap!",
+    "Selina picked up: 2 gold",
+    "Selina picked up: Antidote",
+    "Selina picked up: Torch",
+    "The party defeated Wolf Pack.",
+    "Your torch has burned out!",
+    "Merry spotted a trap!",
+    "The party opened a treasure chest and found 8 gold and Sling.",
+    "You descend deeper... (Floor 3/4)",
+    "Merry spotted a trap!",
+    "Merry spotted a trap!",
+    "The party opened a treasure chest and found 12 gold and Leather.",
+    "Selina picked up: 33 gold",
+    "Selina picked up: Sword",
+    "The party defeated Skeleton Archers.",
+    "Merry picked the lock! (9 picks left)",
+    "Merry picked the lock! (8 picks left)",
+    "Elrond picked up: 21 gold",
+    "Elrond picked up: Healing Herb",
+    "The party defeated Skeleton Patrol.",
+    "The party opened a treasure chest and found 6 gold and Mace.",
+    "The party opened a treasure chest and found 26 gold.",
+    "Elrond picked up: 24 gold",
+    "Elrond picked up: Dagger",
+    "Elrond picked up: Dagger",
+    "Elrond picked up: Chain",
+    "The party defeated Mixed Patrol.",
+    "You descend deeper... (Floor 4/4)",
+    "Roland picked up: Leather",
+    "Roland picked up: Club",
+    "Roland picked up: 11 gold",
+    "The party defeated Goblin Squatters.",
+    "Goblin Squatters defeated! (1/5)",
+    "The party rests using Camping Supplies...",
+    "  Restored 20 HP and 12 MP across the party!",
+    "Rested! +20 HP, +12 MP",
+    "The party rests using Camping Supplies...",
+    "  Restored 0 HP and 12 MP across the party!",
+    "Rested! +0 HP, +12 MP",
+    "Merry spotted a trap!",
+    "Merry picked up: 7 gold",
+    "Merry picked up: Mace",
+    "The party defeated Goblin Squatters.",
+    "Selina reached Level 2! HP+6 MP+14",
+    "Goblin Squatters defeated! (2/5)",
+    "Your torch has burned out!",
+    "Roland picked up: 7 gold",
+    "Roland picked up: Torch",
+    "Roland picked up: Leather",
+    "The party defeated Goblin Squatters.",
+    "Goblin Squatters defeated! (3/5)",
+    "Merry picked the lock! (7 picks left)",
+    "Roland picked up: Torch",
+    "Roland picked up: 34 gold",
+    "Roland picked up: Sword",
+    "The party defeated Orc Raiding Party.",
+    "Selina picked up: 7 gold",
+    "Selina picked up: Healing Herb",
+    "The party defeated Goblin Squatters.",
+    "Goblin Squatters defeated! (4/5)",
+    "Elrond picked up: 6 gold",
+    "Elrond picked up: Torch",
+    "Elrond picked up: Torch",
+    "The party defeated Goblin Squatters.",
+    "Quest 'Goblin Horde': Kill Goblics - Complete!",
+    "Selina picked up: 24 gold",
+    "Selina picked up: Healing Herb",
+    "The party defeated Troll.",
+    "Roland reached Level 2! HP+20",
+    "Elrond reached Level 2! HP+4 MP+19",
+    "Merry reached Level 2! HP+5",
+    "The party opened a treasure chest and found 26 gold.",
+    "The party rests using Camping Supplies...",
+    "  Restored 21 HP and 23 MP across the party!",
+    "Rested! +21 HP, +23 MP",
+    "The party rests using Camping Supplies...",
+    "  Restored 0 HP and 11 MP across the party!",
+    "Rested! +0 HP, +11 MP",
+    "The party rests using Camping Supplies...",
+    "  Restored 0 HP and 6 MP across the party!",
+    "Rested! +0 HP, +6 MP",
+    "Stairs up! Press ESC to leave.",
+    "You ascend to floor 3.",
+    "Stairs up! Press ESC to leave.",
+    "You ascend to floor 2.",
+    "Your torch has burned out!",
+    "Stairs up! Press ESC to leave.",
+    "You ascend to floor 1.",
+    "Stairs up! Press ESC to leave.",
+    "Blocked!",
+    "Welcome to New Haven!",
+    "General Store",
+    "Entering General Shop Interior...",
+    "Welcome to New Haven!"
   ],
-  "visited_dungeons": [],
+  "visited_dungeons": [
+    [
+      17,
+      20
+    ]
+  ],
   "dungeon_cache": [],
   "map_seed": 0,
   "state_context": {

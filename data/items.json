@@ -429,8 +429,8 @@
       "character_can_equip": true,
       "durability": 40,
       "indestructible": false,
-      "buy": 0,
-      "sell": 0
+      "buy": 200,
+      "sell": 150
     }
   },
   "general": {

@@ -1178,11 +1178,12 @@ class PartyMember:
         if item_name not in self.inventory:
             return False
         self.inventory.remove(item_name)
-        # Transfer durability: character inventory → party stash
+        # Transfer durability: character inventory → party stash.
+        # Per-instance durability rides on the stash entry itself so
+        # two copies of the same item don't share a single value.
         saved_dur = self.inventory_durability.pop(item_name, None)
-        if saved_dur is not None:
-            party.shared_inventory_durability[item_name] = saved_dur
-        party.shared_inventory.append(item_name)
+        party.shared_inventory.append(
+            Party._make_inv_entry(item_name, durability=saved_dur))
         return True
 
     def return_equipped_to_party(self, slot, party):
@@ -1195,11 +1196,11 @@ class PartyMember:
         default = self._SLOT_DEFAULTS.get(slot)
         if current is None or current == default:
             return False
-        # Transfer durability: equipped slot → party stash
+        # Transfer durability: equipped slot → party stash.
+        # Per-instance durability rides on the stash entry itself.
         cur_dur = self.equipped_durability.get(slot)
-        if cur_dur is not None:
-            party.shared_inventory_durability[current] = cur_dur
-        party.shared_inventory.append(current)
+        party.shared_inventory.append(
+            Party._make_inv_entry(current, durability=cur_dur))
         self.equipped[slot] = default
         self.equipped_durability[slot] = None
         self._sync_legacy_fields()
@@ -1353,11 +1354,36 @@ class Party:
         return None
 
     @staticmethod
-    def _make_inv_entry(name, charges=None):
-        """Create an inventory entry — plain string if no charges, dict otherwise."""
+    def item_durability(entry):
+        """Return remaining durability for an inventory entry, or None
+        if the item is at full durability / indestructible.
+
+        Durability lives on the entry itself (dict form) so two copies
+        of the same item in the stash can wear independently — a
+        property the old name-keyed durability dict could not provide.
+        """
+        if isinstance(entry, dict):
+            return entry.get("durability")
+        return None
+
+    @staticmethod
+    def _make_inv_entry(name, charges=None, durability=None):
+        """Create an inventory entry.
+
+        Returns a plain string when there is no charge or durability
+        state to track, a dict otherwise. Keeping the "plain string
+        when trivial" form preserves all existing equality checks
+        (e.g. ``"Chain" in inventory``) for items that don't carry
+        per-instance state.
+        """
+        if charges is None and durability is None:
+            return name
+        entry = {"name": name}
         if charges is not None:
-            return {"name": name, "charges": charges}
-        return name
+            entry["charges"] = charges
+        if durability is not None:
+            entry["durability"] = durability
+        return entry
 
     def _find_inv_index(self, item_name):
         """Find the index of the first inventory entry matching item_name."""
@@ -1647,8 +1673,14 @@ class Party:
         item_name = self.item_name(entry)
         member = self.members[member_index]
         member.inventory.append(item_name)
-        # Transfer durability: party stash → character inventory
-        saved_dur = self.shared_inventory_durability.pop(item_name, None)
+        # Transfer durability: party stash → character inventory.
+        # Prefer the per-entry value (new model); fall back to the
+        # legacy name-keyed dict for backward compatibility with old
+        # saves that have not yet been migrated.
+        saved_dur = self.item_durability(entry)
+        if saved_dur is None:
+            saved_dur = self.shared_inventory_durability.pop(
+                item_name, None)
         if saved_dur is not None:
             member.inventory_durability[item_name] = saved_dur
         return True

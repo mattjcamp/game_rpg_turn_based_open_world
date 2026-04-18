@@ -907,10 +907,19 @@ class InventoryMixin:
                         self.party_inv_cursor = max(0, new_total - 1)
                 elif chosen == "Examine":
                     self.examining_item = item_name
-                    # Look up per-instance durability from stash
+                    # Look up per-instance durability from the specific
+                    # stash entry.  Falls back to the legacy name-keyed
+                    # dict only if the entry itself carries no value.
                     from src.party import PartyMember
                     max_dur, indestructible = PartyMember._get_item_max_durability(item_name)
-                    stash_dur = party.shared_inventory_durability.get(item_name)
+                    entry = party.shared_inventory[inv_idx] \
+                        if 0 <= inv_idx < len(party.shared_inventory) \
+                        else None
+                    stash_dur = party.item_durability(entry) \
+                        if entry is not None else None
+                    if stash_dur is None:
+                        stash_dur = party.shared_inventory_durability.get(
+                            item_name)
                     if indestructible or stash_dur is None:
                         self.examining_durability = None
                     else:
