@@ -44,12 +44,12 @@
     ]
   },
   {
-    "name": "Goblin Stronghold",
+    "name": "Goblin Stronghold ",
     "description": "The mountain stronghold of the Goblin Horde",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 7,
-    "difficulty": "normal",
+    "num_levels": 4,
+    "difficulty": "easy",
     "level_size": "medium",
     "torch_density": "abundant",
     "locked_doors": "on",

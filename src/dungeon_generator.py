@@ -533,6 +533,68 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
             moss_placed += 1
 
 
+# ── Difficulty profiles for procedural module dungeons ──────────
+#
+# Each tier defines five dials that actually affect how dangerous a
+# procedurally-generated dungeon feels:
+#
+#   min_rooms / max_rooms   — floor area proxy (more rooms = bigger map)
+#   enc_min / enc_max       — encounters.json "level" filter, offset
+#                             by floor index so deeper floors always
+#                             push toward harder encounters
+#   enc_chance              — per-room probability of rolling a random
+#                             encounter; the main "density" dial
+#
+# Floor index (0-based) is added to both enc_min and enc_max so a
+# 4-floor "normal" dungeon ramps: F1 → 2..4, F2 → 3..5, F3 → 4..6,
+# F4 → 5..7.  Each tier starts and ends in a band that is clearly
+# distinguishable from the neighboring tier so the difficulty setting
+# has visible in-game consequences.
+DIFFICULTY_PROFILES = {
+    "easy":   {"min_rooms": 4,  "max_rooms": 6,
+               "enc_min": 1, "enc_max": 2, "enc_chance": 0.35},
+    "normal": {"min_rooms": 6,  "max_rooms": 10,
+               "enc_min": 2, "enc_max": 4, "enc_chance": 0.50},
+    "hard":   {"min_rooms": 8,  "max_rooms": 14,
+               "enc_min": 3, "enc_max": 6, "enc_chance": 0.65},
+    "deadly": {"min_rooms": 10, "max_rooms": 18,
+               "enc_min": 5, "enc_max": 8, "enc_chance": 0.80},
+}
+
+_ENCOUNTER_LEVEL_MAX = 8  # clamp so we don't demand levels that don't exist
+
+
+def get_difficulty_profile(difficulty, floor_idx=0):
+    """Resolve (min_rooms, max_rooms, enc_min, enc_max, enc_chance)
+    for a difficulty + floor combination.
+
+    Parameters
+    ----------
+    difficulty : str
+        One of "easy", "normal", "hard", "deadly".  Unknown values
+        fall back to "normal" so a stale/renamed module field never
+        crashes generation.
+    floor_idx : int
+        Zero-based floor depth.  Deeper floors push the encounter
+        level band upward so a 4-floor dungeon ramps in threat even
+        on a single difficulty setting.
+    """
+    profile = DIFFICULTY_PROFILES.get(difficulty) \
+        or DIFFICULTY_PROFILES["normal"]
+    enc_min = max(1, profile["enc_min"] + floor_idx)
+    enc_max = min(_ENCOUNTER_LEVEL_MAX,
+                  profile["enc_max"] + floor_idx)
+    if enc_min > enc_max:
+        enc_min = enc_max  # floor pushed past top — clamp both to max
+    return {
+        "min_rooms": profile["min_rooms"],
+        "max_rooms": profile["max_rooms"],
+        "enc_min": enc_min,
+        "enc_max": enc_max,
+        "enc_chance": profile["enc_chance"],
+    }
+
+
 def generate_dungeon(name="The Depths", width=40, height=30,
                      min_rooms=6, max_rooms=10,
                      room_min_size=4, room_max_size=8,
@@ -542,6 +604,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      encounter_area="dungeon",
                      encounter_min_level=None,
                      encounter_max_level=None,
+                     random_encounter_chance=0.5,
                      custom_encounters=None,
                      include_random_encounters=True,
                      torch_density="medium",
@@ -697,7 +760,10 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         for room in rooms[1:]:
             if id(room) in used_rooms:
                 continue
-            if random.random() < 0.5:  # 50% chance per room
+            # Per-room probability of rolling a random encounter; the
+            # difficulty setting feeds this dial so "deadly" dungeons
+            # are noticeably more packed than "easy" ones.
+            if random.random() < random_encounter_chance:
                 mx, my = room.center
                 mx += random.randint(-1, 1)
                 my += random.randint(-1, 1)

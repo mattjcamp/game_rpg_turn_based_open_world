@@ -855,12 +855,19 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 return
 
-            # Bump-to-fight: check if an orc is on the target tile
+            # Bump-to-fight: check if an orc is on the target tile.
+            # While sailing, only sea creatures can be bump-attacked
+            # directly. Moving toward a land creature from the boat
+            # falls through to the boat handler, which disembarks the
+            # party onto that land tile — after which normal contact
+            # checks engage the creature on foot.
             orc = self._get_monster_at(target_col, target_row)
             if orc:
-                self._show_encounter_action(orc)
-                self.move_cooldown = MOVE_REPEAT_DELAY
-                return
+                on_boat = bool(getattr(self.game, "on_boat", False))
+                if not on_boat or getattr(orc, "terrain", "land") == "sea":
+                    self._show_encounter_action(orc)
+                    self.move_cooldown = MOVE_REPEAT_DELAY
+                    return
 
             # Locked tile (painted via the Attributes panel) — opens the
             # pick-lock dialog regardless of underlying walkability so a
@@ -899,17 +906,25 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     self._check_monster_contact()
                     self._move_monsters()
                     self._move_overworld_npcs()
-                    # Occasionally respawn orcs that were killed
-                    if random.random() < ORC_RESPAWN_CHANCE:
-                        self._spawn_orcs()
-                    # While sailing, also roll for sea encounters so
-                    # the open water isn't a safe empty lane.
-                    if getattr(self.game, "on_boat", False) \
-                            and random.random() < ORC_RESPAWN_CHANCE:
-                        self._spawn_sea_encounter()
-                    # Check spawn tiles every step — the spawn_chance
-                    # percentage is the per-step probability
-                    self._spawn_from_spawn_tiles()
+                    # Land-based encounter generators only run while
+                    # the party is on foot — sailing swaps these out
+                    # for sea encounters so the open water has its
+                    # own threat pool and land creatures don't keep
+                    # spawning unreachably on shore.
+                    sailing = bool(getattr(self.game, "on_boat", False))
+                    if not sailing:
+                        # Occasionally respawn orcs that were killed
+                        if random.random() < ORC_RESPAWN_CHANCE:
+                            self._spawn_orcs()
+                        # Check spawn tiles every step — the
+                        # spawn_chance percentage is the per-step
+                        # probability
+                        self._spawn_from_spawn_tiles()
+                    else:
+                        # Roll for sea encounters while sailing so
+                        # the open water isn't a safe empty lane.
+                        if random.random() < ORC_RESPAWN_CHANCE:
+                            self._spawn_sea_encounter()
                 else:
                     # Move building interior guardian NPCs
                     if self._building_interior_npcs:
@@ -1382,10 +1397,21 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             mon.col, mon.row = best
 
     def _check_monster_contact(self):
-        """If an orc is adjacent to (or on top of) the party, show encounter screen."""
+        """If an orc is adjacent to (or on top of) the party, show encounter screen.
+
+        While the party is aboard the boat, only sea creatures can
+        initiate contact — a Wyvern standing on shore next to the boat
+        can't reach the party through the water, so it shouldn't force
+        an encounter.  The party can still deliberately attack land
+        monsters by stepping off the boat onto their tile.
+        """
         party = self.game.party
+        on_boat = bool(getattr(self.game, "on_boat", False))
         for mon in self.overworld_monsters:
             if not mon.is_alive():
+                continue
+            # Skip land creatures while sailing — they can't board.
+            if on_boat and getattr(mon, "terrain", "land") != "sea":
                 continue
             if abs(mon.col - party.col) + abs(mon.row - party.row) <= 1:
                 self._show_encounter_action(mon)
@@ -2638,33 +2664,39 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             return
 
         if mode == "procedural":
-            # Map dungeon settings to generate_dungeon parameters
+            # Map dungeon settings to generate_dungeon parameters.
+            # Difficulty lives on the dungeon_generator so both call
+            # sites (this one and save_load._regenerate_procedural)
+            # stay in sync.
+            from src.dungeon_generator import get_difficulty_profile
             size_map = {"small": (30, 20), "medium": (40, 30),
                         "large": (60, 40)}
-            diff_rooms = {"easy": (4, 6), "normal": (6, 10),
-                          "hard": (8, 14), "deadly": (10, 18)}
             torch_map = {"none": "none", "sparse": "sparse",
                          "moderate": "medium", "abundant": "dense"}
             sz = size_map.get(
                 dungeon_def.get("level_size", "medium"), (40, 30))
-            rm = diff_rooms.get(
-                dungeon_def.get("difficulty", "normal"), (6, 10))
             td = torch_map.get(
                 dungeon_def.get("torch_density", "moderate"), "medium")
             num_levels = max(1, int(dungeon_def.get("num_levels", 1)))
             doors = dungeon_def.get("locked_doors", "off") == "on"
+            difficulty = dungeon_def.get("difficulty", "normal")
 
             gen_levels = []
             seed_base = hash((name, pcol, prow)) & 0xFFFFFFFF
             for li in range(num_levels):
                 lname = f"{name} - Floor {li + 1}" if num_levels > 1 else name
+                prof = get_difficulty_profile(difficulty, floor_idx=li)
                 dd = generate_dungeon(
                     name=lname, width=sz[0], height=sz[1],
-                    min_rooms=rm[0], max_rooms=rm[1],
+                    min_rooms=prof["min_rooms"],
+                    max_rooms=prof["max_rooms"],
                     seed=seed_base + li,
                     place_stairs_down=(li < num_levels - 1),
                     place_doors=doors,
                     torch_density=td,
+                    encounter_min_level=prof["enc_min"],
+                    encounter_max_level=prof["enc_max"],
+                    random_encounter_chance=prof["enc_chance"],
                     style=style)
                 gen_levels.append(dd)
 

@@ -796,31 +796,35 @@ def _regenerate_module_dungeon(game, dungeon_name, ow_col, ow_row):
         return None  # custom dungeons need the full layout data
 
     name = dungeon_def.get("name", "Dungeon")
+    from src.dungeon_generator import get_difficulty_profile
     size_map = {"small": (30, 20), "medium": (40, 30),
                 "large": (60, 40)}
-    diff_rooms = {"easy": (4, 6), "normal": (6, 10),
-                  "hard": (8, 14), "deadly": (10, 18)}
     torch_map = {"none": "none", "sparse": "sparse",
                  "moderate": "medium", "abundant": "dense"}
     sz = size_map.get(dungeon_def.get("level_size", "medium"), (40, 30))
-    rm = diff_rooms.get(dungeon_def.get("difficulty", "normal"), (6, 10))
     td = torch_map.get(dungeon_def.get("torch_density", "moderate"),
                        "medium")
     num_levels = max(1, int(dungeon_def.get("num_levels", 1)))
     doors = dungeon_def.get("locked_doors", "off") == "on"
+    difficulty = dungeon_def.get("difficulty", "normal")
 
     gen_levels = []
     seed_base = hash((name, ow_col, ow_row)) & 0xFFFFFFFF
     for li in range(num_levels):
         lname = (f"{name} - Floor {li + 1}"
                  if num_levels > 1 else name)
+        prof = get_difficulty_profile(difficulty, floor_idx=li)
         dd = generate_dungeon(
             name=lname, width=sz[0], height=sz[1],
-            min_rooms=rm[0], max_rooms=rm[1],
+            min_rooms=prof["min_rooms"],
+            max_rooms=prof["max_rooms"],
             seed=seed_base + li,
             place_stairs_down=(li < num_levels - 1),
             place_doors=doors,
-            torch_density=td)
+            torch_density=td,
+            encounter_min_level=prof["enc_min"],
+            encounter_max_level=prof["enc_max"],
+            random_encounter_chance=prof["enc_chance"])
         gen_levels.append(dd)
 
     # Cache so subsequent saves will persist them

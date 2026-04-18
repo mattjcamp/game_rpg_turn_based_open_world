@@ -170,6 +170,12 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
         self.pickpocket_targets = []   # list of adjacent NPCs
         self.pickpocket_cursor = 0     # index into pickpocket_targets
 
+        # Help overlay ([H] toggles in-town help). Must be initialized
+        # here so draw() can safely read it on the first frame, even
+        # when the session didn't come through reset_for_new_game
+        # (e.g. loading a save).
+        self.showing_help = False
+
     def reset_for_new_game(self):
         """Clear transient state so a new game doesn't inherit overlays
         (shop, temple, healing counter, pickpocket) or interior nesting

@@ -1,22 +1,34 @@
 [
   {
-    "name": "Rats",
+    "name": "Rat Infestation",
     "description": "",
-    "giver_npc": "test",
+    "giver_npc": "Sheila",
     "giver_sprite": "src/assets/game/npcs/vga_mage.png",
     "giver_location": "town:New Haven",
-    "giver_dialogue": "Rats, kill all rats",
+    "giver_dialogue": "Hi, I'm the owner of the General Shop. We have a serious rat infestation in our basement. I'm talking about Giant Rats. If you can take of this I can contribute money to your adventure.",
     "reward_xp": 100,
     "reward_gold": 100,
     "steps": [
       {
-        "description": "New Step",
+        "description": "Clear the Rats",
         "step_type": "kill",
         "encounter": "Rat Infestation",
         "collect_item": "",
         "has_guardian": "no",
         "guardian_encounter": "",
-        "spawn_location": "overview",
+        "spawn_location": "interior:New Haven/Tunnel Short",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      },
+      {
+        "description": "Remove the Goblin",
+        "step_type": "kill",
+        "encounter": "Stray Goblin",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:New Haven/Tunnel Short",
         "target": "",
         "target_count": 1,
         "optional": "no"
@@ -24,5 +36,43 @@
     ],
     "giver_col": 8,
     "giver_row": 8
+  },
+  {
+    "name": "Goblin Horde",
+    "description": "",
+    "giver_npc": "Ron",
+    "giver_sprite": "src/assets/game/npcs/vga_mage.png",
+    "giver_location": "town:New Haven",
+    "giver_dialogue": "Goblins are threatening our town, care to help a people's out? They are hiding in their stronghold.",
+    "reward_xp": 150,
+    "reward_gold": 150,
+    "steps": [
+      {
+        "description": "Kill Goblics",
+        "step_type": "kill",
+        "encounter": "Goblin Squatters",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Goblin Stronghold",
+        "target": "",
+        "target_count": 5,
+        "optional": "no"
+      },
+      {
+        "description": "Remove the Orc Shaman",
+        "step_type": "kill",
+        "encounter": "Shaman's Guard",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Goblin Stronghold ",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 4
   }
 ]
