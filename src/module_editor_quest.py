@@ -136,6 +136,13 @@ class ModuleQuestEditorMixin:
                        str(quest.get("reward_xp", 0)), "int", True),
             FieldEntry("Reward Gold", "reward_gold",
                        str(quest.get("reward_gold", 0)), "int", True),
+            # Item rewards — pressing Enter on this row opens a grid
+            # picker that toggles items in/out of quest.reward_items.
+            # Display shows a summary (count + a few names).
+            FieldEntry("Reward Items", "reward_items",
+                       self._mod_quest_format_reward_items(
+                           quest.get("reward_items", [])),
+                       "item_list", True),
         ]
 
         self._mod_quest_choice_map = {
@@ -157,6 +164,11 @@ class ModuleQuestEditorMixin:
             return
         for fe_entry in self._mod_quest_fields:
             if not fe_entry.editable or fe_entry.field_type == "section":
+                continue
+            # Item lists own their own save path (via the picker's
+            # toggle handler); the field.value here is just a display
+            # summary, not the real data.
+            if fe_entry.field_type == "item_list":
                 continue
             key = fe_entry.key
             val = fe_entry.value
@@ -493,11 +505,78 @@ class ModuleQuestEditorMixin:
             "giver_dialogue": "",
             "reward_xp": 0,
             "reward_gold": 0,
+            "reward_items": [],
             "steps": [],
         }
         self._mod_quest_list.append(new_quest)
         self._mod_quest_cursor = len(self._mod_quest_list) - 1
         self._save_module_quests()
+
+    # ── Reward item picker helpers ──
+
+    @staticmethod
+    def _mod_quest_format_reward_items(items):
+        """Return a short summary string for the Reward Items field.
+
+        Shown inline in the settings panel so the editor can see the
+        current rewards at a glance without opening the picker.
+        """
+        if not items:
+            return "(none)  [Enter to pick]"
+        if len(items) == 1:
+            return items[0]
+        preview = ", ".join(items[:3])
+        if len(items) > 3:
+            preview += f", +{len(items) - 3} more"
+        return f"{len(items)}: {preview}"
+
+    def _mod_quest_load_item_names(self):
+        """Load all item names from party.WEAPONS / ARMORS / ITEM_INFO.
+
+        Cached on first call; invalidate via
+        ``self._mod_quest_item_picker_list = None`` when item data
+        might have changed (e.g., module switch).
+        """
+        if getattr(self, "_mod_quest_item_picker_list", None):
+            return self._mod_quest_item_picker_list
+        try:
+            from src.party import WEAPONS, ARMORS, ITEM_INFO
+            names = sorted(set(list(WEAPONS.keys())
+                               + list(ARMORS.keys())
+                               + list(ITEM_INFO.keys())))
+        except Exception:
+            names = []
+        self._mod_quest_item_picker_list = names
+        return names
+
+    def _mod_quest_open_item_picker(self):
+        """Open the reward item grid picker for the current quest."""
+        quest = self._mod_quest_get_current()
+        if not quest:
+            return
+        self._mod_quest_load_item_names()
+        self._mod_quest_item_picker_active = True
+        self._mod_quest_item_picker_cursor = 0
+        self._mod_quest_item_picker_scroll = 0
+
+    def _mod_quest_toggle_reward_item(self, item_name):
+        """Add or remove *item_name* from the current quest's
+        reward_items list."""
+        quest = self._mod_quest_get_current()
+        if not quest:
+            return
+        items = list(quest.get("reward_items", []))
+        if item_name in items:
+            items.remove(item_name)
+        else:
+            items.append(item_name)
+        quest["reward_items"] = items
+        self._save_module_quests()
+        # Refresh the field display so the summary updates live.
+        for fe in self._mod_quest_fields:
+            if fe.key == "reward_items":
+                fe.value = self._mod_quest_format_reward_items(items)
+                break
 
     def _mod_quest_add_step(self):
         """Add a new default step to the current quest."""
@@ -669,6 +748,13 @@ class ModuleQuestEditorMixin:
     def _handle_mod_quest_settings_field_input(self, event):
         """Handle input for quest settings field editing (level 22)."""
         import pygame
+
+        # Intercept reward-items picker overlay first so it captures
+        # all input while open.
+        if getattr(self, "_mod_quest_item_picker_active", False):
+            self._handle_mod_quest_item_picker_input(event)
+            return
+
         fields = self._mod_quest_fields
         n = len(fields)
         fe = self.features_editor
@@ -679,8 +765,15 @@ class ModuleQuestEditorMixin:
 
         current_field = fields[self._mod_quest_field]
 
+        # Enter on an "item_list" field opens the reward-items picker.
+        if (event.key in (pygame.K_RETURN, pygame.K_SPACE)
+                and current_field.field_type == "item_list"
+                and current_field.editable):
+            self._mod_quest_open_item_picker()
+            return
+
         if self._is_save_shortcut(event):
-            if current_field.editable and current_field.field_type != "choice":
+            if current_field.editable and current_field.field_type not in ("choice", "item_list"):
                 current_field.value = self._mod_quest_buffer
             self._mod_quest_save_settings_fields()
             self._save_module_quests()
@@ -688,7 +781,7 @@ class ModuleQuestEditorMixin:
             return
 
         if event.key == pygame.K_ESCAPE:
-            if current_field.editable and current_field.field_type != "choice":
+            if current_field.editable and current_field.field_type not in ("choice", "item_list"):
                 current_field.value = self._mod_quest_buffer
             self._mod_quest_save_settings_fields()
             self.module_edit_level = 21
@@ -701,30 +794,92 @@ class ModuleQuestEditorMixin:
                 return
 
         if event.key == pygame.K_UP:
-            if current_field.editable and current_field.field_type != "choice":
+            if current_field.editable and current_field.field_type not in ("choice", "item_list"):
                 current_field.value = self._mod_quest_buffer
             self._mod_quest_field = fe._next_editable_generic(
                 fields, (self._mod_quest_field - 1) % n)
             nf = fields[self._mod_quest_field]
-            self._mod_quest_buffer = nf.value if nf.field_type != "choice" else ""
+            self._mod_quest_buffer = (
+                nf.value
+                if nf.field_type not in ("choice", "item_list")
+                else "")
             self._mod_quest_field_scroll = fe._adjust_field_scroll_generic(
                 self._mod_quest_field, self._mod_quest_field_scroll)
         elif event.key == pygame.K_DOWN:
-            if current_field.editable and current_field.field_type != "choice":
+            if current_field.editable and current_field.field_type not in ("choice", "item_list"):
                 current_field.value = self._mod_quest_buffer
             self._mod_quest_field = fe._next_editable_generic(
                 fields, (self._mod_quest_field + 1) % n)
             nf = fields[self._mod_quest_field]
-            self._mod_quest_buffer = nf.value if nf.field_type != "choice" else ""
+            self._mod_quest_buffer = (
+                nf.value
+                if nf.field_type not in ("choice", "item_list")
+                else "")
             self._mod_quest_field_scroll = fe._adjust_field_scroll_generic(
                 self._mod_quest_field, self._mod_quest_field_scroll)
-        elif current_field.field_type == "choice":
-            # Don't allow typing on choice fields
+        elif current_field.field_type in ("choice", "item_list"):
+            # Don't allow typing on choice or item-list fields
             pass
         elif event.key == pygame.K_BACKSPACE:
             self._mod_quest_buffer = self._mod_quest_buffer[:-1]
         elif event.unicode and event.unicode.isprintable():
             self._mod_quest_buffer += event.unicode
+
+    def _handle_mod_quest_item_picker_input(self, event):
+        """Handle input for the reward-items picker overlay.
+
+        Grid navigation (Up/Down/Left/Right/PgUp/PgDn/Home/End) moves
+        the cursor. Enter toggles the focused item in/out of the
+        current quest's ``reward_items`` list. Esc closes the picker.
+        """
+        import pygame
+        from src.settings import SCREEN_WIDTH
+        names = getattr(self, "_mod_quest_item_picker_list", None) or []
+        n = len(names)
+        if not n:
+            self._mod_quest_item_picker_active = False
+            return
+
+        # Grid width must match the renderer's modal sizing exactly.
+        # Renderer formula:
+        #   pw = min(SCREEN_WIDTH - 40, 760)
+        #   cols = max(1, (pw - pad_in*2) // cell_w)   pad_in=14, cell_w=64
+        # Mirrored here so Up/Down jumps the same row height the
+        # user actually sees on screen.
+        pw = min(SCREEN_WIDTH - 40, 760)
+        cols_per_row = max(1, (pw - 28) // 64)
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_quest_item_picker_active = False
+            return
+        if event.key == pygame.K_UP:
+            self._mod_quest_item_picker_cursor = max(
+                0, self._mod_quest_item_picker_cursor - cols_per_row)
+        elif event.key == pygame.K_DOWN:
+            self._mod_quest_item_picker_cursor = min(
+                n - 1,
+                self._mod_quest_item_picker_cursor + cols_per_row)
+        elif event.key == pygame.K_LEFT:
+            self._mod_quest_item_picker_cursor = max(
+                0, self._mod_quest_item_picker_cursor - 1)
+        elif event.key == pygame.K_RIGHT:
+            self._mod_quest_item_picker_cursor = min(
+                n - 1, self._mod_quest_item_picker_cursor + 1)
+        elif event.key == pygame.K_PAGEUP:
+            self._mod_quest_item_picker_cursor = max(
+                0, self._mod_quest_item_picker_cursor - cols_per_row * 4)
+        elif event.key == pygame.K_PAGEDOWN:
+            self._mod_quest_item_picker_cursor = min(
+                n - 1,
+                self._mod_quest_item_picker_cursor + cols_per_row * 4)
+        elif event.key == pygame.K_HOME:
+            self._mod_quest_item_picker_cursor = 0
+        elif event.key == pygame.K_END:
+            self._mod_quest_item_picker_cursor = n - 1
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            idx = self._mod_quest_item_picker_cursor
+            if 0 <= idx < n:
+                self._mod_quest_toggle_reward_item(names[idx])
 
     def _handle_mod_quest_step_list_input(self, event):
         """Handle input for the quest step list (level 22)."""

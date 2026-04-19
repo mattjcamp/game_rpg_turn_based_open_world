@@ -1107,6 +1107,8 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     break
             reward_xp = qdef.get("reward_xp", 0) if qdef else 0
             reward_gold = qdef.get("reward_gold", 0) if qdef else 0
+            reward_items = (qdef.get("reward_items", [])
+                            if qdef else []) or []
 
             # Grant rewards
             if reward_xp:
@@ -1116,6 +1118,12 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                         m.check_level_up()
             if reward_gold:
                 self.game.party.gold += reward_gold
+            # Item rewards — drop each one into the shared stash.
+            for item_name in reward_items:
+                try:
+                    self.game.party.inv_add(item_name)
+                except Exception:
+                    pass
 
             # Build reward text for dialogue
             parts = []
@@ -1123,6 +1131,15 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 parts.append(f"+{reward_xp} XP")
             if reward_gold:
                 parts.append(f"+{reward_gold} Gold")
+            if reward_items:
+                if len(reward_items) == 1:
+                    parts.append(f"+{reward_items[0]}")
+                else:
+                    parts.append(
+                        f"+{len(reward_items)} items "
+                        f"({', '.join(reward_items[:3])}"
+                        + (f", +{len(reward_items)-3} more"
+                           if len(reward_items) > 3 else "") + ")")
             reward_str = ", ".join(parts)
             if reward_str:
                 self.show_message(

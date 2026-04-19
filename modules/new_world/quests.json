@@ -35,7 +35,10 @@
       }
     ],
     "giver_col": 8,
-    "giver_row": 8
+    "giver_row": 8,
+    "reward_items": [
+      "Iron Sword"
+    ]
   },
   {
     "name": "Goblin Horde",
@@ -87,6 +90,9 @@
       }
     ],
     "giver_col": 25,
-    "giver_row": 25
+    "giver_row": 25,
+    "reward_items": [
+      "Sun Sword"
+    ]
   }
 ]

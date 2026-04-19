@@ -482,6 +482,11 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_quest_naming_target = ""   # "quest" or "step"
         # Save flash
         self._mod_quest_save_flash = 0.0
+        # Reward-items picker overlay (quest settings screen)
+        self._mod_quest_item_picker_active = False
+        self._mod_quest_item_picker_cursor = 0
+        self._mod_quest_item_picker_scroll = 0
+        self._mod_quest_item_picker_list = None  # lazy-loaded
 
         # Restore last-used module from config (if it still exists)
         saved_mod_path = self._config.get("active_module_path")
@@ -5351,6 +5356,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Reset cached monster / encounter names so they reload fresh
         self._mod_quest_monster_names = None
         self._mod_quest_encounter_names = None
+        # Clear any open picker overlay + its cached item list.
+        self._mod_quest_item_picker_active = False
+        self._mod_quest_item_picker_list = None
         # Update section subtitle
         for sec in self.module_edit_sections:
             if sec.get("_quests"):
@@ -6320,6 +6328,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "monster_tile_map": getattr(self, "_mod_quest_monster_tiles", {}),
                         "encounter_tile_map": getattr(self, "_mod_quest_encounter_tiles", {}),
                         "artifact_sprite_map": getattr(self, "_mod_quest_artifact_sprites", {}),
+                        # Reward-items picker overlay state
+                        "item_picker_active": self._mod_quest_item_picker_active,
+                        "item_picker_cursor": self._mod_quest_item_picker_cursor,
+                        "item_picker_scroll": self._mod_quest_item_picker_scroll,
+                        "item_picker_list": self._mod_quest_item_picker_list or [],
+                        "reward_items": (
+                            self._mod_quest_get_current().get("reward_items", [])
+                            if self._mod_quest_get_current() else []),
                     })
                 if self._unsaved_dialog_active:
                     self.renderer.draw_unsaved_dialog()

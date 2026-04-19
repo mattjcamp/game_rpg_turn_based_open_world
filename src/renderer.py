@@ -9756,6 +9756,16 @@ class Renderer(CombatEffectRendererMixin):
                 for li, line in enumerate(wrapped):
                     self._u3_text(line, val_x, cur_y + 4 + li * 18,
                                   val_color, fm)
+            elif fe.field_type == "item_list":
+                # Display the summary string; pressing Enter opens
+                # the grid picker overlay (handled by the editor).
+                val_text = fe.value or "(none)"
+                val_color = ((255, 220, 100) if selected
+                             else (200, 200, 200))
+                while (len(val_text) > 2
+                       and fm.size(val_text)[0] > effective_val_max_w):
+                    val_text = val_text[:-1]
+                self._u3_text(val_text, val_x, cur_y + 4, val_color, fm)
             elif selected and fe.editable:
                 val_text = field_buffer + "_"
                 # Truncate display if too wide
@@ -9775,10 +9785,145 @@ class Renderer(CombatEffectRendererMixin):
 
             cur_y += field_h
 
+        # Draw the reward-items picker overlay last so it sits on top.
+        if qd.get("item_picker_active"):
+            self._draw_quest_item_picker(qd, rx, ry, rw, rh, fm, fs, f)
+
         self._draw_quest_flash(qd, rx, ry, rw, rh, f)
         self._u3_text(
             "[Up/Dn] Navigate  [Lt/Rt] Choice  [Type] Edit  [Ctrl+S] Save  [Esc] Back",
             rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_quest_item_picker(self, qd, rx, ry, rw, rh, fm, fs, f):
+        """Draw the reward-items grid picker as a screen-centered modal.
+
+        The quest editor's right-hand panel is narrower than the grid
+        needs, so this overlay sizes itself against the full screen
+        (matching the map-editor item picker's pattern) and dims
+        everything behind it.  Each cell highlights when its item is
+        already in the quest's reward_items list. Enter toggles the
+        focused cell.
+        """
+        names = qd.get("item_picker_list") or []
+        if not names:
+            return
+        cursor = qd.get("item_picker_cursor", 0)
+        cursor = max(0, min(cursor, len(names) - 1))
+        selected_items = set(qd.get("reward_items") or [])
+
+        # Screen-centered modal sizing — matches the map-editor picker
+        # so the user sees a consistent shape across editors.
+        pw = min(SCREEN_WIDTH - 40, 760)
+        ph = min(SCREEN_HEIGHT - 60, 560)
+        ox = (SCREEN_WIDTH - pw) // 2
+        oy = (SCREEN_HEIGHT - ph) // 2
+        ow, oh = pw, ph
+
+        # Dim the whole screen behind the modal.
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT),
+                             pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 160))
+        self.screen.blit(dim, (0, 0))
+
+        pygame.draw.rect(self.screen, (16, 14, 28),
+                         (ox, oy, ow, oh))
+        pygame.draw.rect(self.screen, self._U3_ORANGE,
+                         (ox, oy, ow, oh), 2)
+
+        self._u3_text("REWARD ITEMS", ox + 16, oy + 10,
+                      self._U3_ORANGE, f)
+        self._u3_text(
+            f"{len(selected_items)} selected  /  {len(names)} items",
+            ox + 16, oy + 40, (160, 160, 180), fs)
+
+        # Grid layout — cols computed from actual width so the grid
+        # always fits inside the modal. The input handler reads the
+        # same value back from qd["item_picker_cols"] so arrow-key
+        # navigation lines up with what the user sees.
+        cell_w = 64
+        cell_h = 72
+        pad_in = 14
+        cols_per_row = max(1, (ow - pad_in * 2) // cell_w)
+        qd["item_picker_cols"] = cols_per_row
+        list_top = oy + 70
+        list_bottom = oy + oh - 40
+        rows_vis = max(1, (list_bottom - list_top) // cell_h)
+
+        row_of_cursor = cursor // cols_per_row
+        scroll = qd.get("item_picker_scroll", 0)
+        if row_of_cursor < scroll:
+            scroll = row_of_cursor
+        elif row_of_cursor >= scroll + rows_vis:
+            scroll = row_of_cursor - rows_vis + 1
+        qd["item_picker_scroll"] = scroll
+
+        try:
+            from src.party import ITEM_INFO
+        except Exception:
+            ITEM_INFO = {}
+
+        for i, name in enumerate(names):
+            r = i // cols_per_row
+            c = i % cols_per_row
+            if r < scroll or r >= scroll + rows_vis:
+                continue
+            x = ox + pad_in + c * cell_w
+            y = list_top + (r - scroll) * cell_h
+
+            is_sel = (i == cursor)
+            is_chosen = name in selected_items
+
+            # Background shade — different colours for focused vs
+            # already-selected so both cues are visible together.
+            if is_chosen:
+                bg = pygame.Surface((cell_w - 2, cell_h - 2),
+                                    pygame.SRCALPHA)
+                bg.fill((80, 180, 80, 70))
+                self.screen.blit(bg, (x + 1, y + 1))
+            if is_sel:
+                pygame.draw.rect(self.screen, self._U3_ORANGE,
+                                 (x + 1, y + 1, cell_w - 2, cell_h - 2),
+                                 2)
+
+            # Icon
+            info = ITEM_INFO.get(name, {})
+            icon_type = info.get("icon", "tool")
+            tint = self._potion_tint(info) if info else None
+            icx = x + cell_w // 2
+            icy = y + 26
+            icon_sz = 40
+            icon_bg = pygame.Surface((icon_sz, icon_sz), pygame.SRCALPHA)
+            pygame.draw.rect(icon_bg, (20, 20, 28, 200),
+                             pygame.Rect(0, 0, icon_sz, icon_sz),
+                             border_radius=4)
+            self.screen.blit(icon_bg,
+                             (icx - icon_sz // 2, icy - icon_sz // 2))
+            self._draw_item_icon(icx, icy, icon_type, icon_sz, tint=tint)
+
+            # Checkmark overlay on chosen items
+            if is_chosen:
+                pygame.draw.circle(self.screen, (60, 220, 90),
+                                   (x + cell_w - 12, y + 10), 8)
+                pygame.draw.lines(self.screen, (16, 40, 16), False,
+                                  [(x + cell_w - 16, y + 10),
+                                   (x + cell_w - 13, y + 13),
+                                   (x + cell_w - 8, y + 7)], 2)
+
+            # Name (truncated)
+            lbl = name
+            max_w = cell_w - 4
+            while fs.size(lbl)[0] > max_w and len(lbl) > 2:
+                lbl = lbl[:-1]
+            if lbl != name:
+                lbl = lbl[:-1] + "…"
+            name_col = (255, 255, 230) if is_sel else (200, 200, 215)
+            tw = fs.size(lbl)[0]
+            self._u3_text(lbl, icx - tw // 2, y + cell_h - 20,
+                          name_col, fs)
+
+        self._u3_text(
+            "[Arrows] Move  [Enter] Toggle  [Esc] Done",
+            ox + 16, oy + oh - 22, self._U3_HINT, fs)
 
     def _draw_quest_step_list(self, qd, rx, ry, rw, rh, fm, fs, f):
         """Draw the quest step list."""
