@@ -903,23 +903,37 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         return self.game.party.get_equipped_name("light") == "Torch"
 
     def _tick_torch(self):
-        """Decrement torch charges and handle burnout after a step."""
+        """Decrement torch charges and handle burnout after a step.
+
+        Delegates charge accounting to ``Party.tick_equipped_torch``
+        so the mechanic behaves identically in every state (dungeon,
+        town, overworld, building interiors). Dungeon-local flags
+        (``torch_active``, ``torch_steps``) are kept in sync afterwards
+        because the renderer reads them for lighting decisions.
+        """
         if not self.torch_active:
             return
-        self.torch_steps -= 1
-        # Sync charges back to the equipped item
         party = self.game.party
-        entry = party.equipped.get("light")
-        if entry and entry.get("charges") is not None:
-            entry["charges"] = max(0, self.torch_steps)
-        if self.torch_steps <= 0:
+        result = party.tick_equipped_torch()
+        if result == "burned_out":
             self.torch_active = False
-            self._consume_torch()  # Remove the burned-out torch
-            # Try to reactivate if somehow another torch is equipped
+            self.torch_steps = 0
+            # tick_equipped_torch already removed the burned-out torch
+            # from the LIGHT slot — no extra cleanup needed here.
+            # If another torch happens to be in the LIGHT slot (rare),
+            # activate it; otherwise announce the burnout.
             if self._activate_torch():
                 self.show_message("Lit a new torch!", 2000)
             else:
                 self.show_message("Your torch has burned out!", 2500)
+        else:
+            # Mirror remaining charges into the dungeon-local counter
+            # so rendering / lit-radius logic sees the current value.
+            entry = party.equipped.get("light")
+            if entry and entry.get("charges") is not None:
+                self.torch_steps = entry["charges"]
+            else:
+                self.torch_steps = max(0, self.torch_steps - 1)
 
     def _tick_galadriels_light(self):
         """Decrement Galadriel's Light step counter and auto-remove when expired."""
@@ -1224,7 +1238,12 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             mon.col, mon.row = best
 
     def _check_monster_contact(self):
-        """If a monster is adjacent to (or onto) the party, show encounter screen."""
+        """If a monster is adjacent to (or onto) the party, show encounter screen.
+
+        Uses Chebyshev distance so diagonally-adjacent monsters also
+        trigger — matches overworld behaviour and the player's visual
+        intuition of "right next to me".
+        """
         if not self.dungeon_data:
             return
         if self.encounter_action_active:
@@ -1235,7 +1254,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 continue
             dc = abs(monster.col - party.col)
             dr = abs(monster.row - party.row)
-            if dc + dr <= 1:  # Same tile or cardinal-adjacent
+            if max(dc, dr) <= 1:  # Same tile or any-direction adjacent
                 self._show_encounter_action(monster)
                 return
 

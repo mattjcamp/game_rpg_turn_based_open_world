@@ -54,25 +54,39 @@
         "collect_item": "",
         "has_guardian": "no",
         "guardian_encounter": "",
-        "spawn_location": "dungeon:Goblin Stronghold",
+        "spawn_location": "",
         "target": "",
         "target_count": 5,
-        "optional": "no"
-      },
-      {
-        "description": "Remove the Orc Shaman",
-        "step_type": "kill",
-        "encounter": "Shaman's Guard",
-        "collect_item": "",
-        "has_guardian": "no",
-        "guardian_encounter": "",
-        "spawn_location": "dungeon:Goblin Stronghold ",
-        "target": "",
-        "target_count": 1,
         "optional": "no"
       }
     ],
     "giver_col": 8,
     "giver_row": 4
+  },
+  {
+    "name": "Retrieve the Sun Sword",
+    "description": "",
+    "giver_npc": "Lord British",
+    "giver_sprite": "src/assets/unassigned/wizard_f1.png",
+    "giver_location": "overview",
+    "giver_dialogue": "The realm's Sun Sword has been buried in The Deep. This artifact will provide useful in our battle against the dark forces threatening our lands. Retrieve this and wied it against our enemies.",
+    "reward_xp": 500,
+    "reward_gold": 500,
+    "steps": [
+      {
+        "description": "Retrieve the Sun Sword",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "King's Sword",
+        "has_guardian": "yes",
+        "guardian_encounter": "Undead Warband",
+        "spawn_location": "space:The Deep/Dungeon 4",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 25,
+    "giver_row": 25
   }
 ]

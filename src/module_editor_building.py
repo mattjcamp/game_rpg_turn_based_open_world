@@ -192,6 +192,167 @@ class ModuleBuildingEditorMixin:
         space["tiles"] = copy.deepcopy(template.get("tiles", {}))
         self._save_module_buildings()
 
+    # ── Auto-populate encounters ──
+
+    _BUILDING_DIFFICULTY_OPTIONS = ["easy", "normal", "hard", "deadly"]
+
+    # Building interiors are tighter spaces than dungeons, so we use a
+    # gentler density curve than ``get_difficulty_profile``'s enc_chance
+    # (which is tuned for per-room rolls in procedurally generated
+    # dungeons). These are the tier labels shown in the picker and are
+    # applied on top of the 0.05 floor-tile scaler below.
+    _BUILDING_DENSITY = {
+        "easy":   0.10,
+        "normal": 0.25,
+        "hard":   0.35,
+        "deadly": 0.45,
+    }
+
+    def _mod_building_open_difficulty_picker(self):
+        """Open the difficulty picker overlay for auto-populating encounters."""
+        self._mod_building_diff_picking = True
+        # Default to "normal" (index 1) so a quick Enter does the
+        # least-surprising thing.
+        self._mod_building_diff_cursor = 1
+        self._mod_building_auto_pop_msg = ""
+
+    def _mod_building_auto_populate_encounters(self, difficulty):
+        """Replace the current space's encounters with a difficulty-
+        scaled random selection drawn from encounters.json.
+
+        Writes placements to both ``space["tile_properties"]`` (via the
+        ``"encounter"`` key, so ``_spawn_placed_encounters`` picks them
+        up at runtime) and ``space["encounters"]`` (for editor
+        visibility in the Encounters list).
+
+        Density and level band come from the shared
+        ``get_difficulty_profile`` helper so building spaces match the
+        dungeon difficulty vocabulary exactly.
+        """
+        import json
+        import os
+        import random as _rng
+        from src.dungeon_generator import get_difficulty_profile
+        from src.settings import TILE_DEFS
+
+        space = self._mod_building_get_current_space()
+        if not space:
+            return
+
+        prof = get_difficulty_profile(difficulty, floor_idx=0)
+        enc_min = prof["enc_min"]
+        enc_max = prof["enc_max"]
+        # Building density is independent of the dungeon generator's
+        # enc_chance — buildings are smaller spaces and want fewer
+        # encounters at the same difficulty tier.
+        density = self._BUILDING_DENSITY.get(difficulty, 0.25)
+
+        # ── Gather walkable floor tiles from the space's tile grid ──
+        # Spaces store tiles sparsely as {"col,row": {"tile_id": N, ...}}.
+        tiles = space.get("tiles", {}) or {}
+        walkable = []
+        for pos_key, td in tiles.items():
+            if not isinstance(td, dict):
+                continue
+            tid = td.get("tile_id")
+            if tid is None:
+                continue
+            tdef = TILE_DEFS.get(tid, {})
+            if not tdef.get("walkable"):
+                continue
+            parts = str(pos_key).split(",")
+            if len(parts) != 2:
+                continue
+            try:
+                c, r = int(parts[0]), int(parts[1])
+            except ValueError:
+                continue
+            walkable.append((c, r))
+
+        if not walkable:
+            self._mod_building_auto_pop_msg = (
+                "No walkable tiles in this space")
+            return
+
+        # ── Load encounters.json and filter to the difficulty band ──
+        enc_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data", "encounters.json")
+        try:
+            with open(enc_path, "r") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        pool = []
+        buckets = data.get("encounters", {})
+        if isinstance(buckets, dict):
+            for bucket_entries in buckets.values():
+                if not isinstance(bucket_entries, list):
+                    continue
+                for e in bucket_entries:
+                    if not isinstance(e, dict):
+                        continue
+                    lvl = e.get("level", 1)
+                    if enc_min <= lvl <= enc_max and e.get("name"):
+                        pool.append(e)
+
+        if not pool:
+            self._mod_building_auto_pop_msg = (
+                f"No encounters at levels {enc_min}-{enc_max}")
+            return
+
+        # ── Clear existing encounters (replace mode) ──
+        space["encounters"] = []
+        tprops = space.get("tile_properties")
+        if not isinstance(tprops, dict):
+            tprops = {}
+            space["tile_properties"] = tprops
+        for pos_key in list(tprops.keys()):
+            entry = tprops.get(pos_key)
+            if isinstance(entry, dict) and "encounter" in entry:
+                del entry["encounter"]
+                if not entry:
+                    del tprops[pos_key]
+
+        # ── Compute target count: scales with floor area × density ──
+        # Formula: walkable * density * 0.05
+        #   easy  (10% * 0.05 = 0.5%) → big rooms stay quiet
+        #   deadly (45% * 0.05 = 2.25%) → even big rooms stay manageable
+        target = max(1, int(len(walkable) * density * 0.05))
+        target = min(target, len(walkable))
+
+        rng = _rng.Random()
+        chosen_positions = rng.sample(walkable, target)
+        for (c, r) in chosen_positions:
+            enc = rng.choice(pool)
+            enc_name = enc.get("name", "")
+            if not enc_name:
+                continue
+            pos_key = f"{c},{r}"
+            if pos_key not in tprops:
+                tprops[pos_key] = {}
+            tprops[pos_key]["encounter"] = enc_name
+            # Mirror into the encounters list so the user sees them
+            # in the Encounters screen immediately.
+            space["encounters"].append({
+                "name": enc_name,
+                "encounter_type": "combat",
+                "col": c,
+                "row": r,
+                "description": (
+                    f"Auto ({difficulty}, lvl "
+                    f"{enc.get('level', '?')})"),
+            })
+
+        # Refresh the in-memory list so the Encounters screen is ready
+        # on next open without another load_encounters call.
+        self._mod_building_encounter_list = list(space["encounters"])
+        self._save_module_buildings()
+        self._mod_building_save_flash = 1.5
+        self._mod_building_auto_pop_msg = (
+            f"Added {len(space['encounters'])} encounters "
+            f"({difficulty})")
+
     # ── Encounter helpers (inside a space) ──
 
     def _mod_building_load_encounters(self):

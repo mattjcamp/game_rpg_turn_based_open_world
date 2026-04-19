@@ -1850,8 +1850,8 @@
             "path": "game/dungeon/stone_wall.png"
           },
           "7,0": {
-            "tile_id": 27,
-            "name": "Artifact"
+            "tile_id": 34,
+            "name": "Wall Torch"
           },
           "6,0": {
             "tile_id": 21,
@@ -1994,9 +1994,8 @@
             "path": "game/dungeon/stone_floor.png"
           },
           "4,2": {
-            "tile_id": 20,
-            "name": "Stone Floor",
-            "path": "game/dungeon/stone_floor.png"
+            "tile_id": 29,
+            "name": "Locked Door"
           },
           "3,2": {
             "tile_id": 20,
@@ -2014,7 +2013,15 @@
             "path": "game/dungeon/stone_floor.png"
           }
         },
-        "encounters": [],
+        "encounters": [
+          {
+            "name": "Wild Pack",
+            "encounter_type": "combat",
+            "col": 12,
+            "row": 2,
+            "description": "Auto (normal, lvl 4)"
+          }
+        ],
         "tile_properties": {
           "15,1": {
             "linked": true,
@@ -2032,8 +2039,11 @@
             "light_source": true,
             "light_range": "2"
           },
-          "5,2": {
-            "encounter": "Cellar Rats"
+          "12,2": {
+            "encounter": "Wild Pack"
+          },
+          "4,2": {
+            "locked": true
           }
         }
       },
@@ -5149,7 +5159,29 @@
             "name": "Dungeon"
           }
         },
-        "encounters": [],
+        "encounters": [
+          {
+            "name": "Wolf Pack",
+            "encounter_type": "combat",
+            "col": 20,
+            "row": 23,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Goblin Squatters",
+            "encounter_type": "combat",
+            "col": 17,
+            "row": 7,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Wolves and Goblins",
+            "encounter_type": "combat",
+            "col": 19,
+            "row": 19,
+            "description": "Auto (normal, lvl 3)"
+          }
+        ],
         "tile_properties": {
           "13,12": {
             "linked": true,
@@ -5169,6 +5201,15 @@
           "15,23": {
             "light_source": true,
             "light_range": "3"
+          },
+          "20,23": {
+            "encounter": "Wolf Pack"
+          },
+          "17,7": {
+            "encounter": "Goblin Squatters"
+          },
+          "19,19": {
+            "encounter": "Wolves and Goblins"
           }
         }
       },
@@ -15179,7 +15220,148 @@
             "path": "game/terrain/town_wall.png"
           }
         },
-        "encounters": [],
+        "encounters": [
+          {
+            "name": "Troll and Wolves",
+            "encounter_type": "combat",
+            "col": 32,
+            "row": 3,
+            "description": "Auto (hard, lvl 6)"
+          },
+          {
+            "name": "Orc with Wolves",
+            "encounter_type": "combat",
+            "col": 15,
+            "row": 10,
+            "description": "Auto (hard, lvl 4)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 26,
+            "row": 15,
+            "description": "Auto (hard, lvl 3)"
+          },
+          {
+            "name": "Shambling Dead",
+            "encounter_type": "combat",
+            "col": 34,
+            "row": 1,
+            "description": "Auto (hard, lvl 3)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 11,
+            "row": 39,
+            "description": "Auto (hard, lvl 3)"
+          },
+          {
+            "name": "Undead Horde",
+            "encounter_type": "combat",
+            "col": 15,
+            "row": 27,
+            "description": "Auto (hard, lvl 4)"
+          },
+          {
+            "name": "Orc Raiding Party",
+            "encounter_type": "combat",
+            "col": 36,
+            "row": 43,
+            "description": "Auto (hard, lvl 5)"
+          },
+          {
+            "name": "Orc with Wolves",
+            "encounter_type": "combat",
+            "col": 27,
+            "row": 24,
+            "description": "Auto (hard, lvl 4)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 20,
+            "row": 18,
+            "description": "Auto (hard, lvl 4)"
+          },
+          {
+            "name": "Archer's Nest",
+            "encounter_type": "combat",
+            "col": 26,
+            "row": 1,
+            "description": "Auto (hard, lvl 5)"
+          },
+          {
+            "name": "Archer's Nest",
+            "encounter_type": "combat",
+            "col": 32,
+            "row": 23,
+            "description": "Auto (hard, lvl 5)"
+          },
+          {
+            "name": "Shaman's Guard",
+            "encounter_type": "combat",
+            "col": 5,
+            "row": 21,
+            "description": "Auto (hard, lvl 3)"
+          },
+          {
+            "name": "Dark Riders",
+            "encounter_type": "combat",
+            "col": 23,
+            "row": 8,
+            "description": "Auto (hard, lvl 6)"
+          },
+          {
+            "name": "Wild Pack",
+            "encounter_type": "combat",
+            "col": 28,
+            "row": 13,
+            "description": "Auto (hard, lvl 4)"
+          },
+          {
+            "name": "Dark Patrol",
+            "encounter_type": "combat",
+            "col": 37,
+            "row": 2,
+            "description": "Auto (hard, lvl 6)"
+          },
+          {
+            "name": "Dark Riders",
+            "encounter_type": "combat",
+            "col": 14,
+            "row": 12,
+            "description": "Auto (hard, lvl 6)"
+          },
+          {
+            "name": "Archer's Nest",
+            "encounter_type": "combat",
+            "col": 14,
+            "row": 18,
+            "description": "Auto (hard, lvl 5)"
+          },
+          {
+            "name": "Orc Warband",
+            "encounter_type": "combat",
+            "col": 28,
+            "row": 41,
+            "description": "Auto (hard, lvl 5)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 31,
+            "row": 7,
+            "description": "Auto (hard, lvl 4)"
+          },
+          {
+            "name": "Dark Patrol",
+            "encounter_type": "combat",
+            "col": 20,
+            "row": 10,
+            "description": "Auto (hard, lvl 6)"
+          }
+        ],
         "tile_properties": {
           "36,37": {
             "linked": true,
@@ -15192,6 +15374,66 @@
             "link_x": "1",
             "link_map": "building:The Deep:Dungeon 3",
             "link_y": "1"
+          },
+          "32,3": {
+            "encounter": "Troll and Wolves"
+          },
+          "15,10": {
+            "encounter": "Orc with Wolves"
+          },
+          "26,15": {
+            "encounter": "Orc Scouts"
+          },
+          "34,1": {
+            "encounter": "Shambling Dead"
+          },
+          "11,39": {
+            "encounter": "Orc Scouts"
+          },
+          "15,27": {
+            "encounter": "Undead Horde"
+          },
+          "36,43": {
+            "encounter": "Orc Raiding Party"
+          },
+          "27,24": {
+            "encounter": "Orc with Wolves"
+          },
+          "20,18": {
+            "encounter": "Orc Scouts"
+          },
+          "26,1": {
+            "encounter": "Archer's Nest"
+          },
+          "32,23": {
+            "encounter": "Archer's Nest"
+          },
+          "5,21": {
+            "encounter": "Shaman's Guard"
+          },
+          "23,8": {
+            "encounter": "Dark Riders"
+          },
+          "28,13": {
+            "encounter": "Wild Pack"
+          },
+          "37,2": {
+            "encounter": "Dark Patrol"
+          },
+          "14,12": {
+            "encounter": "Dark Riders"
+          },
+          "14,18": {
+            "encounter": "Archer's Nest"
+          },
+          "28,41": {
+            "encounter": "Orc Warband"
+          },
+          "31,7": {
+            "encounter": "Orc Scouts"
+          },
+          "20,10": {
+            "encounter": "Dark Patrol"
           }
         }
       },
@@ -39421,7 +39663,246 @@
             "path": "game/terrain/mountain.png"
           }
         },
-        "encounters": [],
+        "encounters": [
+          {
+            "name": "Undead Horde",
+            "encounter_type": "combat",
+            "col": 58,
+            "row": 24,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 44,
+            "row": 7,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Orc Warband",
+            "encounter_type": "combat",
+            "col": 56,
+            "row": 20,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Shaman's Guard",
+            "encounter_type": "combat",
+            "col": 1,
+            "row": 28,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Orc Warband",
+            "encounter_type": "combat",
+            "col": 26,
+            "row": 27,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Skeleton Archers",
+            "encounter_type": "combat",
+            "col": 47,
+            "row": 42,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 60,
+            "row": 28,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 67,
+            "row": 2,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Orc Warband",
+            "encounter_type": "combat",
+            "col": 19,
+            "row": 45,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Wolves and Goblins",
+            "encounter_type": "combat",
+            "col": 37,
+            "row": 52,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 40,
+            "row": 53,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Wolves and Goblins",
+            "encounter_type": "combat",
+            "col": 3,
+            "row": 26,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Goblin Ambush",
+            "encounter_type": "combat",
+            "col": 41,
+            "row": 11,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Orc Scouts",
+            "encounter_type": "combat",
+            "col": 42,
+            "row": 16,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Orc with Wolves",
+            "encounter_type": "combat",
+            "col": 8,
+            "row": 14,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Rat Swarm",
+            "encounter_type": "combat",
+            "col": 22,
+            "row": 38,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Goblin Raiders",
+            "encounter_type": "combat",
+            "col": 74,
+            "row": 46,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Skeleton Patrol",
+            "encounter_type": "combat",
+            "col": 52,
+            "row": 52,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Skeleton Archers",
+            "encounter_type": "combat",
+            "col": 55,
+            "row": 17,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Goblin Raiding Party",
+            "encounter_type": "combat",
+            "col": 74,
+            "row": 21,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Wolf Pack",
+            "encounter_type": "combat",
+            "col": 65,
+            "row": 6,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Mixed Patrol",
+            "encounter_type": "combat",
+            "col": 33,
+            "row": 37,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Goblin Squatters",
+            "encounter_type": "combat",
+            "col": 6,
+            "row": 4,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Goblin Raiding Party",
+            "encounter_type": "combat",
+            "col": 64,
+            "row": 6,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Wolves and Goblins",
+            "encounter_type": "combat",
+            "col": 2,
+            "row": 2,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Shaman's Guard",
+            "encounter_type": "combat",
+            "col": 14,
+            "row": 18,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Mixed Patrol",
+            "encounter_type": "combat",
+            "col": 42,
+            "row": 47,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Undead Horde",
+            "encounter_type": "combat",
+            "col": 21,
+            "row": 45,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Orc with Wolves",
+            "encounter_type": "combat",
+            "col": 38,
+            "row": 38,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Skeleton Archers",
+            "encounter_type": "combat",
+            "col": 48,
+            "row": 49,
+            "description": "Auto (normal, lvl 3)"
+          },
+          {
+            "name": "Wolf Pack",
+            "encounter_type": "combat",
+            "col": 59,
+            "row": 25,
+            "description": "Auto (normal, lvl 2)"
+          },
+          {
+            "name": "Undead Horde",
+            "encounter_type": "combat",
+            "col": 45,
+            "row": 34,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Orc with Wolves",
+            "encounter_type": "combat",
+            "col": 47,
+            "row": 44,
+            "description": "Auto (normal, lvl 4)"
+          },
+          {
+            "name": "Orc Warband",
+            "encounter_type": "combat",
+            "col": 58,
+            "row": 36,
+            "description": "Auto (normal, lvl 4)"
+          }
+        ],
         "tile_properties": {
           "1,1": {
             "linked": true,
@@ -39434,6 +39915,108 @@
             "link_map": "overworld",
             "link_x": "21",
             "link_y": "6"
+          },
+          "58,24": {
+            "encounter": "Undead Horde"
+          },
+          "44,7": {
+            "encounter": "Orc Scouts"
+          },
+          "56,20": {
+            "encounter": "Orc Warband"
+          },
+          "1,28": {
+            "encounter": "Shaman's Guard"
+          },
+          "26,27": {
+            "encounter": "Orc Warband"
+          },
+          "47,42": {
+            "encounter": "Skeleton Archers"
+          },
+          "60,28": {
+            "encounter": "Orc Scouts"
+          },
+          "67,2": {
+            "encounter": "Orc Scouts"
+          },
+          "19,45": {
+            "encounter": "Orc Warband"
+          },
+          "37,52": {
+            "encounter": "Wolves and Goblins"
+          },
+          "40,53": {
+            "encounter": "Orc Scouts"
+          },
+          "3,26": {
+            "encounter": "Wolves and Goblins"
+          },
+          "41,11": {
+            "encounter": "Goblin Ambush"
+          },
+          "42,16": {
+            "encounter": "Orc Scouts"
+          },
+          "8,14": {
+            "encounter": "Orc with Wolves"
+          },
+          "22,38": {
+            "encounter": "Rat Swarm"
+          },
+          "74,46": {
+            "encounter": "Goblin Raiders"
+          },
+          "52,52": {
+            "encounter": "Skeleton Patrol"
+          },
+          "55,17": {
+            "encounter": "Skeleton Archers"
+          },
+          "74,21": {
+            "encounter": "Goblin Raiding Party"
+          },
+          "65,6": {
+            "encounter": "Wolf Pack"
+          },
+          "33,37": {
+            "encounter": "Mixed Patrol"
+          },
+          "6,4": {
+            "encounter": "Goblin Squatters"
+          },
+          "64,6": {
+            "encounter": "Goblin Raiding Party"
+          },
+          "2,2": {
+            "encounter": "Wolves and Goblins"
+          },
+          "14,18": {
+            "encounter": "Shaman's Guard"
+          },
+          "42,47": {
+            "encounter": "Mixed Patrol"
+          },
+          "21,45": {
+            "encounter": "Undead Horde"
+          },
+          "38,38": {
+            "encounter": "Orc with Wolves"
+          },
+          "48,49": {
+            "encounter": "Skeleton Archers"
+          },
+          "59,25": {
+            "encounter": "Wolf Pack"
+          },
+          "45,34": {
+            "encounter": "Undead Horde"
+          },
+          "47,44": {
+            "encounter": "Orc with Wolves"
+          },
+          "58,36": {
+            "encounter": "Orc Warband"
           }
         }
       }

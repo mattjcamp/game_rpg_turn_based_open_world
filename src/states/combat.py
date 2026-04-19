@@ -536,6 +536,16 @@ class CombatState(BaseState):
         # Used by quest kill tracking to ensure kills count at the right location.
         self.combat_location = combat_location or source_state
 
+        # Treat building interiors (space:/building:/interior:) as indoor
+        # combat for arena rendering and obstacle selection. The party
+        # came from the overworld state, so we can't flip source_state
+        # without breaking the return-to-state transition — instead we
+        # store a dedicated flag that downstream rendering/obstacle
+        # code can consult independently.
+        self.is_indoor_combat = bool(
+            self.combat_location and self.combat_location.startswith(
+                ("interior:", "building:", "space:")))
+
         # Store map refs for removal after combat (may differ from combat monsters)
         self.monster_refs = list(map_monster_refs) if map_monster_refs else list(monsters)
         self.monster_map_positions = {}
@@ -634,6 +644,10 @@ class CombatState(BaseState):
                 pos = (obs.get("col", 0), obs.get("row", 0))
                 if pos not in used:
                     self.arena_obstacles[pos] = obs.get("type", "rock")
+        elif self.is_indoor_combat:
+            # Encounters inside a building interior use the same
+            # walled-in arena as dungeons.
+            self._spawn_dungeon_obstacles(used)
         elif self.source_state == "overworld" and terrain_tile is not None:
             self._spawn_arena_obstacles(terrain_tile, used)
         elif self.source_state == "dungeon":
@@ -5715,6 +5729,7 @@ class CombatState(BaseState):
             monster_spell_effects=self.monster_spell_effects,
             is_warband=False,
             source_state=self.source_state,
+            is_indoor_combat=self.is_indoor_combat,
             directing_action=self.directing_action,
             menu_actions=self.menu_actions,
             spell_list=self.spell_list,

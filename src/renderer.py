@@ -4402,6 +4402,7 @@ class Renderer(CombatEffectRendererMixin):
                           curse_buffs=None,
                           monster_spell_effects=None,
                           is_warband=False, source_state="dungeon",
+                          is_indoor_combat=False,
                           directing_action=None,
                           menu_actions=None,
                           spell_list=None, spell_cursor=0,
@@ -4424,7 +4425,13 @@ class Renderer(CombatEffectRendererMixin):
 
         mx, my = self._MAP_X, self._MAP_Y
         ts = self._ARENA_TILE
-        is_outdoor = (source_state == "overworld")
+        # Combat inside a building interior uses the walled-in
+        # arena regardless of source_state.  source_state stays
+        # "overworld" so combat returns to the overworld state
+        # (where the party is standing in the interior), but the
+        # arena visuals need to match the setting.
+        is_outdoor = (source_state == "overworld"
+                      and not is_indoor_combat)
 
         # ── 1. draw arena tiles ──
         for r in range(self._ARENA_ROWS):
@@ -9322,9 +9329,81 @@ class Renderer(CombatEffectRendererMixin):
         if bg.get("enc_picking"):
             self._draw_building_enc_picker(bg, rx, ry, rw, rh, fm, fs, f)
 
+        # Difficulty picker overlay (Auto-Populate Encounters)
+        if bg.get("diff_picking"):
+            self._draw_building_difficulty_picker(
+                bg, rx, ry, rw, rh, fm, fs, f)
+
+        # Brief result message after auto-populate completes.
+        _msg = bg.get("auto_pop_msg")
+        if _msg and not bg.get("diff_picking"):
+            mx = rx + 16
+            my = ry + rh - 48
+            self._u3_text(_msg, mx, my, (180, 220, 140), fm)
+
         self._draw_building_flash(bg, rx, ry, rw, rh, f)
         self._u3_text("[Enter] Open  [Esc] Back",
                       rx + 16, ry + rh - 24, self._U3_HINT, fs)
+
+    def _draw_building_difficulty_picker(self, bg, rx, ry, rw, rh,
+                                          fm, fs, f):
+        """Draw the auto-populate difficulty picker overlay.
+
+        Four tiers (easy/normal/hard/deadly), cursor-selectable, with
+        a brief description per tier so the user knows what they're
+        committing to before pressing Enter.
+        """
+        options = bg.get("diff_options") \
+            or ["easy", "normal", "hard", "deadly"]
+        cursor = bg.get("diff_cursor", 1)
+        row_h = 48
+
+        pad = 12
+        ox = rx + pad
+        oy = ry + pad
+        ow = rw - pad * 2
+        oh = rh - pad * 2
+        overlay = pygame.Surface((ow, oh), pygame.SRCALPHA)
+        overlay.fill((20, 12, 30, 240))
+        self.screen.blit(overlay, (ox, oy))
+        pygame.draw.rect(self.screen, (180, 140, 60),
+                         (ox, oy, ow, oh), 2)
+
+        self._u3_text("AUTO-POPULATE ENCOUNTERS",
+                      ox + 16, oy + 10, self._U3_ORANGE, f)
+        self._u3_text(
+            "Replaces existing encounters with a fresh batch scaled to this difficulty.",
+            ox + 16, oy + 44, (160, 160, 180), fs)
+
+        # Short blurb per tier — density values here match the
+        # building-specific table in the editor (not the dungeon
+        # generator, which runs higher numbers per-room).
+        blurbs = {
+            "easy":   "Levels 1-2,  ~10% density",
+            "normal": "Levels 2-4,  ~25% density",
+            "hard":   "Levels 3-6,  ~35% density",
+            "deadly": "Levels 5-8,  ~45% density",
+        }
+
+        ly = oy + 90
+        for i, opt in enumerate(options):
+            selected = (i == cursor)
+            y = ly + i * row_h
+            if selected:
+                bar = pygame.Surface((ow - 4, row_h - 4),
+                                     pygame.SRCALPHA)
+                bar.fill((255, 200, 60, 30))
+                self.screen.blit(bar, (ox + 2, y - 1))
+            prefix = "> " if selected else "  "
+            color = self._U3_WHITE if selected else (180, 180, 180)
+            self._u3_text(f"{prefix}{opt.title()}",
+                          ox + 12, y + 4, color, fm)
+            self._u3_text(f"  {blurbs.get(opt, '')}",
+                          ox + 12, y + 24, (140, 140, 160), fs)
+
+        self._u3_text(
+            "[Up/Dn] Select  [Enter] Generate  [Esc] Cancel",
+            ox + 16, oy + oh - 28, self._U3_HINT, fs)
 
     def _draw_building_encounter_list(self, bg, rx, ry, rw, rh, fm, fs, f):
         """Draw the encounters list within a space."""

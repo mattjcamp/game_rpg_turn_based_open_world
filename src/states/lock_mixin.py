@@ -340,17 +340,29 @@ class LockInteractionMixin:
     def _on_lock_opened_default(self, tile_map, col, row) -> None:
         """Default behaviour when a locked tile is picked open.
 
-        Legacy dungeon ``TILE_LOCKED_DOOR`` tiles are converted to
-        ``TILE_DDOOR`` (open door).  Any other tile just has its
-        ``locked`` tile_property removed so it reverts to its base
-        walkability.
+        Clears both lock signals so a subsequent bump doesn't
+        re-trigger the dialog:
+
+        - Legacy dungeon ``TILE_LOCKED_DOOR`` tiles are converted to
+          ``TILE_DDOOR`` (open door).
+        - Any ``tile_properties[f"{col},{row}"]["locked"]`` flag is
+          removed so tiles authored in the map editor (or ported from
+          buildings.json where both signals co-exist) revert to their
+          base walkability.
+
+        Previously the two branches were mutually exclusive, which
+        caused building-interior doors (stored with *both* tile_id=29
+        and ``tile_properties["locked"]=True``) to flip the tile open
+        but never clear the property — re-locking themselves on the
+        next movement tick.
         """
         if tile_map is None:
             return
         tile_id = tile_map.get_tile(col, row)
         if tile_id == TILE_LOCKED_DOOR:
             tile_map.set_tile(col, row, TILE_DDOOR)
-            return
+        # Always clean up the "locked" tile_property (if present),
+        # even when we just rewrote a legacy TILE_LOCKED_DOOR tile.
         props = getattr(tile_map, "tile_properties", None)
         if props is not None:
             pos_key = f"{col},{row}"

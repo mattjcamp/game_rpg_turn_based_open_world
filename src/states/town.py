@@ -689,6 +689,12 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             self._check_tile_events()
             # Tick Galadriel's Light step counter
             self._tick_galadriels_light()
+            # Torches burn one charge per step everywhere — uses
+            # the shared party-level ticker so the mechanic stays
+            # consistent with overworld/dungeon consumption.
+            if self.game.party.tick_equipped_torch() == "burned_out":
+                self.show_message(
+                    "Your torch has burned out!", 2500)
         else:
             # Non-walkable tile — check for tile interaction
             self._try_tile_interaction(target_col, target_row)
@@ -2888,8 +2894,11 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
 
         # Pick-lock dialog overlay (any tile painted with locked=True,
         # whether on the town map itself or inside a building interior).
+        # The unlock animation plays after the dialog closes, so it's
+        # drawn in the same block but gated independently.
         interact = self._get_door_interact_state()
-        if interact:
+        anim = self.door_unlock_anim
+        if interact or anim:
             tile_map = self.town_data.tile_map
             ts = renderer._U3_TN_TS
             cols = renderer._U3_TN_COLS
@@ -2904,7 +2913,12 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             else:
                 off_r = self.game.party.row - rows // 2
                 off_r = max(0, min(off_r, tile_map.height - rows))
-            renderer._u3_draw_door_interact(interact, off_c, off_r, ts)
+            if anim:
+                renderer._u3_draw_door_unlock_anim(
+                    anim, off_c, off_r, cols, rows, ts)
+            if interact:
+                renderer._u3_draw_door_interact(
+                    interact, off_c, off_r, ts)
 
         # Dialogue box renders on top if active
         if self.message and self.npc_dialogue_active:

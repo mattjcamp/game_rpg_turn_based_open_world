@@ -401,10 +401,16 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._mod_building_space_list = []
         self._mod_building_space_cursor = 0
         self._mod_building_space_scroll = 0
-        # Space sub-screen: 0=Edit Map, 1=Encounters, 2=Import Template
+        # Space sub-screen: Townspeople | Edit Map | Encounters |
+        # Auto-Populate Encounters | Import Template
         self._mod_building_space_sub_cursor = 0
         self._mod_building_space_sub_items = [
-            "Townspeople", "Edit Map", "Encounters", "Import Template"]
+            "Townspeople", "Edit Map", "Encounters",
+            "Auto-Populate Encounters", "Import Template"]
+        # Difficulty picker overlay state (auto-populate)
+        self._mod_building_diff_picking = False
+        self._mod_building_diff_cursor = 1  # default: "normal"
+        self._mod_building_auto_pop_msg = ""
         # Building space NPC edit mode (sub-state within level 17)
         self._mod_building_space_npc_edit_mode = 0  # 0=off, 1=npc list, 2=npc field editor
         # Building space NPC list
@@ -5149,9 +5155,45 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     self._mod_building_name_buf = template.get(
                         "label", "Room")
 
-    def _handle_mod_building_space_sub_input(self, event):
-        """Handle space sub-screen (level 17): Townspeople | Edit Map | Encounters | Import Template."""
+    def _handle_mod_building_diff_picker_input(self, event):
+        """Handle input for the auto-populate difficulty picker overlay.
+
+        Up/Down: select tier. Enter: run auto-populate and close.
+        Esc: cancel without doing anything.
+        """
         import pygame
+        options = self._BUILDING_DIFFICULTY_OPTIONS
+        n = len(options)
+
+        if event.key == pygame.K_ESCAPE:
+            self._mod_building_diff_picking = False
+            self._mod_building_auto_pop_msg = ""
+            return
+        if event.key == pygame.K_UP:
+            self._mod_building_diff_cursor = (
+                self._mod_building_diff_cursor - 1) % n
+            return
+        if event.key == pygame.K_DOWN:
+            self._mod_building_diff_cursor = (
+                self._mod_building_diff_cursor + 1) % n
+            return
+        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            difficulty = options[self._mod_building_diff_cursor]
+            self._mod_building_auto_populate_encounters(difficulty)
+            # Close the picker — the confirmation message lives on
+            # the space sub-screen for a moment via save_flash.
+            self._mod_building_diff_picking = False
+            return
+
+    def _handle_mod_building_space_sub_input(self, event):
+        """Handle space sub-screen (level 17): Townspeople | Edit Map | Encounters | Auto-Populate | Import Template."""
+        import pygame
+
+        # Intercept the difficulty picker (auto-populate encounters)
+        # before any other overlay so it captures all input while open.
+        if self._mod_building_diff_picking:
+            self._handle_mod_building_diff_picker_input(event)
+            return
 
         # Intercept enclosure template picker overlay
         if self._mod_building_enc_picking:
@@ -5187,6 +5229,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self._mod_building_load_encounters()
                 self.module_edit_level = 18
             elif self._mod_building_space_sub_cursor == 3:
+                # Auto-Populate Encounters — opens difficulty picker.
+                self._mod_building_open_difficulty_picker()
+            elif self._mod_building_space_sub_cursor == 4:
                 self._mod_building_open_space_template_picker()
 
     def _handle_mod_building_encounter_list_input(self, event):
@@ -6232,6 +6277,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                         "enc_pick_list": self._mod_building_enc_pick_list,
                         "enc_pick_cursor": self._mod_building_enc_pick_cursor,
                         "enc_pick_scroll": self._mod_building_enc_pick_scroll,
+                        "diff_picking": self._mod_building_diff_picking,
+                        "diff_cursor": self._mod_building_diff_cursor,
+                        "diff_options": self._BUILDING_DIFFICULTY_OPTIONS,
+                        "auto_pop_msg": self._mod_building_auto_pop_msg,
                         "space_npc_edit_mode": self._mod_building_space_npc_edit_mode,
                         "space_npc_list": self._mod_building_space_npc_list,
                         "space_npc_cursor": self._mod_building_space_npc_cursor,

@@ -1560,6 +1560,37 @@ class Party:
             return None
         return entry.get("charges")
 
+    def tick_equipped_torch(self):
+        """Decrement the equipped torch by one step.
+
+        This is the single source of truth for torch consumption so
+        the mechanic behaves identically in every state (overworld,
+        town, building interior, dungeon). Call it from the post-move
+        block of each state that advances party time.
+
+        Returns:
+            str: "burned_out" if the torch was consumed this tick,
+                 "ticked" if it just decremented a charge,
+                 "" if there was nothing to tick.
+        """
+        entry = self.equipped.get("light")
+        if not entry or entry.get("name") != "Torch":
+            return ""
+        charges = entry.get("charges")
+        if charges is None:
+            return ""
+        charges -= 1
+        entry["charges"] = max(0, charges)
+        if charges <= 0:
+            # Burn out: clear the light slot and any Torch effect.
+            self.equipped["light"] = None
+            for slot_key in self.EFFECT_SLOTS:
+                if self.effects.get(slot_key) == "Torch":
+                    self.effects[slot_key] = None
+                    break
+            return "burned_out"
+        return "ticked"
+
     def get_effect(self, slot):
         """Return the effect name in the given effect slot, or None."""
         return self.effects.get(slot)

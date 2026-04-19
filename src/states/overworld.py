@@ -926,12 +926,24 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                         if random.random() < ORC_RESPAWN_CHANCE:
                             self._spawn_sea_encounter()
                 else:
+                    # Inside a building interior — encounter-spawned
+                    # monsters live in overworld_monsters (fresh list
+                    # per interior, repopulated by _spawn_placed_
+                    # encounters) and need the same pursue/wander AI
+                    # and contact detection as the outer overworld,
+                    # otherwise they just stand in place forever.
+                    self._check_monster_contact()
+                    self._move_monsters()
                     # Move building interior guardian NPCs
                     if self._building_interior_npcs:
                         self._move_building_interior_npcs()
                         self._check_building_interior_npc()
                 # Tick Galadriel's Light step counter
                 self._tick_galadriels_light()
+                # Torches burn one charge per step everywhere, not
+                # just in dungeons — uses the shared party-level
+                # ticker so the mechanic stays consistent.
+                self._tick_equipped_torch_with_message()
             else:
                 self.move_cooldown = MOVE_REPEAT_DELAY
                 self.show_message("Blocked!", 800)
@@ -1020,6 +1032,14 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     party.set_effect(slot_key, None)
                     break
             self.show_message("Galadriel's Light fades away...", 3000)
+
+    def _tick_equipped_torch_with_message(self):
+        """Consume one charge from the equipped torch and show a
+        message if it burned out. Safe to call when no torch is
+        equipped (no-ops)."""
+        result = self.game.party.tick_equipped_torch()
+        if result == "burned_out":
+            self.show_message("Your torch has burned out!", 2500)
 
     # ── Overworld NPC helpers (module quest givers) ──────────────
 
@@ -1397,13 +1417,21 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             mon.col, mon.row = best
 
     def _check_monster_contact(self):
-        """If an orc is adjacent to (or on top of) the party, show encounter screen.
+        """If a monster is adjacent to (or on top of) the party, show
+        the encounter screen.
+
+        Adjacency uses Chebyshev distance (``max(|dc|, |dr|) <= 1``)
+        so diagonally-adjacent monsters count too.  Manhattan-only
+        adjacency caused monsters that got stuck on a diagonal tile
+        (because their cardinal path was blocked by water, trees, or
+        another monster) to never trigger an encounter — the party
+        would walk past them without ever seeing the dialog.
 
         While the party is aboard the boat, only sea creatures can
-        initiate contact — a Wyvern standing on shore next to the boat
-        can't reach the party through the water, so it shouldn't force
-        an encounter.  The party can still deliberately attack land
-        monsters by stepping off the boat onto their tile.
+        initiate contact — a Wyvern standing on shore next to the
+        boat can't reach the party through the water, so it shouldn't
+        force an encounter.  The party can still deliberately attack
+        land monsters by stepping off the boat onto their tile.
         """
         party = self.game.party
         on_boat = bool(getattr(self.game, "on_boat", False))
@@ -1413,7 +1441,8 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             # Skip land creatures while sailing — they can't board.
             if on_boat and getattr(mon, "terrain", "land") != "sea":
                 continue
-            if abs(mon.col - party.col) + abs(mon.row - party.row) <= 1:
+            if (max(abs(mon.col - party.col),
+                    abs(mon.row - party.row)) <= 1):
                 self._show_encounter_action(mon)
                 return
 
@@ -1633,12 +1662,28 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
         # arena can spawn appropriate obstacles (trees, rocks, etc.)
         terrain_tile = self.game.tile_map.get_tile(
             self.game.party.col, self.game.party.row)
+
+        # Derive combat_location from the current context. When we're
+        # inside a building interior, use the same space/building
+        # string that quest kill-tracking and arena-style rendering
+        # rely on — otherwise fall back to the open-world default.
+        if self._in_overworld_interior:
+            bld_name = self._building_name
+            int_name = self._overworld_interior_name
+            if bld_name and int_name and bld_name != int_name:
+                combat_location = f"space:{bld_name}/{int_name}"
+            else:
+                combat_location = (
+                    f"building:{bld_name or int_name}")
+        else:
+            combat_location = "overview"
+
         combat_state.start_combat(fighter, monsters,
                                   source_state="overworld",
                                   encounter_name=enc_name,
                                   map_monster_refs=[orc],
                                   terrain_tile=terrain_tile,
-                                  combat_location="overview")
+                                  combat_location=combat_location)
         self.game.change_state("combat")
 
     # ── Tile events ───────────────────────────────────────────────
@@ -3720,8 +3765,12 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.encounter_action_result)
         # Pick-lock dialog overlay — lock on any painted tile
         # (overworld or inside an overworld building interior).
+        # The unlock animation is drawn separately because the dialog
+        # closes *before* the animation plays (see
+        # LockInteractionMixin._attempt_lock_pick).
         interact = self._get_door_interact_state()
-        if interact:
+        anim = self.door_unlock_anim
+        if interact or anim:
             tile_map = self.game.tile_map
             ts = renderer._U3_OW_TS
             cols = renderer._U3_OW_COLS
@@ -3730,7 +3779,12 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                                max(0, tile_map.width - cols)))
             off_r = max(0, min(self.game.party.row - rows // 2,
                                max(0, tile_map.height - rows)))
-            renderer._u3_draw_door_interact(interact, off_c, off_r, ts)
+            if anim:
+                renderer._u3_draw_door_unlock_anim(
+                    anim, off_c, off_r, cols, rows, ts)
+            if interact:
+                renderer._u3_draw_door_interact(
+                    interact, off_c, off_r, ts)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
         if self.showing_help:
