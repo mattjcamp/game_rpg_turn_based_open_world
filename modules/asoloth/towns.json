@@ -3340,14 +3340,12 @@
             "path": "game/terrain/floor_gray.png"
           },
           "1,1": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 57,
+            "name": "Weapon Counter"
           },
           "1,2": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 58,
+            "name": "Armor Counter"
           },
           "2,2": {
             "tile_id": 48,

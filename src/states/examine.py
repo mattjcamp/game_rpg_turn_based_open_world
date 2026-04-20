@@ -187,6 +187,10 @@ class ExamineState(BaseState):
             self._spawn_obstacles()
             self._spawn_examine_items()
             self._place_editor_items()
+            # Rangers/Alchemists roll an INT save to spot reagents the
+            # rest of the party would have missed.  Only runs on the
+            # first visit so players can't farm a tile by re-examining.
+            self._attempt_herbalist_discovery()
 
     def exit(self):
         # Save the current layout before leaving
@@ -419,6 +423,40 @@ class ExamineState(BaseState):
             if (col, row) in self.ground_items:
                 continue
             self.ground_items[(col, row)] = {"item": item_name, "gold": 0}
+
+    # ── Herbalist reagent discovery ──────────────────────────────
+
+    def _attempt_herbalist_discovery(self):
+        """Rangers and Alchemists roll INT saves to discover reagents.
+
+        Each alive Ranger or Alchemist in the party rolls
+        ``d20 + INT modifier`` vs DC 10.  On success, the character
+        identifies a useful potion reagent in the area — a random
+        reagent from :data:`FORAGE_REAGENTS` is added to the shared
+        inventory and a short discovery message is queued so the
+        player sees who found what.  Called from :meth:`enter` on
+        the first visit to a tile, so reagents can't be farmed by
+        repeated re-examination.
+        """
+        party = self.game.party
+        discoveries = []
+        for m in party.members:
+            if not m.is_alive():
+                continue
+            cls = m.char_class.lower()
+            if cls not in _HERBALIST_CLASSES:
+                continue
+            # INT saving throw: d20 + INT modifier vs DC 10
+            roll = random.randint(1, 20) + m.int_mod
+            if roll < 10:
+                continue
+            reagent = random.choice(FORAGE_REAGENTS)
+            party.inv_add(reagent)
+            discoveries.append((m.name, reagent))
+        if discoveries:
+            parts = [f"{name} discovered {item}" for name, item in discoveries]
+            self.pickup_message = " · ".join(parts) + "!"
+            self.pickup_msg_timer = 3500
 
     # ── Pickup ────────────────────────────────────────────────────
 

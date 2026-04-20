@@ -2481,22 +2481,32 @@ class Renderer(CombatEffectRendererMixin):
         # ── 1. draw map tiles ──
         palette = self._get_dungeon_palette(dungeon_level)
         _is_custom = getattr(tile_map, '_custom_mode', False)
+        # Hidden traps: undetected trap tiles render as plain stone floor
+        # so they're indistinguishable from surrounding dungeon terrain.
+        # Only traps that the party has successfully detected show their
+        # sprite (plus the red X/glow overlay drawn further below).
+        _detected_set = detected_traps or set()
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
                 wr = sr + off_r
                 tid = tile_map.get_tile(wc, wr)
+                # Disguise undetected traps as dungeon floor.
+                if tid == TILE_TRAP and (wc, wr) not in _detected_set:
+                    render_tid = TILE_DFLOOR
+                else:
+                    render_tid = tid
                 px = sc * ts
                 py = sr * ts
                 # Custom and procedurally generated dungeons render via
                 # the same unified path; the per-level palette atmosphere
                 # (moss/lava/ice/void detail) is then layered on top of
                 # the standard tile sprite for procedural runs.
-                self._draw_tile(tid, px, py, ts, wc, wr,
+                self._draw_tile(render_tid, px, py, ts, wc, wr,
                                 tile_map=tile_map)
                 if not _is_custom:
                     self._draw_dungeon_atmosphere(
-                        tid, px, py, ts, wc, wr, palette)
+                        render_tid, px, py, ts, wc, wr, palette)
 
         # ── 1a2. placed ground items (items editor → tile_properties) ──
         self._draw_ground_items_on_tilemap(

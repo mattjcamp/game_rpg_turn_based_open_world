@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Goblin Stronghold",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 5,
+    "difficulty": "easy",
+    "level_size": "medium",
+    "torch_density": "abundant",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  }
+]

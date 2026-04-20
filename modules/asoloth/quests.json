@@ -52,5 +52,22 @@
     ],
     "giver_col": 8,
     "giver_row": 16
+  },
+  {
+    "name": "Destroy the Goblin Horde",
+    "description": "",
+    "giver_npc": "Lardo the Bardo",
+    "giver_sprite": "src/assets/game/npcs/u4_villager_male.png",
+    "giver_location": "town:Larian",
+    "giver_dialogue": "The Goblin Horde is threatening our town from their stronghold up North. If you take care of this for us, I will make it worth your while.",
+    "reward_xp": 100,
+    "reward_gold": 50,
+    "reward_items": [
+      "Crossbow",
+      "Bolts"
+    ],
+    "steps": [],
+    "giver_col": 9,
+    "giver_row": 12
   }
 ]

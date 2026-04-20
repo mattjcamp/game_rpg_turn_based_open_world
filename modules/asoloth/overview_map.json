@@ -7165,6 +7165,10 @@
       "link_map": "interior:Larian/Shop Basement",
       "link_x": "19",
       "link_y": "18"
+    },
+    "7,10": {
+      "linked": true,
+      "link_map": "dungeon:Goblin Stronghold"
     }
   }
 }
