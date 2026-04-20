@@ -2,7 +2,7 @@
   "smite_enabled": true,
   "start_with_equipment": false,
   "dm_mode": true,
-  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/new_world",
+  "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/asoloth",
   "music_enabled": false,
   "soundtrack_style": "Classic",
   "start_level": 1,

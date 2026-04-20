@@ -6,7 +6,8 @@
       "description": "Hurls an energy-charged dart in a straight line, stinging on impact.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
@@ -35,7 +36,8 @@
       "description": "Conjures a faint magical barrier around an ally, slightly boosting their armor.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
@@ -60,7 +62,8 @@
       "name": "Sleep",
       "description": "Lulls a weak-minded creature into a light magical slumber.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
@@ -112,7 +115,8 @@
       "description": "Enchants an ally's legs with unnatural speed, extending their movement range for 3 turns.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 2,
@@ -136,7 +140,8 @@
       "description": "Conjures a piercing bolt of arcane energy that streaks toward a chosen foe.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 3,
@@ -164,7 +169,8 @@
       "name": "Invisibility",
       "description": "The caster bends light around themselves, becoming invisible to enemies for 3 turns.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 4,
@@ -185,7 +191,8 @@
       "name": "Misty Step",
       "description": "The caster vanishes in a swirl of silvery mist and reappears at a chosen location on the battlefield.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 4,
@@ -206,7 +213,8 @@
       "name": "Charm Person",
       "description": "Weaves an enchantment that bends the will of a humanoid creature, turning it against its allies for 3 turns.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 5,
@@ -230,7 +238,8 @@
       "name": "Lightning Bolt",
       "description": "Unleashes a searing bolt of lightning that streaks in a straight line, electrocuting everything in its path.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 5,
@@ -258,7 +267,8 @@
       "name": "Animate Dead",
       "description": "Raises a powerful skeleton warrior from the earth to fight for the caster.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 6,
@@ -286,7 +296,8 @@
       "name": "Fireball",
       "description": "Hurls a massive ball of flame that detonates in a 3-tile radius, scorching everything \u2014 friend or foe \u2014 caught in the blast.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 7,

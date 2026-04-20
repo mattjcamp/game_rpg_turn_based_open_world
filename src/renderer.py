@@ -9688,13 +9688,63 @@ class Renderer(CombatEffectRendererMixin):
         val_max_w = rw - 160 - 16   # max pixel width for values
         # Shrink val area when sprite preview occupies top-right
         val_max_w_top = val_max_w - (preview_size + 24 if preview_drawn else 0)
+
+        # ── Pre-compute per-field heights so we can scroll-adjust and
+        #    skip rows that would overflow the hint footer. The generic
+        #    scroll helper used by the input handler assumes uniform
+        #    38-px rows, so it can't account for the multi-line
+        #    Dialogue field (which expands to ~130px when wrapped).
+        #    Without this correction, navigating to bottom rows like
+        #    "Reward XP / Gold / Items" leaves them pushed past the
+        #    visible area and overlapping the hint text. ──
+        def _calc_field_height(idx, _y_for_zone):
+            fe_local = fields[idx]
+            if fe_local.field_type == "section":
+                return row_h
+            if fe_local.key == "giver_dialogue":
+                # Mirror the in-loop wrap-width calculation so the
+                # height we predict matches the height we draw.
+                in_zone = preview_drawn and _y_for_zone < (
+                    ry + 8 + preview_size + 8)
+                eff_w = val_max_w_top if in_zone else val_max_w
+                if (idx == field_cursor and fe_local.editable):
+                    txt = field_buffer + "_"
+                else:
+                    txt = fe_local.value or ""
+                wrapped_lines = self._quest_wrap_text(txt, fm, eff_w)
+                return max(row_h, 22 + len(wrapped_lines) * 18)
+            return row_h
+
+        n_fields = len(fields)
+        if n_fields:
+            field_scroll = max(0, min(field_scroll, n_fields - 1))
+            if field_cursor < field_scroll:
+                field_scroll = field_cursor
+            # Walk the cursor down until the cursor row's bottom fits.
+            available_h = max_bottom - ly
+            guard = 0
+            while field_scroll < field_cursor and guard < n_fields:
+                total = 0
+                y_probe = ly
+                fits = True
+                for j in range(field_scroll, field_cursor + 1):
+                    h = _calc_field_height(j, y_probe)
+                    total += h
+                    y_probe += h
+                    if total > available_h:
+                        fits = False
+                        break
+                if fits:
+                    break
+                field_scroll += 1
+                guard += 1
+            qd["field_scroll"] = field_scroll
+
         cur_y = ly
 
         for idx in range(len(fields)):
             i = field_scroll + idx
             if i >= len(fields):
-                break
-            if cur_y >= max_bottom:
                 break
             fe = fields[i]
             selected = (i == field_cursor)
@@ -9704,6 +9754,9 @@ class Renderer(CombatEffectRendererMixin):
             effective_val_max_w = val_max_w_top if in_sprite_zone else val_max_w
 
             if fe.field_type == "section":
+                # Stop drawing if this row would overflow the hint area.
+                if cur_y + row_h > max_bottom:
+                    break
                 pygame.draw.line(self.screen, (60, 50, 40),
                                  (rx + 10, cur_y + 10),
                                  (rx + rw - 10, cur_y + 10), 1)
@@ -9726,6 +9779,12 @@ class Renderer(CombatEffectRendererMixin):
                 field_h = max(row_h, 22 + len(wrapped) * 18)
             else:
                 field_h = row_h
+
+            # Don't draw rows whose body would extend past the hint
+            # footer — the prior check only looked at the row's top
+            # edge, which let bottom rows overlap "[Up/Dn] Navigate…".
+            if cur_y + field_h > max_bottom:
+                break
 
             if selected:
                 bar = pygame.Surface(

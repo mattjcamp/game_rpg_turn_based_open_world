@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Rat Infestation",
+    "description": "",
+    "giver_npc": "",
+    "giver_sprite": "src/assets/game/npcs/vga_evil_mage.png",
+    "giver_location": "town:Larian",
+    "giver_dialogue": "Hey therre, you look like a tough bunch. Tough enough to help with a little domestic problem. I am the owner of the General Shop, but I have a problem. You see, a while back I let a Goblin stay in my basement in exchange for... well, let's not get into that. But, since then he has let the place fall apart. Now it's full of Giant Rats and some of this vile kin. Can you deal with this? I promise, I can contribute to your adventures.",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "reward_items": [
+      "Camping Supplies",
+      "Arrows"
+    ],
+    "steps": [
+      {
+        "description": "Kill the Rats",
+        "step_type": "kill",
+        "encounter": "Cellar Rats",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Larian/General Shop",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the Rats, Part II",
+        "step_type": "kill",
+        "encounter": "Cellar Rats",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Larian/Shop Basement",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      },
+      {
+        "description": "Remove the Goblin",
+        "step_type": "kill",
+        "encounter": "Goblin Ambush",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Larian/Shop Basement",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 16
+  }
+]

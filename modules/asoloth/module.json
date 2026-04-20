@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "id": "new_world",
-    "name": "New World",
-    "author": "",
-    "description": "A creeping corruption poisons the rivers and fields. Find the purification stones in the dungeons and cleanse the sacred fountain in Ashmoor.",
+    "id": "asoloth",
+    "name": "Asoloth",
+    "author": "You find yourself in a wild land, armed with only a few heavy sticks, some river rocks, and a few spells. Where you go now? What horrors wait for you in the wilds?",
+    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Elderdale to break the spell.",
     "version": "0.1.0"
   },
   "settings": {
@@ -39,9 +39,9 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "ashmoor",
-        "name": "Ashmoor",
-        "description": "A walled outpost on the frontier, always on guard against the wilds."
+        "id": "elderdale",
+        "name": "Elderdale",
+        "description": "A bustling market town where traders from distant lands hawk exotic wares."
       }
     ],
     "dungeons": []
@@ -50,22 +50,22 @@
     "win_condition": {
       "type": "collect_keys",
       "total_keys": 1,
-      "deliver_to": "town_fountain"
+      "deliver_to": "town_shrine"
     },
     "starting_quests": [
-      "purify"
+      "awaken"
     ],
     "key_dungeons": [
       {
         "id": "dungeon_key_1",
-        "name": "Flooded Barrow",
-        "key_name": "Moonstone Key",
+        "name": "Burning Sanctum",
+        "key_name": "Silver Key",
         "dungeon_number": 1,
         "landmark_id": "dungeon_1",
-        "description": "The air around Flooded Barrow shimmers with faint heat. Strange runes glow along the doorframe.",
+        "description": "A narrow crevice leads into Burning Sanctum. The sound of dripping water echoes endlessly below.",
         "quest_type": "retrieve",
-        "quest_objective": "Slay the guardian of Flooded Barrow and claim the Moonstone Key",
-        "quest_hint": "A fearsome creature guards the prize.",
+        "quest_objective": "Search Burning Sanctum for the hidden Silver Key",
+        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
         "kill_target": "",
         "kill_count": 0
       }

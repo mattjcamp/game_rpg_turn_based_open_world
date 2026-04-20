@@ -724,5 +724,16 @@
     "context": "spawns",
     "sprite": "overworld/dungeon",
     "interaction_type": "spawn"
+  },
+  "72": {
+    "name": "Window",
+    "walkable": false,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "town",
+    "sprite": "town/window"
   }
 }

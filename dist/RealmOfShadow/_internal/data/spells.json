@@ -6,11 +6,12 @@
       "description": "Hurls an energy-charged dart in a straight line, stinging on impact.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
-      "mp_cost": 3,
+      "mp_cost": 6,
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
@@ -20,7 +21,7 @@
         "dice_count": 1,
         "dice_sides": 6
       },
-      "range": 99,
+      "range": 10,
       "targeting": "directional_projectile",
       "usable_in": [
         "battle"
@@ -35,7 +36,8 @@
       "description": "Conjures a faint magical barrier around an ally, slightly boosting their armor.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
@@ -60,7 +62,8 @@
       "name": "Sleep",
       "description": "Lulls a weak-minded creature into a light magical slumber.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 1,
@@ -112,7 +115,8 @@
       "description": "Enchants an ally's legs with unnatural speed, extending their movement range for 3 turns.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 2,
@@ -136,17 +140,20 @@
       "description": "Conjures a piercing bolt of arcane energy that streaks toward a chosen foe.",
       "allowable_classes": [
         "Wizard",
-        "Alchemist"
+        "Alchemist",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 3,
-      "mp_cost": 8,
+      "mp_cost": 12,
       "duration": "instant",
       "effect_type": "damage",
       "effect_value": {
-        "dice": "3d8",
+        "dice": "2d8",
         "stat_bonus": "intelligence",
-        "min_damage": 1
+        "min_damage": 1,
+        "dice_count": 2,
+        "dice_sides": 8
       },
       "range": 99,
       "targeting": "select_enemy",
@@ -154,14 +161,16 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": ""
     },
     {
       "id": "invisibility",
       "name": "Invisibility",
       "description": "The caster bends light around themselves, becoming invisible to enemies for 3 turns.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 4,
@@ -182,7 +191,8 @@
       "name": "Misty Step",
       "description": "The caster vanishes in a swirl of silvery mist and reappears at a chosen location on the battlefield.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 4,
@@ -203,7 +213,8 @@
       "name": "Charm Person",
       "description": "Weaves an enchantment that bends the will of a humanoid creature, turning it against its allies for 3 turns.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 5,
@@ -227,18 +238,20 @@
       "name": "Lightning Bolt",
       "description": "Unleashes a searing bolt of lightning that streaks in a straight line, electrocuting everything in its path.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 5,
-      "mp_cost": 15,
+      "mp_cost": 25,
       "duration": "instant",
       "effect_type": "lightning_bolt",
       "effect_value": {
         "dice_count": 6,
         "dice_sides": 6,
         "stat_bonus": "intelligence",
-        "min_damage": 1
+        "min_damage": 1,
+        "dice": "6d6"
       },
       "range": 99,
       "targeting": "directional_projectile",
@@ -246,14 +259,16 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": ""
     },
     {
       "id": "animate_dead",
       "name": "Animate Dead",
       "description": "Raises a powerful skeleton warrior from the earth to fight for the caster.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 6,
@@ -281,11 +296,12 @@
       "name": "Fireball",
       "description": "Hurls a massive ball of flame that detonates in a 3-tile radius, scorching everything \u2014 friend or foe \u2014 caught in the blast.",
       "allowable_classes": [
-        "Wizard"
+        "Wizard",
+        "Druid"
       ],
       "casting_type": "sorcerer",
       "min_level": 7,
-      "mp_cost": 25,
+      "mp_cost": 30,
       "duration": "instant",
       "effect_type": "aoe_fireball",
       "effect_value": {
@@ -293,7 +309,8 @@
         "dice_sides": 8,
         "stat_bonus": "intelligence",
         "min_damage": 1,
-        "radius": 3
+        "radius": 3,
+        "dice": "5d8"
       },
       "range": 99,
       "targeting": "select_tile",
@@ -301,7 +318,8 @@
         "battle"
       ],
       "sfx": "fireball",
-      "hit_sfx": "explosion"
+      "hit_sfx": "explosion",
+      "icon": ""
     },
     {
       "id": "light",
@@ -340,13 +358,15 @@
       ],
       "casting_type": "priest",
       "min_level": 1,
-      "mp_cost": 3,
+      "mp_cost": 5,
       "duration": "instant",
       "effect_type": "heal",
       "effect_value": {
         "dice": "1d6",
         "stat_bonus": "wisdom",
-        "min_heal": 1
+        "min_heal": 1,
+        "dice_count": 1,
+        "dice_sides": 6
       },
       "range": 6,
       "targeting": "select_ally_or_self",
@@ -357,35 +377,8 @@
         "dungeon"
       ],
       "sfx": "heal",
-      "hit_sfx": null
-    },
-    {
-      "id": "new_spell_23",
-      "name": "New Spell",
-      "description": "A new spell.",
-      "allowable_classes": [
-        "Cleric",
-        "Paladin",
-        "Druid",
-        "Ranger"
-      ],
-      "casting_type": "priest",
-      "min_level": 1,
-      "mp_cost": 5,
-      "duration": "instant",
-      "effect_type": "teleport",
-      "effect_value": {
-        "dice": "1d6",
-        "dice_count": 1,
-        "dice_sides": 6
-      },
-      "range": 99,
-      "targeting": "select_tile",
-      "usable_in": [
-        "battle"
-      ],
-      "sfx": "",
-      "hit_sfx": ""
+      "hit_sfx": "",
+      "icon": ""
     },
     {
       "id": "cure_poison",
@@ -420,7 +413,7 @@
       ],
       "casting_type": "priest",
       "min_level": 2,
-      "mp_cost": 8,
+      "mp_cost": 0,
       "duration": "instant",
       "effect_type": "undead_damage",
       "effect_value": {
@@ -434,7 +427,8 @@
         "battle"
       ],
       "sfx": "turn_undead",
-      "hit_sfx": null
+      "hit_sfx": "",
+      "icon": ""
     },
     {
       "id": "bless",
