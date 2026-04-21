@@ -236,9 +236,9 @@ Wizards command the most diverse and powerful spell list in the game. From Fireb
 **Weapons:** Fists, Club, Mace, Sling
 **Armor:** Cloth, Leather, Chain
 
-Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead — a signature ability no other class (not even other priest classes like Paladins) can use. Every party should have one.
+Clerics are the primary healers of the party. Minor Heal, Major Heal, Mass Heal, and the ultimate Restore spell keep everyone standing, while Cure Poison removes dangerous status effects. They can also fight respectably in melee with maces and clubs, wear chain armor, and devastate undead with Turn Undead from level 2 — a signature ability no other class matches at that tier. Every party should have one.
 
-**Turn Undead** (Level 2+, Cleric only) — Channels holy energy at every undead on the battlefield. Each undead makes a Wisdom save against the Cleric's DC. On a failed save, the undead is destroyed completely; on a success it still takes 50% of its max HP as holy damage.
+**Turn Undead** (Cleric Level 2+; Paladin Level 5+) — Channels holy energy at every undead on the battlefield. Each undead makes a Wisdom save against the caster's DC. On a failed save, the undead is destroyed completely; on a success it still takes 50% of its max HP as holy damage.
 
 ---
 
@@ -270,9 +270,9 @@ The Thief has the longest combat range of any class (6 tiles), making them effec
 **Weapons:** All weapons
 **Armor:** Cloth, Leather, Chain, Plate
 
-Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — so they remain a reliable anti-undead class even though Turn Undead itself is reserved for Clerics.
+Paladins combine Fighter durability with limited Priest magic. They can wear the heaviest armor, use any weapon, and still cast healing spells (though with a smaller MP pool than a Cleric). Holy Smite makes them devastating against undead — every attack hits twice as hard — and from level 5 they can also channel Turn Undead, making them a formidable second line of defense against the undead when no Cleric is at hand.
 
-**Holy Smite** — Double damage against undead.
+**Holy Smite** — Double damage against undead. **Turn Undead (Level 5+)** — From level 5, a Paladin can channel holy energy at every undead on the battlefield, just as a Cleric does. Each undead saves vs Wisdom: failure = destroyed, success = 50% max-HP damage.
 
 ---
 
@@ -301,7 +301,7 @@ Rangers are durable frontliners with bow mastery, wilderness lore, and limited h
 |:------:|:------:|:-----:|:------:|
 |   5    |    8   |   2   |  Both  |
 
-**Weapons:** Fists, Dagger, Club, Mace
+**Weapons:** Fists, Dagger, Club, Mace, Sling
 **Armor:** Cloth only
 
 The Druid is the game's only hybrid caster, able to cast both Priest spells (Minor Heal, Cure Poison, Light) and Sorcerer spells (Magic Dart, Shield, Knock). To balance that remarkable spell breadth, a Druid's Magic Point pool is modest — about half the size of a Wizard's or Cleric's at equivalent stats. Their MP pool is drawn from the average of Intelligence and Wisdom and they regenerate MP twice as fast as other classes. The trade-off is low HP and cloth-only armor — like Wizards, they need protection.
@@ -318,10 +318,10 @@ The Druid is the game's only hybrid caster, able to cast both Priest spells (Min
 |:------:|:------:|:-----:|:--------:|
 |   4    |   8    |   4   | Sorcerer |
 
-**Weapons:** Fists, Dagger
+**Weapons:** Fists, Dagger, Sling
 **Armor:** Cloth only
 
-Alchemists have modest combat ability but provide unique value through potion crafting. Their 4-tile range matches the Fighter's mobility, and access to Sorcerer spells means they can still contribute offensive magic. Brew Potions lets them turn reagents into healing potions, antidotes, and other useful consumables. Because that crafting utility is so powerful, the Alchemist is balanced as a partial caster — their base Magic Point pool is half their Intelligence score (roughly half a Wizard's raw casting output), so lean on potions and thrown oils as much as on spells.
+Alchemists have modest combat ability but provide unique value through potion crafting. Their 4-tile range matches the Fighter's mobility, a Sling gives them a light ranged option, and access to Sorcerer spells means they can still contribute offensive magic. Brew Potions lets them turn reagents into healing potions, antidotes, and other useful consumables. Because that crafting utility is so powerful, the Alchemist is balanced as a partial caster — their base Magic Point pool is half their Intelligence score (roughly half a Wizard's raw casting output), so lean on potions and thrown oils as much as on spells.
 
 **Brew Potions** — Craft potions from reagents found in shops and dungeons. **Half-caster Pool** — Base MP is ½ Intelligence, balancing brewing utility against raw spellcasting.
 
@@ -565,7 +565,7 @@ These spells are available to Clerics, Paladins, Rangers, and Druids. Priest mag
 | **Minor Heal**  |  1  |  3 | Heals 1d6 + WIS mod HP (usable outside combat)      |
 | **Light**       |  1  |  3 | Illuminates dungeon corridors for 100 turns          |
 | **Cure Poison** |  2  |  5 | Removes poison from target                           |
-| **Turn Undead** |  2  |  8 | Cleric only. Each undead saves vs WIS — fail = destroyed, pass = 50% HP damage |
+| **Turn Undead** |  2  |  8 | Cleric (Lvl 2+) or Paladin (Lvl 5+). Each undead saves vs WIS — fail = destroyed, pass = 50% HP damage |
 | **Bless**       |  3  | 10 | +2 attack bonus to all allies for 4 turns            |
 | **Curse**       |  3  | 10 | −2 AC and −2 attack on target for 4 turns            |
 | **Major Heal**  |  4  | 15 | Heals 4d8 + WIS mod HP                              |

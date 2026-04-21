@@ -1,9 +1,10 @@
 {
   "name": "Alchemist",
-  "_comment": "Alchemist (Wizard + Crafter). Stealthy sorcerer limited to daggers and cloth. Herbalism training grants a higher chance of finding reagents when foraging.",
+  "_comment": "Alchemist (Wizard + Crafter). Stealthy sorcerer limited to daggers, slings, and cloth. Herbalism training grants a higher chance of finding reagents when foraging.",
   "allowed_weapons": [
     "fists",
-    "dagger"
+    "dagger",
+    "sling"
   ],
   "allowed_armor": [
     "cloth"

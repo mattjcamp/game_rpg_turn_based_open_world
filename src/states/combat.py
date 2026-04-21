@@ -806,8 +806,12 @@ class CombatState(BaseState):
             allowed = [c.lower() for c in spell.get("allowable_classes", [])]
             if fighter_class.lower() not in allowed:
                 continue
-            # Check level requirement
-            if fighter_level < spell.get("min_level", 1):
+            # Check level requirement (per-class override, then global)
+            class_mins = spell.get("class_min_levels", {}) or {}
+            class_mins_lc = {k.lower(): v for k, v in class_mins.items()}
+            required_level = class_mins_lc.get(
+                fighter_class.lower(), spell.get("min_level", 1))
+            if fighter_level < required_level:
                 continue
             # Check MP
             cost = spell["mp_cost"]
@@ -3635,13 +3639,24 @@ class CombatState(BaseState):
         spell = SPELLS_DATA["turn_undead"]
         mp_cost = spell["mp_cost"]
 
-        # Cleric-only: refuse to cast for any other class (even if
-        # allowable_classes in spells.json is edited to include others,
-        # the save-or-destroy mechanic is a Cleric-specific feature).
+        # Clerics and Paladins can channel Turn Undead. Paladins gain
+        # access at level 5 (see class_min_levels in spells.json);
+        # Clerics at level 2.
         caster_class = getattr(f, "char_class", "").lower()
-        if caster_class != "cleric":
+        if caster_class not in ("cleric", "paladin"):
             self.combat_log.append(
-                f"Only Clerics can channel Turn Undead!")
+                f"Only Clerics and Paladins can channel Turn Undead!")
+            self.phase = PHASE_PLAYER
+            self.selected_spell = None
+            return
+        caster_level = getattr(f, "level", 1)
+        class_mins = spell.get("class_min_levels", {}) or {}
+        class_mins_lc = {k.lower(): v for k, v in class_mins.items()}
+        required_level = class_mins_lc.get(
+            caster_class, spell.get("min_level", 1))
+        if caster_level < required_level:
+            self.combat_log.append(
+                f"{f.name} must be level {required_level} to Turn Undead!")
             self.phase = PHASE_PLAYER
             self.selected_spell = None
             return

@@ -14019,9 +14019,13 @@ class Renderer(CombatEffectRendererMixin):
         from src.party import SPELLS_DATA
         char_class = member.char_class
         char_level = member.level
+        def _spell_required_level(s):
+            cm = s.get("class_min_levels", {}) or {}
+            cm_lc = {k.lower(): v for k, v in cm.items()}
+            return cm_lc.get(char_class.lower(), s.get("min_level", 1))
         available = [s for s in SPELLS_DATA.values()
                      if char_class in s.get("allowable_classes", [])
-                     and char_level >= s.get("min_level", 1)]
+                     and char_level >= _spell_required_level(s)]
         if available:
             self._u3_text("SPELLS", tx, ty, self._U3_ORANGE, fm)
             ty += 20

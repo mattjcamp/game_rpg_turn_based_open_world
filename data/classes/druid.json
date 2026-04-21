@@ -5,7 +5,8 @@
     "fists",
     "dagger",
     "club",
-    "mace"
+    "mace",
+    "sling"
   ],
   "allowed_armor": [
     "cloth"

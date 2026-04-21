@@ -409,10 +409,14 @@
       "name": "Turn Undead",
       "description": "Channels holy energy at every undead on the battlefield. Each one must make a Wisdom save or be destroyed outright; those that succeed are still seared for 50% of their HP.",
       "allowable_classes": [
-        "Cleric"
+        "Cleric",
+        "Paladin"
       ],
       "casting_type": "priest",
       "min_level": 2,
+      "class_min_levels": {
+        "Paladin": 5
+      },
       "mp_cost": 0,
       "duration": "instant",
       "effect_type": "undead_damage",
