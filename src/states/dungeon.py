@@ -1420,22 +1420,35 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
     # the mixin via ``_try_open_locked`` in ``_try_move``.
 
     def _attempt_trap_detection(self):
-        """If Detect Traps effect is active, the thief rolls to spot traps in view.
+        """If Detect Traps effect is active, a Thief or trained Ranger
+        rolls to spot traps in view.
 
-        For each visible TILE_TRAP not already detected or triggered, the thief
-        makes a saving throw: d20 + DEX modifier >= 10.  Each trap is rolled
-        once per step while it remains in line of sight.
+        For each visible TILE_TRAP not already detected or triggered,
+        the spotter makes a saving throw: d20 + DEX modifier >= 10.
+        Each trap is rolled once per step while it remains in line of
+        sight.  Thieves qualify at any level; Rangers qualify from
+        level 3 onwards.  If both are present, the Thief is preferred
+        as the class specialist.
         """
         party = self.game.party
         if not party.has_effect("Detect Traps"):
             return
 
-        # Find an alive Thief in the party
+        # Find a qualified spotter — Thief (any level) preferred,
+        # otherwise a Ranger at level 3+.
         thief = None
+        fallback_ranger = None
         for m in party.members:
-            if m.is_alive() and m.char_class == "Thief":
+            if not m.is_alive():
+                continue
+            if m.char_class == "Thief":
                 thief = m
                 break
+            if (m.char_class == "Ranger" and m.level >= 3
+                    and fallback_ranger is None):
+                fallback_ranger = m
+        if thief is None:
+            thief = fallback_ranger
         if thief is None:
             return
 

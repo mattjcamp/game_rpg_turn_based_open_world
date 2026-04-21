@@ -8,8 +8,10 @@
       "description": "Traps are revealed before the party steps on them.",
       "duration": "permanent",
       "requirements": {
-        "class": "Thief",
-        "min_level": 1
+        "any_of": [
+          { "class": "Thief", "min_level": 1 },
+          { "class": "Ranger", "min_level": 3 }
+        ]
       }
     },
     {

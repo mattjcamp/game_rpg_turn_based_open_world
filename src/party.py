@@ -536,18 +536,34 @@ class PartyMember:
 
     @property
     def mp(self):
-        """Magic points depend on class and relevant mental stat."""
+        """Magic points depend on class and relevant mental stat.
+
+        Full casters (Wizard, Cleric, Illusionist) use the full value
+        of their casting stat.  Partial casters — including Alchemist,
+        Paladin, Ranger, Druid, and Lark — get half their casting stat
+        as base MP to reflect that their class draws power from other
+        sources (potion brewing, martial prowess, etc.) as well.
+        """
         cls = self.char_class.lower()
-        if cls in ("wizard", "alchemist"):
+        if cls == "wizard":
             return self.intelligence
         elif cls in ("cleric", "illusionist"):
             return self.wisdom
+        elif cls == "alchemist":
+            # Partial caster — Alchemist's strength comes from potion
+            # brewing; halved base MP balances that utility.
+            return self.intelligence // 2
         elif cls == "lark":
             return self.intelligence // 2
         elif cls == "paladin":
             return self.wisdom // 2
         elif cls == "druid":
-            return max(self.intelligence, self.wisdom) // 2
+            # Druids split their casting between priest and sorcerer
+            # spell lists, so their pool is deliberately modest: half
+            # the average of INT and WIS (≈ INT+WIS // 4).  Combined
+            # with a lower per-level gain this targets roughly half
+            # the MP of a pure Wizard at equivalent stats.
+            return (self.intelligence + self.wisdom) // 4
         elif cls == "ranger":
             return min(self.intelligence, self.wisdom) // 2
         return 0
@@ -583,7 +599,7 @@ class PartyMember:
         HP gains are modified by STR modifier (minimum +1 total).
         MP gains are modified by the class's casting stat modifier:
           - Single-stat casters (Wizard→INT, Cleric→WIS, etc.)
-          - Dual-stat casters (Druid→higher of INT/WIS)
+          - Dual-stat casters (Druid→average of INT/WIS)
         Non-caster classes get no MP bonus.
 
         Returns a list of message strings for each level gained.
@@ -613,10 +629,16 @@ class PartyMember:
                 cast_mod = 0
                 if mp_source:
                     if "abilities" in mp_source:
-                        # Dual-stat (e.g. Druid: higher of INT/WIS)
+                        # Dual-stat casters (Druid).  The ``mode`` key
+                        # controls which stat feeds the per-level MP
+                        # modifier: "higher" (max), "average" (arithmetic
+                        # mean), or otherwise fall back to the lower stat.
                         vals = [getattr(self, a, 10) for a in mp_source["abilities"]]
-                        if mp_source.get("mode") == "higher":
+                        mode = mp_source.get("mode")
+                        if mode == "higher":
                             cast_mod = get_modifier(max(vals))
+                        elif mode == "average":
+                            cast_mod = get_modifier(sum(vals) // len(vals))
                         else:
                             cast_mod = get_modifier(min(vals))
                     elif "ability" in mp_source:
@@ -823,18 +845,22 @@ class PartyMember:
         """Calculate MP contribution from the class mp_source.
 
         Single-stat: stat * (percentage / 100).
-        Dual-stat:   pick higher or lower of two stats, then apply percentage.
+        Dual-stat:   combine two stats per ``mode`` ("higher", "average",
+                     or "lower" — the default), then apply percentage.
         Returns 0 for non-casters.
         """
         src = self.mp_source
         if src is None:
             return 0
         if "abilities" in src:
-            # Dual-stat mode (e.g. Druid uses higher of INT/WIS)
+            # Dual-stat mode (Druid: average of INT/WIS).
             values = [getattr(self, a, 0) for a in src["abilities"]]
-            if src["mode"] == "higher":
+            mode = src.get("mode")
+            if mode == "higher":
                 stat_value = max(values)
-            else:  # "lower"
+            elif mode == "average":
+                stat_value = sum(values) // len(values)
+            else:  # "lower" (or missing)
                 stat_value = min(values)
         else:
             stat_value = getattr(self, src["ability"], 0)
@@ -1657,10 +1683,23 @@ class Party:
         return available
 
     def _meets_requirements(self, reqs):
-        """Check if the party meets ALL requirements."""
+        """Check if the party meets ALL requirements.
+
+        Supports three req shapes:
+          - class/race/min_level: ALL-match across the party.
+          - any_of: [ {class,...}, {class,...} ] — OR-match; the party
+            qualifies if ANY listed sub-requirement is satisfied.
+            Useful for effects like Detect Traps that should be
+            available to multiple classes at different levels
+            (e.g. Thief from L1, Ranger from L3).
+        """
         alive = [m for m in self.members if m.is_alive()]
         if not alive:
             return False
+
+        any_of = reqs.get("any_of")
+        if any_of:
+            return any(self._meets_requirements(r) for r in any_of)
 
         req_class = reqs.get("class")
         req_race = reqs.get("race")

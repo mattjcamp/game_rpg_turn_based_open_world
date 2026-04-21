@@ -1805,6 +1805,34 @@ class CombatState(BaseState):
                 end_col = tc
                 end_row = tr
 
+        # ── Fire Oil: small AoE explosion at landing tile ──
+        # Routes to the same projectile → explosion pipeline used by
+        # the Fireball spell, but at a much smaller scale: radius 1
+        # (3x3 burst), 2d6 fire damage, no caster stat bonus.  Friendly
+        # fire still applies — don't stand next to your target.
+        if item_name == "Fire Oil":
+            fb = AoeFireballEffect(col, row, end_col, end_row)
+            self.aoe_fireball_effects.append(fb)
+            self.game.sfx.play("fireball")
+            self._pending_aoe_fireball = {
+                "fighter": f,
+                "target_col": end_col,
+                "target_row": end_row,
+                "dice_count": 2,
+                "dice_sides": 6,
+                "stat_bonus": None,
+                "min_damage": 1,
+                "radius": 1,
+                "label": item_name,
+            }
+            self.phase = PHASE_AOE_FIREBALL
+            remaining = (f.inventory.count(item_name)
+                         + self.game.party.inv_count(item_name))
+            self.combat_log.append(
+                f"{f.name} hurls {item_name}! ({remaining} left)"
+            )
+            return
+
         proj_color = (200, 220, 240)  # silver for thrown items
         proj = Projectile(col, row, end_col, end_row,
                           color=proj_color,
@@ -2493,6 +2521,10 @@ class CombatState(BaseState):
         stat_bonus = info["stat_bonus"]
         min_damage = info["min_damage"]
         radius = info["radius"]
+        # Optional label for thrown items (e.g. "Fire Oil") so the
+        # detonation log line reads naturally.  Spells leave it unset
+        # and fall back to the generic "fireball" wording.
+        label = info.get("label")
 
         # Spawn the big explosion
         self.aoe_explosions.append(AoeExplosionEffect(tc, tr, radius))
@@ -2514,8 +2546,12 @@ class CombatState(BaseState):
         damage += bonus
         damage = max(min_damage, damage)
 
-        self.combat_log.append(
-            f"The fireball detonates for {damage} damage!")
+        if label:
+            self.combat_log.append(
+                f"The {label} bursts into flames for {damage} damage!")
+        else:
+            self.combat_log.append(
+                f"The fireball detonates for {damage} damage!")
 
         # Track all killed so we can check victory/defeat after
         monsters_hit = []

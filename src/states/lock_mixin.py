@@ -121,7 +121,8 @@ class LockInteractionMixin:
         elif thief and picks <= 0:
             options.append(("Pick Lock (no lockpicks!)", "no_picks"))
         elif thief is None:
-            options.append(("Pick Lock (no thief!)", "no_thief"))
+            options.append(
+                ("Pick Lock (need a Thief or L3+ Ranger!)", "no_thief"))
 
         # Caster with Knock + MP?
         knock_caster = self._find_knock_caster()
@@ -174,7 +175,8 @@ class LockInteractionMixin:
         elif action == "no_thief":
             self._close_lock_interact()
             self._lock_message(
-                "You need a thief to pick the lock!", 2000)
+                "You need a Thief, or a Ranger of level 3 or higher, "
+                "to pick the lock!", 2500)
         elif action == "knock":
             self._close_lock_interact()
             self._attempt_knock_spell(col, row)
@@ -199,7 +201,8 @@ class LockInteractionMixin:
         thief = self._find_lock_thief()
         if thief is None:
             self._lock_message(
-                "The door is locked. You need a thief!", 2000)
+                "The door is locked. You need a Thief or a "
+                "level-3+ Ranger!", 2500)
             return
         picks_left = party.inv_get_charges("Lockpick")
         if picks_left <= 0:
@@ -316,10 +319,22 @@ class LockInteractionMixin:
         }
 
     def _find_lock_thief(self):
+        """Return an alive party member able to pick locks, or None.
+
+        Thieves can pick locks from level 1.  Rangers gain the ability
+        at level 3 (tracked per-class in data/classes/ranger.json's
+        class_abilities).  When both exist the Thief is preferred
+        because they are the class specialist.
+        """
+        ranger = None
         for m in self.game.party.members:
-            if m.is_alive() and m.char_class == "Thief":
+            if not m.is_alive():
+                continue
+            if m.char_class == "Thief":
                 return m
-        return None
+            if m.char_class == "Ranger" and m.level >= 3 and ranger is None:
+                ranger = m
+        return ranger
 
     def _find_knock_caster(self):
         from src.party import SPELLS_DATA

@@ -97,6 +97,10 @@ class ExamineState(BaseState):
         self.examine_layout = {}           # {(col, row): graphic_path} painted in editor
         self._editor_items = {}            # {(col, row): item_name} from module editor
         self.party_member_name = ""
+        # Whether the party has already searched this tile for reagents.
+        # Persisted in the per-tile saved layout so re-examining a tile
+        # shows a notice instead of re-rolling the INT save.
+        self.reagents_searched = False
         # Drop mode state
         self.drop_mode = False
         self.drop_cursor = 0
@@ -181,16 +185,25 @@ class ExamineState(BaseState):
 
         # Check for a saved layout for this overworld tile
         saved = self.game.get_examined_tile(party.col, party.row)
+        self.reagents_searched = False
         if saved is not None:
-            self._restore_layout(saved)
+            self._restore_layout(saved)  # may set reagents_searched
         else:
             self._spawn_obstacles()
             self._spawn_examine_items()
             self._place_editor_items()
-            # Rangers/Alchemists roll an INT save to spot reagents the
-            # rest of the party would have missed.  Only runs on the
-            # first visit so players can't farm a tile by re-examining.
-            self._attempt_herbalist_discovery()
+        # Rangers/Alchemists can comb a tile for reagents exactly once.
+        # Once searched, a revisit by a herbalist shows a notice instead
+        # of re-rolling; tiles searched by a party that has since lost
+        # its herbalist remain marked as searched.
+        if self._has_herbalist():
+            if self.reagents_searched:
+                self.pickup_message = (
+                    "The party already combed this area for reagents.")
+                self.pickup_msg_timer = 3000
+            else:
+                self._attempt_herbalist_discovery()
+                self.reagents_searched = True
 
     def exit(self):
         # Save the current layout before leaving
@@ -209,6 +222,7 @@ class ExamineState(BaseState):
                 f"{c},{r}": v
                 for (c, r), v in self.ground_items.items()
             },
+            "reagents_searched": bool(self.reagents_searched),
         }
         self.game.save_examined_tile(col, row, data)
 
@@ -226,6 +240,7 @@ class ExamineState(BaseState):
         for pos_str, item_data in saved.get("ground_items", {}).items():
             c, r = pos_str.split(",")
             self.ground_items[(int(c), int(r))] = dict(item_data)
+        self.reagents_searched = bool(saved.get("reagents_searched", False))
 
     # ── Input ─────────────────────────────────────────────────────
 

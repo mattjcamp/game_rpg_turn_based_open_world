@@ -187,8 +187,8 @@ Eight professions are available to the aspiring adventurer. Each determines thy 
 | Cleric    |    6   |   10   |   2   |   Priest   |   Chain    |
 | Thief     |    5   |    0   |   6   |    None    |  Leather   |
 | Paladin   |   10   |    5   |   4   |   Priest   |   Plate    |
-| Ranger    |   10   |    3   |   4   |   Priest   |   Chain    |
-| Druid     |    5   |   12   |   2   |    Both    |   Cloth    |
+| Ranger    |   10   |    3   |   6   |   Priest   |   Chain    |
+| Druid     |    5   |    8   |   2   |    Both    |   Cloth    |
 | Alchemist |    4   |    8   |   4   |  Sorcerer  |   Cloth    |
 
 ---
@@ -278,16 +278,18 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 ### Ranger
 
-*Versatile woodsman — skilled with bows, swords, and light healing.*
+*Versatile woodsman — bow master, herbalist, and able scout.*
 
 | HP/Lvl | MP/Lvl | Range | Spells |
 |:------:|:------:|:-----:|:------:|
-|   10   |   3    |   4   | Priest |
+|   10   |   3    |   6   | Priest |
 
-**Weapons:** Fists, Dagger, Club, Sling, Short Bow, Long Bow, Sword
+**Weapons:** Fists, Dagger, Club, Sling, Short Bow, Long Bow, Crossbow, Sword
 **Armor:** Cloth, Leather, Chain
 
-Rangers are durable frontliners with bow proficiency and limited healing magic. With a 4-tile combat range and Long Bow access they can deal serious ranged damage, and their small MP pool lets them cast the occasional Minor Heal to keep the party going between fights. A strong choice for a self-sufficient frontliner.
+Rangers are durable frontliners with bow mastery, wilderness lore, and limited healing magic. Their 6-tile combat range matches a Thief's reach, and they are proficient with every bow in the game — Short Bow, Long Bow, and Crossbow — making them the party's premier ranged attacker. Their small MP pool lets them cast the occasional Minor Heal to keep the party going between fights. A strong choice for a self-sufficient frontliner who can also scout dangerous terrain.
+
+**Herbalism** — When the party presses E to examine a tile in the wilderness, each Ranger rolls a d20 + INT saving throw against DC 10. On a success, the Ranger identifies a potion reagent in the area and adds it to the shared inventory. **Pick Locks (Level 3+)** — From level 3, a Ranger can pick locked doors and chests exactly as a Thief can (d20 + DEX vs DC 12, one lockpick consumed per attempt). **Detect Traps (Level 3+)** — From level 3, the Ranger's woodcraft reveals hidden traps before the party steps on them, rolling d20 + DEX vs DC 10 to spot each trap within sight.
 
 ---
 
@@ -297,14 +299,14 @@ Rangers are durable frontliners with bow proficiency and limited healing magic. 
 
 | HP/Lvl | MP/Lvl | Range | Spells |
 |:------:|:------:|:-----:|:------:|
-|   5    |   12   |   2   |  Both  |
+|   5    |    8   |   2   |  Both  |
 
 **Weapons:** Fists, Dagger, Club, Mace
 **Armor:** Cloth only
 
-The Druid is the game's only hybrid caster, able to cast both Priest spells (Minor Heal, Cure Poison, Light) and Sorcerer spells (Magic Dart, Shield, Knock). Their MP regenerates twice as fast as other classes. The trade-off is low HP and cloth-only armor — like Wizards, they need protection.
+The Druid is the game's only hybrid caster, able to cast both Priest spells (Minor Heal, Cure Poison, Light) and Sorcerer spells (Magic Dart, Shield, Knock). To balance that remarkable spell breadth, a Druid's Magic Point pool is modest — about half the size of a Wizard's or Cleric's at equivalent stats. Their MP pool is drawn from the average of Intelligence and Wisdom and they regenerate MP twice as fast as other classes. The trade-off is low HP and cloth-only armor — like Wizards, they need protection.
 
-**Dual Casting** — Access to both Priest and Sorcerer spell lists. **2× MP Regen** — MP regenerates twice as fast as other classes.
+**Dual Casting** — Access to both Priest and Sorcerer spell lists. **2× MP Regen** — MP regenerates twice as fast as other classes. **Half-caster Pool** — Base MP is ≈ half a Wizard's, balancing breadth against raw spell count.
 
 ---
 
@@ -319,9 +321,9 @@ The Druid is the game's only hybrid caster, able to cast both Priest spells (Min
 **Weapons:** Fists, Dagger
 **Armor:** Cloth only
 
-Alchemists have modest combat ability but provide unique value through potion crafting. Their 4-tile range matches the Fighter's mobility, and access to Sorcerer spells means they can still contribute offensive magic. Brew Potions lets them turn reagents into healing potions, antidotes, and other useful consumables.
+Alchemists have modest combat ability but provide unique value through potion crafting. Their 4-tile range matches the Fighter's mobility, and access to Sorcerer spells means they can still contribute offensive magic. Brew Potions lets them turn reagents into healing potions, antidotes, and other useful consumables. Because that crafting utility is so powerful, the Alchemist is balanced as a partial caster — their base Magic Point pool is half their Intelligence score (roughly half a Wizard's raw casting output), so lean on potions and thrown oils as much as on spells.
 
-**Brew Potions** — Craft potions from reagents found in shops and dungeons.
+**Brew Potions** — Craft potions from reagents found in shops and dungeons. **Half-caster Pool** — Base MP is ½ Intelligence, balancing brewing utility against raw spellcasting.
 
 ---
 
@@ -531,7 +533,7 @@ Spells consume Magic Points (MP) and are divided into two schools: Sorcerer and 
 | Paladin   | Wisdom         | 50%          | Priest   |
 | Ranger    | Wisdom         | 50%          | Priest   |
 | Alchemist | Intelligence   | 50%          | Sorcerer |
-| Druid     | INT or WIS     | 50% (2× regen) | Both  |
+| Druid     | avg(INT, WIS)  | 50% (2× regen) | Both  |
 
 ### Sorcerer Spells
 

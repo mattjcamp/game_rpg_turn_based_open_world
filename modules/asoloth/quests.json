@@ -66,7 +66,20 @@
       "Crossbow",
       "Bolts"
     ],
-    "steps": [],
+    "steps": [
+      {
+        "description": "Destroy the Goblins",
+        "step_type": "kill",
+        "encounter": "Goblin Raiding Party",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Goblin Stronghold",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      }
+    ],
     "giver_col": 9,
     "giver_row": 12
   }
