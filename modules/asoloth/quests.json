@@ -82,5 +82,46 @@
     ],
     "giver_col": 9,
     "giver_row": 12
+  },
+  {
+    "name": "Wolfman Puck",
+    "description": "",
+    "giver_npc": "",
+    "giver_sprite": "src/assets/game/characters/fighter.png",
+    "giver_location": "town:Larian",
+    "giver_dialogue": "The realm is infested with Giant Wolves and I suspect there is an Orc to blame. Can thou do us a solid?",
+    "reward_xp": 200,
+    "reward_gold": 200,
+    "reward_items": [
+      "Arrows"
+    ],
+    "steps": [
+      {
+        "description": "Wolf Control",
+        "step_type": "kill",
+        "encounter": "Wolf Pack",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "overview",
+        "target": "",
+        "target_count": 10,
+        "optional": "no"
+      },
+      {
+        "description": "Get that Dasterdly Orc",
+        "step_type": "kill",
+        "encounter": "Wolves and Goblins",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "overview",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 9,
+    "giver_row": 12
   }
 ]

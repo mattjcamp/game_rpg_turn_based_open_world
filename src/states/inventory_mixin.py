@@ -80,6 +80,11 @@ class InventoryMixin:
         self.brew_result_msg = None   # message shown after a brew attempt
         self.brew_result_timer = 0
 
+        # Gnome tinker selection overlay (choose which item to craft)
+        self.showing_tinker_list = False
+        self.tinker_list_items = []   # list of item-name strings
+        self.tinker_list_cursor = 0
+
         # Level-up animation queue
         # Each entry: {"name": str, "level": int, "hp": int, "mp": int,
         #              "timer": int, "duration": int}
@@ -586,41 +591,24 @@ class InventoryMixin:
 
     # ── Tinker helpers ─────────────────────────────────────────
 
-    # Tiered loot tables keyed by minimum gnome level
-    _TINKER_LOOT_TIERS = [
-        # (min_level, [(weight, item_name), ...])
-        (1, [
-            (25, "Arrows"),
-            (20, "Stones"),
-            (15, "Torch"),
-            (15, "Lockpick"),
-            (10, "Dagger"),
-            (10, "Healing Herb"),
-            (5,  "Antidote"),
-        ]),
-        (4, [
-            (20, "Arrows"),
-            (15, "Mana Potion"),
-            (15, "Lockpick"),
-            (12, "Short Sword"),
-            (10, "Smoke Bomb"),
-            (10, "Holy Water"),
-            (8,  "Healing Herb"),
-            (5,  "Short Bow"),
-            (5,  "Bolts"),
-        ]),
-        (7, [
-            (18, "Mana Potion"),
-            (15, "Holy Water"),
-            (12, "Smoke Bomb"),
-            (12, "Long Sword"),
-            (10, "Chain Mail"),
-            (10, "Steel Shield"),
-            (8,  "Bolts"),
-            (8,  "Fire Bomb"),
-            (7,  "Crossbow"),
-        ]),
+    # Fallback General-Store list used only if counters.json cannot be
+    # read. Keep in sync with data/counters.json -> "general".items.
+    _TINKER_FALLBACK_ITEMS = [
+        "Torch", "Rope", "Lockpick", "Camping Supplies", "Healing Herb",
+        "Antidote", "Arrows", "Bolts", "Stones", "Dagger",
     ]
+
+    # Minimum crafted count for specific tinkered items. A successful
+    # tinker produces at least this many; if ITEM_INFO's default
+    # "charges" value is higher, that default is used instead. Items
+    # not listed here fall back to ITEM_INFO's default charge count
+    # (or a plain entry when the item has no charges at all).
+    _TINKER_MIN_COUNTS = {
+        "Arrows": 10,
+        "Bolts": 10,
+        "Stones": 10,
+        "Camping Supplies": 3,
+    }
 
     def _get_gnome(self):
         """Return the first alive Gnome in the party, or None."""
@@ -638,23 +626,75 @@ class InventoryMixin:
             return False
         return True
 
-    def _get_tinker_loot_table(self, gnome_level):
-        """Return the best loot table the gnome qualifies for by level."""
-        best = self._TINKER_LOOT_TIERS[0][1]
-        for min_lvl, table in self._TINKER_LOOT_TIERS:
-            if gnome_level >= min_lvl:
-                best = table
-        return best
+    def _get_tinker_options(self):
+        """Return the list of items a gnome may tinker together today.
 
-    def _attempt_tinker(self):
-        """Perform a tinker attempt — the gnome crafts a random item.
+        Pulls from data/counters.json -> ``general`` (the General Store
+        counter) so the craftable list stays in sync with what the
+        shopkeeper stocks. ``COUNTER_DATA`` maps shop_type -> list of
+        item names (service counters excluded). Falls back to a
+        hardcoded list if the counter data is unavailable.
+        """
+        try:
+            from src.party import COUNTER_DATA
+            gen = COUNTER_DATA.get("general") if COUNTER_DATA else None
+            # COUNTER_DATA value may be a plain list or (legacy) a dict
+            # with an "items" key — handle both for safety.
+            if isinstance(gen, dict):
+                items = list(gen.get("items") or [])
+            else:
+                items = list(gen or [])
+            if items:
+                return items
+        except Exception:
+            pass
+        return list(self._TINKER_FALLBACK_ITEMS)
+
+    def _open_tinker_list(self):
+        """Open the tinker item-selection overlay."""
+        gnome = self._get_gnome()
+        if not gnome:
+            self.show_message("No Gnome in the party!", 2000)
+            return
+        options = self._get_tinker_options()
+        if not options:
+            self.show_message("Nothing the gnome can tinker!", 2000)
+            return
+        self.tinker_list_items = options
+        self.tinker_list_cursor = 0
+        self.showing_tinker_list = True
+
+    def _handle_tinker_list_input(self, event):
+        """Handle input while the tinker selection overlay is open."""
+        items = self.tinker_list_items
+        if not items:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                self.showing_tinker_list = False
+            return
+        if event.key == pygame.K_UP:
+            self.tinker_list_cursor = (
+                (self.tinker_list_cursor - 1) % len(items))
+        elif event.key == pygame.K_DOWN:
+            self.tinker_list_cursor = (
+                (self.tinker_list_cursor + 1) % len(items))
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            chosen = items[self.tinker_list_cursor]
+            self.showing_tinker_list = False
+            self._attempt_tinker(chosen)
+        elif event.key == pygame.K_ESCAPE:
+            # Cancel — no cooldown consumed
+            self.showing_tinker_list = False
+
+    def _attempt_tinker(self, chosen_item):
+        """Perform a tinker attempt for the player-chosen *chosen_item*.
 
         Uses an INT-based roll:
           roll = d20 + gnome's INT modifier
           DC 8 = success (easy — gnomes are natural tinkerers!)
 
-        On success: a random item from the level-appropriate loot table.
+        On success: the chosen item is added to the shared inventory.
         On failure: the attempt is wasted with no item produced.
+        Either way, the daily cooldown is consumed.
         """
         gnome = self._get_gnome()
         if not gnome:
@@ -672,36 +712,59 @@ class InventoryMixin:
         dc = 8
 
         if total >= dc:
-            # Success — pick a random item from the level-appropriate table
-            table = self._get_tinker_loot_table(gnome.level)
-            total_weight = sum(w for w, _ in table)
-            r = random.randint(1, total_weight)
-            cumulative = 0
-            item = table[-1][1]
-            for weight, item_name in table:
-                cumulative += weight
-                if r <= cumulative:
-                    item = item_name
-                    break
-            party.shared_inventory.append(item)
-            msg = (f"{gnome.name} tinkers a {item}! "
+            # Determine the crafted count. For items listed in
+            # _TINKER_MIN_COUNTS, produce at least that many (use the
+            # ITEM_INFO default if it's already higher). For other items,
+            # inv_add handles charges from the item's own ITEM_INFO entry.
+            from src.party import ITEM_INFO
+            info = ITEM_INFO.get(chosen_item, {})
+            default_charges = info.get("charges")
+            floor = self._TINKER_MIN_COUNTS.get(chosen_item)
+            if floor is not None:
+                charges_to_add = max(floor, default_charges or 0)
+            else:
+                charges_to_add = default_charges  # may be None
+
+            # Snapshot whether this produces a new entry (vs. merging
+            # into an existing stack) so we can update the cursor.
+            old_len = len(party.shared_inventory)
+            party.inv_add(chosen_item, charges=charges_to_add)
+
+            # Grammar: "tinkers 10x Arrows" for counted items,
+            # "tinkers a Dagger" for singletons.
+            if charges_to_add and charges_to_add > 1:
+                made_str = f"{charges_to_add}x {chosen_item}"
+            else:
+                made_str = f"a {chosen_item}"
+            msg = (f"{gnome.name} tinkers {made_str}! "
                    f"(d20:{roll}+{int_mod}={total} vs DC{dc})")
             self.show_message(msg, 3500)
 
-            # Move cursor to the newly created item so its detail shows
+            # Move cursor to the crafted item. If a new stash entry
+            # was appended, target it; if inv_add merged into an
+            # existing stack, locate that stack by name.
             _, _, _, stash_start, _, _, _ = self._stash_layout()
-            new_item_idx = len(party.shared_inventory) - 1
+            new_len = len(party.shared_inventory)
+            if new_len > old_len:
+                new_item_idx = new_len - 1
+            else:
+                new_item_idx = new_len - 1  # default fallback
+                for i, entry in enumerate(party.shared_inventory):
+                    if party.item_name(entry) == chosen_item:
+                        new_item_idx = i
+                        break
             self.party_inv_cursor = stash_start + new_item_idx
 
             # Trigger a crafting animation overlay
+            anim_text = f"Crafted {made_str}!"
             self.use_item_anim = {
                 "effect": "tinker",
                 "timer": 2000,
                 "duration": 2000,
-                "text": f"Crafted {item}!",
+                "text": anim_text,
             }
         else:
-            # Failure — materials wasted
+            # Failure — materials wasted (the chosen item is not produced)
             msg = (f"{gnome.name}'s tinkering fails... scraps everywhere! "
                    f"(d20:{roll}+{int_mod}={total} vs DC{dc})")
             self.show_message(msg, 3500)
@@ -760,6 +823,11 @@ class InventoryMixin:
         # Brew list overlay is open — delegate input
         if self.showing_brew_list:
             self._handle_brew_list_input(event)
+            return
+
+        # Tinker list overlay is open — delegate input
+        if self.showing_tinker_list:
+            self._handle_tinker_list_input(event)
             return
 
         # Examining an item — close on ESC/Enter/Space
@@ -848,8 +916,9 @@ class InventoryMixin:
                 # Close stash and enter pickpocket targeting mode on the map
                 self._start_pickpocket_targeting()
             elif TINK_INDEX >= 0 and idx == TINK_INDEX:
-                # Gnome tinkers a random item on the spot
-                self._attempt_tinker()
+                # Gnome tinkering: open the item-selection overlay so the
+                # player can pick which General-Store item to craft.
+                self._open_tinker_list()
             else:
                 options = self._get_party_inv_action_options()
                 if options:

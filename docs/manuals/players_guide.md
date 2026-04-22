@@ -289,7 +289,7 @@ Paladins combine Fighter durability with limited Priest magic. They can wear the
 
 Rangers are durable frontliners with bow mastery, wilderness lore, and limited healing magic. Their 6-tile combat range matches a Thief's reach, and they are proficient with every bow in the game — Short Bow, Long Bow, and Crossbow — making them the party's premier ranged attacker. Their small MP pool lets them cast the occasional Minor Heal to keep the party going between fights. A strong choice for a self-sufficient frontliner who can also scout dangerous terrain.
 
-**Herbalism** — When the party presses E to examine a tile in the wilderness, each Ranger rolls a d20 + INT saving throw against DC 10. On a success, the Ranger identifies a potion reagent in the area and adds it to the shared inventory. **Pick Locks (Level 3+)** — From level 3, a Ranger can pick locked doors and chests exactly as a Thief can (d20 + DEX vs DC 12, one lockpick consumed per attempt). **Detect Traps (Level 3+)** — From level 3, the Ranger's woodcraft reveals hidden traps before the party steps on them, rolling d20 + DEX vs DC 10 to spot each trap within sight.
+**Herbalism** — When the party presses E to examine a tile in the wilderness, each Ranger rolls a d20 + INT saving throw against DC 13. On a success, the Ranger identifies a potion reagent in the area and adds it to the shared inventory. **Pick Locks (Level 3+)** — From level 3, a Ranger can pick locked doors and chests exactly as a Thief can (d20 + DEX vs DC 12, one lockpick consumed per attempt). **Detect Traps (Level 3+)** — From level 3, the Ranger's woodcraft reveals hidden traps before the party steps on them, rolling d20 + DEX vs DC 10 to spot each trap within sight.
 
 ---
 

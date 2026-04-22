@@ -106,6 +106,12 @@ class DungeonData:
         self.monsters = monsters or []
         # Fog of war: tiles the party has ever seen
         self.explored_tiles = set()
+        # (col, row) positions of TILE_STAIRS tiles that, when ESC'd
+        # from, exit the dungeon back to the overworld instead of
+        # ascending one level. Used on the bottom level of procedural
+        # multi-level dungeons so the party doesn't have to walk all
+        # the way back to the top floor to leave.
+        self.overworld_exits = set()
 
     # ── Serialization ────────────────────────────────────────────
 
@@ -149,6 +155,7 @@ class DungeonData:
             "explored_tiles": [list(pos) for pos in self.explored_tiles],
             "monsters": monsters_data,
             "style": self.style,
+            "overworld_exits": [list(pos) for pos in self.overworld_exits],
         }
 
     @classmethod
@@ -189,6 +196,7 @@ class DungeonData:
         dd.triggered_traps = {tuple(p) for p in data.get("triggered_traps", [])}
         dd.detected_traps = {tuple(p) for p in data.get("detected_traps", [])}
         dd.explored_tiles = {tuple(p) for p in data.get("explored_tiles", [])}
+        dd.overworld_exits = {tuple(p) for p in data.get("overworld_exits", [])}
         return dd
 
 
@@ -601,6 +609,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      seed=None,
                      place_stairs_down=False, place_artifact=False,
                      place_doors=False,
+                     place_overworld_exit=False,
                      encounter_area="dungeon",
                      encounter_min_level=None,
                      encounter_max_level=None,
@@ -624,6 +633,13 @@ def generate_dungeon(name="The Depths", width=40, height=30,
         place_stairs_down: If True, place stairs-down in the last room
         place_artifact: If True, place the quest artifact in the last room
         place_doors: If True, place doors at room/corridor junctions
+        place_overworld_exit: If True, place an additional stairs-up
+            tile somewhere in the dungeon that exits directly back to
+            the overworld (instead of ascending one level).  Used on
+            the bottom level of procedural multi-level dungeons so
+            the party can leave without walking all the way back up.
+            The (col, row) of the exit is recorded on
+            ``DungeonData.overworld_exits``.
         custom_encounters: Optional list of encounter dicts.  New format:
             ``{"monsters": ["Orc", "Skeleton", ...]}``.  Legacy format
             ``{"monster": str, "count": int}`` is also supported.
@@ -813,8 +829,58 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     entry_col = stairs_col
     entry_row = stairs_row
 
-    return DungeonData(tmap, rooms, entry_col, entry_row, name,
-                       monsters=monsters, style=style)
+    dd = DungeonData(tmap, rooms, entry_col, entry_row, name,
+                     monsters=monsters, style=style)
+
+    # --- Optional: place an "exit to overworld" staircase ---
+    # Uses the same tile (TILE_STAIRS) as the entrance stairs so the
+    # graphic matches; the dungeon state consults
+    # ``dungeon_data.overworld_exits`` to decide whether an ESC-on-
+    # stairs should ascend or leave the dungeon entirely.
+    if place_overworld_exit and len(rooms) >= 2:
+        exit_col, exit_row = _place_overworld_exit_stairs(tmap, rooms)
+        if exit_col is not None:
+            dd.overworld_exits.add((exit_col, exit_row))
+
+    return dd
+
+
+def _place_overworld_exit_stairs(tmap, rooms):
+    """Place a TILE_STAIRS somewhere that leads back to the overworld.
+
+    Picks a room in the middle of the run (avoids the first room which
+    already holds the ascend-stairs, and the last room which may hold
+    the quest artifact or other special tiles).  Within the chosen
+    room, tries random floor tiles first so the exit doesn't always
+    land on the exact center.  Returns ``(col, row)`` of the placed
+    stair, or ``(None, None)`` if no suitable spot was found.
+    """
+    if len(rooms) < 2:
+        return None, None
+
+    # Candidate rooms: everything except the first (ascend stairs live
+    # there) and the last (may hold artifact / stairs-down).
+    if len(rooms) >= 3:
+        candidates = list(rooms[1:-1])
+    else:
+        # Only 2 rooms — fall back to the second one but avoid its center
+        candidates = [rooms[1]]
+    random.shuffle(candidates)
+
+    for room in candidates:
+        # Try random interior floor tiles (up to 20 attempts per room)
+        for _ in range(20):
+            cx = random.randint(room.x + 1, room.x + room.w - 2)
+            cy = random.randint(room.y + 1, room.y + room.h - 2)
+            if tmap.get_tile(cx, cy) == TILE_DFLOOR:
+                tmap.set_tile(cx, cy, TILE_STAIRS)
+                return cx, cy
+        # Fallback: room center if it's a floor tile
+        cc, cr = room.center
+        if tmap.get_tile(cc, cr) == TILE_DFLOOR:
+            tmap.set_tile(cc, cr, TILE_STAIRS)
+            return cc, cr
+    return None, None
 
 
 def generate_house_dungeon(name="Elara's House"):
@@ -844,6 +910,7 @@ def generate_house_dungeon(name="Elara's House"):
         room_min_size=3, room_max_size=5,
         place_artifact=True,
         place_doors=False,
+        place_overworld_exit=True,
         encounter_area="house_basement",
     )
     return [level_0, level_1]
@@ -868,6 +935,7 @@ def generate_quest_dungeon(name="Shadow Dungeon"):
         name=f"{name} - Level 2",
         place_artifact=True,
         place_doors=False,
+        place_overworld_exit=True,
     )
     return [level_0, level_1]
 
@@ -944,6 +1012,7 @@ def generate_innkeeper_quest_dungeon(name="Shadow Dungeon", num_floors=None,
             place_stairs_down=not is_last,
             place_artifact=(is_last and place_artifact),
             place_doors=place_doors,
+            place_overworld_exit=(is_last and num_floors > 1),
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,
@@ -1098,6 +1167,7 @@ def generate_keys_dungeon(dungeon_number, name=None, place_artifact=True,
             place_stairs_down=not is_last,
             place_artifact=(is_last and place_artifact),
             place_doors=place_doors,
+            place_overworld_exit=(is_last and num_floors > 1),
             encounter_area="dungeon",
             encounter_min_level=enc_level,
             encounter_max_level=enc_level,

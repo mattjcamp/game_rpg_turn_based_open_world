@@ -445,7 +445,7 @@ class ExamineState(BaseState):
         """Rangers and Alchemists roll INT saves to discover reagents.
 
         Each alive Ranger or Alchemist in the party rolls
-        ``d20 + INT modifier`` vs DC 10.  On success, the character
+        ``d20 + INT modifier`` vs DC 13.  On success, the character
         identifies a useful potion reagent in the area — a random
         reagent from :data:`FORAGE_REAGENTS` is added to the shared
         inventory and a short discovery message is queued so the
@@ -461,9 +461,10 @@ class ExamineState(BaseState):
             cls = m.char_class.lower()
             if cls not in _HERBALIST_CLASSES:
                 continue
-            # INT saving throw: d20 + INT modifier vs DC 10
+            # INT saving throw: d20 + INT modifier vs DC 13
+            # (DC was 10 — raised to 13 to reduce discovery rate by ~25%)
             roll = random.randint(1, 20) + m.int_mod
-            if roll < 10:
+            if roll < 13:
                 continue
             reagent = random.choice(FORAGE_REAGENTS)
             party.inv_add(reagent)

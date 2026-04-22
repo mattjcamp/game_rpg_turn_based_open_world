@@ -35,7 +35,7 @@
   "class_abilities": [
     {
       "name": "Herbalism",
-      "description": "Keen knowledge of flora lets Rangers spot reagents in the wild. When the party presses E to examine a tile, each Ranger rolls an INT saving throw (d20 + INT mod vs DC 10) — success identifies a potion reagent."
+      "description": "Keen knowledge of flora lets Rangers spot reagents in the wild. When the party presses E to examine a tile, each Ranger rolls an INT saving throw (d20 + INT mod vs DC 13) — success identifies a potion reagent."
     },
     {
       "name": "Pick Locks",

@@ -20,5 +20,27 @@
         "encounters": []
       }
     ]
+  },
+  {
+    "name": "Derelict Caves",
+    "description": "Old ruins, who can say what they were used for? Who can say what now lies below?",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 3,
+    "difficulty": "normal",
+    "level_size": "medium",
+    "torch_density": "sparse",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
   }
 ]

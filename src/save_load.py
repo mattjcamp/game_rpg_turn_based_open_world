@@ -850,6 +850,8 @@ def _regenerate_module_dungeon(game, dungeon_name, ow_col, ow_row):
             max_rooms=prof["max_rooms"],
             seed=seed_base + li,
             place_stairs_down=(li < num_levels - 1),
+            place_overworld_exit=(
+                li == num_levels - 1 and num_levels > 1),
             place_doors=doors,
             torch_density=td,
             encounter_min_level=prof["enc_min"],

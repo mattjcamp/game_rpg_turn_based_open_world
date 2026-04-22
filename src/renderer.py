@@ -14752,6 +14752,9 @@ class Renderer(CombatEffectRendererMixin):
                                  brew_result_msg=None,
                                  pickpocket_available=False,
                                  tinker_available=False,
+                                 showing_tinker_list=False,
+                                 tinker_list_items=None,
+                                 tinker_list_cursor=0,
                                  applying_poison_step=None,
                                  applying_poison_cursor=0,
                                  applying_poison_item=None,
@@ -15565,6 +15568,54 @@ class Renderer(CombatEffectRendererMixin):
                         self._u3_text("MISSING REAGENTS", dx, dy,
                                       self._U3_RED, fm)
 
+        # ── Tinker list popup ──
+        if showing_tinker_list:
+            options = tinker_list_items or []
+            if not options:
+                popup_w = 280
+                popup_h = 60
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+                pygame.draw.rect(self.screen, (20, 30, 20),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, (140, 200, 140),
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+                self._u3_text("TINKER", popup_x + 10, popup_y + 6,
+                              self._U3_ORANGE, fm)
+                self._u3_text("NOTHING TO TINKER",
+                              popup_x + 10, popup_y + 30,
+                              self._U3_GRAY, fm)
+            else:
+                popup_w = 320
+                popup_h = 28 + len(options) * 22 + 16
+                popup_x = SCREEN_WIDTH // 2 - popup_w // 2
+                popup_y = SCREEN_HEIGHT // 2 - popup_h // 2
+
+                pygame.draw.rect(self.screen, (20, 30, 20),
+                                 (popup_x, popup_y, popup_w, popup_h))
+                pygame.draw.rect(self.screen, (140, 200, 140),
+                                 (popup_x, popup_y, popup_w, popup_h), 2)
+
+                self._u3_text("TINKER — PICK AN ITEM",
+                              popup_x + 10, popup_y + 6,
+                              self._U3_ORANGE, fm)
+
+                oy = popup_y + 28
+                for ii, item_name in enumerate(options):
+                    sel = (ii == tinker_list_cursor)
+                    prefix = "> " if sel else "  "
+                    col = self._U3_WHITE if sel else (180, 220, 180)
+                    self._u3_text(f"{prefix}{item_name}",
+                                  popup_x + 10, oy, col, fm)
+                    if sel:
+                        hl = pygame.Rect(popup_x + 4, oy - 1,
+                                         popup_w - 8, 20)
+                        hl_s = pygame.Surface((hl.w, hl.h),
+                                              pygame.SRCALPHA)
+                        hl_s.fill((255, 255, 255, 25))
+                        self.screen.blit(hl_s, hl)
+                    oy += 22
+
         # ── Brew result message ──
         if brew_result_msg:
             msg_w = max(280, fm.size(brew_result_msg)[0] + 40)
@@ -15715,6 +15766,15 @@ class Renderer(CombatEffectRendererMixin):
             if spell_list_items:
                 self._u3_text(
                     "[UP/DN] SELECT  [ENTER] CAST  [ESC] CANCEL",
+                    8, bar_y + 5, self._U3_BLUE)
+            else:
+                self._u3_text(
+                    "[ESC] BACK",
+                    8, bar_y + 5, self._U3_BLUE)
+        elif showing_tinker_list:
+            if tinker_list_items:
+                self._u3_text(
+                    "[UP/DN] SELECT  [ENTER] TINKER  [ESC] CANCEL",
                     8, bar_y + 5, self._U3_BLUE)
             else:
                 self._u3_text(

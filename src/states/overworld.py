@@ -2754,6 +2754,8 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     max_rooms=prof["max_rooms"],
                     seed=seed_base + li,
                     place_stairs_down=(li < num_levels - 1),
+                    place_overworld_exit=(
+                        li == num_levels - 1 and num_levels > 1),
                     place_doors=doors,
                     torch_density=td,
                     encounter_min_level=prof["enc_min"],
@@ -3650,6 +3652,9 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                 brew_list_cursor=self.brew_list_cursor,
                 brew_result_msg=self.brew_result_msg,
                 tinker_available=self._can_tinker(),
+                showing_tinker_list=self.showing_tinker_list,
+                tinker_list_items=self.tinker_list_items,
+                tinker_list_cursor=self.tinker_list_cursor,
                 applying_poison_step=self.applying_poison_step,
                 applying_poison_cursor=self.applying_poison_cursor,
                 applying_poison_item=self.applying_poison_item,

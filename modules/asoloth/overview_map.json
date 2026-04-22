@@ -7169,6 +7169,10 @@
     "7,10": {
       "linked": true,
       "link_map": "dungeon:Goblin Stronghold"
+    },
+    "30,8": {
+      "linked": true,
+      "link_map": "dungeon:Derelict Caves"
     }
   }
 }

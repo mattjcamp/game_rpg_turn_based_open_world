@@ -695,7 +695,14 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                         custom_exits and (pcol, prow) in custom_exits
                     )
                     if tile_id == TILE_STAIRS:
-                        if self.quest_levels and self.current_level > 0:
+                        # Tiles recorded in ``overworld_exits`` leave the
+                        # dungeon directly (used on the bottom floor of
+                        # procedural multi-level dungeons).
+                        overworld_exits = getattr(
+                            self.dungeon_data, "overworld_exits", None) or set()
+                        if (pcol, prow) in overworld_exits:
+                            self._exit_dungeon()
+                        elif self.quest_levels and self.current_level > 0:
                             # Ascend one level up in a multi-level dungeon
                             self._ascend_level()
                         else:
@@ -1487,7 +1494,13 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         )
 
         if tile_id == TILE_STAIRS:
-            self.show_message("Stairs up! Press ESC to leave.", 2000)
+            overworld_exits = getattr(
+                self.dungeon_data, "overworld_exits", None) or set()
+            if (col, row) in overworld_exits:
+                self.show_message(
+                    "Exit to the surface! Press ESC to leave.", 2000)
+            else:
+                self.show_message("Stairs up! Press ESC to leave.", 2000)
 
         if tile_id == TILE_CHEST:
             pos = (col, row)
@@ -1762,6 +1775,9 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 brew_list_cursor=self.brew_list_cursor,
                 brew_result_msg=self.brew_result_msg,
                 tinker_available=self._can_tinker(),
+                showing_tinker_list=self.showing_tinker_list,
+                tinker_list_items=self.tinker_list_items,
+                tinker_list_cursor=self.tinker_list_cursor,
                 applying_poison_step=self.applying_poison_step,
                 applying_poison_cursor=self.applying_poison_cursor,
                 applying_poison_item=self.applying_poison_item,
