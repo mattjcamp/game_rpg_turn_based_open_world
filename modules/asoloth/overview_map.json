@@ -706,7 +706,7 @@
       7,
       7,
       3,
-      3,
+      5,
       3,
       7,
       7,
@@ -2154,7 +2154,7 @@
       1,
       1,
       1,
-      45,
+      6,
       1,
       1,
       1,
@@ -2406,7 +2406,7 @@
       1,
       0,
       7,
-      0,
+      67,
       2,
       0,
       0,
@@ -4461,7 +4461,7 @@
       2,
       2,
       0,
-      0,
+      71,
       0,
       0,
       0,
@@ -5989,7 +5989,7 @@
       2,
       2,
       0,
-      7,
+      67,
       7,
       0,
       0,
@@ -6186,7 +6186,7 @@
       1,
       7,
       7,
-      7,
+      67,
       0,
       0,
       7,
@@ -6403,7 +6403,7 @@
       1,
       7,
       7,
-      69,
+      0,
       7,
       7,
       1,
@@ -6720,7 +6720,7 @@
       1,
       1,
       1,
-      7,
+      45,
       7,
       7,
       1,
@@ -7173,6 +7173,29 @@
     "30,8": {
       "linked": true,
       "link_map": "dungeon:Derelict Caves"
+    },
+    "41,22": {
+      "linked": true,
+      "link_map": "dungeon:Orc Headquarters"
+    },
+    "25,32": {
+      "linked": true,
+      "link_map": "dungeon:Caves"
+    },
+    "60,46": {
+      "spawn_chance": "20",
+      "spawn_radius": "3",
+      "max_spawned": "2",
+      "linked": true,
+      "link_map": "dungeon:Caves"
+    },
+    "80,3": {
+      "linked": true,
+      "link_map": "dungeon:Citadel of the Sun"
+    },
+    "85,6": {
+      "linked": true,
+      "link_map": "dungeon:Dragon's Lair"
     }
   }
 }

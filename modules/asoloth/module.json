@@ -2,8 +2,8 @@
   "metadata": {
     "id": "asoloth",
     "name": "Asoloth",
-    "author": "You find yourself in a wild land, armed with only a few heavy sticks, some river rocks, and a few spells. Where you go now? What horrors wait for you in the wilds?",
-    "description": "The land sleeps under an enchantment. Gather the awakening crystals from the dungeons and bring them to the shrine in Elderdale to break the spell.",
+    "author": "hyperbolic",
+    "description": "You wake in a wild land with little more than a handful of heavy sticks, river rocks, and a few spells. Something is stirring beneath the sea-cliffs of the far northeastern isle \u2014 and the longer it wakes, the darker Asoloth grows. Will you be the one to end the wyrm, or will you be its next bed of bones?",
     "version": "0.1.0"
   },
   "settings": {
@@ -39,12 +39,48 @@
     "overworld": "overworld.json",
     "towns": [
       {
-        "id": "elderdale",
-        "name": "Elderdale",
-        "description": "A bustling market town where traders from distant lands hawk exotic wares."
+        "id": "larian",
+        "name": "Larian",
+        "description": "A weatherworn market town at the heart of Asoloth. Caravaneers hawk wares, a shrine stands at its eastern quarter, and rumors move faster than the rain."
       }
     ],
-    "dungeons": []
+    "dungeons": [
+      {
+        "id": "goblin_stronghold",
+        "name": "Goblin Stronghold",
+        "description": "A mossy keep seized by goblin raiders."
+      },
+      {
+        "id": "derelict_caves",
+        "name": "Derelict Caves",
+        "description": "Old forgotten ruins north of town."
+      },
+      {
+        "id": "orc_hq",
+        "name": "Orc Headquarters",
+        "description": "An orc warren with something darker pulling its strings."
+      },
+      {
+        "id": "caves_a",
+        "name": "Caves",
+        "description": "A tangle of natural caves."
+      },
+      {
+        "id": "caves_b",
+        "name": "Caves",
+        "description": "A dangerous cave system."
+      },
+      {
+        "id": "citadel_sun",
+        "name": "Citadel of the Sun",
+        "description": "A ruined island temple that hides the Sun Sword."
+      },
+      {
+        "id": "dragons_lair",
+        "name": "Dragon's Lair",
+        "description": "A shattered keep above the ancient wyrm's sleeping-pit."
+      }
+    ]
   },
   "progression": {
     "win_condition": {
@@ -57,15 +93,15 @@
     ],
     "key_dungeons": [
       {
-        "id": "dungeon_key_1",
-        "name": "Burning Sanctum",
-        "key_name": "Silver Key",
+        "id": "dungeon_dragon",
+        "name": "Dragon's Lair",
+        "key_name": "Dragonheart",
         "dungeon_number": 1,
-        "landmark_id": "dungeon_1",
-        "description": "A narrow crevice leads into Burning Sanctum. The sound of dripping water echoes endlessly below.",
+        "landmark_id": "dragons_lair",
+        "description": "A shattered keep on the far northeastern isle. The cliffs smoke, the surf steams where it strikes the shore \u2014 something ancient sleeps below.",
         "quest_type": "retrieve",
-        "quest_objective": "Search Burning Sanctum for the hidden Silver Key",
-        "quest_hint": "Rumors say it was sealed away behind deadly traps.",
+        "quest_objective": "Descend the Dragon's Lair, slay the wyrm, and return with the Dragonheart",
+        "quest_hint": "The Sage in Larian said the Sun Sword is the only blade worthy of the task.",
         "kill_target": "",
         "kill_count": 0
       }

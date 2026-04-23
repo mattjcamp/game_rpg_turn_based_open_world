@@ -3130,7 +3130,7 @@
         "path": "game/terrain/sand.png"
       }
     },
-    "description": "",
+    "description": "A weatherworn market town of packed-earth roads and shingled roofs. A shrine stands near the eastern quarter; a basement below the General Shop has seen better days. Caravaneers hawk iron and salt, and the talk of late is all of smoke on the northeastern horizon.",
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
@@ -3146,6 +3146,45 @@
         ],
         "god_name": "The Divine",
         "wander_range": 4
+      },
+      {
+        "name": "Old Dunmire",
+        "npc_type": "villager",
+        "sprite": "src/assets/game/npcs/u4_elder.png",
+        "col": 12,
+        "row": 8,
+        "dialogue": [
+          "I was born in Larian, and so was my father, and his father before him. And none of us \u2014 not one \u2014 ever saw the sea smoke like it does now. Something wakes, traveler. Something old.",
+          "The shrine has stood a hundred years. It'll stand a hundred more, gods willing. But only if somebody puts the wyrm back to sleep \u2014 or ends it outright."
+        ],
+        "god_name": "The Divine",
+        "wander_range": 2
+      },
+      {
+        "name": "Meg of the Harborside",
+        "npc_type": "villager",
+        "sprite": "src/assets/game/npcs/u4_villager_female.png",
+        "col": 18,
+        "row": 16,
+        "dialogue": [
+          "Aye, I've sailed as far as the Sun Citadel and back. Cold place, that. But beyond it \u2014 northeast, past the wyvern reef \u2014 there's an isle that smokes even in winter. No gull lands there. No sane sailor either.",
+          "If thou means to go, bring more than a boat. Bring fire, and a blade that answers to the sun, and a will to come back."
+        ],
+        "god_name": "The Divine",
+        "wander_range": 3
+      },
+      {
+        "name": "Ink-stained Felas",
+        "npc_type": "villager",
+        "sprite": "src/assets/game/npcs/vga_druid.png",
+        "col": 10,
+        "row": 14,
+        "dialogue": [
+          "I've been copying a scroll the Sage brought me. It speaks of a wyrm bound beneath a broken keep \u2014 bound, not slain. A poor bargain, if thou askest me.",
+          "The old binding used a sword of daylight. Dost thou see the pattern? The Citadel, the Sun Sword, the wyrm \u2014 they are three points of the same triangle."
+        ],
+        "god_name": "The Divine",
+        "wander_range": 2
       }
     ],
     "_action_import": "Map assigned",

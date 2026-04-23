@@ -461,6 +461,52 @@
           "Orc Shaman",
           "Dark Mage"
         ]
+      },
+      {
+        "name": "Ancient Dragon",
+        "monsters": [
+          "Dragon"
+        ]
+      },
+      {
+        "name": "Dragon Cultists",
+        "monsters": [
+          "Dark Mage",
+          "Dark Mage",
+          "Skeleton Archer"
+        ]
+      },
+      {
+        "name": "Drake Pack",
+        "monsters": [
+          "Wyvern",
+          "Wyvern"
+        ]
+      },
+      {
+        "name": "Drake and Keeper",
+        "monsters": [
+          "Wyvern",
+          "Orc Shaman"
+        ]
+      },
+      {
+        "name": "Wyrm-blooded Cultists",
+        "monsters": [
+          "Dark Mage",
+          "Dark Mage",
+          "Troll"
+        ]
+      },
+      {
+        "name": "Bone Pit Horde",
+        "monsters": [
+          "Skeleton",
+          "Skeleton",
+          "Skeleton Archer",
+          "Zombie",
+          "Zombie"
+        ]
       }
     ],
     "house_basement": [
