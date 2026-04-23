@@ -63,7 +63,7 @@
     },
     "Dragon": {
       "description": "A younger dragon",
-      "hp": 150,
+      "hp": 125,
       "ac": 18,
       "attack_bonus": 6,
       "damage_dice": 4,

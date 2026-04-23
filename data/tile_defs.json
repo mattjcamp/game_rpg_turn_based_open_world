@@ -735,5 +735,16 @@
     ],
     "context": "town",
     "sprite": "town/window"
+  },
+  "73": {
+    "name": "scroll",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "artifacts",
+    "sprite": "items/scroll"
   }
 }

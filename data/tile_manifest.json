@@ -1214,8 +1214,10 @@
     "scroll": {
       "path": "src/assets/game/items/icons_32/scroll.png",
       "usable_in": [
-        "items"
-      ]
+        "items",
+        "objects"
+      ],
+      "tile_id": 73
     },
     "spear": {
       "path": "src/assets/game/items/icons_32/spear.png",
