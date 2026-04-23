@@ -112,7 +112,7 @@
     {
       "id": "long_shanks",
       "name": "Long Shanks",
-      "description": "Enchants an ally's legs with unnatural speed, extending their movement range for 3 turns.",
+      "description": "Enchants an ally's legs with unnatural speed, extending their movement range for 3 turns. May also be cast on yourself.",
       "allowable_classes": [
         "Wizard",
         "Alchemist",
@@ -127,7 +127,7 @@
         "range_bonus": 4
       },
       "range": 99,
-      "targeting": "select_ally",
+      "targeting": "select_ally_or_self",
       "usable_in": [
         "battle"
       ],

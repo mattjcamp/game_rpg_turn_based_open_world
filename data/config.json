@@ -1,12 +1,12 @@
 {
-  "smite_enabled": false,
+  "smite_enabled": true,
   "start_with_equipment": false,
-  "dm_mode": false,
+  "dm_mode": true,
   "active_module_path": "/Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/modules/asoloth",
   "music_enabled": false,
   "soundtrack_style": "Classic",
   "start_level": 1,
-  "music_muted": true,
+  "music_muted": false,
   "quest_monsters_only": false,
   "music_volume": 0.5
 }

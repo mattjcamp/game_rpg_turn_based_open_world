@@ -431,17 +431,25 @@ class InventoryMixin:
                    PICK_INDEX, TINK_INDEX).
 
         NUM_EFFECT_ROWS counts active effects + available (unassigned) effects.
+        BREW_INDEX is -1 when no alchemist is in the party (the Brew
+        Potions row is then hidden entirely — the player can't do it).
         PICK_INDEX is -1 when the Pickpocket row is hidden.
         TINK_INDEX is -1 when the Tinker row is hidden.
         """
         party = self.game.party
         n = len(self._all_effect_rows())
         cast_idx = n                        # one row for CAST
-        brew_idx = cast_idx + 1             # one row for BREW
+        # Brew Potions only appears when an Alchemist is present. Gating
+        # this prevents a dead menu entry from appearing in parties that
+        # have no way to brew.
+        brew_idx = -1
+        next_idx = cast_idx + 1
+        if self._has_alchemist():
+            brew_idx = next_idx
+            next_idx += 1
         # Pickpocket row shows only when effect is active + adjacent NPC
         pick_idx = -1
         tink_idx = -1
-        next_idx = brew_idx + 1
         if self._can_pickpocket():
             pick_idx = next_idx
             next_idx += 1
@@ -909,8 +917,10 @@ class InventoryMixin:
                 self.spell_list_items = spells
                 self.spell_list_cursor = 0
                 self.showing_spell_list = True
-            elif idx == BREW_INDEX:
-                # Open potion crafting overlay
+            elif BREW_INDEX >= 0 and idx == BREW_INDEX:
+                # Open potion crafting overlay (only reachable when the
+                # party has an alchemist — otherwise the row is hidden
+                # and this branch can't fire).
                 self._open_brew_list()
             elif PICK_INDEX >= 0 and idx == PICK_INDEX:
                 # Close stash and enter pickpocket targeting mode on the map

@@ -7,183 +7,91 @@
   "gold": 25,
   "roster": [
     {
-      "name": "Roland",
+      "name": "Gimli",
       "class": "Fighter",
       "race": "Dwarf",
       "gender": "Male",
       "hp": 20,
-      "strength": 19,
-      "dexterity": 11,
-      "intelligence": 10,
-      "wisdom": 8,
+      "strength": 22,
+      "dexterity": 18,
+      "intelligence": 5,
+      "wisdom": 5,
       "level": 1,
       "equipped": {
-        "right_hand": "Club",
+        "right_hand": "Fists",
         "left_hand": null,
         "body": "Cloth",
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/fighter.png",
-      "equipped_durability": {
-        "right_hand": 12
-      }
+      "sprite": "src/assets/game/npcs/villager_guard.png"
     },
     {
-      "name": "Elrond",
-      "class": "Wizard",
-      "race": "Elf",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 11,
-      "dexterity": 9,
-      "intelligence": 16,
-      "wisdom": 12,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Club",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/wizard.png",
-      "equipped_durability": {
-        "right_hand": 12
-      }
-    },
-    {
-      "name": "Merry",
+      "name": "Pippin",
       "class": "Thief",
       "race": "Halfling",
       "gender": "Male",
       "hp": 20,
-      "strength": 12,
-      "dexterity": 14,
-      "intelligence": 13,
+      "strength": 15,
+      "dexterity": 25,
+      "intelligence": 5,
+      "wisdom": 5,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/game/npcs/vga_ranger.png"
+    },
+    {
+      "name": "Elrond",
+      "class": "Cleric",
+      "race": "Halfling",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 5,
+      "dexterity": 10,
+      "intelligence": 10,
+      "wisdom": 25,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/game/characters/illusionist.png"
+    },
+    {
+      "name": "Gandalf",
+      "class": "Wizard",
+      "race": "Elf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 5,
+      "dexterity": 10,
+      "intelligence": 25,
       "wisdom": 10,
       "level": 1,
       "equipped": {
-        "right_hand": "Club",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/thief.png",
-      "equipped_durability": {
-        "right_hand": 12
-      }
-    },
-    {
-      "name": "Selina",
-      "class": "Cleric",
-      "race": "Human",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 11,
-      "dexterity": 9,
-      "intelligence": 12,
-      "wisdom": 18,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Club",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/cleric.png",
-      "equipped_durability": {
-        "right_hand": 12
-      }
-    },
-    {
-      "name": "Evyndrake",
-      "class": "Ranger",
-      "race": "Human",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 12,
-      "dexterity": 16,
-      "intelligence": 11,
-      "wisdom": 11,
-      "level": 1,
-      "equipped": {
         "right_hand": "Fists",
         "left_hand": null,
         "body": "Cloth",
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/npcs/vga_rogue.png"
-    },
-    {
-      "name": "Trojan",
-      "class": "Druid",
-      "race": "Elf",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/ranger.png"
-    },
-    {
-      "name": "Doctor",
-      "class": "Alchemist",
-      "race": "Gnome",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 10,
-      "dexterity": 10,
-      "intelligence": 15,
-      "wisdom": 15,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/alchemist.png"
-    },
-    {
-      "name": "Gimli",
-      "class": "Paladin",
-      "race": "Dwarf",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 17,
-      "dexterity": 10,
-      "intelligence": 10,
-      "wisdom": 13,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/npcs/u4_guard.png"
+      "sprite": "src/assets/game/npcs/vga_evil_mage.png"
     }
   ],
   "active_party": [
-    4,
-    5,
-    6,
-    7
+    0,
+    1,
+    2,
+    3
   ],
   "party_effects": {
     "effect_1": null,

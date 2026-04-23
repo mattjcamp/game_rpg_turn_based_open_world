@@ -2453,7 +2453,8 @@ class Renderer(CombatEffectRendererMixin):
                          door_unlock_anim=None, door_interact=None,
                          infravision=False, galadriels_light=False,
                          artifact_pickup_anim=None,
-                         dungeon_level=0):
+                         dungeon_level=0,
+                         quest_effects=None):
         """
         Full Ultima III-style dungeon screen — full-width map with bottom info bar.
         Fog of war limits visibility.
@@ -2817,6 +2818,12 @@ class Renderer(CombatEffectRendererMixin):
         # ── 8. door interaction prompt ──
         if door_interact:
             self._u3_draw_door_interact(door_interact, off_c, off_r, ts)
+
+        # ── 9. module quest visual effects ──
+        # Re-use the overworld/town effect pipeline so a step-complete or
+        # quest-complete overlay renders identically inside a dungeon.
+        if quest_effects:
+            self._draw_quest_effects(quest_effects)
 
     # ── dungeon tile rendering ─────────────────────────────
 
@@ -3890,30 +3897,116 @@ class Renderer(CombatEffectRendererMixin):
         return self._skeleton_fallback
 
     def _draw_quest_monster_glow(self, cx, cy, size=32):
-        """Draw a pulsing golden-orange glow behind a quest-spawned monster."""
+        """Draw a pulsing golden-orange glow behind a quest-spawned monster,
+        plus a floating exclamation-mark marker that hovers above its head so
+        the target is unmistakable from across the map."""
         self._draw_pulsing_glow(
             cx, cy, size, (255, 180, 40), (255, 220, 80))
+        self._draw_quest_marker(
+            cx, cy, size, marker="!",
+            marker_color=(255, 240, 120),
+            outline_color=(120, 60, 0),
+            bg_color=(200, 40, 30))
 
     def _draw_quest_item_glow(self, cx, cy, size=32):
-        """Draw a pulsing cyan glow behind a quest collectible item."""
+        """Draw a pulsing cyan glow behind a quest collectible item, plus a
+        floating sparkle-star marker that hovers above it to flag the item
+        as a quest objective."""
         self._draw_pulsing_glow(
             cx, cy, size, (40, 180, 255), (80, 220, 255))
+        self._draw_quest_marker(
+            cx, cy, size, marker="*",
+            marker_color=(220, 245, 255),
+            outline_color=(10, 50, 90),
+            bg_color=(40, 120, 200))
 
     def _draw_pulsing_glow(self, cx, cy, size, outer_rgb, inner_rgb):
-        """Draw a pulsing glow circle at (cx, cy)."""
-        import math, time
+        """Draw a pulsing, multi-ring glow at (cx, cy).
+
+        The glow was made significantly stronger (brighter base alpha, a
+        second wider halo ring, and a larger radius swing) after players
+        reported quest targets were easy to miss in dim dungeons.
+        """
         t = time.time()
         pulse = (math.sin(t * 3.0) + 1.0) / 2.0  # 0..1
-        alpha = int(40 + pulse * 80)
-        radius = int(size * (0.6 + pulse * 0.2))
+        # ── outer halo ring (wide, low-alpha, fades slower) ──
+        halo_radius = int(size * (0.95 + pulse * 0.25))
+        halo_alpha = int(55 + pulse * 55)
+        halo = pygame.Surface((halo_radius * 2, halo_radius * 2),
+                              pygame.SRCALPHA)
+        pygame.draw.circle(
+            halo, (*outer_rgb, halo_alpha),
+            (halo_radius, halo_radius), halo_radius)
+        self.screen.blit(halo, (cx - halo_radius, cy - halo_radius))
+        # ── core glow (brighter, tighter) ──
+        radius = int(size * (0.65 + pulse * 0.25))
+        alpha = int(90 + pulse * 110)
         glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(
             glow, (*outer_rgb, alpha), (radius, radius), radius)
         inner_r = max(4, radius // 2)
-        inner_alpha = int(60 + pulse * 60)
+        inner_alpha = int(120 + pulse * 100)
         pygame.draw.circle(
-            glow, (*inner_rgb, inner_alpha), (radius, radius), inner_r)
+            glow, (*inner_rgb, min(255, inner_alpha)),
+            (radius, radius), inner_r)
         self.screen.blit(glow, (cx - radius, cy - radius))
+        # ── pulsing outline ring so the silhouette reads even against a
+        # busy background (e.g. cave walls in the Goblin Stronghold) ──
+        ring_radius = int(size * (0.55 + pulse * 0.1))
+        ring_alpha = int(140 + pulse * 115)
+        ring = pygame.Surface((ring_radius * 2 + 4, ring_radius * 2 + 4),
+                              pygame.SRCALPHA)
+        pygame.draw.circle(
+            ring, (*inner_rgb, min(255, ring_alpha)),
+            (ring_radius + 2, ring_radius + 2), ring_radius, 2)
+        self.screen.blit(ring, (cx - ring_radius - 2, cy - ring_radius - 2))
+
+    def _draw_quest_marker(self, cx, cy, size, marker="!",
+                            marker_color=(255, 240, 120),
+                            outline_color=(0, 0, 0),
+                            bg_color=(200, 40, 30)):
+        """Draw a floating badge + glyph above a quest target.
+
+        The badge bobs up and down on a sine wave and carries a bright
+        glyph ("!" for monsters, "*" for items) so the player can spot
+        quest objectives even when the base pulsing glow fades into the
+        dungeon lighting.
+        """
+        t = time.time()
+        bob = int(math.sin(t * 4.0) * 2)
+        mx = cx
+        my = cy - int(size * 0.85) + bob
+        # Badge circle (outline + fill + inner highlight) acts as a
+        # consistent backdrop so the glyph reads against any tile.
+        badge_r = max(6, size // 4)
+        shadow = pygame.Surface((badge_r * 2 + 4, badge_r * 2 + 4),
+                                pygame.SRCALPHA)
+        pygame.draw.circle(shadow, (0, 0, 0, 130),
+                           (badge_r + 2, badge_r + 3), badge_r + 1)
+        self.screen.blit(shadow, (mx - badge_r - 2, my - badge_r - 1))
+        pygame.draw.circle(self.screen, outline_color,
+                           (mx, my), badge_r + 1)
+        pygame.draw.circle(self.screen, bg_color,
+                           (mx, my), badge_r)
+        # Soft highlight
+        hi_r = max(2, badge_r // 2)
+        hi = pygame.Surface((hi_r * 2, hi_r * 2), pygame.SRCALPHA)
+        pygame.draw.circle(hi, (255, 255, 255, 90),
+                           (hi_r, hi_r), hi_r)
+        self.screen.blit(hi, (mx - hi_r, my - badge_r + 1))
+        # Glyph (reuse the small font if available, otherwise build one)
+        if not hasattr(self, "_quest_marker_font"):
+            self._quest_marker_font = pygame.font.SysFont(
+                "liberationsans", max(14, size // 2), bold=True)
+        glyph_font = self._quest_marker_font
+        # Outline (black) then fill for readability
+        outline_surf = glyph_font.render(marker, True, outline_color)
+        glyph_surf = glyph_font.render(marker, True, marker_color)
+        gx = mx - glyph_surf.get_width() // 2
+        gy = my - glyph_surf.get_height() // 2 - 1
+        for ox, oy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            self.screen.blit(outline_surf, (gx + ox, gy + oy))
+        self.screen.blit(glyph_surf, (gx, gy))
 
     def _u3_draw_dungeon_monster(self, monster, cx, cy):
         """Draw a monster in the dungeon using its unique tile sprite."""
@@ -14750,6 +14843,7 @@ class Renderer(CombatEffectRendererMixin):
                                  brew_list_items=None,
                                  brew_list_cursor=0,
                                  brew_result_msg=None,
+                                 brew_available=False,
                                  pickpocket_available=False,
                                  tinker_available=False,
                                  showing_tinker_list=False,
@@ -14873,24 +14967,31 @@ class Renderer(CombatEffectRendererMixin):
             self.screen.blit(sel_surf, sel_rect)
         ty += row_h
 
-        # ── BREW row ──
-        BREW_INDEX = NUM_EFFECTS + 1
-        brew_selected = (cursor_index == BREW_INDEX)
-        brew_prefix = "> " if brew_selected else "  "
-        brew_color = self._U3_WHITE if brew_selected else (180, 120, 255)
-        self._u3_text(f"{brew_prefix}BREW POTIONS", tx, ty, brew_color, fm)
-        if brew_selected:
-            self._u3_text("ENTER", tx + left_w - 100, ty,
-                          (180, 120, 255), self.font_small)
-            sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
-            sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
-            sel_surf.fill((255, 255, 255, 25))
-            self.screen.blit(sel_surf, sel_rect)
-        ty += row_h
+        # ── BREW row (only when the party has an alchemist) ──
+        # Matches the layout decision in inventory_mixin._stash_layout:
+        # when no alchemist is present we skip the row entirely so the
+        # index bookkeeping for PICKPOCKET/TINKER/stash stays contiguous
+        # and there's no dead entry to cursor past.
+        BREW_INDEX = -1
+        next_header = NUM_EFFECTS + 1  # effects + CAST
+        if brew_available:
+            BREW_INDEX = next_header
+            next_header += 1
+            brew_selected = (cursor_index == BREW_INDEX)
+            brew_prefix = "> " if brew_selected else "  "
+            brew_color = self._U3_WHITE if brew_selected else (180, 120, 255)
+            self._u3_text(f"{brew_prefix}BREW POTIONS", tx, ty, brew_color, fm)
+            if brew_selected:
+                self._u3_text("ENTER", tx + left_w - 100, ty,
+                              (180, 120, 255), self.font_small)
+                sel_rect = pygame.Rect(tx - 4, ty - 1, left_w - 24, row_h)
+                sel_surf = pygame.Surface((sel_rect.w, sel_rect.h), pygame.SRCALPHA)
+                sel_surf.fill((255, 255, 255, 25))
+                self.screen.blit(sel_surf, sel_rect)
+            ty += row_h
 
         # ── PICKPOCKET row (only when available) ──
         PICK_INDEX = -1
-        next_header = BREW_INDEX + 1
         if pickpocket_available:
             PICK_INDEX = next_header
             next_header += 1
@@ -15135,7 +15236,7 @@ class Renderer(CombatEffectRendererMixin):
             else:
                 is_available_effect = True
         is_cast_row = (cursor_index == CAST_INDEX)
-        is_brew_row = (cursor_index == BREW_INDEX)
+        is_brew_row = (BREW_INDEX >= 0 and cursor_index == BREW_INDEX)
         is_pick_row = (PICK_INDEX >= 0 and cursor_index == PICK_INDEX)
         is_tink_row = (TINK_INDEX >= 0 and cursor_index == TINK_INDEX)
         header_count = next_header  # effects + CAST + BREW (+ PICKPOCKET/TINKER if shown)

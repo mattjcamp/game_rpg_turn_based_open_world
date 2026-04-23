@@ -5,6 +5,59 @@ to eliminate duplication across state files.
 """
 
 
+def build_quest_location_hint(qdef):
+    """Return a human-readable notice of dungeon locations referenced by
+    a quest's steps, or an empty string if the quest doesn't involve any
+    dungeons.
+
+    This is appended to the quest giver's dialogue when a quest is first
+    offered so the player clearly knows they're signing up for a dungeon
+    crawl (e.g. the Goblin Stronghold) rather than a surface-level
+    errand.  Collect-step ``has_guardian`` flags are also surfaced so
+    the player knows to expect a boss fight for artifact retrieval.
+    """
+    if not qdef:
+        return ""
+    steps = qdef.get("steps", []) or []
+    dungeon_names = []
+    has_guardian = False
+    for step in steps:
+        loc = step.get("spawn_location", "") or ""
+        if loc.startswith("dungeon:"):
+            name = loc[len("dungeon:"):].strip()
+            if name and name not in dungeon_names:
+                dungeon_names.append(name)
+        if step.get("has_guardian") == "yes":
+            has_guardian = True
+    if not dungeon_names:
+        return ""
+    if len(dungeon_names) == 1:
+        line = (f"[Adventurer's Note: This quest will take you into "
+                f"the {dungeon_names[0]} dungeon — tread carefully.]")
+    else:
+        joined = ", ".join(dungeon_names[:-1]) + f" and {dungeon_names[-1]}"
+        line = (f"[Adventurer's Note: This quest will take you into "
+                f"the following dungeons: {joined}.]")
+    if has_guardian:
+        line = line[:-1] + " A powerful guardian is said to watch over "
+        line += "what you seek.]"
+    return line
+
+
+def augment_quest_dialogue(dialogue_lines, qdef):
+    """Return a copy of *dialogue_lines* with a dungeon hint appended when
+    the quest involves a dungeon.
+
+    Always returns a list.  Safe to call with ``None``/missing data —
+    this makes the call-site one-liner free of defensive checks.
+    """
+    lines = list(dialogue_lines or [])
+    hint = build_quest_location_hint(qdef)
+    if hint:
+        lines.append(hint)
+    return lines
+
+
 def collect_quest_item(game, quest_name, step_idx, item_name):
     """Mark a quest collect step as complete and return a UI message.
 

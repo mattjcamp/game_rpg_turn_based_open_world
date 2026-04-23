@@ -69,6 +69,12 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         # (door_unlock_anim is managed by LockInteractionMixin; see
         # self._init_lock_interaction() above.)
 
+        # ── Module quest visual effects (step_complete, quest_complete) ──
+        # Mirrors the overworld/town states so kill- and collect-step
+        # completions inside a dungeon fire the same celebratory overlay
+        # instead of being announced only as text in the info bar.
+        self.quest_effects = []
+
     def reset_for_new_game(self):
         """Drop all dungeon-local state so a fresh game doesn't inherit
         torch timers, queued combat messages, or door/encounter overlays
@@ -98,6 +104,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         self._encounter_flee_distance = 0
         self.showing_help = False
         self.artifact_pickup_anim = None
+        self.quest_effects = []
         if hasattr(self, "_init_inventory_state"):
             self._init_inventory_state()
 
@@ -193,10 +200,21 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         toward any active module quest kill steps.
 
         Works like the overworld / town version but runs inside the
-        dungeon state so kills are credited immediately.
+        dungeon state so kills are credited immediately.  When progress
+        is made we also queue a ``step_complete`` visual effect so the
+        player sees the same overlay they'd get out in the overworld or
+        a town — previously only the bottom-bar text changed, which was
+        easy to miss and made it unclear the quest had advanced.
         """
         from src.quest_manager import check_quest_kills
         result_msg = check_quest_kills(self.game)
+        if result_msg:
+            self.quest_effects.append({
+                "type": "step_complete",
+                "timer": 2000,
+                "duration": 2000,
+                "text": result_msg,
+            })
         return result_msg
 
     def _inject_quest_dungeon_monsters(self):
@@ -454,6 +472,15 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         msg = collect_quest_item(
             self.game, qname, step_idx, item_name)
         self.show_message(msg, 3000 if "complete" in msg.lower() else 2500)
+        # Also fire the shared step_complete overlay so picking up a
+        # quest item in a dungeon feels as rewarding as clearing a
+        # kill step — identical cue in both paths.
+        self.quest_effects.append({
+            "type": "step_complete",
+            "timer": 2000,
+            "duration": 2000,
+            "text": msg,
+        })
 
     def _spawn_placed_encounters(self):
         """Materialize designer-placed encounter templates as monsters.
@@ -1753,6 +1780,13 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         if self.encounter_result_timer > 0:
             self.encounter_result_timer -= dt_ms
 
+        # Tick module quest visual effects (step_complete, quest_complete)
+        if self.quest_effects:
+            for fx in self.quest_effects:
+                fx["timer"] -= dt_ms
+            self.quest_effects = [
+                fx for fx in self.quest_effects if fx["timer"] > 0]
+
     def draw(self, renderer):
         """Draw the dungeon in Ultima III style."""
         if self.showing_party_inv:
@@ -1774,6 +1808,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 brew_list_items=self.brew_list_items,
                 brew_list_cursor=self.brew_list_cursor,
                 brew_result_msg=self.brew_result_msg,
+                brew_available=bool(self._has_alchemist()),
                 tinker_available=self._can_tinker(),
                 showing_tinker_list=self.showing_tinker_list,
                 tinker_list_items=self.tinker_list_items,
@@ -1832,6 +1867,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             artifact_pickup_anim=self.artifact_pickup_anim,
             galadriels_light=galadriels_active,
             dungeon_level=self.current_level,
+            quest_effects=self.quest_effects,
         )
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])

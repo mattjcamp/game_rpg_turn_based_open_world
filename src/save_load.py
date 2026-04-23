@@ -11,7 +11,7 @@ import os
 import time
 
 from src.party import Party, PartyMember
-from src.settings import TILE_DUNGEON_CLEARED
+from src.settings import TILE_DUNGEON_CLEARED, TILE_GRASS
 
 # ── Save directory ────────────────────────────────────────────────
 _SAVE_DIR = os.path.join(
@@ -441,12 +441,30 @@ def save_game(slot, game):
                     if tm.get_tile(c, r) == TILE_DUNGEON_CLEARED:
                         cleared_dungeons.append([c, r])
 
+        # Collect destroyed monster spawn positions.  The overworld state
+        # tracks these on ``destroyed_spawns`` (a set of (col, row) tuples)
+        # and replaces the underlying tile with grass at destruction time.
+        # Because the overworld tile_map is rebuilt from seed/static map
+        # on load, both the set *and* the grass-replaced tiles need to be
+        # re-applied on load — otherwise a previously-cleared lair would
+        # reappear on the map next session.
+        destroyed_spawns = []
+        ow_state = game.states.get("overworld") if hasattr(
+            game, "states") else None
+        if ow_state is not None:
+            for pos in getattr(ow_state, "destroyed_spawns", set()):
+                try:
+                    destroyed_spawns.append([int(pos[0]), int(pos[1])])
+                except (TypeError, IndexError, ValueError):
+                    continue
+
         save_data = {
             "version": 3,
             "timestamp": time.time(),
             "state": state_name,
             "party": _serialize_party(game.party),
             "cleared_dungeons": cleared_dungeons,
+            "destroyed_spawns": destroyed_spawns,
             # ── Module identification ──
             "module_path": getattr(game, "active_module_path", None),
             "module_name": getattr(game, "active_module_name", None),
@@ -571,6 +589,26 @@ def load_game(slot, game):
         for pos in save_data.get("cleared_dungeons", []):
             c, r = pos
             game.tile_map.set_tile(c, r, TILE_DUNGEON_CLEARED)
+
+        # ── Restore destroyed monster spawn tiles ──────────────
+        # Mirror the destruction behaviour: the tile becomes grass and
+        # the position is remembered on the overworld state so roaming
+        # monster-spawn logic can skip it even if somehow a spawn tile
+        # still remained on the map.
+        destroyed_positions = {
+            (int(p[0]), int(p[1]))
+            for p in save_data.get("destroyed_spawns", [])
+            if isinstance(p, (list, tuple)) and len(p) >= 2
+        }
+        for c, r in destroyed_positions:
+            if 0 <= c < game.tile_map.width and 0 <= r < game.tile_map.height:
+                game.tile_map.set_tile(c, r, TILE_GRASS)
+        ow_state = game.states.get("overworld") if hasattr(
+            game, "states") else None
+        if ow_state is not None:
+            # Overwriting (not union-ing) matches the save's snapshot
+            # semantics — the save is the source of truth.
+            ow_state.destroyed_spawns = destroyed_positions
 
         # ── Restore darkness effect ─────────────────────────────
         game.darkness_active = save_data.get("darkness_active", False)

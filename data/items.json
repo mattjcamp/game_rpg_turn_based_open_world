@@ -532,6 +532,19 @@
         255
       ]
     },
+    "Dragonheart": {
+      "description": "The smoldering heart of an ancient wyrm. It beats once every few minutes, slow as the tide, and the air around it shimmers with heat.",
+      "icon": "artifact",
+      "item_type": "quest_item",
+      "quest_item": true,
+      "party_can_equip": false,
+      "character_can_equip": false,
+      "icon_color": [
+        200,
+        40,
+        30
+      ]
+    },
     "Elixir of Strength": {
       "description": "A thick crimson brew. Grants +2 STR for the next combat.",
       "icon": "potion",
@@ -854,19 +867,6 @@
       "sell": 30,
       "party_can_equip": false,
       "character_can_equip": false
-    },
-    "Dragonheart": {
-      "description": "The smoldering heart of an ancient wyrm. It beats once every few minutes, slow as the tide, and the air around it shimmers with heat.",
-      "icon": "artifact",
-      "item_type": "quest_item",
-      "quest_item": true,
-      "party_can_equip": false,
-      "character_can_equip": false,
-      "icon_color": [
-        200,
-        40,
-        30
-      ]
     }
   }
 }

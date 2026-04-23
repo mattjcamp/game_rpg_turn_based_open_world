@@ -1571,7 +1571,18 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 # Offer the quest
                 self.npc_dialogue_active = True
                 self.npc_speaking = npc
-                self.quest_dialogue_lines = list(npc.quest_dialogue or [])
+                # Look up the quest definition so we can append a
+                # dungeon hint if any steps take place in a dungeon —
+                # this is how the player learns the Goblin Stronghold
+                # quest actually sends them into a dungeon.
+                from src.quest_manager import augment_quest_dialogue
+                quest_defs = getattr(
+                    self.game, "_module_quest_defs", [])
+                qdef = next(
+                    (q for q in quest_defs if q.get("name") == mqname),
+                    None)
+                self.quest_dialogue_lines = augment_quest_dialogue(
+                    npc.quest_dialogue, qdef)
                 self.quest_dialogue_index = 0
                 if self.quest_dialogue_lines:
                     self._set_dialogue(
@@ -2787,6 +2798,7 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 brew_list_items=self.brew_list_items,
                 brew_list_cursor=self.brew_list_cursor,
                 brew_result_msg=self.brew_result_msg,
+                brew_available=bool(self._has_alchemist()),
                 pickpocket_available=self._can_pickpocket(),
                 tinker_available=self._can_tinker(),
                 showing_tinker_list=self.showing_tinker_list,
