@@ -106,7 +106,8 @@
           "save_dc": 13
         }
       ],
-      "battle_scale": 2
+      "battle_scale": 2,
+      "difficulty": "deadly"
     },
     "Giant Rat": {
       "description": "A large rat. Weak but fast.Gross.Meh",
@@ -133,7 +134,9 @@
       "post_attack_move": 0,
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "easy"
     },
     "Goblin": {
       "description": "A small, sneaky goblin. Attacks in groups.",
@@ -174,7 +177,9 @@
       "post_attack_move": 0,
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "easy"
     },
     "Orc": {
       "description": "A brutal orc. Tough fight.",
@@ -216,7 +221,8 @@
       "spells": null,
       "on_hit_effects": null,
       "passives": null,
-      "battle_scale": 1
+      "battle_scale": 1,
+      "difficulty": "normal"
     },
     "Orc Shaman": {
       "description": "An orc witch doctor who bolsters allies and curses foes.",
@@ -271,7 +277,8 @@
       "post_attack_move": 0,
       "on_hit_effects": null,
       "passives": null,
-      "battle_scale": 1
+      "battle_scale": 1,
+      "difficulty": "normal"
     },
     "Skeleton": {
       "description": "An undead skeleton warrior. Medium difficulty.",
@@ -299,7 +306,8 @@
       "spells": null,
       "on_hit_effects": null,
       "passives": null,
-      "battle_scale": 1
+      "battle_scale": 1,
+      "difficulty": "normal"
     },
     "Skeleton Archer": {
       "description": "A skeletal bowman that fires arrows from a distance.",
@@ -341,7 +349,8 @@
       "spells": null,
       "on_hit_effects": null,
       "passives": null,
-      "battle_scale": 1
+      "battle_scale": 1,
+      "difficulty": "normal"
     },
     "Troll": {
       "description": "A massive brute with thick hide. Hits hard and regenerates.",
@@ -387,7 +396,8 @@
       "move_range": 1,
       "post_attack_move": 0,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "difficulty": "normal"
     },
     "Wolf": {
       "description": "A fierce grey wolf. Fast and cunning.",
@@ -415,7 +425,8 @@
       "spells": null,
       "on_hit_effects": null,
       "passives": null,
-      "battle_scale": 1
+      "battle_scale": 1,
+      "difficulty": "easy"
     },
     "Wyvern": {
       "description": "A smal dragon with two legs and a pointed tail",
@@ -454,7 +465,8 @@
         }
       ],
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "difficulty": "hard"
     },
     "Zombie": {
       "description": "A shambling corpse. Slow but durable.",
@@ -481,7 +493,9 @@
       "terrain": "land",
       "spells": null,
       "on_hit_effects": null,
-      "passives": null
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
     }
   },
   "spawn_tables": {

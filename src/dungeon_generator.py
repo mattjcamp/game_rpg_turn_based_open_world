@@ -625,6 +625,21 @@ DIFFICULTY_PROFILES = {
                "enc_min": 5, "enc_max": 8, "enc_chance": 0.80},
 }
 
+# Canonical, ordered list of dungeon difficulty tiers.  Used by the
+# dungeon editor (which dungeon to generate at this tier?), the monster
+# editor (which tier does this creature belong to?), and the encounter
+# filter (which monsters may spawn in this dungeon?).  Keeping this in
+# one place means new tiers (e.g. "insane") can be added by editing
+# this tuple plus DIFFICULTY_PROFILES above and they show up everywhere.
+DIFFICULTY_TIERS = tuple(DIFFICULTY_PROFILES.keys())
+
+# Sentinel used in the monster editor's Difficulty field to mean "no
+# tier set on this creature".  Untagged monsters bypass the dungeon
+# difficulty filter — they're allowed to spawn in any tier.  Storing
+# this as the literal string "any" (rather than absent / null) lets the
+# editor cycle through it like any other choice.
+DIFFICULTY_ANY = "any"
+
 _ENCOUNTER_LEVEL_MAX = 8  # clamp so we don't demand levels that don't exist
 
 
@@ -673,7 +688,8 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                      custom_encounters=None,
                      include_random_encounters=True,
                      torch_density="medium",
-                     style=None):
+                     style=None,
+                     dungeon_difficulty=None):
     """
     Generate a procedural dungeon.
 
@@ -705,6 +721,14 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             are generated for rooms not already occupied by custom
             encounters.  When custom_encounters is provided and this is
             False, only the custom encounters appear.
+        dungeon_difficulty: Optional tier name (``"easy"``,
+            ``"normal"``, ``"hard"``, ``"deadly"``).  When set, random
+            encounters are filtered so only encounters whose monsters
+            all match this tier (or are tagged ``"any"``/untagged) can
+            spawn — letting the author keep dragons out of easy
+            dungeons by tagging the dragon "deadly" in the monster
+            editor.  Custom (module-defined) encounters bypass this
+            filter; author intent always wins.
 
     Returns:
         DungeonData with the generated map and metadata.
@@ -848,9 +872,16 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                 mx += random.randint(-1, 1)
                 my += random.randint(-1, 1)
                 if tmap.get_tile(mx, my) == floor_tile:
-                    enc = create_encounter(encounter_area,
-                                           min_level=encounter_min_level,
-                                           max_level=encounter_max_level)
+                    enc = create_encounter(
+                        encounter_area,
+                        min_level=encounter_min_level,
+                        max_level=encounter_max_level,
+                        dungeon_difficulty=dungeon_difficulty)
+                    if enc is None:
+                        # No encounter in this difficulty/level/terrain
+                        # combination — leave the room empty rather
+                        # than spawning something off-tier.
+                        continue
                     monster = create_monster(enc["monster_party_tile"])
                     monster.col = mx
                     monster.row = my

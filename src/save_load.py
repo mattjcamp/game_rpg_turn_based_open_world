@@ -894,7 +894,11 @@ def _regenerate_module_dungeon(game, dungeon_name, ow_col, ow_row):
             torch_density=td,
             encounter_min_level=prof["enc_min"],
             encounter_max_level=prof["enc_max"],
-            random_encounter_chance=prof["enc_chance"])
+            random_encounter_chance=prof["enc_chance"],
+            # Keep parity with the live overworld call site so a
+            # dungeon regenerated from save data filters monsters by
+            # the same difficulty tier the player saw originally.
+            dungeon_difficulty=difficulty)
         gen_levels.append(dd)
 
     # Cache so subsequent saves will persist them

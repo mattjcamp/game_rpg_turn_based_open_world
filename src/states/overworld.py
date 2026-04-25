@@ -2774,6 +2774,12 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     encounter_min_level=prof["enc_min"],
                     encounter_max_level=prof["enc_max"],
                     random_encounter_chance=prof["enc_chance"],
+                    # Per-monster difficulty tag filter: with this set,
+                    # only monsters whose ``difficulty`` field matches
+                    # (or is "any"/untagged) will spawn from random
+                    # encounters.  Module-defined custom encounters
+                    # bypass the filter — author intent always wins.
+                    dungeon_difficulty=difficulty,
                     style=style)
                 gen_levels.append(dd)
 

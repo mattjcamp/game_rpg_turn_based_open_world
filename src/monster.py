@@ -255,8 +255,38 @@ _ENCOUNTER_DATA = _load_json("encounters.json")
 ENCOUNTERS = _ENCOUNTER_DATA.get("encounters", {})
 
 
+def _monster_difficulty(name):
+    """Return the difficulty tier set on monster *name*, or ``"any"``.
+
+    A monster with no ``difficulty`` field — or with the explicit
+    sentinel ``"any"`` — is treated as a wildcard that fits any
+    dungeon tier.  Used by the dungeon-difficulty encounter filter.
+    """
+    data = MONSTERS.get(name) or {}
+    return data.get("difficulty", "any") or "any"
+
+
+def _encounter_matches_difficulty(enc, dungeon_difficulty):
+    """True if every monster in *enc* fits the dungeon tier.
+
+    A monster fits when its difficulty is exactly the dungeon's
+    difficulty OR the wildcard ``"any"`` (which is also the default
+    for untagged monsters).  Empty encounters fail closed — they have
+    no monsters that could match.
+    """
+    monster_names = enc.get("monsters") or []
+    if not monster_names:
+        return False
+    for name in monster_names:
+        tier = _monster_difficulty(name)
+        if tier != "any" and tier != dungeon_difficulty:
+            return False
+    return True
+
+
 def create_encounter(area="dungeon", terrain="land",
-                     min_level=None, max_level=None):
+                     min_level=None, max_level=None,
+                     dungeon_difficulty=None):
     """Pick a random encounter template matching *terrain* and level range.
 
     Parameters
@@ -271,6 +301,16 @@ def create_encounter(area="dungeon", terrain="land",
         If set, only encounters with ``"level" >= min_level`` are eligible.
     max_level : int or None
         If set, only encounters with ``"level" <= max_level`` are eligible.
+    dungeon_difficulty : str or None
+        When set (one of ``"easy"``, ``"normal"``, ``"hard"``,
+        ``"deadly"``), restrict the pool to encounters where every
+        constituent monster has ``difficulty`` equal to this value or
+        the wildcard ``"any"``.  Untagged monsters (no ``difficulty``
+        field at all) count as wildcards.  This is what lets a player
+        say "easy dungeons should only have rats and wolves" by
+        tagging tougher creatures with their proper tier.  ``None``
+        skips this filter entirely (current behaviour for the
+        overworld and other non-tier-aware callers).
 
     Returns a dict with keys:
         name : str            — display name (e.g. "Goblin Ambush")
@@ -288,9 +328,25 @@ def create_encounter(area="dungeon", terrain="land",
         pool = [e for e in pool if e.get("level", 1) >= min_level]
     if max_level is not None:
         pool = [e for e in pool if e.get("level", 1) <= max_level]
+    # Filter by per-monster difficulty tier.  An encounter is eligible
+    # only when EVERY monster in it is either untagged ("any" or
+    # missing) or tagged with the dungeon's exact difficulty.  This
+    # implements the "exact tier" rule the editor exposes: tagging
+    # Dragon = "deadly" pulls it from every easy/normal/hard pool.
+    if dungeon_difficulty:
+        pool = [e for e in pool
+                if _encounter_matches_difficulty(e, dungeon_difficulty)]
     if not pool:
         # No encounters for this terrain — return None so caller can skip
         if terrain != "land":
+            return None
+        # When a dungeon-difficulty filter is active, an empty pool
+        # means no on-tier encounters exist for this slice.  Return
+        # None instead of falling back to a random monster, which
+        # could pull a creature from any tier and undo the author's
+        # tagging.  Caller (e.g. generate_dungeon) will leave the
+        # room empty.
+        if dungeon_difficulty:
             return None
         # Fallback for land if no templates at all
         m = create_random_monster(area)
@@ -314,6 +370,10 @@ def create_encounter(area="dungeon", terrain="land",
     for name in chosen.get("monsters", []):
         monsters.append(create_monster(name))
     if not monsters:
+        # Same reasoning as the empty-pool branch: don't smuggle in
+        # an off-tier random monster when difficulty filtering is on.
+        if dungeon_difficulty:
+            return None
         m = create_random_monster(area)
         return {"name": m.name, "monsters": [m],
                 "monster_party_tile": m.name, "level": 1}

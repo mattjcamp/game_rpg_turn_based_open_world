@@ -5,7 +5,7 @@
     "mode": "procedural",
     "dungeon_style": "cave",
     "num_levels": 5,
-    "difficulty": "easy",
+    "difficulty": "normal",
     "level_size": "medium",
     "torch_density": "abundant",
     "locked_doors": "off",

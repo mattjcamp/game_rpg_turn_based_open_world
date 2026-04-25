@@ -2613,6 +2613,15 @@ class FeaturesEditor:
                str(mon.get("humanoid", False)), "choice"),
             FE("Terrain", "terrain",
                mon.get("terrain", "land"), "choice"),
+            # Difficulty tier — controls which procedurally-generated
+            # dungeons this creature is eligible to spawn in.  Cycle
+            # through "any" / easy / normal / hard / deadly.  "any"
+            # (the default for monsters that haven't been tagged yet)
+            # lets the creature spawn in dungeons of every tier so
+            # un-edited content keeps working; a specific tier locks
+            # the creature to dungeons of that exact difficulty only.
+            FE("Difficulty", "difficulty",
+               mon.get("difficulty", "any"), "choice"),
             FE("-- Abilities --", "_hdr_abilities", "", "section", False),
             FE("Breath Fire", "_sp_breath_fire",
                str(any(s.get("type") == "breath_fire"
@@ -2874,6 +2883,13 @@ class FeaturesEditor:
             return ["land", "sea"]
         if key == "battle_scale":
             return ["1x", "2x", "3x", "4x"]
+        if key == "difficulty":
+            # Single source of truth for tier names lives on the
+            # dungeon generator; the editor just renders what's there.
+            from src.dungeon_generator import (
+                DIFFICULTY_TIERS, DIFFICULTY_ANY,
+            )
+            return [DIFFICULTY_ANY, *DIFFICULTY_TIERS]
         return []
 
     def add_monster(self):
@@ -2895,6 +2911,10 @@ class FeaturesEditor:
             "undead": False,
             "humanoid": False,
             "terrain": "land",
+            # Untagged by default: a brand-new monster spawns in
+            # dungeons of any difficulty until the author picks a
+            # specific tier.
+            "difficulty": "any",
             "tile": "",
         }
         self.mon_list.append(new_mon)
