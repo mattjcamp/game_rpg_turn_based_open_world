@@ -1905,9 +1905,9 @@
       "link_map": "dungeon:Dragon's Lair"
     },
     "18,10": {
-      "walkable": "inherit (yes)",
+      "walkable": "yes (override)",
       "linked": true,
-      "link_map": "dungeon:Old Building"
+      "link_map": "dungeon:Creepy Forest"
     }
   }
 }

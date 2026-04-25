@@ -432,5 +432,27 @@
         "encounters": []
       }
     ]
+  },
+  {
+    "name": "Creepy Forest",
+    "description": "The light appears stolen from this dark forest... Do you dare enter?",
+    "mode": "procedural",
+    "dungeon_style": "forest",
+    "num_levels": 3,
+    "difficulty": "normal",
+    "level_size": "medium",
+    "torch_density": "moderate",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
   }
 ]

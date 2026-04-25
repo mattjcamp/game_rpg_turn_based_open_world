@@ -595,14 +595,19 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             # other dungeon monster (bump-to-fight, standard Attack/
             # Run dialog, template-driven combat).
             self._spawn_placed_encounters()
-            # Try to light the equipped torch automatically
+            # Try to light the equipped torch automatically.  Forest
+            # dungeons swap "descend" for "enter" since the player is
+            # walking into another part of the woods, not climbing
+            # downward.
+            _is_forest = getattr(self.dungeon_data, "style", None) == "forest"
+            _verb = "enter" if _is_forest else "descend into"
             if self._activate_torch():
                 self.show_message(
-                    f"You descend into {self.dungeon_data.name}... Torch lit!", 2500
+                    f"You {_verb} {self.dungeon_data.name}... Torch lit!", 2500
                 )
             else:
                 self.show_message(
-                    f"You descend into {self.dungeon_data.name}... No torch equipped!", 2500
+                    f"You {_verb} {self.dungeon_data.name}... No torch equipped!", 2500
                 )
             # Move party to dungeon entry point.
             # entry_col/entry_row is already resolved by the
@@ -1538,11 +1543,30 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         if tile_id == TILE_STAIRS:
             overworld_exits = getattr(
                 self.dungeon_data, "overworld_exits", None) or set()
-            if (col, row) in overworld_exits:
+            _is_forest = (
+                getattr(self.dungeon_data, "style", None) == "forest")
+            # Forest dungeons branch off current_level instead of the
+            # overworld_exits set: on intermediate floors the south
+            # trail walks one area back; only when we're already at
+            # the entry area (floor 0) does it leave the woods.  The
+            # ESC handler mirrors this — overworld_exits stays empty
+            # for forest, and the handler falls through to
+            # _exit_dungeon() naturally when current_level == 0.
+            if _is_forest:
+                if self.quest_levels and self.current_level > 0:
+                    self.show_message(
+                        "A trail leads to the previous area. "
+                        "Press ESC to take it.", 2000)
+                else:
+                    self.show_message(
+                        "A trail leads out of the woods. "
+                        "Press ESC to take it.", 2000)
+            elif (col, row) in overworld_exits:
                 self.show_message(
                     "Exit to the surface! Press ESC to leave.", 2000)
             else:
-                self.show_message("Stairs up! Press ESC to leave.", 2000)
+                self.show_message(
+                    "Stairs up! Press ESC to leave.", 2000)
 
         if tile_id == TILE_CHEST:
             pos = (col, row)
@@ -1593,8 +1617,15 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                     self._visible_tiles = self._compute_visible_tiles()
                 depth = self.current_level + 1
                 total = len(self.quest_levels)
-                self.show_message(
-                    f"You descend deeper... (Floor {depth}/{total})", 2000)
+                _is_forest = (
+                    getattr(self.dungeon_data, "style", None) == "forest")
+                if _is_forest:
+                    self.show_message(
+                        f"The trail winds deeper into the woods... "
+                        f"(Area {depth}/{total})", 2000)
+                else:
+                    self.show_message(
+                        f"You descend deeper... (Floor {depth}/{total})", 2000)
                 # Inject quest monsters and collect items on the lowest floor
                 self._inject_quest_dungeon_monsters()
                 self._inject_quest_dungeon_collect_items()
@@ -1602,7 +1633,13 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 if active_q:
                     active_q["current_level"] = self.current_level
             else:
-                self.show_message("Stairs leading down...", 1500)
+                _is_forest = (
+                    getattr(self.dungeon_data, "style", None) == "forest")
+                if _is_forest:
+                    self.show_message(
+                        "A trail leads further into the woods...", 1500)
+                else:
+                    self.show_message("Stairs leading down...", 1500)
 
         elif tile_id == TILE_ARTIFACT:
             # Pick up whatever quest artifact belongs to this dungeon
@@ -1657,8 +1694,15 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.game.camera.map_height = self.game.tile_map.height
                 self.game.camera.update(self.game.party.col,
                                         self.game.party.row)
-                self.show_message(
-                    "The portal returns you to the surface!", 3000)
+                _is_forest = (
+                    getattr(self.dungeon_data, "style", None) == "forest")
+                if _is_forest:
+                    self.show_message(
+                        "The portal returns you to the world map!",
+                        3000)
+                else:
+                    self.show_message(
+                        "The portal returns you to the surface!", 3000)
                 self.game.change_state("overworld")
 
             dungeon_name = getattr(self.dungeon_data, "name",

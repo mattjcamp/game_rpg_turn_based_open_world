@@ -12,7 +12,14 @@ class ModuleDungeonEditorMixin:
 
     # Valid options for choice fields
     _DUNGEON_MODE_OPTIONS = ["procedural", "custom"]
-    _DUNGEON_STYLE_OPTIONS = ["cave", "ruins"]
+    # Style picker for the procedural dungeon generator.  Each value
+    # maps to a branch in dungeon_generator.generate_dungeon():
+    #   "cave"   – mountain walls + path floor (overworld cave look)
+    #   "ruins"  – stone-block dungeon (default behaviour)
+    #   "forest" – tree/water/mountain walls + grass/path/sand
+    #              floors, with entrances on opposite map edges
+    #              rendered as continuing trails rather than stairs.
+    _DUNGEON_STYLE_OPTIONS = ["cave", "ruins", "forest"]
     _DUNGEON_SIZE_OPTIONS = ["small", "medium", "large"]
     _DUNGEON_DIFFICULTY_OPTIONS = ["easy", "normal", "hard", "deadly"]
     _DUNGEON_TORCH_OPTIONS = ["none", "sparse", "moderate", "abundant"]

@@ -19,12 +19,17 @@ from src.settings import (
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
     TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
     TILE_MOUNTAIN, TILE_PATH,
+    TILE_FOREST, TILE_WATER, TILE_GRASS, TILE_SAND,
 )
 from src.monster import create_encounter, create_monster
 
 # All tile IDs that count as "wall" for dungeon generation purposes
 # (door placement, torch placement, decoration adjacency checks).
-_WALL_TILES = frozenset({TILE_DWALL, TILE_MOUNTAIN})
+# Forest dungeons use trees/water as walls in addition to mountains —
+# the door & decoration helpers treat any of these as solid blocking
+# terrain regardless of dungeon style.
+_WALL_TILES = frozenset({TILE_DWALL, TILE_MOUNTAIN,
+                         TILE_FOREST, TILE_WATER})
 
 
 # ── Debug switch: suppress random encounters in newly generated dungeons ──
@@ -118,14 +123,21 @@ class DungeonData:
     def floor_tile(self):
         """Return the tile_id used for walkable floor in this dungeon.
 
-        Cave-style dungeons use ``TILE_PATH`` (matches the overworld
-        cave look); every other style uses ``TILE_DFLOOR`` (the
-        standard stone-block dungeon floor).  Pickup code (chest,
-        trap, artifact) reads this when restoring a tile after the
-        feature is consumed, so the cell blends back into the
-        surrounding floor regardless of dungeon style.
+        Per-style mapping:
+        - ``"cave"``   → ``TILE_PATH``   (overworld cave look)
+        - ``"forest"`` → ``TILE_GRASS``  (clearings between the trees)
+        - everything else → ``TILE_DFLOOR`` (stone-block dungeon floor)
+
+        Pickup code (chest, trap, artifact) reads this when restoring
+        a tile after the feature is consumed, so the cell blends back
+        into the surrounding floor regardless of dungeon style.  The
+        renderer also uses it to disguise undetected traps.
         """
-        return TILE_PATH if self.style == "cave" else TILE_DFLOOR
+        if self.style == "cave":
+            return TILE_PATH
+        if self.style == "forest":
+            return TILE_GRASS
+        return TILE_DFLOOR
 
     # ── Serialization ────────────────────────────────────────────
 
@@ -164,12 +176,18 @@ class DungeonData:
             for (c, r), tid in self.tile_map.decorations.items()
         ]
 
+        # Serialize per-cell property overrides (walkability flips for
+        # forest dungeons, etc.) so a saved-and-reloaded dungeon
+        # still treats trees as walls.
+        tile_props = getattr(self.tile_map, "tile_properties", None) or {}
+
         return {
             "name": self.name,
             "width": self.tile_map.width,
             "height": self.tile_map.height,
             "tiles": tiles_2d,
             "decorations": decorations_data,
+            "tile_properties": dict(tile_props),
             "entry_col": self.entry_col,
             "entry_row": self.entry_row,
             "opened_chests": [list(pos) for pos in self.opened_chests],
@@ -202,6 +220,13 @@ class DungeonData:
             except (TypeError, ValueError):
                 continue
             tmap.set_decoration(c, r, tid)
+
+        # Restore per-cell property overrides (walkability flips
+        # for forest tree-walls, etc.).  Older saves don't have
+        # this key — leaving tile_properties unset is fine.
+        saved_props = data.get("tile_properties")
+        if isinstance(saved_props, dict) and saved_props:
+            tmap.tile_properties = dict(saved_props)
 
         # Restore monsters
         monsters = []
@@ -740,15 +765,27 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     BUFFER = 3
     total_height = height + BUFFER
 
-    # Cave-style dungeons use the mountain tile for walls and the
-    # overworld "Path" tile as the walkable group, since stone-floor
-    # looks too man-made for a natural cave.  Decorations (torches,
-    # puddles, moss) live on the overlay layer with transparent
-    # sprite backgrounds, so a single sprite per object renders
-    # correctly over any wall/floor style — no per-style variants
-    # required.
-    wall_tile = TILE_MOUNTAIN if style == "cave" else TILE_DWALL
-    floor_tile = TILE_PATH if style == "cave" else TILE_DFLOOR
+    # Per-style wall/floor selection.  Decorations (torches, puddles,
+    # moss) live on the overlay layer with transparent sprite
+    # backgrounds, so a single sprite per object renders correctly
+    # over any wall/floor style — no per-style variants required.
+    #
+    # - "cave":   mountain walls, overworld "path" floor.
+    # - "forest": tree walls (post-process sprinkles a few water
+    #             ponds and mountain boulders), grass floor in rooms,
+    #             with corridors converted to TILE_PATH and a few
+    #             sand patches scattered in clearings during the
+    #             post-process pass.
+    # - else:     standard stone-block dungeon (TILE_DWALL / TILE_DFLOOR).
+    if style == "cave":
+        wall_tile = TILE_MOUNTAIN
+        floor_tile = TILE_PATH
+    elif style == "forest":
+        wall_tile = TILE_FOREST
+        floor_tile = TILE_GRASS
+    else:
+        wall_tile = TILE_DWALL
+        floor_tile = TILE_DFLOOR
     tmap = TileMap(width, total_height, default_tile=wall_tile)
 
     rooms = []
@@ -784,9 +821,21 @@ def generate_dungeon(name="The Depths", width=40, height=30,
 
             rooms.append(new_room)
 
-    # --- Place stairs (entrance) in the first room ---
-    stairs_col, stairs_row = rooms[0].center
-    tmap.set_tile(stairs_col, stairs_row, TILE_STAIRS)
+    # --- Place stairs (entrance) ---
+    # Forest dungeons put the entrance on the south edge of the map
+    # (with a short trail carved inward) so the stairs read as a
+    # trail leading back the way you came rather than a stairwell in
+    # a room.  Other styles keep the original "first-room center"
+    # behaviour.  If the edge placement can't reach the carved area
+    # for any reason, we fall back to the room-center stairs.
+    stairs_col, stairs_row = (None, None)
+    if style == "forest":
+        stairs_col, stairs_row = _place_forest_edge_stairs(
+            tmap, edge="south", tile_id=TILE_STAIRS,
+            floor_tile=floor_tile, wall_tile=wall_tile)
+    if stairs_col is None:
+        stairs_col, stairs_row = rooms[0].center
+        tmap.set_tile(stairs_col, stairs_row, TILE_STAIRS)
 
     # --- Place chests in some of the later rooms ---
     for room in rooms[2:]:  # Skip first two rooms (too close to entrance)
@@ -895,10 +944,20 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                     monsters.append(monster)
 
     # --- Optional: place stairs down in the last (deepest) room ---
+    # Forest dungeons mirror the entrance: descent stairs sit on the
+    # north edge with a short trail carved inward, reading as "the
+    # trail continues deeper into the woods".  Falls back to the
+    # last-room center if the edge placement can't connect.
     if place_stairs_down and len(rooms) >= 2:
-        last_room = rooms[-1]
-        sc, sr = last_room.center
-        tmap.set_tile(sc, sr, TILE_STAIRS_DOWN)
+        sc, sr = (None, None)
+        if style == "forest":
+            sc, sr = _place_forest_edge_stairs(
+                tmap, edge="north", tile_id=TILE_STAIRS_DOWN,
+                floor_tile=floor_tile, wall_tile=wall_tile)
+        if sc is None:
+            last_room = rooms[-1]
+            sc, sr = last_room.center
+            tmap.set_tile(sc, sr, TILE_STAIRS_DOWN)
 
     # --- Optional: place quest artifact in the last room ---
     if place_artifact and len(rooms) >= 2:
@@ -934,12 +993,194 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # ``dungeon_data.overworld_exits`` to decide whether an ESC-on-
     # stairs should ascend or leave the dungeon entirely.
     if place_overworld_exit and len(rooms) >= 2:
-        exit_col, exit_row = _place_overworld_exit_stairs(
-            tmap, rooms, floor_tile=floor_tile)
-        if exit_col is not None:
-            dd.overworld_exits.add((exit_col, exit_row))
+        if style == "forest":
+            # Forest dungeons deliberately do NOT register an
+            # overworld-exit cell.  The user-facing flow is "each
+            # floor is another forest area" — the south-edge trail
+            # ascends one area at a time, and the ESC handler in
+            # states/dungeon.py already falls through to
+            # _exit_dungeon() when ascending from floor 0.  Adding
+            # an overworld_exit here would short-circuit the trail
+            # walk: pressing ESC at the bottom floor's south stairs
+            # would jump straight to the world map instead of
+            # taking the player back one area at a time.
+            pass
+        else:
+            exit_col, exit_row = _place_overworld_exit_stairs(
+                tmap, rooms, floor_tile=floor_tile)
+            if exit_col is not None:
+                dd.overworld_exits.add((exit_col, exit_row))
+
+    # --- Forest-style terrain pass ---
+    # Runs LAST so it sees decorations (skips torch-bearing walls
+    # when sprinkling water/mountain variants) and converts the
+    # carved corridors + edge-stair trails to TILE_PATH in one go.
+    if style == "forest":
+        _apply_forest_terrain(tmap, rooms)
 
     return dd
+
+
+def _place_forest_edge_stairs(tmap, edge, tile_id,
+                              floor_tile, wall_tile):
+    """Place a stairs tile on the *edge* of a forest dungeon and
+    carve a short trail from the edge inward to the nearest carved
+    (room/corridor) cell.
+
+    Forest dungeons read as "going from one area of the woods to
+    another", so entrances and exits sit on the map perimeter rather
+    than inside a room — the stair tile itself is rendered as a
+    plain path cell to sell the illusion of a continuing trail.
+
+    Parameters
+    ----------
+    edge : str
+        ``"south"`` (entry, faces back the way you came) or
+        ``"north"`` (descent, faces deeper into the woods).
+    tile_id : int
+        Usually ``TILE_STAIRS`` for entrances/ascents or
+        ``TILE_STAIRS_DOWN`` for descents.  The renderer's forest
+        override paints either as the path sprite.
+    floor_tile, wall_tile : int
+        The room-floor tile (``TILE_GRASS``) and default wall tile
+        (``TILE_FOREST``) for this dungeon.  Trail cells are carved
+        as ``floor_tile`` so they get caught by the
+        post-processing pass that converts non-room floors to
+        ``TILE_PATH``.
+
+    Returns ``(col, row)`` of the placed stair, or ``(None, None)``
+    if no carved cell could be reached from any candidate column.
+    """
+    width = tmap.width
+    height = tmap.height
+
+    # The edge row sits one inside the absolute border so the trail
+    # has somewhere to extend without falling out of bounds.
+    if edge == "south":
+        edge_row = height - 2
+        step_dr = -1
+    else:  # north
+        edge_row = 1
+        step_dr = 1
+
+    # Pick a column from the central third of the map first so the
+    # entrance lines up with the bulk of the carved area; sweep
+    # outward if those don't connect.
+    col_start = max(1, width // 3)
+    col_end = min(width - 1, (2 * width) // 3)
+    centered = list(range(col_start, col_end))
+    edges = list(range(1, col_start)) + list(range(col_end, width - 1))
+    random.shuffle(centered)
+    random.shuffle(edges)
+    candidates = centered + edges
+
+    for c in candidates:
+        # Walk inward from the edge until we hit a non-wall cell.
+        r = edge_row
+        while 0 < r < height - 1:
+            if tmap.get_tile(c, r) != wall_tile:
+                # Carve trail from edge_row up to (but not over) r,
+                # then mark the very edge cell as the stair.
+                tr = edge_row
+                while tr != r:
+                    tmap.set_tile(c, tr, floor_tile)
+                    tr += step_dr
+                tmap.set_tile(c, edge_row, tile_id)
+                return c, edge_row
+            r += step_dr
+
+    return None, None
+
+
+def _apply_forest_terrain(tmap, rooms):
+    """Post-process a forest dungeon for visual variety.
+
+    Three passes, in order:
+
+    1. **Corridors → trails.**  Any ``TILE_GRASS`` cell that lives
+       outside every room rectangle is a corridor (or an edge-stair
+       trail).  Those become ``TILE_PATH`` so the player can read
+       "clearing" vs "trail" at a glance.
+    2. **Wall variants.**  A small fraction of ``TILE_FOREST``
+       walls are flipped to ``TILE_WATER`` (small ponds) or
+       ``TILE_MOUNTAIN`` (boulders) — keeps the wall silhouette
+       interesting without diluting the forest theme.  Cells that
+       carry a decoration overlay (torches) are skipped so the
+       overlay still reads against trees.
+    3. **Sand patches.**  Roughly a third of the rooms get one or
+       two sand cells, evoking dirt patches in a clearing.
+
+    Wall cells (TILE_FOREST in particular — which is walkable on
+    the overworld) are flagged non-walkable per cell via
+    ``tile_properties`` so the player can't step into a tree the
+    way they'd walk through forest on the world map.  Water and
+    mountain are already non-walkable per ``TILE_DEFS``, so they
+    don't need an override.
+    """
+    width = tmap.width
+    height = tmap.height
+
+    # Lazily initialise the per-cell property dict the existing
+    # walkability override system reads.
+    if not getattr(tmap, "tile_properties", None):
+        tmap.tile_properties = {}
+    props = tmap.tile_properties
+
+    # 1. Identify cells inside any room rectangle.
+    room_cells = set()
+    for room in rooms:
+        for r in range(room.y, room.y2):
+            for c in range(room.x, room.x2):
+                room_cells.add((c, r))
+
+    # Corridor grass → path.
+    for r in range(height):
+        for c in range(width):
+            if (tmap.get_tile(c, r) == TILE_GRASS
+                    and (c, r) not in room_cells):
+                tmap.set_tile(c, r, TILE_PATH)
+
+    # 2. Wall variants — sparse so the forest still reads as forest.
+    decorations = getattr(tmap, "decorations", {}) or {}
+    for r in range(height):
+        for c in range(width):
+            if tmap.get_tile(c, r) != TILE_FOREST:
+                continue
+            if (c, r) in decorations:
+                continue  # don't pull the rug out from under a torch
+            roll = random.random()
+            if roll < 0.05:
+                tmap.set_tile(c, r, TILE_WATER)
+            elif roll < 0.08:
+                tmap.set_tile(c, r, TILE_MOUNTAIN)
+
+    # 3. Sand patches in a subset of the rooms.
+    for room in rooms:
+        if room.w < 3 or room.h < 3:
+            continue
+        if random.random() >= 0.3:
+            continue
+        for _ in range(random.randint(1, 3)):
+            cx = random.randint(room.x + 1, room.x + room.w - 2)
+            cy = random.randint(room.y + 1, room.y + room.h - 2)
+            if tmap.get_tile(cx, cy) == TILE_GRASS:
+                tmap.set_tile(cx, cy, TILE_SAND)
+
+    # 4. Override TILE_FOREST cells to be non-walkable.  The
+    # overworld treats forest as walkable terrain (you can step
+    # into the woods), but inside a forest dungeon trees are the
+    # walls and must block movement.  Water and mountain are
+    # already non-walkable per TILE_DEFS, so we only need overrides
+    # for the surviving forest cells (after the variant pass above).
+    for r in range(height):
+        for c in range(width):
+            if tmap.get_tile(c, r) == TILE_FOREST:
+                key = f"{c},{r}"
+                entry = props.get(key)
+                if not isinstance(entry, dict):
+                    entry = {}
+                    props[key] = entry
+                entry["walkable"] = False
 
 
 def _place_overworld_exit_stairs(tmap, rooms, floor_tile=TILE_DFLOOR):

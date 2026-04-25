@@ -2483,12 +2483,18 @@ class Renderer(CombatEffectRendererMixin):
         _is_custom = getattr(tile_map, '_custom_mode', False)
         # Hidden traps: undetected trap tiles render as the dungeon's
         # native floor tile (TILE_DFLOOR for stone dungeons, TILE_PATH
-        # for cave-style) so they're indistinguishable from
-        # surrounding terrain regardless of dungeon style.  Only
-        # traps the party has successfully detected show their sprite
-        # (plus the red X/glow overlay drawn further below).
+        # for cave-style, TILE_GRASS for forest) so they're
+        # indistinguishable from surrounding terrain regardless of
+        # dungeon style.  Only traps the party has successfully
+        # detected show their sprite (plus the red X/glow overlay
+        # drawn further below).
         _detected_set = detected_traps or set()
         _hidden_floor = getattr(dungeon_data, "floor_tile", TILE_DFLOOR)
+        # Forest dungeons paint stair tiles with the path sprite so
+        # entrances and exits read as a continuing trail rather than
+        # a stairwell.  The actual tile_id in the map is unchanged —
+        # only the rendered sprite.
+        _forest_style = getattr(dungeon_data, "style", None) == "forest"
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
@@ -2497,6 +2503,9 @@ class Renderer(CombatEffectRendererMixin):
                 # Disguise undetected traps as the native floor.
                 if tid == TILE_TRAP and (wc, wr) not in _detected_set:
                     render_tid = _hidden_floor
+                elif _forest_style and tid in (TILE_STAIRS,
+                                               TILE_STAIRS_DOWN):
+                    render_tid = TILE_PATH
                 else:
                     render_tid = tid
                 px = sc * ts
