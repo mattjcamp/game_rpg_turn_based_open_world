@@ -746,5 +746,16 @@
     ],
     "context": "artifacts",
     "sprite": "items/scroll"
+  },
+  "74": {
+    "name": "Abandoned Building",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "overworld",
+    "sprite": "overworld/abandoned_building"
   }
 }

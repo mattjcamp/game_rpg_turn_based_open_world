@@ -469,6 +469,25 @@ def _draw_tile_inspector(renderer, data: Dict):
             ty += 16
             continue
 
+        # ── Tristate (inherit / yes / no override) ──
+        # Glyph: [~] = inherit (taking the tile type's default), [x] =
+        # forced walkable, [ ] = forced blocked. Colour coded so the
+        # override states stand out from the inherited default.
+        if field_type == "tristate":
+            val = str(value)
+            if val.startswith("inherit"):
+                box, col = "[~]", (140, 140, 160)
+            elif val.startswith("yes"):
+                box, col = "[x]", (120, 255, 120)
+            else:
+                box, col = "[ ]", (255, 120, 120)
+            if is_active:
+                col = _COL_ORANGE
+            renderer._u3_text(f"{box} {label}: {val}",
+                              ix + pad, ty, col, fs)
+            ty += 16
+            continue
+
         # ── Map picker ──
         if field_type == "map_picker":
             lbl_col = _COL_ORANGE if is_active else (140, 140, 160)

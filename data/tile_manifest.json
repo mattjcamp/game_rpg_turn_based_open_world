@@ -181,6 +181,13 @@
         "town"
       ],
       "tile_id": 70
+    },
+    "abandoned_building": {
+      "path": "src/assets/unassigned/abandoned_building.png",
+      "usable_in": [
+        "overworld"
+      ],
+      "tile_id": 74
     }
   },
   "town": {

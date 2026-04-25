@@ -80,8 +80,8 @@
         "optional": "no"
       }
     ],
-    "giver_col": 9,
-    "giver_row": 12
+    "giver_col": 4,
+    "giver_row": 16
   },
   {
     "name": "Wolfman Puck",
@@ -189,15 +189,15 @@
         "optional": "no"
       }
     ],
-    "giver_col": 16,
-    "giver_row": 28
+    "giver_col": 26,
+    "giver_row": 6
   },
   {
     "name": "Retrieve the Sun Sword",
     "description": "Laird the Lord whispers of a blade hidden in a temple on a far island \u2014 the Sun Sword, said to carry the light that ancient wyrms fear.",
     "giver_npc": "Laird the Lord",
     "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
-    "giver_location": "overview",
+    "giver_location": "town:Realm Keep",
     "giver_dialogue": "I'll be plain with thee, sellsword. There is an old temple called the Citadel of the Sun upon an island far to the east. Within it sleeps a blade forged in daylight \u2014 the Sun Sword. Find a boat, brave the deep, and bring it back. If what I fear wakes, this blade may be our only salvation.",
     "reward_xp": 500,
     "reward_gold": 500,
@@ -226,7 +226,7 @@
     "description": "Sage Veylin of Larian has traced the shadow over Asoloth to a single source: an ancient wyrm that slumbers beneath a ruined keep on the far northeastern island. Descend into the lair, end the dragon, and bring its heart to the shrine.",
     "giver_npc": "Sage Veylin",
     "giver_sprite": "src/assets/game/npcs/vga_mage.png",
-    "giver_location": "town:Larian",
+    "giver_location": "town:Realm Keep",
     "giver_dialogue": "Sit, traveler. What I tell thee now leaves this room with thee alone. The unrest in these lands \u2014 the wolves, the orcs, the dead that will not lie \u2014 they are not the sickness, only its fever. The true blight is an ancient wyrm, older than Larian, older than any scroll I have read. It sleeps beneath a shattered keep on the far northeastern island, and as it stirs the land darkens. Arm thyself well. Take the Sun Sword if thou hast the arm for it. Descend through the broken halls, past the lava that feeds its breath, past the bones of those who tried before. End the wyrm. Cut out its heart and bring it to the shrine \u2014 only there may it be undone. Do this, and Asoloth yet has a morning.",
     "reward_xp": 2500,
     "reward_gold": 1500,

@@ -58,15 +58,22 @@ TILE_DDOOR    = 26
 TILE_ARTIFACT = 27
 TILE_PORTAL   = 28
 TILE_LOCKED_DOOR = 29
-# Decorative dungeon tiles
+# Decorative dungeon tiles.
+#
+# These are placed on the ``TileMap.decorations`` overlay layer rather
+# than overwriting tiles in the main grid.  Their PNG sprites have
+# transparent backgrounds, so the renderer paints the underlying
+# floor / wall first and then blits the decoration on top — which
+# means a single torch / puddle / moss sprite renders correctly over
+# any dungeon style (stone-block, cave, crypt, lava, ice, void, …)
+# without needing per-style sprite variants.
 TILE_PUDDLE    = 32
 TILE_MOSS      = 33
 TILE_WALL_TORCH = 34
-# Note: tile_id 37 is user-defined ("Brick" by default) in tile_defs.json.
-# The old hardcoded TILE_CAVE_TORCH = 37 was removed because it collided with
-# the user-extensible tile registry. All torches now use TILE_WALL_TORCH;
-# light-emission is data-driven via the ``flags`` block in tile_defs.json
-# (see lighting.py:scan_light_sources).
+# Tile id 75 was previously TILE_CAVE_TORCH (a cave-backdrop variant
+# of the torch sprite, kept around so torches didn't sit on a
+# stone-block square against a mountain wall).  The decoration overlay
+# system makes that variant unnecessary — id 75 is now retired.
 # Town-interior special tiles
 TILE_ALTAR     = 35
 TILE_VOID      = 36  # Black empty space (non-walkable, for interior edges)

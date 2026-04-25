@@ -3823,6 +3823,8 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
                     interact, off_c, off_r, ts)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
+        if self.quest_step_queue:
+            renderer.draw_quest_step_animation(self.quest_step_queue[0])
         if self.showing_help:
             renderer.draw_overworld_help_overlay()
         if self.showing_log:

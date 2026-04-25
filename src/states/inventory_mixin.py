@@ -90,6 +90,13 @@ class InventoryMixin:
         #              "timer": int, "duration": int}
         self.level_up_queue = []
 
+        # Quest-step-completed banner queue. Entries are appended by
+        # ``_drain_pending_quest_callouts`` from ``game.pending_quest_callouts``
+        # (filled by quest_manager when a step gets marked complete).
+        # Each entry: {"quest": str, "desc": str, "quest_complete": bool,
+        #              "timer": int, "duration": int}
+        self.quest_step_queue = []
+
     # ── Messages ───────────────────────────────────────────────
 
     def show_message(self, text, duration_ms=2000):
@@ -140,13 +147,43 @@ class InventoryMixin:
                 })
 
     def _update_level_up_queue(self, dt_ms):
-        """Tick down the current level-up animation.  Call from update()."""
-        if not self.level_up_queue:
+        """Tick down the current level-up animation.  Call from update().
+
+        Also drains pending quest-step callouts and ticks that queue, so
+        every state that already pumped level-up animations automatically
+        gets quest-step banners with no additional wiring.
+        """
+        if self.level_up_queue:
+            entry = self.level_up_queue[0]
+            entry["timer"] -= dt_ms
+            if entry["timer"] <= 0:
+                self.level_up_queue.pop(0)
+        self._drain_pending_quest_callouts()
+        if self.quest_step_queue:
+            qentry = self.quest_step_queue[0]
+            qentry["timer"] -= dt_ms
+            if qentry["timer"] <= 0:
+                self.quest_step_queue.pop(0)
+
+    def _drain_pending_quest_callouts(self):
+        """Move queued quest-step callouts off the Game onto this state.
+
+        ``quest_manager`` stages callouts on ``game.pending_quest_callouts``
+        because it doesn't know which state is currently active.  Whichever
+        state ticks next picks them up here and animates them.
+        """
+        pending = getattr(self.game, "pending_quest_callouts", None) or []
+        if not pending:
             return
-        entry = self.level_up_queue[0]
-        entry["timer"] -= dt_ms
-        if entry["timer"] <= 0:
-            self.level_up_queue.pop(0)
+        for raw in pending:
+            self.quest_step_queue.append({
+                "quest": raw.get("quest", ""),
+                "desc": raw.get("desc", ""),
+                "quest_complete": bool(raw.get("quest_complete", False)),
+                "timer": 3000,
+                "duration": 3000,
+            })
+        self.game.pending_quest_callouts = []
 
     # ── Hook methods (overridden by subclasses) ────────────────
 

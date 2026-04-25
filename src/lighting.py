@@ -531,14 +531,30 @@ def scan_light_sources(tile_map, off_c: int, off_r: int,
     feature_lights: list = []
     torch_positions: list = []
 
+    # Decorations (overlay layer) carry procedurally placed torches
+    # whose flame sprite renders over whatever wall is underneath.  We
+    # look at a decoration first, then fall back to the base tile, so
+    # custom dungeons that paint torches directly into the grid still
+    # emit light.
+    decorations = getattr(tile_map, "decorations", {}) or {}
+
     for sr in range(rows):
         for sc in range(cols):
             wc = sc + off_c
             wr = sr + off_r
-            tid = tile_map.get_tile(wc, wr)
             ssc = sc + pad_sc
             ssr = sr + pad_sr
-            flags = TILE_DEFS.get(tid, {}).get("flags", {})
+
+            deco_id = decorations.get((wc, wr))
+            base_id = tile_map.get_tile(wc, wr)
+
+            # Try the decoration's flags first — if absent, fall back
+            # to the base tile's flags.
+            deco_flags = TILE_DEFS.get(deco_id, {}).get("flags", {}) \
+                if deco_id is not None else {}
+            base_flags = TILE_DEFS.get(base_id, {}).get("flags", {})
+            flags = deco_flags or base_flags
+
             if flags.get("light_source"):
                 radius = flags.get("light_radius", 5.0)
                 intensity = flags.get("light_intensity", 3.0)

@@ -30,7 +30,6 @@ from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
     TILE_DUNGEON_CLEARED,
-    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
 )
 from src.monster import MONSTERS
 from src.party import (
@@ -2482,19 +2481,22 @@ class Renderer(CombatEffectRendererMixin):
         # ── 1. draw map tiles ──
         palette = self._get_dungeon_palette(dungeon_level)
         _is_custom = getattr(tile_map, '_custom_mode', False)
-        # Hidden traps: undetected trap tiles render as plain stone floor
-        # so they're indistinguishable from surrounding dungeon terrain.
-        # Only traps that the party has successfully detected show their
-        # sprite (plus the red X/glow overlay drawn further below).
+        # Hidden traps: undetected trap tiles render as the dungeon's
+        # native floor tile (TILE_DFLOOR for stone dungeons, TILE_PATH
+        # for cave-style) so they're indistinguishable from
+        # surrounding terrain regardless of dungeon style.  Only
+        # traps the party has successfully detected show their sprite
+        # (plus the red X/glow overlay drawn further below).
         _detected_set = detected_traps or set()
+        _hidden_floor = getattr(dungeon_data, "floor_tile", TILE_DFLOOR)
         for sr in range(rows):
             for sc in range(cols):
                 wc = sc + off_c
                 wr = sr + off_r
                 tid = tile_map.get_tile(wc, wr)
-                # Disguise undetected traps as dungeon floor.
+                # Disguise undetected traps as the native floor.
                 if tid == TILE_TRAP and (wc, wr) not in _detected_set:
-                    render_tid = TILE_DFLOOR
+                    render_tid = _hidden_floor
                 else:
                     render_tid = tid
                 px = sc * ts
@@ -2508,6 +2510,18 @@ class Renderer(CombatEffectRendererMixin):
                 if not _is_custom:
                     self._draw_dungeon_atmosphere(
                         render_tid, px, py, ts, wc, wr, palette)
+                # Decoration overlay: cosmetic objects (puddles, moss,
+                # torches) live on tile_map.decorations and are drawn
+                # ON TOP of the base tile with transparent sprite
+                # backgrounds, so the same sprite reads correctly over
+                # any dungeon style.  This is the generic replacement
+                # for the old per-style sprite variants
+                # (TILE_CAVE_TORCH etc.).
+                deco_id = tile_map.decorations.get((wc, wr)) \
+                    if hasattr(tile_map, 'decorations') else None
+                if deco_id is not None:
+                    self._draw_tile(deco_id, px, py, ts, wc, wr,
+                                    tile_map=tile_map)
 
         # ── 1a2. placed ground items (items editor → tile_properties) ──
         self._draw_ground_items_on_tilemap(
@@ -2609,16 +2623,28 @@ class Renderer(CombatEffectRendererMixin):
         # ── 1e. animated torch light glow (via unified lighting) ──
         # Scan for wall torches visible to the party; filter by LOS set.
         # A "torch" is any tile whose tile_defs.json entry has
-        # ``flags.light_source: true``.
+        # ``flags.light_source: true``.  Procedurally placed torches
+        # live on the decoration overlay layer (transparent sprite over
+        # the underlying wall); custom dungeons may still paint torches
+        # directly into the base grid, so we check both.
         from src.settings import TILE_DEFS as _TD_TORCH
+        _decorations = getattr(tile_map, "decorations", {}) or {}
         _dg_torch_positions = []
         for sr2 in range(rows):
             for sc2 in range(cols):
                 wc2 = sc2 + off_c
                 wr2 = sr2 + off_r
-                _tid = tile_map.get_tile(wc2, wr2)
-                if _TD_TORCH.get(_tid, {}).get(
-                        "flags", {}).get("light_source"):
+                _is_torch = False
+                _deco_id = _decorations.get((wc2, wr2))
+                if _deco_id is not None and _TD_TORCH.get(
+                        _deco_id, {}).get("flags", {}).get("light_source"):
+                    _is_torch = True
+                else:
+                    _tid = tile_map.get_tile(wc2, wr2)
+                    if _TD_TORCH.get(_tid, {}).get(
+                            "flags", {}).get("light_source"):
+                        _is_torch = True
+                if _is_torch:
                     if visible_tiles and (wc2, wr2) not in visible_tiles:
                         continue
                     _dg_torch_positions.append((sc2, sr2))
@@ -3897,16 +3923,16 @@ class Renderer(CombatEffectRendererMixin):
         return self._skeleton_fallback
 
     def _draw_quest_monster_glow(self, cx, cy, size=32):
-        """Draw a pulsing golden-orange glow behind a quest-spawned monster,
-        plus a floating exclamation-mark marker that hovers above its head so
-        the target is unmistakable from across the map."""
+        """Draw a soft pulsing golden glow behind a quest-spawned monster.
+
+        The glow is intentionally subtle — it should hint at a quest target
+        without overpowering the scene.  Earlier iterations stacked a loud
+        halo with a floating "!" badge, which players found distracting;
+        the badge has been removed and the halo's intensity reduced (see
+        ``_draw_pulsing_glow``'s ``intensity`` parameter)."""
         self._draw_pulsing_glow(
-            cx, cy, size, (255, 180, 40), (255, 220, 80))
-        self._draw_quest_marker(
-            cx, cy, size, marker="!",
-            marker_color=(255, 240, 120),
-            outline_color=(120, 60, 0),
-            bg_color=(200, 40, 30))
+            cx, cy, size, (255, 180, 40), (255, 220, 80),
+            intensity=0.45)
 
     def _draw_quest_item_glow(self, cx, cy, size=32):
         """Draw a pulsing cyan glow behind a quest collectible item, plus a
@@ -3920,18 +3946,21 @@ class Renderer(CombatEffectRendererMixin):
             outline_color=(10, 50, 90),
             bg_color=(40, 120, 200))
 
-    def _draw_pulsing_glow(self, cx, cy, size, outer_rgb, inner_rgb):
+    def _draw_pulsing_glow(self, cx, cy, size, outer_rgb, inner_rgb,
+                           intensity=1.0):
         """Draw a pulsing, multi-ring glow at (cx, cy).
 
-        The glow was made significantly stronger (brighter base alpha, a
-        second wider halo ring, and a larger radius swing) after players
-        reported quest targets were easy to miss in dim dungeons.
+        ``intensity`` (0..1) scales every alpha channel so callers can
+        tune the loudness of the effect.  Quest monsters use a low value
+        (~0.45) so the glow reads as a subtle hint; quest items keep the
+        full-strength default so collectible sparkles stay eye-catching.
         """
         t = time.time()
         pulse = (math.sin(t * 3.0) + 1.0) / 2.0  # 0..1
+        intensity = max(0.0, min(1.0, intensity))
         # ── outer halo ring (wide, low-alpha, fades slower) ──
         halo_radius = int(size * (0.95 + pulse * 0.25))
-        halo_alpha = int(55 + pulse * 55)
+        halo_alpha = int((55 + pulse * 55) * intensity)
         halo = pygame.Surface((halo_radius * 2, halo_radius * 2),
                               pygame.SRCALPHA)
         pygame.draw.circle(
@@ -3940,12 +3969,12 @@ class Renderer(CombatEffectRendererMixin):
         self.screen.blit(halo, (cx - halo_radius, cy - halo_radius))
         # ── core glow (brighter, tighter) ──
         radius = int(size * (0.65 + pulse * 0.25))
-        alpha = int(90 + pulse * 110)
+        alpha = int((90 + pulse * 110) * intensity)
         glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(
             glow, (*outer_rgb, alpha), (radius, radius), radius)
         inner_r = max(4, radius // 2)
-        inner_alpha = int(120 + pulse * 100)
+        inner_alpha = int((120 + pulse * 100) * intensity)
         pygame.draw.circle(
             glow, (*inner_rgb, min(255, inner_alpha)),
             (radius, radius), inner_r)
@@ -3953,7 +3982,7 @@ class Renderer(CombatEffectRendererMixin):
         # ── pulsing outline ring so the silhouette reads even against a
         # busy background (e.g. cave walls in the Goblin Stronghold) ──
         ring_radius = int(size * (0.55 + pulse * 0.1))
-        ring_alpha = int(140 + pulse * 115)
+        ring_alpha = int((140 + pulse * 115) * intensity)
         ring = pygame.Surface((ring_radius * 2 + 4, ring_radius * 2 + 4),
                               pygame.SRCALPHA)
         pygame.draw.circle(
@@ -16421,6 +16450,144 @@ class Renderer(CombatEffectRendererMixin):
                                    (4, 4), 3)
                 pygame.draw.circle(star_s, (255, 255, 255, min(255, star_a + 40)),
                                    (4, 4), 1)
+                self.screen.blit(star_s, (corner_x - 4, corner_y - 4))
+
+    def draw_quest_step_animation(self, entry):
+        """Draw a celebratory banner when a quest step (or whole quest)
+        completes — modelled on ``draw_level_up_animation`` so the two
+        callouts share a consistent visual language.
+
+        *entry* is a dict with keys:
+            quest          – quest name (e.g. "The Lost Heir")
+            desc           – step description (e.g. "Defeat the goblin chief")
+            quest_complete – True when this was the final step of the quest
+            timer          – remaining ms
+            duration       – total ms
+        """
+        import math as _math
+
+        if not entry or entry["timer"] <= 0:
+            return
+
+        from src.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+        sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT
+
+        t = entry["timer"]
+        dur = entry["duration"]
+        progress = 1.0 - (t / dur)
+
+        if progress < 0.15:
+            alpha = progress / 0.15
+        elif progress > 0.85:
+            alpha = (1.0 - progress) / 0.15
+        else:
+            alpha = 1.0
+        alpha = max(0.0, min(1.0, alpha))
+
+        # ── Banner background ──
+        banner_w = min(sw - 40, 380)
+        banner_h = 72
+        bx = (sw - banner_w) // 2
+        # Stagger below the level-up banner so both can show concurrently.
+        target_y = sh // 3 - banner_h // 2 + 90
+        if progress < 0.1:
+            by = int(-banner_h + (target_y + banner_h) * (progress / 0.1))
+        else:
+            by = target_y
+
+        bg = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
+        bg_alpha = int(210 * alpha)
+        bg.fill((10, 30, 18, bg_alpha))
+        self.screen.blit(bg, (bx, by))
+
+        # ── Emerald border with pulse ──
+        pulse = 0.7 + 0.3 * _math.sin(progress * _math.pi * 8)
+        quest_done = bool(entry.get("quest_complete"))
+        if quest_done:
+            border_rgb = (255, 210, 90)   # gold for full-quest completion
+            title_rgb = (255, 230, 110)
+        else:
+            border_rgb = (90, 220, 130)   # emerald for step completion
+            title_rgb = (140, 240, 170)
+        border_c = (
+            int(border_rgb[0] * pulse * alpha),
+            int(border_rgb[1] * pulse * alpha),
+            int(border_rgb[2] * pulse * alpha),
+            int(255 * alpha)
+        )
+        border_s = pygame.Surface((banner_w, banner_h), pygame.SRCALPHA)
+        pygame.draw.rect(border_s, border_c,
+                         (0, 0, banner_w, banner_h), 3)
+        self.screen.blit(border_s, (bx, by))
+
+        # ── Title ──
+        title_text = "QUEST COMPLETE!" if quest_done else "STEP COMPLETE"
+        title_pulse = 0.8 + 0.2 * _math.sin(progress * _math.pi * 6)
+        title_color = (
+            int(title_rgb[0] * title_pulse),
+            int(title_rgb[1] * title_pulse),
+            int(title_rgb[2] * title_pulse),
+        )
+        title_surf = self.font.render(title_text, True, title_color)
+        title_surf.set_alpha(int(255 * alpha))
+        tx = bx + (banner_w - title_surf.get_width()) // 2
+        ty = by + 8
+        self.screen.blit(title_surf, (tx, ty))
+
+        # ── Quest name + step description (stacked, truncated to fit) ──
+        quest_name = entry.get("quest", "")
+        desc = entry.get("desc", "")
+        if quest_name and desc:
+            info_text = f"{quest_name} — {desc}"
+        else:
+            info_text = quest_name or desc or ""
+        # Soft truncation to fit the banner width
+        max_w = banner_w - 24
+        if self.font_small.size(info_text)[0] > max_w:
+            while (len(info_text) > 4
+                   and self.font_small.size(info_text + "…")[0] > max_w):
+                info_text = info_text[:-1]
+            info_text = info_text + "…"
+        info_surf = self.font_small.render(info_text, True, (220, 245, 225))
+        info_surf.set_alpha(int(255 * alpha))
+        ix = bx + (banner_w - info_surf.get_width()) // 2
+        iy = by + 36
+        self.screen.blit(info_surf, (ix, iy))
+
+        # ── Sparkle particles drifting up from the banner ──
+        import time as _time
+        now = _time.time()
+        num_sparkles = 12
+        for i in range(num_sparkles):
+            phase = now * 2.5 + i * (2 * _math.pi / num_sparkles)
+            sx = bx + int((i / num_sparkles) * banner_w)
+            sy = by + banner_h - int(
+                (now * 30 + i * 17) % (banner_h + 20))
+            spark_alpha = int(180 * alpha * (
+                0.5 + 0.5 * _math.sin(phase)))
+            if spark_alpha > 10:
+                spark_s = pygame.Surface((4, 4), pygame.SRCALPHA)
+                sc = (180, 240, 200, spark_alpha) if not quest_done \
+                    else (255, 230, 120, spark_alpha)
+                pygame.draw.circle(spark_s, sc, (2, 2), 2)
+                self.screen.blit(spark_s, (sx, sy))
+
+        # ── Star bursts at corners ──
+        for corner_x, corner_y in ((bx + 6, by + 6),
+                                    (bx + banner_w - 7, by + 6),
+                                    (bx + 6, by + banner_h - 7),
+                                    (bx + banner_w - 7, by + banner_h - 7)):
+            star_a = int(200 * alpha * (
+                0.5 + 0.5 * _math.sin(now * 4 + corner_x * 0.1)))
+            if star_a > 20:
+                star_s = pygame.Surface((8, 8), pygame.SRCALPHA)
+                core = (255, 230, 130) if quest_done else (200, 250, 220)
+                pygame.draw.circle(star_s, (*core, star_a),
+                                   (4, 4), 3)
+                pygame.draw.circle(
+                    star_s,
+                    (255, 255, 255, min(255, star_a + 40)),
+                    (4, 4), 1)
                 self.screen.blit(star_s, (corner_x - 4, corner_y - 4))
 
     # ═══════════════════════════════════════════════════════════════

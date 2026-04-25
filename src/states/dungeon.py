@@ -15,7 +15,7 @@ from src.states.lock_mixin import LockInteractionMixin
 from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
-    TILE_DUNGEON_CLEARED, TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
+    TILE_DUNGEON_CLEARED, TILE_PATH,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
 )
 
@@ -1078,12 +1078,27 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             ( 0,  1, -1,  0), ( 1,  0,  0, -1),
         ]
 
+        # Procedurally placed torches now live on the decoration
+        # overlay layer (transparent torch sprite over the underlying
+        # wall).  Custom dungeons may still paint torches directly
+        # into the base grid, so we scan both: any cell whose
+        # decoration OR base tile carries flags.light_source counts
+        # as a torch for shadowcasting.
         from src.settings import TILE_DEFS as _TD_TORCH
+        decorations = getattr(tile_map, "decorations", {}) or {}
+
+        def _is_torch_at(wc, wr):
+            deco_id = decorations.get((wc, wr))
+            if deco_id is not None and _TD_TORCH.get(
+                    deco_id, {}).get("flags", {}).get("light_source"):
+                return True
+            base_id = tile_map.get_tile(wc, wr)
+            return bool(_TD_TORCH.get(base_id, {}).get(
+                "flags", {}).get("light_source"))
+
         for wr in range(tile_map.height):
             for wc in range(tile_map.width):
-                _tid = tile_map.get_tile(wc, wr)
-                if _TD_TORCH.get(_tid, {}).get(
-                        "flags", {}).get("light_source"):
+                if _is_torch_at(wc, wr):
                     lit = {(wc, wr)}
                     for xx, xy, yx, yy in octants:
                         self._cast_light(lit, tile_map, wc, wr,
@@ -1534,8 +1549,12 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             if pos not in self.dungeon_data.opened_chests:
                 self.dungeon_data.opened_chests.add(pos)
                 self._open_chest()
-                # Replace chest with floor now that it's opened
-                self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
+                # Replace chest with the dungeon's native floor tile
+                # (TILE_PATH for cave-style dungeons, TILE_DFLOOR
+                # otherwise) so the cell blends back into the
+                # surrounding floor.
+                self.dungeon_data.tile_map.set_tile(
+                    col, row, self.dungeon_data.floor_tile)
 
         elif tile_id == TILE_TRAP:
             pos = (col, row)
@@ -1551,8 +1570,11 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                     self.show_message(
                         f"Trap! {victim.name} takes {damage} damage!", 2000
                     )
-                # Disarm the trap (replace with floor)
-                self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
+                # Disarm the trap (replace with the dungeon's
+                # native floor tile so cave dungeons get TILE_PATH
+                # back, not stone-block TILE_DFLOOR).
+                self.dungeon_data.tile_map.set_tile(
+                    col, row, self.dungeon_data.floor_tile)
 
         elif tile_id == TILE_STAIRS_DOWN:
             if self.quest_levels and self.current_level < len(self.quest_levels) - 1:
@@ -1587,7 +1609,10 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             active_q = self._get_active_quest()
             artifact = active_q.get("artifact_name", "Shadow Crystal") if active_q else "Shadow Crystal"
             self.game.party.inv_add(artifact)
-            self.dungeon_data.tile_map.set_tile(col, row, TILE_DFLOOR)
+            # Restore the dungeon's native floor under the artifact
+            # so cave dungeons keep their TILE_PATH look.
+            self.dungeon_data.tile_map.set_tile(
+                col, row, self.dungeon_data.floor_tile)
             if active_q:
                 active_q["status"] = "artifact_found"
             # Only spawn a portal if exit_portal is enabled
@@ -1672,18 +1697,28 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 f"The party opened a treasure chest and found {gold} gold.", 2000)
 
     def _place_portal(self, col, row):
-        """Place a TILE_PORTAL on an adjacent walkable floor tile."""
+        """Place a TILE_PORTAL on an adjacent walkable floor tile.
+
+        A neighbour qualifies if its base tile is a regular dungeon
+        floor (stone-block dungeons use ``TILE_DFLOOR``; cave-style
+        dungeons use ``TILE_PATH``).  Any decoration overlay sitting
+        on that cell (puddle / moss) is removed when the portal takes
+        its place — the portal is the active visual now.
+        """
         tmap = self.dungeon_data.tile_map
+        FLOOR_TILES = (TILE_DFLOOR, TILE_PATH)
         # Try cardinal directions first, then diagonals
         for dc, dr in [(0, -1), (1, 0), (0, 1), (-1, 0),
                        (1, -1), (1, 1), (-1, 1), (-1, -1)]:
             nc, nr = col + dc, row + dr
             if 0 <= nc < tmap.width and 0 <= nr < tmap.height:
-                if tmap.get_tile(nc, nr) in (TILE_DFLOOR, TILE_PUDDLE, TILE_MOSS):
+                if tmap.get_tile(nc, nr) in FLOOR_TILES:
                     tmap.set_tile(nc, nr, TILE_PORTAL)
+                    tmap.clear_decoration(nc, nr)
                     return
         # Fallback: place it right where the artifact was (already floor)
         tmap.set_tile(col, row, TILE_PORTAL)
+        tmap.clear_decoration(col, row)
 
     def _ascend_level(self):
         """Ascend one level up in a multi-level quest dungeon."""
@@ -1871,6 +1906,8 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         )
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
+        if self.quest_step_queue:
+            renderer.draw_quest_step_animation(self.quest_step_queue[0])
         if self.encounter_action_active:
             renderer.draw_encounter_action_screen(
                 self.encounter_action_monster,

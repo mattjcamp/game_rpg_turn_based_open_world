@@ -28,6 +28,15 @@ class TileMap:
         # Sprite overrides: (col, row) -> asset path from custom layouts
         # Used so the runtime renderer matches the editor's visuals.
         self.sprite_overrides = {}
+        # Decoration overlay: (col, row) -> tile_id rendered ON TOP of the
+        # base tile.  Used by the procedural dungeon generator for cosmetic
+        # objects (puddles, moss, torches) so a single transparent-backed
+        # sprite shows correctly over any underlying floor/wall style
+        # (stone-block dungeon, cave, crypt, lava, ice, void, …).  The
+        # underlying tile in ``self.tiles`` is what drives walkability,
+        # collision, doors, BFS, etc.; the decoration is purely visual
+        # plus a hook for ``flags.light_source`` (torches).
+        self.decorations = {}
         # Unique tiles: (col, row) -> tile definition dict from unique_tiles.json
         self.unique_tiles = {}
         # Tracks which unique tiles have already been triggered (one_time)
@@ -49,7 +58,19 @@ class TileMap:
             self.tiles[row][col] = tile_id
 
     def is_walkable(self, col, row):
-        """Check if a tile can be walked on."""
+        """Check if a tile can be walked on.
+
+        Per-tile overrides set in the map editor take precedence over the
+        tile type's default ``walkable`` flag.  Authors store overrides on
+        ``tile_properties["<col>,<row>"]["walkable"]`` as ``True`` (force
+        walkable) or ``False`` (force blocked).  When the key is absent
+        the tile inherits its type's default.
+        """
+        props = getattr(self, "tile_properties", None)
+        if props:
+            entry = props.get(f"{col},{row}")
+            if isinstance(entry, dict) and "walkable" in entry:
+                return bool(entry["walkable"])
         tile_id = self.get_tile(col, row)
         return TILE_DEFS.get(tile_id, {}).get("walkable", False)
 
@@ -57,6 +78,32 @@ class TileMap:
         """Get the display name of a tile."""
         tile_id = self.get_tile(col, row)
         return TILE_DEFS.get(tile_id, {}).get("name", "Unknown")
+
+    # ── Decoration overlay methods ───────────────────────────────
+
+    def set_decoration(self, col, row, tile_id):
+        """Place a cosmetic decoration tile on top of the base tile.
+
+        Decorations are rendered AFTER the base tile, with transparent
+        sprite backgrounds so the underlying floor/wall texture shows
+        through.  This lets a single sprite (e.g. ``wall_torch.png``)
+        look correct over any dungeon style without duplicating
+        per-style variants.
+
+        The base tile in ``self.tiles`` is unchanged — walkability,
+        BFS, door placement, and all other gameplay logic continue to
+        see the floor/wall underneath.
+        """
+        if 0 <= col < self.width and 0 <= row < self.height:
+            self.decorations[(col, row)] = tile_id
+
+    def get_decoration(self, col, row):
+        """Return the decoration tile_id at (col, row), or ``None``."""
+        return self.decorations.get((col, row))
+
+    def clear_decoration(self, col, row):
+        """Remove any decoration at (col, row)."""
+        self.decorations.pop((col, row), None)
 
     # ── Unique tile methods ──────────────────────────────────────
 

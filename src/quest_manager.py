@@ -58,6 +58,44 @@ def augment_quest_dialogue(dialogue_lines, qdef):
     return lines
 
 
+def queue_quest_step_callout(game, quest_name, step_desc, quest_complete=False):
+    """Push a quest-step-completion callout onto the game's pending list.
+
+    The active state's mixin drains ``game.pending_quest_callouts`` each
+    update tick into its own animation queue so the on-screen banner runs
+    on the same lifecycle as level-up callouts.  ``quest_complete=True``
+    flags the entry so the renderer can show a different title (e.g.
+    "QUEST COMPLETE!" instead of "STEP COMPLETE").
+    """
+    if not hasattr(game, "pending_quest_callouts"):
+        game.pending_quest_callouts = []
+    game.pending_quest_callouts.append({
+        "quest": quest_name or "",
+        "desc": step_desc or "",
+        "quest_complete": bool(quest_complete),
+    })
+
+
+def _resolve_step_description(qdef, step_idx):
+    """Pull a human-readable label off the quest step (falls back to a
+    generic 'Step N complete')."""
+    steps = (qdef or {}).get("steps", []) or []
+    if 0 <= step_idx < len(steps):
+        step = steps[step_idx]
+        for key in ("description", "summary", "name", "title"):
+            v = step.get(key)
+            if v:
+                return str(v)
+    return f"Step {step_idx + 1} complete"
+
+
+def _find_quest_def(game, quest_name):
+    for qd in getattr(game, "_module_quest_defs", []) or []:
+        if qd.get("name") == quest_name:
+            return qd
+    return None
+
+
 def collect_quest_item(game, quest_name, step_idx, item_name):
     """Mark a quest collect step as complete and return a UI message.
 
@@ -80,12 +118,17 @@ def collect_quest_item(game, quest_name, step_idx, item_name):
         progress = qstate.get("step_progress", [])
         if step_idx < len(progress):
             progress[step_idx] = True
+            qdef = _find_quest_def(game, quest_name)
+            step_desc = _resolve_step_description(qdef, step_idx)
             if all(progress):
                 qstate["status"] = "completed"
                 game.sfx.play("treasure")
+                queue_quest_step_callout(
+                    game, quest_name, step_desc, quest_complete=True)
                 return f"Collected {item_name}! Quest complete!"
             else:
                 game.sfx.play("treasure")
+                queue_quest_step_callout(game, quest_name, step_desc)
                 return f"Collected {item_name}!"
         else:
             game.sfx.play("treasure")
@@ -262,6 +305,11 @@ def check_quest_kills(game):
                 messages.append(
                     f"Quest '{qname}': {desc} - Complete!")
                 game.sfx.play("treasure")
+                # Queue an on-screen callout so the player sees the step
+                # land even if the message log scrolls off-screen.
+                quest_done = all(progress) and progress
+                queue_quest_step_callout(
+                    game, qname, desc, quest_complete=quest_done)
             else:
                 messages.append(
                     f"{encounter_name} defeated! "

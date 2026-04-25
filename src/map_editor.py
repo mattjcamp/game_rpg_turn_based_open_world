@@ -636,6 +636,21 @@ class MapEditorState:
             fields.append(("Label", "label",
                            props.get("label", ""), True))
 
+        # ── Universal: walkable override ──
+        # Tile types ship with a default walkable flag; authors can pin a
+        # specific cell to walkable=True or walkable=False to override
+        # that default.  ``None`` (key missing from props) means the cell
+        # inherits its type's default.
+        walk_override = props.get("walkable", None)
+        if walk_override is None:
+            walk_display = f"inherit ({'yes' if walkable else 'no'})"
+        elif walk_override:
+            walk_display = "yes (override)"
+        else:
+            walk_display = "no (override)"
+        fields.append(("Walkable", "walkable",
+                       walk_display, "tristate"))
+
         # ── Universal: tile link (any tile can link to another map) ──
         is_linked = props.get("linked", False)
         # "toggle" type: press Enter to flip True/False
@@ -1069,6 +1084,29 @@ class MapEditorInputHandler:
                     # stale range values don't persist invisibly.
                     elif key == "light_source":
                         st.remove_tile_prop(col, row, "light_range")
+                # Refresh field display
+                new_info = st.get_cursor_tile_info()
+                new_fields = new_info["fields"]
+                st.inspector_buffer = (new_fields[st.inspector_field_idx][2]
+                                       if st.inspector_field_idx < len(new_fields)
+                                       else "")
+            return None
+
+        # ── Tristate fields (Walkable: inherit / yes / no) ──
+        # Cycle inherit → yes (override) → no (override) → inherit so the
+        # author can pin a tile walkable, blocked, or revert to its
+        # type's default with successive Enter presses.
+        if field_type == "tristate":
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                col, row = info["col"], info["row"]
+                key = cur_field[1]
+                cur_props = st.get_tile_props(col, row)
+                if key not in cur_props:
+                    st.set_tile_prop(col, row, key, True)
+                elif cur_props[key] is True:
+                    st.set_tile_prop(col, row, key, False)
+                else:
+                    st.remove_tile_prop(col, row, key)
                 # Refresh field display
                 new_info = st.get_cursor_tile_info()
                 new_fields = new_info["fields"]

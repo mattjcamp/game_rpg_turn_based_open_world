@@ -133,7 +133,7 @@
   },
   {
     "name": "Dragon's Lair",
-    "description": "A shattered keep clings to the cliffs of the far northeastern isle. The wind carries the smell of old smoke. Something immense sleeps below — and the ground is warm beneath thy feet.",
+    "description": "A shattered keep clings to the cliffs of the far northeastern isle. The wind carries the smell of old smoke. Something immense sleeps below \u2014 and the ground is warm beneath thy feet.",
     "mode": "procedural",
     "dungeon_style": "ruins",
     "num_levels": 10,
@@ -148,8 +148,19 @@
         "torch_density": "moderate",
         "random_encounters": true,
         "encounters": [
-          { "monsters": ["Skeleton", "Skeleton", "Skeleton Archer"] },
-          { "monsters": ["Zombie", "Zombie"] }
+          {
+            "monsters": [
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Zombie",
+              "Zombie"
+            ]
+          }
         ]
       },
       {
@@ -158,8 +169,20 @@
         "torch_density": "sparse",
         "random_encounters": true,
         "encounters": [
-          { "monsters": ["Dark Mage", "Skeleton", "Skeleton Archer"] },
-          { "monsters": ["Skeleton Archer", "Skeleton Archer", "Skeleton"] }
+          {
+            "monsters": [
+              "Dark Mage",
+              "Skeleton",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Skeleton Archer",
+              "Skeleton Archer",
+              "Skeleton"
+            ]
+          }
         ]
       },
       {
@@ -168,9 +191,27 @@
         "torch_density": "sparse",
         "random_encounters": true,
         "encounters": [
-          { "monsters": ["Dark Mage", "Dark Mage", "Skeleton"] },
-          { "monsters": ["Orc", "Orc", "Dark Mage"] },
-          { "monsters": ["Orc Shaman", "Skeleton Archer", "Skeleton Archer"] }
+          {
+            "monsters": [
+              "Dark Mage",
+              "Dark Mage",
+              "Skeleton"
+            ]
+          },
+          {
+            "monsters": [
+              "Orc",
+              "Orc",
+              "Dark Mage"
+            ]
+          },
+          {
+            "monsters": [
+              "Orc Shaman",
+              "Skeleton Archer",
+              "Skeleton Archer"
+            ]
+          }
         ]
       },
       {
@@ -179,9 +220,22 @@
         "torch_density": "moderate",
         "random_encounters": true,
         "encounters": [
-          { "monsters": ["Wyvern"] },
-          { "monsters": ["Wyvern", "Orc"] },
-          { "monsters": ["Troll"] }
+          {
+            "monsters": [
+              "Wyvern"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Orc"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll"
+            ]
+          }
         ]
       },
       {
@@ -190,10 +244,30 @@
         "torch_density": "abundant",
         "random_encounters": false,
         "encounters": [
-          { "monsters": ["Wyvern", "Wyvern"] },
-          { "monsters": ["Troll", "Wyvern"] },
-          { "monsters": ["Troll", "Troll"] },
-          { "monsters": ["Wyvern", "Orc Shaman"] }
+          {
+            "monsters": [
+              "Wyvern",
+              "Wyvern"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Wyvern"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Troll"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Orc Shaman"
+            ]
+          }
         ]
       },
       {
@@ -202,9 +276,26 @@
         "torch_density": "sparse",
         "random_encounters": false,
         "encounters": [
-          { "monsters": ["Wyvern", "Wyvern", "Troll"] },
-          { "monsters": ["Troll", "Troll", "Orc Shaman"] },
-          { "monsters": ["Wyvern", "Dark Mage"] }
+          {
+            "monsters": [
+              "Wyvern",
+              "Wyvern",
+              "Troll"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Troll",
+              "Orc Shaman"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Dark Mage"
+            ]
+          }
         ]
       },
       {
@@ -213,9 +304,30 @@
         "torch_density": "none",
         "random_encounters": false,
         "encounters": [
-          { "monsters": ["Skeleton", "Skeleton", "Skeleton Archer", "Zombie", "Zombie"] },
-          { "monsters": ["Skeleton Archer", "Skeleton Archer", "Skeleton Archer"] },
-          { "monsters": ["Zombie", "Zombie", "Zombie", "Skeleton"] }
+          {
+            "monsters": [
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer",
+              "Zombie",
+              "Zombie"
+            ]
+          },
+          {
+            "monsters": [
+              "Skeleton Archer",
+              "Skeleton Archer",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Zombie",
+              "Zombie",
+              "Zombie",
+              "Skeleton"
+            ]
+          }
         ]
       },
       {
@@ -224,9 +336,33 @@
         "torch_density": "sparse",
         "random_encounters": false,
         "encounters": [
-          { "monsters": ["Skeleton", "Skeleton", "Skeleton Archer", "Skeleton Archer", "Zombie", "Zombie"] },
-          { "monsters": ["Dark Mage", "Skeleton", "Skeleton", "Skeleton Archer", "Skeleton Archer"] },
-          { "monsters": ["Zombie", "Zombie", "Zombie", "Zombie"] }
+          {
+            "monsters": [
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer",
+              "Skeleton Archer",
+              "Zombie",
+              "Zombie"
+            ]
+          },
+          {
+            "monsters": [
+              "Dark Mage",
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Zombie",
+              "Zombie",
+              "Zombie",
+              "Zombie"
+            ]
+          }
         ]
       },
       {
@@ -235,9 +371,29 @@
         "torch_density": "moderate",
         "random_encounters": false,
         "encounters": [
-          { "monsters": ["Dark Mage", "Dark Mage", "Troll", "Orc Shaman"] },
-          { "monsters": ["Troll", "Troll", "Orc Shaman", "Dark Mage"] },
-          { "monsters": ["Wyvern", "Wyvern", "Dark Mage"] }
+          {
+            "monsters": [
+              "Dark Mage",
+              "Dark Mage",
+              "Troll",
+              "Orc Shaman"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Troll",
+              "Orc Shaman",
+              "Dark Mage"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Wyvern",
+              "Dark Mage"
+            ]
+          }
         ]
       },
       {
@@ -246,8 +402,34 @@
         "torch_density": "abundant",
         "random_encounters": false,
         "encounters": [
-          { "monsters": ["Dragon"] }
+          {
+            "monsters": [
+              "Dragon"
+            ]
+          }
         ]
+      }
+    ]
+  },
+  {
+    "name": "Old Building",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 1,
+    "difficulty": "easy",
+    "level_size": "small",
+    "torch_density": "sparse",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
       }
     ]
   }

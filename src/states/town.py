@@ -2962,6 +2962,8 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.quest_choices, self.quest_choice_cursor)
         if self.level_up_queue:
             renderer.draw_level_up_animation(self.level_up_queue[0])
+        if self.quest_step_queue:
+            renderer.draw_quest_step_animation(self.quest_step_queue[0])
         if self.showing_log:
             renderer.draw_log_overlay(self.game.game_log, self.log_scroll)
         if self.showing_help:

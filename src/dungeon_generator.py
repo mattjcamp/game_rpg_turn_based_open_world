@@ -17,7 +17,8 @@ from src.tile_map import TileMap
 from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_LOCKED_DOOR,
-    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH, TILE_MOUNTAIN,
+    TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
+    TILE_MOUNTAIN, TILE_PATH,
 )
 from src.monster import create_encounter, create_monster
 
@@ -113,6 +114,19 @@ class DungeonData:
         # the way back to the top floor to leave.
         self.overworld_exits = set()
 
+    @property
+    def floor_tile(self):
+        """Return the tile_id used for walkable floor in this dungeon.
+
+        Cave-style dungeons use ``TILE_PATH`` (matches the overworld
+        cave look); every other style uses ``TILE_DFLOOR`` (the
+        standard stone-block dungeon floor).  Pickup code (chest,
+        trap, artifact) reads this when restoring a tile after the
+        feature is consumed, so the cell blends back into the
+        surrounding floor regardless of dungeon style.
+        """
+        return TILE_PATH if self.style == "cave" else TILE_DFLOOR
+
     # ── Serialization ────────────────────────────────────────────
 
     def to_dict(self):
@@ -142,11 +156,20 @@ class DungeonData:
                 "encounter_template": getattr(m, "encounter_template", None),
             })
 
+        # Serialize the cosmetic decoration overlay (puddles, moss,
+        # torches).  Stored as a list of [col, row, tile_id] triples so
+        # the JSON is human-readable and stable across versions.
+        decorations_data = [
+            [c, r, tid]
+            for (c, r), tid in self.tile_map.decorations.items()
+        ]
+
         return {
             "name": self.name,
             "width": self.tile_map.width,
             "height": self.tile_map.height,
             "tiles": tiles_2d,
+            "decorations": decorations_data,
             "entry_col": self.entry_col,
             "entry_row": self.entry_row,
             "opened_chests": [list(pos) for pos in self.opened_chests],
@@ -171,6 +194,14 @@ class DungeonData:
         for r, row_data in enumerate(data["tiles"]):
             for c, tile_id in enumerate(row_data):
                 tmap.set_tile(c, r, tile_id)
+        # Restore the decoration overlay (puddles, moss, torches).
+        # Older saves predate this layer; fall back to an empty overlay.
+        for entry in data.get("decorations", []):
+            try:
+                c, r, tid = entry
+            except (TypeError, ValueError):
+                continue
+            tmap.set_decoration(c, r, tid)
 
         # Restore monsters
         monsters = []
@@ -200,34 +231,34 @@ class DungeonData:
         return dd
 
 
-def _carve_room(tmap, room):
+def _carve_room(tmap, room, floor_tile=TILE_DFLOOR):
     """Carve a room out of solid wall, filling it with floor."""
     for row in range(room.y, room.y2):
         for col in range(room.x, room.x2):
-            tmap.set_tile(col, row, TILE_DFLOOR)
+            tmap.set_tile(col, row, floor_tile)
 
 
-def _carve_h_tunnel(tmap, x1, x2, y, width=1):
+def _carve_h_tunnel(tmap, x1, x2, y, width=1, floor_tile=TILE_DFLOOR):
     """Carve a horizontal tunnel of the given *width* (centred on *y*)."""
     half = width // 2
     for col in range(min(x1, x2), max(x1, x2) + 1):
         for dy in range(-half, -half + width):
             r = y + dy
             if 1 <= r < tmap.height - 1:
-                tmap.set_tile(col, r, TILE_DFLOOR)
+                tmap.set_tile(col, r, floor_tile)
 
 
-def _carve_v_tunnel(tmap, y1, y2, x, width=1):
+def _carve_v_tunnel(tmap, y1, y2, x, width=1, floor_tile=TILE_DFLOOR):
     """Carve a vertical tunnel of the given *width* (centred on *x*)."""
     half = width // 2
     for row in range(min(y1, y2), max(y1, y2) + 1):
         for dx in range(-half, -half + width):
             c = x + dx
             if 1 <= c < tmap.width - 1:
-                tmap.set_tile(c, row, TILE_DFLOOR)
+                tmap.set_tile(c, row, floor_tile)
 
 
-def _connect_rooms(tmap, room_a, room_b):
+def _connect_rooms(tmap, room_a, room_b, floor_tile=TILE_DFLOOR):
     """Connect two rooms with an L-shaped corridor.
 
     Tunnel width varies randomly: most corridors are 1 tile wide,
@@ -243,14 +274,14 @@ def _connect_rooms(tmap, room_a, room_b):
 
     # Randomly choose horizontal-first or vertical-first
     if random.random() < 0.5:
-        _carve_h_tunnel(tmap, ax, bx, ay, width=w1)
-        _carve_v_tunnel(tmap, ay, by, bx, width=w2)
+        _carve_h_tunnel(tmap, ax, bx, ay, width=w1, floor_tile=floor_tile)
+        _carve_v_tunnel(tmap, ay, by, bx, width=w2, floor_tile=floor_tile)
     else:
-        _carve_v_tunnel(tmap, ay, by, ax, width=w1)
-        _carve_h_tunnel(tmap, ax, bx, by, width=w2)
+        _carve_v_tunnel(tmap, ay, by, ax, width=w1, floor_tile=floor_tile)
+        _carve_h_tunnel(tmap, ax, bx, by, width=w2, floor_tile=floor_tile)
 
 
-def _place_doors(tmap, rooms):
+def _place_doors(tmap, rooms, floor_tile=TILE_DFLOOR):
     """Place doors flush against walls where corridors enter rooms.
 
     Scans the one-tile-thick wall ring just *outside* each room.  A
@@ -261,8 +292,11 @@ def _place_doors(tmap, rooms):
     3. It has wall on both perpendicular sides (1-wide opening), giving
        the door a flush-against-the-wall appearance matching town doors.
     """
-    PASSABLE = {TILE_DFLOOR, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-                TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PUDDLE, TILE_MOSS}
+    # Note: puddles and moss live on the decoration overlay layer now,
+    # so the underlying tile here is the floor tile — no need to list
+    # them explicitly.
+    PASSABLE = {floor_tile, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
+                TILE_STAIRS_DOWN, TILE_ARTIFACT}
 
     # Pre-compute room interior tile sets
     all_room_tiles = set()
@@ -342,7 +376,8 @@ def _place_locked_doors(tmap, rooms):
             tmap.set_tile(dc, dr, TILE_LOCKED_DOOR)
 
 
-def _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row):
+def _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row,
+                                   floor_tile=TILE_DFLOOR):
     """Revert locked doors that disconnect rooms from the entrance.
 
     After doors and locked doors are placed, BFS from the stairs to find
@@ -355,9 +390,10 @@ def _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row):
     width = tmap.width
     height = tmap.height
 
-    WALKABLE_FOR_CHECK = {TILE_DFLOOR, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-                          TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PUDDLE,
-                          TILE_MOSS, TILE_DDOOR}
+    # Decorations (puddles/moss) sit on the overlay layer — the base
+    # tile under them is the floor tile, which is already in this set.
+    WALKABLE_FOR_CHECK = {floor_tile, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
+                          TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_DDOOR}
 
     def bfs_reachable(start_c, start_r):
         visited = set()
@@ -398,8 +434,17 @@ def _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row):
             break
 
 
-def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
+def _place_decorations(tmap, rooms, width, height, torch_density="medium",
+                       floor_tile=TILE_DFLOOR):
     """Sprinkle cosmetic decorations: puddles, moss, and wall torches.
+
+    Decorations are stored on ``tmap.decorations`` (the overlay layer)
+    rather than overwriting tiles in the main grid.  Their sprites have
+    transparent backgrounds and are rendered on top of whatever floor
+    or wall tile sits underneath, so a single torch / puddle / moss
+    sprite looks correct in any dungeon style (stone, cave, crypt,
+    lava, ice, void, …).  This is also why we no longer need a
+    style-specific ``torch_tile`` argument.
 
     Parameters
     ----------
@@ -441,7 +486,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
                         # somewhere to shine)
                         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                             nx, ny = x + dx, y + dy
-                            if tmap.get_tile(nx, ny) == TILE_DFLOOR:
+                            if tmap.get_tile(nx, ny) == floor_tile:
                                 torch_candidates.append((x, y))
                                 break
         for y in range(room.y - 1, room.y + room.h + 1):
@@ -450,7 +495,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
                     if tmap.get_tile(x, y) in _WALL_TILES:
                         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                             nx, ny = x + dx, y + dy
-                            if tmap.get_tile(nx, ny) == TILE_DFLOOR:
+                            if tmap.get_tile(nx, ny) == floor_tile:
                                 torch_candidates.append((x, y))
                                 break
 
@@ -462,7 +507,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
                     for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < width and 0 <= ny < height:
-                            if tmap.get_tile(nx, ny) == TILE_DFLOOR:
+                            if tmap.get_tile(nx, ny) == floor_tile:
                                 torch_candidates.append((x, y))
                                 break
 
@@ -494,9 +539,12 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
                 break
         if adjacent_door:
             continue
-        # All torches use TILE_WALL_TORCH now — the renderer picks
-        # the right sprite/background from the underlying wall context.
-        tmap.set_tile(tc, tr, TILE_WALL_TORCH)
+        # Torches go on the decoration overlay layer.  The base wall
+        # tile (stone, mountain, etc.) stays in the main grid and is
+        # what scan/lighting/walkability code sees; the torch sprite
+        # is drawn over it with a transparent background so the same
+        # sprite works on any wall style.
+        tmap.set_decoration(tc, tr, TILE_WALL_TORCH)
         placed_torches.append((tc, tr))
         if len(placed_torches) >= max_torches:
             break
@@ -506,7 +554,7 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
     floor_tiles = []
     for y in range(height):
         for x in range(width):
-            if tmap.get_tile(x, y) == TILE_DFLOOR:
+            if tmap.get_tile(x, y) == floor_tile:
                 floor_tiles.append((x, y))
     num_puddles = max(2, len(rooms) // 2)
     random.shuffle(floor_tiles)
@@ -520,24 +568,32 @@ def _place_decorations(tmap, rooms, width, height, torch_density="medium"):
             if tmap.get_tile(fx + dx, fy + dy) in _WALL_TILES
         )
         if wall_count >= 1 and random.random() < 0.4:
-            tmap.set_tile(fx, fy, TILE_PUDDLE)
+            tmap.set_decoration(fx, fy, TILE_PUDDLE)
             puddles_placed += 1
 
     # --- Moss: grows on floor tiles adjacent to walls ---
+    # We avoid stacking moss on top of an existing puddle decoration so
+    # the two effects don't fight for the same cell.  A torch sitting
+    # on an adjacent wall counts as "wall neighbour" for the wall_count
+    # heuristic — torches anchor the wall and moss often grows beside
+    # them.
     num_moss = max(3, len(rooms))
     random.shuffle(floor_tiles)
     moss_placed = 0
     for fx, fy in floor_tiles:
         if moss_placed >= num_moss:
             break
-        if tmap.get_tile(fx, fy) != TILE_DFLOOR:
-            continue  # may have been turned into puddle
-        wall_count = sum(
-            1 for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]
-            if tmap.get_tile(fx + dx, fy + dy) in (_WALL_TILES | {TILE_WALL_TORCH})
-        )
+        if tmap.get_decoration(fx, fy) is not None:
+            continue  # already decorated (e.g. with a puddle)
+        wall_count = 0
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            nx, ny = fx + dx, fy + dy
+            if tmap.get_tile(nx, ny) in _WALL_TILES:
+                wall_count += 1
+            elif tmap.get_decoration(nx, ny) == TILE_WALL_TORCH:
+                wall_count += 1
         if wall_count >= 1 and random.random() < 0.35:
-            tmap.set_tile(fx, fy, TILE_MOSS)
+            tmap.set_decoration(fx, fy, TILE_MOSS)
             moss_placed += 1
 
 
@@ -660,8 +716,15 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     BUFFER = 3
     total_height = height + BUFFER
 
-    # Cave-style dungeons use the mountain tile for walls
+    # Cave-style dungeons use the mountain tile for walls and the
+    # overworld "Path" tile as the walkable group, since stone-floor
+    # looks too man-made for a natural cave.  Decorations (torches,
+    # puddles, moss) live on the overlay layer with transparent
+    # sprite backgrounds, so a single sprite per object renders
+    # correctly over any wall/floor style — no per-style variants
+    # required.
     wall_tile = TILE_MOUNTAIN if style == "cave" else TILE_DWALL
+    floor_tile = TILE_PATH if style == "cave" else TILE_DFLOOR
     tmap = TileMap(width, total_height, default_tile=wall_tile)
 
     rooms = []
@@ -688,11 +751,12 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                 break
 
         if not overlap:
-            _carve_room(tmap, new_room)
+            _carve_room(tmap, new_room, floor_tile=floor_tile)
 
             # Connect to previous room
             if rooms:
-                _connect_rooms(tmap, rooms[-1], new_room)
+                _connect_rooms(tmap, rooms[-1], new_room,
+                               floor_tile=floor_tile)
 
             rooms.append(new_room)
 
@@ -707,7 +771,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             cx = room.x + random.choice([1, room.w - 2])
             cy = room.y + random.choice([1, room.h - 2])
             # Make sure it's on floor
-            if tmap.get_tile(cx, cy) == TILE_DFLOOR:
+            if tmap.get_tile(cx, cy) == floor_tile:
                 tmap.set_tile(cx, cy, TILE_CHEST)
 
     # --- Place traps in corridors and some rooms ---
@@ -718,7 +782,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             # Offset slightly from center
             tx += random.randint(-1, 1)
             ty += random.randint(-1, 1)
-            if tmap.get_tile(tx, ty) == TILE_DFLOOR:
+            if tmap.get_tile(tx, ty) == floor_tile:
                 tmap.set_tile(tx, ty, TILE_TRAP)
 
     # --- Place monsters in rooms (not the entrance room) ---
@@ -742,7 +806,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
             mx, my = room.center
             mx += random.randint(-1, 1)
             my += random.randint(-1, 1)
-            if tmap.get_tile(mx, my) != TILE_DFLOOR:
+            if tmap.get_tile(mx, my) != floor_tile:
                 mx, my = room.center  # fallback to exact center
             # Support both new {"monsters": [...]} and legacy {"monster", "count"}
             if "monsters" in enc_spec:
@@ -783,7 +847,7 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                 mx, my = room.center
                 mx += random.randint(-1, 1)
                 my += random.randint(-1, 1)
-                if tmap.get_tile(mx, my) == TILE_DFLOOR:
+                if tmap.get_tile(mx, my) == floor_tile:
                     enc = create_encounter(encounter_area,
                                            min_level=encounter_min_level,
                                            max_level=encounter_max_level)
@@ -813,17 +877,18 @@ def generate_dungeon(name="The Depths", width=40, height=30,
 
     # --- Place doors flush against walls where corridors enter rooms ---
     if place_doors:
-        _place_doors(tmap, rooms)
+        _place_doors(tmap, rooms, floor_tile=floor_tile)
 
         # --- Upgrade single-entrance rooms to locked doors ---
         _place_locked_doors(tmap, rooms)
 
     # --- Connectivity check: revert locked doors that break access -----
-    _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row)
+    _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row,
+                                   floor_tile=floor_tile)
 
     # --- Place cosmetic decorations (puddles, moss, wall torches) ---
     _place_decorations(tmap, rooms, width, total_height,
-                       torch_density=torch_density)
+                       torch_density=torch_density, floor_tile=floor_tile)
 
     # Entry point is on the stairs
     entry_col = stairs_col
@@ -838,14 +903,15 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # ``dungeon_data.overworld_exits`` to decide whether an ESC-on-
     # stairs should ascend or leave the dungeon entirely.
     if place_overworld_exit and len(rooms) >= 2:
-        exit_col, exit_row = _place_overworld_exit_stairs(tmap, rooms)
+        exit_col, exit_row = _place_overworld_exit_stairs(
+            tmap, rooms, floor_tile=floor_tile)
         if exit_col is not None:
             dd.overworld_exits.add((exit_col, exit_row))
 
     return dd
 
 
-def _place_overworld_exit_stairs(tmap, rooms):
+def _place_overworld_exit_stairs(tmap, rooms, floor_tile=TILE_DFLOOR):
     """Place a TILE_STAIRS somewhere that leads back to the overworld.
 
     Picks a room in the middle of the run (avoids the first room which
@@ -872,12 +938,12 @@ def _place_overworld_exit_stairs(tmap, rooms):
         for _ in range(20):
             cx = random.randint(room.x + 1, room.x + room.w - 2)
             cy = random.randint(room.y + 1, room.y + room.h - 2)
-            if tmap.get_tile(cx, cy) == TILE_DFLOOR:
+            if tmap.get_tile(cx, cy) == floor_tile:
                 tmap.set_tile(cx, cy, TILE_STAIRS)
                 return cx, cy
         # Fallback: room center if it's a floor tile
         cc, cr = room.center
-        if tmap.get_tile(cc, cr) == TILE_DFLOOR:
+        if tmap.get_tile(cc, cr) == floor_tile:
             tmap.set_tile(cc, cr, TILE_STAIRS)
             return cc, cr
     return None, None
