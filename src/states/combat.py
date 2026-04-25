@@ -703,6 +703,15 @@ class CombatState(BaseState):
             self._rebuild_menu()
             return
 
+        # ── Consumed fighter: roll Strength save to escape; on
+        # failure take the per-turn HP tick.  Either branch ends the
+        # turn so the player doesn't get an action while inside the
+        # monster.  Resolved BEFORE sleep/poison ticks because
+        # nothing else applies while you're being digested.
+        if getattr(f, "consumed_by", None) is not None:
+            self._tick_consumed_fighter(f)
+            return
+
         # ── Sleeping fighter: skip turn, decrement sleep counter ──
         if f in self.sleep_buffs:
             self.combat_log.append(f"{f.name} is fast asleep... Zzz")
@@ -4277,7 +4286,13 @@ class CombatState(BaseState):
             # Invisible fighters are ignored by monsters
             if member in self.invisibility_buffs:
                 continue
-            col, row = self.fighter_positions[member]
+            # Consumed (swallowed) fighters are off the board and
+            # not in fighter_positions — skip cleanly so monsters
+            # don't crash trying to target them.
+            pos = self.fighter_positions.get(member)
+            if pos is None:
+                continue
+            col, row = pos
             dist = min(max(abs(col - tc), abs(row - tr))
                        for tc, tr in mon_tiles)
             if dist < best_dist:
@@ -4302,7 +4317,11 @@ class CombatState(BaseState):
                 continue
             if member in self.invisibility_buffs:
                 continue
-            col, row = self.fighter_positions[member]
+            # Same skip as above — consumed fighters have no position.
+            pos = self.fighter_positions.get(member)
+            if pos is None:
+                continue
+            col, row = pos
             for tc, tr in mon_tiles:
                 if max(abs(col - tc), abs(row - tr)) == 1:
                     adjacent_targets.append(member)
@@ -4522,6 +4541,223 @@ class CombatState(BaseState):
                     self.combat_log.append(
                         f"{monster.name} drains {healed} HP "
                         f"from {target.name}!")
+
+            elif etype == "consume":
+                self._apply_consume_effect(monster, target, eff)
+
+    # ── Swallow-whole (Consume) helpers ──────────────────────────
+
+    def _apply_consume_effect(self, monster, target, eff):
+        """Resolve a consume on-hit effect from *monster* against *target*.
+
+        Target rolls a Strength save vs ``eff["save_dc"]``.  On
+        success, nothing happens.  On failure, the target is
+        "consumed": removed from the combat board, marked with
+        ``consumed_by`` / ``consume_dpt`` / ``consume_save_dc``
+        attributes, and a swallow animation is queued at their last
+        position.  While consumed they're still in ``self.fighters``
+        so the turn iterator visits them — the ``_announce_turn``
+        handler is what auto-resolves their per-turn save and HP
+        tick (see _tick_consumed_fighter).
+        """
+        # Already consumed?  Belt-and-braces — the explicit save
+        # below would also fail to roll twice, but we'd rather log
+        # nothing than an irrelevant "still inside!" line.
+        if getattr(target, "consumed_by", None) is not None:
+            return
+
+        save_roll = roll_d20()
+        str_mod = get_modifier(getattr(target, "strength", 10))
+        save_total = save_roll + str_mod
+        save_dc = int(eff.get("save_dc", 13))
+
+        if save_total >= save_dc:
+            self.combat_log.append(
+                f"{target.name} twists free of {monster.name}'s jaws! "
+                f"(STR save {save_roll}+{str_mod}={save_total} "
+                f"vs DC {save_dc})")
+            return
+
+        # Save failed — character is swallowed whole.
+        target.consumed_by = monster
+        target.consume_dpt = int(eff.get("damage_per_turn", 1))
+        target.consume_save_dc = save_dc
+        # Queue the swallow animation at the character's last cell
+        # before we forget where they were standing.
+        last_pos = self.fighter_positions.get(target)
+        if last_pos is not None:
+            fc, fr = last_pos
+            try:
+                from src.states.combat_effects import ConsumeEffect
+                self.hit_effects.append(ConsumeEffect(fc, fr))
+            except ImportError:
+                # Fallback to a regular hit flash if the new effect
+                # class isn't available for some reason.
+                self.hit_effects.append(HitEffect(fc, fr))
+        # Remove the character from the board.  They stay in
+        # self.fighters (so the turn iterator visits them) and stay
+        # alive — the per-turn handler decides when (or whether)
+        # they reappear.
+        self.fighter_positions.pop(target, None)
+        self.combat_log.append(
+            f"{monster.name} swallows {target.name} whole! "
+            f"(STR save {save_roll}+{str_mod}={save_total} "
+            f"vs DC {save_dc} — Failed!)")
+
+    def _tick_consumed_fighter(self, fighter):
+        """Resolve one turn for a fighter who is currently consumed.
+
+        Each turn the fighter rolls a Strength save vs the
+        ``consume_save_dc`` they were swallowed at.
+
+        - Success → spat out at a random walkable arena tile,
+          ``consumed_by`` cleared, release animation queued.
+        - Failure → loses ``consume_dpt`` HP.  If that drops them
+          to 0 HP, they die inside the monster; ``consumed_by`` is
+          cleared so post-death revival (Resurrect, etc.) doesn't
+          have to special-case the consumed flag.
+
+        Either branch ends the fighter's turn — they don't get a
+        normal action the same turn they roll an escape.  This
+        mirrors how sleep/poison ticks consume the turn.
+        """
+        monster = getattr(fighter, "consumed_by", None)
+        # Defensive: if the monster died before we got here, just
+        # release the fighter cleanly (release_consumed_from_monster
+        # is normally what handles this on the death event).
+        if monster is None or not monster.is_alive():
+            self._release_consumed_fighter(fighter,
+                                           released_by_death=True)
+            self._end_fighter_turn()
+            return
+
+        save_dc = int(getattr(fighter, "consume_save_dc", 13))
+        save_roll = roll_d20()
+        str_mod = get_modifier(getattr(fighter, "strength", 10))
+        save_total = save_roll + str_mod
+
+        if save_total >= save_dc:
+            self.combat_log.append(
+                f"{fighter.name} fights free of {monster.name}! "
+                f"(STR save {save_roll}+{str_mod}={save_total} "
+                f"vs DC {save_dc})")
+            self._spit_out_fighter(fighter, monster)
+            self._end_fighter_turn()
+            return
+
+        # Save failed — take the per-turn damage.
+        dpt = int(getattr(fighter, "consume_dpt", 1))
+        fighter.hp = max(0, fighter.hp - dpt)
+        self.combat_log.append(
+            f"{fighter.name} is crushed inside {monster.name}! "
+            f"(-{dpt} HP, {fighter.hp}/{fighter.max_hp})  "
+            f"(STR save {save_roll}+{str_mod}={save_total} "
+            f"vs DC {save_dc} — Failed!)")
+
+        if not fighter.is_alive():
+            # Died inside — clear the link so any later code that
+            # iterates consumed fighters doesn't touch this body.
+            fighter.consumed_by = None
+            self.combat_log.append(
+                f"{fighter.name} has fallen!")
+            if not any(m.is_alive() for m in self.fighters):
+                self.phase = PHASE_DEFEAT
+                self.phase_timer = 2500
+                return
+
+        self._end_fighter_turn()
+
+    def _spit_out_fighter(self, fighter, monster):
+        """Place *fighter* back on the board at a random walkable
+        tile, queue a release animation, and clear consumed state.
+
+        Tries random tiles first for the "they reappear in a random
+        location on the map" feel; if no random sample lands on a
+        walkable cell, falls back to the spiral search around the
+        monster's position so the fighter never gets stuck nowhere.
+        """
+        # Build the set of currently-walkable tiles.  We exclude
+        # arena walls, currently-occupied fighter tiles, occupied
+        # monster tiles, and ground-item piles.
+        occupied = set()
+        for f, pos in self.fighter_positions.items():
+            if f.is_alive():
+                occupied.add(pos)
+        for m, pos in self.monster_positions.items():
+            if not m.is_alive():
+                continue
+            for tile in self._monster_occupied_tiles(m, *pos):
+                occupied.add(tile)
+
+        # Try a handful of random candidates first.
+        free_candidates = []
+        for c in range(1, ARENA_COLS - 1):
+            for r in range(1, ARENA_ROWS - 1):
+                if self._is_arena_wall(c, r):
+                    continue
+                if (c, r) in occupied:
+                    continue
+                if (c, r) in self.ground_items:
+                    continue
+                free_candidates.append((c, r))
+
+        if free_candidates:
+            new_pos = random.choice(free_candidates)
+        else:
+            # Fallback: spiral around the monster.
+            mc, mr = self.monster_positions.get(monster, (0, 0))
+            new_pos = self._find_free_loot_tile(mc, mr) or (mc, mr)
+
+        self.fighter_positions[fighter] = new_pos
+        try:
+            from src.states.combat_effects import ReleaseEffect
+            self.hit_effects.append(ReleaseEffect(*new_pos))
+        except ImportError:
+            self.hit_effects.append(HitEffect(*new_pos))
+
+        # Clear consumed state — the fighter is back on the board.
+        fighter.consumed_by = None
+        fighter.consume_dpt = 0
+        fighter.consume_save_dc = 0
+
+    def _release_consumed_fighter(self, fighter, released_by_death=False):
+        """Place *fighter* back on the board after their captor died.
+
+        Called from ``_on_monster_killed`` when a Man Eater is
+        killed while it has someone in its belly.  Drops the fighter
+        on the monster's tile (or the nearest free tile via the
+        spiral search) so the body is recoverable even if the
+        fighter died inside.
+        """
+        monster = getattr(fighter, "consumed_by", None)
+        if monster is None and not released_by_death:
+            return
+
+        # Find a tile to drop them on.  We don't go through
+        # _spit_out_fighter because we want adjacency to the
+        # corpse, not a random arena cell.
+        if monster is not None:
+            mc, mr = self.monster_positions.get(monster, (0, 0))
+        else:
+            mc, mr = (ARENA_COLS // 2, ARENA_ROWS // 2)
+        new_pos = self._find_free_loot_tile(mc, mr) or (mc, mr)
+        self.fighter_positions[fighter] = new_pos
+
+        try:
+            from src.states.combat_effects import ReleaseEffect
+            self.hit_effects.append(ReleaseEffect(*new_pos))
+        except ImportError:
+            self.hit_effects.append(HitEffect(*new_pos))
+
+        fighter.consumed_by = None
+        fighter.consume_dpt = 0
+        fighter.consume_save_dc = 0
+        if fighter.is_alive():
+            self.combat_log.append(
+                f"{fighter.name} tumbles free as the beast falls!")
+        else:
+            self.combat_log.append(
+                f"{fighter.name}'s body spills out as the beast falls.")
 
     def _monster_retreat(self, monster, target, steps):
         """Move *monster* up to *steps* tiles away from *target*.
@@ -4799,7 +5035,11 @@ class CombatState(BaseState):
                 continue
             if member in self.invisibility_buffs:
                 continue
-            fc, fr = self.fighter_positions[member]
+            # Consumed (swallowed) fighters have no board position.
+            pos = self.fighter_positions.get(member)
+            if pos is None:
+                continue
+            fc, fr = pos
             dist = max(abs(fc - mc), abs(fr - mr))
             if dist <= max_range:
                 candidates.append(member)
@@ -4984,7 +5224,12 @@ class CombatState(BaseState):
                 continue
             if member in self.invisibility_buffs:
                 continue
-            fc, fr = self.fighter_positions[member]
+            # Skip consumed fighters — they're inside another monster
+            # and not on the board to be hit.
+            pos = self.fighter_positions.get(member)
+            if pos is None:
+                continue
+            fc, fr = pos
             dist = max(abs(fc - mc), abs(fr - mr))
             if dist <= max_range:
                 targets.append(member)
@@ -5394,8 +5639,21 @@ class CombatState(BaseState):
         return True
 
     def _on_monster_killed(self, monster):
-        """Log a monster's death. Does NOT trigger victory — caller checks."""
+        """Log a monster's death. Does NOT trigger victory — caller checks.
+
+        If the monster had any consumed party members in its belly,
+        release them onto the board (per the user's design choice
+        of "Released unharmed" for swallow-whole).  The release
+        works for dead party members too — their body spills out
+        so it can still be reached by Resurrect.
+        """
         self.combat_log.append(f"{monster.name} is defeated!")
+        # Release anyone this monster was holding inside.  Iterate
+        # over a snapshot since _release_consumed_fighter mutates
+        # fighter state.
+        for f in list(self.fighters):
+            if getattr(f, "consumed_by", None) is monster:
+                self._release_consumed_fighter(f, released_by_death=True)
 
     def _wake_monster(self, monster):
         """Wake a sleeping monster (e.g. when it takes damage)."""

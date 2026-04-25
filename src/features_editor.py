@@ -2694,6 +2694,23 @@ class FeaturesEditor:
                str(on_hit.get("drain", {}).get("chance", 25)), "int"),
             FE("  Amount", "_oh_drain_amt",
                str(on_hit.get("drain", {}).get("amount", 3)), "int"),
+            # Swallow-whole effect.  On a successful hit, the target
+            # rolls a Strength save vs ``Save DC``; on failure they're
+            # consumed (removed from the board, takes ``Dmg/Turn`` HP
+            # at the start of every turn until they make another
+            # Strength save to escape and reappear at a random
+            # walkable tile).  Designed for "Man Eater" style
+            # creatures.
+            FE("Consume On Hit", "_oh_consume",
+               str("consume" in on_hit), "choice"),
+            FE("  Chance %", "_oh_consume_chance",
+               str(on_hit.get("consume", {}).get("chance", 30)), "int"),
+            FE("  Dmg/Turn", "_oh_consume_dpt",
+               str(on_hit.get("consume", {}).get(
+                   "damage_per_turn", 1)), "int"),
+            FE("  Save DC", "_oh_consume_dc",
+               str(on_hit.get("consume", {}).get("save_dc", 13)),
+               "int"),
             FE("-- Passives --", "_hdr_passives", "", "section", False),
             FE("Regen/Turn", "_pas_regen",
                str(passive_map.get("regen", {}).get("amount", 0)),
@@ -2849,6 +2866,13 @@ class FeaturesEditor:
                 "chance": int(fvals.get("_oh_drain_chance", "25")),
                 "amount": int(fvals.get("_oh_drain_amt", "3")),
             })
+        if fvals.get("_oh_consume") == "True":
+            on_hit.append({
+                "type": "consume",
+                "chance": int(fvals.get("_oh_consume_chance", "30")),
+                "damage_per_turn": int(fvals.get("_oh_consume_dpt", "1")),
+                "save_dc": int(fvals.get("_oh_consume_dc", "13")),
+            })
         mon["on_hit_effects"] = on_hit if on_hit else None
 
         # ── Rebuild passives list from flat _pas_ fields ──
@@ -2873,6 +2897,7 @@ class FeaturesEditor:
         if key in ("undead", "humanoid"):
             return ["True", "False"]
         if key in ("_oh_poison", "_oh_stun", "_oh_slow", "_oh_drain",
+                    "_oh_consume",
                     "_pas_fire_res", "_pas_ice_res", "_pas_poison_imm",
                     "_sp_breath_fire", "_sp_wizard", "_sp_healer",
                     "_sp_poison"):

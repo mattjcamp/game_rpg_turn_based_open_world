@@ -181,6 +181,51 @@
       "battle_scale": 1,
       "difficulty": "easy"
     },
+    "Man Eater": {
+      "description": "Carnivorous half-plant, half-animal",
+      "hp": 45,
+      "ac": 16,
+      "attack_bonus": 2,
+      "damage_dice": 2,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 50,
+      "gold_min": 10,
+      "gold_max": 30,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "difficulty": "hard",
+      "tile": "monsters/man_thing_f1",
+      "battle_scale": 2,
+      "move_range": 3,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": [
+        {
+          "type": "drain",
+          "chance": 25,
+          "amount": 3
+        },
+        {
+          "type": "consume",
+          "chance": 75,
+          "damage_per_turn": 1,
+          "save_dc": 14
+        }
+      ],
+      "passives": [
+        {
+          "type": "poison_immunity"
+        }
+      ]
+    },
     "Orc": {
       "description": "A brutal orc. Tough fight.",
       "undead": false,

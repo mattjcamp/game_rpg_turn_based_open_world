@@ -931,7 +931,17 @@ def generate_dungeon(name="The Depths", width=40, height=30,
                         # combination — leave the room empty rather
                         # than spawning something off-tier.
                         continue
-                    monster = create_monster(enc["monster_party_tile"])
+                    # Belt-and-braces: create_encounter already falls
+                    # back to the first listed monster when
+                    # ``monster_party_tile`` is blank, but if the
+                    # encounter has no monsters at all (genuinely
+                    # malformed data) we'd rather skip the room than
+                    # crash the dungeon roll.
+                    party_tile_name = enc.get("monster_party_tile") or (
+                        enc["monsters"][0].name if enc.get("monsters") else None)
+                    if not party_tile_name:
+                        continue
+                    monster = create_monster(party_tile_name)
                     monster.col = mx
                     monster.row = my
                     monster.encounter_template = {

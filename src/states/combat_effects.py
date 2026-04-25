@@ -118,6 +118,39 @@ class HitEffect(_TimerEffect):
         self.damage = damage
 
 
+class ConsumeEffect(_TimerEffect):
+    """A "swallowed whole" effect at the consumed character's last tile.
+
+    Rendered as a contracting purple/red vortex with a "SWALLOWED!"
+    label so the player can tell at a glance which character just
+    got eaten.  Ends quickly so the per-turn flow can continue.
+    """
+    DURATION = 0.55
+
+    def __init__(self, col, row):
+        super().__init__()
+        self.col = col
+        self.row = row
+        self.damage = 0  # not used for damage numbers
+
+
+class ReleaseEffect(_TimerEffect):
+    """The "spat out" / "released" counterpart to ``ConsumeEffect``.
+
+    Rendered as an expanding green/yellow burst with an "ESCAPED!"
+    label at the tile the character reappears on, signalling that
+    they've broken free of the monster's belly (or been spilled out
+    when the monster died).
+    """
+    DURATION = 0.55
+
+    def __init__(self, col, row):
+        super().__init__()
+        self.col = col
+        self.row = row
+        self.damage = 0
+
+
 class _BackstabEffect(_TimerEffect):
     """A brief purple-white flash for the Thief's backstab.
 

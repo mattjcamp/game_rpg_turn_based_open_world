@@ -464,12 +464,20 @@
       },
       {
         "name": "Ancient Dragon",
+        "level": 1,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Dragon",
         "monsters": [
           "Dragon"
         ]
       },
       {
         "name": "Dragon Cultists",
+        "level": 1,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Dark Mage",
         "monsters": [
           "Dark Mage",
           "Dark Mage",
@@ -478,6 +486,10 @@
       },
       {
         "name": "Drake Pack",
+        "level": 1,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Wyvern",
         "monsters": [
           "Wyvern",
           "Wyvern"
@@ -485,6 +497,10 @@
       },
       {
         "name": "Drake and Keeper",
+        "level": 1,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Wyvern",
         "monsters": [
           "Wyvern",
           "Orc Shaman"
@@ -492,6 +508,10 @@
       },
       {
         "name": "Wyrm-blooded Cultists",
+        "level": 1,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Dark Mage",
         "monsters": [
           "Dark Mage",
           "Dark Mage",
@@ -500,6 +520,10 @@
       },
       {
         "name": "Bone Pit Horde",
+        "level": 1,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Skeleton",
         "monsters": [
           "Skeleton",
           "Skeleton",

@@ -120,6 +120,25 @@
       "gold_reward": 25,
       "loot": [],
       "background_tile": 0
+    },
+    "75": {
+      "name": "Man Eater Spawn",
+      "description": "A monster lair.",
+      "spawn_monsters": [
+        "Man Eater",
+        "Man Eater"
+      ],
+      "spawn_chance": 20,
+      "spawn_radius": 3,
+      "max_spawned": 2,
+      "boss_monster": "",
+      "boss_monsters": [
+        "Man Eater"
+      ],
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [],
+      "background_tile": 0
     }
   }
 }

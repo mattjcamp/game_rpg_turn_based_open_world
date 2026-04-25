@@ -125,6 +125,110 @@ class CombatEffectRendererMixin:
                 self.screen.blit(outline, (rx + ox, float_y + oy))
             self.screen.blit(surf, (rx, float_y))
 
+    def _u3_draw_consume_effect(self, ax, ay, ts, fx):
+        """Draw the "swallowed whole" effect — a contracting purple
+        vortex with a bold "SWALLOWED!" label so the player can see
+        which character just got eaten.
+
+        Phase 1 (0–0.5):   purple/red rings shrink toward the centre
+                           (the character being pulled in).
+        Phase 2 (0.2–1.0): "SWALLOWED!" floats up and fades.
+        """
+        cx = ax + fx.col * ts + ts // 2
+        cy = ay + fx.row * ts + ts // 2
+        p = fx.progress  # 0 → 1
+
+        # Phase 1: contracting concentric rings.
+        if p < 0.5:
+            sub_p = p / 0.5
+            for i in range(3):
+                base_r = 16 + i * 4
+                r = max(2, int(base_r * (1.0 - sub_p)))
+                alpha_f = 1.0 - sub_p
+                col = (int(150 * alpha_f),
+                       int(40 * alpha_f),
+                       int(180 * alpha_f))
+                pygame.draw.circle(self.screen, col, (cx, cy), r, 2)
+            # Bright core that pulses inward.
+            core = max(1, int(6 * (1.0 - sub_p)))
+            pygame.draw.circle(self.screen, (220, 100, 255),
+                               (cx, cy), core)
+
+        # Phase 2: floating label.
+        if p > 0.2:
+            label_p = min(1.0, (p - 0.2) / 0.8)
+            float_y = cy - 18 - int(label_p * 14)
+            alpha_f = 1.0 - max(0.0, (label_p - 0.5) / 0.5)
+            r_val = int(255 * alpha_f)
+            g_val = int(180 * alpha_f)
+            b_val = int(255 * alpha_f)
+            if r_val > 0:
+                text = "SWALLOWED!"
+                surf = self.font_small.render(
+                    text, True, (r_val, g_val, b_val))
+                outline = self.font_small.render(
+                    text, True, (0, 0, 0))
+                rx = cx - surf.get_width() // 2
+                for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    self.screen.blit(outline, (rx + ox, float_y + oy))
+                self.screen.blit(surf, (rx, float_y))
+
+    def _u3_draw_release_effect(self, ax, ay, ts, fx):
+        """Draw the "spat out" / "released" effect — a green/yellow
+        burst expanding outward at the destination tile, with an
+        "ESCAPED!" label.  The reverse of ``_u3_draw_consume_effect``.
+
+        Phase 1 (0–0.5):   bright burst rings expand outward.
+        Phase 2 (0.2–1.0): "ESCAPED!" label floats up and fades.
+        """
+        cx = ax + fx.col * ts + ts // 2
+        cy = ay + fx.row * ts + ts // 2
+        p = fx.progress
+
+        if p < 0.5:
+            sub_p = p / 0.5
+            # Outer expanding ring (green to yellow, fading).
+            outer_r = int(4 + sub_p * 16)
+            alpha_f = 1.0 - sub_p
+            col_outer = (int(120 * alpha_f),
+                         int(255 * alpha_f),
+                         int(80 * alpha_f))
+            pygame.draw.circle(self.screen, col_outer,
+                               (cx, cy), outer_r, 2)
+            # Inner bright core.
+            inner_r = int(2 + sub_p * 6)
+            col_inner = (int(255 * alpha_f),
+                         int(255 * alpha_f),
+                         int(120 * alpha_f))
+            pygame.draw.circle(self.screen, col_inner,
+                               (cx, cy), inner_r)
+            # Sparkle bursts at cardinal points.
+            for i in range(4):
+                ang = i * 1.5708
+                sx = cx + int(math.cos(ang) * outer_r)
+                sy = cy + int(math.sin(ang) * outer_r)
+                spark_sz = max(1, int(2 * alpha_f))
+                pygame.draw.circle(self.screen, (255, 255, 200),
+                                   (sx, sy), spark_sz)
+
+        if p > 0.2:
+            label_p = min(1.0, (p - 0.2) / 0.8)
+            float_y = cy - 18 - int(label_p * 14)
+            alpha_f = 1.0 - max(0.0, (label_p - 0.5) / 0.5)
+            r_val = int(180 * alpha_f)
+            g_val = int(255 * alpha_f)
+            b_val = int(120 * alpha_f)
+            if r_val > 0:
+                text = "ESCAPED!"
+                surf = self.font_small.render(
+                    text, True, (r_val, g_val, b_val))
+                outline = self.font_small.render(
+                    text, True, (0, 0, 0))
+                rx = cx - surf.get_width() // 2
+                for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    self.screen.blit(outline, (rx + ox, float_y + oy))
+                self.screen.blit(surf, (rx, float_y))
+
     def _u3_draw_backstab(self, ax, ay, ts, fx):
         """Draw the Thief backstab effect — purple expanding rings
         with bright sparkle bursts, distinct from normal hit flashes."""

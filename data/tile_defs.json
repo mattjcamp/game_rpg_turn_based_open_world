@@ -757,5 +757,17 @@
     ],
     "context": "overworld",
     "sprite": "overworld/abandoned_building"
+  },
+  "75": {
+    "name": "Man Eater Spawn",
+    "walkable": true,
+    "color": [
+      180,
+      40,
+      40
+    ],
+    "context": "spawns",
+    "sprite": "overworld/island_jungle",
+    "interaction_type": "spawn"
   }
 }

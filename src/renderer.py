@@ -4671,7 +4671,16 @@ class Renderer(CombatEffectRendererMixin):
             for member in fighters:
                 if not member.is_alive():
                     continue
-                col, row = fighter_positions.get(member, (3, 5))
+                # Fighters who aren't on the board (consumed /
+                # swallowed by a Man Eater, etc.) have no entry in
+                # fighter_positions.  They're still in self.fighters
+                # so the turn iterator visits them, but their sprite
+                # must not draw — falling back to a default tile
+                # would make a swallowed character visibly stand
+                # in the corner of the arena.
+                if member not in fighter_positions:
+                    continue
+                col, row = fighter_positions[member]
                 is_active = (member is active_fighter)
                 # Invisible members are semi-transparent with pulsing alpha
                 if invisibility_buffs and member in invisibility_buffs:
@@ -4775,13 +4784,20 @@ class Renderer(CombatEffectRendererMixin):
 
         # ── 2d. hit flash effects ──
         if hit_effects:
-            from src.states.combat_effects import _BackstabEffect, ShatterEffect
+            from src.states.combat_effects import (
+                _BackstabEffect, ShatterEffect,
+                ConsumeEffect, ReleaseEffect,
+            )
             for fx in hit_effects:
                 if fx.alive:
                     if isinstance(fx, ShatterEffect):
                         self._u3_draw_shatter_effect(mx, my, ts, fx)
                     elif isinstance(fx, _BackstabEffect):
                         self._u3_draw_backstab(mx, my, ts, fx)
+                    elif isinstance(fx, ConsumeEffect):
+                        self._u3_draw_consume_effect(mx, my, ts, fx)
+                    elif isinstance(fx, ReleaseEffect):
+                        self._u3_draw_release_effect(mx, my, ts, fx)
                     else:
                         self._u3_draw_hit_effect(mx, my, ts, fx)
 

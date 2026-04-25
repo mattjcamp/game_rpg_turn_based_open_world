@@ -365,9 +365,21 @@ def create_encounter(area="dungeon", terrain="land",
 
     enc_name = chosen.get("name", "Encounter")
     enc_level = chosen.get("level", 1)
-    party_tile = chosen.get("monster_party_tile", chosen["monsters"][0])
+    # ``monster_party_tile`` chooses which monster's sprite represents
+    # the group on the map.  Some authored encounters have the key
+    # present but blank ("") — dict.get's default only fires when the
+    # key is missing, so an explicit empty string sneaks through and
+    # later crashes ``create_monster("")``.  Treat empty/None the
+    # same as missing and fall back to the first monster in the
+    # encounter's ``monsters`` list.
+    chosen_monsters = chosen.get("monsters") or []
+    party_tile = chosen.get("monster_party_tile")
+    if not party_tile:
+        party_tile = chosen_monsters[0] if chosen_monsters else None
     monsters = []
-    for name in chosen.get("monsters", []):
+    for name in chosen_monsters:
+        if not name:
+            continue  # skip blank entries in the monster list
         monsters.append(create_monster(name))
     if not monsters:
         # Same reasoning as the empty-pool branch: don't smuggle in
