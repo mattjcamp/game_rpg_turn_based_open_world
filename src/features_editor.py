@@ -2508,6 +2508,60 @@ class FeaturesEditor:
                       "cast_chance": 40, "range": 9}},
     }
 
+    # ── Offensive wizard spells available to monsters ─────────────
+    #
+    # These mirror the four most common offensive spells from the
+    # player wizard list (data/spells.json: magic_dart, magic_arrow,
+    # lightning_bolt, fireball_aoe) so a monster tagged as a wizard
+    # can throw the same kind of damage at the party that a player
+    # caster would.  Damage is dialled down vs the player versions
+    # because monsters cast every turn at no MP cost — full player
+    # numbers would melt the party.  The level picker (1–5) on each
+    # spell scales dice / range / cast_chance the same way Wizard
+    # and Healer Spells do above.
+
+    # Magic Dart — single target ranged, low damage, no save.
+    _MAGIC_DART_LEVELS = {
+        1: {"dice": 1, "sides": 4, "bonus": 0, "range": 5, "cast_chance": 25},
+        2: {"dice": 1, "sides": 6, "bonus": 0, "range": 6, "cast_chance": 30},
+        3: {"dice": 1, "sides": 6, "bonus": 1, "range": 7, "cast_chance": 35},
+        4: {"dice": 1, "sides": 8, "bonus": 1, "range": 8, "cast_chance": 40},
+        5: {"dice": 2, "sides": 4, "bonus": 2, "range": 9, "cast_chance": 45},
+    }
+
+    # Magic Arrow — single target ranged, medium damage, no save.
+    _MAGIC_ARROW_LEVELS = {
+        1: {"dice": 1, "sides": 8, "bonus": 0, "range": 6, "cast_chance": 20},
+        2: {"dice": 2, "sides": 4, "bonus": 1, "range": 7, "cast_chance": 25},
+        3: {"dice": 2, "sides": 6, "bonus": 1, "range": 8, "cast_chance": 30},
+        4: {"dice": 2, "sides": 8, "bonus": 2, "range": 9, "cast_chance": 35},
+        5: {"dice": 3, "sides": 6, "bonus": 2, "range": 10, "cast_chance": 40},
+    }
+
+    # Lightning Bolt — single target heavy damage, no save.
+    _LIGHTNING_LEVELS = {
+        1: {"dice": 2, "sides": 6, "bonus": 0, "range": 6, "cast_chance": 15},
+        2: {"dice": 3, "sides": 6, "bonus": 0, "range": 7, "cast_chance": 18},
+        3: {"dice": 4, "sides": 6, "bonus": 1, "range": 8, "cast_chance": 22},
+        4: {"dice": 5, "sides": 6, "bonus": 1, "range": 9, "cast_chance": 27},
+        5: {"dice": 6, "sides": 6, "bonus": 2, "range": 10, "cast_chance": 33},
+    }
+
+    # Fireball — AOE damage with a DEX save for half (mirrors
+    # breath_fire's resolution, including fire-resistance handling).
+    _FIREBALL_LEVELS = {
+        1: {"dice": 2, "sides": 6, "bonus": 0, "range": 5,
+            "save_dc": 11, "cast_chance": 15},
+        2: {"dice": 3, "sides": 6, "bonus": 0, "range": 6,
+            "save_dc": 13, "cast_chance": 18},
+        3: {"dice": 3, "sides": 8, "bonus": 1, "range": 7,
+            "save_dc": 14, "cast_chance": 22},
+        4: {"dice": 4, "sides": 8, "bonus": 1, "range": 8,
+            "save_dc": 16, "cast_chance": 27},
+        5: {"dice": 5, "sides": 8, "bonus": 2, "range": 9,
+            "save_dc": 18, "cast_chance": 33},
+    }
+
     # Healer spell templates by level (1-5).
     _HEALER_LEVELS = {
         1: {"heal_self": {"heal_dice": 1, "heal_sides": 4, "heal_bonus": 0,
@@ -2554,6 +2608,25 @@ class FeaturesEditor:
                     t = cls._HEALER_LEVELS[lvl].get(s["type"], {})
                     if dice >= t.get("heal_dice", 1) and sides >= t.get("heal_sides", 4):
                         return lvl
+        return 2  # default
+
+    @classmethod
+    def _spell_level_from_table(cls, mon, spell_type, table):
+        """Infer the level of an offensive monster spell from its dice
+        stats, used so re-opening the editor shows the level the user
+        last saved.  Walks levels high-to-low and returns the first
+        one whose dice/sides this spell meets or exceeds.  Falls back
+        to 2 if the spell isn't on the monster yet.
+        """
+        for s in (mon.get("spells") or []):
+            if s.get("type") != spell_type:
+                continue
+            dice = s.get("damage_dice", 1)
+            sides = s.get("damage_sides", 6)
+            for lvl in (5, 4, 3, 2, 1):
+                t = table[lvl]
+                if dice >= t["dice"] and sides >= t["sides"]:
+                    return lvl
         return 2  # default
 
     def build_mon_fields(self, mon):
@@ -2646,6 +2719,41 @@ class FeaturesEditor:
                        for s in (mon.get("spells") or []))), "choice"),
             FE("  Spell Level", "_sp_wiz_level",
                str(self._wizard_level_from_spells(mon)), "choice"),
+            # Offensive wizard spells.  Each is a separate toggle
+            # with its own 1–5 Level picker that scales damage,
+            # range, and cast chance via the matching _LEVELS table
+            # above.  These complement the Wizard Spells (sleep /
+            # curse) bundle so a lich-style monster can actually
+            # throw fireballs and lightning bolts at the party
+            # rather than only debuffing them.
+            FE("Magic Dart", "_sp_magic_dart",
+               str(any(s.get("type") == "magic_dart"
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Spell Level", "_sp_dart_level",
+               str(self._spell_level_from_table(
+                   mon, "magic_dart", self._MAGIC_DART_LEVELS)),
+               "choice"),
+            FE("Magic Arrow", "_sp_magic_arrow",
+               str(any(s.get("type") == "magic_arrow"
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Spell Level", "_sp_arrow_level",
+               str(self._spell_level_from_table(
+                   mon, "magic_arrow", self._MAGIC_ARROW_LEVELS)),
+               "choice"),
+            FE("Lightning Bolt", "_sp_lightning",
+               str(any(s.get("type") == "lightning_bolt"
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Spell Level", "_sp_lightning_level",
+               str(self._spell_level_from_table(
+                   mon, "lightning_bolt", self._LIGHTNING_LEVELS)),
+               "choice"),
+            FE("Fireball", "_sp_fireball",
+               str(any(s.get("type") == "fireball"
+                       for s in (mon.get("spells") or []))), "choice"),
+            FE("  Spell Level", "_sp_fireball_level",
+               str(self._spell_level_from_table(
+                   mon, "fireball", self._FIREBALL_LEVELS)),
+               "choice"),
             FE("Healer Spells", "_sp_healer",
                str(any(s.get("type") in ("heal_self", "heal_ally")
                        for s in (mon.get("spells") or []))), "choice"),
@@ -2837,6 +2945,55 @@ class FeaturesEditor:
                 "damage_per_turn": int(fvals.get("_sp_poi_dpt", "2")),
                 "duration": int(fvals.get("_sp_poi_dur", "4")),
             })
+        # ── Offensive wizard spells (Magic Dart, Magic Arrow,
+        #    Lightning Bolt, Fireball) — each driven by its own
+        #    Level picker that scales damage / range / cast chance
+        #    via the matching _LEVELS table on this class. ──
+        if fvals.get("_sp_magic_dart") == "True":
+            lvl = max(1, min(5, int(fvals.get("_sp_dart_level", "2"))))
+            t = self._MAGIC_DART_LEVELS[lvl]
+            spells.append({
+                "type": "magic_dart", "name": "Magic Dart",
+                "range": t["range"],
+                "cast_chance": t["cast_chance"],
+                "damage_dice": t["dice"],
+                "damage_sides": t["sides"],
+                "damage_bonus": t["bonus"],
+            })
+        if fvals.get("_sp_magic_arrow") == "True":
+            lvl = max(1, min(5, int(fvals.get("_sp_arrow_level", "2"))))
+            t = self._MAGIC_ARROW_LEVELS[lvl]
+            spells.append({
+                "type": "magic_arrow", "name": "Magic Arrow",
+                "range": t["range"],
+                "cast_chance": t["cast_chance"],
+                "damage_dice": t["dice"],
+                "damage_sides": t["sides"],
+                "damage_bonus": t["bonus"],
+            })
+        if fvals.get("_sp_lightning") == "True":
+            lvl = max(1, min(5, int(fvals.get("_sp_lightning_level", "2"))))
+            t = self._LIGHTNING_LEVELS[lvl]
+            spells.append({
+                "type": "lightning_bolt", "name": "Lightning Bolt",
+                "range": t["range"],
+                "cast_chance": t["cast_chance"],
+                "damage_dice": t["dice"],
+                "damage_sides": t["sides"],
+                "damage_bonus": t["bonus"],
+            })
+        if fvals.get("_sp_fireball") == "True":
+            lvl = max(1, min(5, int(fvals.get("_sp_fireball_level", "2"))))
+            t = self._FIREBALL_LEVELS[lvl]
+            spells.append({
+                "type": "fireball", "name": "Fireball",
+                "range": t["range"],
+                "cast_chance": t["cast_chance"],
+                "damage_dice": t["dice"],
+                "damage_sides": t["sides"],
+                "damage_bonus": t["bonus"],
+                "save_dc": t["save_dc"],
+            })
         mon["spells"] = spells if spells else None
 
         # ── Rebuild on_hit_effects list from flat _oh_ fields ──
@@ -2900,9 +3057,13 @@ class FeaturesEditor:
                     "_oh_consume",
                     "_pas_fire_res", "_pas_ice_res", "_pas_poison_imm",
                     "_sp_breath_fire", "_sp_wizard", "_sp_healer",
-                    "_sp_poison"):
+                    "_sp_poison",
+                    "_sp_magic_dart", "_sp_magic_arrow",
+                    "_sp_lightning", "_sp_fireball"):
             return ["True", "False"]
-        if key in ("_sp_wiz_level", "_sp_heal_level"):
+        if key in ("_sp_wiz_level", "_sp_heal_level",
+                    "_sp_dart_level", "_sp_arrow_level",
+                    "_sp_lightning_level", "_sp_fireball_level"):
             return ["1", "2", "3", "4", "5"]
         if key == "terrain":
             return ["land", "sea"]

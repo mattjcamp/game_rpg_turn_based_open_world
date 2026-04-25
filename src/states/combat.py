@@ -5024,6 +5024,26 @@ class CombatState(BaseState):
                     return True
                 continue
 
+            # ── Offensive wizard spells (Magic Dart / Magic Arrow /
+            #    Lightning Bolt are single-target ranged damage with
+            #    no save; Fireball is AOE with a DEX save for half).
+            #    These mirror the player wizard list so a "Wizard"
+            #    monster can throw the same kind of damage at the
+            #    party that a player caster would. ──
+            if stype in ("magic_dart", "magic_arrow", "lightning_bolt"):
+                target = self._pick_spell_target(monster, srange)
+                if target:
+                    self._monster_cast_bolt(monster, target, spell)
+                    return True
+                continue
+
+            if stype == "fireball":
+                targets = self._pick_breath_targets(monster, srange)
+                if targets:
+                    self._monster_cast_fireball(monster, targets, spell)
+                    return True
+                continue
+
         return False  # no spell was cast
 
     def _pick_spell_target(self, monster, max_range):
@@ -5307,6 +5327,206 @@ class CombatState(BaseState):
                                        success=True,
                                        source_col=_src_c_center,
                                        source_row=_src_r_center))
+
+            target.hp = max(0, target.hp - dmg)
+            self.hit_effects.append(HitEffect(tc, tr, dmg))
+            self._wake_fighter(target)
+
+            if not target.is_alive():
+                self.combat_log.append(f"{target.name} has fallen!")
+
+        if not any(m.is_alive() for m in self.fighters):
+            self.phase = PHASE_DEFEAT
+            self.phase_timer = 2500
+            self.game.sfx.play("defeat")
+            self.combat_log.append("The party has been defeated!")
+            self.game.game_log.append("The party was defeated in battle.")
+        else:
+            self.active_monster_idx += 1
+            self.phase = PHASE_MONSTER_SPELL
+            self.phase_timer = 1400
+
+    # ── Offensive wizard spells (Magic Dart / Arrow / Lightning) ──
+
+    def _monster_cast_bolt(self, monster, target, spell):
+        """Generic single-target ranged damage spell, no save.
+
+        Used for Magic Dart, Magic Arrow, and Lightning Bolt — they
+        differ in dice / range / cast_chance AND in the visual
+        animation queued at cast time.  We re-use the same effect
+        classes the player wizard uses so the on-screen feedback
+        is unmistakable:
+
+        - magic_dart    → fast Projectile (white spark)
+        - magic_arrow   → Projectile (silver-blue, arrow symbol)
+        - lightning_bolt → LightningBoltEffect (crackling line of
+                          tiles between monster and target)
+
+        Damage is applied immediately; the projectile sells the
+        cast visually while the HitEffect's number floats up at
+        the target so the player can read what hit them.
+        """
+        name = spell.get("name", "Bolt")
+        stype = spell.get("type", "magic_dart")
+        dice = spell.get("damage_dice", 1)
+        sides = spell.get("damage_sides", 6)
+        bonus = spell.get("damage_bonus", 0)
+        damage = max(1, roll_dice(dice, sides) + bonus)
+
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        tc, tr = self.fighter_positions.get(target, (0, 0))
+
+        # Per-spell visual.  Lightning is the bolt-along-tiles
+        # effect; Magic Dart / Magic Arrow are travelling
+        # projectiles colour-coded so they read at a glance.
+        if stype == "lightning_bolt":
+            bolt_tiles = self._line_tiles(mc, mr, tc, tr)
+            if bolt_tiles:
+                self.lightning_bolt_effects.append(
+                    LightningBoltEffect(bolt_tiles))
+        elif stype == "magic_arrow":
+            self.projectiles.append(Projectile(
+                mc, mr, tc, tr,
+                color=(180, 200, 255), symbol=">"))
+        else:  # magic_dart (and any future bolt-style spell)
+            self.projectiles.append(Projectile(
+                mc, mr, tc, tr,
+                color=(220, 220, 255), symbol="*"))
+        try:
+            self.game.sfx.play("fireball")  # shared zap sfx
+        except Exception:
+            pass
+
+        target.hp = max(0, target.hp - damage)
+        self.hit_effects.append(HitEffect(tc, tr, damage))
+        self._wake_fighter(target)
+
+        self.combat_log.append(
+            f"{monster.name} casts {name} at {target.name}! "
+            f"({dice}d{sides}+{bonus} = {damage} damage)")
+
+        if not target.is_alive():
+            self.combat_log.append(f"{target.name} has fallen!")
+
+        if not any(m.is_alive() for m in self.fighters):
+            self.phase = PHASE_DEFEAT
+            self.phase_timer = 2500
+            self.game.sfx.play("defeat")
+            self.combat_log.append("The party has been defeated!")
+            self.game.game_log.append("The party was defeated in battle.")
+        else:
+            self.active_monster_idx += 1
+            self.phase = PHASE_MONSTER_SPELL
+            self.phase_timer = 1100
+
+    @staticmethod
+    def _line_tiles(c0, r0, c1, r1):
+        """Return a list of (col, row) tiles along a straight line
+        from (c0, r0) to (c1, r1), excluding the start cell.
+
+        Used to give the lightning-bolt effect a tile path between
+        the casting monster and its target so the player sees a
+        clear electrical streak rather than a generic flash.  Uses
+        Bresenham so diagonals look natural; the start tile is
+        omitted so the bolt visibly originates *from* the monster
+        rather than over its head.
+        """
+        tiles = []
+        dx = abs(c1 - c0)
+        dy = abs(r1 - r0)
+        sx = 1 if c0 < c1 else -1
+        sy = 1 if r0 < r1 else -1
+        err = dx - dy
+        cx, cy = c0, r0
+        while True:
+            if (cx, cy) != (c0, r0):
+                tiles.append((cx, cy))
+            if cx == c1 and cy == r1:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                cx += sx
+            if e2 < dx:
+                err += dx
+                cy += sy
+        return tiles
+
+    def _monster_cast_fireball(self, monster, targets, spell):
+        """AOE fireball — DEX save for half on every target.
+
+        Damage resolves identically to
+        ``_monster_cast_breath_fire`` (same dice + DEX save +
+        fire-resistance handling).  Visually we re-use the
+        player's ``AoeFireballEffect`` (the travelling fireball)
+        and ``AoeExplosionEffect`` (the multi-tile blast) so a
+        Lich's fireball looks the same as a player wizard's,
+        and the player can read "FIREBALL!" from the visual
+        alone.  Centred on the closest hit target so the AOE
+        burst sits in the middle of the affected fighters.
+        """
+        name = spell.get("name", "Fireball")
+        save_dc = spell.get("save_dc", 13)
+        dice = spell.get("damage_dice", 3)
+        sides = spell.get("damage_sides", 6)
+        bonus = spell.get("damage_bonus", 0)
+        total_damage = roll_dice(dice, sides) + bonus
+
+        # Pick a centre tile for the explosion: the first target's
+        # cell.  Single-target case stays correct; multi-target
+        # case anchors the burst on a real victim rather than a
+        # midpoint that might land on a wall.
+        mc, mr = self.monster_positions.get(monster, (0, 0))
+        center = self.fighter_positions.get(targets[0], (mc, mr))
+        ec, er = center
+        # Travelling fireball + the AOE explosion at the impact.
+        # Same effect classes the player wizard uses, so the
+        # renderer's existing AOE handlers draw them automatically.
+        self.aoe_fireball_effects.append(
+            AoeFireballEffect(mc, mr, ec, er))
+        self.aoe_explosions.append(
+            AoeExplosionEffect(ec, er, radius=2))
+        try:
+            self.game.sfx.play("fireball")
+        except Exception:
+            pass
+
+        self.combat_log.append(
+            f"{monster.name} hurls a {name}! "
+            f"({dice}d{sides}+{bonus} = {total_damage} fire damage)")
+
+        for target in targets:
+            save_roll = roll_d20()
+            dex_mod = get_modifier(target.dexterity)
+            save_total = save_roll + dex_mod
+            tc, tr = self.fighter_positions.get(target, (0, 0))
+
+            resist = False
+            for pas in getattr(target, "passives", None) or []:
+                if pas.get("type") == "fire_resistance":
+                    resist = True
+                    break
+
+            if save_total >= save_dc:
+                dmg = max(1, total_damage // 2)
+                if resist:
+                    dmg = max(1, dmg // 2)
+                self.combat_log.append(
+                    f"{target.name} saves ({save_roll}+{dex_mod}="
+                    f"{save_total} vs DC {save_dc}) — {dmg} damage!")
+                self.monster_spell_effects.append(
+                    MonsterSpellEffect(tc, tr, "fireball", name,
+                                       success=False))
+            else:
+                dmg = total_damage
+                if resist:
+                    dmg = max(1, dmg // 2)
+                self.combat_log.append(
+                    f"{target.name} fails save ({save_roll}+{dex_mod}="
+                    f"{save_total} vs DC {save_dc}) — {dmg} damage!")
+                self.monster_spell_effects.append(
+                    MonsterSpellEffect(tc, tr, "fireball", name,
+                                       success=True))
 
             target.hp = max(0, target.hp - dmg)
             self.hit_effects.append(HitEffect(tc, tr, dmg))

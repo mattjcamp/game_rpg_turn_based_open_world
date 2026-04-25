@@ -1022,6 +1022,12 @@
         "monsters",
         "people"
       ]
+    },
+    "lich": {
+      "path": "src/assets/unassigned/skeleton_f2_copy.png",
+      "usable_in": [
+        "monsters"
+      ]
     }
   },
   "unique_tiles": {

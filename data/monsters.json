@@ -52,6 +52,24 @@
           "duration": 3,
           "ac_penalty": 2,
           "attack_penalty": 2
+        },
+        {
+          "type": "magic_dart",
+          "name": "Magic Dart",
+          "range": 6,
+          "cast_chance": 30,
+          "damage_dice": 1,
+          "damage_sides": 6,
+          "damage_bonus": 0
+        },
+        {
+          "type": "magic_arrow",
+          "name": "Magic Arrow",
+          "range": 7,
+          "cast_chance": 25,
+          "damage_dice": 2,
+          "damage_sides": 4,
+          "damage_bonus": 1
         }
       ],
       "terrain": "land",
@@ -59,7 +77,8 @@
       "post_attack_move": 0,
       "on_hit_effects": null,
       "passives": null,
-      "battle_scale": 1
+      "battle_scale": 1,
+      "difficulty": "normal"
     },
     "Dragon": {
       "description": "A younger dragon",
@@ -181,12 +200,118 @@
       "battle_scale": 1,
       "difficulty": "easy"
     },
+    "Lich": {
+      "description": "A powerful and magical undead creature",
+      "hp": 30,
+      "ac": 15,
+      "attack_bonus": 3,
+      "damage_dice": 3,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 40,
+      "gold_min": 10,
+      "gold_max": 40,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": true,
+      "humanoid": false,
+      "terrain": "land",
+      "difficulty": "hard",
+      "tile": "monsters/lich",
+      "battle_scale": 1,
+      "move_range": 2,
+      "post_attack_move": 0,
+      "spells": [
+        {
+          "type": "sleep",
+          "name": "Dark Slumber",
+          "range": 9,
+          "cast_chance": 45,
+          "save_dc": 18,
+          "duration": 5,
+          "max_target_hp": 70
+        },
+        {
+          "type": "curse",
+          "name": "Hex",
+          "range": 9,
+          "cast_chance": 40,
+          "duration": 6,
+          "ac_penalty": 5,
+          "attack_penalty": 4
+        },
+        {
+          "type": "magic_dart",
+          "name": "Magic Dart",
+          "range": 6,
+          "cast_chance": 30,
+          "damage_dice": 1,
+          "damage_sides": 6,
+          "damage_bonus": 0
+        },
+        {
+          "type": "magic_arrow",
+          "name": "Magic Arrow",
+          "range": 7,
+          "cast_chance": 25,
+          "damage_dice": 2,
+          "damage_sides": 4,
+          "damage_bonus": 1
+        },
+        {
+          "type": "lightning_bolt",
+          "name": "Lightning Bolt",
+          "range": 7,
+          "cast_chance": 18,
+          "damage_dice": 3,
+          "damage_sides": 6,
+          "damage_bonus": 0
+        },
+        {
+          "type": "fireball",
+          "name": "Fireball",
+          "range": 6,
+          "cast_chance": 18,
+          "damage_dice": 3,
+          "damage_sides": 6,
+          "damage_bonus": 0,
+          "save_dc": 13
+        }
+      ],
+      "on_hit_effects": [
+        {
+          "type": "poison",
+          "chance": 30,
+          "damage_per_turn": 5,
+          "duration": 5
+        },
+        {
+          "type": "slow",
+          "chance": 25,
+          "duration": 2
+        },
+        {
+          "type": "drain",
+          "chance": 25,
+          "amount": 3
+        }
+      ],
+      "passives": [
+        {
+          "type": "poison_immunity"
+        }
+      ]
+    },
     "Man Eater": {
       "description": "Carnivorous half-plant, half-animal",
-      "hp": 45,
+      "hp": 50,
       "ac": 16,
-      "attack_bonus": 2,
-      "damage_dice": 2,
+      "attack_bonus": 3,
+      "damage_dice": 3,
       "damage_sides": 4,
       "damage_bonus": 0,
       "xp_reward": 50,
@@ -541,6 +666,35 @@
       "passives": null,
       "battle_scale": 1,
       "difficulty": "normal"
+    },
+    "Wild Boar": {
+      "description": "An unusually large boar",
+      "hp": 15,
+      "ac": 14,
+      "attack_bonus": 1,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 20,
+      "gold_min": 3,
+      "gold_max": 10,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "difficulty": "easy",
+      "tile": "monsters/npcs_u4_healer",
+      "battle_scale": 1,
+      "move_range": 4,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
     }
   },
   "spawn_tables": {

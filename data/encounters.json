@@ -774,6 +774,18 @@
           "Troll",
           "Troll"
         ]
+      },
+      {
+        "name": "Lich with Minions",
+        "level": 4,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "",
+        "monsters": [
+          "Lich",
+          "Skeleton",
+          "Skeleton"
+        ]
       }
     ]
   }

@@ -764,7 +764,7 @@
       6,
       7,
       0,
-      75,
+      0,
       0,
       2,
       2,
@@ -1908,6 +1908,9 @@
       "walkable": "yes (override)",
       "linked": true,
       "link_map": "dungeon:Creepy Forest"
+    },
+    "12,13": {
+      "encounter": "Lich with Minions"
     }
   }
 }
