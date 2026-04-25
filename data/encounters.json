@@ -786,6 +786,16 @@
           "Skeleton",
           "Skeleton"
         ]
+      },
+      {
+        "name": "Mind Flayer",
+        "level": 5,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "",
+        "monsters": [
+          "Mind Flayer"
+        ]
       }
     ]
   }

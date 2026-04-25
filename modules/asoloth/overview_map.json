@@ -1909,8 +1909,8 @@
       "linked": true,
       "link_map": "dungeon:Creepy Forest"
     },
-    "12,13": {
-      "encounter": "Lich with Minions"
+    "11,12": {
+      "encounter": "Mind Flayer"
     }
   }
 }
