@@ -2522,7 +2522,12 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self._cc_elapsed = 0.0
         self._cc_message = None
         self._cc_msg_timer = 0.0
-        # Stats: 50 points to distribute, min 5 max 25 per stat
+        # Stats: 50 points to distribute, min 5 max 18 per BASE stat.
+        # Racial modifiers (PartyMember.strength etc.) add on top at
+        # runtime, so a Dwarf with STR +2 ends up with effective max
+        # 20, a Halfling with STR -2 caps at effective 16, and so on.
+        # The hard 18 cap on the base value matches D&D-style "human
+        # maximum" and prevents the old "STR 25 character" abuse.
         self._cc_stats = {"strength": 10, "dexterity": 10,
                           "intelligence": 15, "wisdom": 15}
         self._cc_stat_names = ["strength", "dexterity",
@@ -2750,7 +2755,11 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self._cc_stat_cursor = (
                     self._cc_stat_cursor + 1) % 4
             elif event.key == pygame.K_RIGHT:
-                if (self._cc_stats[stat_key] < 25
+                # Cap base stat at 18 — racial modifiers stack on
+                # top via PartyMember.strength etc., so a Dwarf
+                # (STR +2) effective-tops at 20 and a Halfling
+                # (STR -2) effective-tops at 16.
+                if (self._cc_stats[stat_key] < 18
                         and self._cc_points_remaining > 0):
                     self._cc_stats[stat_key] += 1
             elif event.key == pygame.K_LEFT:

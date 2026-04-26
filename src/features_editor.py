@@ -2438,10 +2438,23 @@ class FeaturesEditor:
                 data = json.load(f)
         except (OSError, ValueError):
             data = {}
+        # Sort the monster browse list by difficulty tier first
+        # (easy → normal → hard → deadly → any/untagged), then
+        # alphabetically by name within each tier.  Authors scanning
+        # the list can grasp the threat ramp at a glance — easy
+        # creatures up top, deadly bosses at the bottom.  Untagged
+        # monsters land in their own bucket at the end so it's
+        # obvious they still need a tier assigned.
+        _difficulty_order = {
+            "easy": 0, "normal": 1, "hard": 2, "deadly": 3, "any": 4,
+        }
         monsters = []
-        for name, entry in sorted(
-                data.get("monsters", {}).items()):
+        for name, entry in data.get("monsters", {}).items():
             monsters.append({"_name": name, **entry})
+        monsters.sort(key=lambda m: (
+            _difficulty_order.get(m.get("difficulty", "any"), 4),
+            m["_name"].lower(),
+        ))
         self.mon_list = monsters
         self.mon_cursor = 0
         self.mon_scroll = 0

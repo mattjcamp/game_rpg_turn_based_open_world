@@ -12,10 +12,10 @@
       "race": "Dwarf",
       "gender": "Male",
       "hp": 20,
-      "strength": 22,
-      "dexterity": 18,
-      "intelligence": 5,
-      "wisdom": 5,
+      "strength": 18,
+      "dexterity": 14,
+      "intelligence": 9,
+      "wisdom": 9,
       "level": 1,
       "equipped": {
         "right_hand": "Fists",
@@ -24,57 +24,17 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/npcs/villager_guard.png"
+      "sprite": "src/assets/game/npcs/shopkeep.png"
     },
     {
-      "name": "Pippin",
+      "name": "Merry",
       "class": "Thief",
       "race": "Halfling",
       "gender": "Male",
       "hp": 20,
-      "strength": 15,
-      "dexterity": 25,
-      "intelligence": 5,
-      "wisdom": 5,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/npcs/vga_ranger.png"
-    },
-    {
-      "name": "Elrond",
-      "class": "Cleric",
-      "race": "Halfling",
-      "gender": "Female",
-      "hp": 20,
-      "strength": 5,
-      "dexterity": 10,
+      "strength": 12,
+      "dexterity": 18,
       "intelligence": 10,
-      "wisdom": 25,
-      "level": 1,
-      "equipped": {
-        "right_hand": "Fists",
-        "left_hand": null,
-        "body": "Cloth",
-        "head": null
-      },
-      "inventory": [],
-      "sprite": "src/assets/game/characters/illusionist.png"
-    },
-    {
-      "name": "Gandalf",
-      "class": "Wizard",
-      "race": "Elf",
-      "gender": "Male",
-      "hp": 20,
-      "strength": 5,
-      "dexterity": 10,
-      "intelligence": 25,
       "wisdom": 10,
       "level": 1,
       "equipped": {
@@ -84,7 +44,47 @@
         "head": null
       },
       "inventory": [],
+      "sprite": "src/assets/game/characters/thief.png"
+    },
+    {
+      "name": "Gandolf",
+      "class": "Wizard",
+      "race": "Elf",
+      "gender": "Male",
+      "hp": 20,
+      "strength": 9,
+      "dexterity": 11,
+      "intelligence": 18,
+      "wisdom": 12,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
       "sprite": "src/assets/game/npcs/vga_evil_mage.png"
+    },
+    {
+      "name": "Selina",
+      "class": "Cleric",
+      "race": "Human",
+      "gender": "Female",
+      "hp": 20,
+      "strength": 10,
+      "dexterity": 12,
+      "intelligence": 10,
+      "wisdom": 18,
+      "level": 1,
+      "equipped": {
+        "right_hand": "Fists",
+        "left_hand": null,
+        "body": "Cloth",
+        "head": null
+      },
+      "inventory": [],
+      "sprite": "src/assets/game/characters/cleric.png"
     }
   ],
   "active_party": [

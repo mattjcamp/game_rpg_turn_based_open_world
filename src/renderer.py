@@ -11983,16 +11983,44 @@ class Renderer(CombatEffectRendererMixin):
                 # Subtitle
                 sub = ""
                 sub_x = text_x + 16
+                # Per-tier colour so the threat ramp reads at a
+                # glance.  Falls through to the "selected vs
+                # unselected" neutral palette below if the item
+                # doesn't surface a difficulty (e.g. items, tiles).
+                tier_colors = {
+                    "easy":   (120, 200, 120),  # green
+                    "normal": (200, 200, 200),  # neutral white
+                    "hard":   (240, 180,  80),  # orange
+                    "deadly": (240,  90,  90),  # red
+                    "any":    (140, 140, 160),  # grey-blue
+                }
+                tier_override = None
                 if "_section" in item:
                     sub = item["_section"].title()
+                elif "difficulty" in item:
+                    # Monsters: replace HP/AC with the tier name in
+                    # caps so it reads as a label rather than data.
+                    tier = item.get("difficulty", "any")
+                    sub = tier.upper()
+                    tier_override = tier_colors.get(tier)
                 elif "hp" in item:
+                    # Fallback for monster-shaped entries that
+                    # don't have a difficulty tag yet (older saves).
                     sub = f"HP {item['hp']}  AC {item['ac']}"
                 elif "items" in item and isinstance(item["items"], list):
                     sub = f"{len(item['items'])} items"
                 elif "_tile_id" in item:
                     sub = ""
                 if sub:
-                    sc = (140, 180, 140) if selected else (120, 120, 140)
+                    if tier_override is not None:
+                        # Dim slightly when not selected so the
+                        # focused row still pops.
+                        if selected:
+                            sc = tier_override
+                        else:
+                            sc = tuple(int(c * 0.75) for c in tier_override)
+                    else:
+                        sc = (140, 180, 140) if selected else (120, 120, 140)
                     self._u3_text(sub, sub_x, dy + 22, sc, fs)
                 dy += row_h
 
@@ -18721,9 +18749,23 @@ class Renderer(CombatEffectRendererMixin):
             bar_x = cx + 120
             row_h = 50
 
+            # Look up the selected race's stat modifiers so we can
+            # render each stat as "BASE (+MOD = TOTAL)" — making it
+            # obvious that a Dwarf's STR caps at 20 (18 base + 2),
+            # a Halfling's STR caps at 16 (18 base − 2), etc.
+            race_mods = (RACE_INFO.get(game._cc_selected_race(), {})
+                         .get("stat_modifiers", {}))
+
+            # Base stat range now caps at 18 (was 25), so the bar's
+            # "filled width" denominator drops accordingly.
+            BASE_MIN = 5
+            BASE_MAX = 18
+            BAR_DENOM = BASE_MAX - BASE_MIN  # = 13
+
             for i, stat_key in enumerate(game._cc_stat_names):
                 sy = cy + 52 + i * row_h
                 val = game._cc_stats[stat_key]
+                mod = race_mods.get(stat_key, 0)
                 label = stat_key[:3].title()
                 if i == game._cc_stat_cursor:
                     sel_bar = pygame.Rect(
@@ -18741,11 +18783,22 @@ class Renderer(CombatEffectRendererMixin):
                     self._u3_text(f"{label}:", cx + 22, sy,
                                   (180, 180, 200), f_main)
 
-                # Value
+                # Base value, then the racial mod + effective total
+                # so the player sees what their actual stat will be
+                # once the race mod gets applied at runtime.
                 self._u3_text(f"{val:2d}", cx + 74, sy,
                               (255, 255, 255), f_main)
-                # Visual bar
-                bar_w = int((val - 5) / 20 * bar_max_w)
+                if mod:
+                    sign = "+" if mod > 0 else ""
+                    mod_col = ((100, 220, 100) if mod > 0
+                               else (220, 120, 120))
+                    self._u3_text(f"{sign}{mod}", cx + 100, sy,
+                                  mod_col, f_hint)
+                    self._u3_text(f"= {val + mod}", cx + 124, sy,
+                                  (180, 180, 200), f_hint)
+
+                # Visual bar — scaled to the new 5..18 base range.
+                bar_w = int((val - BASE_MIN) / BAR_DENOM * bar_max_w)
                 bar_bg = pygame.Rect(bar_x, sy + 3, bar_max_w, 12)
                 bar_fill = pygame.Rect(bar_x, sy + 3, bar_w, 12)
                 pygame.draw.rect(self.screen, (20, 20, 40), bar_bg)
@@ -18756,10 +18809,12 @@ class Renderer(CombatEffectRendererMixin):
                     pygame.draw.rect(self.screen, bar_color, bar_fill)
                 pygame.draw.rect(self.screen, (60, 60, 100),
                                  bar_bg, 1)
-                # Min/max labels below bar
-                self._u3_text("5", bar_x, sy + 18,
+                # Min/max labels below bar — the new max matches the
+                # 18 cap on the base stat, with racial mods stacking
+                # on top via the inline "+N = total" hint above.
+                self._u3_text(str(BASE_MIN), bar_x, sy + 18,
                               (100, 100, 120), f_hint)
-                self._u3_text("25", bar_x + bar_max_w - 14,
+                self._u3_text(str(BASE_MAX), bar_x + bar_max_w - 14,
                               sy + 18, (100, 100, 120), f_hint)
 
             # Right column: summary
@@ -18826,15 +18881,29 @@ class Renderer(CombatEffectRendererMixin):
                 self._u3_text(val, val_x, dy, (255, 255, 255), f_main)
                 dy += 24
             dy += 10
+            # Confirm summary: show base + racial mod + effective so
+            # the player sees what their character will actually have
+            # once the race modifier is applied at runtime.
+            confirm_race_mods = (
+                RACE_INFO.get(game._cc_selected_race(), {})
+                .get("stat_modifiers", {}))
             stat_val_x = cx + 50
             for stat_key in game._cc_stat_names:
                 val = game._cc_stats[stat_key]
+                mod = confirm_race_mods.get(stat_key, 0)
                 self._u3_text(
                     f"{stat_key[:3].title()}:", cx, dy,
                     (140, 140, 160), f_main)
-                self._u3_text(
-                    f"{val:2d}", stat_val_x, dy,
-                    (200, 200, 220), f_main)
+                if mod:
+                    sign = "+" if mod > 0 else ""
+                    self._u3_text(
+                        f"{val:2d} ({sign}{mod}) = {val + mod}",
+                        stat_val_x, dy,
+                        (200, 200, 220), f_main)
+                else:
+                    self._u3_text(
+                        f"{val:2d}", stat_val_x, dy,
+                        (200, 200, 220), f_main)
                 dy += 22
             # Confirm/cancel buttons
             btn_y = dy + 24

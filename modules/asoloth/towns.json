@@ -9057,7 +9057,20 @@
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
-    "npcs": [],
+    "npcs": [
+      {
+        "name": "Laird Bullish",
+        "npc_type": "villager",
+        "sprite": "src/assets/unassigned/wizard_f1.png",
+        "col": 12,
+        "row": 12,
+        "dialogue": [
+          "Hello there, I seem to have lost doth crown"
+        ],
+        "god_name": "The Divine",
+        "wander_range": 4
+      }
+    ],
     "_action_import": "Map assigned",
     "_action_generate": "Map assigned",
     "interiors": [

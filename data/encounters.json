@@ -464,7 +464,7 @@
       },
       {
         "name": "Ancient Dragon",
-        "level": 1,
+        "level": 8,
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Dragon",
@@ -474,7 +474,7 @@
       },
       {
         "name": "Dragon Cultists",
-        "level": 1,
+        "level": 4,
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
@@ -486,7 +486,7 @@
       },
       {
         "name": "Drake Pack",
-        "level": 1,
+        "level": 7,
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Wyvern",
@@ -497,7 +497,7 @@
       },
       {
         "name": "Drake and Keeper",
-        "level": 1,
+        "level": 6,
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Wyvern",
@@ -508,7 +508,7 @@
       },
       {
         "name": "Wyrm-blooded Cultists",
-        "level": 1,
+        "level": 6,
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Dark Mage",
@@ -520,7 +520,7 @@
       },
       {
         "name": "Bone Pit Horde",
-        "level": 1,
+        "level": 5,
         "weight": 10,
         "terrain": "land",
         "monster_party_tile": "Skeleton",
@@ -530,6 +530,236 @@
           "Skeleton Archer",
           "Zombie",
           "Zombie"
+        ]
+      },
+      {
+        "name": "Lone Ogre",
+        "level": 5,
+        "weight": 18,
+        "terrain": "land",
+        "monster_party_tile": "Ogre",
+        "monsters": [
+          "Ogre"
+        ]
+      },
+      {
+        "name": "Ogre and Drake",
+        "level": 6,
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Ogre",
+        "monsters": [
+          "Ogre",
+          "Wyvern"
+        ]
+      },
+      {
+        "name": "Ogre Brutes",
+        "level": 7,
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Ogre",
+        "monsters": [
+          "Ogre",
+          "Ogre"
+        ]
+      },
+      {
+        "name": "Ogre Warband",
+        "level": 8,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Ogre",
+        "monsters": [
+          "Ogre",
+          "Ogre",
+          "Ogre"
+        ]
+      },
+      {
+        "name": "Wailing Spirit",
+        "level": 5,
+        "weight": 15,
+        "terrain": "land",
+        "monster_party_tile": "Banshee",
+        "monsters": [
+          "Banshee"
+        ]
+      },
+      {
+        "name": "Banshee Pair",
+        "level": 6,
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Banshee",
+        "monsters": [
+          "Banshee",
+          "Banshee"
+        ]
+      },
+      {
+        "name": "Lich and Banshee",
+        "level": 7,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Lich",
+        "monsters": [
+          "Lich",
+          "Banshee"
+        ]
+      },
+      {
+        "name": "Banshee Choir",
+        "level": 7,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Banshee",
+        "monsters": [
+          "Banshee",
+          "Banshee",
+          "Banshee"
+        ]
+      },
+      {
+        "name": "Cursed Manor",
+        "level": 8,
+        "weight": 8,
+        "terrain": "land",
+        "monster_party_tile": "Banshee",
+        "monsters": [
+          "Banshee",
+          "Banshee",
+          "Lich"
+        ]
+      },
+      {
+        "name": "Haunted Trail",
+        "level": 6,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Banshee",
+        "monsters": [
+          "Banshee",
+          "Man Eater"
+        ]
+      },
+      {
+        "name": "Predator's Den",
+        "level": 7,
+        "weight": 8,
+        "terrain": "land",
+        "monster_party_tile": "Man Eater",
+        "monsters": [
+          "Man Eater",
+          "Man Eater",
+          "Wyvern"
+        ]
+      },
+      {
+        "name": "Mind Flayer",
+        "level": 7,
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Mind Flayer",
+        "monsters": [
+          "Mind Flayer"
+        ]
+      },
+      {
+        "name": "Mind Flayer Conclave",
+        "level": 8,
+        "weight": 8,
+        "terrain": "land",
+        "monster_party_tile": "Mind Flayer",
+        "monsters": [
+          "Mind Flayer",
+          "Mind Flayer"
+        ]
+      },
+      {
+        "name": "Vampire Lord",
+        "level": 7,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Vampire Lord",
+        "monsters": [
+          "Vampire Lord"
+        ]
+      },
+      {
+        "name": "Vampire's Court",
+        "level": 8,
+        "weight": 6,
+        "terrain": "land",
+        "monster_party_tile": "Vampire Lord",
+        "monsters": [
+          "Vampire Lord",
+          "Vampire Lord"
+        ]
+      },
+      {
+        "name": "Stone Sentinel",
+        "level": 7,
+        "weight": 12,
+        "terrain": "land",
+        "monster_party_tile": "Stone Golem",
+        "monsters": [
+          "Stone Golem"
+        ]
+      },
+      {
+        "name": "Twin Sentinels",
+        "level": 8,
+        "weight": 8,
+        "terrain": "land",
+        "monster_party_tile": "Stone Golem",
+        "monsters": [
+          "Stone Golem",
+          "Stone Golem"
+        ]
+      },
+      {
+        "name": "Lurking Hydra",
+        "level": 7,
+        "weight": 10,
+        "terrain": "land",
+        "monster_party_tile": "Hydra",
+        "monsters": [
+          "Hydra"
+        ]
+      },
+      {
+        "name": "Ancient Hydra",
+        "level": 8,
+        "weight": 6,
+        "terrain": "land",
+        "monster_party_tile": "Hydra",
+        "monsters": [
+          "Hydra",
+          "Stone Golem"
+        ]
+      },
+      {
+        "name": "Death's Heralds",
+        "level": 8,
+        "weight": 6,
+        "terrain": "land",
+        "monster_party_tile": "Vampire Lord",
+        "monsters": [
+          "Vampire Lord",
+          "Mind Flayer"
+        ]
+      },
+      {
+        "name": "The Apocalypse",
+        "level": 8,
+        "weight": 3,
+        "terrain": "land",
+        "monster_party_tile": "Hydra",
+        "monsters": [
+          "Hydra",
+          "Vampire Lord",
+          "Mind Flayer"
         ]
       }
     ],
