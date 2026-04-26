@@ -1079,7 +1079,7 @@
       0,
       0,
       0,
-      0,
+      74,
       0,
       2,
       2,
@@ -1935,6 +1935,13 @@
     },
     "55,11": {
       "encounter": "Mind Flayer"
+    },
+    "16,17": {
+      "walkable": "yes (override)",
+      "linked": true,
+      "link_map": "building:Abandoned Building:Main Hall",
+      "link_x": "15",
+      "link_y": "13"
     }
   }
 }
