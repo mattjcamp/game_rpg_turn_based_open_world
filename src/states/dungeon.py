@@ -205,6 +205,11 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         player sees the same overlay they'd get out in the overworld or
         a town — previously only the bottom-bar text changed, which was
         easy to miss and made it unclear the quest had advanced.
+
+        After the kill check runs, sweep the dungeon for surviving
+        monsters tagged for now-completed quest steps and remove
+        their highlight glow — otherwise a kill quest's leftover
+        creatures keep glowing as if they're still required.
         """
         from src.quest_manager import check_quest_kills
         result_msg = check_quest_kills(self.game)
@@ -215,7 +220,52 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 "duration": 2000,
                 "text": result_msg,
             })
+        # Always run the highlight sweep — it's cheap and idempotent,
+        # and catches the "step just completed" transition without
+        # us having to inspect the result message.
+        self._clear_completed_quest_highlights()
         return result_msg
+
+    def _clear_completed_quest_highlights(self):
+        """Strip the ``_quest_name`` highlight tag from any monster
+        whose quest step has been marked complete.
+
+        The renderer keys the orange/yellow quest-target glow off
+        ``monster._quest_name`` (see
+        ``renderer._u3_draw_dungeon_monster``).  Once a step is
+        finished, the surviving creatures tagged for it shouldn't
+        glow anymore — they're not required to advance the quest.
+        Without this sweep the player gets a misleading "this enemy
+        still matters" cue after seeing the [COMPLETE] message.
+
+        Safe to call repeatedly: it only walks monsters and only
+        removes tags for steps that are confirmed complete, so a
+        per-combat or per-entry call is essentially free.
+        """
+        if not self.dungeon_data:
+            return
+        mq_states = getattr(self.game, "module_quest_states", {}) or {}
+        for m in self.dungeon_data.monsters:
+            qname = getattr(m, "_quest_name", None)
+            if not qname:
+                continue
+            step_idx = getattr(m, "_quest_step_idx", None)
+            state = mq_states.get(qname, {})
+            progress = state.get("step_progress", []) or []
+            step_done = (
+                step_idx is not None
+                and 0 <= step_idx < len(progress)
+                and progress[step_idx]
+            )
+            quest_done = state.get("status") == "completed"
+            if step_done or quest_done:
+                # Use try/del so we don't crash on monsters that
+                # somehow lost the attribute already (e.g. reloaded
+                # save data).
+                try:
+                    del m._quest_name
+                except AttributeError:
+                    pass
 
     def _inject_quest_dungeon_monsters(self):
         """Add quest-registered monsters to the dungeon's monster list.
@@ -327,6 +377,14 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 }
                 self.dungeon_data.monsters.append(mon)
                 occupied.add((col, row))
+
+        # If the player re-enters a dungeon where some quest steps
+        # finished in a previous visit, the surviving tagged
+        # monsters from those steps would otherwise glow on first
+        # render.  One pass through the highlight sweep clears
+        # them so the only glowing creatures are the ones that
+        # still actually count.
+        self._clear_completed_quest_highlights()
 
     def _inject_quest_dungeon_collect_items(self):
         """Place quest collect items on the current dungeon floor.

@@ -250,5 +250,34 @@
     ],
     "giver_col": 14,
     "giver_row": 11
+  },
+  {
+    "name": "Retreive the Dark Light",
+    "description": "",
+    "giver_npc": "Raistlan",
+    "giver_sprite": "src/assets/game/npcs/vga_evil_mage.png",
+    "giver_location": "overview",
+    "giver_dialogue": "",
+    "reward_xp": 1000,
+    "reward_gold": 1000,
+    "reward_items": [
+      "Silver Bow"
+    ],
+    "steps": [
+      {
+        "description": "Retrieve the Dark Light",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "Crystal",
+        "has_guardian": "yes",
+        "guardian_encounter": "Ancient Hydra",
+        "spawn_location": "dungeon:Very Dark Cave",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 34,
+    "giver_row": 19
   }
 ]

@@ -313,25 +313,31 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
         """
         if getattr(self.game, "quest_monsters_only", False):
             # Still prune any non-alive / off-map monsters so the list
-            # stays healthy, but do not top up.
+            # stays healthy, but do not top up.  Use the monster's
+            # own terrain check so sea creatures on land and land
+            # creatures on water both get filtered out — a plain
+            # ``is_walkable`` only catches the second case.
             self.overworld_monsters = [
                 m for m in self.overworld_monsters
                 if m.is_alive()
-                and self.game.tile_map.is_walkable(m.col, m.row)
+                and m._can_enter(m.col, m.row, self.game.tile_map)
             ]
             return
         tile_map = self.game.tile_map
         party = self.game.party
 
-        # Keep only alive monsters standing on walkable tiles.
-        # Removes any monster that ended up on water, mountains, or
-        # any other non-walkable tile (e.g. after map edits or bugs).
+        # Keep only alive monsters standing on tiles their terrain
+        # actually allows.  ``_can_enter`` returns False for a land
+        # monster on water AND for a sea creature on land, so this
+        # safety net handles both directions of misplacement (e.g.
+        # designer-placed encounters that landed on the wrong
+        # terrain, or post-edit map mutations).
         valid = []
         for m in self.overworld_monsters:
             if not m.is_alive():
                 continue
-            if not tile_map.is_walkable(m.col, m.row):
-                continue  # monster on non-walkable tile — remove it
+            if not m._can_enter(m.col, m.row, tile_map):
+                continue
             valid.append(m)
         self.overworld_monsters = valid
 
@@ -493,6 +499,17 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             if not party_tile:
                 continue
             mon = create_monster(party_tile)
+            # Terrain check.  A designer-placed encounter at (c, r)
+            # may sit on a tile the monster physically can't stand
+            # on — most commonly a land creature on what's now an
+            # ocean tile after procedural map gen.  Skip the spawn
+            # rather than materialising a monster floating on water.
+            # We don't auto-relocate because the placement
+            # coordinates are author intent; designers can move
+            # the marker in the editor if they want a different
+            # location.
+            if not mon._can_enter(c, r, tile_map):
+                continue
             mon.col = c
             mon.row = r
             mon.encounter_template = {
