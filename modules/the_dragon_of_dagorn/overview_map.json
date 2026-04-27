@@ -1282,7 +1282,7 @@
       "link_y": "2"
     },
     "7,10": {
-      "walkable": "inherit (yes)",
+      "walkable": "yes (override)",
       "linked": true,
       "link_map": "dungeon:Goblin's Nest"
     },

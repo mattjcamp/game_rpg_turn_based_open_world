@@ -676,6 +676,16 @@ def load_game(slot, game):
         # (Must run after _init_module_towns so town data exists)
         game._inject_module_quest_npcs()
 
+        # ── Replay world-unlock rewards from completed quests ──
+        # The overworld tile_map is rebuilt from seed/static map on
+        # every load, so any tile mutations granted by completed
+        # quests must be re-applied.  We don't store a separate world
+        # diff in the save — we replay deterministically from the
+        # quest definitions for every quest with status "turned_in".
+        # (Must run after _inject_module_quest_npcs so
+        # ``_module_quest_defs`` is populated.)
+        _replay_world_unlocks(game)
+
         # ── Restore the player to the correct state ────────────
         state_ctx = save_data.get("state_context", {})
         target_state = state_ctx.get("state", "overworld")
@@ -904,6 +914,46 @@ def _regenerate_module_dungeon(game, dungeon_name, ow_col, ow_row):
     # Cache so subsequent saves will persist them
     game.dungeon_cache[(ow_col, ow_row)] = gen_levels
     return gen_levels
+
+
+def _replay_world_unlocks(game):
+    """Re-apply world-unlock rewards from every turned-in quest.
+
+    Called from :func:`load_game` after the overworld tile map is
+    rebuilt and ``module_quest_states`` / ``_module_quest_defs`` are
+    populated.  Walks every quest the player has already completed
+    and turned in, then mutates the overworld tile map to match — so
+    obstacles previously cleared stay cleared, bridges built stay
+    built, etc., across save/load cycles.
+
+    The persistence model is intentionally light: the save file only
+    records *which* quests were turned in, not the resulting world
+    diff.  This means changing a quest's reward in the module after
+    a player completed it will retroactively update old saves on
+    next load — which is the trade-off the design picked over
+    storing a separate world-diff list.
+    """
+    tmap = getattr(game, "tile_map", None)
+    if tmap is None:
+        return
+    quest_defs = getattr(game, "_module_quest_defs", []) or []
+    quest_states = getattr(game, "module_quest_states", {}) or {}
+    if not quest_defs or not quest_states:
+        return
+    try:
+        from src.module_editor_quest import apply_world_unlocks
+    except ImportError:
+        return
+    for qdef in quest_defs:
+        qname = qdef.get("name")
+        if not qname:
+            continue
+        state = quest_states.get(qname, {})
+        if state.get("status") != "turned_in":
+            continue
+        unlocks = qdef.get("reward_world_unlocks") or []
+        if unlocks:
+            apply_world_unlocks(tmap, unlocks)
 
 
 def _restore_dungeon_state(game, ctx):

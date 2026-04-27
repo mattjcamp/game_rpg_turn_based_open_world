@@ -1,6 +1,114 @@
 """Quest editor mixin — extracted from game.py to reduce god-class size."""
 
 
+# ── Reward "World Unlock" tile choices ─────────────────────────────────
+# A world-unlock reward mutates one overworld tile when the quest is
+# turned in.  Two designer-facing kinds share the same underlying op
+# (``set_tile``) but expose different tile-pickers:
+#
+# * ``remove_obstacle`` — replace an impassable tile (mountain, water)
+#   with something the party can walk on.  The picker only offers
+#   passable terrain.
+# * ``add_tile`` — paint an arbitrary new tile at a coordinate
+#   (e.g. dropping a TILE_BRIDGE on water, or carving a TILE_PATH).
+#   The picker offers the full set of overworld tile types.
+#
+# Both are just integer tile ids in the quest JSON; the ``kind`` field
+# is preserved purely so the editor can re-open the right picker.
+WORLD_UNLOCK_KIND_NONE = ""
+WORLD_UNLOCK_KIND_REMOVE = "remove_obstacle"
+WORLD_UNLOCK_KIND_ADD = "add_tile"
+
+WORLD_UNLOCK_KIND_LABELS = {
+    WORLD_UNLOCK_KIND_NONE: "(none)",
+    WORLD_UNLOCK_KIND_REMOVE: "Remove Obstacle",
+    WORLD_UNLOCK_KIND_ADD: "Add Tile",
+}
+WORLD_UNLOCK_LABEL_TO_KIND = {v: k for k, v in WORLD_UNLOCK_KIND_LABELS.items()}
+WORLD_UNLOCK_KIND_OPTIONS = [
+    WORLD_UNLOCK_KIND_LABELS[WORLD_UNLOCK_KIND_NONE],
+    WORLD_UNLOCK_KIND_LABELS[WORLD_UNLOCK_KIND_REMOVE],
+    WORLD_UNLOCK_KIND_LABELS[WORLD_UNLOCK_KIND_ADD],
+]
+
+
+def world_unlock_tile_options(kind):
+    """Return the (display_name, tile_id) options for the Tile picker.
+
+    The list returned depends on the unlock *kind*:
+
+    * ``remove_obstacle`` — only passable overworld terrain so the
+      designer can't accidentally swap a boulder for another boulder.
+    * ``add_tile`` — every overworld-relevant tile type, including
+      walls/water/etc., so the designer can place bridges, mountains,
+      towns, etc.
+    * any other / empty kind — empty list (the field is disabled).
+    """
+    from src.settings import (
+        TILE_GRASS, TILE_PATH, TILE_SAND, TILE_BRIDGE, TILE_FOREST,
+        TILE_WATER, TILE_MOUNTAIN, TILE_TOWN, TILE_DUNGEON,
+        TILE_DUNGEON_CLEARED, TILE_DEFS,
+    )
+    passable = [TILE_GRASS, TILE_PATH, TILE_SAND, TILE_BRIDGE, TILE_FOREST]
+    all_overworld = passable + [
+        TILE_WATER, TILE_MOUNTAIN, TILE_TOWN, TILE_DUNGEON,
+        TILE_DUNGEON_CLEARED,
+    ]
+    if kind == WORLD_UNLOCK_KIND_REMOVE:
+        ids = passable
+    elif kind == WORLD_UNLOCK_KIND_ADD:
+        ids = all_overworld
+    else:
+        return []
+    options = []
+    for tid in ids:
+        info = TILE_DEFS.get(tid)
+        if info:
+            options.append((info.get("name", f"Tile {tid}"), tid))
+    return options
+
+
+def world_unlock_tile_name(tile_id):
+    """Return the display name for a tile id (or "(none)" if missing)."""
+    from src.settings import TILE_DEFS
+    if tile_id is None or tile_id == "":
+        return "(none)"
+    info = TILE_DEFS.get(tile_id)
+    if info:
+        return info.get("name", f"Tile {tile_id}")
+    return f"Tile {tile_id}"
+
+
+def apply_world_unlocks(tile_map, unlocks):
+    """Apply a list of ``reward_world_unlocks`` ops to *tile_map*.
+
+    Each op is ``{"kind": ..., "col": int, "row": int, "tile": int}``.
+    Only ops with valid in-bounds coordinates and an integer tile id
+    are applied — bad entries are skipped silently so a malformed
+    quest file never crashes a game on load.
+
+    Returns the list of ``(col, row, tile_id)`` triples that were
+    actually applied, useful for building reward-summary text.
+    """
+    applied = []
+    if not tile_map or not unlocks:
+        return applied
+    for op in unlocks:
+        if not isinstance(op, dict):
+            continue
+        try:
+            c = int(op.get("col"))
+            r = int(op.get("row"))
+            t = int(op.get("tile"))
+        except (TypeError, ValueError):
+            continue
+        if not (0 <= c < tile_map.width and 0 <= r < tile_map.height):
+            continue
+        tile_map.set_tile(c, r, t)
+        applied.append((c, r, t))
+    return applied
+
+
 class ModuleQuestEditorMixin:
     """Mixin providing quest editing functionality for the Game class."""
 
@@ -114,6 +222,42 @@ class ModuleQuestEditorMixin:
         if current_loc_display not in loc_options:
             loc_options.append(current_loc_display)
 
+        # ── World Unlock fields ──
+        # Edit only the FIRST entry in reward_world_unlocks via 4
+        # inline fields (kind / col / row / tile). The data model is a
+        # list so authors can hand-edit quests.json to add multi-tile
+        # unlocks (e.g. a 2-wide bridge); the editor surfaces one
+        # entry to keep the UI simple.
+        unlocks = quest.get("reward_world_unlocks") or []
+        first_unlock = unlocks[0] if unlocks else {}
+        u_kind = first_unlock.get("kind", WORLD_UNLOCK_KIND_NONE)
+        u_kind_label = WORLD_UNLOCK_KIND_LABELS.get(u_kind,
+                                                    WORLD_UNLOCK_KIND_LABELS[
+                                                        WORLD_UNLOCK_KIND_NONE])
+        u_col = first_unlock.get("col", "")
+        u_row = first_unlock.get("row", "")
+        u_tile_id = first_unlock.get("tile")
+        # Tile picker contents depend on the kind; cache them so
+        # cycling Left/Right hits the right list.
+        u_tile_options = world_unlock_tile_options(u_kind)
+        u_tile_names = [name for name, _tid in u_tile_options]
+        u_tile_name_to_id = {name: tid for name, tid in u_tile_options}
+        u_tile_id_to_name = {tid: name for name, tid in u_tile_options}
+        # Cache for the save/load side
+        self._mod_quest_unlock_tile_name_to_id = u_tile_name_to_id
+        if u_tile_id in u_tile_id_to_name:
+            u_tile_display = u_tile_id_to_name[u_tile_id]
+        elif u_tile_names:
+            u_tile_display = u_tile_names[0]
+        else:
+            u_tile_display = "(none)"
+        # If the kind is "(none)" the tile choice is disabled; show
+        # that explicitly so the row doesn't look broken.
+        u_tile_choices = (u_tile_names if u_kind != WORLD_UNLOCK_KIND_NONE
+                          else ["(none)"])
+        if u_tile_display not in u_tile_choices:
+            u_tile_choices.append(u_tile_display)
+
         self._mod_quest_fields = [
             FieldEntry("Name", "name", quest.get("name", ""), "text", True),
             FieldEntry("Description", "description",
@@ -143,11 +287,26 @@ class ModuleQuestEditorMixin:
                        self._mod_quest_format_reward_items(
                            quest.get("reward_items", [])),
                        "item_list", True),
+            # ── World Unlock reward (mutates the overworld map) ──
+            FieldEntry("World Unlock", "", "", "section", False),
+            FieldEntry("Unlock Kind", "unlock_kind",
+                       u_kind_label, "choice", True),
+            FieldEntry("Unlock Col", "unlock_col",
+                       str(u_col), "int",
+                       u_kind != WORLD_UNLOCK_KIND_NONE),
+            FieldEntry("Unlock Row", "unlock_row",
+                       str(u_row), "int",
+                       u_kind != WORLD_UNLOCK_KIND_NONE),
+            FieldEntry("Unlock Tile", "unlock_tile",
+                       u_tile_display, "choice",
+                       u_kind != WORLD_UNLOCK_KIND_NONE),
         ]
 
         self._mod_quest_choice_map = {
             "giver_sprite": sprite_names,
             "giver_location": loc_options,
+            "unlock_kind": WORLD_UNLOCK_KIND_OPTIONS,
+            "unlock_tile": u_tile_choices,
         }
 
         fe = self.features_editor
@@ -162,6 +321,13 @@ class ModuleQuestEditorMixin:
         quest = self._mod_quest_get_current()
         if not quest:
             return
+        # Buffer the world-unlock virtual fields here; they don't map
+        # 1:1 to quest keys — they're consolidated into a single
+        # ``reward_world_unlocks`` list at the end.
+        unlock_kind_label = None
+        unlock_col_str = None
+        unlock_row_str = None
+        unlock_tile_label = None
         for fe_entry in self._mod_quest_fields:
             if not fe_entry.editable or fe_entry.field_type == "section":
                 continue
@@ -172,6 +338,20 @@ class ModuleQuestEditorMixin:
                 continue
             key = fe_entry.key
             val = fe_entry.value
+            # Capture world-unlock virtual fields and skip the generic
+            # ``quest[key] = val`` write — they're consolidated below.
+            if key == "unlock_kind":
+                unlock_kind_label = val
+                continue
+            if key == "unlock_col":
+                unlock_col_str = val
+                continue
+            if key == "unlock_row":
+                unlock_row_str = val
+                continue
+            if key == "unlock_tile":
+                unlock_tile_label = val
+                continue
             if fe_entry.field_type == "int":
                 # giver_col / giver_row: blank means "auto-place"
                 if key in ("giver_col", "giver_row") and (
@@ -192,6 +372,55 @@ class ModuleQuestEditorMixin:
                 loc_map = getattr(self, "_mod_quest_location_map", {})
                 val = loc_map.get(val, val)
             quest[key] = val
+
+        # ── Consolidate the world-unlock virtual fields ──
+        kind_value = WORLD_UNLOCK_LABEL_TO_KIND.get(
+            unlock_kind_label or "", WORLD_UNLOCK_KIND_NONE)
+        if kind_value == WORLD_UNLOCK_KIND_NONE:
+            # No unlock authored — drop the list entirely so the JSON
+            # stays clean.
+            existing = quest.get("reward_world_unlocks") or []
+            # Preserve any extra entries authored by hand (we only
+            # manage the first one through the editor).
+            if len(existing) > 1:
+                quest["reward_world_unlocks"] = existing[1:]
+            else:
+                quest.pop("reward_world_unlocks", None)
+        else:
+            try:
+                col_int = int(unlock_col_str) if unlock_col_str not in (
+                    None, "") else 0
+            except ValueError:
+                col_int = 0
+            try:
+                row_int = int(unlock_row_str) if unlock_row_str not in (
+                    None, "") else 0
+            except ValueError:
+                row_int = 0
+            tile_map_lookup = getattr(
+                self, "_mod_quest_unlock_tile_name_to_id", {}) or {}
+            tile_id = tile_map_lookup.get(unlock_tile_label)
+            if tile_id is None:
+                # Best-effort fallback — keep the previously stored id
+                # if the label can't be resolved (e.g. tiles list out
+                # of sync mid-edit).  Otherwise default to grass.
+                from src.settings import TILE_GRASS
+                existing = quest.get("reward_world_unlocks") or []
+                if existing and isinstance(existing[0], dict):
+                    tile_id = existing[0].get("tile", TILE_GRASS)
+                else:
+                    tile_id = TILE_GRASS
+            new_first = {
+                "kind": kind_value,
+                "col": col_int,
+                "row": row_int,
+                "tile": int(tile_id),
+            }
+            existing = quest.get("reward_world_unlocks") or []
+            if existing:
+                quest["reward_world_unlocks"] = [new_first] + list(existing[1:])
+            else:
+                quest["reward_world_unlocks"] = [new_first]
 
     def _mod_quest_load_steps(self):
         """Load step list from the current quest."""
@@ -506,6 +735,7 @@ class ModuleQuestEditorMixin:
             "reward_xp": 0,
             "reward_gold": 0,
             "reward_items": [],
+            "reward_world_unlocks": [],
             "steps": [],
         }
         self._mod_quest_list.append(new_quest)
@@ -744,6 +974,26 @@ class ModuleQuestEditorMixin:
         idx = (idx + direction) % len(options)
         field.value = options[idx]
         self._mod_quest_buffer = field.value
+
+        # Changing the Unlock Kind toggles whether Col/Row/Tile are
+        # editable and what tile types are offered — rebuild the field
+        # list (same pattern used for step_type / has_guardian on the
+        # step editor).
+        if field.key == "unlock_kind":
+            # Persist current values so the rebuild picks them up,
+            # then re-emit the field list.
+            self._mod_quest_save_settings_fields()
+            current_idx = self._mod_quest_field
+            self._mod_quest_build_settings_fields()
+            # _build_ resets cursor to first editable field; restore
+            # the position the user was on so cycling feels stable.
+            if current_idx < len(self._mod_quest_fields):
+                cur = self._mod_quest_fields[current_idx]
+                if cur.editable and cur.field_type != "section":
+                    self._mod_quest_field = current_idx
+                    self._mod_quest_buffer = (
+                        cur.value if cur.field_type
+                        not in ("choice", "item_list") else "")
 
     def _handle_mod_quest_settings_field_input(self, event):
         """Handle input for quest settings field editing (level 22)."""

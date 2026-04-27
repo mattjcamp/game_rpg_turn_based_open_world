@@ -1618,6 +1618,9 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 reward_gold = qdef.get("reward_gold", 0) if qdef else 0
                 reward_items = (qdef.get("reward_items", [])
                                 if qdef else []) or []
+                reward_world_unlocks = (
+                    qdef.get("reward_world_unlocks", [])
+                    if qdef else []) or []
 
                 # Grant rewards
                 if reward_xp:
@@ -1633,6 +1636,20 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                         self.game.party.inv_add(item_name)
                     except Exception:
                         pass
+
+                # World-unlock rewards — mutate the overworld tile
+                # map so previously-impassable terrain becomes
+                # traversable (or whatever swap the quest authored).
+                # The grant is intentionally applied to the *overworld*
+                # tile_map, not whichever map the player is currently
+                # standing on (towns/dungeons have their own tile maps).
+                applied_unlocks = []
+                if reward_world_unlocks:
+                    from src.module_editor_quest import (
+                        apply_world_unlocks, world_unlock_tile_name)
+                    overworld_tm = getattr(self.game, "tile_map", None)
+                    applied_unlocks = apply_world_unlocks(
+                        overworld_tm, reward_world_unlocks)
 
                 # Build reward text
                 parts = []
@@ -1650,6 +1667,17 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                             + (f", +{len(reward_items)-3} more"
                                if len(reward_items) > 3 else "")
                             + ")")
+                if applied_unlocks:
+                    from src.module_editor_quest import world_unlock_tile_name
+                    if len(applied_unlocks) == 1:
+                        c, r, t = applied_unlocks[0]
+                        parts.append(
+                            f"World changed: {world_unlock_tile_name(t)} "
+                            f"at ({c},{r})")
+                    else:
+                        parts.append(
+                            f"World changed: {len(applied_unlocks)} "
+                            f"tiles updated")
                 reward_str = ", ".join(parts)
                 if reward_str:
                     self._set_dialogue(

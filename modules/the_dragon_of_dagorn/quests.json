@@ -79,5 +79,79 @@
     ],
     "giver_col": 12,
     "giver_row": 9
+  },
+  {
+    "name": "Goblins",
+    "description": "",
+    "giver_npc": "Loren ",
+    "giver_sprite": "src/assets/game/npcs/elder.png",
+    "giver_location": "town:Plainstown",
+    "giver_dialogue": "Up to the North is a cave where we suspect the goblins that have been causing all this mischief have been hiding. There is a reward for any adventurer willing to take on this problem for our town.",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Kill Those Goblins",
+        "step_type": "kill",
+        "encounter": "Wolves and Goblins",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Goblin's Nest",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the Goblin Leaders",
+        "step_type": "kill",
+        "encounter": "Goblin Ambush",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Goblin's Nest",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 20,
+    "giver_row": 20
+  },
+  {
+    "name": "Retrieve the Town Seal",
+    "description": "",
+    "giver_npc": "",
+    "giver_sprite": "src/assets/unassigned/wizard_f1.png",
+    "giver_location": "town:Plainstown",
+    "giver_dialogue": "Our town's seal has been stolen and hidden in that creepy forest near the sea up north. Please retreive this artifact and I will provide passage off this island.",
+    "reward_xp": 200,
+    "reward_gold": 200,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Retrieve the Town Seal",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "Seal of Binding",
+        "has_guardian": "yes",
+        "guardian_encounter": "Necromancer's Guard",
+        "spawn_location": "dungeon:The Old Forest by the Sea",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 15,
+    "giver_row": 16,
+    "reward_world_unlocks": [
+      {
+        "kind": "add_tile",
+        "col": 5,
+        "row": 13,
+        "tile": 8
+      }
+    ]
   }
 ]
