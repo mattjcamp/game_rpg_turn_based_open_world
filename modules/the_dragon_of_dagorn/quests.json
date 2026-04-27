@@ -1,0 +1,83 @@
+[
+  {
+    "name": "Rats!",
+    "description": "",
+    "giver_npc": "Thelma",
+    "giver_sprite": "src/assets/game/npcs/villager_citizen.png",
+    "giver_location": "town:Plainstown",
+    "giver_dialogue": "Hail new arrivals! I hear you are in need of coin and more to aid in your adventures. I have a problem that I think you can solve. Maybe we can make a deal? I am the shop owner and I've found myself with a Graint Rat problem and I suspect it may be even worse. They are in my shop and in my basement. If you would deal with that problem I can make it worth your while! I have some extra Camping Supplies that I think may be real worthwhile. Deal?",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "reward_items": [
+      "Camping Supplies",
+      "Arrows"
+    ],
+    "steps": [
+      {
+        "description": "Kill the shop rat",
+        "step_type": "kill",
+        "encounter": "Cellar Rats",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Plainstown/General Shop Interior",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      },
+      {
+        "description": "Kill the basement rats",
+        "step_type": "kill",
+        "encounter": "Rat Swarm",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Plainstown/Tunnel Long",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "Rat Out the Goblic",
+        "step_type": "kill",
+        "encounter": "Stray Goblin",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Plainstown/Tunnel Long",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 12
+  },
+  {
+    "name": "Ghost Hunters",
+    "description": "",
+    "giver_npc": "Neil",
+    "giver_sprite": "src/assets/game/characters/fighter.png",
+    "giver_location": "town:Plainstown",
+    "giver_dialogue": "Oh my... I was part of a \"ghost hunter\" team. I never really believe it ghosts at all until I came face to face with one in one of those houses. My partner didn't make it. Can ghosts kill? I'm so sorry I lied about being a ghost hunter. Can you take care of this? I can share my fee with you...",
+    "reward_xp": 100,
+    "reward_gold": 50,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Debunk the Ghost",
+        "step_type": "kill",
+        "encounter": "Shambling Dead",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Plainstown/Inside House 2",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 12,
+    "giver_row": 9
+  }
+]

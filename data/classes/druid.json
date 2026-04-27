@@ -1,6 +1,6 @@
 {
   "name": "Druid",
-  "_comment": "Druid (Cleric + Wizard). Dual caster using both priest and sorcerer spells. Partial caster balanced at ~half a Wizard's MP — base MP is half the average of INT/WIS, per-level gain uses the average stat's modifier. Recovers MP at 2x rate.",
+  "_comment": "Druid (Cleric + Wizard). Dual caster using both priest and sorcerer spells. Partial caster balanced at ~half a Wizard's MP \u2014 base MP is half the average of INT/WIS, per-level gain uses the average stat's modifier. Recovers MP at 2x rate.",
   "allowed_weapons": [
     "fists",
     "dagger",
@@ -14,7 +14,7 @@
   "hp_per_level": 5,
   "mp_per_level": 8,
   "range": 2,
-  "exp_per_level": 1000,
+  "exp_per_level": 1500,
   "allowed_races": [
     "human",
     "dwarf",

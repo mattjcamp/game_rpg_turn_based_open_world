@@ -16,7 +16,7 @@
       "throwable": false,
       "buy": 0,
       "sell": 0,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false
     },
     "Club": {
@@ -55,7 +55,7 @@
       "character_can_equip": true,
       "melee": false,
       "throwable": false,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false
     },
     "Dagger": {
@@ -123,7 +123,7 @@
       "item_type": "halberd",
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "melee": false,
       "throwable": false,
@@ -164,7 +164,7 @@
       "sell": 75,
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "melee": false,
       "throwable": false
@@ -183,7 +183,7 @@
       "sell": 20,
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "melee": false,
       "throwable": false
@@ -273,7 +273,7 @@
       "sell": 30,
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "melee": false,
       "throwable": false
@@ -290,7 +290,7 @@
       "item_type": "spear",
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "melee": false,
       "throwable": false,
@@ -326,7 +326,7 @@
       "sell": 60,
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "melee": false,
       "throwable": false
@@ -414,7 +414,7 @@
       "sell": 25,
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false
     },
     "Plate": {
@@ -427,7 +427,7 @@
       "item_type": "plate",
       "party_can_equip": false,
       "character_can_equip": true,
-      "durability": 40,
+      "durability": 20,
       "indestructible": false,
       "buy": 200,
       "sell": 150

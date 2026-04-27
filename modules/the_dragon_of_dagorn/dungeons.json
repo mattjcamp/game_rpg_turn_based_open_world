@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Goblin's Nest",
+    "description": "A dank, smelly hole, full of trash. The perfect place to find a den of goblins.",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 4,
+    "difficulty": "easy",
+    "level_size": "large",
+    "torch_density": "none",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "The Old Forest by the Sea",
+    "description": "Just looking at this old sea weather wood suffucates you. But, something is mesmerizing about the wood. You feel drawn in.",
+    "mode": "procedural",
+    "dungeon_style": "forest",
+    "num_levels": 6,
+    "difficulty": "normal",
+    "level_size": "large",
+    "torch_density": "moderate",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  }
+]

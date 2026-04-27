@@ -16,8 +16,16 @@ from src.settings import (
     MOVE_REPEAT_DELAY, TILE_STAIRS, TILE_CHEST, TILE_TRAP, TILE_DFLOOR,
     TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR, TILE_DDOOR,
     TILE_DUNGEON_CLEARED, TILE_PATH,
+    TILE_FOREST_ARCHWAY_UP, TILE_FOREST_ARCHWAY_DOWN,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
 )
+
+# Tile groups for ascend/descend logic.  Forest-style dungeons use the
+# archway tiles as their level transitions; classic stone dungeons use
+# the original stair tiles.  The handlers below treat both groups
+# identically — only the rendered sprite differs.
+_ASCEND_TILES  = {TILE_STAIRS, TILE_FOREST_ARCHWAY_UP}
+_DESCEND_TILES = {TILE_STAIRS_DOWN, TILE_FOREST_ARCHWAY_DOWN}
 
 
 class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
@@ -784,7 +792,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                     on_custom_exit = (
                         custom_exits and (pcol, prow) in custom_exits
                     )
-                    if tile_id == TILE_STAIRS:
+                    if tile_id in _ASCEND_TILES:
                         # Tiles recorded in ``overworld_exits`` leave the
                         # dungeon directly (used on the bottom floor of
                         # procedural multi-level dungeons).
@@ -1598,7 +1606,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             msg_sink=self.show_message,
         )
 
-        if tile_id == TILE_STAIRS:
+        if tile_id in _ASCEND_TILES:
             overworld_exits = getattr(
                 self.dungeon_data, "overworld_exits", None) or set()
             _is_forest = (
@@ -1658,7 +1666,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
                 self.dungeon_data.tile_map.set_tile(
                     col, row, self.dungeon_data.floor_tile)
 
-        elif tile_id == TILE_STAIRS_DOWN:
+        elif tile_id in _DESCEND_TILES:
             if self.quest_levels and self.current_level < len(self.quest_levels) - 1:
                 # Descend to next level
                 self.current_level += 1
@@ -1829,12 +1837,15 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         self.current_level -= 1
         self.dungeon_data = self.quest_levels[self.current_level]
         self._invalidate_torch_cache()
-        # Find the stairs-down tile on the level above to place the party
+        # Find the descent tile on the level above to place the party.
+        # Stone dungeons use TILE_STAIRS_DOWN; forest dungeons use the
+        # archway equivalent — either one signals "this is where we
+        # came down from".
         tmap = self.dungeon_data.tile_map
         placed = False
         for r in range(tmap.height):
             for c in range(tmap.width):
-                if tmap.get_tile(c, r) == TILE_STAIRS_DOWN:
+                if tmap.get_tile(c, r) in _DESCEND_TILES:
                     self.game.party.col = c
                     self.game.party.row = r
                     placed = True

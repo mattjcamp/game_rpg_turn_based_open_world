@@ -30,7 +30,20 @@ from src.settings import (
     TILE_DFLOOR, TILE_DWALL, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
     TILE_STAIRS_DOWN, TILE_DDOOR, TILE_ARTIFACT, TILE_PORTAL, TILE_LOCKED_DOOR,
     TILE_DUNGEON_CLEARED,
+    TILE_WALL_TORCH, TILE_PUDDLE, TILE_MOSS,
 )
+
+
+# Tiles whose sprites have transparent backgrounds and are designed
+# to overlay an underlying surface.  Procedural dungeons place them
+# on ``tile_map.decorations`` with the proper wall/floor underneath;
+# custom maps (towns, shops, hand-painted dungeons) sometimes paint
+# them as base tiles instead.  In that case ``_draw_tile`` synthesises
+# a backdrop from neighbouring tiles so the torch flame / moss / puddle
+# blends with its surroundings instead of floating on the screen-fill
+# black.
+_WALL_OVERLAY_TILES = frozenset({TILE_WALL_TORCH})
+_FLOOR_OVERLAY_TILES = frozenset({TILE_PUDDLE, TILE_MOSS})
 from src.monster import MONSTERS
 from src.party import (
     ITEM_INFO, SPELLS_DATA, WEAPONS, ARMORS, EFFECTS_DATA,
@@ -1062,6 +1075,45 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_altar_tile(px, py, ts)
             return
 
+        # 3a. Decoration-overlay backdrop synthesis.
+        #     Tiles in _WALL_OVERLAY_TILES / _FLOOR_OVERLAY_TILES have
+        #     transparent sprites — they're meant to sit on top of an
+        #     underlying surface.  Procedural dungeons supply that
+        #     surface via ``tile_map.decorations`` (the overlay is
+        #     drawn after the base tile in draw_dungeon_u3).  When
+        #     these tiles are hand-painted as BASE tiles in a custom
+        #     map (shop, hand-built dungeon, town interior), there is
+        #     no base underneath, so the transparent sprite blits
+        #     directly over the screen-fill black and the player sees
+        #     a flame floating on a dark void instead of a flame on
+        #     the brick wall it's mounted on.  Synthesise a backdrop
+        #     from the 4 cardinal neighbours: for wall-overlay tiles
+        #     (torches), pick the most common non-walkable neighbour;
+        #     for floor-overlay tiles, pick the most common walkable
+        #     one.  The backdrop is drawn first, then the overlay
+        #     sprite goes on top via the normal blit below.
+        if (tile_id in _WALL_OVERLAY_TILES
+                or tile_id in _FLOOR_OVERLAY_TILES):
+            backdrop_id = self._infer_overlay_backdrop(
+                tile_map, wc, wr, tile_id)
+            if backdrop_id is not None:
+                backdrop_sprite = self._tile_sprites.get(backdrop_id)
+                if backdrop_sprite:
+                    bsw, bsh = backdrop_sprite.get_size()
+                    if bsw != ts or bsh != ts:
+                        bcache = getattr(
+                            self, '_scaled_tile_cache', None)
+                        if bcache is None:
+                            bcache = self._scaled_tile_cache = {}
+                        bkey = (backdrop_id, ts)
+                        bscaled = bcache.get(bkey)
+                        if bscaled is None:
+                            bscaled = pygame.transform.scale(
+                                backdrop_sprite, (ts, ts))
+                            bcache[bkey] = bscaled
+                        backdrop_sprite = bscaled
+                    self.screen.blit(backdrop_sprite, (px, py))
+
         # 4. Standard sprite lookup with auto-scaling cache.
         #    (TILE_EXIT previously had a global town_gate override here;
         #    removed so painted sprites / per-cell overrides always win.)
@@ -1138,6 +1190,60 @@ class Renderer(CombatEffectRendererMixin):
         else:
             pygame.draw.rect(self.screen, (0, 0, 0),
                              pygame.Rect(px, py, ts, ts))
+
+    def _infer_overlay_backdrop(self, tile_map, wc, wr, tile_id):
+        """Pick a tile_id to paint as the backdrop under a hand-placed
+        decoration overlay tile (torch / puddle / moss).
+
+        Walks the four cardinal neighbours and tallies tile_ids that
+        could plausibly sit *behind* this overlay:
+
+        - For ``_WALL_OVERLAY_TILES`` (torches) — neighbours that are
+          *non-walkable*, since a wall torch is mounted on a wall.
+        - For ``_FLOOR_OVERLAY_TILES`` (puddles, moss) — neighbours
+          that are *walkable*, since these decorations sit on a floor.
+
+        Returns the most common matching tile_id, or ``None`` if no
+        suitable neighbour exists (the caller then falls back to the
+        existing transparent-on-black render, which matches today's
+        behaviour for isolated overlay tiles in open space).
+        """
+        from src.settings import TILE_VOID
+        if tile_map is None:
+            return None
+        is_wall_overlay = tile_id in _WALL_OVERLAY_TILES
+        counts = {}
+        for dc, dr in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+            nc, nr = wc + dc, wr + dr
+            if not (0 <= nc < tile_map.width
+                    and 0 <= nr < tile_map.height):
+                continue
+            nid = tile_map.get_tile(nc, nr)
+            # Skip same-overlay neighbours (they'd just stack the
+            # transparent sprite again) and TILE_VOID (no sprite).
+            if (nid == tile_id or nid == TILE_VOID
+                    or nid in _WALL_OVERLAY_TILES
+                    or nid in _FLOOR_OVERLAY_TILES):
+                continue
+            # Walkability check, honouring per-cell tile_properties
+            # overrides (forest dungeons flip TILE_FOREST to
+            # non-walkable, for example).
+            walkable = TILE_DEFS.get(nid, {}).get("walkable", False)
+            props = getattr(tile_map, "tile_properties", None)
+            if props:
+                entry = props.get(f"{nc},{nr}")
+                if isinstance(entry, dict) and "walkable" in entry:
+                    walkable = bool(entry["walkable"])
+            if is_wall_overlay and walkable:
+                continue
+            if not is_wall_overlay and not walkable:
+                continue
+            counts[nid] = counts.get(nid, 0) + 1
+        if not counts:
+            return None
+        # Most common matching neighbour wins; ties resolve to the
+        # first inserted via the dict's insertion order.
+        return max(counts, key=counts.get)
 
     def _draw_dungeon_atmosphere(self, tile_id, px, py, ts, wc, wr,
                                  palette):

@@ -78,6 +78,15 @@ TILE_WALL_TORCH = 34
 TILE_ALTAR     = 35
 TILE_VOID      = 36  # Black empty space (non-walkable, for interior edges)
 
+# Forest-dungeon transition tiles.  These behave exactly like
+# TILE_STAIRS / TILE_STAIRS_DOWN — same ascend/descend logic, same
+# placement on the south/north edge in procedural forest dungeons —
+# but render with their own archway sprites so the player gets a
+# clearly identifiable gateway tile in the woods instead of an
+# invisible "stairs disguised as path" cell.
+TILE_FOREST_ARCHWAY_UP   = 77
+TILE_FOREST_ARCHWAY_DOWN = 78
+
 # ----- Spawn tile IDs -----
 TILE_SPAWN     = 66  # Monster spawn point (overworld)
 TILE_SPAWN_CAMPFIRE = 67  # Campfire spawn point (overworld)
@@ -128,6 +137,9 @@ TILE_DEFS = {
     TILE_WALL_TORCH: {"color": (160, 120, 40), "walkable": False, "name": "Wall Torch"},
     TILE_ALTAR:      {"color": (200, 160, 100), "walkable": False, "name": "Altar"},
     TILE_VOID:       {"color": (0, 0, 0),       "walkable": False, "name": "Void"},
+    # Forest-dungeon transition gateways
+    TILE_FOREST_ARCHWAY_UP:   {"color": (80, 120, 60),  "walkable": True, "name": "Forest Archway Up"},
+    TILE_FOREST_ARCHWAY_DOWN: {"color": (40, 55, 35),   "walkable": True, "name": "Forest Archway Down"},
     # Spawn tiles
     TILE_SPAWN:      {"color": (180, 40, 40),    "walkable": True,  "name": "Monster Spawn"},
     TILE_SPAWN_CAMPFIRE: {"color": (200, 120, 30), "walkable": True, "name": "Campfire Spawn"},

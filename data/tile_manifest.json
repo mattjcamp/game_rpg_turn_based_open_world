@@ -101,7 +101,8 @@
       "path": "src/assets/unassigned/town_village.png",
       "usable_in": [
         "overworld"
-      ]
+      ],
+      "tile_id": 76
     },
     "water_deep_ocean": {
       "path": "src/assets/unassigned/water_deep_ocean.png",
@@ -376,6 +377,20 @@
         "dungeon"
       ],
       "tile_id": 34
+    },
+    "forest_archway_up": {
+      "path": "src/assets/game/dungeon/forest_archway_up.png",
+      "usable_in": [
+        "dungeon"
+      ],
+      "tile_id": 77
+    },
+    "forest_archway_down": {
+      "path": "src/assets/game/dungeon/forest_archway_down.png",
+      "usable_in": [
+        "dungeon"
+      ],
+      "tile_id": 78
     }
   },
   "people": {

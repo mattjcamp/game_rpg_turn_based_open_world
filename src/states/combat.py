@@ -2570,12 +2570,19 @@ class CombatState(BaseState):
         monsters_hit = []
         fighters_hit = []
 
-        # Damage ALL monsters in blast radius (Chebyshev distance)
+        # Damage ALL monsters in blast radius (Chebyshev distance).
+        # Multi-tile monsters: take the *minimum* distance across
+        # their entire footprint, so a 2x2 dragon catches the blast
+        # if any of its 4 tiles is within radius (not just the
+        # anchor — that bug previously let a fireball aimed at a
+        # non-anchor dragon tile log full damage but apply zero).
         for monster in list(self.monsters):
             if not monster.is_alive():
                 continue
             mc, mr = self.monster_positions.get(monster, (-99, -99))
-            dist = max(abs(mc - tc), abs(mr - tr))
+            occupied = self._monster_occupied_tiles(monster, mc, mr)
+            dist = min(max(abs(c - tc), abs(r - tr))
+                       for c, r in occupied)
             if dist <= radius:
                 monster.hp = max(0, monster.hp - damage)
                 label = monster.name
@@ -2699,19 +2706,28 @@ class CombatState(BaseState):
 
         bolt_set = set(bolt_tiles)
 
-        # Damage all monsters on the bolt path
+        # Damage all monsters on the bolt path.  Multi-tile monsters
+        # (battle_scale >= 2, e.g. Dragon at 2x2) occupy more than just
+        # their anchor tile, so we test the bolt against the full
+        # footprint via _monster_occupied_tiles.  A bolt that grazes
+        # any tile of the dragon counts as a hit; without this, aiming
+        # at one of the dragon's non-anchor tiles would log damage but
+        # apply none.
         monsters_hit = []
         for monster in list(self.monsters):
             if not monster.is_alive():
                 continue
             mc, mr = self.monster_positions.get(monster, (-99, -99))
-            if (mc, mr) in bolt_set:
+            occupied = self._monster_occupied_tiles(monster, mc, mr)
+            if occupied & bolt_set:
                 monster.hp = max(0, monster.hp - damage)
                 label = monster.name
                 if monster.charmed:
                     label += " (ally)"
                 self.combat_log.append(
                     f"  Lightning strikes {label} for {damage} damage!")
+                # Centre the hit-flash on the monster's anchor tile
+                # so the damage number floats above the sprite.
                 self.hit_effects.append(HitEffect(mc, mr, damage))
                 monsters_hit.append(monster)
 

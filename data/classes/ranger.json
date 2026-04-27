@@ -19,7 +19,7 @@
   "hp_per_level": 10,
   "mp_per_level": 3,
   "range": 6,
-  "exp_per_level": 1000,
+  "exp_per_level": 1500,
   "allowed_races": [
     "human",
     "dwarf",
@@ -35,12 +35,12 @@
   "class_abilities": [
     {
       "name": "Herbalism",
-      "description": "Keen knowledge of flora lets Rangers spot reagents in the wild. When the party presses E to examine a tile, each Ranger rolls an INT saving throw (d20 + INT mod vs DC 13) — success identifies a potion reagent."
+      "description": "Keen knowledge of flora lets Rangers spot reagents in the wild. When the party presses E to examine a tile, each Ranger rolls an INT saving throw (d20 + INT mod vs DC 13) \u2014 success identifies a potion reagent."
     },
     {
       "name": "Pick Locks",
       "min_level": 3,
-      "description": "From level 3, a Ranger can pick locked doors and chests (d20 + DEX mod vs DC 12), consuming one lockpick per attempt — same mechanic as a Thief."
+      "description": "From level 3, a Ranger can pick locked doors and chests (d20 + DEX mod vs DC 12), consuming one lockpick per attempt \u2014 same mechanic as a Thief."
     },
     {
       "name": "Detect Traps",

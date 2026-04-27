@@ -20,6 +20,7 @@ from src.settings import (
     TILE_PUDDLE, TILE_MOSS, TILE_WALL_TORCH,
     TILE_MOUNTAIN, TILE_PATH,
     TILE_FOREST, TILE_WATER, TILE_GRASS, TILE_SAND,
+    TILE_FOREST_ARCHWAY_UP, TILE_FOREST_ARCHWAY_DOWN,
 )
 from src.monster import create_encounter, create_monster
 
@@ -321,7 +322,8 @@ def _place_doors(tmap, rooms, floor_tile=TILE_DFLOOR):
     # so the underlying tile here is the floor tile — no need to list
     # them explicitly.
     PASSABLE = {floor_tile, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-                TILE_STAIRS_DOWN, TILE_ARTIFACT}
+                TILE_STAIRS_DOWN, TILE_ARTIFACT,
+                TILE_FOREST_ARCHWAY_UP, TILE_FOREST_ARCHWAY_DOWN}
 
     # Pre-compute room interior tile sets
     all_room_tiles = set()
@@ -418,7 +420,8 @@ def _fix_disconnected_locked_doors(tmap, rooms, stairs_col, stairs_row,
     # Decorations (puddles/moss) sit on the overlay layer — the base
     # tile under them is the floor tile, which is already in this set.
     WALKABLE_FOR_CHECK = {floor_tile, TILE_STAIRS, TILE_CHEST, TILE_TRAP,
-                          TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_DDOOR}
+                          TILE_STAIRS_DOWN, TILE_ARTIFACT, TILE_DDOOR,
+                          TILE_FOREST_ARCHWAY_UP, TILE_FOREST_ARCHWAY_DOWN}
 
     def bfs_reachable(start_c, start_r):
         visited = set()
@@ -830,8 +833,11 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # for any reason, we fall back to the room-center stairs.
     stairs_col, stairs_row = (None, None)
     if style == "forest":
+        # Forest dungeons use a wooded archway as the visible "way back"
+        # marker — readable as a gateway tile rather than the invisible
+        # stairs-painted-as-path the renderer used to emit.
         stairs_col, stairs_row = _place_forest_edge_stairs(
-            tmap, edge="south", tile_id=TILE_STAIRS,
+            tmap, edge="south", tile_id=TILE_FOREST_ARCHWAY_UP,
             floor_tile=floor_tile, wall_tile=wall_tile)
     if stairs_col is None:
         stairs_col, stairs_row = rooms[0].center
@@ -961,8 +967,11 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     if place_stairs_down and len(rooms) >= 2:
         sc, sr = (None, None)
         if style == "forest":
+            # Mirror of the south-edge entrance: a darker archway at
+            # the north edge whose interior reads as "the trail
+            # continues deeper into the woods".
             sc, sr = _place_forest_edge_stairs(
-                tmap, edge="north", tile_id=TILE_STAIRS_DOWN,
+                tmap, edge="north", tile_id=TILE_FOREST_ARCHWAY_DOWN,
                 floor_tile=floor_tile, wall_tile=wall_tile)
         if sc is None:
             last_room = rooms[-1]
@@ -1048,9 +1057,12 @@ def _place_forest_edge_stairs(tmap, edge, tile_id,
         ``"south"`` (entry, faces back the way you came) or
         ``"north"`` (descent, faces deeper into the woods).
     tile_id : int
-        Usually ``TILE_STAIRS`` for entrances/ascents or
-        ``TILE_STAIRS_DOWN`` for descents.  The renderer's forest
-        override paints either as the path sprite.
+        For forest dungeons this is now ``TILE_FOREST_ARCHWAY_UP``
+        (south-edge entrance/ascent) or ``TILE_FOREST_ARCHWAY_DOWN``
+        (north-edge descent) — a wooden archway sprite that reads as
+        a clear gateway in the woods.  Older callers may still pass
+        ``TILE_STAIRS``/``TILE_STAIRS_DOWN``, which the renderer
+        disguises as the path sprite (legacy behaviour).
     floor_tile, wall_tile : int
         The room-floor tile (``TILE_GRASS``) and default wall tile
         (``TILE_FOREST``) for this dungeon.  Trail cells are carved

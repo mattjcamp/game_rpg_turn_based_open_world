@@ -11,7 +11,7 @@
   "hp_per_level": 4,
   "mp_per_level": 15,
   "range": 2,
-  "exp_per_level": 1000,
+  "exp_per_level": 1500,
   "allowed_races": [
     "human",
     "elf",

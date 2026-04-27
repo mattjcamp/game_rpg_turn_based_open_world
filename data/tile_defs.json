@@ -769,5 +769,38 @@
     "context": "spawns",
     "sprite": "overworld/island_jungle",
     "interaction_type": "spawn"
+  },
+  "76": {
+    "name": "Village",
+    "walkable": true,
+    "color": [
+      128,
+      128,
+      128
+    ],
+    "context": "overworld",
+    "sprite": "overworld/town_village"
+  },
+  "77": {
+    "name": "Forest Archway Up",
+    "walkable": true,
+    "color": [
+      80,
+      120,
+      60
+    ],
+    "context": "dungeon",
+    "sprite": "dungeon/forest_archway_up"
+  },
+  "78": {
+    "name": "Forest Archway Down",
+    "walkable": true,
+    "color": [
+      40,
+      55,
+      35
+    ],
+    "context": "dungeon",
+    "sprite": "dungeon/forest_archway_down"
   }
 }

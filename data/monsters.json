@@ -111,7 +111,7 @@
       "damage_dice": 1,
       "damage_sides": 6,
       "damage_bonus": 1,
-      "xp_reward": 20,
+      "xp_reward": 30,
       "gold_min": 0,
       "gold_max": 5,
       "color": [
@@ -140,7 +140,7 @@
       "damage_dice": 2,
       "damage_sides": 4,
       "damage_bonus": 1,
-      "xp_reward": 45,
+      "xp_reward": 50,
       "gold_min": 10,
       "gold_max": 25,
       "color": [
@@ -263,7 +263,7 @@
       "damage_dice": 1,
       "damage_sides": 4,
       "damage_bonus": 0,
-      "xp_reward": 55,
+      "xp_reward": 25,
       "gold_min": 5,
       "gold_max": 18,
       "color": [
@@ -348,7 +348,7 @@
       "damage_dice": 1,
       "damage_sides": 4,
       "damage_bonus": 0,
-      "xp_reward": 35,
+      "xp_reward": 20,
       "gold_min": 5,
       "gold_max": 18,
       "color": [
@@ -391,7 +391,7 @@
       "damage_dice": 2,
       "damage_sides": 6,
       "damage_bonus": 2,
-      "xp_reward": 75,
+      "xp_reward": 70,
       "gold_min": 10,
       "gold_max": 25,
       "color": [
@@ -438,7 +438,7 @@
       "damage_dice": 1,
       "damage_sides": 6,
       "damage_bonus": 1,
-      "xp_reward": 25,
+      "xp_reward": 30,
       "gold_min": 3,
       "gold_max": 12,
       "color": [
@@ -465,7 +465,7 @@
       "damage_dice": 1,
       "damage_sides": 8,
       "damage_bonus": 0,
-      "xp_reward": 110,
+      "xp_reward": 90,
       "gold_min": 8,
       "gold_max": 25,
       "color": [
@@ -519,7 +519,7 @@
       "damage_dice": 3,
       "damage_sides": 4,
       "damage_bonus": 0,
-      "xp_reward": 40,
+      "xp_reward": 135,
       "gold_min": 10,
       "gold_max": 40,
       "color": [
@@ -625,7 +625,7 @@
       "damage_dice": 3,
       "damage_sides": 4,
       "damage_bonus": 0,
-      "xp_reward": 50,
+      "xp_reward": 125,
       "gold_min": 10,
       "gold_max": 30,
       "color": [
@@ -670,7 +670,7 @@
       "damage_dice": 2,
       "damage_sides": 6,
       "damage_bonus": 3,
-      "xp_reward": 90,
+      "xp_reward": 80,
       "gold_min": 15,
       "gold_max": 40,
       "color": [
@@ -699,7 +699,7 @@
       "damage_dice": 2,
       "damage_sides": 4,
       "damage_bonus": 0,
-      "xp_reward": 85,
+      "xp_reward": 120,
       "gold_min": 3,
       "gold_max": 25,
       "color": [
@@ -739,7 +739,7 @@
       "damage_dice": 4,
       "damage_sides": 8,
       "damage_bonus": 0,
-      "xp_reward": 35,
+      "xp_reward": 335,
       "gold_min": 20,
       "gold_max": 50,
       "color": [
@@ -787,7 +787,7 @@
       "damage_dice": 3,
       "damage_sides": 8,
       "damage_bonus": 2,
-      "xp_reward": 300,
+      "xp_reward": 190,
       "gold_min": 40,
       "gold_max": 120,
       "color": [
@@ -820,7 +820,7 @@
       "damage_dice": 1,
       "damage_sides": 6,
       "damage_bonus": 0,
-      "xp_reward": 240,
+      "xp_reward": 140,
       "gold_min": 25,
       "gold_max": 90,
       "color": [
@@ -886,7 +886,7 @@
       "damage_dice": 2,
       "damage_sides": 12,
       "damage_bonus": 0,
-      "xp_reward": 250,
+      "xp_reward": 205,
       "gold_min": 30,
       "gold_max": 80,
       "color": [
@@ -922,7 +922,7 @@
       "damage_dice": 1,
       "damage_sides": 10,
       "damage_bonus": 0,
-      "xp_reward": 280,
+      "xp_reward": 160,
       "gold_min": 50,
       "gold_max": 150,
       "color": [
