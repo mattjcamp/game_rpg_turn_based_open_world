@@ -4943,20 +4943,28 @@
             "link_y": "17"
           },
           "6,8": {
-            "walkable": "inherit (no)",
-            "light_source": true
+            "walkable": "yes (override)",
+            "light_source": true,
+            "light_range": "5",
+            "effect": "fire"
           },
           "6,6": {
-            "walkable": "inherit (no)",
-            "light_source": true
+            "walkable": "yes (override)",
+            "light_source": true,
+            "light_range": "5",
+            "effect": "fire"
           },
           "9,6": {
-            "walkable": "inherit (no)",
-            "light_source": true
+            "walkable": "yes (override)",
+            "light_source": true,
+            "light_range": "5",
+            "effect": "fire"
           },
           "9,8": {
-            "walkable": "inherit (no)",
-            "light_source": true
+            "walkable": "yes (override)",
+            "light_source": true,
+            "light_range": "5",
+            "effect": "fire"
           }
         }
       },
@@ -6764,6 +6772,11 @@
           },
           "6,5": {
             "walkable": "inherit (no)",
+            "light_source": true
+          },
+          "2,2": {
+            "walkable": "yes (override)",
+            "effect": "fire",
             "light_source": true
           }
         }

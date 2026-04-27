@@ -469,6 +469,29 @@ def _draw_tile_inspector(renderer, data: Dict):
             ty += 16
             continue
 
+        # ── Effect (animated overlay picker) ──
+        # Glyph + colour signals what's currently attached: a faint dot
+        # for "none", smoky grey for rising smoke, hot orange for fire,
+        # bright pink for fairy light.  Press Enter/Space to cycle.
+        if field_type == "effect":
+            val = str(value)
+            if val == "(none)" or not val:
+                box, col = "[ ]", (140, 140, 160)
+            elif "smoke" in val:
+                box, col = "[~]", (180, 180, 195)
+            elif "fire" in val:
+                box, col = "[*]", (255, 150, 60)
+            elif "fairy" in val or "light" in val:
+                box, col = "[+]", (240, 160, 230)
+            else:
+                box, col = "[?]", (200, 200, 210)
+            if is_active:
+                col = _COL_ORANGE
+            renderer._u3_text(f"{box} {label}: {val}",
+                              ix + pad, ty, col, fs)
+            ty += 16
+            continue
+
         # ── Tristate (inherit / yes / no override) ──
         # Glyph: [~] = inherit (taking the tile type's default), [x] =
         # forced walkable, [ ] = forced blocked. Colour coded so the
@@ -760,12 +783,21 @@ def _draw_dense_grid(renderer, data: Dict):
     end_c = min(cam_c + vis_cols, map_w)
     end_r = min(cam_r + vis_rows, map_h)
 
+    tprops_for_fx = data.get("tile_properties") or {}
     for mr in range(cam_r, end_r):
         for mc in range(cam_c, end_c):
             tile_id = tiles[mr][mc]
             px = ox + (mc - cam_c) * ts
             py = oy + (mr - cam_r) * ts
             renderer._draw_tile(tile_id, px, py, ts, mc, mr)
+            # Editor preview of animated tile effects: _draw_tile got
+            # called without a tile_map, so its built-in finally hook
+            # has nothing to look up.  Run the overlay explicitly,
+            # passing the editor's tile_properties dict directly.
+            if tprops_for_fx:
+                renderer._draw_tile_effect_overlay(
+                    px, py, ts, mc, mr,
+                    tile_properties=tprops_for_fx)
 
     # Ground-item overlay (tiles with tile_properties[...]["item"] set)
     _draw_ground_items(renderer, data, ox, oy, ts,
@@ -1006,6 +1038,7 @@ def _draw_sparse_grid(renderer, data: Dict):
         start_c, start_r = 0, 0
         end_c, end_r = tw, th
 
+    tprops_for_fx = data.get("tile_properties") or {}
     for r in range(start_r, end_r):
         for c in range(start_c, end_c):
             px = gx + (c - cam_c) * ts
@@ -1036,6 +1069,14 @@ def _draw_sparse_grid(renderer, data: Dict):
                     col = TILE_DEFS.get(tid, {}).get("color", (80, 80, 80))
                     pygame.draw.rect(screen, col,
                                      pygame.Rect(px, py, ts, ts))
+                # Editor preview of animated tile effects.  The sparse
+                # grid blits sprites directly (not via _draw_tile), so
+                # we paint the overlay explicitly from the editor's
+                # tile_properties dict.
+                if tprops_for_fx:
+                    renderer._draw_tile_effect_overlay(
+                        px, py, ts, c, r,
+                        tile_properties=tprops_for_fx)
 
             else:
                 # Checkerboard for empty

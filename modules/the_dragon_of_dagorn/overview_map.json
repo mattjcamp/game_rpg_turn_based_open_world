@@ -1290,6 +1290,32 @@
       "walkable": "inherit (yes)",
       "linked": true,
       "link_map": "dungeon:The Old Forest by the Sea"
+    },
+    "8,5": {
+      "walkable": "yes (override)"
+    },
+    "14,7": {
+      "walkable": "yes (override)"
+    },
+    "37,1": {
+      "walkable": "inherit (no)",
+      "effect": "rising_smoke"
+    },
+    "38,1": {
+      "walkable": "inherit (yes)",
+      "effect": "rising_smoke"
+    },
+    "39,1": {
+      "walkable": "inherit (no)",
+      "effect": "rising_smoke"
+    },
+    "38,0": {
+      "walkable": "inherit (no)",
+      "effect": "rising_smoke"
+    },
+    "39,0": {
+      "walkable": "inherit (no)",
+      "effect": "rising_smoke"
     }
   }
 }

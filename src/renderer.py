@@ -1036,12 +1036,49 @@ class Renderer(CombatEffectRendererMixin):
     # applied as a separate overlay via `_draw_dungeon_atmosphere` so
     # the per-tile rendering itself stays context-free.
     def _draw_tile(self, tile_id, px, py, ts, wc, wr, *, tile_map=None):
-        """Render *tile_id* at (px, py) using the unified sprite registry."""
+        """Render *tile_id* at (px, py) using the unified sprite registry.
+
+        After the base tile is drawn (regardless of which code path
+        renders it — sprite override, animated tile, standard blit,
+        fallback rect), the optional *animated effect overlay* declared
+        in ``tile_map.tile_properties[…]['effect']`` is painted on top.
+        The overlay runs in a ``finally`` block so every early return
+        still triggers it.
+        """
         from src.settings import (
             TILE_VOID, TILE_DUNGEON_CLEARED,
             TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
             TILE_ALTAR, TILE_BOAT, TILE_WATER, TILE_DEFS,
         )
+
+        try:
+            self._draw_tile_body(
+                tile_id, px, py, ts, wc, wr, tile_map=tile_map,
+                TILE_VOID=TILE_VOID,
+                TILE_DUNGEON_CLEARED=TILE_DUNGEON_CLEARED,
+                TILE_SPAWN_CAMPFIRE=TILE_SPAWN_CAMPFIRE,
+                TILE_SPAWN_GRAVEYARD=TILE_SPAWN_GRAVEYARD,
+                TILE_ALTAR=TILE_ALTAR,
+                TILE_BOAT=TILE_BOAT,
+                TILE_WATER=TILE_WATER,
+                TILE_DEFS=TILE_DEFS,
+            )
+        finally:
+            # Animated effect overlay, if any, paints on top of whatever
+            # the body just rendered.  Cheap no-op when there's no
+            # tile_properties on the map or no 'effect' key on this cell.
+            self._draw_tile_effect_overlay(
+                px, py, ts, wc, wr, tile_map=tile_map)
+
+    def _draw_tile_body(self, tile_id, px, py, ts, wc, wr, *,
+                        tile_map, TILE_VOID, TILE_DUNGEON_CLEARED,
+                        TILE_SPAWN_CAMPFIRE, TILE_SPAWN_GRAVEYARD,
+                        TILE_ALTAR, TILE_BOAT, TILE_WATER, TILE_DEFS):
+        """Original tile-drawing body, separated out so that
+        ``_draw_tile``'s try/finally can wrap it cleanly.  All early
+        returns inside this body propagate through the wrapper, and
+        the effect overlay still fires from the wrapper's ``finally``.
+        """
 
         # 1. TILE_VOID — always invisible (border / unpainted cells)
         if tile_id == TILE_VOID:
@@ -1190,6 +1227,179 @@ class Renderer(CombatEffectRendererMixin):
         else:
             pygame.draw.rect(self.screen, (0, 0, 0),
                              pygame.Rect(px, py, ts, ts))
+
+    # ── Animated tile effect overlays ───────────────────────────────
+    # The map editor lets authors attach a procedural animated effect
+    # to any tile (rising smoke / fire / fairy light) by writing a
+    # ``"effect"`` key into ``tile_properties[col,row]``.  These
+    # helpers paint that animation on top of the tile every frame.
+    # All animations are fully procedural (pygame.draw + per-tile
+    # deterministic seed + ``pygame.time.get_ticks()`` phase) — no
+    # sprite assets, so the effect can sit on any base tile.
+
+    def _draw_tile_effect_overlay(self, px, py, ts, wc, wr, *,
+                                  tile_map=None, tile_properties=None):
+        """Read ``tile_properties[(wc,wr)]`` (or the string-key
+        equivalent) and dispatch to the matching effect drawer.
+
+        Both runtime tile_maps (where the dict lives on
+        ``tile_map.tile_properties``) and the in-editor preview
+        (which passes its ``state.tile_properties`` directly) are
+        supported.  Different subsystems use either tuple or string
+        keys, so we try both.
+        """
+        if tile_properties is None:
+            if tile_map is None:
+                return
+            tile_properties = getattr(tile_map, "tile_properties", None)
+            if not tile_properties:
+                return
+        # Tuple keys come from procedural generation; string keys come
+        # from the JSON-backed editor.  Try both before giving up.
+        props = tile_properties.get((wc, wr))
+        if props is None:
+            props = tile_properties.get(f"{wc},{wr}")
+        if not isinstance(props, dict):
+            return
+        effect = props.get("effect")
+        if not effect:
+            return
+        if effect == "rising_smoke":
+            self._draw_effect_rising_smoke(px, py, ts, wc, wr)
+        elif effect == "fire":
+            self._draw_effect_fire(px, py, ts, wc, wr)
+        elif effect == "fairy_light":
+            self._draw_effect_fairy_light(px, py, ts, wc, wr)
+        # Unknown effect strings are silently ignored — keeps forward
+        # compatibility if a future editor version adds new options.
+
+    def _draw_effect_rising_smoke(self, px, py, ts, wc, wr):
+        """Three grey/white puffs drifting up out of the tile, swaying
+        side to side and fading as they rise."""
+        import math as _m
+        t = pygame.time.get_ticks() * 0.001  # seconds
+        seed = (wc * 31 + wr * 17) & 0xFFFF
+        cx = px + ts // 2
+        # Three offset puffs so the column always has something visible.
+        for i in range(3):
+            phase = (t * 0.55 + i / 3.0 + seed * 0.013) % 1.0
+            # y goes from "just above the tile floor" (phase=0) to
+            # "above the tile" (phase=1).  We let it drift one full
+            # tile height total so it leaves the cell as it dissipates.
+            y = py + ts - 2 - int(phase * ts)
+            sway = int(_m.sin(phase * _m.pi * 2 + seed) * 4)
+            x = cx + sway
+            # Puff grows then shrinks slightly (peaks mid-rise).
+            r = 2 + int(3 * _m.sin(phase * _m.pi))
+            if r < 1:
+                continue
+            # Alpha ramps in fast, fades out slowly.
+            a = int(180 * max(0.0, 1.0 - phase) * min(1.0, phase * 4))
+            if a <= 0:
+                continue
+            shade = 200 - int(40 * phase)  # darker grey when fresh
+            puff = pygame.Surface((r * 2 + 2, r * 2 + 2),
+                                  pygame.SRCALPHA)
+            pygame.draw.circle(puff, (shade, shade, shade, a),
+                               (r + 1, r + 1), r)
+            self.screen.blit(puff, (x - r - 1, y - r - 1))
+
+    def _draw_effect_fire(self, px, py, ts, wc, wr):
+        """Flickering orange/yellow flame anchored at the bottom
+        center.  Two stacked layers (outer red-orange, inner yellow)
+        with a soft glow disk under everything."""
+        import math as _m
+        t = pygame.time.get_ticks() * 0.001
+        seed = (wc * 31 + wr * 17) & 0xFFFF
+        cx = px + ts // 2
+        base_y = py + ts - 4
+        flicker = 0.7 + 0.3 * _m.sin(t * 7.0 + seed)
+        # Soft glow under the flame.
+        glow_r = max(4, int(ts * 0.35 * flicker))
+        glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+        pygame.draw.circle(
+            glow, (255, 130, 40, 70),
+            (glow_r, glow_r), glow_r)
+        self.screen.blit(glow, (cx - glow_r, base_y - glow_r + 2))
+        # Outer flame (red-orange).
+        outer_h = int(ts * 0.55 * flicker) + 2
+        outer = [
+            (cx,             base_y - outer_h),       # tip
+            (cx - 5,         base_y - outer_h // 2),  # left mid
+            (cx - 6,         base_y - 2),             # left base
+            (cx + 6,         base_y - 2),             # right base
+            (cx + 5,         base_y - outer_h // 2),  # right mid
+        ]
+        # Slight horizontal jitter on the tip so the flame "dances".
+        outer[0] = (outer[0][0] + int(_m.sin(t * 9 + seed) * 1),
+                    outer[0][1])
+        pygame.draw.polygon(self.screen,
+                            (240, 90, 30), outer)
+        # Inner flame (yellow), slightly smaller.
+        inner_flicker = 0.7 + 0.3 * _m.sin(t * 11.0 + seed * 1.7)
+        inner_h = int(outer_h * 0.65 * inner_flicker) + 1
+        inner = [
+            (cx,                 base_y - inner_h),
+            (cx - 3,             base_y - inner_h // 2),
+            (cx - 4,             base_y - 2),
+            (cx + 4,             base_y - 2),
+            (cx + 3,             base_y - inner_h // 2),
+        ]
+        pygame.draw.polygon(self.screen,
+                            (255, 220, 90), inner)
+        # Tiny white-hot core dot at the base.
+        pygame.draw.circle(self.screen, (255, 255, 220),
+                           (cx, base_y - 3), 1)
+        # Occasional spark drifting up and away.
+        spark_phase = (t * 1.3 + seed * 0.07) % 1.0
+        if spark_phase < 0.6:
+            sx = cx + int(_m.sin(t * 5 + seed) * 5)
+            sy = base_y - 6 - int(spark_phase * 14)
+            sa = int(255 * (1.0 - spark_phase / 0.6))
+            spark = pygame.Surface((3, 3), pygame.SRCALPHA)
+            pygame.draw.circle(spark, (255, 200, 80, sa),
+                               (1, 1), 1)
+            self.screen.blit(spark, (sx, sy))
+
+    def _draw_effect_fairy_light(self, px, py, ts, wc, wr):
+        """Three pastel sparkles orbiting the tile center, twinkling
+        through alpha and a four-point glint shape."""
+        import math as _m
+        t = pygame.time.get_ticks() * 0.001
+        seed = (wc * 31 + wr * 17) & 0xFFFF
+        cx = px + ts // 2
+        cy = py + ts // 2
+        radius = ts // 3
+        # Three sparkles, distributed around the orbit.  Each has a
+        # different colour so the cluster shimmers.
+        colors = [(255, 235, 180),  # warm cream
+                  (200, 220, 255),  # icy blue
+                  (255, 200, 240)]  # rose pink
+        for i in range(3):
+            phase = t * 1.4 + (i * 2.094) + seed * 0.01  # 2π/3 ≈ 2.094
+            x = cx + int(_m.cos(phase) * radius)
+            y = cy + int(_m.sin(phase) * (radius * 0.7))
+            twinkle = 0.5 + 0.5 * _m.sin(t * 5 + i * 1.7 + seed)
+            a = int(255 * twinkle)
+            if a < 30:
+                continue
+            r, g, b = colors[i]
+            # Soft halo.
+            halo = pygame.Surface((9, 9), pygame.SRCALPHA)
+            pygame.draw.circle(halo, (r, g, b, max(0, a // 4)),
+                               (4, 4), 4)
+            self.screen.blit(halo, (x - 4, y - 4))
+            # Four-point glint cross — gives it the "fairy" feel.
+            cross_a = min(255, a + 40)
+            pygame.draw.line(self.screen, (r, g, b),
+                             (x - 2, y), (x + 2, y), 1)
+            pygame.draw.line(self.screen, (r, g, b),
+                             (x, y - 2), (x, y + 2), 1)
+            # Bright core.
+            core = pygame.Surface((3, 3), pygame.SRCALPHA)
+            pygame.draw.circle(core, (255, 255, 255, cross_a),
+                               (1, 1), 1)
+            self.screen.blit(core, (x - 1, y - 1))
 
     def _infer_overlay_backdrop(self, tile_map, wc, wr, tile_id):
         """Pick a tile_id to paint as the backdrop under a hand-placed

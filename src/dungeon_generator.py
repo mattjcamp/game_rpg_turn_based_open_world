@@ -832,13 +832,25 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     # behaviour.  If the edge placement can't reach the carved area
     # for any reason, we fall back to the room-center stairs.
     stairs_col, stairs_row = (None, None)
+    entrance_edge = None  # Tracked so the descent can avoid the same edge.
     if style == "forest":
         # Forest dungeons use a wooded archway as the visible "way back"
         # marker — readable as a gateway tile rather than the invisible
-        # stairs-painted-as-path the renderer used to emit.
-        stairs_col, stairs_row = _place_forest_edge_stairs(
-            tmap, edge="south", tile_id=TILE_FOREST_ARCHWAY_UP,
-            floor_tile=floor_tile, wall_tile=wall_tile)
+        # stairs-painted-as-path the renderer used to emit.  The edge
+        # is randomised per level for variety; if a randomly-chosen
+        # edge can't carve a connecting trail (e.g. no carved cell on
+        # that side of the map) we try the others before falling back
+        # to a room-center stair.
+        edges_to_try = ["north", "east", "south", "west"]
+        random.shuffle(edges_to_try)
+        for e in edges_to_try:
+            sc, sr = _place_forest_edge_stairs(
+                tmap, edge=e, tile_id=TILE_FOREST_ARCHWAY_UP,
+                floor_tile=floor_tile, wall_tile=wall_tile)
+            if sc is not None:
+                stairs_col, stairs_row = sc, sr
+                entrance_edge = e
+                break
     if stairs_col is None:
         stairs_col, stairs_row = rooms[0].center
         tmap.set_tile(stairs_col, stairs_row, TILE_STAIRS)
@@ -967,12 +979,21 @@ def generate_dungeon(name="The Depths", width=40, height=30,
     if place_stairs_down and len(rooms) >= 2:
         sc, sr = (None, None)
         if style == "forest":
-            # Mirror of the south-edge entrance: a darker archway at
-            # the north edge whose interior reads as "the trail
-            # continues deeper into the woods".
-            sc, sr = _place_forest_edge_stairs(
-                tmap, edge="north", tile_id=TILE_FOREST_ARCHWAY_DOWN,
-                floor_tile=floor_tile, wall_tile=wall_tile)
+            # Pick a different edge than the entrance so the player
+            # actually has to traverse the level instead of stepping
+            # onto the descent archway from the entrance trail.  Try
+            # each remaining edge in random order until one carves a
+            # valid trail; only fall back to a room-center stair if
+            # all three remaining edges fail.
+            remaining = [e for e in ("north", "east", "south", "west")
+                         if e != entrance_edge]
+            random.shuffle(remaining)
+            for e in remaining:
+                sc, sr = _place_forest_edge_stairs(
+                    tmap, edge=e, tile_id=TILE_FOREST_ARCHWAY_DOWN,
+                    floor_tile=floor_tile, wall_tile=wall_tile)
+                if sc is not None:
+                    break
         if sc is None:
             last_room = rooms[-1]
             sc, sr = last_room.center
@@ -1042,74 +1063,104 @@ def generate_dungeon(name="The Depths", width=40, height=30,
 
 def _place_forest_edge_stairs(tmap, edge, tile_id,
                               floor_tile, wall_tile):
-    """Place a stairs tile on the *edge* of a forest dungeon and
+    """Place an archway tile on the *edge* of a forest dungeon and
     carve a short trail from the edge inward to the nearest carved
     (room/corridor) cell.
 
     Forest dungeons read as "going from one area of the woods to
     another", so entrances and exits sit on the map perimeter rather
-    than inside a room — the stair tile itself is rendered as a
-    plain path cell to sell the illusion of a continuing trail.
+    than inside a room.
 
     Parameters
     ----------
     edge : str
-        ``"south"`` (entry, faces back the way you came) or
-        ``"north"`` (descent, faces deeper into the woods).
+        Any cardinal direction — ``"north"``, ``"east"``, ``"south"``
+        or ``"west"``.  North/south fix the row near the top/bottom
+        and sweep columns; east/west fix the column near the right/
+        left and sweep rows.
     tile_id : int
-        For forest dungeons this is now ``TILE_FOREST_ARCHWAY_UP``
-        (south-edge entrance/ascent) or ``TILE_FOREST_ARCHWAY_DOWN``
-        (north-edge descent) — a wooden archway sprite that reads as
-        a clear gateway in the woods.  Older callers may still pass
-        ``TILE_STAIRS``/``TILE_STAIRS_DOWN``, which the renderer
+        For forest dungeons this is ``TILE_FOREST_ARCHWAY_UP`` (the
+        "way back" archway) or ``TILE_FOREST_ARCHWAY_DOWN`` (the
+        "deeper into the woods" archway).  Older callers may still
+        pass ``TILE_STAIRS``/``TILE_STAIRS_DOWN``, which the renderer
         disguises as the path sprite (legacy behaviour).
     floor_tile, wall_tile : int
         The room-floor tile (``TILE_GRASS``) and default wall tile
         (``TILE_FOREST``) for this dungeon.  Trail cells are carved
-        as ``floor_tile`` so they get caught by the
-        post-processing pass that converts non-room floors to
-        ``TILE_PATH``.
+        as ``floor_tile`` so they get caught by the post-processing
+        pass that converts non-room floors to ``TILE_PATH``.
 
-    Returns ``(col, row)`` of the placed stair, or ``(None, None)``
-    if no carved cell could be reached from any candidate column.
+    Returns ``(col, row)`` of the placed archway, or
+    ``(None, None)`` if no carved cell could be reached from any
+    candidate position along the chosen edge.
     """
     width = tmap.width
     height = tmap.height
 
-    # The edge row sits one inside the absolute border so the trail
-    # has somewhere to extend without falling out of bounds.
+    # Resolve the chosen edge to a "fixed axis position" + "sweep axis"
+    # description.  For north/south the fixed axis is a row and we
+    # sweep columns; for east/west it's a column and we sweep rows.
+    horizontal = edge in ("north", "south")
     if edge == "south":
-        edge_row = height - 2
-        step_dr = -1
-    else:  # north
-        edge_row = 1
-        step_dr = 1
+        fixed_idx = height - 2          # one inside the bottom border
+        step      = -1                  # walk inward → row decreasing
+    elif edge == "north":
+        fixed_idx = 1                   # one inside the top border
+        step      = 1                   # row increasing
+    elif edge == "east":
+        fixed_idx = width - 2           # one inside the right border
+        step      = -1                  # col decreasing
+    elif edge == "west":
+        fixed_idx = 1                   # one inside the left border
+        step      = 1                   # col increasing
+    else:
+        raise ValueError(
+            f"_place_forest_edge_stairs: unknown edge {edge!r}")
 
-    # Pick a column from the central third of the map first so the
-    # entrance lines up with the bulk of the carved area; sweep
-    # outward if those don't connect.
-    col_start = max(1, width // 3)
-    col_end = min(width - 1, (2 * width) // 3)
-    centered = list(range(col_start, col_end))
-    edges = list(range(1, col_start)) + list(range(col_end, width - 1))
+    # Pick the sweep axis (columns for horizontal edges, rows for
+    # vertical edges).  Try the central third first so the trail
+    # connects into the bulk of the carved area, then fall back to
+    # the outer thirds if those don't reach.
+    sweep_size = width if horizontal else height
+    sweep_start = max(1, sweep_size // 3)
+    sweep_end   = min(sweep_size - 1, (2 * sweep_size) // 3)
+    centered = list(range(sweep_start, sweep_end))
+    outer = (list(range(1, sweep_start))
+             + list(range(sweep_end, sweep_size - 1)))
     random.shuffle(centered)
-    random.shuffle(edges)
-    candidates = centered + edges
+    random.shuffle(outer)
+    candidates = centered + outer
 
-    for c in candidates:
-        # Walk inward from the edge until we hit a non-wall cell.
-        r = edge_row
-        while 0 < r < height - 1:
-            if tmap.get_tile(c, r) != wall_tile:
-                # Carve trail from edge_row up to (but not over) r,
-                # then mark the very edge cell as the stair.
-                tr = edge_row
-                while tr != r:
-                    tmap.set_tile(c, tr, floor_tile)
-                    tr += step_dr
-                tmap.set_tile(c, edge_row, tile_id)
-                return c, edge_row
-            r += step_dr
+    if horizontal:
+        # Fixed row, sweep across columns.  Walk inward (row direction)
+        # from the edge row until we hit a non-wall cell.
+        for c in candidates:
+            r = fixed_idx
+            while 0 < r < height - 1:
+                if tmap.get_tile(c, r) != wall_tile:
+                    # Carve floor between the edge and the carved
+                    # interior, then plant the archway on the edge.
+                    tr = fixed_idx
+                    while tr != r:
+                        tmap.set_tile(c, tr, floor_tile)
+                        tr += step
+                    tmap.set_tile(c, fixed_idx, tile_id)
+                    return c, fixed_idx
+                r += step
+    else:
+        # Fixed column, sweep across rows.  Walk inward (col direction)
+        # from the edge column until we hit a non-wall cell.
+        for r in candidates:
+            c = fixed_idx
+            while 0 < c < width - 1:
+                if tmap.get_tile(c, r) != wall_tile:
+                    tc = fixed_idx
+                    while tc != c:
+                        tmap.set_tile(tc, r, floor_tile)
+                        tc += step
+                    tmap.set_tile(fixed_idx, r, tile_id)
+                    return fixed_idx, r
+                c += step
 
     return None, None
 

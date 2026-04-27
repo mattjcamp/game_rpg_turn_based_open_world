@@ -28,6 +28,32 @@ from src.settings import (
 )
 
 
+# ─── Animated tile effects ──────────────────────────────────────────
+# Authors can attach an animated cosmetic to any tile via the inspector.
+# The cycle order is fixed (so Enter/Space always advances predictably);
+# the labels here drive the inspector display.  The empty string is the
+# "no effect" state and is also what get_cursor_tile_info reports when
+# ``tile_properties[col,row]["effect"]`` isn't present.
+EFFECT_NONE         = ""
+EFFECT_RISING_SMOKE = "rising_smoke"
+EFFECT_FIRE         = "fire"
+EFFECT_FAIRY_LIGHT  = "fairy_light"
+
+EFFECT_CYCLE = (
+    EFFECT_NONE,
+    EFFECT_RISING_SMOKE,
+    EFFECT_FIRE,
+    EFFECT_FAIRY_LIGHT,
+)
+
+_EFFECT_LABELS = {
+    EFFECT_NONE:         "(none)",
+    EFFECT_RISING_SMOKE: "rising smoke",
+    EFFECT_FIRE:         "fire",
+    EFFECT_FAIRY_LIGHT:  "fairy light",
+}
+
+
 # ─── Brush definition ────────────────────────────────────────────────
 
 @dataclass
@@ -694,6 +720,16 @@ class MapEditorState:
             fields.append(("Light Range", "light_range",
                            props.get("light_range", "5"), True))
 
+        # ── Universal: animated effect overlay ──────────────────────
+        # Authors can attach an animated cosmetic to any tile.  The
+        # value cycles through (none → rising_smoke → fire →
+        # fairy_light → none) with Enter/Space.  When set, the
+        # runtime renderer paints the matching procedural animation
+        # on top of the tile every frame.
+        effect_value = props.get("effect", "")
+        effect_display = _EFFECT_LABELS.get(effect_value, "(none)")
+        fields.append(("Effect", "effect", effect_display, "effect"))
+
         return {
             "tile_id": tile_id,
             "tile_name": tile_name,
@@ -1085,6 +1121,36 @@ class MapEditorInputHandler:
                     elif key == "light_source":
                         st.remove_tile_prop(col, row, "light_range")
                 # Refresh field display
+                new_info = st.get_cursor_tile_info()
+                new_fields = new_info["fields"]
+                st.inspector_buffer = (new_fields[st.inspector_field_idx][2]
+                                       if st.inspector_field_idx < len(new_fields)
+                                       else "")
+            return None
+
+        # ── Effect picker (cycles through available animated effects) ──
+        # Enter/Space advances through (none → rising_smoke → fire →
+        # fairy_light → none).  Stored as a string under the tile's
+        # ``effect`` property; the runtime renderer reads the string and
+        # paints the matching procedural animation each frame.  We
+        # remove the property entirely on the "none" state so saved
+        # files stay clean of empty-string keys.
+        if field_type == "effect":
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                col, row = info["col"], info["row"]
+                cur = st.get_tile_props(col, row).get("effect", EFFECT_NONE)
+                try:
+                    nxt_idx = (EFFECT_CYCLE.index(cur) + 1) % len(EFFECT_CYCLE)
+                except ValueError:
+                    # Stale value not in the cycle list — start over.
+                    nxt_idx = 1
+                nxt = EFFECT_CYCLE[nxt_idx]
+                if nxt == EFFECT_NONE:
+                    st.remove_tile_prop(col, row, "effect")
+                else:
+                    st.set_tile_prop(col, row, "effect", nxt)
+                # Refresh field display so the buffer matches the new
+                # value immediately.
                 new_info = st.get_cursor_tile_info()
                 new_fields = new_info["fields"]
                 st.inspector_buffer = (new_fields[st.inspector_field_idx][2]
