@@ -5,7 +5,11 @@
       "name": "Monster Spawn",
       "description": "A monster lair.",
       "spawn_monsters": [
-        "Giant Rat"
+        "Giant Rat",
+        "Wolf",
+        "Goblin",
+        "Orc",
+        "Lich"
       ],
       "spawn_chance": 5,
       "spawn_radius": 5,
@@ -123,7 +127,7 @@
     },
     "75": {
       "name": "Man Eater Spawn",
-      "description": "A monster lair.",
+      "description": "An unsettling rustling sound comes from a thick bed of plants",
       "spawn_monsters": [
         "Man Eater",
         "Man Eater"
@@ -133,6 +137,8 @@
       "max_spawned": 2,
       "boss_monster": "",
       "boss_monsters": [
+        "Man Eater",
+        "Man Eater",
         "Man Eater"
       ],
       "xp_reward": 50,

@@ -458,6 +458,22 @@ def save_game(slot, game):
                 except (TypeError, IndexError, ValueError):
                     continue
 
+        # Spawn-once memory for designer-placed encounters in building
+        # interiors. Without this, every load would reset the set and
+        # killed monsters would respawn the next time the player walks
+        # into the building.
+        building_spawns_raw = getattr(
+            game, "building_interior_spawns", {}) or {}
+        building_interior_spawns = {}
+        for iname, positions in building_spawns_raw.items():
+            try:
+                building_interior_spawns[iname] = sorted(
+                    [int(p[0]), int(p[1])] for p in positions
+                    if isinstance(p, (list, tuple)) and len(p) >= 2
+                )
+            except (TypeError, ValueError, IndexError):
+                continue
+
         save_data = {
             "version": 3,
             "timestamp": time.time(),
@@ -465,6 +481,7 @@ def save_game(slot, game):
             "party": _serialize_party(game.party),
             "cleared_dungeons": cleared_dungeons,
             "destroyed_spawns": destroyed_spawns,
+            "building_interior_spawns": building_interior_spawns,
             # ── Module identification ──
             "module_path": getattr(game, "active_module_path", None),
             "module_name": getattr(game, "active_module_name", None),
@@ -609,6 +626,26 @@ def load_game(slot, game):
             # Overwriting (not union-ing) matches the save's snapshot
             # semantics — the save is the source of truth.
             ow_state.destroyed_spawns = destroyed_positions
+
+        # ── Restore building-interior spawn-once memory ─────────
+        # Designer-placed encounters in building interiors track
+        # which (col, row) placements have already been materialised
+        # so a defeated monster doesn't respawn on re-entry. The
+        # interior tile_map is rebuilt from JSON each time the party
+        # walks in, so this set has to live on the game object and
+        # be reattached when the player enters the interior.
+        saved_bis = save_data.get("building_interior_spawns", {}) or {}
+        restored_bis = {}
+        for iname, positions in saved_bis.items():
+            try:
+                restored_bis[iname] = {
+                    (int(p[0]), int(p[1]))
+                    for p in positions
+                    if isinstance(p, (list, tuple)) and len(p) >= 2
+                }
+            except (TypeError, ValueError, IndexError):
+                restored_bis[iname] = set()
+        game.building_interior_spawns = restored_bis
 
         # ── Restore darkness effect ─────────────────────────────
         game.darkness_active = save_data.get("darkness_active", False)

@@ -37,12 +37,18 @@ from src.settings import (
 EFFECT_NONE         = ""
 EFFECT_RISING_SMOKE = "rising_smoke"
 EFFECT_FIRE         = "fire"
+EFFECT_TORCH        = "torch"
 EFFECT_FAIRY_LIGHT  = "fairy_light"
 
+# Cycle order matches the inspector's Enter/Space progression. ``torch``
+# sits next to ``fire`` so authors can compare the two flame sizes by
+# tapping Enter once. Keep ``EFFECT_NONE`` first so the picker always
+# starts with the "no effect" baseline.
 EFFECT_CYCLE = (
     EFFECT_NONE,
     EFFECT_RISING_SMOKE,
     EFFECT_FIRE,
+    EFFECT_TORCH,
     EFFECT_FAIRY_LIGHT,
 )
 
@@ -50,6 +56,7 @@ _EFFECT_LABELS = {
     EFFECT_NONE:         "(none)",
     EFFECT_RISING_SMOKE: "rising smoke",
     EFFECT_FIRE:         "fire",
+    EFFECT_TORCH:        "torch",
     EFFECT_FAIRY_LIGHT:  "fairy light",
 }
 
@@ -722,7 +729,7 @@ class MapEditorState:
 
         # ── Universal: animated effect overlay ──────────────────────
         # Authors can attach an animated cosmetic to any tile.  The
-        # value cycles through (none → rising_smoke → fire →
+        # value cycles through (none → rising_smoke → fire → torch →
         # fairy_light → none) with Enter/Space.  When set, the
         # runtime renderer paints the matching procedural animation
         # on top of the tile every frame.
@@ -1130,11 +1137,11 @@ class MapEditorInputHandler:
 
         # ── Effect picker (cycles through available animated effects) ──
         # Enter/Space advances through (none → rising_smoke → fire →
-        # fairy_light → none).  Stored as a string under the tile's
-        # ``effect`` property; the runtime renderer reads the string and
-        # paints the matching procedural animation each frame.  We
-        # remove the property entirely on the "none" state so saved
-        # files stay clean of empty-string keys.
+        # torch → fairy_light → none).  Stored as a string under the
+        # tile's ``effect`` property; the runtime renderer reads the
+        # string and paints the matching procedural animation each
+        # frame.  We remove the property entirely on the "none" state
+        # so saved files stay clean of empty-string keys.
         if field_type == "effect":
             if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 col, row = info["col"], info["row"]

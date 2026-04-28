@@ -153,5 +153,34 @@
         "tile": 8
       }
     ]
+  },
+  {
+    "name": "Find Our Family Heirloom",
+    "description": "",
+    "giver_npc": "Lori",
+    "giver_sprite": "src/assets/game/characters/ranger.png",
+    "giver_location": "overview",
+    "giver_dialogue": "We lost our family heirloom in that old abandoned builiding over there. Can you help us find it?",
+    "reward_xp": 200,
+    "reward_gold": 200,
+    "reward_items": [
+      "Fire Oil"
+    ],
+    "steps": [
+      {
+        "description": "Find the Family Heirloom",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "scroll",
+        "has_guardian": "yes",
+        "guardian_encounter": "Cursed Battalion",
+        "spawn_location": "space:Abandoned Building/Basement",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 6,
+    "giver_row": 21
   }
 ]

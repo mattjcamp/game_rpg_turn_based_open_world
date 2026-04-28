@@ -472,13 +472,23 @@ def _draw_tile_inspector(renderer, data: Dict):
         # ── Effect (animated overlay picker) ──
         # Glyph + colour signals what's currently attached: a faint dot
         # for "none", smoky grey for rising smoke, hot orange for fire,
-        # bright pink for fairy light.  Press Enter/Space to cycle.
+        # softer orange for torch (smaller flame), bright pink for
+        # fairy light.  Press Enter/Space to cycle.
+        # NOTE: ordering matters — "torch" is checked before "fire"
+        # because the substring match for "fire" would otherwise win
+        # on a value like "torch" only because "torch" is shorter; but
+        # the real reason is forward-compat: any future effect whose
+        # label *contains* "fire" (e.g. "wildfire") should still
+        # resolve to the fire glyph by default, and putting torch
+        # first ensures the more specific label wins.
         if field_type == "effect":
             val = str(value)
             if val == "(none)" or not val:
                 box, col = "[ ]", (140, 140, 160)
             elif "smoke" in val:
                 box, col = "[~]", (180, 180, 195)
+            elif "torch" in val:
+                box, col = "[i]", (245, 180, 90)
             elif "fire" in val:
                 box, col = "[*]", (255, 150, 60)
             elif "fairy" in val or "light" in val:

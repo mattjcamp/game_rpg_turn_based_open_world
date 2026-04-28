@@ -451,9 +451,13 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
         level has its own. That avoids the (c,r) collision that
         would otherwise happen if an overworld placement and an
         interior placement shared the same coordinates. A defeated
-        placement stays defeated — even after leaving and re-
-        entering the same interior or dungeon — because the
-        tile_map object persists across those transitions.
+        placement stays defeated even after leaving and re-entering
+        the same interior or dungeon: dungeon levels are cached on
+        the game (so the same tile_map carries its set across
+        transitions), and building interiors hand the set back via
+        ``game.building_interior_spawns`` keyed by interior name —
+        the interior tile_map is rebuilt from JSON on each entry,
+        but the set it points at is the same object.
         """
         from src.monster import find_encounter_template
         tile_map = self.game.tile_map
@@ -1950,6 +1954,22 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
 
         # Store tile_properties on the interior map so links work at runtime
         imap.tile_properties = interior.get("tile_properties", {})
+
+        # Restore the spawn-once memory for this interior so designer-
+        # placed encounters that were already materialised (and likely
+        # killed) on a previous visit stay gone. The interior tile_map
+        # is rebuilt from JSON on every entry, so without this the
+        # ``_spawned_placement_positions`` set would be empty each
+        # time and dead monsters would silently respawn. The set is
+        # held on the game (keyed by interior name) and shared by
+        # reference, so ``_spawn_placed_encounters`` mutating it also
+        # updates the cache.
+        spawn_cache = getattr(self.game, "building_interior_spawns", None)
+        if spawn_cache is None:
+            spawn_cache = {}
+            self.game.building_interior_spawns = spawn_cache
+        imap._spawned_placement_positions = spawn_cache.setdefault(
+            interior_name, set())
 
         self.game.tile_map = imap
 

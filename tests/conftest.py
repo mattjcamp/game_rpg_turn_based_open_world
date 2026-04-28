@@ -22,6 +22,27 @@ pg.QUIT = 256
 pg.KEYDOWN = 768
 pg.KEYUP = 769
 pg.SRCALPHA = 0x00010000
+# A handful of event-type constants referenced at module-load time by
+# music.py / map_editor.py / features_editor.py. The values don't matter
+# for tests; they just need to be present so module-level expressions
+# like ``pygame.USEREVENT + 10`` don't blow up during import.
+pg.USEREVENT = 24
+pg.MOUSEBUTTONDOWN = 1025
+pg.MOUSEBUTTONUP = 1026
+pg.MOUSEMOTION = 1024
+pg.MOUSEWHEEL = 1027
+# Modifier-key bitmask constants. Module-level expressions in src/game.py
+# (KMOD_CTRL | KMOD_META | KMOD_GUI) are evaluated at import, so all three
+# need to exist as ints. The exact values match real pygame, but tests
+# don't depend on the values — they're just bitflags being OR'd together.
+pg.KMOD_NONE = 0x0000
+pg.KMOD_SHIFT = 0x0003
+pg.KMOD_CTRL = 0x00C0
+pg.KMOD_ALT = 0x0300
+pg.KMOD_META = 0x0C00
+pg.KMOD_GUI = 0x0C00
+pg.KMOD_CAPS = 0x2000
+pg.KMOD_NUM = 0x1000
 
 # Key constants used in the game
 _KEYS = {
@@ -169,11 +190,23 @@ class _MockMixer:
         @staticmethod
         def load(*a): pass
         @staticmethod
-        def play(*a): pass
+        def play(*a, **kw): pass
         @staticmethod
         def stop(): pass
         @staticmethod
+        def pause(): pass
+        @staticmethod
+        def unpause(): pass
+        @staticmethod
+        def fadeout(*a): pass
+        @staticmethod
+        def queue(*a, **kw): pass
+        @staticmethod
         def set_volume(v): pass
+        @staticmethod
+        def set_endevent(*a): pass
+        @staticmethod
+        def get_busy(): return False
 
 
 class _MockImage:
@@ -206,6 +239,17 @@ pg.mixer = _MockMixer()
 pg.image = _MockImage()
 pg.transform = _MockTransform()
 pg.math = types.ModuleType("pygame.math")
+# ``surfarray`` is imported at module load by src.renderer / src.lighting /
+# src.tile_manifest. We don't need real pixel access in headless tests, but
+# the submodule must exist on the mock pygame so ``import pygame.surfarray``
+# succeeds. The pixels3d / pixels_alpha calls only run on the render path,
+# which tests don't exercise.
+pg.surfarray = types.ModuleType("pygame.surfarray")
+pg.surfarray.pixels3d = lambda surf: None
+pg.surfarray.pixels_alpha = lambda surf: None
+# pygame.error is a real exception class — code does
+# ``except pygame.error:`` to catch missing-track / mixer failures.
+pg.error = type("error", (Exception,), {})
 
 # Register all mock modules before any game import
 sys.modules["pygame"] = pg
@@ -217,6 +261,7 @@ sys.modules["pygame.mixer"] = pg.mixer
 sys.modules["pygame.image"] = pg.image
 sys.modules["pygame.transform"] = pg.transform
 sys.modules["pygame.math"] = pg.math
+sys.modules["pygame.surfarray"] = pg.surfarray
 
 
 # ── Shared fixtures ─────────────────────────────────────────────────

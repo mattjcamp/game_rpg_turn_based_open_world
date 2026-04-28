@@ -1268,40 +1268,82 @@ class Renderer(CombatEffectRendererMixin):
             self._draw_effect_rising_smoke(px, py, ts, wc, wr)
         elif effect == "fire":
             self._draw_effect_fire(px, py, ts, wc, wr)
+        elif effect == "torch":
+            self._draw_effect_torch(px, py, ts, wc, wr)
         elif effect == "fairy_light":
             self._draw_effect_fairy_light(px, py, ts, wc, wr)
         # Unknown effect strings are silently ignored — keeps forward
         # compatibility if a future editor version adds new options.
 
     def _draw_effect_rising_smoke(self, px, py, ts, wc, wr):
-        """Three grey/white puffs drifting up out of the tile, swaying
-        side to side and fading as they rise."""
+        """Plume of grey/white puffs drifting up out of the tile.
+
+        Tuned for visibility: more puffs at higher opacity, wider radii,
+        a darker base shade so it reads against light terrain (sand,
+        grass, snow), and a faint dark base at the source so the eye
+        catches the column even when individual puffs are mid-fade.
+        Each tile gets its own deterministic seed so neighbouring smoky
+        tiles don't animate in lockstep.
+        """
         import math as _m
         t = pygame.time.get_ticks() * 0.001  # seconds
         seed = (wc * 31 + wr * 17) & 0xFFFF
         cx = px + ts // 2
-        # Three offset puffs so the column always has something visible.
-        for i in range(3):
-            phase = (t * 0.55 + i / 3.0 + seed * 0.013) % 1.0
-            # y goes from "just above the tile floor" (phase=0) to
-            # "above the tile" (phase=1).  We let it drift one full
-            # tile height total so it leaves the cell as it dissipates.
-            y = py + ts - 2 - int(phase * ts)
-            sway = int(_m.sin(phase * _m.pi * 2 + seed) * 4)
+
+        # Faint dark base at the smoke's source — a small, low-opacity
+        # smudge that grounds the column visually even when no single
+        # puff is currently bright. Without this, the plume can look
+        # like it's floating in air on light backgrounds.
+        base_y = py + ts - 3
+        base_r = max(3, ts // 5)
+        base = pygame.Surface((base_r * 2 + 2, base_r * 2 + 2),
+                              pygame.SRCALPHA)
+        # Pulsing slightly so the column "breathes".
+        base_pulse = 0.85 + 0.15 * _m.sin(t * 2.0 + seed)
+        base_a = int(110 * base_pulse)
+        pygame.draw.circle(base, (60, 60, 65, base_a),
+                           (base_r + 1, base_r + 1), base_r)
+        self.screen.blit(base, (cx - base_r - 1, base_y - base_r - 1))
+
+        # Six staggered puffs (was three) so the plume reads as a
+        # continuous column instead of a series of isolated dots.
+        # Slightly faster rise speed too, so motion is more obvious.
+        n_puffs = 6
+        for i in range(n_puffs):
+            phase = (t * 0.7 + i / n_puffs + seed * 0.013) % 1.0
+            # Puffs drift up to 1.25× the tile height so the trail
+            # extends slightly past the cell — sells the "rising"
+            # motion at typical tile sizes.
+            y = py + ts - 2 - int(phase * ts * 1.25)
+            sway = int(_m.sin(phase * _m.pi * 2 + seed + i * 0.7) * 5)
             x = cx + sway
-            # Puff grows then shrinks slightly (peaks mid-rise).
-            r = 2 + int(3 * _m.sin(phase * _m.pi))
+            # Bigger radius and bigger growth curve. Mid-flight puffs
+            # are now 4–9 px instead of 2–5.
+            r = 4 + int(5 * _m.sin(phase * _m.pi))
             if r < 1:
                 continue
-            # Alpha ramps in fast, fades out slowly.
-            a = int(180 * max(0.0, 1.0 - phase) * min(1.0, phase * 4))
+            # Higher max alpha (180 → 230) and a snappier ramp-in so
+            # fresh puffs pop. Long fade tail still sells dissipation.
+            a = int(230 * max(0.0, 1.0 - phase) * min(1.0, phase * 5))
             if a <= 0:
                 continue
-            shade = 200 - int(40 * phase)  # darker grey when fresh
+            # Darker fresh shade (was 200) for stronger contrast on
+            # light terrain; lightens as the puff rises and disperses.
+            shade = 150 - int(50 * phase) + 80 * int(phase > 0.55)
+            shade = max(60, min(220, shade))
             puff = pygame.Surface((r * 2 + 2, r * 2 + 2),
                                   pygame.SRCALPHA)
             pygame.draw.circle(puff, (shade, shade, shade, a),
                                (r + 1, r + 1), r)
+            # Inner darker core — gives the puff dimension instead of
+            # reading as a flat disc.
+            inner_r = max(1, r - 2)
+            pygame.draw.circle(puff,
+                               (max(40, shade - 50),
+                                max(40, shade - 50),
+                                max(45, shade - 45),
+                                min(255, a + 20)),
+                               (r + 1, r + 1), inner_r)
             self.screen.blit(puff, (x - r - 1, y - r - 1))
 
     def _draw_effect_fire(self, px, py, ts, wc, wr):
@@ -1360,6 +1402,64 @@ class Renderer(CombatEffectRendererMixin):
             pygame.draw.circle(spark, (255, 200, 80, sa),
                                (1, 1), 1)
             self.screen.blit(spark, (sx, sy))
+
+    def _draw_effect_torch(self, px, py, ts, wc, wr):
+        """A small, calmer flame — the "wall torch" sibling of the
+        full ``fire`` effect.
+
+        Compared to ``_draw_effect_fire`` this is roughly 60% the
+        height, narrower at the base, has a softer glow disc, no
+        spark particles, and flickers more gently. Visually distinct
+        enough that authors can place a torch alongside a campfire on
+        the same map without the two reading as the same effect.
+        """
+        import math as _m
+        t = pygame.time.get_ticks() * 0.001
+        seed = (wc * 31 + wr * 17) & 0xFFFF
+        cx = px + ts // 2
+        # Sit a touch higher than ``fire`` so the flame reads as
+        # mounted (a torch on a wall) rather than burning at floor
+        # level like a campfire.
+        base_y = py + ts // 2 + ts // 6
+        # Gentler flicker — slower frequency, smaller amplitude.
+        flicker = 0.85 + 0.15 * _m.sin(t * 5.0 + seed)
+        # Subdued glow halo — smaller and dimmer than the fire glow.
+        glow_r = max(3, int(ts * 0.22 * flicker))
+        glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+        pygame.draw.circle(
+            glow, (255, 150, 50, 55),
+            (glow_r, glow_r), glow_r)
+        self.screen.blit(glow, (cx - glow_r, base_y - glow_r + 1))
+        # Outer flame (red-orange) — narrower triangle, ~60% the
+        # height of the regular fire effect.
+        outer_h = int(ts * 0.32 * flicker) + 2
+        outer = [
+            (cx,         base_y - outer_h),       # tip
+            (cx - 3,     base_y - outer_h // 2),  # left mid
+            (cx - 3,     base_y - 1),             # left base
+            (cx + 3,     base_y - 1),             # right base
+            (cx + 3,     base_y - outer_h // 2),  # right mid
+        ]
+        # Slight tip jitter, smaller than fire's so the flame looks
+        # steadier.
+        outer[0] = (outer[0][0] + int(_m.sin(t * 6 + seed) * 1),
+                    outer[0][1])
+        pygame.draw.polygon(self.screen, (235, 110, 40), outer)
+        # Inner yellow flame — even smaller.
+        inner_flicker = 0.85 + 0.15 * _m.sin(t * 8.0 + seed * 1.7)
+        inner_h = int(outer_h * 0.6 * inner_flicker) + 1
+        inner = [
+            (cx,         base_y - inner_h),
+            (cx - 2,     base_y - inner_h // 2),
+            (cx - 2,     base_y - 1),
+            (cx + 2,     base_y - 1),
+            (cx + 2,     base_y - inner_h // 2),
+        ]
+        pygame.draw.polygon(self.screen, (255, 220, 100), inner)
+        # White-hot core dot — single pixel, no spark drift to keep
+        # the silhouette small and torch-like.
+        pygame.draw.circle(self.screen, (255, 255, 230),
+                           (cx, base_y - 2), 1)
 
     def _draw_effect_fairy_light(self, px, py, ts, wc, wr):
         """Three pastel sparkles orbiting the tile center, twinkling

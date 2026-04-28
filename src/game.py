@@ -118,6 +118,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.quest_dungeon_monsters = {}   # {dungeon_name: [{monster_key, ...}]}
         self.quest_collect_items = {}      # {location_key: [{item_info, ...}]}
         self.dungeon_cache = {}
+        # Spawn-once memory for designer-placed encounters in building
+        # interiors. Mirrors the per-tile_map ``_spawned_placement_positions``
+        # set used by dungeons; we hold one set per interior name on the
+        # game so a defeated placement stays defeated even after the
+        # player leaves the building and the interior tile_map is rebuilt
+        # from JSON on re-entry.
+        # {interior_name: set of (col, row) tuples}
+        self.building_interior_spawns = {}
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
         self.pending_combat_location = ""
@@ -640,6 +648,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.quest_collect_items = {}
         self.game_log = []
         self.dungeon_cache = {}  # clear persisted dungeon layouts
+        # Drop spawn-once memory for building interiors so a fresh game
+        # doesn't inherit "this lair is already cleared" markers from a
+        # prior session — see ``__init__`` for the field's purpose.
+        self.building_interior_spawns = {}
 
         # ── Scrub per-state overlays (interior darkness, shop/temple
         # overlays, dungeon torch timers, etc.) — the state objects are
