@@ -538,7 +538,7 @@
       3,
       6,
       3,
-      3,
+      68,
       3,
       3,
       3,
@@ -617,7 +617,7 @@
       3,
       3,
       3,
-      3,
+      5,
       3,
       1,
       4,
@@ -665,7 +665,7 @@
       1,
       1,
       0,
-      0,
+      75,
       2,
       2,
       2,
@@ -744,7 +744,7 @@
       0,
       0,
       0,
-      3,
+      5,
       3,
       3,
       3,
@@ -1002,7 +1002,7 @@
       0,
       0,
       0,
-      0,
+      67,
       0,
       0,
       7,
@@ -1113,7 +1113,7 @@
       1,
       1,
       1,
-      7,
+      45,
       7,
       1,
       1,
@@ -1270,8 +1270,8 @@
     ]
   ],
   "party_start": {
-    "col": 28,
-    "row": 10
+    "col": 23,
+    "row": 12
   },
   "tile_properties": {
     "10,14": {
@@ -1339,8 +1339,27 @@
       "link_y": "0"
     },
     "20,16": {
-      "walkable": "inherit (no)",
-      "effect": "torch"
+      "effect": "(none)"
+    },
+    "28,17": {
+      "walkable": "yes (override)"
+    },
+    "12,26": {
+      "walkable": "yes (override)",
+      "effect": "fairy_light",
+      "linked": true,
+      "link_map": "building:Sea Shrine:Main Hall",
+      "link_x": "8",
+      "link_y": "13"
+    },
+    "19,14": {
+      "walkable": true
+    },
+    "18,14": {
+      "walkable": true
+    },
+    "18,13": {
+      "walkable": true
     }
   }
 }

@@ -512,25 +512,37 @@ class PartyMember:
 
     # ── Stats (base + racial modifiers) ─────────────────────────
 
+    # Effective stats = base + racial modifier + magic-item stat_bonuses.
+    # Magic-item bonuses default to zero for mundane gear, so existing
+    # characters/items see no change in behavior.
+
     @property
     def strength(self):
         mods = self.race_info.get("stat_modifiers", {})
-        return self.base_strength + mods.get("strength", 0)
+        return (self.base_strength
+                + mods.get("strength", 0)
+                + self.get_total_stat_bonus("str"))
 
     @property
     def dexterity(self):
         mods = self.race_info.get("stat_modifiers", {})
-        return self.base_dexterity + mods.get("dexterity", 0)
+        return (self.base_dexterity
+                + mods.get("dexterity", 0)
+                + self.get_total_stat_bonus("dex"))
 
     @property
     def intelligence(self):
         mods = self.race_info.get("stat_modifiers", {})
-        return self.base_intelligence + mods.get("intelligence", 0)
+        return (self.base_intelligence
+                + mods.get("intelligence", 0)
+                + self.get_total_stat_bonus("int"))
 
     @property
     def wisdom(self):
         mods = self.race_info.get("stat_modifiers", {})
-        return self.base_wisdom + mods.get("wisdom", 0)
+        return (self.base_wisdom
+                + mods.get("wisdom", 0)
+                + self.get_total_stat_bonus("wis"))
 
     # ── Derived stats ──────────────────────────────────────────
 
@@ -905,10 +917,17 @@ class PartyMember:
         return self.get_modifier(self.wisdom)
 
     def get_ac(self):
-        """Armor class based on armor evasion + DEX modifier + potion buffs."""
+        """Armor class: armor evasion + DEX mod + potion buffs + magic-item ac_bonus.
+
+        ``ac_bonus`` is summed across every equipped magic item (weapons
+        and armors alike — a parrying dagger could grant +1 AC even
+        though it lives in a hand slot).  Mundane gear has no
+        ``ac_bonus`` field, so this is a no-op for existing items.
+        """
         base = ARMORS.get(self.armor, {"evasion": 50})["evasion"]
         ac = 10 + self.dex_mod + (base - 50) // 5
         ac += getattr(self, "potion_buffs", {}).get("ac", 0)
+        ac += self.get_total_ac_bonus()
         return ac
 
     def get_attack_bonus(self, ranged=False):
@@ -965,6 +984,55 @@ class PartyMember:
             return (1, 8, mod)
         else:
             return (1, 10, mod)
+
+    # ── Magic-item bonus aggregation ──────────────────────────────
+    # Cumulative magic effects from all equipped items.  These read
+    # straight off the WEAPONS / ARMORS dicts so they never go stale —
+    # equip/unequip changes are picked up automatically.
+
+    def iter_equipped_items(self):
+        """Yield (slot, item_name, item_def) for each non-default equipped item.
+
+        Default placeholders ("Fists", "Cloth") are skipped — they aren't
+        real items in items.json.  ``item_def`` is the WEAPONS or ARMORS
+        entry (a dict), or None if the item couldn't be resolved.
+        """
+        for slot, name in self.equipped.items():
+            if not name:
+                continue
+            if name == self._SLOT_DEFAULTS.get(slot):
+                continue
+            defn = WEAPONS.get(name) or ARMORS.get(name)
+            yield slot, name, defn
+
+    def get_total_ac_bonus(self):
+        """Sum ``ac_bonus`` across all equipped magic items."""
+        total = 0
+        for _, _, defn in self.iter_equipped_items():
+            if defn:
+                total += int(defn.get("ac_bonus", 0) or 0)
+        return total
+
+    def get_total_stat_bonus(self, stat):
+        """Sum a stat bonus (str/dex/con/int/wis/cha) across equipped items."""
+        total = 0
+        key = stat.lower()
+        for _, _, defn in self.iter_equipped_items():
+            if defn:
+                sb = defn.get("stat_bonuses") or {}
+                total += int(sb.get(key, 0) or 0)
+        return total
+
+    def get_granted_effect_ids(self):
+        """Effect ids granted by this character's equipped items (as a list)."""
+        ids = []
+        for _, _, defn in self.iter_equipped_items():
+            if not defn:
+                continue
+            eid = defn.get("grants_effect")
+            if eid:
+                ids.append(eid)
+        return ids
 
     def get_ranged_weapon(self):
         """Return the name of the first ranged weapon found in either hand, or None.
@@ -1639,8 +1707,46 @@ class Party:
             self.party_equip("Torch", "light")
 
     def has_effect(self, effect_name):
-        """Return True if the party has the named effect in any slot."""
-        return any(v == effect_name for v in self.effects.values())
+        """Return True if the party has the named effect in any slot.
+
+        Also matches against the item-granted effect lane so callers
+        like the renderer's "is the Detect Traps icon lit?" check
+        treat a Sun-Sword aura the same as a slotted class effect.
+        """
+        if any(v == effect_name for v in self.effects.values()):
+            return True
+        for eff in self.get_item_granted_effects():
+            if eff.get("name") == effect_name:
+                return True
+        return False
+
+    def get_item_granted_effects(self):
+        """Return effect dicts granted by equipped magic items, party-wide.
+
+        These live in a SEPARATE item-granted lane and do not consume
+        one of the 4 normal class/race effect slots — they're simply
+        the union of every alive party member's grants_effect items,
+        deduplicated by effect id.
+
+        Recomputed on read: equip/unequip changes are reflected with
+        no explicit invalidate.  Unknown effect ids are silently
+        dropped, so a typo in an item's ``grants_effect`` won't crash
+        the renderer.
+        """
+        by_id = {e["id"]: e for e in EFFECTS_DATA}
+        seen = set()
+        result = []
+        for m in self.members:
+            if not m.is_alive():
+                continue
+            for eid in m.get_granted_effect_ids():
+                if eid in seen:
+                    continue
+                eff = by_id.get(eid)
+                if eff:
+                    seen.add(eid)
+                    result.append(eff)
+        return result
 
     def get_available_effects(self):
         """Return list of effect dicts from EFFECTS_DATA that the party qualifies for.

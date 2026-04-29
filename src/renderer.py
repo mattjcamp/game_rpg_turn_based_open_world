@@ -2713,6 +2713,23 @@ class Renderer(CombatEffectRendererMixin):
         if getattr(getattr(self, "game", None), "on_boat", False):
             return
 
+        # ── Magic-item auras — gather across the whole party ──
+        # The world map shows one party sprite, but any member could be
+        # wielding a magic item.  Unioning the auras (deduplicated by
+        # color) lets a Sun-Sword glow read on the map without each
+        # member needing their own marker.  Drawn before the sprite so
+        # the glow pools beneath the party tile.
+        if party is not None:
+            seen_colors = set()
+            for m in getattr(party, "members", []) or []:
+                if not m.is_alive():
+                    continue
+                for aura in self._collect_member_auras(m):
+                    if aura["color"] in seen_colors:
+                        continue
+                    seen_colors.add(aura["color"])
+                    self._u3_draw_item_aura(cx, cy, aura)
+
         sprite = self._party_map_sprite
         if sprite:
             sx = cx - sprite.get_width() // 2
@@ -6224,6 +6241,84 @@ class Renderer(CombatEffectRendererMixin):
         "alchemist":   (200, 200, 120),   # olive
     }
 
+    # ── Magic-item aura helpers ───────────────────────────────────
+    # Stateless: re-derived from equipped items every frame so equip /
+    # unequip changes show up immediately with no bookkeeping.
+
+    def _collect_member_auras(self, member):
+        """Return aura render-config dicts for one party member.
+
+        Walks the member's item-granted effect ids, looks each up in
+        ``EFFECTS_DATA``, and returns those that carry an ``aura_color``
+        (R, G, B list).  Effects without an ``aura_color`` are silently
+        skipped — that's the opt-in marker that says "this effect has
+        a visual flourish."
+        """
+        try:
+            granted_ids = member.get_granted_effect_ids()
+        except Exception:
+            return []
+        if not granted_ids:
+            return []
+        by_id = {e["id"]: e for e in EFFECTS_DATA}
+        out = []
+        for eid in granted_ids:
+            eff = by_id.get(eid)
+            if not eff:
+                continue
+            color = eff.get("aura_color")
+            if not color or len(color) < 3:
+                continue
+            out.append({
+                "color": (int(color[0]), int(color[1]), int(color[2])),
+                "pulse_hz": float(eff.get("aura_pulse_hz", 1.0)),
+                "radius": int(eff.get("aura_radius", 18)),
+            })
+        return out
+
+    def _u3_draw_item_aura(self, cx, cy, aura, t_ms=None):
+        """Draw a soft pulsing radial glow centred at (cx, cy).
+
+        ``aura`` is a dict from :meth:`_collect_member_auras` (color,
+        pulse_hz, radius).  Drawn BEFORE the character sprite so the
+        glow pools beneath them.  Three nested SRCALPHA circles give a
+        cheap radial-gradient look; alpha breathes with a sine wave
+        whose period is set by ``pulse_hz``.
+        """
+        if t_ms is None:
+            t_ms = pygame.time.get_ticks()
+        color = aura["color"]
+        radius = aura["radius"]
+        # 0..1 pulse from a sine wave at the configured frequency
+        phase = (t_ms / 1000.0) * aura["pulse_hz"] * math.tau
+        pulse = 0.5 + 0.5 * math.sin(phase)
+        # Three nested layers — large dim ring, medium glow, bright core.
+        # Alpha values intentionally modest: the aura should suggest
+        # "this character is magical" without overwhelming the sprite.
+        r_outer = int(radius * 1.4)
+        layers = (
+            (r_outer,                 int(35 + 25 * pulse)),
+            (int(radius * 1.0),       int(60 + 35 * pulse)),
+            (int(radius * 0.55),      int(95 + 55 * pulse)),
+        )
+        size = r_outer * 2
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        for r, a in layers:
+            if r <= 0:
+                continue
+            pygame.draw.circle(surf, (*color, a), (r_outer, r_outer), r)
+        self.screen.blit(surf, (cx - r_outer, cy - r_outer))
+
+    def _draw_member_auras_at(self, member, cx, cy):
+        """Draw every aura granted to *member* at the given screen point.
+
+        Convenience wrapper used by both the combat-arena fighter draw
+        and the world-map party draw, so both code paths flicker the
+        same way.
+        """
+        for aura in self._collect_member_auras(member):
+            self._u3_draw_item_aura(cx, cy, aura)
+
     def _u3_draw_party_member_sprite(self, ax, ay, ts, col, row,
                                       member, is_active, alpha=255):
         """Draw a party member on the combat arena using loaded sprite.
@@ -6231,6 +6326,10 @@ class Renderer(CombatEffectRendererMixin):
         alpha < 255 renders the sprite semi-transparent (for invisibility)."""
         cx = ax + col * ts + ts // 2
         cy = ay + row * ts + ts // 2
+
+        # ── Magic-item aura — drawn first so the sprite sits on top ──
+        if member.is_alive():
+            self._draw_member_auras_at(member, cx, cy)
 
         color = self._CLASS_COLORS.get(member.char_class.lower(),
                                         self._U3_WHITE)

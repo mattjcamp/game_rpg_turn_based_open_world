@@ -182,5 +182,34 @@
     ],
     "giver_col": 6,
     "giver_row": 21
+  },
+  {
+    "name": "Retrieve the Sun Sword",
+    "description": "",
+    "giver_npc": "Laird",
+    "giver_sprite": "src/assets/unassigned/wizard_f1.png",
+    "giver_location": "town:Seat of the Realm",
+    "giver_dialogue": "Our troubles started not with the dragon, but with a perverse mage who inverted the natural order of things in the realm. The great Sun Sword was buried deep in the Shrine of the Sea unending all things. That is what brought the dragon. Retrieve the Sun Sword and I will help you weld this artifact against the great dragon.",
+    "reward_xp": 1000,
+    "reward_gold": 1000,
+    "reward_items": [
+      "Sun Sword"
+    ],
+    "steps": [
+      {
+        "description": "Retrieve the Sun Sword",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "King's Sword",
+        "has_guardian": "yes",
+        "guardian_encounter": "Wyrm-blooded Cultists",
+        "spawn_location": "space:Sea Shrine/Citadel 4",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 12
   }
 ]

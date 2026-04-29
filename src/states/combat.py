@@ -1963,6 +1963,8 @@ class CombatState(BaseState):
                 dice_count, dice_sides, dmg_bonus = f.get_damage_dice(rw_name)
                 damage, _holy = self._apply_damage(
                     f, target, dice_count, dice_sides, dmg_bonus, crit, rw_name)
+                # ── Magic-item on-hit proc (ranged) ──
+                self._apply_item_on_hit(f, target, rw_name)
 
             # ── Thrown poison potion effect ──
             if thrown_is_poison and target.is_alive():
@@ -2185,8 +2187,15 @@ class CombatState(BaseState):
                       crit, weapon_label):
         """Roll damage, apply Holy Smite if applicable, deal HP, and log.
 
+        Also rolls any magic-item ``bonus_damage`` dice and applies
+        ``damage_type`` scaling against the target's resistances and
+        vulnerabilities.  ``weapon_label`` is the equipped weapon's
+        item name and is used to look up these magic attributes.
+
         Spawns a HitEffect on the target.  Returns ``(damage, holy_smite)``.
         """
+        from src.party import WEAPONS
+
         holy_smite = False
         if (getattr(f, "char_class", "").lower() == "paladin"
                 and getattr(target, "undead", False)):
@@ -2194,6 +2203,20 @@ class CombatState(BaseState):
             holy_smite = True
 
         damage = roll_damage(dice_count, dice_sides, dmg_bonus, critical=crit)
+
+        # ── Magic-item bonus damage ──
+        # Rolled separately so the damage-type scaling below applies to
+        # the entire blow (base + bonus), but the bonus itself follows
+        # the item's own dice spec (int or "NdM" string).
+        wp_def = WEAPONS.get(weapon_label) or {}
+        bonus_dmg = wp_def.get("bonus_damage")
+        if bonus_dmg:
+            damage += self._roll_bonus_damage(bonus_dmg, crit)
+
+        # ── Damage-type scaling ──
+        dmg_type = wp_def.get("damage_type", "physical")
+        damage = self._scale_damage_for_type(damage, dmg_type, target)
+
         target.hp = max(0, target.hp - damage)
 
         if holy_smite:
@@ -2202,13 +2225,132 @@ class CombatState(BaseState):
                 f"with {weapon_label}!")
             self.game.sfx.play("critical")
         else:
+            type_suffix = "" if dmg_type == "physical" else f" ({dmg_type})"
             self.combat_log.append(
-                f"{f.name} deals {damage} damage to {target.name} "
+                f"{f.name} deals {damage}{type_suffix} damage to {target.name} "
                 f"with {weapon_label}!")
 
         mc, mr = self.monster_positions.get(target, (0, 0))
         self.hit_effects.append(HitEffect(mc, mr, damage))
         return damage, holy_smite
+
+    # ── Magic-item helpers ──────────────────────────────────────
+
+    def _roll_bonus_damage(self, spec, crit=False):
+        """Roll a weapon's ``bonus_damage`` spec.
+
+        Accepts either an int (flat) or a dice string ("1d6", "2d4").
+        On a critical hit the dice count (or flat value) is doubled,
+        matching the engine's existing crit convention.  Returns 0 for
+        unparseable input rather than raising — bad data shouldn't
+        crash a swing.
+        """
+        if isinstance(spec, (int, float)):
+            return int(spec) * (2 if crit else 1)
+        if isinstance(spec, str):
+            s = spec.strip().lower()
+            if "d" in s:
+                try:
+                    n_str, m_str = s.split("d", 1)
+                    n = int(n_str) if n_str else 1
+                    m = int(m_str)
+                except ValueError:
+                    return 0
+                roll_count = n * (2 if crit else 1)
+                return sum(random.randint(1, m) for _ in range(roll_count))
+            try:
+                return int(s) * (2 if crit else 1)
+            except ValueError:
+                return 0
+        return 0
+
+    def _scale_damage_for_type(self, damage, dmg_type, target):
+        """Halve damage if target resists, double if vulnerable.
+
+        Honors both the new ``resist`` / ``vulnerable`` arrays on
+        monsters and the legacy ``passives`` flags
+        (``fire_resistance``, ``ice_resistance``).  ``physical`` is the
+        default and is never scaled — physical resistance/vulnerability
+        would need explicit ``"physical"`` entries to take effect.
+        """
+        if not dmg_type:
+            return damage
+        # Legacy passive flag (e.g. fire_resistance halves fire damage)
+        legacy_passive = f"{dmg_type}_resistance"
+        passives = getattr(target, "passives", None) or []
+        legacy_resist = any(p.get("type") == legacy_passive for p in passives)
+        # New explicit lists
+        resist = set(getattr(target, "resist", None) or [])
+        vulnerable = set(getattr(target, "vulnerable", None) or [])
+        if legacy_resist or dmg_type in resist:
+            damage = damage // 2
+        if dmg_type in vulnerable:
+            damage = damage * 2
+        return max(0, damage)
+
+    def _apply_item_on_hit(self, f, target, weapon_name):
+        """Roll a weapon's on-hit spell trigger and dispatch if it fires.
+
+        The on_hit block on a weapon ({"spell_id", "chance"}) describes
+        a spell from spells.json that may proc on each successful hit.
+        Damage inherits the weapon's ``damage_type`` so a Sun Sword's
+        proc burns as fire (and respects monster resist/vulnerable).
+        Bypasses MP cost — the weapon itself is the caster.
+        """
+        if target is None or not target.is_alive():
+            return
+        from src.party import WEAPONS
+
+        wp_def = WEAPONS.get(weapon_name) or {}
+        on_hit = wp_def.get("on_hit") or {}
+        spell_id = on_hit.get("spell_id")
+        chance = float(on_hit.get("chance", 0.0) or 0.0)
+        if not spell_id or chance <= 0:
+            return
+        if random.random() >= chance:
+            return
+        spell = SPELLS_DATA.get(spell_id)
+        if not spell:
+            return
+
+        # Roll spell damage from effect_value.dice (item is the caster,
+        # so no character stat bonus and no MP cost).
+        ev = spell.get("effect_value", {}) or {}
+        dice_str = ev.get("dice", "1d4")
+        parts = dice_str.lower().split("d")
+        try:
+            num_dice = int(parts[0]) if len(parts) == 2 and parts[0] else 1
+            die_sides = int(parts[1]) if len(parts) == 2 else 4
+        except ValueError:
+            num_dice, die_sides = 1, 4
+        damage = sum(random.randint(1, die_sides) for _ in range(num_dice))
+        min_damage = ev.get("min_damage", 1)
+        damage = max(min_damage, damage)
+
+        # Inherit the weapon's damage type for resist/vulnerable scaling
+        dmg_type = wp_def.get("damage_type", "physical")
+        damage = self._scale_damage_for_type(damage, dmg_type, target)
+
+        target.hp = max(0, target.hp - damage)
+
+        # Visual + audio — reuse the fireball explosion effect for any
+        # on-hit proc; it reads as "magical eruption" generically.
+        mc, mr = self.monster_positions.get(target, (0, 0))
+        self.fireball_explosions.append(FireballExplosion(mc, mr))
+        self.hit_effects.append(HitEffect(mc, mr, damage))
+
+        sfx = spell.get("sfx")
+        hit_sfx = spell.get("hit_sfx")
+        if sfx:
+            self.game.sfx.play(sfx)
+        if hit_sfx:
+            self.game.sfx.play(hit_sfx)
+
+        spell_name = spell.get("name", spell_id)
+        type_suffix = "" if dmg_type == "physical" else f" {dmg_type}"
+        self.combat_log.append(
+            f"  ✦ {weapon_name} flares — {spell_name} for "
+            f"{damage}{type_suffix} damage!")
 
     # ── Melee attack ─────────────────────────────────────────────
 
@@ -2328,6 +2470,12 @@ class CombatState(BaseState):
             if thief_crit:
                 mc, mr = self.monster_positions.get(target, (0, 0))
                 self.hit_effects.append(_BackstabEffect(mc, mr))
+
+            # ── Magic-item on-hit proc ──
+            # Runs *before* poison so the spell visual lands while the
+            # target is still alive in the common case; we still null-check
+            # inside the helper.
+            self._apply_item_on_hit(f, target, melee_wp)
 
             # ── Weapon poison on melee hit ──
             if target.is_alive():

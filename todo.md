@@ -1,5 +1,6 @@
 ## Polish
-- Consider a new forest transition tile graphic. Maybe even something as simple as a flag or a subltly pulsing graphic
+- Lite tiles should have their light shine past water tiles
+- Make Sun Sword powerful with a fire affect
 
 ## Bugs
 

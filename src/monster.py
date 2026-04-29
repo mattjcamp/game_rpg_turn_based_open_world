@@ -38,6 +38,7 @@ class Monster:
                  ranged=None, spells=None,
                  move_range=1, post_attack_move=0,
                  on_hit_effects=None, passives=None,
+                 resist=None, vulnerable=None,
                  battle_scale=1):
         self.name = name
         self.max_hp = hp
@@ -80,10 +81,19 @@ class Monster:
         # Passive abilities always active during combat
         # List of dicts: [{type, ...}]
         #   type "regen"           → amount (HP healed per turn)
-        #   type "fire_resistance" → (halves fire damage)
-        #   type "ice_resistance"  → (halves ice damage)
+        #   type "fire_resistance" → (halves fire damage)  [legacy form]
+        #   type "ice_resistance"  → (halves ice damage)   [legacy form]
         #   type "poison_immunity" → (immune to poison status)
         self.passives = passives or []
+
+        # Damage-type resistances and vulnerabilities (modern form).
+        # ``resist[]``  halves incoming damage of that type.
+        # ``vulnerable[]`` doubles it.  Both are simple lists of strings
+        # (e.g. ["fire", "holy"]).  These complement the legacy
+        # ``passives`` resistance flags above — both forms are honored
+        # in combat's _scale_damage_for_type.
+        self.resist = list(resist) if resist else []
+        self.vulnerable = list(vulnerable) if vulnerable else []
 
         # Battle scale: how many tiles wide/tall the monster is in combat.
         # 1 = normal (1x1), 2 = large (2x2), 3 = huge (3x3), etc.
@@ -220,6 +230,8 @@ def create_monster(name):
         post_attack_move=data.get("post_attack_move", 0),
         on_hit_effects=data.get("on_hit_effects"),
         passives=data.get("passives"),
+        resist=data.get("resist"),
+        vulnerable=data.get("vulnerable"),
         battle_scale=data.get("battle_scale", 1),
     )
 

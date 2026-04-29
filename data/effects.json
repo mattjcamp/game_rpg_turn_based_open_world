@@ -1,5 +1,5 @@
 {
-  "_comment": "Effect definitions for Realm of Shadow. Each effect can be slotted into one of the party's 4 effect slots. Duration is a step count or 'permanent'. Requirements use ALL-match logic: every listed field must be satisfied. For class/race, the party must have a member of that class/race. For max_level, the party's highest level must be at or below that value.",
+  "_comment": "Effect definitions for Realm of Shadow. Each effect can be slotted into one of the party's 4 effect slots. Duration is a step count or 'permanent'. Requirements use ALL-match logic: every listed field must be satisfied. For class/race, the party must have a member of that class/race. For max_level, the party's highest level must be at or below that value. Effects with 'item_granted: true' are granted by equipped items via items.json grants_effect — they live in a separate item-granted lane and do NOT consume one of the 4 party effect slots.",
 
   "effects": [
     {
@@ -31,6 +31,16 @@
       "requirements": {
         "race": "Elf"
       }
+    },
+    {
+      "id": "sun_sword_aura",
+      "name": "Sun Sword Aura",
+      "description": "The Sun Sword sheds a warm golden light, illuminating the area around its wielder.",
+      "duration": "permanent",
+      "item_granted": true,
+      "aura_color": [255, 215, 80],
+      "aura_pulse_hz": 1.2,
+      "aura_radius": 18
     }
   ]
 }

@@ -63,6 +63,20 @@ def load_items(data_dir=None):
             entry["durability"] = data["durability"]
         if data.get("indestructible"):
             entry["indestructible"] = True
+        # Magic-item attributes — only emitted when present so mundane
+        # weapons stay slim.  Combat reads these straight off WEAPONS.
+        if data.get("damage_type"):
+            entry["damage_type"] = data["damage_type"]
+        if data.get("bonus_damage"):
+            entry["bonus_damage"] = data["bonus_damage"]
+        if data.get("ac_bonus"):
+            entry["ac_bonus"] = data["ac_bonus"]
+        if data.get("stat_bonuses"):
+            entry["stat_bonuses"] = dict(data["stat_bonuses"])
+        if data.get("grants_effect"):
+            entry["grants_effect"] = data["grants_effect"]
+        if data.get("on_hit"):
+            entry["on_hit"] = dict(data["on_hit"])
         weapons[name] = entry
 
         # Description & icon (what ITEM_INFO needs)
@@ -103,6 +117,15 @@ def load_items(data_dir=None):
             entry["durability"] = data["durability"]
         if data.get("indestructible"):
             entry["indestructible"] = True
+        # Magic-item attributes (armors don't have on_hit/bonus_damage/
+        # damage_type since those are weapon-only, but they share the
+        # passive bonuses with weapons).
+        if data.get("ac_bonus"):
+            entry["ac_bonus"] = data["ac_bonus"]
+        if data.get("stat_bonuses"):
+            entry["stat_bonuses"] = dict(data["stat_bonuses"])
+        if data.get("grants_effect"):
+            entry["grants_effect"] = data["grants_effect"]
         armors[name] = entry
 
         if "description" in data or "icon" in data:

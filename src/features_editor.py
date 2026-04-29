@@ -1969,6 +1969,43 @@ class FeaturesEditor:
                 FE("Stackable", "stackable",
                    str(item.get("stackable", False)), "choice"),
             ]
+        # Magic attributes — only meaningful for equippable gear
+        # (weapons & armors). Lets a designer turn any equippable into a
+        # magic item without a parallel schema. All fields default to a
+        # non-magical value, so existing items round-trip unchanged.
+        if section in ("weapons", "armors"):
+            stat_bonuses = item.get("stat_bonuses") or {}
+            on_hit = item.get("on_hit") or {}
+            fields += [
+                FE("-- Magic --", "_hdr_magic", "", "section", False),
+                FE("AC Bonus", "ac_bonus",
+                   str(item.get("ac_bonus", 0)), "int"),
+                FE("STR Bonus", "_sb_str",
+                   str(stat_bonuses.get("str", 0)), "int"),
+                FE("DEX Bonus", "_sb_dex",
+                   str(stat_bonuses.get("dex", 0)), "int"),
+                FE("CON Bonus", "_sb_con",
+                   str(stat_bonuses.get("con", 0)), "int"),
+                FE("INT Bonus", "_sb_int",
+                   str(stat_bonuses.get("int", 0)), "int"),
+                FE("WIS Bonus", "_sb_wis",
+                   str(stat_bonuses.get("wis", 0)), "int"),
+                FE("CHA Bonus", "_sb_cha",
+                   str(stat_bonuses.get("cha", 0)), "int"),
+                FE("Grants Effect", "grants_effect",
+                   item.get("grants_effect", "") or "", "choice"),
+            ]
+            if section == "weapons":
+                fields += [
+                    FE("Damage Type", "damage_type",
+                       item.get("damage_type", "physical"), "choice"),
+                    FE("Bonus Damage", "bonus_damage",
+                       str(item.get("bonus_damage", "") or "")),
+                    FE("On-Hit Spell", "_on_hit_spell",
+                       on_hit.get("spell_id", "") or "", "choice"),
+                    FE("On-Hit Chance", "_on_hit_chance",
+                       str(on_hit.get("chance", 0.0))),
+                ]
         fields += [
             FE("-- Shop --", "_hdr3", "", "section", False),
             FE("Buy Price", "buy",
@@ -1988,15 +2025,49 @@ class FeaturesEditor:
         self.item_buffer = buf
 
     def save_item_fields(self):
-        """Apply edited fields back to the item dict in memory."""
+        """Apply edited fields back to the item dict in memory.
+
+        Magic-attribute synthetic fields (``_sb_*`` for stat bonuses and
+        ``_on_hit_*`` for the on-hit trigger) are gathered into the
+        ``stat_bonuses`` and ``on_hit`` dicts on the item. Empty/zero
+        values cause the corresponding key to be removed so existing
+        non-magical items don't accumulate noisy zero entries on save.
+        """
         if self.item_cursor >= len(self.item_list):
             return
         item = self.item_list[self.item_cursor]
         if self.item_fields:
             entry = self.item_fields[self.item_field]
             entry.value = self.item_buffer
+
+        # Pass 1: collect synthetic magic-attribute values
+        sb_collected = {}
+        on_hit_spell = ""
+        on_hit_chance = 0.0
+        on_hit_seen = False
+
         for entry in self.item_fields:
             key, val = entry.key, entry.value
+            if key.startswith("_sb_"):
+                stat = key[len("_sb_"):]
+                try:
+                    n = int(val)
+                except ValueError:
+                    n = 0
+                if n != 0:
+                    sb_collected[stat] = n
+                continue
+            if key == "_on_hit_spell":
+                on_hit_spell = val.strip()
+                on_hit_seen = True
+                continue
+            if key == "_on_hit_chance":
+                try:
+                    on_hit_chance = float(val)
+                except ValueError:
+                    on_hit_chance = 0.0
+                on_hit_seen = True
+                continue
             if key.startswith("_") and key not in ("_name", "_section",
                                                     "_slots"):
                 continue
@@ -2008,12 +2079,51 @@ class FeaturesEditor:
                     item[key] = int(val)
                 except ValueError:
                     pass
+            elif key == "ac_bonus":
+                try:
+                    n = int(val)
+                except ValueError:
+                    n = 0
+                if n != 0:
+                    item["ac_bonus"] = n
+                else:
+                    item.pop("ac_bonus", None)
             elif key in ("ranged", "melee", "throwable", "usable",
                          "stackable", "party_can_equip",
                          "character_can_equip", "indestructible"):
                 item[key] = val == "True"
+            elif key == "grants_effect":
+                v = val.strip()
+                if v:
+                    item["grants_effect"] = v
+                else:
+                    item.pop("grants_effect", None)
+            elif key == "damage_type":
+                v = val.strip()
+                if v and v != "physical":
+                    item["damage_type"] = v
+                else:
+                    item.pop("damage_type", None)
+            elif key == "bonus_damage":
+                v = val.strip()
+                if v:
+                    item["bonus_damage"] = v
+                else:
+                    item.pop("bonus_damage", None)
             else:
                 item[key] = val
+
+        # Pass 2: reassemble synthetic groups
+        if sb_collected:
+            item["stat_bonuses"] = sb_collected
+        else:
+            item.pop("stat_bonuses", None)
+        if on_hit_seen:
+            if on_hit_spell:
+                item["on_hit"] = {"spell_id": on_hit_spell,
+                                  "chance": on_hit_chance}
+            else:
+                item.pop("on_hit", None)
 
     def get_item_choices(self, key):
         """Return choice options for an item field."""
@@ -2030,6 +2140,20 @@ class FeaturesEditor:
                    "stackable", "party_can_equip",
                    "character_can_equip", "indestructible"):
             return ["True", "False"]
+        if key == "damage_type":
+            return ["physical", "fire", "holy", "cold", "lightning"]
+        if key == "grants_effect":
+            try:
+                from src.party import EFFECTS_DATA
+                return [""] + [e["id"] for e in EFFECTS_DATA]
+            except Exception:
+                return [""]
+        if key == "_on_hit_spell":
+            try:
+                from src.party import SPELLS_DATA
+                return [""] + sorted(SPELLS_DATA.keys())
+            except Exception:
+                return [""]
         return []
 
     def add_item(self):

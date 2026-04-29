@@ -298,19 +298,32 @@
       "sell": 60
     },
     "Sun Sword": {
-      "power": 10,
+      "power": 20,
       "ranged": false,
       "slots": [
         "right_hand",
         "left_hand"
       ],
-      "description": "A radiant blade infused with solar energy.",
+      "description": "A radiant blade infused with solar energy. Burns those it strikes and bathes its wielder in light.",
       "icon": "sword",
       "item_type": "sword",
       "party_can_equip": false,
       "character_can_equip": true,
       "durability": 0,
-      "indestructible": true
+      "indestructible": true,
+      "melee": false,
+      "throwable": false,
+      "buy": 0,
+      "sell": 0,
+      "damage_type": "fire",
+      "bonus_damage": "1d6",
+      "ac_bonus": 0,
+      "stat_bonuses": {},
+      "grants_effect": "sun_sword_aura",
+      "on_hit": {
+        "spell_id": "fireball",
+        "chance": 0.25
+      }
     },
     "Sword": {
       "power": 5,
