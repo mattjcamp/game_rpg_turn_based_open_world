@@ -1276,9 +1276,14 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
         to this interior and creates NPC objects with
         ``npc_type='quest_item'`` on walkable tiles.  The player can
         walk into them to pick them up.
+
+        If the underlying quest step set ``spawn_col`` / ``spawn_row``
+        the item is pinned to that exact tile (when valid); otherwise a
+        random walkable tile is chosen.
         """
         import random as _rng
         from src.town_generator import NPC
+        from src.quest_manager import pick_quest_item_position
 
         items_dict = getattr(self.game, "quest_collect_items", {})
         key = f"interior:{interior_name}"
@@ -1314,10 +1319,10 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
             if step_idx < len(progress) and progress[step_idx]:
                 continue
 
-            free = [p for p in walkable if p not in occupied]
-            if not free:
+            pos = pick_quest_item_position(entry, walkable, occupied, rng)
+            if pos is None:
                 break
-            col, row = rng.choice(free)
+            col, row = pos
             occupied.add((col, row))
 
             npc = NPC(

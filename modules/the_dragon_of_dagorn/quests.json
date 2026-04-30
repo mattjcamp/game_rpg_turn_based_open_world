@@ -206,7 +206,9 @@
         "spawn_location": "space:Sea Shrine/Citadel 4",
         "target": "",
         "target_count": 1,
-        "optional": "no"
+        "optional": "no",
+        "spawn_col": 7,
+        "spawn_row": 7
       }
     ],
     "giver_col": 8,

@@ -79,13 +79,23 @@ LightCache = Dict[Tuple[int, int, int], Set[Tuple[int, int]]]
 def _is_opaque(tile_map, x: int, y: int) -> bool:
     """True when a tile blocks light and sight.
 
-    Non-walkable tiles (walls, void, etc.) are always opaque.  Closed
-    doors are walkable but opaque — you see the door itself but not
-    what's behind it.
+    Non-walkable tiles (walls, void, etc.) are opaque by default.
+    Closed doors are walkable but opaque — you see the door itself
+    but not what's behind it.
+
+    Tiles whose ``tile_defs.json`` entry has ``flags.transparent: true``
+    are an exception: they block movement but not light.  Water is the
+    canonical example — the party can't walk into a flooded chamber,
+    but a torch on the far shore should still illuminate it.
     """
-    if not tile_map.is_walkable(x, y):
-        return True
-    return tile_map.get_tile(x, y) == TILE_DDOOR
+    tid = tile_map.get_tile(x, y)
+    if tid == TILE_DDOOR:
+        return True  # closed door — walkable but opaque
+    if tile_map.is_walkable(x, y):
+        return False
+    # Non-walkable: opaque unless explicitly flagged transparent.
+    flags = TILE_DEFS.get(tid, {}).get("flags", {})
+    return not flags.get("transparent", False)
 
 
 # ── Shadowcasting ─────────────────────────────────────────────────

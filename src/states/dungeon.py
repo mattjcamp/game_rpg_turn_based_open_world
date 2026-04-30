@@ -18,6 +18,7 @@ from src.settings import (
     TILE_DUNGEON_CLEARED, TILE_PATH,
     TILE_FOREST_ARCHWAY_UP, TILE_FOREST_ARCHWAY_DOWN,
     GUARDIAN_LEASH, GUARDIAN_INTERCEPT_RANGE_INTERIOR,
+    TILE_DEFS,
 )
 
 # Tile groups for ascend/descend logic.  Forest-style dungeons use the
@@ -399,11 +400,16 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
 
         Items only spawn on the **lowest** floor of a multi-level dungeon.
         Guardian monsters are also placed near the item and anchored to it.
+
+        Honors the optional ``spawn_col`` / ``spawn_row`` override on
+        each entry (set in the module editor's collect-step screen).
+        Blank/missing coords fall back to a random walkable tile.
         """
         import random as _rng
         import re
         from src.monster import create_monster, MONSTERS
         from src.town_generator import NPC
+        from src.quest_manager import pick_quest_item_position
 
         # Only place items on the lowest floor
         if self.quest_levels:
@@ -465,11 +471,12 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
             if step_idx < len(progress) and progress[step_idx]:
                 continue
 
-            # Place the collect item
-            free = [p for p in walkable if p not in occupied]
-            if not free:
+            # Place the collect item — honor the editor-set
+            # spawn_col / spawn_row override, falling back to random.
+            pos = pick_quest_item_position(entry, walkable, occupied, rng)
+            if pos is None:
                 continue
-            col, row = rng.choice(free)
+            col, row = pos
             occupied.add((col, row))
 
             item_obj = {
@@ -1222,10 +1229,19 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
 
                 # Check if this tile blocks light — walls and closed
                 # doors are opaque (you can see the door itself but
-                # not through it).
+                # not through it).  Tiles with ``flags.transparent``
+                # set in tile_defs.json are an exception: they block
+                # movement but not light (water is the canonical case
+                # — a torch across a flooded chamber should still
+                # illuminate the far side).
                 tid = tile_map.get_tile(map_x, map_y)
-                is_wall = (not tile_map.is_walkable(map_x, map_y)
-                           or tid == TILE_DDOOR)
+                if tid == TILE_DDOOR:
+                    is_wall = True
+                elif tile_map.is_walkable(map_x, map_y):
+                    is_wall = False
+                else:
+                    _flags = TILE_DEFS.get(tid, {}).get("flags", {})
+                    is_wall = not _flags.get("transparent", False)
 
                 if blocked:
                     if is_wall:

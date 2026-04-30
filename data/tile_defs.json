@@ -19,7 +19,10 @@
       180
     ],
     "context": "overworld",
-    "sprite": "overworld/water"
+    "sprite": "overworld/water",
+    "flags": {
+      "transparent": true
+    }
   },
   "2": {
     "name": "Forest",
@@ -510,7 +513,10 @@
       128
     ],
     "context": "town",
-    "sprite": "overworld/water"
+    "sprite": "overworld/water",
+    "flags": {
+      "transparent": true
+    }
   },
   "54": {
     "name": "Scrub",

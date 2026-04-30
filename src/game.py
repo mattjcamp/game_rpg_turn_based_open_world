@@ -1721,7 +1721,9 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     self, "_mod_quest_artifact_sprites", {})
                 artifact_sprite = artifact_sprites.get(collect_item, "")
 
-                # Build the collect item registration
+                # Build the collect item registration.  Optional
+                # spawn_col / spawn_row pin the item to an exact tile
+                # (blank / missing = pick a random walkable tile).
                 item_info = {
                     "quest_name": quest_name,
                     "step_idx": step_idx,
@@ -1730,6 +1732,8 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                     "has_guardian": has_guardian,
                     "guardian_key": guardian_key,
                     "target_count": max(1, step.get("target_count", 1)),
+                    "spawn_col": step.get("spawn_col"),
+                    "spawn_row": step.get("spawn_row"),
                 }
 
                 # Register at the appropriate location
@@ -1936,6 +1940,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         Returns ``(col, row)`` of the placed item, or ``None``.
         """
         import random as _rng
+        from src.quest_manager import _coerce_int
         from src.town_generator import NPC
         from src.settings import TILE_GRASS, TILE_PATH
 
@@ -1956,7 +1961,39 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         rng = _rng.Random(
             hash((quest_name, step_idx, item_name)) & 0xFFFFFFFF)
 
+        # ── Honor an exact (col, row) override from the quest editor ──
+        # Authors can pin an overworld collect item to a specific tile
+        # via the step's spawn_col / spawn_row.  The override is accepted
+        # when both coords are set, in-bounds, on a grass/path tile,
+        # and unoccupied; otherwise we warn and fall through to the
+        # ring-search fallback below.
+        sc = _coerce_int(item_info.get("spawn_col"))
+        sr = _coerce_int(item_info.get("spawn_row"))
         placed_pos = None
+        if sc is not None and sr is not None and sc >= 0 and sr >= 0:
+            in_bounds = (0 <= sc < tmap.width and 0 <= sr < tmap.height)
+            valid_terrain = in_bounds and tmap.get_tile(sc, sr) in (
+                TILE_GRASS, TILE_PATH)
+            if valid_terrain and (sc, sr) not in occupied:
+                npc = NPC(
+                    col=sc, row=sr,
+                    name=item_name,
+                    dialogue=[f"You found {item_name}!"],
+                    npc_type="quest_item",
+                )
+                npc._quest_name = quest_name
+                npc._quest_step_idx = step_idx
+                npc._item_sprite = item_sprite
+                npc.quest_highlight = True
+                ow_npcs.append(npc)
+                occupied.add((sc, sr))
+                return (sc, sr)
+            print(
+                f"[quest] Overworld spawn coord ({sc},{sr}) for "
+                f"{item_name!r} is invalid (out-of-bounds, wrong "
+                "terrain, or occupied) — falling back to ring search."
+            )
+
         for ring in range(3, 20):
             candidates = []
             for dc in range(-ring, ring + 1):

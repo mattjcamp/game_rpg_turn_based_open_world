@@ -6233,9 +6233,9 @@
             "link_y": "12"
           },
           "6,6": {
-            "walkable": "inherit (yes)",
+            "walkable": "yes (override)",
             "light_source": true,
-            "light_range": "5",
+            "light_range": "3",
             "effect": "fairy_light"
           },
           "6,7": {
@@ -6245,13 +6245,13 @@
             "effect": "fairy_light"
           },
           "9,7": {
-            "walkable": "inherit (yes)",
+            "walkable": "yes (override)",
             "light_source": true,
             "light_range": "5",
             "effect": "fairy_light"
           },
           "9,6": {
-            "walkable": "inherit (yes)",
+            "walkable": "yes (override)",
             "light_source": true,
             "light_range": "5",
             "effect": "fairy_light"

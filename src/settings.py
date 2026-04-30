@@ -105,7 +105,8 @@ TILE_ENCOUNTER = 69
 # Each tile has: color (RGB), walkable (bool), name (str)
 TILE_DEFS = {
     TILE_GRASS:    {"color": (34, 139, 34),   "walkable": True,  "name": "Grass"},
-    TILE_WATER:    {"color": (30, 90, 180),   "walkable": False, "name": "Water"},
+    TILE_WATER:    {"color": (30, 90, 180),   "walkable": False, "name": "Water",
+                    "flags": {"transparent": True}},
     TILE_FOREST:   {"color": (0, 80, 0),      "walkable": True,  "name": "Forest"},
     TILE_MOUNTAIN: {"color": (130, 130, 130), "walkable": False, "name": "Mountain"},
     TILE_TOWN:     {"color": (180, 140, 80),  "walkable": True,  "name": "Town"},

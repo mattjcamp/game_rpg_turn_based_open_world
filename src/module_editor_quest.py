@@ -639,16 +639,25 @@ class ModuleQuestEditorMixin:
                            str(step.get("target_count", 1)), "int", True),
             ]
         else:
-            # Collect: Item, Spawn Location, Guardian, Guardian Encounter
+            # Collect: Item, Spawn Location, Spawn Col/Row,
+            # Target Count, Guardian, Guardian Encounter
             current_item = step.get("collect_item", "")
             if not current_item:
                 current_item = "(none)"
             has_guardian = step.get("has_guardian", "no")
+            # Spawn col/row are optional overrides on top of Spawn
+            # Location.  Blank in the UI = "any walkable tile" (the
+            # default random placement).  Same convention as the
+            # quest-giver giver_col/giver_row fields above.
             type_fields = [
                 FieldEntry("Item", "collect_item",
                            current_item, "choice", True),
                 FieldEntry("Spawn Location", "spawn_location",
                            spawn_loc_display, "choice", True),
+                FieldEntry("Spawn Col", "spawn_col",
+                           str(step.get("spawn_col", "")), "int", True),
+                FieldEntry("Spawn Row", "spawn_row",
+                           str(step.get("spawn_row", "")), "int", True),
                 FieldEntry("Target Count", "target_count",
                            str(step.get("target_count", 1)), "int", True),
                 FieldEntry("", "", "", "section", False),
@@ -710,6 +719,14 @@ class ModuleQuestEditorMixin:
             key = fe_entry.key
             val = fe_entry.value
             if fe_entry.field_type == "int":
+                # spawn_col / spawn_row: blank means "any walkable tile"
+                # — pop the key so the runtime spawner falls back to
+                # random placement.  Same convention as giver_col /
+                # giver_row on quest-giver settings.
+                if key in ("spawn_col", "spawn_row") and (
+                        val == "" or val is None):
+                    step.pop(key, None)
+                    continue
                 try:
                     val = int(val)
                 except ValueError:

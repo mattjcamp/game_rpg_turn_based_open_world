@@ -2179,9 +2179,15 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
 
     def _spawn_building_quest_collect_items(self, interior_name, imap,
                                                space_name=""):
-        """Place collectible quest items inside a building interior."""
+        """Place collectible quest items inside a building interior.
+
+        Honors the optional ``spawn_col`` / ``spawn_row`` override from
+        the quest step (set in the module editor's collect-step screen).
+        Blank/missing coords fall back to a random walkable tile.
+        """
         import random as _rng
         from src.town_generator import NPC
+        from src.quest_manager import pick_quest_item_position
 
         items_dict = getattr(self.game, "quest_collect_items", {})
         # Check both the generic building key and the specific space key.
@@ -2220,10 +2226,10 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             if step_idx < len(progress) and progress[step_idx]:
                 continue
 
-            free = [p for p in walkable if p not in occupied]
-            if not free:
+            pos = pick_quest_item_position(entry, walkable, occupied, rng)
+            if pos is None:
                 break
-            col, row = rng.choice(free)
+            col, row = pos
             occupied.add((col, row))
 
             npc = NPC(

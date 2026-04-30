@@ -5,6 +5,75 @@ to eliminate duplication across state files.
 """
 
 
+def _coerce_int(value):
+    """Best-effort int parse — returns ``None`` on blank / non-numeric.
+
+    Used for the optional ``spawn_col`` / ``spawn_row`` overrides on
+    collect steps, which authors leave blank when they want random
+    placement.  Empty strings, ``None``, and unparseable values all
+    map to ``None`` so ``pick_quest_item_position`` treats them as
+    "no override".
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def pick_quest_item_position(item_info, walkable, occupied, rng):
+    """Choose a tile for a quest collectible.
+
+    Honors the optional ``spawn_col`` / ``spawn_row`` override on
+    ``item_info`` when both are present, non-negative, and resolve to
+    a walkable tile that isn't already occupied.  Otherwise falls
+    back to a random walkable, unoccupied tile and prints a warning
+    to the console (so the author can spot mis-placed coordinates
+    during testing).
+
+    Parameters
+    ----------
+    item_info : dict
+        Per-item registration carrying at minimum ``item_name``;
+        ``spawn_col`` and ``spawn_row`` are optional.
+    walkable : iterable of (col, row)
+        Every walkable tile in the destination map.  May be a list
+        or set; the function handles both.
+    occupied : set of (col, row)
+        Tiles already taken (other NPCs, exits, etc.).
+    rng : random.Random
+        Source of randomness for the fallback path so callers stay
+        deterministic across save/load.
+
+    Returns
+    -------
+    (col, row) tuple, or ``None`` if no suitable tile exists.
+    """
+    walkable_set = walkable if isinstance(walkable, set) else set(walkable)
+
+    sc = _coerce_int(item_info.get("spawn_col"))
+    sr = _coerce_int(item_info.get("spawn_row"))
+
+    if sc is not None and sr is not None and sc >= 0 and sr >= 0:
+        pos = (sc, sr)
+        if pos in walkable_set and pos not in occupied:
+            return pos
+        # Authors usually want to know when their override didn't
+        # land on a valid tile.  Print rather than log so headless
+        # tests don't need a logging fixture.
+        print(
+            f"[quest] Spawn coord ({sc},{sr}) for "
+            f"{item_info.get('item_name', '?')!r} is invalid "
+            f"(not walkable or occupied) — falling back to random."
+        )
+
+    free = [p for p in walkable_set if p not in occupied]
+    if not free:
+        return None
+    return rng.choice(free)
+
+
 def build_quest_location_hint(qdef):
     """Return a human-readable notice of dungeon locations referenced by
     a quest's steps, or an empty string if the quest doesn't involve any
