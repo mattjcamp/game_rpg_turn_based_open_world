@@ -1,7 +1,7 @@
 [
   {
     "name": "Abandoned Building",
-    "description": "An old, creepy building, that has been derelict for years",
+    "description": "A merchant's house gone derelict a generation ago, when its owner walked into the cellar and never came back out. The shutters still hang on their hinges; nothing else inside is willing to.",
     "spaces": [
       {
         "name": "Main Hall",
@@ -1503,7 +1503,7 @@
   },
   {
     "name": "Sea Shrine",
-    "description": "A temple built to honor the gods of the seas",
+    "description": "A four-tiered temple cut into a sea-stack on the western coast, raised to the Suns of the old Conclave. Its lowest citadel was flooded long before the dragon woke — by design, not accident. What was hidden there was hidden from the dragon itself.",
     "spaces": [
       {
         "name": "Main Hall",

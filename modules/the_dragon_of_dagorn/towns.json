@@ -3123,7 +3123,7 @@
         "name": "Path Floor"
       }
     },
-    "description": "A humble settlement set against the trees and montains of this valley",
+    "description": "A walled village of timber and slate set against the eastern foothills. Its lanes still hold the smell of woodsmoke and turned earth — the troubles here are small ones, but every villager has begun looking west more often than they used to.",
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
@@ -7437,7 +7437,7 @@
         "name": "Water"
       }
     },
-    "description": "An old town by the sea",
+    "description": "A clutter of fishing shacks and salvage-built docks pressed against the cliffs of the western shore. Half the boats no longer go out. The folk here were the first to see the dragon's shadow on the water — and the first whose dead refused to lie quiet.",
     "town_style": "mountain",
     "entry_col": 21,
     "entry_row": 24,
@@ -10951,7 +10951,7 @@
         "path": "game/terrain/wall_copy.png"
       }
     },
-    "description": "The capital city, where all the business of the realm is conducted.",
+    "description": "The capital fortress, banner-hung and ringed with sun-rune walls. Queen Aelyse Veyron, last of the Sun-Priestess line, holds court here. The realm's archives, its mages, and its standing army all answer to this place — and all of them, lately, are stretched thin.",
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,

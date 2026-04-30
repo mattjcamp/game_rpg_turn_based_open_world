@@ -1,11 +1,11 @@
 [
   {
-    "name": "Rats!",
-    "description": "",
+    "name": "A Rat Problem",
+    "description": "Thelma the shopkeeper has lost her cellar to vermin — and from the noise underneath, something larger has moved in beneath them.",
     "giver_npc": "Thelma",
     "giver_sprite": "src/assets/game/npcs/villager_citizen.png",
     "giver_location": "town:Plainstown",
-    "giver_dialogue": "Hail new arrivals! I hear you are in need of coin and more to aid in your adventures. I have a problem that I think you can solve. Maybe we can make a deal? I am the shop owner and I've found myself with a Graint Rat problem and I suspect it may be even worse. They are in my shop and in my basement. If you would deal with that problem I can make it worth your while! I have some extra Camping Supplies that I think may be real worthwhile. Deal?",
+    "giver_dialogue": "Welcome, friends — and forgive the mess. My cellar has been overrun with giant rats, and the noise from below has gotten worse the last few nights. I would handle it myself, but my husband is no fighter and neither am I. Clear them out and I can spare a set of camping supplies and a quiver of arrows for your trouble. Mind your steps down there — I do not think it is only rats anymore.",
     "reward_xp": 100,
     "reward_gold": 100,
     "reward_items": [
@@ -14,7 +14,7 @@
     ],
     "steps": [
       {
-        "description": "Kill the shop rat",
+        "description": "Clear the rat from the shop floor",
         "step_type": "kill",
         "encounter": "Cellar Rats",
         "collect_item": "",
@@ -26,7 +26,7 @@
         "optional": "no"
       },
       {
-        "description": "Kill the basement rats",
+        "description": "Hunt down the rat swarm in the basement tunnel",
         "step_type": "kill",
         "encounter": "Rat Swarm",
         "collect_item": "",
@@ -38,7 +38,7 @@
         "optional": "no"
       },
       {
-        "description": "Rat Out the Goblic",
+        "description": "Deal with the goblin runner sniffing around",
         "step_type": "kill",
         "encounter": "Stray Goblin",
         "collect_item": "",
@@ -54,18 +54,18 @@
     "giver_row": 12
   },
   {
-    "name": "Ghost Hunters",
-    "description": "",
+    "name": "Whatever Killed Maric",
+    "description": "Neil pretended to be a ghost-hunter for coin. Then his partner Maric was killed by something in an empty house — and Neil wants the truth more than the fee.",
     "giver_npc": "Neil",
     "giver_sprite": "src/assets/game/characters/fighter.png",
     "giver_location": "town:Plainstown",
-    "giver_dialogue": "Oh my... I was part of a \"ghost hunter\" team. I never really believe it ghosts at all until I came face to face with one in one of those houses. My partner didn't make it. Can ghosts kill? I'm so sorry I lied about being a ghost hunter. Can you take care of this? I can share my fee with you...",
+    "giver_dialogue": "I am not — I am not really a ghost-hunter. We took the villagers' coin and waved a censer and that was the whole trade. Then in the second house, something rose up out of the floorboards and it was not smoke. Maric never came out. I cannot go back in there. Please — put whatever it is back in the ground and I will split what I have left.",
     "reward_xp": 100,
     "reward_gold": 50,
     "reward_items": [],
     "steps": [
       {
-        "description": "Debunk the Ghost",
+        "description": "Put whatever killed Maric back in the ground",
         "step_type": "kill",
         "encounter": "Shambling Dead",
         "collect_item": "",
@@ -81,18 +81,18 @@
     "giver_row": 9
   },
   {
-    "name": "Goblins",
-    "description": "",
-    "giver_npc": "Loren ",
+    "name": "Goblins in the Hill",
+    "description": "Loren the village elder remembers when the goblins kept to the deeper west. They do not anymore. Their cliffside nest north of town has grown bold enough to need cleaning out.",
+    "giver_npc": "Loren",
     "giver_sprite": "src/assets/game/npcs/elder.png",
     "giver_location": "town:Plainstown",
-    "giver_dialogue": "Up to the North is a cave where we suspect the goblins that have been causing all this mischief have been hiding. There is a reward for any adventurer willing to take on this problem for our town.",
+    "giver_dialogue": "There is a cave in the cliffs north of here. We used to give it a wide berth and it gave us the same. Now they are raiding the high pastures, and we have found tracks in the orchard. The wards must be weakening for them to come this far. We will pay any adventurer brave enough to root them out — and a little more for whoever takes their war-leaders down with them.",
     "reward_xp": 100,
     "reward_gold": 100,
     "reward_items": [],
     "steps": [
       {
-        "description": "Kill Those Goblins",
+        "description": "Break the goblin warbands haunting the lower tunnels",
         "step_type": "kill",
         "encounter": "Wolves and Goblins",
         "collect_item": "",
@@ -104,7 +104,7 @@
         "optional": "no"
       },
       {
-        "description": "Kill the Goblin Leaders",
+        "description": "Slay the goblin war-leaders in the deep nest",
         "step_type": "kill",
         "encounter": "Goblin Ambush",
         "collect_item": "",
@@ -120,18 +120,18 @@
     "giver_row": 20
   },
   {
-    "name": "Retrieve the Town Seal",
-    "description": "",
-    "giver_npc": "",
+    "name": "The Stolen Sealstone",
+    "description": "Elder Wenryn says Plainstown's Sealstone — one of the lesser wards laid by the old Conclave — was taken in the night and dragged into the Old Forest by the Sea. Without it, the village's protections fade by the hour.",
+    "giver_npc": "Elder Wenryn",
     "giver_sprite": "src/assets/unassigned/wizard_f1.png",
     "giver_location": "town:Plainstown",
-    "giver_dialogue": "Our town's seal has been stolen and hidden in that creepy forest near the sea up north. Please retreive this artifact and I will provide passage off this island.",
+    "giver_dialogue": "You feel it, do you not? The pressure on the air. Our village rests on a Sealstone — an old ward laid by the Conclave of Suns when this land was first settled. Three nights ago someone took it. The trail leads west, into the Old Forest by the Sea, and only the dead and the dragon's friends walk willingly into that wood. Bring it back to me, and I can show you a path off the island that the dragon's eyes do not yet watch.",
     "reward_xp": 200,
     "reward_gold": 200,
     "reward_items": [],
     "steps": [
       {
-        "description": "Retrieve the Town Seal",
+        "description": "Recover the Sealstone from the old forest",
         "step_type": "collect",
         "encounter": "",
         "collect_item": "Seal of Binding",
@@ -155,12 +155,12 @@
     ]
   },
   {
-    "name": "Find Our Family Heirloom",
-    "description": "",
+    "name": "The Veyron Heirloom",
+    "description": "A widow at the crossroads has lost the only thing of her late husband's the dragon's fire did not take — a sealed Veyron family scroll, last seen in the cellar of the abandoned house up the road.",
     "giver_npc": "Lori",
     "giver_sprite": "src/assets/game/characters/ranger.png",
     "giver_location": "overview",
-    "giver_dialogue": "We lost our family heirloom in that old abandoned builiding over there. Can you help us find it?",
+    "giver_dialogue": "My husband ran back into our home when the dragon's shadow came over Shanty Town. He was carrying his grandfather's writ — a Veyron family scroll, sealed in red wax. He never came out. The fire took the house and what little of him we found, we buried. The scroll was not with him. There is an old place up the road, the abandoned merchant house, and locals say things have been moving in there since the wards weakened. I think he made it that far. I have no coin, but I have his last bottle of fire-oil. Please.",
     "reward_xp": 200,
     "reward_gold": 200,
     "reward_items": [
@@ -168,7 +168,7 @@
     ],
     "steps": [
       {
-        "description": "Find the Family Heirloom",
+        "description": "Recover the Veyron family scroll from the cellar",
         "step_type": "collect",
         "encounter": "",
         "collect_item": "scroll",
@@ -184,12 +184,51 @@
     "giver_row": 21
   },
   {
-    "name": "Retrieve the Sun Sword",
-    "description": "",
-    "giver_npc": "Laird",
+    "name": "The Crypt Won't Hold Them",
+    "description": "Quill the undertaker can't bury the Shanty Town dead fast enough — and the ones already in the crypt have started leaving. With the seals failing, the very soil has turned restless.",
+    "giver_npc": "Quill",
+    "giver_sprite": "src/assets/game/npcs/elder.png",
+    "giver_location": "town:Shanty Town",
+    "giver_dialogue": "I have been a grave-digger forty years. I have never had to put the same man in the ground twice — until last week. We are past three now. The crypt up on the bluffs is the source. Something in the seal-stones underneath has gone quiet, and the long-dead can feel it. I will pay what I have to anyone willing to go in there and put them down for good.",
+    "reward_xp": 250,
+    "reward_gold": 250,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Clear the restless dead in the upper crypt",
+        "step_type": "kill",
+        "encounter": "Shambling Dead",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Crypt",
+        "target": "",
+        "target_count": 2,
+        "optional": "no"
+      },
+      {
+        "description": "Silence the wailing spirit in the lower vault",
+        "step_type": "kill",
+        "encounter": "Wailing Spirit",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Crypt",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 10,
+    "giver_row": 14
+  },
+  {
+    "name": "The Sun Sword",
+    "description": "Laird Marrowen, the last living scholar of the Conclave of Suns, says the only weapon that ever wounded Hargorn lies beneath the Sea Shrine. Recover the Sun Sword before Vorkhaal's people do.",
+    "giver_npc": "Laird Marrowen",
     "giver_sprite": "src/assets/unassigned/wizard_f1.png",
     "giver_location": "town:Seat of the Realm",
-    "giver_dialogue": "Our troubles started not with the dragon, but with a perverse mage who inverted the natural order of things in the realm. The great Sun Sword was buried deep in the Shrine of the Sea unending all things. That is what brought the dragon. Retrieve the Sun Sword and I will help you weld this artifact against the great dragon.",
+    "giver_dialogue": "Sit. Listen. The dragon you came here to slay is no random terror — Hargorn was bound by the Conclave of Suns a thousand years ago, sealed beneath the western water. The wards held until one of our own, Vorkhaal, learned to feed on them to extend his life. The first seal he broke woke the dragon. We knew this day might come, so the Conclave forged a failsafe: a blade quenched in the dragon's own heart-fire. The Sun Sword. It rests in the lowest citadel of the Sea Shrine, beneath the flood-line. Vorkhaal's wyrm-blooded cultists already crawl those tiers. Bring it back to me, and I will teach you to wield it.",
     "reward_xp": 1000,
     "reward_gold": 1000,
     "reward_items": [
@@ -197,7 +236,7 @@
     ],
     "steps": [
       {
-        "description": "Retrieve the Sun Sword",
+        "description": "Recover the Sun Sword from the drowned citadel",
         "step_type": "collect",
         "encounter": "",
         "collect_item": "King's Sword",
@@ -215,18 +254,18 @@
     "giver_row": 12
   },
   {
-    "name": "Return the Magic Scroll",
-    "description": "",
-    "giver_npc": "Raistlan",
+    "name": "The Apostate's Rite",
+    "description": "Branwen left the Conclave before Vorkhaal's heresy. She wants the binding-rite scroll back from the mountain coven — without it, the Sun Sword is just a sword.",
+    "giver_npc": "Branwen the Apostate",
     "giver_sprite": "src/assets/game/npcs/vga_evil_mage.png",
     "giver_location": "overview",
-    "giver_dialogue": "The mage coven has taken the official scroll and have hidden it in their stronghold hidden in the mountains to the West of the capital. Retreive this articact, for the realm!",
+    "giver_dialogue": "I was Conclave once. Before Vorkhaal inverted us. I left when I understood what he had done — and what he meant to keep doing. There is a scroll in the heart of the coven stronghold: the binding-rite, the words that let a sun-forged blade pierce a sealed-thing's hide. Without it, your Sun Sword is a fancy hilt. Go in. Take it. Vorkhaal's apprentices will show you no mercy, and I would ask you to show them none either.",
     "reward_xp": 500,
     "reward_gold": 500,
     "reward_items": [],
     "steps": [
       {
-        "description": "Find the Scroll",
+        "description": "Recover the binding-rite scroll from the coven",
         "step_type": "collect",
         "encounter": "",
         "collect_item": "scroll",
@@ -242,18 +281,18 @@
     "giver_row": 23
   },
   {
-    "name": "Destroy the Orcs",
-    "description": "",
-    "giver_npc": "Roland",
+    "name": "The Western Warband",
+    "description": "Captain Roland has watched the orcs creep eastward every week the wards have grown thinner. Their warchief means to take the high passes before the year is out.",
+    "giver_npc": "Captain Roland",
     "giver_sprite": "src/assets/game/characters/fighter.png",
     "giver_location": "town:Seat of the Realm",
-    "giver_dialogue": "The orcs must be driven from the realm. Go to their stronghold in the mountain and root them out.",
+    "giver_dialogue": "I have lost three patrols in the last month. The orcs in the western hills used to be a nuisance; now they have a warchief, and warchiefs need war. We cannot hold the passes if they come in numbers. Get into the stronghold, break their footmen, and put a sword through whatever they are calling a king. The realm will pay, and pay well.",
     "reward_xp": 300,
     "reward_gold": 300,
     "reward_items": [],
     "steps": [
       {
-        "description": "Destroy the Orc Footman",
+        "description": "Break the orc footmen at the stronghold gate",
         "step_type": "kill",
         "encounter": "Orc Warchief's Guard",
         "collect_item": "",
@@ -265,7 +304,7 @@
         "optional": "no"
       },
       {
-        "description": "Destroy the Orc Leader",
+        "description": "Slay the orc warchief in his hall",
         "step_type": "kill",
         "encounter": "Orc Siege",
         "collect_item": "",
@@ -281,18 +320,18 @@
     "giver_row": 15
   },
   {
-    "name": "Deliver the Realm from the Dragon",
-    "description": "",
-    "giver_npc": "Lord British",
+    "name": "Slay the Dragon",
+    "description": "Queen Aelyse Veyron, last of the Sun-Priestess line, sends you across the strait to end Hargorn while there is still a realm to save.",
+    "giver_npc": "Queen Aelyse Veyron",
     "giver_sprite": "src/assets/unassigned/wizard_f2.png",
     "giver_location": "town:Seat of the Realm",
-    "giver_dialogue": "The time was come for you to deliver the realm from the yaws of the dragon. Go to the it's island and slay the beast!",
+    "giver_dialogue": "You have done what I could not ask of any soldier of mine. You have walked into Vorkhaal's house, and into the drowned shrine, and come back. Now there is one task left. Hargorn rises every night, and the coast burns a little longer each time. Take the Sun Sword. Take the binding rite. Cross the strait to the dragon's island, and end this. Whatever the wyrm took from this realm, it is time we took it back.",
     "reward_xp": 1000,
     "reward_gold": 1000,
     "reward_items": [],
     "steps": [
       {
-        "description": "Slay the Dragon",
+        "description": "Slay Hargorn in its lair",
         "step_type": "kill",
         "encounter": "Ancient Dragon",
         "collect_item": "",

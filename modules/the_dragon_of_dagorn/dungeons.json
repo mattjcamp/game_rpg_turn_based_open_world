@@ -1,7 +1,7 @@
 [
   {
     "name": "Goblin's Nest",
-    "description": "A dank, smelly hole, full of trash. The perfect place to find a den of goblins.",
+    "description": "A reeking warren of tunnels gouged into the cliffs north of Plainstown. Goblin scavengers have moved in from the deeper west, bolder now that the wards are weak.",
     "mode": "procedural",
     "dungeon_style": "cave",
     "num_levels": 4,
@@ -23,7 +23,7 @@
   },
   {
     "name": "The Old Forest by the Sea",
-    "description": "Just looking at this old sea weather wood suffucates you. But, something is mesmerizing about the wood. You feel drawn in.",
+    "description": "Salt-warped trees grow inland from the western shore, their roots fed on something that should have stayed buried. The wood remembers, and pulls at travellers who come too close.",
     "mode": "procedural",
     "dungeon_style": "forest",
     "num_levels": 6,
@@ -45,7 +45,7 @@
   },
   {
     "name": "Orc Stronghold",
-    "description": "The orcs have taken up arms here",
+    "description": "A ruined hill-keep in the western mountains, retaken by an orc warband. Their drums roll down the passes most nights now, and patrols from the realm's borders have stopped coming back.",
     "mode": "procedural",
     "dungeon_style": "ruins",
     "num_levels": 4,
@@ -67,7 +67,7 @@
   },
   {
     "name": "Mage Coven",
-    "description": "The area around the entrance crackles with a magical energy",
+    "description": "A black-stone redoubt above the snowline, raised by Vorkhaal the Inverted and his apprentices. The air around the gate crackles like a held-in lightning strike. Even with the master gone, the work inside has not stopped.",
     "mode": "procedural",
     "dungeon_style": "ruins",
     "num_levels": 5,
@@ -89,7 +89,7 @@
   },
   {
     "name": "Crypt",
-    "description": "A stench overwhelms the area, broken open coffins and cyrpts leave bodies exposed.",
+    "description": "A lichyard cut into the bluffs above Shanty Town. Broken-open coffins lie strewn across the floor; the smell would shame an open grave. With the seals failing, the long-dead have stopped staying in their boxes.",
     "mode": "procedural",
     "dungeon_style": "ruins",
     "num_levels": 4,
@@ -111,7 +111,7 @@
   },
   {
     "name": "Dragon's Lair",
-    "description": "Smoke and fire lick the stones around the entrance to this massive cave system",
+    "description": "A vast cave system beneath Hargorn's island, hot enough that the stone weeps. Smoke and fire lick the entrance day and night. The closer you get to the heart, the less the air remembers how to be air.",
     "mode": "procedural",
     "dungeon_style": "cave",
     "num_levels": 10,
