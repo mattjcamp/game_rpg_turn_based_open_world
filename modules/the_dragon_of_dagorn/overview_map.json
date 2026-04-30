@@ -1360,6 +1360,22 @@
     },
     "18,13": {
       "walkable": true
+    },
+    "20,14": {
+      "walkable": "inherit (yes)",
+      "linked": true,
+      "link_map": "dungeon:Mage Coven"
+    },
+    "21,17": {
+      "walkable": "inherit (yes)",
+      "linked": true,
+      "link_x": "0",
+      "link_map": "dungeon:Orc Stronghold"
+    },
+    "30,8": {
+      "walkable": "inherit (yes)",
+      "linked": true,
+      "link_map": "dungeon:Crypt"
     }
   }
 }

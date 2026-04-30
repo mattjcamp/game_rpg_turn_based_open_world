@@ -42,5 +42,93 @@
         "encounters": []
       }
     ]
+  },
+  {
+    "name": "Orc Stronghold",
+    "description": "The orcs have taken up arms here",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 4,
+    "difficulty": "hard",
+    "level_size": "medium",
+    "torch_density": "moderate",
+    "locked_doors": "on",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Mage Coven",
+    "description": "The area around the entrance crackles with a magical energy",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 5,
+    "difficulty": "hard",
+    "level_size": "large",
+    "torch_density": "moderate",
+    "locked_doors": "on",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Crypt",
+    "description": "A stench overwhelms the area, broken open coffins and cyrpts leave bodies exposed.",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 4,
+    "difficulty": "hard",
+    "level_size": "small",
+    "torch_density": "moderate",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Dragon's Lair",
+    "description": "Smoke and fire lick the stones around the entrance to this massive cave system",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 10,
+    "difficulty": "deadly",
+    "level_size": "large",
+    "torch_density": "sparse",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
   }
 ]

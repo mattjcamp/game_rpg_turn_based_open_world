@@ -211,5 +211,98 @@
     ],
     "giver_col": 8,
     "giver_row": 12
+  },
+  {
+    "name": "Return the Magic Scroll",
+    "description": "",
+    "giver_npc": "Raistlan",
+    "giver_sprite": "src/assets/game/npcs/vga_evil_mage.png",
+    "giver_location": "overview",
+    "giver_dialogue": "The mage coven has taken the official scroll and have hidden it in their stronghold hidden in the mountains to the West of the capital. Retreive this articact, for the realm!",
+    "reward_xp": 500,
+    "reward_gold": 500,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Find the Scroll",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "scroll",
+        "has_guardian": "yes",
+        "guardian_encounter": "Lich and Banshee",
+        "spawn_location": "dungeon:Mage Coven",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 32,
+    "giver_row": 23
+  },
+  {
+    "name": "Destroy the Orcs",
+    "description": "",
+    "giver_npc": "Roland",
+    "giver_sprite": "src/assets/game/characters/fighter.png",
+    "giver_location": "town:Seat of the Realm",
+    "giver_dialogue": "The orcs must be driven from the realm. Go to their stronghold in the mountain and root them out.",
+    "reward_xp": 300,
+    "reward_gold": 300,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Destroy the Orc Footman",
+        "step_type": "kill",
+        "encounter": "Orc Warchief's Guard",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Orc Stronghold",
+        "target": "",
+        "target_count": 3,
+        "optional": "no"
+      },
+      {
+        "description": "Destroy the Orc Leader",
+        "step_type": "kill",
+        "encounter": "Orc Siege",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Orc Stronghold",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 12,
+    "giver_row": 15
+  },
+  {
+    "name": "Deliver the Realm from the Dragon",
+    "description": "",
+    "giver_npc": "Lord British",
+    "giver_sprite": "src/assets/unassigned/wizard_f2.png",
+    "giver_location": "town:Seat of the Realm",
+    "giver_dialogue": "The time was come for you to deliver the realm from the yaws of the dragon. Go to the it's island and slay the beast!",
+    "reward_xp": 1000,
+    "reward_gold": 1000,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Slay the Dragon",
+        "step_type": "kill",
+        "encounter": "Ancient Dragon",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Dragon's Lair",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 12,
+    "giver_row": 18
   }
 ]
