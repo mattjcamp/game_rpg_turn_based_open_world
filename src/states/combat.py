@@ -6208,6 +6208,27 @@ class CombatState(BaseState):
         # Store killed monster names for kill-quest tracking
         killed_names = [m.name for m in self.monsters if not m.is_alive()]
         self.game.pending_killed_monsters = killed_names
+        # Capture (quest_name, step_idx) tags from any killed monsters
+        # that were placed by the module-quest spawner. Without this,
+        # an untagged random encounter that just happens to share the
+        # quest target's name (e.g. a random Dragon on floor 1 of a
+        # dungeon whose quest target is also a Dragon on floor 10)
+        # would incorrectly credit the quest. The downstream credit
+        # logic in quest_manager.check_quest_kills uses these tags to
+        # require an actual quest-spawned kill for non-overworld steps.
+        killed_quest_tags = []
+        for m in self.monsters:
+            if m.is_alive():
+                continue
+            qname = getattr(m, "_quest_name", None)
+            qstep = getattr(m, "_quest_step_idx", None)
+            if qname is not None and qstep is not None:
+                killed_quest_tags.append({
+                    "quest_name": qname,
+                    "step_idx": int(qstep),
+                    "monster_name": m.name,
+                })
+        self.game.pending_killed_quest_tags = killed_quest_tags
         self.game.pending_combat_location = getattr(
             self, "combat_location", "overview")
 

@@ -1503,7 +1503,7 @@
   },
   {
     "name": "Sea Shrine",
-    "description": "A four-tiered temple cut into a sea-stack on the western coast, raised to the Suns of the old Conclave. Its lowest citadel was flooded long before the dragon woke — by design, not accident. What was hidden there was hidden from the dragon itself.",
+    "description": "A four-tiered temple cut into a sea-stack on the western coast, raised to the Suns of the old Conclave. Its lowest citadel was flooded long before the dragon woke \u2014 by design, not accident. What was hidden there was hidden from the dragon itself.",
     "spaces": [
       {
         "name": "Main Hall",
@@ -4795,8 +4795,8 @@
             "path": "game/terrain/path.png"
           },
           "6,11": {
-            "tile_id": 10,
-            "name": "Floor"
+            "tile_id": 29,
+            "name": "Locked Door"
           },
           "7,11": {
             "tile_id": 46,

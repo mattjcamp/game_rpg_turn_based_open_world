@@ -132,3 +132,103 @@ class TestConfig:
             f.write("NOT VALID JSON {{{{")
         config = load_config()
         assert config == _DEFAULT_CONFIG
+
+
+# ── Boat persistence ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def isolated_save_dir(tmp_path, monkeypatch):
+    """Redirect save_load to write into a temp directory."""
+    from src import save_load as sl
+    save_dir = tmp_path / "saves"
+    save_dir.mkdir()
+    monkeypatch.setattr(sl, "_SAVE_DIR", str(save_dir))
+    return save_dir
+
+
+class TestBoatPersistence:
+    """Boats are mutable terrain — sailing one moves a TILE_BOAT marker
+    on the overworld map. Because load_game rebuilds the tile_map from
+    seed/static-map on every load, those mutations are wiped unless
+    save_game snapshots them and load_game re-stamps them.
+
+    Without this round-trip, a player who sails to the mainland and
+    saves gets stranded on reload: the boat snaps back to its original
+    spawn point and the party is left on land with no way back to it.
+    """
+
+    def _wipe_boats(self, tmap):
+        """Clear all TILE_BOAT tiles from a fresh tile_map so the test
+        controls the boat layout deterministically. Returns the list
+        of (col, row) positions that were originally boats."""
+        from src.settings import TILE_BOAT, TILE_WATER
+        originals = []
+        for r in range(tmap.height):
+            for c in range(tmap.width):
+                if tmap.get_tile(c, r) == TILE_BOAT:
+                    originals.append((c, r))
+                    tmap.set_tile(c, r, TILE_WATER)
+        return originals
+
+    def test_sailed_boat_position_survives_save_load(
+            self, game, isolated_save_dir):
+        """The bug: sail boat → save → load → boat is back at its
+        original spawn point and the party is stranded.
+        """
+        from src import save_load
+        from src.settings import TILE_BOAT, TILE_WATER
+
+        # Start from a known empty-of-boats overworld so we can place
+        # a single boat at a position we know is *not* in the procedural
+        # spawn set. Test then re-checks the post-load map for that
+        # exact position.
+        original_boats = self._wipe_boats(game.tile_map)
+        sailed_to = (4, 4)
+        # Make sure the position we picked isn't where a boat would
+        # naturally regenerate from the seed.
+        assert sailed_to not in original_boats
+        game.tile_map.set_tile(*sailed_to, TILE_BOAT)
+        game.on_boat = True
+        game.party.col, game.party.row = sailed_to
+
+        assert save_load.save_game(1, game), "save_game returned False"
+        assert save_load.load_game(1, game), "load_game returned False"
+
+        # The sailed-to tile must still be a boat after reload.
+        assert game.tile_map.get_tile(*sailed_to) == TILE_BOAT, (
+            "Boat should still be at the sailed-to position after "
+            "save/load round-trip.")
+        # And the party should still be aboard at that tile.
+        assert game.on_boat is True
+        assert (game.party.col, game.party.row) == sailed_to
+
+        # Original (procedural) boat spawns should NOT have a boat —
+        # otherwise we'd be duplicating them on every load.
+        for orig in original_boats:
+            if orig == sailed_to:
+                continue
+            assert game.tile_map.get_tile(*orig) != TILE_BOAT, (
+                f"Original boat spawn {orig} should be cleared after "
+                "load — boats only exist where the saved snapshot put "
+                "them.")
+
+    def test_legacy_save_without_boat_field_loads_cleanly(
+            self, game, isolated_save_dir):
+        """Saves that predate the boat_positions field must still load
+        — they fall back to the rebuilt map's original boat layout
+        rather than crashing."""
+        from src import save_load
+
+        assert save_load.save_game(1, game)
+
+        # Strip the field from disk to mimic a legacy save.
+        for fn in os.listdir(isolated_save_dir):
+            path = os.path.join(isolated_save_dir, fn)
+            with open(path) as f:
+                data = json.load(f)
+            data.pop("boat_positions", None)
+            with open(path, "w") as f:
+                json.dump(data, f)
+
+        assert save_load.load_game(1, game)

@@ -1757,6 +1757,12 @@ class Party:
           - min_level: party must have an alive member at or above that level
 
         Effects already slotted are excluded.
+        Item-granted effects (``item_granted: true`` in effects.json,
+        e.g. Sun Sword Aura) are also excluded — those live in the
+        item-granted lane and surface automatically while the
+        granting item is equipped, so showing them in the manual
+        4-slot picker is misleading (and worse, they'd be offered
+        even before the player has the item).
         Also includes "Torch" if the party has a torch in stash inventory
         and no torch is currently slotted.
         """
@@ -1764,6 +1770,10 @@ class Party:
         available = []
         for eff in EFFECTS_DATA:
             if eff["name"] in slotted:
+                continue
+            if eff.get("item_granted"):
+                # Surfaces via get_item_granted_effects when the
+                # granting item is equipped — never assignable.
                 continue
             reqs = eff.get("requirements", {})
             if not self._meets_requirements(reqs):

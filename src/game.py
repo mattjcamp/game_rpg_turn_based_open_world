@@ -128,6 +128,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.building_interior_spawns = {}
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
+        # Per-kill quest tags so downstream quest credit can require
+        # an actual quest-spawned monster (vs. a random encounter that
+        # happens to share the target's name).
+        self.pending_killed_quest_tags = []
         self.pending_combat_location = ""
         self.examined_tiles = {}
 
@@ -571,6 +575,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         # Combat rewards (must be set before change_state triggers enter())
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
+        self.pending_killed_quest_tags = []
         self.pending_combat_location = ""
         # Examine tile persistence (must exist before examine state enter())
         self.examined_tiles = {}
@@ -871,6 +876,7 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         self.key_dungeons = {}  # {(col,row): {dungeon_number, name, key_name, ...}}
         self.pending_combat_rewards = None  # set by combat victory, consumed by source state
         self.pending_killed_monsters = []   # monster names killed in last combat
+        self.pending_killed_quest_tags = []  # [{quest_name, step_idx, monster_name}]
         self.pending_combat_location = ""   # where the combat took place
         self.town_data_map = {}
         if self.module_manifest:

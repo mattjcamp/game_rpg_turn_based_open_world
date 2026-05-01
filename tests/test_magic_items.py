@@ -225,6 +225,35 @@ class TestPartyItemGrantedEffects:
         fighter.equip_item("Sun Sword", "right_hand")
         assert game.party.has_effect("Sun Sword Aura")
 
+    def test_item_granted_effects_excluded_from_picker(self, game):
+        # Item-granted effects (item_granted: true in effects.json) live
+        # in the separate ``get_item_granted_effects`` lane and surface
+        # automatically while the granting item is equipped. They must
+        # NEVER appear in the manual 4-slot picker fed by
+        # ``get_available_effects`` — otherwise the player sees options
+        # like "Sun Sword Aura" before they've found the Sun Sword and
+        # can pick a buff that the renderer can't actually apply.
+        available = game.party.get_available_effects()
+        names = [e.get("name") for e in available]
+        ids = [e.get("id") for e in available]
+        assert "Sun Sword Aura" not in names
+        assert "sun_sword_aura" not in ids
+        # Sanity: every returned effect is non-item-granted.
+        for e in available:
+            assert not e.get("item_granted"), (
+                f"{e.get('name')!r} is flagged item_granted but still "
+                "appeared in the manual effect picker.")
+
+    def test_picker_still_excludes_aura_with_sword_equipped(self, game):
+        # Even with the Sun Sword equipped (so the aura *is* live in the
+        # item-granted lane), the picker must not double-list it.
+        fighter = next(m for m in game.party.members
+                       if m.char_class.lower() == "fighter")
+        fighter.inventory.append("Sun Sword")
+        fighter.equip_item("Sun Sword", "right_hand")
+        names = [e.get("name") for e in game.party.get_available_effects()]
+        assert "Sun Sword Aura" not in names
+
 
 # ====================================================================
 #  Cumulative magic-item bonuses on a character

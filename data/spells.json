@@ -519,7 +519,7 @@
       "casting_type": "priest",
       "min_level": 5,
       "mp_cost": 14,
-      "duration": 1000,
+      "duration": "10",
       "effect_type": "repel_monsters",
       "effect_value": {
         "radius": 5,
@@ -533,7 +533,8 @@
         "town"
       ],
       "sfx": "magic_burst",
-      "hit_sfx": null
+      "hit_sfx": "",
+      "icon": ""
     },
     {
       "id": "mass_heal",

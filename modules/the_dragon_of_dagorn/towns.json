@@ -3123,7 +3123,7 @@
         "name": "Path Floor"
       }
     },
-    "description": "A walled village of timber and slate set against the eastern foothills. Its lanes still hold the smell of woodsmoke and turned earth — the troubles here are small ones, but every villager has begun looking west more often than they used to.",
+    "description": "A walled village of timber and slate set against the eastern foothills. Its lanes still hold the smell of woodsmoke and turned earth \u2014 the troubles here are small ones, but every villager has begun looking west more often than they used to.",
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
@@ -3363,14 +3363,12 @@
             "path": "game/terrain/floor_gray.png"
           },
           "1,1": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 57,
+            "name": "Weapon Counter"
           },
           "1,2": {
-            "tile_id": 12,
-            "name": "Counter",
-            "path": "game/terrain/town_counter.png"
+            "tile_id": 58,
+            "name": "Armor Counter"
           },
           "2,2": {
             "tile_id": 48,
@@ -7437,7 +7435,7 @@
         "name": "Water"
       }
     },
-    "description": "A clutter of fishing shacks and salvage-built docks pressed against the cliffs of the western shore. Half the boats no longer go out. The folk here were the first to see the dragon's shadow on the water — and the first whose dead refused to lie quiet.",
+    "description": "A clutter of fishing shacks and salvage-built docks pressed against the cliffs of the western shore. Half the boats no longer go out. The folk here were the first to see the dragon's shadow on the water \u2014 and the first whose dead refused to lie quiet.",
     "town_style": "mountain",
     "entry_col": 21,
     "entry_row": 24,
@@ -10951,11 +10949,72 @@
         "path": "game/terrain/wall_copy.png"
       }
     },
-    "description": "The capital fortress, banner-hung and ringed with sun-rune walls. Queen Aelyse Veyron, last of the Sun-Priestess line, holds court here. The realm's archives, its mages, and its standing army all answer to this place — and all of them, lately, are stretched thin.",
+    "description": "The capital fortress, banner-hung and ringed with sun-rune walls. Queen Aelyse Veyron, last of the Sun-Priestess line, holds court here. The realm's archives, its mages, and its standing army all answer to this place \u2014 and all of them, lately, are stretched thin.",
     "town_style": "medieval",
     "entry_col": 12,
     "entry_row": 12,
-    "npcs": [],
+    "npcs": [
+      {
+        "name": "Archivist Cael",
+        "npc_type": "elder",
+        "col": 4,
+        "row": 6,
+        "wander_range": 2,
+        "sprite": "src/assets/game/characters/wizard.png",
+        "god_name": "The Divine",
+        "dialogue": [
+          "I am Archivist Cael. Every charter, every chronicle, every binding-rite copied since the founding rests under this roof.",
+          "A thousand years past, the Conclave of Suns drew the dragon Hargorn beneath the western sea. Three Sealstones held the binding.",
+          "One stone is broken. One was stolen out of Plainstown in the night. The third still stands at the strait \u2014 and on its strength alone the realm now rests.",
+          "Read what we have, traveller. The Sun-Priests left answers we are too late to ask of them."
+        ]
+      },
+      {
+        "name": "Court Mage Lirien",
+        "npc_type": "villager",
+        "col": 20,
+        "row": 6,
+        "wander_range": 3,
+        "sprite": "src/assets/game/characters/illusionist.png",
+        "god_name": "The Divine",
+        "dialogue": [
+          "Court Mage Lirien, at your service. I tend what is left of the wards over the strait.",
+          "Vorkhaal was one of us \u2014 a Conclave-brother turned heretic. He drinks the seal-magic to cheat his own death, and the wards thin to feed him.",
+          "Each season I feel the wardlines slip a finger's width westward. We do not have decades, traveller. We may not have years.",
+          "If your road takes you to the mountain coven, recover the binding-rite and end his work. Without it the Sun Sword is just a sword, and the dragon owns the coast."
+        ]
+      },
+      {
+        "name": "Captain Halric",
+        "npc_type": "villager",
+        "col": 8,
+        "row": 16,
+        "wander_range": 3,
+        "sprite": "src/assets/game/characters/paladin.png",
+        "god_name": "The Divine",
+        "dialogue": [
+          "Captain Halric of the Sun Guard. If you wear a sword in Her Majesty's hall, see that you can use it.",
+          "Half my company rides the western passes with Captain Roland. The other half stand the docks, watching for what crawls out of the burning surf.",
+          "Orcs that once kept to the deep west walk the foothills openly now. The wards' weakness has emboldened every wretched thing west of the river.",
+          "Banner of the Sun above us, blade in hand, and not one soldier over to spare. That is the realm in this hour."
+        ]
+      },
+      {
+        "name": "Sister Mireille",
+        "npc_type": "priest",
+        "col": 16,
+        "row": 16,
+        "wander_range": 2,
+        "sprite": "src/assets/game/characters/cleric.png",
+        "god_name": "The Divine",
+        "dialogue": [
+          "Light of the Sun upon you. I am Sister Mireille of the inner shrine.",
+          "Her Majesty Queen Aelyse Veyron is the last of the Sun-Priestess line. When she falls, the rite that crowns the realm dies with her.",
+          "There is a sword that drew Hargorn's blood once, long ago. It rests beneath the drowned Sea Shrine, waiting for hands that can carry it.",
+          "Pray for the Queen, traveller. She prays for us all."
+        ]
+      }
+    ],
     "tile_properties": {
       "12,0": {
         "walkable": "yes (override)",
@@ -10963,9 +11022,1553 @@
         "link_map": "overworld",
         "link_x": "23",
         "link_y": "14"
+      },
+      "5,3": {
+        "walkable": "inherit (yes)",
+        "linked": true,
+        "link_map": "interior:Seat of the Realm/General Shop",
+        "link_x": "9",
+        "link_y": "2"
+      },
+      "19,3": {
+        "walkable": "inherit (yes)",
+        "linked": true,
+        "link_map": "interior:Seat of the Realm/Weapons Shop",
+        "link_x": "0",
+        "link_y": "2"
+      },
+      "12,11": {
+        "walkable": "inherit (yes)",
+        "linked": true,
+        "link_map": "interior:Seat of the Realm/Shrine",
+        "link_x": "7",
+        "link_y": "13"
       }
     },
     "_action_import": "Map assigned",
-    "_action_generate": "Map assigned"
+    "_action_generate": "Map assigned",
+    "interiors": [
+      {
+        "name": "General Shop",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "0,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "2,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "5,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "6,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "7,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "8,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,1": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,2": {
+            "tile_id": 13,
+            "name": "Door"
+          },
+          "9,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "8,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "7,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "6,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "5,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "2,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,2": {
+            "tile_id": 72,
+            "name": "Window"
+          },
+          "0,1": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "8,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "8,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "6,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "5,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "4,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "3,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "2,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "1,1": {
+            "tile_id": 12,
+            "name": "Counter"
+          },
+          "1,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "2,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "3,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "4,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "5,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "6,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "8,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "6,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "5,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "4,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "3,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "2,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "1,3": {
+            "tile_id": 59,
+            "name": "Magic Shop"
+          }
+        },
+        "template_label": "General Shop Interior",
+        "tile_properties": {
+          "0,2": {
+            "walkable": "inherit (no)",
+            "light_source": true
+          },
+          "9,2": {
+            "walkable": "yes (override)",
+            "linked": true,
+            "link_x": "5",
+            "link_y": "3",
+            "link_map": "town:Seat of the Realm"
+          }
+        }
+      },
+      {
+        "name": "Weapons Shop",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "0,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "2,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "5,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "6,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "7,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "8,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,1": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,2": {
+            "tile_id": 72,
+            "name": "Window"
+          },
+          "9,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "9,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "8,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "7,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "6,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "5,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "2,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,2": {
+            "tile_id": 13,
+            "name": "Door"
+          },
+          "0,1": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "8,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "8,1": {
+            "tile_id": 58,
+            "name": "Armor Counter"
+          },
+          "7,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "6,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "5,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "4,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "3,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "2,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "1,1": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "1,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "2,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "3,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "4,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "5,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "6,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,2": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "8,3": {
+            "tile_id": 57,
+            "name": "Weapon Counter"
+          },
+          "6,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "5,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "4,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "3,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "2,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "1,3": {
+            "tile_id": 10,
+            "name": "Floor"
+          }
+        },
+        "template_label": "General Shop Interior",
+        "tile_properties": {
+          "9,2": {
+            "walkable": "inherit (no)",
+            "light_source": true
+          },
+          "0,2": {
+            "walkable": "yes (override)",
+            "linked": true,
+            "link_map": "town:Seat of the Realm",
+            "link_x": "19",
+            "link_y": "3"
+          }
+        }
+      },
+      {
+        "name": "Shrine",
+        "width": 16,
+        "height": 14,
+        "tiles": {
+          "0,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "1,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "2,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "3,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "4,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "5,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "6,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "7,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "8,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "9,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "10,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "11,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "12,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "13,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "14,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "15,0": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "0,1": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "1,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "2,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "3,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "4,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "5,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "6,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "7,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "10,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "11,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "12,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "13,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "14,1": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "15,1": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "0,2": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "2,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "3,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "4,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "5,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "6,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "7,2": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,2": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "10,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "11,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "12,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "13,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "14,2": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "15,2": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,3": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "2,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "5,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "6,3": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "7,3": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,3": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,3": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "10,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "11,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "12,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "13,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "14,3": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "15,3": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "2,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "4,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "5,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "6,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "7,4": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,4": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "10,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "11,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "12,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "13,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "14,4": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "15,4": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,5": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "2,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "5,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "6,5": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "7,5": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,5": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,5": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "10,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "11,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "12,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "13,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "14,5": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "15,5": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,6": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "2,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "3,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "4,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "5,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "6,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "7,6": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,6": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "10,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "11,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "12,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "13,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "14,6": {
+            "tile_id": 53,
+            "name": "Water"
+          },
+          "15,6": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,7": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "2,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "3,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "4,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "5,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "6,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "7,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "10,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "11,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "12,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "13,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "14,7": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "15,7": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "1,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "2,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "3,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "4,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "5,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "6,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "7,8": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,8": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "10,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "11,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "12,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "13,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "14,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "15,8": {
+            "tile_id": 51,
+            "name": "Lighter Bricks"
+          },
+          "0,9": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "1,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "2,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "3,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "4,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "5,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "6,9": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "7,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,9": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "10,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "11,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "12,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "13,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "14,9": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "15,9": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "0,10": {
+            "tile_id": 72,
+            "name": "Window"
+          },
+          "1,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "2,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "3,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "4,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "5,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "6,10": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,10": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "10,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "11,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "12,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "13,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "14,10": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "15,10": {
+            "tile_id": 72,
+            "name": "Window"
+          },
+          "0,11": {
+            "tile_id": 72,
+            "name": "Window"
+          },
+          "1,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "2,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "3,11": {
+            "tile_id": 61,
+            "name": "Healing Counter"
+          },
+          "4,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "5,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "6,11": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "7,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,11": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "10,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "11,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "12,11": {
+            "tile_id": 61,
+            "name": "Healing Counter"
+          },
+          "13,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "14,11": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "15,11": {
+            "tile_id": 72,
+            "name": "Window"
+          },
+          "0,12": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "1,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "2,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "3,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "4,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "5,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "6,12": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "7,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "8,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "9,12": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "10,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "11,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "12,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "13,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "14,12": {
+            "tile_id": 10,
+            "name": "Floor",
+            "path": "game/terrain/town_floor.png"
+          },
+          "15,12": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "0,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "1,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "2,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "3,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "4,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "5,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "6,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "7,13": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "8,13": {
+            "tile_id": 10,
+            "name": "Floor"
+          },
+          "9,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "10,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "11,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "12,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "13,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "14,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          },
+          "15,13": {
+            "tile_id": 51,
+            "name": "Lighter Bricks",
+            "path": "game/terrain/wall_copy.png"
+          }
+        },
+        "template_label": "Shrine",
+        "tile_properties": {
+          "3,4": {
+            "walkable": "yes (override)",
+            "effect": "fairy_light",
+            "light_source": true
+          },
+          "4,4": {
+            "walkable": "inherit (no)",
+            "effect": "fairy_light"
+          },
+          "11,4": {
+            "walkable": "inherit (no)",
+            "effect": "fairy_light"
+          },
+          "12,4": {
+            "walkable": "yes (override)",
+            "effect": "fairy_light",
+            "light_source": true
+          },
+          "0,10": {
+            "walkable": "inherit (no)",
+            "light_source": true
+          },
+          "15,10": {
+            "walkable": "inherit (no)",
+            "light_source": true
+          },
+          "7,13": {
+            "walkable": "inherit (yes)",
+            "effect": "(none)",
+            "linked": true,
+            "link_map": "town:Seat of the Realm",
+            "link_x": "12",
+            "link_y": "11"
+          },
+          "8,13": {
+            "walkable": "inherit (yes)",
+            "linked": true,
+            "link_map": "town:Seat of the Realm",
+            "link_x": "12",
+            "link_y": "11"
+          }
+        }
+      }
+    ]
   }
 ]

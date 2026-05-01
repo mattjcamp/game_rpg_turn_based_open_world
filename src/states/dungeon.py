@@ -167,6 +167,7 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
 
         # Consume the list so it doesn't get counted again
         self.game.pending_killed_monsters = []
+        self.game.pending_killed_quest_tags = []
         self.game.pending_combat_location = ""
 
         active_q = self._get_active_quest()

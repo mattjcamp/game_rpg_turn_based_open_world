@@ -11,7 +11,7 @@ import os
 import time
 
 from src.party import Party, PartyMember
-from src.settings import TILE_DUNGEON_CLEARED, TILE_GRASS
+from src.settings import TILE_BOAT, TILE_DUNGEON_CLEARED, TILE_GRASS, TILE_WATER
 
 # ── Save directory ────────────────────────────────────────────────
 _SAVE_DIR = os.path.join(
@@ -434,12 +434,30 @@ def save_game(slot, game):
 
         # Collect cleared dungeon positions from the overworld tile map
         cleared_dungeons = []
+        # Collect current boat tile positions. Boats are mutable: the
+        # player can sail them anywhere, and the tile_map is rebuilt
+        # from seed/static map on every load — so without snapshotting
+        # current positions here, every boat snaps back to its original
+        # spawn point (and a player who sailed to the mainland gets
+        # stranded on load).
+        boat_positions = []
         if hasattr(game, "tile_map") and game.tile_map is not None:
             tm = game.tile_map
             for r in range(tm.height):
                 for c in range(tm.width):
-                    if tm.get_tile(c, r) == TILE_DUNGEON_CLEARED:
+                    t = tm.get_tile(c, r)
+                    if t == TILE_DUNGEON_CLEARED:
                         cleared_dungeons.append([c, r])
+                    elif t == TILE_BOAT:
+                        boat_positions.append([c, r])
+        # If the party is aboard a boat, their tile is rendered as the
+        # boat sprite by the renderer rather than written as TILE_BOAT
+        # to the map — make sure that position is in the list so the
+        # boat reappears under them on load.
+        if getattr(game, "on_boat", False) and hasattr(game, "party"):
+            party_pos = [int(game.party.col), int(game.party.row)]
+            if party_pos not in boat_positions:
+                boat_positions.append(party_pos)
 
         # Collect destroyed monster spawn positions.  The overworld state
         # tracks these on ``destroyed_spawns`` (a set of (col, row) tuples)
@@ -493,6 +511,7 @@ def save_game(slot, game):
             # Boat tile position persists with the tile_map itself, so
             # only the transient "party is aboard" flag needs saving.
             "on_boat": bool(getattr(game, "on_boat", False)),
+            "boat_positions": boat_positions,
             "quest_npc_assignments": getattr(
                 game, "quest_npc_assignments", {}),
             "module_quest_states": getattr(
@@ -606,6 +625,29 @@ def load_game(slot, game):
         for pos in save_data.get("cleared_dungeons", []):
             c, r = pos
             game.tile_map.set_tile(c, r, TILE_DUNGEON_CLEARED)
+
+        # ── Restore boat positions ──────────────────────────────
+        # The freshly rebuilt tile_map carries the *original* boat
+        # placements from the static/procedural map. If the player has
+        # sailed a boat, the saved snapshot of TILE_BOAT positions
+        # supersedes those originals — so we clear every boat tile in
+        # the rebuilt map first, then re-stamp the saved positions.
+        # Pre-v3.1 saves don't include this list; in that case we leave
+        # boats at their original spawn positions (legacy behaviour).
+        saved_boats = save_data.get("boat_positions")
+        if saved_boats is not None:
+            tm = game.tile_map
+            for r in range(tm.height):
+                for c in range(tm.width):
+                    if tm.get_tile(c, r) == TILE_BOAT:
+                        tm.set_tile(c, r, TILE_WATER)
+            for pos in saved_boats:
+                try:
+                    c, r = int(pos[0]), int(pos[1])
+                except (TypeError, ValueError, IndexError):
+                    continue
+                if 0 <= c < tm.width and 0 <= r < tm.height:
+                    tm.set_tile(c, r, TILE_BOAT)
 
         # ── Restore destroyed monster spawn tiles ──────────────
         # Mirror the destruction behaviour: the tile becomes grass and

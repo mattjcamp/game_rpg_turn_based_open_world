@@ -274,6 +274,32 @@ def _location_matches(step_location, combat_location):
     return False
 
 
+def _is_localized_step(step_location):
+    """Return True for steps that pin the encounter to a specific
+    place (dungeon, town, building, interior, space).
+
+    Localized steps require the killed monster to actually be the
+    quest-tagged spawn at that location. Without this, a player can
+    accidentally finish e.g. "Slay the Ancient Dragon — Floor 10" by
+    killing a random Dragon on floor 1, because every monster in the
+    encounter's roster shares the name. Overview/overworld steps stay
+    on the legacy roster-name match for back-compat with quests like
+    "kill 5 goblins anywhere on the map".
+    """
+    if not step_location:
+        return False
+    sl = step_location.lower()
+    if sl in ("overview", "overview map"):
+        return False
+    return (
+        sl.startswith("dungeon:")
+        or sl.startswith("town:")
+        or sl.startswith("building:")
+        or sl.startswith("interior:")
+        or sl.startswith("space:")
+    )
+
+
 def check_quest_kills(game):
     """Check if any pending killed monsters satisfy quest kill steps.
 
@@ -288,6 +314,12 @@ def check_quest_kills(game):
     matching location — i.e. one completed encounter battle = one
     step credit, regardless of how many monsters were in the group.
 
+    For steps localized to a specific place (dungeon, town, building,
+    interior, space) the killed monster must additionally bear the
+    matching quest tag — otherwise random encounters that happen to
+    share the boss's name would credit the quest. Overview/overworld
+    steps still credit roster-name matches alone for back-compat.
+
     Args:
         game: The Game instance
 
@@ -301,6 +333,13 @@ def check_quest_kills(game):
         return None
 
     combat_location = getattr(game, "pending_combat_location", "")
+    # Set of (quest_name, step_idx) for monsters that were placed by
+    # the quest spawner. Populated in CombatState._trigger_victory.
+    killed_quest_tag_keys = {
+        (t["quest_name"], int(t["step_idx"]))
+        for t in getattr(game, "pending_killed_quest_tags", []) or []
+        if isinstance(t, dict) and "quest_name" in t and "step_idx" in t
+    }
 
     mq_states = getattr(game, "module_quest_states", {})
     quest_defs = getattr(game, "_module_quest_defs", [])
@@ -363,6 +402,14 @@ def check_quest_kills(game):
             if not roster_hit:
                 continue
 
+            # For localized steps, additionally require that one of
+            # the killed monsters carried this quest's tag — i.e. it
+            # was the spawn the quest placed, not a random encounter
+            # that happened to share the boss's name.
+            if _is_localized_step(step_location):
+                if (qname, i) not in killed_quest_tag_keys:
+                    continue
+
             # One encounter cleared = one credit toward target_count.
             target_count = max(1, step.get("target_count", 1))
             kills_so_far = state.get(f"step_{i}_kills", 0) + 1
@@ -392,5 +439,6 @@ def check_quest_kills(game):
                     "giver for your reward.")
 
     game.pending_killed_monsters = []
+    game.pending_killed_quest_tags = []
     game.pending_combat_location = ""
     return " | ".join(messages) if messages else None
