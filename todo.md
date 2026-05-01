@@ -3,7 +3,7 @@
 - One quest should be designated the "last quest" and will prompt a special end of game screen. Players will still have the option to play return to the game.
 
 ## Bugs
-- Map state doesn't appear to be persistant. Changes from quests get lost, ship postions are not recorded, and destroyed spawns reappear when the game is reloaded. Audit how the maps are saved. Keep in mind that once a new game has begun, that map should be consistant until the 
+- Map state doesn't appear to be persistant. Changes from quests get lost, ship postions are not recorded, and destroyed spawns reappear when the game is reloaded. Audit how the maps are saved. Keep in mind that once a new game has begun, that map should be consistant within each game. (some issues have been resolved but we need to make sure that overall this is working).
 
 ## Features
 

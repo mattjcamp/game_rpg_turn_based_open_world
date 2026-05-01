@@ -11,7 +11,10 @@ import os
 import time
 
 from src.party import Party, PartyMember
-from src.settings import TILE_BOAT, TILE_DUNGEON_CLEARED, TILE_GRASS, TILE_WATER
+from src.settings import (
+    TILE_BOAT, TILE_CHEST, TILE_DDOOR, TILE_DUNGEON,
+    TILE_DUNGEON_CLEARED, TILE_GRASS, TILE_LOCKED_DOOR, TILE_WATER,
+)
 
 # ── Save directory ────────────────────────────────────────────────
 _SAVE_DIR = os.path.join(
@@ -432,14 +435,10 @@ def save_game(slot, game):
                 state_name = name
                 break
 
-        # Collect cleared dungeon positions from the overworld tile map
+        # Collect overworld tile mutations. The tile_map is rebuilt
+        # from seed / static map on every load, so any mutation made
+        # during play gets erased unless we snapshot it here.
         cleared_dungeons = []
-        # Collect current boat tile positions. Boats are mutable: the
-        # player can sail them anywhere, and the tile_map is rebuilt
-        # from seed/static map on every load — so without snapshotting
-        # current positions here, every boat snaps back to its original
-        # spawn point (and a player who sailed to the mainland gets
-        # stranded on load).
         boat_positions = []
         if hasattr(game, "tile_map") and game.tile_map is not None:
             tm = game.tile_map
@@ -492,14 +491,56 @@ def save_game(slot, game):
             except (TypeError, ValueError, IndexError):
                 continue
 
+        # ── Full overworld tile snapshot ────────────────────────────
+        # The per-feature deltas above (cleared_dungeons, boats,
+        # destroyed_spawns) only catch the tile mutations they were
+        # explicitly written for. Quest world-unlocks are replayed.
+        # But there are still gaps: opened overworld chests, picked
+        # locked doors, picked-up ground items in tile_properties,
+        # and triggered one-time unique tiles. Rather than chase
+        # each call site, snapshot the entire overworld tile array
+        # and overlay on load. The cost is ~10-15 KB per save for a
+        # 64×48 map; the benefit is that *any* runtime tile mutation
+        # round-trips automatically.
+        overworld_tiles = None
+        overworld_tile_props = None
+        overworld_triggered_unique = []
+        overworld_unique_cooldowns = {}
+        if hasattr(game, "tile_map") and game.tile_map is not None:
+            tm = game.tile_map
+            overworld_tiles = [list(row) for row in tm.tiles]
+            # tile_properties keys are "col,row" strings already, so
+            # the dict is JSON-safe as-is.
+            overworld_tile_props = dict(
+                getattr(tm, "tile_properties", {}) or {})
+            for pos in getattr(tm, "triggered_unique", set()) or set():
+                try:
+                    overworld_triggered_unique.append(
+                        [int(pos[0]), int(pos[1])])
+                except (TypeError, IndexError, ValueError):
+                    continue
+            for pos, steps in (
+                    getattr(tm, "unique_cooldowns", {}) or {}).items():
+                try:
+                    overworld_unique_cooldowns[
+                        f"{int(pos[0])},{int(pos[1])}"] = int(steps)
+                except (TypeError, IndexError, ValueError):
+                    continue
+
         save_data = {
-            "version": 3,
+            "version": 4,
             "timestamp": time.time(),
             "state": state_name,
             "party": _serialize_party(game.party),
             "cleared_dungeons": cleared_dungeons,
             "destroyed_spawns": destroyed_spawns,
             "building_interior_spawns": building_interior_spawns,
+            # Full overworld tile snapshot (v4+). Catches every
+            # mutation the per-feature deltas miss.
+            "overworld_tiles": overworld_tiles,
+            "overworld_tile_props": overworld_tile_props,
+            "overworld_triggered_unique": overworld_triggered_unique,
+            "overworld_unique_cooldowns": overworld_unique_cooldowns,
             # ── Module identification ──
             "module_path": getattr(game, "active_module_path", None),
             "module_name": getattr(game, "active_module_name", None),
@@ -620,6 +661,58 @@ def load_game(slot, game):
 
         # ── Restore the party ───────────────────────────────────
         game.party = _deserialize_party(save_data["party"])
+
+        # ── Restore the full overworld tile snapshot ────────────
+        # This supersedes the per-feature deltas below for v4+ saves,
+        # but we keep the deltas for back-compat with v3 saves that
+        # only contain cleared_dungeons / boat_positions / etc. The
+        # snapshot is applied first so any subsequent delta restoration
+        # is essentially a no-op on v4+ saves (they already match) and
+        # the only path that matters on v3 saves.
+        ow_tiles_saved = save_data.get("overworld_tiles")
+        if ow_tiles_saved:
+            tm = game.tile_map
+            # Defend against shape mismatches (e.g. someone changed
+            # the module's map size between save and load).
+            saved_h = len(ow_tiles_saved)
+            saved_w = len(ow_tiles_saved[0]) if saved_h else 0
+            for r in range(min(saved_h, tm.height)):
+                row = ow_tiles_saved[r]
+                if not isinstance(row, list):
+                    continue
+                for c in range(min(saved_w, tm.width)):
+                    try:
+                        tm.set_tile(c, r, int(row[c]))
+                    except (TypeError, ValueError):
+                        continue
+        ow_props_saved = save_data.get("overworld_tile_props")
+        if isinstance(ow_props_saved, dict):
+            # Replace, don't merge — the saved snapshot is the source
+            # of truth, and any *removed* properties (e.g. a picked-up
+            # ground item that left an empty entry) need to actually
+            # be removed.
+            game.tile_map.tile_properties = dict(ow_props_saved)
+        # One-time unique-tile triggers and their per-tile cooldowns.
+        # Without these, an "ancient shrine" the player already used
+        # could be triggered again after every reload.
+        triggered = set()
+        for pos in save_data.get("overworld_triggered_unique", []) or []:
+            try:
+                triggered.add((int(pos[0]), int(pos[1])))
+            except (TypeError, IndexError, ValueError):
+                continue
+        if triggered or hasattr(game.tile_map, "triggered_unique"):
+            game.tile_map.triggered_unique = triggered
+        cooldowns = {}
+        for key, steps in (save_data.get(
+                "overworld_unique_cooldowns", {}) or {}).items():
+            try:
+                c_str, r_str = key.split(",")
+                cooldowns[(int(c_str), int(r_str))] = int(steps)
+            except (TypeError, ValueError, AttributeError):
+                continue
+        if cooldowns or hasattr(game.tile_map, "unique_cooldowns"):
+            game.tile_map.unique_cooldowns = cooldowns
 
         # ── Restore cleared dungeon tiles ───────────────────────
         for pos in save_data.get("cleared_dungeons", []):
@@ -883,6 +976,21 @@ def _restore_quest(game, save_data, quest_attr):
     }
     if name:
         quest["name"] = name
+
+    # Re-stamp the dungeon tile on the overworld so the active inn /
+    # standard quest's pin doesn't disappear after load. Inn-style
+    # quests place a fresh TILE_DUNGEON when the player accepts; the
+    # tile is normally rebuilt from seed/static map on load and
+    # wouldn't carry the pin without this. (v4+ saves cover this via
+    # the full overworld snapshot, but v3 saves still need it.)
+    tmap = getattr(game, "tile_map", None)
+    if (status in ("active", "artifact_found")
+            and dcol is not None and drow is not None and tmap is not None):
+        if (0 <= int(dcol) < tmap.width
+                and 0 <= int(drow) < tmap.height):
+            current = tmap.get_tile(int(dcol), int(drow))
+            if current not in (TILE_DUNGEON, TILE_DUNGEON_CLEARED):
+                tmap.set_tile(int(dcol), int(drow), TILE_DUNGEON)
 
     # Restore dungeon levels for active/in-progress quests
     if status in ("active", "artifact_found") and dcol is not None:
