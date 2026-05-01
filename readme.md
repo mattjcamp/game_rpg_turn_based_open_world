@@ -8,7 +8,7 @@ An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. 
 - Quest system
 - Proceduraly generated dungeons and intentionally crafted adventures
 - Race and class system
-- [1980's style Player's Manual](docs/manuals/players_guide.pdf), [Adventure Map](docs/manuals/overview_map.png), and [Cloth Map]([Adventure Map](docs/manuals/cloth_map.png))
+- [1980's style Player's Manual](docs/manuals/players_guide.pdf), [Adventure Map](docs/manuals/overview_map.png), and [Cloth Map](docs/manuals/cloth_map.png))
 - Dungeon Master mode that allows players to craft their own adventures
 
 ---
