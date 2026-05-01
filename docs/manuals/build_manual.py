@@ -121,6 +121,10 @@ H3 = _para_style(
     "H3", fontName=BOLD_FONT, fontSize=13.5, leading=17,
     textColor=ACCENT, alignment=0, spaceAfter=6, spaceBefore=14,
 )
+H4 = _para_style(
+    "H4", fontName=BOLD_FONT, fontSize=11.5, leading=14,
+    textColor=ACCENT, alignment=0, spaceAfter=4, spaceBefore=10,
+)
 CLASS_NAME = _para_style(
     "ClassName", fontName=BOLD_FONT, fontSize=24, leading=28,
     textColor=ACCENT, alignment=0, spaceAfter=4, spaceBefore=0,
@@ -690,6 +694,12 @@ def _render_blocks(story, blocks):
                 i += 1
                 continue
             story.append(Paragraph(text, H3))
+            i += 1
+            continue
+        if typ == "h4":
+            # Sub-heading inside an H3 group — used for individual
+            # bestiary entries inside a tier ("Easy Threats" → "Goblin").
+            story.append(Paragraph(payload[0].strip(), H4))
             i += 1
             continue
         if typ == "p":

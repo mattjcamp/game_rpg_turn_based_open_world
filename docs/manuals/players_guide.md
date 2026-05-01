@@ -218,8 +218,9 @@ Fighters are the backbone of any party. With the highest HP per level, a generou
 
 **Weapons:** Fists, Dagger
 **Armor:** Cloth only
+**Allowed Races:** Human, Elf, Gnome
 
-Wizards command the most diverse and powerful spell list in the game. From Fireball to Lightning Bolt, Charm Person to Animate Dead, they reshape the battlefield. Their weakness is severe — the lowest HP per level, no armor, and only daggers for weapons. Keep them behind thy front line and let them rain destruction from safety.
+Wizards command the most diverse and powerful spell list in the game. From Fireball to Lightning Bolt, Charm Person to Animate Dead, they reshape the battlefield. Their weakness is severe — the lowest HP per level, no armor, and only daggers for weapons. Keep them behind thy front line and let them rain destruction from safety. Note that the Wizard's path is closed to Dwarves and Halflings — only the keenly-mindful races may pursue it.
 
 **Arcane Focus** — Spell damage is increased by the Intelligence modifier.
 
@@ -357,6 +358,110 @@ The right-hand pane displays the active character's available actions. From here
 
 ---
 
+## EQUIPMENT & GOODS
+
+---
+
+The merchants of the realm offer a wide array of arms, armor, and supplies. Save thy gold for the gear best suited to thy party — a Wizard wastes coin on a sword they cannot wield, just as a Fighter gains little from a sling.
+
+### Weapons
+
+Every class can fight with their fists, but the right weapon turns an adventurer from a brawler into a force on the battlefield. Damage is rolled per attack as **Power d6** plus any bonuses from strength or magic. Most weapons can break with extended use; magical weapons marked **indestructible** never wear out.
+
+| Weapon       | Power | Range  | Buy | Notes                                   |
+|--------------|:-----:|:------:|:---:|------------------------------------------|
+| **Fists**    |   0   | melee  |  —  | Always available, indestructible        |
+| **Dagger**   |   1   | melee  | 20g | Lightest blade; backstab weapon for Thieves |
+| **Club**     |   1   | melee  | 20g | Cheap blunt weapon                       |
+| **Mace**     |   2   | melee  | 40g | Cleric & Druid favourite                 |
+| **Spear**    |   6   | melee  | 50g | Reach and reasonable cost                |
+| **Sword**    |   5   | melee  | 40g | Reliable side-arm                        |
+| **Sling**    |   2   | ranged | 60g | Stones-only, the Alchemist's stand-by   |
+| **Short Bow**|   4   | ranged | 60g | Fires arrows; Thief & Ranger             |
+| **Long Bow** |   7   | ranged |150g | Powerful bow; Ranger only                |
+| **Crossbow** |   9   | ranged |250g | Heaviest standard bow; Ranger & Fighter  |
+
+**Found, not bought.** A handful of weapons can only be looted from dungeons or won as quest rewards: the **Iron Sword** (Pow 8), **Halberd** (Pow 9), **Broad Axe** (Pow 7), **Silver Bow** (Pow 9, indestructible), **Mystic Sword** (Pow 10, indestructible), and the legendary **Sun Sword** (Pow 20, indestructible, deals fire damage with a 1d6 bonus and a 25% chance to proc Fireball on hit). The Sun Sword also bathes its wielder in a warm golden aura while equipped — a comforting sight in dark places.
+
+### Armor
+
+Armor reduces incoming damage by improving thy AC. Heavier armor offers more protection but is restricted by class.
+
+| Armor       | Buy   | Sell | Notes                                      |
+|-------------|:-----:|:----:|--------------------------------------------|
+| **Cloth**   |  20g  |  10g | Minimum protection; available to all       |
+| **Leather** |  50g  |  25g | Light armor; Thieves and most casters      |
+| **Chain**   | 120g  |  60g | Mid-tier; Cleric, Ranger, Paladin, Fighter |
+| **Plate**   | 200g  | 150g | Best mundane armor; Fighter & Paladin only |
+
+**Magical sets.** **+2 Chain**, **+2 Plate**, and the rare **Exotic** armor are quest rewards — all indestructible and offering bonuses no merchant carries.
+
+### Consumables & Provisions
+
+Healing items keep thy party alive between fights; reagents and tools open up the most rewarding paths through the world.
+
+| Item                | Buy | Effect                                                   |
+|---------------------|:---:|----------------------------------------------------------|
+| **Healing Potion**  | 40g | Restore 30 HP to one ally                                |
+| **Healing Herb**    | 15g | Restore 15 HP to one ally                                |
+| **Antidote**        | 10g | Cures poison status                                       |
+| **Mana Potion**     |  —  | Restore 10 MP (found, not bought)                        |
+| **Spring Water**    |  3g | A mouthful of water; minor heal in a pinch               |
+| **Holy Water**      |  —  | Quest item — anti-undead reagent                         |
+| **Torch**           |  5g | Lights dark dungeon corridors                             |
+| **Lockpick**        |  8g | Required for picking locked doors and chests             |
+| **Camping Supplies**| 25g | Allows the party to rest and recover                     |
+| **Fire Oil**        | 35g | Throwable flask — 20 fire damage on splash               |
+| **Smoke Bomb**      |  —  | Disengage tool; obscures the battlefield                 |
+| **Stones**          |  3g | Sling ammunition (Alchemist's bread and butter)          |
+| **Arrows**          |  5g | Short Bow / Long Bow ammunition                          |
+| **Bolts**           |  8g | Crossbow ammunition                                      |
+| **Rope**            |  —  | A stout coil for climbs and bindings                     |
+
+### Elixirs & Poisons
+
+The Alchemist's brewing skill turns reagents into temporary buffs and battlefield-shaping toxins. These can also be purchased pre-made if a shop carries them.
+
+| Item                  | Buy | Effect                                       |
+|-----------------------|:---:|----------------------------------------------|
+| **Elixir of Strength**| 60g | Temporary +2 Strength (one combat)           |
+| **Elixir of Warding** | 60g | Temporary +2 AC (one combat)                 |
+| **Poison Vial**       | 50g | Coats a weapon with poison for the next combat |
+| **Lingering Venom**   | 70g | Stronger poison; longer duration             |
+| **Paralytic Poison**  | 75g | Chance to stop a target on hit                |
+| **Weakening Poison**  | 60g | Reduces target's attack on hit               |
+
+### Reagents
+
+Reagents are rarely sold by general merchants — most are foraged from the wild (Rangers and Alchemists excel at this) or recovered from dungeons. They feed into the Alchemist's Brew Potions ability.
+
+| Reagent              | Source                            |
+|----------------------|-----------------------------------|
+| **Brimite Ore**      | Mountain caves and ruined mines   |
+| **Glowcap Mushroom** | Forest floors and dungeon halls   |
+| **Moonpetal**        | Open meadows under moonlight      |
+| **Serpent Root**     | Swamp and undergrowth             |
+| **Dragonheart**      | Quest reward — extremely rare     |
+
+### Keys & Quest Items
+
+The realm's most jealously-guarded doors yield only to a matching key. Keys are quest-locked and cannot be bought; carry them carefully.
+
+| Key             | Notes                                        |
+|-----------------|----------------------------------------------|
+| **Bronze Key**  | Common dungeon entrance key                  |
+| **Iron Key**    | Mid-tier strongholds                         |
+| **Silver Key**  | Sealed temples                                |
+| **Gold Key**    | Royal vaults                                  |
+| **Crystal Key** | Mage towers                                   |
+| **Diamond Key** | Ancient barrows                               |
+| **Ruby Key**    | Volcanic sanctums                             |
+| **Obsidian Key**| Shadow strongholds                            |
+
+Other quest-bound items thou mayst find: the **Family Heirloom** (a scroll of the Veyron line), the **Shadow Crystal**, the **Scroll of Fire**, and at the climax of certain campaigns, the heart of a slain wyrm — the **Dragonheart** itself.
+
+---
+
 ## QUESTS & ADVENTURES
 
 ---
@@ -418,7 +523,11 @@ During combat, use **[W/A/S/D]** to move thy character on the tactical grid. Wal
 
 The lands of Shadow teem with dangerous creatures, from vermin in the cellars to terrible beasts lurking in the deepest dungeon halls. Herein is a field guide to the monsters thou shalt encounter on thy journey. Study it well, for knowledge of thine enemy is the first step toward victory.
 
-### Giant Rat
+Creatures are sorted by **threat tier** — the difficulty bracket the dungeon master uses when populating an area. Easy and Normal foes prowl the surface and the upper dungeon floors; Hard and Deadly creatures haunt the depths and the wildlands beyond civilisation; **Boss** monsters are unique creatures that appear only as the climactic encounter of a story-line.
+
+### Easy Threats
+
+#### Giant Rat
 
 *A common pest found in basements and dungeon tunnels. Weak alone, but they attack in swarms.*
 
@@ -426,19 +535,23 @@ The lands of Shadow teem with dangerous creatures, from vermin in the cellars to
 
 Found in dungeons and house basements. Swarms of rats are a frequent first encounter for new adventurers. They pose little individual threat but can overwhelm the careless.
 
----
-
-### Goblin
+#### Goblin
 
 *Small, sneaky creatures that attack in groups. They carry thrown rocks for ranged harassment.*
 
 **HP: 6 • AC: 11 • Attack: +2 • Damage: 1d4**
 
-Ranged: Thrown rock (range 4, 1d3). Goblins are cowardly but cunning — they prefer to pelt the party from a distance and flee when cornered.
+Goblins are cowardly but cunning — they prefer to pelt the party from a distance and flee when cornered. Easily dispatched alone, but a pack can overwhelm an unprepared party.
 
----
+#### Wild Boar
 
-### Wolf
+*An unusually large boar with sharp tusks. Surprisingly tough.*
+
+**HP: 15 • AC: 14 • Attack: +1 • Damage: 1d4**
+
+Found rooting through forests and meadows. Boars are sluggish to engage but their thick hide and low-slung stance make them surprisingly hard to bring down quickly.
+
+#### Wolf
 
 *Fierce grey wolves that hunt in packs. Fast and cunning.*
 
@@ -448,7 +561,9 @@ Found roaming the overworld and in dungeon corridors. Wolves are swift and dange
 
 ---
 
-### Skeleton
+### Normal Threats
+
+#### Skeleton
 
 *Undead warriors animated by dark magic. Vulnerable to Turn Undead and holy weapons.*
 
@@ -456,9 +571,15 @@ Found roaming the overworld and in dungeon corridors. Wolves are swift and dange
 
 Undead — takes massive damage from Turn Undead. A Cleric is invaluable against these foes. Found in dungeons throughout the realm.
 
----
+#### Skeleton Archer
 
-### Zombie
+*A skeletal bowman that fires arrows from a distance.*
+
+**HP: 12 • AC: 12 • Attack: +3 • Damage: 1d4**
+
+Undead — vulnerable to Turn Undead. Like its sword-bearing kin, the archer crumbles to a Cleric's holy channel — but until then it picks off thy spellcasters from across the room. Close the distance fast or pick it off with thy own bows first.
+
+#### Zombie
 
 *Shambling corpses — slow but surprisingly durable. They just keep coming.*
 
@@ -466,55 +587,131 @@ Undead — takes massive damage from Turn Undead. A Cleric is invaluable against
 
 Undead — vulnerable to Turn Undead. Zombies are slow but absorb punishment that would fell lesser creatures. Cleave through them quickly.
 
----
-
-### Orc
+#### Orc
 
 *Brutal and well-armed warriors. A serious threat, especially in groups.*
 
 **HP: 22 • AC: 13 • Attack: +5 • Damage: 1d8+2**
 
-Ranged: Javelin (range 3, 1d6+1). Humanoid — can be charmed. Orcs are among the most dangerous common enemies in the realm.
+Humanoid — can be charmed. Orcs are among the most dangerous common enemies in the realm and travel in war-bands led by a Shaman.
 
----
-
-### Orc Shaman
+#### Orc Shaman
 
 *An orc witch doctor who bolsters allies with healing magic and poisons foes.*
 
 **HP: 16 • AC: 11 • Attack: +3 • Damage: 1d4**
 
-Casts Mend Wounds to heal allies and Poison Spit to weaken the party. Eliminate shamans first to prevent them from healing their warriors.
+Casts Heal Self, Heal Ally, and Poison. Eliminate shamans first to prevent them from healing their warriors — every round they live, the war-band's grunts get a little harder to kill.
 
----
-
-### Dark Mage
+#### Dark Mage
 
 *A robed figure crackling with dark energy. Attacks from range and casts debilitating spells.*
 
 **HP: 14 • AC: 12 • Attack: +4 • Damage: 2d4+1**
 
-Ranged: Dark bolt (range 7, 2d4+1). Casts Dark Slumber and Hex. Close distance quickly — their ranged attacks are devastating.
+Casts Sleep, Curse, Magic Dart, and Magic Arrow. Close distance quickly — their ranged attacks are devastating, and their Sleep can take a party member out of the fight for several rounds.
 
----
-
-### Troll
+#### Troll
 
 *A massive brute with thick hide. Hits incredibly hard and regenerates health each turn.*
 
 **HP: 30 • AC: 14 • Attack: +6 • Damage: 2d6+2**
 
-Regenerates 1d6+2 HP per turn. Focus fire to overwhelm its regeneration. A Curse spell can reduce its devastating damage output.
+Regenerates HP each turn (Heal Self / Heal Ally). Focus fire to overwhelm its regeneration. A Curse spell can reduce its devastating damage output.
 
 ---
 
-### Dragon
+### Hard Threats
+
+#### Banshee
+
+*A wailing spirit that drains the life of those who hear her cry.*
+
+**HP: 35 • AC: 13 • Attack: +5 • Damage: 1d8**
+
+Undead — vulnerable to Turn Undead. Casts Sleep and Curse. The Banshee's wail can debilitate the entire front line if she is not silenced quickly. Bring a Cleric.
+
+#### Lich
+
+*A powerful and magical undead creature.*
+
+**HP: 30 • AC: 15 • Attack: +3 • Damage: 3d4**
+
+Undead — vulnerable to Turn Undead. Immune to poison. Casts the full sorcerer line — Sleep, Curse, Magic Dart, Magic Arrow, Lightning Bolt, and even Fireball. The Lich is a one-creature siege engine; close distance and break its concentration before it can level the battlefield.
+
+#### Man Eater
+
+*A carnivorous half-plant, half-animal that lures prey within its reach.*
+
+**HP: 50 • AC: 16 • Attack: +3 • Damage: 3d4**
+
+Immune to poison. The Man Eater is rooted in place but devastating to anything that strays close. Pick at it from range and never let thy melee fighters stand adjacent for long.
+
+#### Ogre
+
+*A massive, dim-witted brute that swings a club the size of a small tree.*
+
+**HP: 40 • AC: 13 • Attack: +5 • Damage: 2d6+3**
+
+Slow-witted but a single Ogre's club-strike can fell an unarmoured caster outright. Stagger thy front line so a single missed parry doesn't end the fight.
+
+#### Wyvern
+
+*A small dragon with two legs and a pointed tail. The lesser kin of the great wyrms.*
+
+**HP: 60 • AC: 14 • Attack: +4 • Damage: 2d4**
+
+Breathes fire (cone). The Wyvern is the dragon's lesser cousin — still vastly dangerous, particularly in tight dungeon corridors where its breath catches the whole party. Spread out before engaging.
+
+---
+
+### Deadly Threats
+
+#### Hydra
+
+*A many-headed serpent whose every strike lands again and again.*
+
+**HP: 110 • AC: 15 • Attack: +6 • Damage: 3d8+2**
+
+Resistant to fire. The Hydra is a damage sponge with the bite to kill in a single round. Pile on thy heaviest hits — magical weapons, Lightning Bolt, Mass Heal between rounds. Fireball is wasted on it.
+
+#### Mind Flayer
+
+*A tentacled aberration whose mere presence weighs upon the mind.*
+
+**HP: 50 • AC: 15 • Attack: +6 • Damage: 1d6**
+
+Casts Sleep, Curse, Magic Dart, and Poison. The Flayer's damage in melee is modest, but its volley of mind-magic can disable half the party in two rounds. Silence it first.
+
+#### Stone Golem
+
+*A hulking construct of living stone, immune to poison and resistant to fire.*
+
+**HP: 110 • AC: 18 • Attack: +6 • Damage: 2d12**
+
+Resistant to fire; immune to poison. The Golem hits as hard as a Dragon and shrugs off thy alchemy. Magic damage on the Cleric / Wizard line and the heaviest physical strikes thy fighters can muster — there is no shortcut.
+
+#### Vampire Lord
+
+*An ancient nobleman of the night who drains the very life of those he strikes.*
+
+**HP: 60 • AC: 16 • Attack: +7 • Damage: 1d10**
+
+Undead — vulnerable to Turn Undead. Regenerates HP each turn. Casts Sleep and Curse. Holy Water and a Cleric's channel are by far thy best tools; without them, the Vampire's regeneration may outlast thy MP pool.
+
+---
+
+### Boss Encounters
+
+Boss creatures are unique. Each appears only as the climactic encounter of a story-line, never in random encounters or wandering wild packs — when one is slain, that legend ends. Approach with thy strongest party and thy best gear.
+
+#### Dragon
 
 *An ancient wyrm of terrible power. The most fearsome creature in the realm.*
 
-**HP: 60 • AC: 18 • Attack: +10 • Damage: 3d8+4**
+**HP: 125 • AC: 18 • Attack: +6 • Damage: 4d8**
 
-Ranged: Fire breath (range 5, 4d6 damage in a cone). The Dragon is the deadliest foe thou shalt face. It strikes with devastating claws and breathes searing flame that scorches all in its path. Only the most powerful and well-prepared parties should dare challenge a Dragon. Bring thy strongest weapons, healing magic, and courage.
+Breathes fire (cone). Regenerates HP each turn. Resistant to fire. The Dragon is the deadliest foe thou shalt face. It strikes with devastating claws and breathes searing flame that scorches all in its path. Only the most powerful and well-prepared parties should dare challenge a Dragon. Bring thy strongest weapons — the **Sun Sword**, in particular, deals fire damage even *the dragon's* hide cannot fully resist — and thy fullest reserves of healing magic.
 
 ---
 
