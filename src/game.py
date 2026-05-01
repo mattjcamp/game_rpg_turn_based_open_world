@@ -3062,12 +3062,15 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         """Return to the active game, or load the most recent save."""
         if self._game_started:
             # Game already running - just dismiss the title screen.
-            # Refresh overworld interiors from disk in case the
-            # module editor changed them since the game was started.
+            # Refresh overworld interior *metadata* from disk so the
+            # module editor's interior list edits propagate; this no
+            # longer touches tile arrays or the dungeon cache because
+            # those wipes were destroying live player progress (boats
+            # snapping back to spawn, cleared bridges reverting,
+            # explored dungeons resetting). Module authors who want
+            # to test overworld / dungeon edits live should start a
+            # fresh game from the modules screen.
             self._refresh_overworld_interior_data()
-            # Clear dungeon cache so edited dungeon layouts are rebuilt
-            # with the latest level data on next entry.
-            self.dungeon_cache = {}
             self.showing_title = False
             return
 
@@ -3139,15 +3142,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         from src.tile_map import validate_module_links
         validate_module_links(self.active_module_path)
 
-        # If the overview map tiles were also updated, refresh them
-        # so the player sees the latest map layout.
-        tiles = sdata.get("tiles")
-        if tiles and isinstance(tiles, list):
-            mc = sdata.get("map_config", {})
-            new_w = mc.get("width", 0) or (len(tiles[0]) if tiles else 0)
-            new_h = mc.get("height", 0) or len(tiles)
-            if new_w == tmap.width and new_h == tmap.height:
-                tmap.tiles = tiles
+        # NOTE: The tile array (``tmap.tiles``) is intentionally NOT
+        # refreshed here. Overwriting it with the static map's
+        # pristine version wipes every runtime mutation — bridge
+        # tiles placed by quest unlocks, boats the player has
+        # sailed, cleared dungeon pins, opened chests — every time
+        # the player ducks into the menu and back. Module authors
+        # who want to test overworld map edits live should start a
+        # fresh game from the modules screen instead.
 
     def _title_quit(self):
         """Quit the game."""

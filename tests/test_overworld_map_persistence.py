@@ -227,6 +227,71 @@ class TestActiveQuestDungeonPin:
 # ── Back-compat ────────────────────────────────────────────────────
 
 
+class TestReturnToGamePreservesProgress:
+    """The "RETURN TO GAME" button on the title menu must not clobber
+    runtime tile mutations. The original implementation refreshed the
+    overworld interior list AND overwrote ``tile_map.tiles`` with the
+    static map's pristine data — wiping every quest-unlocked bridge,
+    every sailed boat, every cleared dungeon every time the player
+    bounced through the menu. Same applied to the dungeon cache.
+
+    Module authors who want to live-test overworld / dungeon edits
+    can start a new game from the modules screen.
+    """
+
+    def test_overworld_tile_mutations_survive_menu_return(
+            self, game, tmp_path, monkeypatch):
+        # Plant some module data on disk so
+        # ``_refresh_overworld_interior_data`` actually engages
+        # (it returns early when active_module_path is unset).
+        import json
+        import os
+        mod_dir = tmp_path / "fake_module"
+        mod_dir.mkdir()
+        # Provide a static_overworld.json with a *different* tile
+        # layout than what's in memory — if the function reads it
+        # and overwrites tile_map.tiles, the test will catch it.
+        bogus_tiles = [
+            [TILE_GRASS for _ in range(game.tile_map.width)]
+            for _ in range(game.tile_map.height)
+        ]
+        with open(mod_dir / "static_overworld.json", "w") as f:
+            json.dump({
+                "interiors": [],
+                "tiles": bogus_tiles,
+                "map_config": {
+                    "width": game.tile_map.width,
+                    "height": game.tile_map.height,
+                },
+            }, f)
+        game.active_module_path = str(mod_dir)
+        game._game_started = True
+
+        # Simulate runtime mutations: a bridge tile from a quest
+        # unlock, a boat the player has sailed.
+        game.tile_map.set_tile(10, 10, TILE_PATH)
+        game.tile_map.set_tile(15, 15, TILE_DUNGEON_CLEARED)
+        # Also stash a non-empty dungeon cache so we can see it
+        # survive the return.
+        game.dungeon_cache[(20, 20)] = ["sentinel"]
+
+        # Take the menu→return path.
+        game.showing_title = True
+        game._title_return_to_game()
+
+        # Tile mutations must still be there.
+        assert game.tile_map.get_tile(10, 10) == TILE_PATH, (
+            "Quest-unlocked tile at (10,10) was wiped by menu return.")
+        assert game.tile_map.get_tile(15, 15) == TILE_DUNGEON_CLEARED, (
+            "Cleared dungeon pin at (15,15) was wiped by menu return.")
+        # Dungeon cache must still be there.
+        assert game.dungeon_cache.get((20, 20)) == ["sentinel"], (
+            "Dungeon cache cleared by menu return — explored "
+            "procedural dungeons should not reset.")
+        # And the title screen should be dismissed.
+        assert game.showing_title is False
+
+
 class TestLegacySaveCompat:
     """v3 saves predate the full-overworld snapshot. They should still
     load without errors and continue to use the per-feature deltas.
