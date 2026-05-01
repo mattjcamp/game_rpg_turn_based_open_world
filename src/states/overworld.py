@@ -1199,6 +1199,11 @@ class OverworldState(LockInteractionMixin, InventoryMixin, BaseState):
             # Mark as turned in so rewards aren't given again
             mq_state["status"] = "turned_in"
             self.ow_quest_dialogue_lines = []
+            # End-of-game screen for final-quest turn-ins. See
+            # quest_manager.maybe_trigger_victory for the
+            # idempotency rules.
+            from src.quest_manager import maybe_trigger_victory
+            maybe_trigger_victory(self.game, mqname)
 
         elif status == "turned_in":
             self.show_message(

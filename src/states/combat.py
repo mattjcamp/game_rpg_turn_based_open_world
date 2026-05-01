@@ -6216,17 +6216,38 @@ class CombatState(BaseState):
         # would incorrectly credit the quest. The downstream credit
         # logic in quest_manager.check_quest_kills uses these tags to
         # require an actual quest-spawned kill for non-overworld steps.
+        #
+        # We harvest tags from two places:
+        #   1. ``self.monsters`` — the in-combat instances. The
+        #      original tagging path stores ``_quest_name`` directly on
+        #      these for encounters that were created on the fly with
+        #      no separate map presence (rare).
+        #   2. ``self.monster_refs`` — the map-side monster objects
+        #      that triggered this combat. The dungeon / overworld
+        #      bridges create *fresh* combat monsters from the
+        #      encounter template, so the quest tag set in
+        #      ``_inject_quest_dungeon_monsters`` lives only on the
+        #      map monster — without this second sweep, killing the
+        #      glowing quest dragon would never credit the quest
+        #      because the combat dragons have no tag.
         killed_quest_tags = []
-        for m in self.monsters:
-            if m.is_alive():
-                continue
-            qname = getattr(m, "_quest_name", None)
-            qstep = getattr(m, "_quest_step_idx", None)
-            if qname is not None and qstep is not None:
+        seen_keys = set()
+        for source in (self.monsters, self.monster_refs):
+            for m in source or []:
+                if m in self.monsters and m.is_alive():
+                    continue
+                qname = getattr(m, "_quest_name", None)
+                qstep = getattr(m, "_quest_step_idx", None)
+                if qname is None or qstep is None:
+                    continue
+                key = (qname, int(qstep))
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
                 killed_quest_tags.append({
                     "quest_name": qname,
                     "step_idx": int(qstep),
-                    "monster_name": m.name,
+                    "monster_name": getattr(m, "name", ""),
                 })
         self.game.pending_killed_quest_tags = killed_quest_tags
         self.game.pending_combat_location = getattr(

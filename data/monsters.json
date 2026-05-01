@@ -777,7 +777,7 @@
         }
       ],
       "battle_scale": 2,
-      "difficulty": "deadly"
+      "difficulty": "boss"
     },
     "Hydra": {
       "description": "A many-headed serpent whose every strike lands again and again.",

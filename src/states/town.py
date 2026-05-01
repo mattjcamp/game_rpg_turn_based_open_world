@@ -1707,6 +1707,12 @@ class TownState(LockInteractionMixin, InventoryMixin, BaseState):
                 # Mark as turned in so rewards aren't given again
                 mq_state["status"] = "turned_in"
                 self._refresh_quest_highlights()
+                # If this was the module's final quest, pop the
+                # end-of-game screen. The trigger only fires on this
+                # transition — reloading a save where the quest is
+                # already turned in won't re-show the screen.
+                from src.quest_manager import maybe_trigger_victory
+                maybe_trigger_victory(self.game, mqname)
                 return
 
             elif status == "turned_in":

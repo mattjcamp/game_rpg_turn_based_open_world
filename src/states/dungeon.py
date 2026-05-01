@@ -1883,7 +1883,19 @@ class DungeonState(LockInteractionMixin, InventoryMixin, BaseState):
         if active_q:
             active_q["current_level"] = self.current_level
         depth = self.current_level + 1
-        self.show_message(f"You ascend to floor {depth}.", 2000)
+        total = len(self.quest_levels) if self.quest_levels else depth
+        # Forest-style "dungeons" are open-air woodland trails — the
+        # word "floor" and the verb "ascend" both read as a stone
+        # staircase, which is wrong for a path between groves. Mirror
+        # the wording the descend handler uses for forests.
+        _is_forest = (
+            getattr(self.dungeon_data, "style", None) == "forest")
+        if _is_forest:
+            self.show_message(
+                f"You backtrack along the trail... "
+                f"(Area {depth}/{total})", 2000)
+        else:
+            self.show_message(f"You ascend to floor {depth}.", 2000)
 
     def _exit_dungeon(self):
         """Leave the dungeon and return to the overworld."""

@@ -572,6 +572,23 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
             {"label": "NEW GAME", "action": self._game_over_new},
         ]
 
+        # --- Victory screen (final-quest turn-in) ---
+        # Shown when the player turns in a quest with
+        # is_final_quest=True. Mirrors the game-over screen plumbing
+        # but is celebratory rather than grim, and includes a
+        # "Continue Playing" option so the player can keep
+        # exploring the post-game world.
+        self.showing_victory = False
+        self.victory_cursor = 0
+        self.victory_elapsed = 0.0
+        self.victory_text = ""
+        self.victory_quest_name = ""
+        self.victory_options = [
+            {"label": "CONTINUE PLAYING", "action": self._victory_continue},
+            {"label": "NEW GAME", "action": self._victory_new_game},
+            {"label": "MAIN MENU", "action": self._victory_main_menu},
+        ]
+
         # Combat rewards (must be set before change_state triggers enter())
         self.pending_combat_rewards = None
         self.pending_killed_monsters = []
@@ -2553,6 +2570,37 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         """Start a fresh game from the game over screen."""
         self.showing_game_over = False
         self._title_new_game()
+
+    # ── Victory screen actions ───────────────────────────────────
+
+    def trigger_victory(self, quest_name="", victory_text=""):
+        """Show the end-of-game screen after a final-quest turn-in.
+
+        Called once when a quest flagged ``is_final_quest`` flips to
+        ``status="turned_in"``. The trigger fires on the *transition*,
+        not on every state evaluation, so reloading a save where the
+        final quest is already turned in does NOT re-pop the screen.
+        """
+        self.showing_victory = True
+        self.victory_cursor = 0
+        self.victory_elapsed = 0.0
+        self.victory_quest_name = quest_name or ""
+        self.victory_text = victory_text or ""
+
+    def _victory_continue(self):
+        """Dismiss the victory screen and return to the world."""
+        self.showing_victory = False
+
+    def _victory_new_game(self):
+        """Start a fresh game from the victory screen."""
+        self.showing_victory = False
+        self._title_new_game()
+
+    def _victory_main_menu(self):
+        """Return to the title screen from the victory screen."""
+        self.showing_victory = False
+        self.showing_title = True
+        self.title_cursor = 0
 
     def _title_create_char(self):
         """Open the character creation screen from the title."""
@@ -5729,6 +5777,23 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             self.game_over_options[self.game_over_cursor]["action"]()
 
+    def _handle_victory_input(self, event):
+        """Handle input on the end-of-game victory screen."""
+        if event.type != pygame.KEYDOWN:
+            return
+        # Ignore input during the initial fade-in so the player can't
+        # bash through the screen before reading any of it.
+        if self.victory_elapsed < 2.0:
+            return
+        if event.key == pygame.K_UP:
+            self.victory_cursor = (
+                (self.victory_cursor - 1) % len(self.victory_options))
+        elif event.key == pygame.K_DOWN:
+            self.victory_cursor = (
+                (self.victory_cursor + 1) % len(self.victory_options))
+        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self.victory_options[self.victory_cursor]["action"]()
+
     def change_state(self, state_name):
         """Switch to a different game state."""
         if self.current_state:
@@ -6084,6 +6149,10 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 for event in events:
                     self._handle_game_over_input(event)
                 self.game_over_elapsed += dt
+            elif self.showing_victory:
+                for event in events:
+                    self._handle_victory_input(event)
+                self.victory_elapsed += dt
             elif self.showing_quest_log:
                 for event in events:
                     if event.type != pygame.KEYDOWN:
@@ -6407,6 +6476,14 @@ class Game(ModuleTownEditorMixin, ModuleDungeonEditorMixin,
                 self.renderer.draw_game_over_screen(
                     self.game_over_options, self.game_over_cursor,
                     self.game_over_elapsed)
+            elif self.showing_victory:
+                self.renderer.draw_victory_screen(
+                    self.victory_options, self.victory_cursor,
+                    self.victory_elapsed,
+                    victory_text=self.victory_text,
+                    quest_name=self.victory_quest_name,
+                    module_name=getattr(
+                        self, "active_module_name", "") or "")
             elif self.showing_quest_log:
                 quest_data = self._build_quest_log()
                 self.renderer.draw_quest_screen(

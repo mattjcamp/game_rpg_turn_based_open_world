@@ -114,9 +114,9 @@
     "description": "A vast cave system beneath Hargorn's island, hot enough that the stone weeps. Smoke and fire lick the entrance day and night. The closer you get to the heart, the less the air remembers how to be air.",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 10,
+    "num_levels": 2,
     "difficulty": "deadly",
-    "level_size": "large",
+    "level_size": "small",
     "torch_density": "sparse",
     "locked_doors": "off",
     "levels": [

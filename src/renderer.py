@@ -14034,6 +14034,219 @@ class Renderer(CombatEffectRendererMixin):
                           SCREEN_HEIGHT - 50,
                           hint_color, self.font_small)
 
+    def draw_victory_screen(self, options, cursor, elapsed,
+                             victory_text="", quest_name="",
+                             module_name=""):
+        """Draw the end-of-game victory screen.
+
+        Mirrors :meth:`draw_game_over_screen` in structure (fade-in
+        title, drifting particles, option panel, hint line) but uses a
+        warm gold/amber palette and rising particles to read as
+        triumph rather than mourning. The author-supplied
+        ``victory_text`` is rendered as wrapped paragraphs in the
+        middle of the screen; when blank a generic line is shown.
+
+        Parameters
+        ----------
+        options : list of dicts
+            Each entry has ``{"label": str, "action": callable}``.
+        cursor : int
+            Index of the highlighted option.
+        elapsed : float
+            Seconds since the screen first appeared. Drives fades and
+            blocks input during the first 2 s.
+        victory_text : str
+            Author's epilogue. Wrapped to ~58 chars per line.
+        quest_name : str
+            Name of the final quest (rendered as a small caption).
+        module_name : str
+            Optional module label, also rendered as a caption.
+        """
+        self.screen.fill((0, 0, 0))
+
+        # ── Rising gold-mote particles ──
+        # Same RNG-without-RNG technique as draw_game_over_screen so
+        # the test environment (no pygame display) doesn't introduce
+        # nondeterminism. Particles drift *up* (versus the slow
+        # horizontal drift on the game-over screen) to read as embers
+        # rising from a victory bonfire.
+        seeds = [23, 59, 101, 149, 191, 233, 277, 311, 367, 409,
+                 457, 499, 547, 593, 641, 683, 727, 769, 811, 859]
+        for i, seed in enumerate(seeds):
+            px = (seed * 11 + i * 37) % SCREEN_WIDTH
+            base_py = (seed * 7 + i * 53) % SCREEN_HEIGHT
+            # Steady upward drift, wrapping around the screen so the
+            # field stays full.
+            rise = (elapsed * (15 + (i % 4) * 4)) % SCREEN_HEIGHT
+            py = int(base_py - rise) % SCREEN_HEIGHT
+            phase = elapsed * (0.4 + i * 0.07) + seed
+            shimmer = int(35 + 25 * math.sin(phase))
+            shimmer = max(15, min(80, shimmer))
+            r = min(255, shimmer + 40)
+            g = min(255, shimmer + 20)
+            b = max(0, shimmer // 4)
+            self.screen.set_at((px, py), (r, g, b))
+            if i % 2 == 0:
+                self.screen.set_at(
+                    ((px + 1) % SCREEN_WIDTH, py),
+                    (max(0, r - 60), max(0, g - 40), 0))
+
+        # ── Sun emblem ──
+        sun_fade = min(1.0, elapsed / 1.5)
+        sun_y = 70
+        sun_art = [
+            "         \\   |   /",
+            "          \\  |  /",
+            "       _____.-._____",
+            "      /    .' '.    \\",
+            "     /   .'     '.   \\",
+            "    /  .'   ___   '.  \\",
+            "    | :    ( o )    : |",
+            "    \\  '.   '''   .'  /",
+            "     \\   '.     .'   /",
+            "      \\    '.-.'    /",
+            "       \\____/_\\____/",
+            "          /  |  \\",
+            "         /   |   \\",
+        ]
+        for i, line in enumerate(sun_art):
+            line_fade = min(1.0, max(0.0, sun_fade - i * 0.04))
+            r = int(255 * line_fade)
+            g = int(200 * line_fade)
+            b = int(70 * line_fade)
+            pulse = 0.10 * math.sin(elapsed * 1.5 + i * 0.25)
+            r = min(255, int(r * (1.0 + pulse)))
+            g = min(255, int(g * (1.0 + pulse * 0.5)))
+            sw = len(line) * 7
+            self._u3_text(line,
+                          SCREEN_WIDTH // 2 - sw // 2,
+                          sun_y + i * 14,
+                          (r, g, b), self.font)
+
+        # ── "VICTORY" title ──
+        title_fade = min(1.0, max(0.0, (elapsed - 1.0) / 1.0))
+        title_y = sun_y + len(sun_art) * 14 + 16
+        if title_fade > 0:
+            title_text = "V I C T O R Y"
+            pulse = 0.18 * math.sin(elapsed * 2.2)
+            tr = min(255, int((230 + 25 * pulse) * title_fade))
+            tg = min(255, int((180 + 30 * pulse) * title_fade))
+            tb = int(60 * title_fade)
+            tw = len(title_text) * 9
+            self._u3_text(title_text,
+                          SCREEN_WIDTH // 2 - tw // 2, title_y,
+                          (tr, tg, tb), self.font)
+
+        # ── Quest / module caption ──
+        cap_fade = min(1.0, max(0.0, (elapsed - 1.4) / 0.8))
+        cap_y = title_y + 24
+        if cap_fade > 0:
+            caption_parts = []
+            if quest_name:
+                caption_parts.append(f"~ {quest_name} ~")
+            if module_name:
+                caption_parts.append(module_name)
+            caption = "   ".join(caption_parts)
+            if caption:
+                cc = int(180 * cap_fade)
+                cw = len(caption) * 6
+                self._u3_text(caption,
+                              SCREEN_WIDTH // 2 - cw // 2,
+                              cap_y,
+                              (cc, max(0, cc - 30), max(0, cc - 80)),
+                              self.font_med)
+
+        # ── Wrapped epilogue text ──
+        body_fade = min(1.0, max(0.0, (elapsed - 1.8) / 1.0))
+        body_y = cap_y + 36
+        if body_fade > 0:
+            body = (victory_text
+                    or "Your journey is complete. The realm endures, "
+                       "and your name will live on in song.")
+            # Simple word-wrap to a per-line cap. The font is fixed
+            # width-ish so a character count is good enough; we don't
+            # need pygame.measure here.
+            max_chars = 58
+            lines = []
+            for paragraph in body.split("\n"):
+                words = paragraph.strip().split()
+                line = ""
+                for w in words:
+                    if not line:
+                        line = w
+                    elif len(line) + 1 + len(w) <= max_chars:
+                        line += " " + w
+                    else:
+                        lines.append(line)
+                        line = w
+                if line:
+                    lines.append(line)
+                lines.append("")  # paragraph break
+            if lines and lines[-1] == "":
+                lines.pop()
+            br = int(220 * body_fade)
+            bg = int(200 * body_fade)
+            bb = int(150 * body_fade)
+            for li, ln in enumerate(lines[:8]):  # cap at 8 lines
+                lw = len(ln) * 6
+                self._u3_text(ln,
+                              SCREEN_WIDTH // 2 - lw // 2,
+                              body_y + li * 18,
+                              (br, bg, bb), self.font_med)
+
+        # ── Menu options ──
+        menu_y = SCREEN_HEIGHT - 40 - len(options) * 40
+        menu_fade = min(1.0, max(0.0, (elapsed - 2.0) / 1.0))
+        if menu_fade > 0:
+            panel_w = 320
+            panel_h = 30 + len(options) * 40 + 20
+            panel_x = (SCREEN_WIDTH - panel_w) // 2
+            panel_surf = pygame.Surface(
+                (panel_w, panel_h), pygame.SRCALPHA)
+            panel_surf.fill((30, 22, 5, int(180 * menu_fade)))
+            self.screen.blit(panel_surf, (panel_x, menu_y - 10))
+            border_alpha = int(140 * menu_fade)
+            pygame.draw.rect(self.screen,
+                             (180, 130, 40, border_alpha),
+                             (panel_x, menu_y - 10, panel_w, panel_h),
+                             1)
+            for i, opt in enumerate(options):
+                y = menu_y + 10 + i * 40
+                selected = (i == cursor)
+                if selected:
+                    arrow_offset = int(3 * math.sin(elapsed * 4.0))
+                    arrow_x = panel_x + 16 + arrow_offset
+                    self._u3_text(">", arrow_x, y,
+                                  (int(255 * menu_fade),
+                                   int(220 * menu_fade),
+                                   int(80 * menu_fade)), self.font)
+                    self._u3_text(opt["label"], panel_x + 40, y,
+                                  (int(255 * menu_fade),
+                                   int(230 * menu_fade),
+                                   int(140 * menu_fade)), self.font)
+                    bar = pygame.Surface(
+                        (panel_w - 12, 24), pygame.SRCALPHA)
+                    bar.fill((220, 170, 60, int(30 * menu_fade)))
+                    self.screen.blit(bar, (panel_x + 6, y - 2))
+                else:
+                    c = int(170 * menu_fade)
+                    self._u3_text(opt["label"], panel_x + 40, y,
+                                  (c, max(0, c - 20),
+                                   max(0, c - 80)),
+                                  self.font)
+
+        # ── Bottom hint ──
+        hint_fade = min(1.0, max(0.0, (elapsed - 2.5) / 1.0))
+        if hint_fade > 0:
+            hint_color = (int(150 * hint_fade), int(110 * hint_fade),
+                          int(40 * hint_fade))
+            hint = "[UP/DOWN] SELECT   [ENTER] CHOOSE"
+            hw = len(hint) * 5
+            self._u3_text(hint,
+                          SCREEN_WIDTH // 2 - hw // 2,
+                          SCREEN_HEIGHT - 18,
+                          hint_color, self.font_small)
+
     def draw_settings_screen(self, settings, cursor):
         """Draw a full-screen settings overlay in Ultima III style.
 

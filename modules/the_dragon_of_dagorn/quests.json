@@ -344,6 +344,16 @@
       }
     ],
     "giver_col": 12,
-    "giver_row": 18
+    "giver_row": 18,
+    "reward_world_unlocks": [
+      {
+        "kind": "add_tile",
+        "col": 0,
+        "row": 0,
+        "tile": 0
+      }
+    ],
+    "is_final_quest": true,
+    "victory_text": "The nightmare is over, the dragon has been driven from the realm. You return a hero, and yet you are haunted by what you have learned of the world in your adventures. What path will you take next?"
   }
 ]

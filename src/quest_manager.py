@@ -165,6 +165,33 @@ def _find_quest_def(game, quest_name):
     return None
 
 
+def maybe_trigger_victory(game, quest_name):
+    """If *quest_name* is the module's final quest, pop the victory screen.
+
+    Idempotent: only fires when the game isn't already showing the
+    victory screen (so multiple turn-in handlers can call this without
+    risk of stacking screens). Safe to call with an unknown quest
+    name or before the module manifest is loaded.
+
+    Triggered from the turn-in code paths in town.py and overworld.py
+    on the transition where ``status`` flips to ``"turned_in"``.
+    Loading a save where the final quest is *already* turned in does
+    NOT re-fire because the load path doesn't run the turn-in
+    handler — it just restores ``module_quest_states`` directly.
+    """
+    qdef = _find_quest_def(game, quest_name)
+    if not qdef or not qdef.get("is_final_quest"):
+        return False
+    if getattr(game, "showing_victory", False):
+        return False
+    trigger = getattr(game, "trigger_victory", None)
+    if not callable(trigger):
+        return False
+    trigger(quest_name=quest_name,
+            victory_text=qdef.get("victory_text", "") or "")
+    return True
+
+
 def collect_quest_item(game, quest_name, step_idx, item_name):
     """Mark a quest collect step as complete and return a UI message.
 

@@ -239,12 +239,18 @@ def create_monster(name):
 def create_random_monster(table="dungeon"):
     """Pick a random monster using weighted spawn tables from JSON."""
     pool = SPAWN_TABLES.get(table, list(MONSTERS.keys()))
-    # Build weighted list from spawn_weight values
+    # Build weighted list from spawn_weight values. Boss-tagged
+    # monsters are NEVER returned from the random spawn path — they're
+    # reserved for explicit quest placements so the climactic
+    # encounter feels unique.
     weighted = []
     for name in pool:
         data = MONSTERS.get(name)
-        if data:
-            weighted.append((name, data.get("spawn_weight", 20)))
+        if not data:
+            continue
+        if data.get("difficulty") == "boss":
+            continue
+        weighted.append((name, data.get("spawn_weight", 20)))
     if not weighted:
         # Fallback to first monster
         return create_monster(list(MONSTERS.keys())[0])
@@ -296,6 +302,22 @@ def _encounter_matches_difficulty(enc, dungeon_difficulty):
     return True
 
 
+def _encounter_has_boss(enc):
+    """True if any monster in *enc* is tagged ``"boss"``.
+
+    Bosses are unique creatures reserved for explicit quest spawns;
+    they're filtered out of every random encounter pool — including
+    pools where ``dungeon_difficulty`` filtering isn't active (e.g.
+    overworld and town encounters). Without this guard, the climactic
+    boss could surface in random encounter rolls before the player
+    ever reaches the quest's intended set-piece.
+    """
+    for name in enc.get("monsters") or []:
+        if _monster_difficulty(name) == "boss":
+            return True
+    return False
+
+
 def create_encounter(area="dungeon", terrain="land",
                      min_level=None, max_level=None,
                      dungeon_difficulty=None):
@@ -340,6 +362,12 @@ def create_encounter(area="dungeon", terrain="land",
         pool = [e for e in pool if e.get("level", 1) >= min_level]
     if max_level is not None:
         pool = [e for e in pool if e.get("level", 1) <= max_level]
+    # Always strip encounters that contain a boss-tagged monster.
+    # Bosses are unique and only enter combat via explicit quest
+    # placement — they must not surface from any random pool, dungeon
+    # or otherwise. (This runs before the optional dungeon_difficulty
+    # filter so it covers overworld / town encounters too.)
+    pool = [e for e in pool if not _encounter_has_boss(e)]
     # Filter by per-monster difficulty tier.  An encounter is eligible
     # only when EVERY monster in it is either untagged ("any" or
     # missing) or tagged with the dungeon's exact difficulty.  This

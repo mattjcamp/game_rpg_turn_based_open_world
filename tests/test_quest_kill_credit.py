@@ -162,6 +162,92 @@ class TestDungeonKillCredit:
 # ── Overworld kill step (back-compat) ──────────────────────────────
 
 
+class TestTagPropagationFromMapMonster:
+    """The dungeon and overworld bridges build *fresh* in-combat
+    monsters from the encounter template — they don't carry over the
+    ``_quest_name`` tag set by the quest spawner on the map monster.
+    Without harvesting the tag from ``self.monster_refs`` (the map
+    monsters that triggered the encounter), a localized dungeon kill
+    quest like "Slay the Dragon" would never credit on victory:
+    combat code never sees the tag because it lives on the map
+    monster, not on the in-combat instance.
+
+    This was the bug the player hit on the dragon quest after the
+    earlier false-credit fix — the tag was being checked, but never
+    reaching the credit path.
+    """
+
+    def test_tag_on_map_monster_credits_after_combat(self, combat):
+        # combat fixture wires a single Giant Rat into combat. We
+        # rebuild it minimally to mimic the dungeon-quest case: the
+        # in-combat monster has NO tag, but the map_monster_ref does.
+        ds = combat
+        # Rename the in-combat creature so the test reads as the
+        # dragon quest scenario without any data-file coupling.
+        for m in ds.monsters:
+            m.name = "Dragon"
+            m.hp = 0
+            # Explicitly leave _quest_name / _quest_step_idx unset.
+            assert not hasattr(m, "_quest_name")
+        # Give the map-side monster ref the quest tag — same shape
+        # as ``_inject_quest_dungeon_monsters`` writes.
+        for ref in ds.monster_refs:
+            ref._quest_name = "Slay the Ancient Dragon"
+            ref._quest_step_idx = 0
+        ds.combat_location = "dungeon:Dragon's Lair - Floor 10"
+
+        ds._trigger_victory()
+
+        tags = ds.game.pending_killed_quest_tags
+        keys = {(t["quest_name"], t["step_idx"]) for t in tags}
+        assert ("Slay the Ancient Dragon", 0) in keys, (
+            "Map-monster quest tag must be harvested into "
+            "pending_killed_quest_tags so the localized-step credit "
+            "path sees the kill.")
+
+    def test_tag_only_on_combat_monster_still_works(self, combat):
+        # Belt-and-suspenders: original tagging path (tag set directly
+        # on the in-combat monster) must still work.
+        ds = combat
+        for m in ds.monsters:
+            m.name = "Goblin"
+            m.hp = 0
+            m._quest_name = "Goblin Hunt"
+            m._quest_step_idx = 0
+        ds.combat_location = "dungeon:Goblin Camp"
+
+        ds._trigger_victory()
+
+        tags = ds.game.pending_killed_quest_tags
+        keys = {(t["quest_name"], t["step_idx"]) for t in tags}
+        assert ("Goblin Hunt", 0) in keys
+
+    def test_duplicate_tags_deduplicated(self, combat):
+        # Same tag on combat monster AND map monster ref shouldn't
+        # produce two entries — the credit logic uses a set lookup
+        # so a duplicate is harmless, but the harvested list staying
+        # tidy makes the in-game log cleaner.
+        ds = combat
+        for m in ds.monsters:
+            m.name = "Dragon"
+            m.hp = 0
+            m._quest_name = "Slay the Dragon"
+            m._quest_step_idx = 0
+        for ref in ds.monster_refs:
+            ref._quest_name = "Slay the Dragon"
+            ref._quest_step_idx = 0
+        ds.combat_location = "dungeon:Dragon's Lair"
+
+        ds._trigger_victory()
+
+        tags = ds.game.pending_killed_quest_tags
+        matching = [t for t in tags
+                    if (t["quest_name"], t["step_idx"])
+                    == ("Slay the Dragon", 0)]
+        assert len(matching) == 1, (
+            "Tag harvested from both lanes must be deduplicated.")
+
+
 class TestOverworldKillCreditUntagged:
     """Overview/overworld kill steps keep the legacy roster-name
     behaviour: a random goblin counts toward "kill 5 goblins" without

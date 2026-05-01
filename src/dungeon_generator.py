@@ -653,13 +653,28 @@ DIFFICULTY_PROFILES = {
                "enc_min": 5, "enc_max": 8, "enc_chance": 0.80},
 }
 
-# Canonical, ordered list of dungeon difficulty tiers.  Used by the
-# dungeon editor (which dungeon to generate at this tier?), the monster
-# editor (which tier does this creature belong to?), and the encounter
-# filter (which monsters may spawn in this dungeon?).  Keeping this in
-# one place means new tiers (e.g. "insane") can be added by editing
-# this tuple plus DIFFICULTY_PROFILES above and they show up everywhere.
-DIFFICULTY_TIERS = tuple(DIFFICULTY_PROFILES.keys())
+# Per-monster difficulty tiers exposed in the monster editor.
+#
+# The first four mirror DIFFICULTY_PROFILES — a monster tagged with one
+# of those is restricted to dungeons of the matching difficulty.
+#
+# "boss" is a separate, reserved designation for unique creatures
+# (e.g. the dragon at the climax of the main quest). A boss-tagged
+# monster is filtered out of EVERY random spawn pool — random
+# encounters in dungeons, overworld random encounters, and weighted
+# spawn tables — so it can only enter combat via explicit quest
+# placement (see DungeonState._inject_quest_dungeon_monsters and the
+# overworld / town quest spawners). Without this, modules whose final
+# quest target was also in the random pool would have the boss show
+# up multiple times before the climactic fight, deflating the moment.
+#
+# "boss" is intentionally NOT a key in DIFFICULTY_PROFILES — it's a
+# per-monster designation, not a whole-dungeon difficulty option.
+# Adding a new whole-dungeon tier (e.g. "insane") still means
+# extending DIFFICULTY_PROFILES; the boss exception is the only tier
+# that lives only in this list.
+DIFFICULTY_BOSS = "boss"
+DIFFICULTY_TIERS = (*DIFFICULTY_PROFILES.keys(), DIFFICULTY_BOSS)
 
 # Sentinel used in the monster editor's Difficulty field to mean "no
 # tier set on this creature".  Untagged monsters bypass the dungeon

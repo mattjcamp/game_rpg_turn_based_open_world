@@ -300,6 +300,20 @@ class ModuleQuestEditorMixin:
             FieldEntry("Unlock Tile", "unlock_tile",
                        u_tile_display, "choice",
                        u_kind != WORLD_UNLOCK_KIND_NONE),
+            # ── Final Quest (end-of-game trigger) ──
+            # When "Is Final Quest" is True, turning this quest in to
+            # its giver pops the special victory screen with the
+            # author-supplied epilogue. Only one quest per module
+            # should be flagged — if more than one is set, the first
+            # one turned in wins. "Victory Text" is the epilogue
+            # blurb shown on the victory screen; leave blank for the
+            # generic fallback line.
+            FieldEntry("Final Quest", "", "", "section", False),
+            FieldEntry("Is Final Quest", "is_final_quest",
+                       "True" if quest.get("is_final_quest") else "False",
+                       "choice", True),
+            FieldEntry("Victory Text", "victory_text",
+                       quest.get("victory_text", ""), "text", True),
         ]
 
         self._mod_quest_choice_map = {
@@ -307,6 +321,7 @@ class ModuleQuestEditorMixin:
             "giver_location": loc_options,
             "unlock_kind": WORLD_UNLOCK_KIND_OPTIONS,
             "unlock_tile": u_tile_choices,
+            "is_final_quest": ["False", "True"],
         }
 
         fe = self.features_editor
@@ -371,6 +386,12 @@ class ModuleQuestEditorMixin:
             if key == "giver_location":
                 loc_map = getattr(self, "_mod_quest_location_map", {})
                 val = loc_map.get(val, val)
+            # Booleans surface as the strings "True"/"False" in the
+            # editor UI. Persist them as actual JSON booleans so the
+            # runtime ``qdef.get("is_final_quest")`` truthiness check
+            # works.
+            if key == "is_final_quest":
+                val = (val == "True")
             quest[key] = val
 
         # ── Consolidate the world-unlock virtual fields ──
@@ -753,6 +774,16 @@ class ModuleQuestEditorMixin:
             "reward_gold": 0,
             "reward_items": [],
             "reward_world_unlocks": [],
+            # Mark this quest as the climax of the module. When the
+            # player turns it in to the quest giver, the game pops a
+            # special victory screen (see Game.trigger_victory) before
+            # letting them continue exploring or restart. Only one
+            # quest per module should carry the flag — if more than
+            # one is set, the first turned in wins.
+            "is_final_quest": False,
+            # Author-supplied epilogue shown on the victory screen.
+            # Falls back to a generic message when blank.
+            "victory_text": "",
             "steps": [],
         }
         self._mod_quest_list.append(new_quest)
