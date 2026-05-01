@@ -1375,9 +1375,10 @@
       "link_map": "dungeon:Orc Stronghold"
     },
     "30,8": {
-      "walkable": "inherit (yes)",
-      "linked": true,
-      "link_map": "dungeon:Crypt"
+      "walkable": "yes (override)",
+      "spawn_chance": "20",
+      "spawn_radius": "3",
+      "max_spawned": "2"
     },
     "1,12": {
       "walkable": "inherit (yes)",
