@@ -6,21 +6,21 @@ An Ultima III–inspired top-down, turn-based RPG built with Python and Pygame. 
 
 - Dungeons & Dragons inspired turn-based combat system
 - Quest system
-- Proceduraly generated dungeons and intentionally crafted adventures
+- Procedurally generated dungeons and intentionally crafted adventures
 - Race and class system
-- [1980's style Player's Manual](docs/manuals/players_guide.pdf), [Adventure Map](docs/manuals/overview_map.png), and [Cloth Map](docs/manuals/cloth_map.png))
+- [1980s-style Player's Manual](docs/manuals/players_guide.pdf), [Adventure Map](docs/manuals/overview_map.png), and [Cloth Map](docs/manuals/cloth_map.png)
 - Dungeon Master mode that allows players to craft their own adventures
 
 ---
 
 <table>
 <tr>
-<td align="center"><img src="docs/blog/screens_v1.0.0/overview_map.png" width="400" alt="Title Screen"></td>
-<td align="center"><img src="docs/blog/screens_v1.0.0/town.png" width="400" alt="Overworld Exploration"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/overview_map.png" width="400" alt="Overworld map"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/town.png" width="400" alt="Town exploration"></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/blog/screens_v1.0.0/combat.png" width="400" alt="Title Screen"></td>
-<td align="center"><img src="docs/blog/screens_v1.0.0/dungeon.png" width="400" alt="Overworld Exploration"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/combat.png" width="400" alt="Turn-based combat"></td>
+<td align="center"><img src="docs/blog/screens_v1.0.0/dungeon.png" width="400" alt="Dungeon delving"></td>
 </tr>
 </table>
 
@@ -49,7 +49,7 @@ A pre-built macOS version is available on the [Releases](../../releases) page. T
 
 ## How to Build Realm of Shadow in Python
 
-If you want to run this game on Windows or Linux, or if you just want to tinker with the code you will need to clone this repository and use Python. 
+If you want to run this game on Windows or Linux, or if you just want to tinker with the code, you'll need to clone this repository and use Python.
 
 ### What You Need
 
