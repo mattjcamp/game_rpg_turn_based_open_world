@@ -18,6 +18,8 @@ interface MonsterSpec {
   damage: { dice: number; sides: number; bonus: number };
   dexMod: number;
   color: [number, number, number];
+  /** Tiles per turn. Mirrors `move_range` in the Python data files. */
+  baseMoveRange: number;
 }
 
 const SPECS: Record<string, MonsterSpec> = {
@@ -29,6 +31,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 4, bonus: 0 },
     dexMod: 2,
     color: [140, 100, 80],
+    baseMoveRange: 5,
   },
   Goblin: {
     name: "Goblin",
@@ -38,6 +41,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 4, bonus: 0 },
     dexMod: 2,
     color: [100, 160, 60],
+    baseMoveRange: 4,
   },
   Skeleton: {
     name: "Skeleton",
@@ -47,6 +51,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 6, bonus: 1 },
     dexMod: 1,
     color: [220, 220, 200],
+    baseMoveRange: 3,
   },
   Orc: {
     name: "Orc",
@@ -56,6 +61,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 8, bonus: 2 },
     dexMod: 0,
     color: [80, 130, 70],
+    baseMoveRange: 3,
   },
 };
 
@@ -72,6 +78,8 @@ export function makeMonster(name: keyof typeof SPECS, idSuffix = ""): Combatant 
     damage: spec.damage,
     dexMod: spec.dexMod,
     color: spec.color,
+    baseMoveRange: spec.baseMoveRange,
+    position: { col: 0, row: 0 }, // overwritten by Combat
   };
 }
 

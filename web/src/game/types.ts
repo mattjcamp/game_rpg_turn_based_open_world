@@ -27,6 +27,18 @@ export interface Combatant {
   dexMod: number;
   /** Visual hint for the placeholder portrait colour (RGB 0-255). */
   color: [number, number, number];
+  /**
+   * Tile movement budget per turn. Refreshed at the start of every turn
+   * by the Combat controller. For party members this comes from the
+   * class template's `range`; for monsters from `move_range`.
+   */
+  baseMoveRange: number;
+  /**
+   * Position on the arena grid. Initial value is irrelevant — the
+   * Combat constructor lays out party and enemies into starting
+   * formations and overwrites whatever the caller passed.
+   */
+  position: { col: number; row: number };
 }
 
 /**

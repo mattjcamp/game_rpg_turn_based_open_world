@@ -11,17 +11,27 @@ and continues to live at the repo root.
   rendering so it can be unit-tested independently.
 - Reuse existing JSON game data (monsters, items, encounters) wherever possible.
 
-## First slice
+## Current slice — tactical grid combat
 
-A single turn-based combat encounter (JRPG-style, party vs enemies) that
-exercises the ported `combat_engine` math:
+A single turn-based encounter on the same 18×21 arena the Pygame version
+uses, with positions, movement points, and bump-to-attack:
 
-- Initiative rolls from `combat_engine.rollInitiative`
-- Attack resolution from `combat_engine.rollAttack` (nat-1 / nat-20 rules)
-- Damage from `combat_engine.rollDamage` (crit doubles dice, not bonus)
+- Initiative, attack, and damage all flow through the ported
+  `combat_engine` (nat-1 / nat-20 rules; crit doubles dice, not bonus).
+- Each turn refills the active actor's `movePoints` from their
+  `baseMoveRange`. Each cardinal step costs one point.
+- Walking into an adjacent enemy is a melee attack; the bump consumes
+  ALL remaining movement (turn ends after the attack resolves).
+- Monster AI: attack adjacent party members (focus-fire the lowest HP),
+  otherwise step toward the nearest with a Chebyshev-distance heuristic.
 
-The Phaser combat scene reads from a pure-TypeScript `Combat` controller; the
-controller has no Phaser dependency and is fully tested under Vitest.
+Input: WASD or arrow keys to move, tap an adjacent tile to move there
+(works on touch devices), space or the End-Turn button to skip remaining
+moves. Movement, bump, miss/hit/crit, victory/defeat are all animated.
+
+The Phaser combat scene reads from a pure-TypeScript `Combat` controller;
+the controller has no Phaser dependency and is fully tested under Vitest
+(41 tests at last count — engine math + tactical rules).
 
 ## Run locally
 
@@ -48,10 +58,11 @@ web/
 │       ├── rng.ts                  # seedable RNG (mulberry32) for tests
 │       ├── types.ts                # Combatant / AttackResult types
 │       ├── combat/
+│       │   ├── Arena.ts            # grid constants, walls, distances
 │       │   ├── engine.ts           # port of src/combat_engine.py
 │       │   ├── engine.test.ts      # port of tests/test_combat_engine.py
-│       │   ├── Combat.ts           # higher-level turn controller
-│       │   └── Combat.test.ts      # turn-flow tests
+│       │   ├── Combat.ts           # tactical turn controller
+│       │   └── Combat.test.ts      # engine + tactical tests
 │       ├── data/
 │       │   ├── monsters.ts         # small inline sample
 │       │   └── fighters.ts         # 4 sample party members

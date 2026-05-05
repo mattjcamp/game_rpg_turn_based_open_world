@@ -21,6 +21,8 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 8, bonus: 3 }, // longsword + STR
       dexMod: 1,
       color: [180, 60, 60], // ember red
+      baseMoveRange: 4,
+      position: { col: 0, row: 0 }, // overwritten by Combat
     },
     {
       id: "thora",
@@ -33,6 +35,8 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 12, bonus: 4 }, // greataxe + STR
       dexMod: 0,
       color: [200, 130, 60], // amber
+      baseMoveRange: 3,
+      position: { col: 0, row: 0 },
     },
     {
       id: "syl",
@@ -45,6 +49,8 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 8, bonus: 3 }, // longbow + DEX
       dexMod: 3,
       color: [80, 160, 100], // forest green
+      baseMoveRange: 5,
+      position: { col: 0, row: 0 },
     },
     {
       id: "miren",
@@ -57,6 +63,8 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 6, bonus: 2 }, // staff or fire bolt
       dexMod: 1,
       color: [120, 100, 200], // arcane violet
+      baseMoveRange: 4,
+      position: { col: 0, row: 0 },
     },
   ];
 }
