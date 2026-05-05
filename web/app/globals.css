@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  background: #0f0f1a;
+  color: #f6efd6;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+}
+
+/* Phaser canvas should fill its container without overflowing on mobile. */
+#phaser-container canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}

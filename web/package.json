@@ -1,0 +1,32 @@
+{
+  "name": "realm-of-shadow-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript / Next.js / Phaser port of the Realm of Shadow RPG. Experimental.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "next": "14.2.18",
+    "phaser": "3.80.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.19",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.18",
+    "postcss": "8.4.39",
+    "tailwindcss": "3.4.4",
+    "typescript": "5.5.3",
+    "vitest": "1.6.0"
+  }
+}
