@@ -120,8 +120,15 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private installCamera(): void {
+    // Bounds extended upward by HUD_HEIGHT so the camera always has
+    // headroom to scroll the world strictly below the HUD bar. Without
+    // this, when the player stands at row 0 the camera clamps scrollY
+    // to 0 and the top tiles render under the HUD.
     this.cameras.main.setBounds(
-      0, 0, this.tileMap.width * TILE, this.tileMap.height * TILE
+      0,
+      -HUD_HEIGHT,
+      this.tileMap.width * TILE,
+      this.tileMap.height * TILE + HUD_HEIGHT
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
   }

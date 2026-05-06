@@ -42,6 +42,13 @@ export interface Town {
   npcs: NpcDef[];
   /** Per-tile properties dict, same shape as overworld TileMap. */
   tileProperties: Record<string, unknown>;
+  /**
+   * Building interiors that live inside this town. Each interior is
+   * structurally identical to a Town (same tile dict, npcs, tile_properties)
+   * — we just expose them under their parent so navigation can be
+   * resolved by a "Town/Interior" path.
+   */
+  interiors: Town[];
 }
 
 interface RawNpc {
@@ -64,6 +71,7 @@ interface RawTown {
   entry_row?: number;
   npcs?: RawNpc[];
   tile_properties?: Record<string, unknown>;
+  interiors?: RawTown[];
 }
 
 /**
@@ -142,6 +150,11 @@ export function townFromRaw(raw: RawTown): Town {
     godName: n.god_name,
     wanderRange: n.wander_range,
   }));
+  // Interiors are structurally identical to towns — recurse with the
+  // same parser and treat them as nested Town objects. We don't allow
+  // interiors-of-interiors today (none in the data); a too-deep nest
+  // would just be parsed but unreachable via the path resolver.
+  const interiors: Town[] = (raw.interiors ?? []).map(townFromRaw);
   return {
     name: raw.name ?? "Unknown",
     width: w,
@@ -150,6 +163,7 @@ export function townFromRaw(raw: RawTown): Town {
     entry: { col: raw.entry_col ?? 0, row: raw.entry_row ?? 0 },
     npcs,
     tileProperties: (raw.tile_properties ?? {}) as Record<string, unknown>,
+    interiors,
   };
 }
 
@@ -176,6 +190,47 @@ export async function loadTowns(url = "/data/towns.json"): Promise<Town[]> {
 
 export function getTownByName(towns: Town[], name: string): Town | null {
   return towns.find((t) => t.name === name) ?? null;
+}
+
+/**
+ * Find a building interior inside a named parent town.
+ *
+ * Path syntax: `"<TownName>/<InteriorName>"`. Both the town and the
+ * interior are looked up by exact name match.
+ */
+export function getInteriorByPath(towns: Town[], path: string): Town | null {
+  const idx = path.indexOf("/");
+  if (idx <= 0) return null;
+  const townName = path.slice(0, idx);
+  const interiorName = path.slice(idx + 1);
+  const town = getTownByName(towns, townName);
+  if (!town) return null;
+  return town.interiors.find((i) => i.name === interiorName) ?? null;
+}
+
+/**
+ * Resolve either a bare town name or a "Town/Interior" path to the
+ * matching map. This is the single entry point scenes should use when
+ * they receive a `mapPath` from a tile link — the caller doesn't need
+ * to know whether it's a town or an interior.
+ */
+export function resolveTownOrInterior(towns: Town[], path: string): Town | null {
+  if (path.includes("/")) return getInteriorByPath(towns, path);
+  return getTownByName(towns, path);
+}
+
+/**
+ * Returns the parent town's name for a "Town/Interior" path, or null
+ * for a bare town name (which has no parent).
+ *
+ * Useful for scenes that need to know which town to return to from an
+ * interior — interior exits link back via `town:<TownName>` already,
+ * so this is mostly a fallback for cases where the interior data is
+ * missing that link.
+ */
+export function parentTownName(path: string): string | null {
+  const idx = path.indexOf("/");
+  return idx > 0 ? path.slice(0, idx) : null;
 }
 
 /** Re-export the link type so scenes don't need to import from TileMap. */

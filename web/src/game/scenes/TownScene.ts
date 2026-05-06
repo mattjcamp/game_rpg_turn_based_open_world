@@ -1,35 +1,49 @@
 /**
- * Town interior Phaser scene.
+ * Town & interior Phaser scene.
  *
- * Reads a named town out of `data/towns.json`, renders its tile grid,
- * places the party and the town's NPCs, supports WASD/tap movement,
- * tap-on-NPC opens a dialog box, and stepping on an "overworld"-linked
- * tile fades back to OverworldScene with the linked return position.
+ * Reads either a top-level town or a "Town/Interior" building from
+ * `data/towns.json`, renders its tile grid, places the party and the
+ * map's NPCs, supports WASD/tap movement, tap-on-NPC opens a dialog
+ * box, and stepping on a linked tile fades to the next scene.
  *
- * Rendering note: town tiles are drawn as coloured rectangles for now
- * (each tile_def has a colour and walkability from `tile_defs.json`).
- * Pixel-perfect town interior art is a future slice — the gameplay
- * loop here doesn't need it.
+ * Three link kinds are honoured on exit:
+ *   - "overworld"  → OverworldScene (return to world map)
+ *   - "town"       → TownScene with the named town
+ *   - "interior"   → TownScene with a "Town/Interior" path
+ *
+ * Rendering note: town tiles are drawn as either sprites (when a
+ * tile_def has a `sprite`) or coloured rectangles. Pixel-perfect
+ * interior art is a future slice — the gameplay loop here doesn't
+ * need it.
  *
  * Init data:
  *   { townName, entryCol, entryRow, returnCol, returnRow }
- *     - townName: string key into towns.json
- *     - entryCol/entryRow: where to drop the player (from the overworld
+ *     - townName: town name OR "Town/Interior" path into towns.json.
+ *       The field is named `townName` for backwards compatibility with
+ *       OverworldScene; treat it as a generic mapPath.
+ *     - entryCol/entryRow: where to drop the player (from the source
  *       tile's link_x/link_y)
- *     - returnCol/returnRow: where to put the player on the overworld
- *       when they leave (typically the overworld tile they entered from)
+ *     - returnCol/returnRow: where to put the player on the *previous*
+ *       map when they leave through an "overworld"/"town" link without
+ *       its own link_x/link_y (rare — the editor usually sets them).
  */
 
 import Phaser from "phaser";
 import {
   loadTowns,
-  getTownByName,
+  resolveTownOrInterior,
   tileMapForTown,
   type Town,
   type NpcDef,
 } from "../world/Towns";
 import { TileMap } from "../world/TileMap";
-import { tileDef, loadTileDefs, PLAYER_SPRITE } from "../world/Tiles";
+import {
+  tileDef,
+  loadTileDefs,
+  PLAYER_SPRITE,
+  spriteManifest,
+  tileSpriteKey,
+} from "../world/Tiles";
 import { gameState } from "../state";
 
 const TILE = 32;
@@ -89,7 +103,11 @@ export class TownScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Reuse already-cached textures; load anything new.
+    // Tile sprites — overworld + town interior, registered in Tiles.ts.
+    for (const { key, path } of spriteManifest()) {
+      this.load.image(key, path);
+    }
+    // Player avatar (also via the manifest, but explicit for clarity).
     this.load.image(PLAYER_SPRITE, PLAYER_SPRITE);
     // We don't yet know which NPC sprites the chosen town uses, so
     // preload the full character set we ship. Phaser caches by key —
@@ -118,7 +136,10 @@ export class TownScene extends Phaser.Scene {
       // town-only tile ids.
       await loadTileDefs();
       const towns = await loadTowns();
-      const found = getTownByName(towns, this.townName);
+      // resolveTownOrInterior accepts both bare town names ("Plainstown")
+      // and "Town/Interior" paths ("Plainstown/General Shop Interior")
+      // so the same scene class handles every interior map.
+      const found = resolveTownOrInterior(towns, this.townName);
       if (!found) {
         this.add.text(
           20, 20,
@@ -159,15 +180,24 @@ export class TownScene extends Phaser.Scene {
   // ── Static rendering ─────────────────────────────────────────────
 
   private drawMap(): void {
+    // 25×25 = 625 tiles for Plainstown. Phaser handles this load fine
+    // as a one-time scene-create cost. The camera culls off-screen
+    // images automatically.
     for (let row = 0; row < this.town.height; row++) {
       for (let col = 0; col < this.town.width; col++) {
         const id = this.tileMap.getTile(col, row);
-        const def = tileDef(id);
-        const colorHex = Phaser.Display.Color.GetColor(...def.color);
-        this.add
-          .rectangle(col * TILE, row * TILE, TILE, TILE, colorHex)
-          .setOrigin(0)
-          .setStrokeStyle(1, 0x000000, 0.15);
+        const x = col * TILE;
+        const y = row * TILE;
+        const key = tileSpriteKey(id);
+        if (key && this.textures.exists(key)) {
+          this.add.image(x, y, key).setOrigin(0);
+        } else {
+          // Fallback: coloured rectangle for tile ids we don't ship a
+          // sprite for. This still happens for void / unrecognised ids.
+          const def = tileDef(id);
+          const colorHex = Phaser.Display.Color.GetColor(...def.color);
+          this.add.rectangle(x, y, TILE, TILE, colorHex).setOrigin(0);
+        }
       }
     }
   }
@@ -252,8 +282,16 @@ export class TownScene extends Phaser.Scene {
   }
 
   private installCamera(): void {
+    // Bounds extended upward by HUD_HEIGHT so the camera always has
+    // headroom to scroll the world strictly below the HUD bar. Without
+    // this, when the player stands at row 0 the camera clamps scrollY
+    // to 0 and the top tiles render under the HUD (and the player
+    // marker disappears behind party HP text).
     this.cameras.main.setBounds(
-      0, 0, this.town.width * TILE, this.town.height * TILE
+      0,
+      -HUD_HEIGHT,
+      this.town.width * TILE,
+      this.town.height * TILE + HUD_HEIGHT
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
   }
@@ -340,21 +378,46 @@ export class TownScene extends Phaser.Scene {
 
   private checkExit(col: number, row: number): void {
     const link = this.tileMap.getTileLink(col, row);
-    if (!link || link.kind !== "overworld") return;
-    // Use the link's link_x/link_y if present, else the return coords
-    // we were handed when the scene was launched.
-    const back = {
-      col: link.x ?? this.returnCol,
-      row: link.y ?? this.returnRow,
-    };
-    gameState.playerPos = back;
-    // Mark the overworld trigger consumed so re-entering doesn't loop.
-    // (Towns don't fight you, but this keeps the consumed-triggers
-    // model consistent if we add re-entry rules later.)
-    this.cameras.main.fadeOut(220, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => {
-      this.scene.start("OverworldScene");
-    });
+    if (!link) return;
+
+    if (link.kind === "overworld") {
+      // Use the link's link_x/link_y if present, else the return coords
+      // we were handed when the scene was launched.
+      const back = {
+        col: link.x ?? this.returnCol,
+        row: link.y ?? this.returnRow,
+      };
+      gameState.playerPos = back;
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.scene.start("OverworldScene");
+      });
+      return;
+    }
+
+    if (link.kind === "town" || link.kind === "interior") {
+      // For both link kinds, we re-enter TownScene with the new map
+      // path. Interior paths are stored as "Town/Building"; town links
+      // are bare names. The link's link_x/link_y is where to spawn
+      // inside the destination map (the editor sets this to the door
+      // tile).
+      //
+      // Return coords = the tile we're leaving on. If the player walks
+      // back through the same door we'll land where we came from.
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.scene.start("TownScene", {
+          townName: link.name,
+          entryCol: link.x ?? 0,
+          entryRow: link.y ?? 0,
+          returnCol: col,
+          returnRow: row,
+        });
+      });
+      return;
+    }
+    // Other link kinds (dungeon, etc) are not yet implemented — fall
+    // through silently and let the player keep walking.
   }
 
   // ── Dialog ───────────────────────────────────────────────────────

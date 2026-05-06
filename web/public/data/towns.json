@@ -3465,7 +3465,25 @@
             "walkable": "inherit (no)",
             "light_source": true
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Brennan",
+            "npc_type": "shopkeep",
+            "col": 5,
+            "row": 2,
+            "dialogue": [
+              "Welcome to the General Stores. Coin or barter, both are good with me.",
+              "Times are uneasy \u2014 folk buy more rope and lamp oil than they used to.",
+              "If you're heading west into the wilds, take twice what you think you need.",
+              "Safe travels, friend."
+            ],
+            "shop_type": "general",
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/alchemist.png"
+          }
+        ]
       },
       {
         "name": "Tunnel Short",
@@ -4972,7 +4990,25 @@
             "light_source": true,
             "light_range": "2"
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Brother Halen",
+            "npc_type": "priest",
+            "col": 8,
+            "row": 7,
+            "dialogue": [
+              "Peace upon you, traveller. The shrine is open to all who walk in faith.",
+              "We tend the lamp here as our forebears did, against the day the worm wakes.",
+              "If you carry wounds of body or spirit, lay them down a moment.",
+              "Walk in the light, friend."
+            ],
+            "shop_type": "general",
+            "god_name": "Terran",
+            "wander_range": 3,
+            "sprite": "src/assets/game/characters/cleric.png"
+          }
+        ]
       },
       {
         "name": "Tunnel Long",
@@ -5879,7 +5915,24 @@
             "item": "Torch",
             "light_source": true
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Old Vesper",
+            "npc_type": "elder",
+            "col": 10,
+            "row": 10,
+            "dialogue": [
+              "Few find their way this far in. Sit, if you like \u2014 the stone is colder than the company.",
+              "I've been reading the marks on these walls for thirty years. They were old before my grandfather's grandfather.",
+              "The worm is in them. Coiled. Waiting. The wise thing is preparation, not panic.",
+              "Go well, and watch the shadows where the light bends."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/illusionist.png"
+          }
+        ]
       },
       {
         "name": "Inside House",
@@ -6191,7 +6244,22 @@
             "light_source": true
           }
         },
-        "npcs": []
+        "npcs": [
+          {
+            "name": "Mara",
+            "npc_type": "villager",
+            "col": 4,
+            "row": 3,
+            "dialogue": [
+              "Oh \u2014 you startled me. We don't get many strangers walking right in.",
+              "My husband works the eastern fields. He says the soil sours a little more each season.",
+              "Stay if you like. The kettle's still warm."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/cleric.png"
+          }
+        ]
       },
       {
         "name": "Inside House 2",
@@ -6485,7 +6553,23 @@
             "walkable": "inherit (no)",
             "light_source": true
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Tomas",
+            "npc_type": "villager",
+            "col": 4,
+            "row": 3,
+            "dialogue": [
+              "Heard you came in from the road. Anything moving out there?",
+              "Children won't sleep some nights \u2014 they say a great worm circles the hills in their dreams.",
+              "Maybe it's just talk. Maybe it isn't."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/paladin.png"
+          }
+        ]
       },
       {
         "name": "Inside House 3",
@@ -6785,7 +6869,23 @@
             "effect": "fire",
             "light_source": true
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Senna",
+            "npc_type": "villager",
+            "col": 4,
+            "row": 3,
+            "dialogue": [
+              "If you're a tracker, I'd pay coin for word of my brother \u2014 went north a fortnight ago.",
+              "He's a stubborn man. Carries a notched blade and a green cloak.",
+              "Just bring word. Alive or otherwise. I need to know."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/ranger.png"
+          }
+        ]
       }
     ]
   },
@@ -7713,7 +7813,23 @@
             "link_x": "6",
             "link_y": "3"
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Old Pell",
+            "npc_type": "villager",
+            "col": 13,
+            "row": 5,
+            "dialogue": [
+              "Hush \u2014 close the door behind you, the wind off the dunes carries grit.",
+              "I've lived in Shanty Town all my life. Wasn't always this dry.",
+              "Used to be the river ran clean through here. Now we drink what the well coughs up."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/wizard.png"
+          }
+        ]
       },
       {
         "name": "House 2",
@@ -7814,7 +7930,23 @@
             "link_x": "7",
             "link_y": "12"
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Wynn",
+            "npc_type": "villager",
+            "col": 13,
+            "row": 5,
+            "dialogue": [
+              "Mind the floor \u2014 board's loose by the window.",
+              "If you're heading deeper, mind the gravesoil paths even more. Things move there at dusk.",
+              "The Elder will want a word with you before you go. She always does."
+            ],
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/illusionist.png"
+          }
+        ]
       }
     ]
   },
@@ -11267,7 +11399,25 @@
             "link_y": "3",
             "link_map": "town:Seat of the Realm"
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Madala",
+            "npc_type": "shopkeep",
+            "col": 5,
+            "row": 2,
+            "dialogue": [
+              "Welcome to the Crown General Stores \u2014 finest goods this side of the realm.",
+              "Provisions, rope, lanterns, parchment \u2014 if you can name it, I likely have it.",
+              "Royal coin is preferred. Other coin is accepted, with a small surcharge.",
+              "Walk on, and walk well."
+            ],
+            "shop_type": "general",
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/alchemist.png"
+          }
+        ]
       },
       {
         "name": "Weapons Shop",
@@ -11488,7 +11638,25 @@
             "link_x": "19",
             "link_y": "3"
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Borric Ironhand",
+            "npc_type": "shopkeep",
+            "col": 4,
+            "row": 2,
+            "dialogue": [
+              "Pick a blade \u2014 they're all sharper than your wits, no offence.",
+              "Steel from the northern smelters, finished here under Crown standard.",
+              "If a blade breaks in your hand within a moon, bring it back. I'll take it personally.",
+              "Mind the edges."
+            ],
+            "shop_type": "weapons",
+            "god_name": "The Divine",
+            "wander_range": 2,
+            "sprite": "src/assets/game/characters/fighter.png"
+          }
+        ]
       },
       {
         "name": "Shrine",
@@ -12567,7 +12735,25 @@
             "link_x": "12",
             "link_y": "11"
           }
-        }
+        },
+        "npcs": [
+          {
+            "name": "Sister Iona",
+            "npc_type": "priest",
+            "col": 7,
+            "row": 8,
+            "dialogue": [
+              "The light keeps watch over even the Crown City \u2014 the lamps here have not gone dark in a hundred years.",
+              "Speak your trouble, if you carry one. The shrine listens better than most courts.",
+              "We mend what can be mended. The rest, we carry together.",
+              "Go in peace, friend."
+            ],
+            "shop_type": "general",
+            "god_name": "Terran",
+            "wander_range": 3,
+            "sprite": "src/assets/game/characters/cleric.png"
+          }
+        ]
       }
     ]
   }

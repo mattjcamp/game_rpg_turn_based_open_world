@@ -9,6 +9,9 @@ import {
   townFromRaw,
   tileMapForTown,
   getTownByName,
+  getInteriorByPath,
+  resolveTownOrInterior,
+  parentTownName,
 } from "./Towns";
 
 describe("normalizeSpritePath", () => {
@@ -158,5 +161,92 @@ describe("getTownByName", () => {
     ];
     expect(getTownByName(towns, "Plainstown")?.name).toBe("Plainstown");
     expect(getTownByName(towns, "Nowhere")).toBeNull();
+  });
+});
+
+describe("interior parsing & resolution", () => {
+  // Mirrors the real towns.json shape: a town with a nested interiors[]
+  // whose entries are full Town payloads.
+  const raw = {
+    name: "Plainstown",
+    width: 4,
+    height: 4,
+    tiles: { "0,0": { tile_id: 50 } },
+    interiors: [
+      {
+        name: "General Shop Interior",
+        width: 4,
+        height: 4,
+        tiles: { "0,0": { tile_id: 49 } },
+        entry_col: 2,
+        entry_row: 1,
+        npcs: [
+          {
+            name: "Brennan",
+            npc_type: "shopkeep",
+            sprite: "src/assets/game/characters/alchemist.png",
+            col: 2,
+            row: 2,
+            dialogue: ["Welcome."],
+          },
+        ],
+      },
+      {
+        name: "Inside House",
+        width: 4,
+        height: 4,
+        tiles: { "0,0": { tile_id: 49 } },
+      },
+    ],
+  };
+
+  it("parses interiors[] into a recursive Town tree", () => {
+    const t = townFromRaw(raw);
+    expect(t.interiors).toHaveLength(2);
+    expect(t.interiors[0].name).toBe("General Shop Interior");
+    // Recursive parse means NPC sprite paths are normalised inside
+    // interiors too.
+    expect(t.interiors[0].npcs[0].sprite).toBe(
+      "/assets/characters/alchemist.png"
+    );
+    expect(t.interiors[0].entry).toEqual({ col: 2, row: 1 });
+  });
+
+  it("defaults the interiors array to empty when missing", () => {
+    const t = townFromRaw({
+      name: "T",
+      width: 1,
+      height: 1,
+      tiles: {},
+    });
+    expect(t.interiors).toEqual([]);
+  });
+
+  it("getInteriorByPath finds an interior by 'Town/Interior' path", () => {
+    const towns = [townFromRaw(raw)];
+    const inn = getInteriorByPath(towns, "Plainstown/Inside House");
+    expect(inn?.name).toBe("Inside House");
+  });
+
+  it("getInteriorByPath returns null for unknown town or interior", () => {
+    const towns = [townFromRaw(raw)];
+    expect(getInteriorByPath(towns, "Nowhere/Anything")).toBeNull();
+    expect(getInteriorByPath(towns, "Plainstown/Nope")).toBeNull();
+    // Missing slash isn't an interior path.
+    expect(getInteriorByPath(towns, "Plainstown")).toBeNull();
+  });
+
+  it("resolveTownOrInterior dispatches based on the slash", () => {
+    const towns = [townFromRaw(raw)];
+    expect(resolveTownOrInterior(towns, "Plainstown")?.name).toBe("Plainstown");
+    expect(
+      resolveTownOrInterior(towns, "Plainstown/General Shop Interior")?.name
+    ).toBe("General Shop Interior");
+    expect(resolveTownOrInterior(towns, "Missing")).toBeNull();
+  });
+
+  it("parentTownName extracts the town segment from interior paths", () => {
+    expect(parentTownName("Plainstown/General Shop Interior")).toBe("Plainstown");
+    expect(parentTownName("Plainstown")).toBeNull();
   });
 });

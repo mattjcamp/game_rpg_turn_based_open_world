@@ -33,6 +33,26 @@ export const TILE_ENCOUNTER = 69;
 export const TILE_FOREST_ARCHWAY_UP = 77;
 export const TILE_FOREST_ARCHWAY_DOWN = 78;
 
+// ── Town interior tiles ────────────────────────────────────────
+// (subset of `src/settings.py` TILE_DEFS keyed by their id)
+export const TILE_DOOR = 13;             // walkable
+export const TILE_DFLOOR = 20;           // dungeon stone floor — also used by Seat of the Realm
+export const TILE_BRICK = 37;            // red brick wall — blocked
+export const TILE_SHRINE = 45;           // walkable shrine
+export const TILE_PATH_FLOOR = 46;       // alias of overworld path
+export const TILE_SAND_FLOOR = 47;       // alias of overworld sand
+export const TILE_FLOOR_GRAY = 48;       // walkable interior floor
+export const TILE_BRICK_BROWN = 49;      // brown brick wall — blocked
+export const TILE_GRASS_PLAINS = 50;     // walkable grass variant
+export const TILE_BRICK_LIGHTER = 51;    // lighter brick wall — blocked
+export const TILE_SHOP_SIGN = 52;        // store sign — blocked
+export const TILE_TOWN_WATER = 53;       // water variant — blocked
+export const TILE_SCRUB = 54;            // scrubland — walkable
+export const TILE_TOWN_GATE = 56;        // gate — walkable
+export const TILE_SHOP_ARMOR = 60;       // armoury sign — blocked
+export const TILE_FLOOR_LIGHT = 63;      // walkable interior floor (lighter)
+export const TILE_LIGHT_SAND = 70;       // walkable sand variant
+
 export interface TileDef {
   /** Fallback color when no sprite is loaded for this tile id. */
   color: [number, number, number];
@@ -78,6 +98,42 @@ const DEFS: Record<number, TileDef> = {
   [TILE_ENCOUNTER]: { color: [180, 60, 140], walkable: true,  name: "Encounter" },
   [TILE_FOREST_ARCHWAY_UP]:   { color: [80, 120, 60], walkable: true, name: "Forest Archway" },
   [TILE_FOREST_ARCHWAY_DOWN]: { color: [40, 55, 35],  walkable: true, name: "Forest Archway" },
+
+  // ── Town interior (covers all tiles used by the bundled towns) ─
+  [TILE_DOOR]:          { color: [120, 80, 40],   walkable: true,  name: "Door",
+                          sprite: "/assets/town/door.png" },
+  [TILE_DFLOOR]:        { color: [50, 45, 40],    walkable: true,  name: "Stone Floor",
+                          sprite: "/assets/dungeon/stone_floor.png" },
+  [TILE_BRICK]:         { color: [120, 60, 50],   walkable: false, name: "Brick",
+                          sprite: "/assets/town/brick_wall_red.png" },
+  [TILE_SHRINE]:        { color: [200, 180, 110], walkable: true,  name: "Shrine",
+                          sprite: "/assets/town/shrine_church.png" },
+  [TILE_PATH_FLOOR]:    { color: [160, 140, 100], walkable: true,  name: "Path",
+                          sprite: "/assets/terrain/path.png" },
+  [TILE_SAND_FLOOR]:    { color: [210, 190, 130], walkable: true,  name: "Sand",
+                          sprite: "/assets/terrain/sand.png" },
+  [TILE_FLOOR_GRAY]:    { color: [120, 110, 100], walkable: true,  name: "Floor",
+                          sprite: "/assets/town/floor_gray.png" },
+  [TILE_BRICK_BROWN]:   { color: [110, 80, 60],   walkable: false, name: "Brick Wall",
+                          sprite: "/assets/town/brick_wall_brown.png" },
+  [TILE_GRASS_PLAINS]:  { color: [70, 130, 60],   walkable: true,  name: "Grass",
+                          sprite: "/assets/town/grass_plains.png" },
+  [TILE_BRICK_LIGHTER]: { color: [150, 140, 130], walkable: false, name: "Wall",
+                          sprite: "/assets/town/wall_lighter.png" },
+  [TILE_SHOP_SIGN]:     { color: [180, 140, 80],  walkable: false, name: "Shop Sign",
+                          sprite: "/assets/town/shop_sign.png" },
+  [TILE_TOWN_WATER]:    { color: [30, 90, 180],   walkable: false, name: "Water",
+                          sprite: "/assets/terrain/water.png" },
+  [TILE_SCRUB]:         { color: [80, 110, 50],   walkable: true,  name: "Scrub",
+                          sprite: "/assets/town/brush_scrubland.png" },
+  [TILE_TOWN_GATE]:     { color: [140, 100, 60],  walkable: true,  name: "Gate",
+                          sprite: "/assets/items/town_gate.png" },
+  [TILE_SHOP_ARMOR]:    { color: [180, 140, 80],  walkable: false, name: "Armoury",
+                          sprite: "/assets/town/shop_sign.png" },
+  [TILE_FLOOR_LIGHT]:   { color: [180, 160, 130], walkable: true,  name: "Floor",
+                          sprite: "/assets/town/floor_light.png" },
+  [TILE_LIGHT_SAND]:    { color: [220, 200, 150], walkable: true,  name: "Sand",
+                          sprite: "/assets/town/light_sand.png" },
 };
 
 /** Path to the player avatar sprite. */
