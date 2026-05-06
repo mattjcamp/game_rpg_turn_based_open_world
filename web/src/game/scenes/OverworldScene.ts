@@ -266,6 +266,9 @@ export class OverworldScene extends Phaser.Scene {
       for (const [key, delta] of Object.entries(map)) {
         k.on(`keydown-${key}`, () => this.tryStep(delta[0], delta[1]));
       }
+      // 'P' opens the party screen as an overlay. We pause this scene
+      // so its keyboard handlers don't fire while the overlay is up.
+      k.on("keydown-P", () => this.openParty());
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
@@ -370,6 +373,12 @@ export class OverworldScene extends Phaser.Scene {
         triggerKey: key,
       });
     });
+  }
+
+  private openParty(): void {
+    if (gameState.defeated) return;
+    this.scene.pause();
+    this.scene.launch("PartyScene", { from: "OverworldScene" });
   }
 
   private showDefeat(): void {

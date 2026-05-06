@@ -11,6 +11,7 @@ import Phaser from "phaser";
 import { CombatScene } from "./scenes/CombatScene";
 import { OverworldScene } from "./scenes/OverworldScene";
 import { TownScene } from "./scenes/TownScene";
+import { PartyScene } from "./scenes/PartyScene";
 
 export type StartScene = "OverworldScene" | "CombatScene";
 
@@ -18,9 +19,11 @@ export function startGame(parent: HTMLElement, startScene: StartScene = "Overwor
   // Phaser auto-starts the first scene in the array. Reorder so the
   // requested starting scene is first; all scenes stay registered so
   // cross-scene transitions (`this.scene.start(key, data)`) work.
+  // PartyScene is registered too so any active scene can `scene.launch`
+  // it as an overlay.
   const sceneOrder = startScene === "CombatScene"
-    ? [CombatScene, OverworldScene, TownScene]
-    : [OverworldScene, CombatScene, TownScene];
+    ? [CombatScene, OverworldScene, TownScene, PartyScene]
+    : [OverworldScene, CombatScene, TownScene, PartyScene];
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent,

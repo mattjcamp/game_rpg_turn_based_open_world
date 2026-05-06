@@ -15,10 +15,21 @@
 
 import type { Combatant } from "./types";
 import { makeSampleParty } from "./data/fighters";
+import type { Party } from "./world/Party";
 
 export interface GameState {
-  /** Persistent party — HP carries across encounters. */
+  /** Combat-layer party — slim Combatant[] used by CombatScene only.
+   *  HP changes here are written back through to `partyData` after
+   *  combat ends. Kept as a separate handle while the combat engine
+   *  runs against this narrower shape. */
   party: Combatant[];
+  /**
+   * Full Party payload from `/data/party.json` — roster, active
+   * indices, gold, shared inventory, party effects. Loaded lazily by
+   * the first scene that needs it (PartyScene) and held here so
+   * subsequent opens are instant and edits survive transitions.
+   */
+  partyData: Party | null;
   /** Where the player avatar stands on the overworld grid. */
   playerPos: { col: number; row: number };
   /** "col,row" of overworld tiles whose encounter has already been resolved. */
@@ -30,6 +41,7 @@ export interface GameState {
 function makeFreshState(): GameState {
   return {
     party: makeSampleParty(),
+    partyData: null,
     // The dragon overworld declares party_start { col: 11, row: 16 }.
     // OverworldScene will overwrite this from the loaded map's
     // party_start once it finishes loading; this default just keeps
@@ -45,6 +57,7 @@ export const gameState: GameState = makeFreshState();
 export function resetGameState(): void {
   const fresh = makeFreshState();
   gameState.party = fresh.party;
+  gameState.partyData = fresh.partyData;
   gameState.playerPos = fresh.playerPos;
   gameState.consumedTriggers = fresh.consumedTriggers;
   gameState.defeated = fresh.defeated;

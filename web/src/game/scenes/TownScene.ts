@@ -432,6 +432,7 @@ export class TownScene extends Phaser.Scene {
         k.on(`keydown-${key}`, () => this.tryStep(delta[0], delta[1]));
       }
       k.on("keydown-ESC", () => this.closeDialog());
+      k.on("keydown-P", () => this.openParty());
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
@@ -557,6 +558,14 @@ export class TownScene extends Phaser.Scene {
     }
     // Other link kinds (dungeon, etc) are not yet implemented — fall
     // through silently and let the player keep walking.
+  }
+
+  private openParty(): void {
+    // Don't open the party screen while a dialog is up — let the
+    // player finish the conversation first.
+    if (this.dialog) return;
+    this.scene.pause();
+    this.scene.launch("PartyScene", { from: "TownScene" });
   }
 
   // ── Dialog ───────────────────────────────────────────────────────
