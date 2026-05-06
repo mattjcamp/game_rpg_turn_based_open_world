@@ -43,7 +43,15 @@ import {
   PLAYER_SPRITE,
   spriteManifest,
   tileSpriteKey,
+  populateRuntimeDefs,
 } from "../world/Tiles";
+import {
+  collectLightSources,
+  brightnessAt,
+  mapIsDark,
+  type LightSource,
+} from "../world/Lighting";
+import { decorationFor } from "../world/Decorations";
 import { gameState } from "../state";
 
 const TILE = 32;
@@ -68,6 +76,14 @@ export class TownScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
   private hpSummary!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
+  /** Set of darkness rectangles drawn one per tile, indexed by `${col},${row}`. */
+  private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
+  /** Light sources collected once per scene from map + tile_defs.
+   *  Named `mapLights` to avoid colliding with Phaser.Scene's built-in
+   *  `lights: LightsManager`. */
+  private mapLights: LightSource[] = [];
+  /** Whether the current map renders with darkness — set by collectLightSources. */
+  private dark = false;
 
   // Init context
   private townName = "";
@@ -100,15 +116,38 @@ export class TownScene extends Phaser.Scene {
     this.busy = false;
     this.npcs = [];
     this.dialog = undefined;
+    this.darkness = new Map();
+    this.mapLights = [];
+    this.dark = false;
   }
 
   preload(): void {
-    // Tile sprites — overworld + town interior, registered in Tiles.ts.
+    this.textures.on("addtexture", (key: string) => {
+      const tex = this.textures.get(key);
+      if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    });
+
+    // Two-phase load: pull tile_defs.json via Phaser's loader, then
+    // enqueue every tile sprite declared in it once the JSON arrives.
+    // Phaser keeps preload going for any files added inside this
+    // listener, so create() only fires once the full sprite set
+    // (overworld + town + dungeon tiles) is in cache.
+    this.load.json("tile_defs", "/data/tile_defs.json");
+    this.load.once("filecomplete-json-tile_defs", () => {
+      const raw = this.cache.json.get("tile_defs");
+      if (raw) populateRuntimeDefs(raw);
+      for (const { key, path } of spriteManifest()) {
+        this.load.image(key, path);
+      }
+    });
+
+    // Hardcoded tile sprites + player marker can start loading now,
+    // they don't depend on the JSON.
     for (const { key, path } of spriteManifest()) {
       this.load.image(key, path);
     }
-    // Player avatar (also via the manifest, but explicit for clarity).
     this.load.image(PLAYER_SPRITE, PLAYER_SPRITE);
+
     // We don't yet know which NPC sprites the chosen town uses, so
     // preload the full character set we ship. Phaser caches by key —
     // duplicates are no-ops.
@@ -119,10 +158,6 @@ export class TownScene extends Phaser.Scene {
       const path = `/assets/characters/${f}.png`;
       this.load.image(path, path);
     }
-    this.textures.on("addtexture", (key: string) => {
-      const tex = this.textures.get(key);
-      if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
-    });
   }
 
   async create(): Promise<void> {
@@ -159,6 +194,8 @@ export class TownScene extends Phaser.Scene {
     }
 
     this.tileMap = tileMapForTown(this.town);
+    this.mapLights = collectLightSources(this.tileMap);
+    this.dark = mapIsDark(this.mapLights);
     this.drawMap();
     this.drawNpcs();
     this.drawPlayer();
@@ -166,6 +203,7 @@ export class TownScene extends Phaser.Scene {
     this.installCamera();
     this.installInput();
     this.refreshHud();
+    if (this.dark) this.refreshDarkness();
   }
 
   // ── Coordinate helpers ───────────────────────────────────────────
@@ -198,6 +236,64 @@ export class TownScene extends Phaser.Scene {
           const colorHex = Phaser.Display.Color.GetColor(...def.color);
           this.add.rectangle(x, y, TILE, TILE, colorHex).setOrigin(0);
         }
+      }
+    }
+    // Decoration glyphs (fire / fairy_light / item) drawn over their
+    // tile so authors can mark hearths, magical lights, and ground
+    // items in tile_properties without shipping a sprite per kind.
+    // Depth 7 puts them under the player but above tiles & NPCs.
+    for (const [key, entry] of Object.entries(this.tileMap.tileProperties)) {
+      const spec = decorationFor(entry);
+      if (!spec) continue;
+      const [c, r] = key.split(",").map((s) => parseInt(s, 10));
+      if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
+      this.add
+        .text(this.tileX(c), this.tileY(r), spec.glyph, {
+          fontFamily: "Georgia, serif",
+          fontSize: "20px",
+          color: spec.color,
+          stroke: spec.stroke ?? "#1a1a2e",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(7);
+    }
+
+    // Pre-create one darkness rectangle per cell at depth 9 so it
+    // sits above tiles + NPCs but below the player marker. Visibility
+    // alpha is set per-frame in refreshDarkness().
+    if (this.dark) {
+      for (let row = 0; row < this.town.height; row++) {
+        for (let col = 0; col < this.town.width; col++) {
+          const r = this.add
+            .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0.85)
+            .setOrigin(0)
+            .setDepth(9);
+          this.darkness.set(`${col},${row}`, r);
+        }
+      }
+    }
+  }
+
+  /**
+   * Update each darkness rectangle's alpha based on the brightness at
+   * its tile. Called every time the player moves so the party's light
+   * pool tracks them across the map.
+   */
+  private refreshDarkness(): void {
+    if (!this.dark) return;
+    const party = { col: this.playerCol, row: this.playerRow };
+    for (let row = 0; row < this.town.height; row++) {
+      for (let col = 0; col < this.town.width; col++) {
+        const rect = this.darkness.get(`${col},${row}`);
+        if (!rect) continue;
+        const b = brightnessAt(col, row, this.mapLights, party);
+        // Darkness alpha is the inverse of brightness, with a small
+        // ambient floor so even fully-lit tiles read as warm rather
+        // than 100% transparent. Cap at 0.92 so the player can still
+        // make out tile shapes in the gloom.
+        const alpha = Math.max(0, Math.min(0.92, (1 - b) * 0.92));
+        rect.setFillStyle(0x000000, alpha);
       }
     }
   }
@@ -371,6 +467,7 @@ export class TownScene extends Phaser.Scene {
       onComplete: () => {
         this.busy = false;
         this.refreshHud();
+        this.refreshDarkness();
         this.checkExit(nc, nr);
       },
     });

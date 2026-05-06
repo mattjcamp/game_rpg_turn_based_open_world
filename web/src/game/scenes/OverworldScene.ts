@@ -19,7 +19,15 @@ import {
   isEncounterTrigger,
   spriteManifest,
   tileSpriteKey,
+  populateRuntimeDefs,
 } from "../world/Tiles";
+import {
+  collectLightSources,
+  brightnessAt,
+  mapIsDark,
+  type LightSource,
+} from "../world/Lighting";
+import { decorationFor } from "../world/Decorations";
 import { gameState, triggerKey } from "../state";
 import type { Combatant } from "../types";
 
@@ -34,22 +42,42 @@ export class OverworldScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   private busy = false;
   private defeatOverlay?: Phaser.GameObjects.Text;
+  private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
+  /** Renamed from `lights` to avoid colliding with Phaser.Scene.lights. */
+  private mapLights: LightSource[] = [];
+  private dark = false;
 
   constructor() {
     super({ key: "OverworldScene" });
   }
 
   preload(): void {
-    // Preload every sprite the world / player needs. Phaser caches by
-    // key; if this scene re-enters the textures stay loaded.
-    for (const { key, path } of spriteManifest()) {
-      this.load.image(key, path);
-    }
     // Crisp pixels, no smoothing — these are 32×32 tile graphics.
     this.textures.on("addtexture", (key: string) => {
       const tex = this.textures.get(key);
       if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
+
+    // Two-phase load: tile_defs.json arrives first via Phaser's loader,
+    // then the listener adds every tile sprite that tile_defs declares.
+    // Phaser keeps the loader running while new files are queued during
+    // preload, so the scene's create() runs only after ALL tile sprites
+    // (hardcoded + runtime) have finished loading.
+    this.load.json("tile_defs", "/data/tile_defs.json");
+    this.load.once("filecomplete-json-tile_defs", () => {
+      const raw = this.cache.json.get("tile_defs");
+      if (raw) populateRuntimeDefs(raw);
+      // spriteManifest() now returns hardcoded + runtime tiles. Phaser
+      // dedupes by key, so no harm if a key was already queued.
+      for (const { key, path } of spriteManifest()) {
+        this.load.image(key, path);
+      }
+    });
+    // Also enqueue the hardcoded set immediately so the player marker
+    // and overworld basics start loading without waiting on JSON.
+    for (const { key, path } of spriteManifest()) {
+      this.load.image(key, path);
+    }
   }
 
   async create(): Promise<void> {
@@ -65,12 +93,15 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
+    this.mapLights = collectLightSources(this.tileMap);
+    this.dark = mapIsDark(this.mapLights);
     this.drawMap();
     this.drawPlayer();
     this.drawHud();
     this.installCamera();
     this.installInput();
     this.refreshHud();
+    if (this.dark) this.refreshDarkness();
 
     if (gameState.defeated) this.showDefeat();
   }
@@ -108,6 +139,49 @@ export class OverworldScene extends Phaser.Scene {
             })
             .setOrigin(0.5);
         }
+      }
+    }
+    // Decoration glyphs (rising_smoke at the dragon's lair, fairy
+    // lights along certain paths, etc.) drawn from tile_properties.
+    for (const [key, entry] of Object.entries(this.tileMap.tileProperties)) {
+      const spec = decorationFor(entry);
+      if (!spec) continue;
+      const [c, r] = key.split(",").map((s) => parseInt(s, 10));
+      if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
+      this.add
+        .text(c * TILE + TILE / 2, r * TILE + TILE / 2, spec.glyph, {
+          fontFamily: "Georgia, serif",
+          fontSize: "20px",
+          color: spec.color,
+          stroke: spec.stroke ?? "#1a1a2e",
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(7);
+    }
+    if (this.dark) {
+      for (let row = 0; row < this.tileMap.height; row++) {
+        for (let col = 0; col < this.tileMap.width; col++) {
+          const r = this.add
+            .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0.85)
+            .setOrigin(0)
+            .setDepth(9);
+          this.darkness.set(`${col},${row}`, r);
+        }
+      }
+    }
+  }
+
+  private refreshDarkness(): void {
+    if (!this.dark) return;
+    const party = gameState.playerPos;
+    for (let row = 0; row < this.tileMap.height; row++) {
+      for (let col = 0; col < this.tileMap.width; col++) {
+        const rect = this.darkness.get(`${col},${row}`);
+        if (!rect) continue;
+        const b = brightnessAt(col, row, this.mapLights, party);
+        const alpha = Math.max(0, Math.min(0.92, (1 - b) * 0.92));
+        rect.setFillStyle(0x000000, alpha);
       }
     }
   }
@@ -235,6 +309,7 @@ export class OverworldScene extends Phaser.Scene {
       onComplete: () => {
         this.busy = false;
         this.refreshHud();
+        this.refreshDarkness();
         // Town/dungeon links take priority over encounter triggers.
         // (In the dragon module they're on different tiles anyway.)
         if (this.checkLink(nc, nr)) return;

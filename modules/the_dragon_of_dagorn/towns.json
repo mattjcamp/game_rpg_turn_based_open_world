@@ -3183,6 +3183,46 @@
         "link_map": "interior:Plainstown/Shrine",
         "link_x": "8",
         "link_y": "13"
+      },
+      "4,5": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "5,5": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "6,5": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "7,5": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "8,5": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "4,6": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "5,6": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "6,6": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "7,6": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
+      },
+      "8,6": {
+        "walkable": "no (override)",
+        "_note": "shop roof \u2014 bridge sprite, not walkable"
       }
     },
     "_action_import": "Map assigned",

@@ -42,12 +42,28 @@ export interface TileLink {
   y?: number;
 }
 
+/**
+ * Per-cell property entry from the module editor. The named fields
+ * are the ones the engine reads directly; everything else is allowed
+ * through so authors can attach extra metadata (effects, items,
+ * shop_type, lighting hints, etc.) without us having to enumerate it
+ * here.
+ */
 interface TilePropEntry {
   walkable?: boolean | string;
   linked?: boolean;
   link_map?: string;
   link_x?: string | number;
   link_y?: string | number;
+  light_source?: boolean | string;
+  light_range?: string | number;
+  effect?: string;
+  item?: string;
+  shop_type?: string;
+  label?: string;
+  // Authors are free to add other keys; the lighting / decoration /
+  // future-feature code just type-narrows what it cares about.
+  [key: string]: unknown;
 }
 
 export class TileMap {
@@ -92,12 +108,21 @@ export class TileMap {
   /**
    * Walkability — per-tile override beats the tile-id default.
    *
-   * Overrides come in three flavours from the editor:
-   *   - boolean true / false
-   *   - string "yes (override)" / "no (override)" — force
-   *   - string "inherit (yes)" / "inherit (no)" — defer to base
+   * Authors store overrides on `tile_properties["<col>,<row>"].walkable`
+   * in any of the value forms the Python module editor produces:
    *
-   * Anything else falls back to the tile-id default from `Tiles.ts`.
+   *   - boolean true / false               — explicit force
+   *   - string "yes (override)" / "no (override)"  — explicit force
+   *   - string "True" / "False"            — Python-stringified bool
+   *   - string "inherit (yes)" / "inherit (no)" — defer to tile_def
+   *   - any other value                    — defer to tile_def
+   *
+   * The "inherit" forms exist so authors can attach OTHER properties
+   * to a tile (light_source, item, link_map…) without having to also
+   * pin down its walkability — the tile keeps its tile_defs default.
+   *
+   * Anything we don't recognise falls back to `tileDef(id).walkable`
+   * to stay consistent with the Python game's behaviour.
    */
   isWalkable(col: number, row: number): boolean {
     if (!this.inBounds(col, row)) return false;
@@ -106,9 +131,15 @@ export class TileMap {
     const props = this.tileProperties[`${col},${row}`];
     if (!props || props.walkable === undefined) return baseWalkable;
     const w = props.walkable;
-    if (w === true || w === "yes (override)") return true;
-    if (w === false || w === "no (override)") return false;
-    return baseWalkable; // covers "inherit (yes/no)" and unknown strings
+    if (w === true) return true;
+    if (w === false) return false;
+    if (typeof w === "string") {
+      const s = w.trim().toLowerCase();
+      if (s === "yes (override)" || s === "true") return true;
+      if (s === "no (override)" || s === "false") return false;
+      // "inherit (yes)" / "inherit (no)" / anything else defers
+    }
+    return baseWalkable;
   }
 
   /**

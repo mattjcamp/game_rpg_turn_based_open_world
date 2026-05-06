@@ -190,6 +190,26 @@ describe("TileMap — walkability overrides", () => {
     });
     expect(water.isWalkable(0, 0)).toBe(false); // water default is blocked
   });
+
+  it('Python-style stringified booleans "True"/"False" are recognised', () => {
+    // Some module-editor JSONs write walkable as the Python-stringified
+    // bool. Honour them as explicit overrides.
+    const trueOnWater = new TileMap(1, 1, [[TILE_WATER]], {
+      tileProperties: { "0,0": { walkable: "True" } },
+    });
+    expect(trueOnWater.isWalkable(0, 0)).toBe(true);
+    const falseOnGrass = new TileMap(1, 1, [[TILE_GRASS]], {
+      tileProperties: { "0,0": { walkable: "False" } },
+    });
+    expect(falseOnGrass.isWalkable(0, 0)).toBe(false);
+  });
+
+  it("override forms are case-insensitive and trim whitespace", () => {
+    const m = new TileMap(1, 1, [[TILE_GRASS]], {
+      tileProperties: { "0,0": { walkable: "  NO (OVERRIDE)  " } },
+    });
+    expect(m.isWalkable(0, 0)).toBe(false);
+  });
 });
 
 // ── Tile linking ─────────────────────────────────────────────────────
