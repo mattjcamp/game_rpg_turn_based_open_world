@@ -19,6 +19,9 @@ export interface DecoSpec {
 
 const EFFECTS: Record<string, DecoSpec> = {
   fire:         { glyph: "▲", color: "#ff8e3c", stroke: "#3a1100" },
+  // Wall torches — same warm flame palette as fire but a slimmer
+  // glyph since they sit on a wall rather than in a hearth.
+  torch:        { glyph: "i", color: "#ff8e3c", stroke: "#3a1100" },
   fairy_light:  { glyph: "✦", color: "#cfe7ff", stroke: "#1a2c4a" },
   rising_smoke: { glyph: "≋", color: "#a0a0a0", stroke: "#1a1a2e" },
 };

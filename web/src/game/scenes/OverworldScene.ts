@@ -334,8 +334,25 @@ export class OverworldScene extends Phaser.Scene {
       });
       return true;
     }
-    // Other link kinds (dungeon, building) aren't wired up yet — let
-    // the encounter check fire instead so play continues normally.
+    if (link.kind === "building") {
+      // Buildings live in their own JSON. We re-prefix the name with
+      // "building:" so TownScene knows to dispatch through the
+      // Buildings loader instead of the Towns one. `link.name` may be
+      // either "<Name>" (default to first space) or "<Name>:<Space>".
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.scene.start("TownScene", {
+          townName: `building:${link.name}`,
+          entryCol: link.x ?? 0,
+          entryRow: link.y ?? 0,
+          returnCol: col,
+          returnRow: row,
+        });
+      });
+      return true;
+    }
+    // Other link kinds (dungeon) aren't wired up yet — let the
+    // encounter check fire instead so play continues normally.
     return false;
   }
 

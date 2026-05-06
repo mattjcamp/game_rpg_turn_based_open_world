@@ -11,6 +11,7 @@ describe("decorationFor", () => {
 
   it("maps known effect strings to glyph specs", () => {
     expect(decorationFor({ effect: "fire" })?.glyph).toBe("▲");
+    expect(decorationFor({ effect: "torch" })?.glyph).toBe("i");
     expect(decorationFor({ effect: "fairy_light" })?.glyph).toBe("✦");
     expect(decorationFor({ effect: "rising_smoke" })?.glyph).toBe("≋");
   });

@@ -36,6 +36,11 @@ import {
   type Town,
   type NpcDef,
 } from "../world/Towns";
+import {
+  loadBuildings,
+  getBuildingSpace,
+  parseBuildingPath,
+} from "../world/Buildings";
 import { TileMap } from "../world/TileMap";
 import {
   tileDef,
@@ -170,15 +175,27 @@ export class TownScene extends Phaser.Scene {
       // building the map so isWalkable() resolves correctly for
       // town-only tile ids.
       await loadTileDefs();
-      const towns = await loadTowns();
-      // resolveTownOrInterior accepts both bare town names ("Plainstown")
-      // and "Town/Interior" paths ("Plainstown/General Shop Interior")
-      // so the same scene class handles every interior map.
-      const found = resolveTownOrInterior(towns, this.townName);
+      // Three accepted path forms, dispatched in this order:
+      //   "building:<name>[:<space>]" → buildings.json
+      //   "<town>/<interior>"          → towns.json (interior)
+      //   "<town>"                     → towns.json (top-level)
+      // Buildings live in their own JSON so we resolve them first.
+      const buildingRef = parseBuildingPath(this.townName);
+      let found: Town | null = null;
+      if (buildingRef) {
+        const buildings = await loadBuildings();
+        const ref = buildingRef.space
+          ? `${buildingRef.building}:${buildingRef.space}`
+          : buildingRef.building;
+        found = getBuildingSpace(buildings, ref);
+      } else {
+        const towns = await loadTowns();
+        found = resolveTownOrInterior(towns, this.townName);
+      }
       if (!found) {
         this.add.text(
           20, 20,
-          `Town not found: ${this.townName}`,
+          `Map not found: ${this.townName}`,
           { color: "#ff6b6b", fontFamily: "monospace", fontSize: "16px" }
         );
         return;
@@ -195,7 +212,15 @@ export class TownScene extends Phaser.Scene {
 
     this.tileMap = tileMapForTown(this.town);
     this.mapLights = collectLightSources(this.tileMap);
-    this.dark = mapIsDark(this.mapLights);
+    // Lighting policy:
+    //   * Outdoor towns (top-level entries in towns.json) inherit the
+    //     overworld's day/night lighting, which today is always bright.
+    //   * Interiors (nested under a town via "Town/Building" path) and
+    //     building spaces (any "building:..." path) are always dark
+    //     with light pools — the Python game's INTERIOR_DARKNESS mode.
+    const isIndoor =
+      this.townName.startsWith("building:") || this.townName.includes("/");
+    this.dark = isIndoor && mapIsDark(this.mapLights);
     this.drawMap();
     this.drawNpcs();
     this.drawPlayer();
@@ -505,6 +530,23 @@ export class TownScene extends Phaser.Scene {
       this.cameras.main.once("camerafadeoutcomplete", () => {
         this.scene.start("TownScene", {
           townName: link.name,
+          entryCol: link.x ?? 0,
+          entryRow: link.y ?? 0,
+          returnCol: col,
+          returnRow: row,
+        });
+      });
+      return;
+    }
+
+    if (link.kind === "building") {
+      // Same re-entry pattern, but TileMap.getTileLink stripped the
+      // "building:" prefix on parse. We add it back here so TownScene
+      // dispatches to the buildings loader instead of towns.
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.scene.start("TownScene", {
+          townName: `building:${link.name}`,
           entryCol: link.x ?? 0,
           entryRow: link.y ?? 0,
           returnCol: col,
