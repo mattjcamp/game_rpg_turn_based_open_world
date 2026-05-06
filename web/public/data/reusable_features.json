@@ -1,0 +1,43 @@
+{
+  "town": [
+    {
+      "name": "Shop Facade",
+      "width": 8,
+      "height": 8,
+      "tiles": {
+        "0,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "2,0": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "0,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        },
+        "1,1": {
+          "tile_id": 13,
+          "path": "game/terrain/town_door.png",
+          "name": "Door"
+        },
+        "2,1": {
+          "tile_id": 37,
+          "path": "unassigned/brick_wall_red.png",
+          "name": "Brick"
+        }
+      }
+    }
+  ],
+  "dungeon": [],
+  "overworld": []
+}

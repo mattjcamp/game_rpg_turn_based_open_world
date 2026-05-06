@@ -1,0 +1,997 @@
+{
+  "monsters": {
+    "Giant Rat": {
+      "description": "A large rat. Weak but fast.Gross.Meh",
+      "undead": false,
+      "humanoid": false,
+      "hp": 8,
+      "ac": 12,
+      "attack_bonus": 2,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 15,
+      "gold_min": 2,
+      "gold_max": 8,
+      "color": [
+        140,
+        100,
+        80
+      ],
+      "spawn_weight": 40,
+      "tile": "game/monsters/giant_rat.png",
+      "terrain": "land",
+      "move_range": 10,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "easy"
+    },
+    "Goblin": {
+      "description": "A small, sneaky goblin. Attacks in groups.",
+      "undead": false,
+      "humanoid": true,
+      "hp": 6,
+      "ac": 11,
+      "attack_bonus": 2,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 10,
+      "gold_min": 1,
+      "gold_max": 6,
+      "color": [
+        100,
+        160,
+        60
+      ],
+      "spawn_weight": 40,
+      "tile": "game/monsters/goblin.png",
+      "ranged": {
+        "range": 4,
+        "attack_bonus": 2,
+        "damage_dice": 1,
+        "damage_sides": 3,
+        "damage_bonus": 0,
+        "projectile_color": [
+          160,
+          140,
+          120
+        ],
+        "projectile_symbol": ".",
+        "label": "thrown rock"
+      },
+      "terrain": "land",
+      "move_range": 6,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "easy"
+    },
+    "Wild Boar": {
+      "description": "An unusually large boar",
+      "hp": 15,
+      "ac": 14,
+      "attack_bonus": 1,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 20,
+      "gold_min": 3,
+      "gold_max": 10,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "difficulty": "easy",
+      "tile": "monsters/npcs_u4_healer",
+      "battle_scale": 1,
+      "move_range": 4,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null
+    },
+    "Wolf": {
+      "description": "A fierce grey wolf. Fast and cunning.",
+      "undead": false,
+      "humanoid": false,
+      "hp": 12,
+      "ac": 13,
+      "attack_bonus": 4,
+      "damage_dice": 1,
+      "damage_sides": 6,
+      "damage_bonus": 1,
+      "xp_reward": 30,
+      "gold_min": 0,
+      "gold_max": 5,
+      "color": [
+        150,
+        150,
+        160
+      ],
+      "spawn_weight": 35,
+      "tile": "game/monsters/wolf.png",
+      "move_range": 4,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "easy"
+    },
+    "Dark Mage": {
+      "description": "A robed figure crackling with dark energy.",
+      "undead": false,
+      "humanoid": true,
+      "hp": 14,
+      "ac": 12,
+      "attack_bonus": 4,
+      "damage_dice": 2,
+      "damage_sides": 4,
+      "damage_bonus": 1,
+      "xp_reward": 50,
+      "gold_min": 10,
+      "gold_max": 25,
+      "color": [
+        100,
+        40,
+        140
+      ],
+      "spawn_weight": 15,
+      "tile": "game/monsters/dark_mage.png",
+      "ranged": {
+        "range": 7,
+        "attack_bonus": 5,
+        "damage_dice": 2,
+        "damage_sides": 4,
+        "damage_bonus": 1,
+        "projectile_color": [
+          160,
+          60,
+          220
+        ],
+        "projectile_symbol": "*",
+        "label": "dark bolt"
+      },
+      "spells": [
+        {
+          "type": "sleep",
+          "name": "Dark Slumber",
+          "range": 6,
+          "cast_chance": 30,
+          "save_dc": 12,
+          "duration": 3,
+          "max_target_hp": 25
+        },
+        {
+          "type": "curse",
+          "name": "Hex",
+          "range": 6,
+          "cast_chance": 25,
+          "duration": 3,
+          "ac_penalty": 2,
+          "attack_penalty": 2
+        },
+        {
+          "type": "magic_dart",
+          "name": "Magic Dart",
+          "range": 6,
+          "cast_chance": 30,
+          "damage_dice": 1,
+          "damage_sides": 6,
+          "damage_bonus": 0
+        },
+        {
+          "type": "magic_arrow",
+          "name": "Magic Arrow",
+          "range": 7,
+          "cast_chance": 25,
+          "damage_dice": 2,
+          "damage_sides": 4,
+          "damage_bonus": 1
+        }
+      ],
+      "terrain": "land",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
+    },
+    "Orc": {
+      "description": "A brutal orc. Tough fight.",
+      "undead": false,
+      "humanoid": true,
+      "hp": 22,
+      "ac": 13,
+      "attack_bonus": 5,
+      "damage_dice": 1,
+      "damage_sides": 8,
+      "damage_bonus": 2,
+      "xp_reward": 50,
+      "gold_min": 5,
+      "gold_max": 15,
+      "color": [
+        80,
+        140,
+        60
+      ],
+      "spawn_weight": 25,
+      "tile": "game/monsters/orc.png",
+      "ranged": {
+        "range": 3,
+        "attack_bonus": 3,
+        "damage_dice": 1,
+        "damage_sides": 6,
+        "damage_bonus": 1,
+        "projectile_color": [
+          180,
+          140,
+          80
+        ],
+        "projectile_symbol": "/",
+        "label": "javelin"
+      },
+      "move_range": 4,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
+    },
+    "Orc Shaman": {
+      "description": "An orc witch doctor who bolsters allies and curses foes.",
+      "undead": false,
+      "humanoid": true,
+      "hp": 16,
+      "ac": 11,
+      "attack_bonus": 3,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 25,
+      "gold_min": 5,
+      "gold_max": 18,
+      "color": [
+        80,
+        140,
+        60
+      ],
+      "spawn_weight": 10,
+      "tile": "game/monsters/orc.png",
+      "spells": [
+        {
+          "type": "heal_self",
+          "name": "Self Heal",
+          "cast_chance": 40,
+          "heal_dice": 1,
+          "heal_sides": 8,
+          "heal_bonus": 2
+        },
+        {
+          "type": "heal_ally",
+          "name": "Mend Wounds",
+          "range": 6,
+          "cast_chance": 40,
+          "heal_dice": 1,
+          "heal_sides": 8,
+          "heal_bonus": 2
+        },
+        {
+          "type": "poison",
+          "name": "Poison",
+          "range": 5,
+          "cast_chance": 30,
+          "save_dc": 11,
+          "damage_per_turn": 2,
+          "duration": 4
+        }
+      ],
+      "terrain": "land",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
+    },
+    "Skeleton": {
+      "description": "An undead skeleton warrior. Medium difficulty.",
+      "undead": true,
+      "humanoid": false,
+      "hp": 16,
+      "ac": 13,
+      "attack_bonus": 3,
+      "damage_dice": 1,
+      "damage_sides": 6,
+      "damage_bonus": 1,
+      "xp_reward": 30,
+      "gold_min": 5,
+      "gold_max": 15,
+      "color": [
+        220,
+        220,
+        200
+      ],
+      "spawn_weight": 35,
+      "tile": "game/monsters/skeleton.png",
+      "move_range": 3,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
+    },
+    "Skeleton Archer": {
+      "description": "A skeletal bowman that fires arrows from a distance.",
+      "undead": true,
+      "humanoid": false,
+      "hp": 12,
+      "ac": 12,
+      "attack_bonus": 3,
+      "damage_dice": 1,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 20,
+      "gold_min": 5,
+      "gold_max": 18,
+      "color": [
+        220,
+        220,
+        200
+      ],
+      "spawn_weight": 20,
+      "tile": "game/monsters/skeleton.png",
+      "ranged": {
+        "range": 6,
+        "attack_bonus": 4,
+        "damage_dice": 1,
+        "damage_sides": 6,
+        "damage_bonus": 0,
+        "projectile_color": [
+          255,
+          255,
+          200
+        ],
+        "projectile_symbol": "-",
+        "label": "bone arrow"
+      },
+      "move_range": 2,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
+    },
+    "Troll": {
+      "description": "A massive brute with thick hide. Hits hard and regenerates.",
+      "undead": false,
+      "humanoid": true,
+      "hp": 30,
+      "ac": 14,
+      "attack_bonus": 6,
+      "damage_dice": 2,
+      "damage_sides": 6,
+      "damage_bonus": 2,
+      "xp_reward": 70,
+      "gold_min": 10,
+      "gold_max": 25,
+      "color": [
+        80,
+        100,
+        60
+      ],
+      "spawn_weight": 10,
+      "tile": "game/monsters/troll.png",
+      "spells": [
+        {
+          "type": "heal_self",
+          "name": "Self Heal",
+          "cast_chance": 40,
+          "heal_dice": 1,
+          "heal_sides": 6,
+          "heal_bonus": 1
+        },
+        {
+          "type": "heal_ally",
+          "name": "Mend Wounds",
+          "range": 5,
+          "cast_chance": 35,
+          "heal_dice": 1,
+          "heal_sides": 6,
+          "heal_bonus": 1
+        }
+      ],
+      "terrain": "land",
+      "battle_scale": 1,
+      "move_range": 1,
+      "post_attack_move": 0,
+      "on_hit_effects": null,
+      "passives": null,
+      "difficulty": "normal"
+    },
+    "Zombie": {
+      "description": "A shambling corpse. Slow but durable.",
+      "undead": true,
+      "humanoid": false,
+      "hp": 20,
+      "ac": 10,
+      "attack_bonus": 2,
+      "damage_dice": 1,
+      "damage_sides": 6,
+      "damage_bonus": 1,
+      "xp_reward": 30,
+      "gold_min": 3,
+      "gold_max": 12,
+      "color": [
+        100,
+        120,
+        80
+      ],
+      "spawn_weight": 30,
+      "tile": "game/monsters/zombie.png",
+      "move_range": 3,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "normal"
+    },
+    "Banshee": {
+      "description": "A wailing spirit that drains the life of those who hear her cry.",
+      "hp": 35,
+      "ac": 13,
+      "attack_bonus": 5,
+      "damage_dice": 1,
+      "damage_sides": 8,
+      "damage_bonus": 0,
+      "xp_reward": 90,
+      "gold_min": 8,
+      "gold_max": 25,
+      "color": [
+        180,
+        200,
+        220
+      ],
+      "spawn_weight": 12,
+      "tile": "monsters/illusionist_f1",
+      "terrain": "land",
+      "move_range": 3,
+      "post_attack_move": 1,
+      "spells": [
+        {
+          "type": "sleep",
+          "name": "Mournful Lullaby",
+          "save_dc": 16,
+          "duration": 4,
+          "max_target_hp": 50,
+          "cast_chance": 40,
+          "range": 8
+        },
+        {
+          "type": "curse",
+          "name": "Withering Wail",
+          "duration": 5,
+          "ac_penalty": 4,
+          "attack_penalty": 3,
+          "cast_chance": 35,
+          "range": 8
+        }
+      ],
+      "on_hit_effects": [
+        {
+          "type": "drain",
+          "chance": 40,
+          "amount": 8
+        }
+      ],
+      "passives": null,
+      "battle_scale": 1,
+      "undead": true,
+      "humanoid": false,
+      "difficulty": "hard"
+    },
+    "Lich": {
+      "description": "A powerful and magical undead creature",
+      "hp": 30,
+      "ac": 15,
+      "attack_bonus": 3,
+      "damage_dice": 3,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 135,
+      "gold_min": 10,
+      "gold_max": 40,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": true,
+      "humanoid": false,
+      "terrain": "land",
+      "difficulty": "hard",
+      "tile": "monsters/lich",
+      "battle_scale": 1,
+      "move_range": 2,
+      "post_attack_move": 0,
+      "spells": [
+        {
+          "type": "sleep",
+          "name": "Dark Slumber",
+          "range": 9,
+          "cast_chance": 45,
+          "save_dc": 18,
+          "duration": 5,
+          "max_target_hp": 70
+        },
+        {
+          "type": "curse",
+          "name": "Hex",
+          "range": 9,
+          "cast_chance": 40,
+          "duration": 6,
+          "ac_penalty": 5,
+          "attack_penalty": 4
+        },
+        {
+          "type": "magic_dart",
+          "name": "Magic Dart",
+          "range": 6,
+          "cast_chance": 30,
+          "damage_dice": 1,
+          "damage_sides": 6,
+          "damage_bonus": 0
+        },
+        {
+          "type": "magic_arrow",
+          "name": "Magic Arrow",
+          "range": 7,
+          "cast_chance": 25,
+          "damage_dice": 2,
+          "damage_sides": 4,
+          "damage_bonus": 1
+        },
+        {
+          "type": "lightning_bolt",
+          "name": "Lightning Bolt",
+          "range": 7,
+          "cast_chance": 18,
+          "damage_dice": 3,
+          "damage_sides": 6,
+          "damage_bonus": 0
+        },
+        {
+          "type": "fireball",
+          "name": "Fireball",
+          "range": 6,
+          "cast_chance": 18,
+          "damage_dice": 3,
+          "damage_sides": 6,
+          "damage_bonus": 0,
+          "save_dc": 13
+        }
+      ],
+      "on_hit_effects": [
+        {
+          "type": "poison",
+          "chance": 30,
+          "damage_per_turn": 5,
+          "duration": 5
+        },
+        {
+          "type": "slow",
+          "chance": 25,
+          "duration": 2
+        },
+        {
+          "type": "drain",
+          "chance": 25,
+          "amount": 3
+        }
+      ],
+      "passives": [
+        {
+          "type": "poison_immunity"
+        }
+      ]
+    },
+    "Man Eater": {
+      "description": "Carnivorous half-plant, half-animal",
+      "hp": 50,
+      "ac": 16,
+      "attack_bonus": 3,
+      "damage_dice": 3,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 125,
+      "gold_min": 10,
+      "gold_max": 30,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "difficulty": "hard",
+      "tile": "monsters/man_thing_f1",
+      "battle_scale": 2,
+      "move_range": 3,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": [
+        {
+          "type": "drain",
+          "chance": 25,
+          "amount": 3
+        },
+        {
+          "type": "consume",
+          "chance": 75,
+          "damage_per_turn": 1,
+          "save_dc": 14
+        }
+      ],
+      "passives": [
+        {
+          "type": "poison_immunity"
+        }
+      ]
+    },
+    "Ogre": {
+      "description": "A massive, dim-witted brute that swings a club the size of a small tree.",
+      "hp": 40,
+      "ac": 13,
+      "attack_bonus": 5,
+      "damage_dice": 2,
+      "damage_sides": 6,
+      "damage_bonus": 3,
+      "xp_reward": 80,
+      "gold_min": 15,
+      "gold_max": 40,
+      "color": [
+        120,
+        90,
+        60
+      ],
+      "spawn_weight": 18,
+      "tile": "monsters/barbarian_f2",
+      "terrain": "land",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "undead": false,
+      "humanoid": true,
+      "difficulty": "hard"
+    },
+    "Wyvern": {
+      "description": "A smal dragon with two legs and a pointed tail",
+      "hp": 60,
+      "ac": 14,
+      "attack_bonus": 4,
+      "damage_dice": 2,
+      "damage_sides": 4,
+      "damage_bonus": 0,
+      "xp_reward": 120,
+      "gold_min": 3,
+      "gold_max": 25,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "tile": "monsters/dragon_f2",
+      "battle_scale": 1,
+      "move_range": 4,
+      "post_attack_move": 1,
+      "spells": [
+        {
+          "type": "breath_fire",
+          "name": "Fire Breath",
+          "cast_chance": 50,
+          "range": 4,
+          "damage_dice": 4,
+          "damage_sides": 6,
+          "damage_bonus": 0,
+          "save_dc": 13
+        }
+      ],
+      "on_hit_effects": null,
+      "passives": null,
+      "difficulty": "hard"
+    },
+    "Dragon": {
+      "description": "A younger dragon",
+      "hp": 125,
+      "ac": 18,
+      "attack_bonus": 6,
+      "damage_dice": 4,
+      "damage_sides": 8,
+      "damage_bonus": 0,
+      "xp_reward": 335,
+      "gold_min": 20,
+      "gold_max": 50,
+      "color": [
+        200,
+        50,
+        50
+      ],
+      "spawn_weight": 20,
+      "undead": false,
+      "humanoid": false,
+      "terrain": "land",
+      "tile": "monsters/dragon_f1",
+      "move_range": 8,
+      "post_attack_move": 2,
+      "on_hit_effects": null,
+      "passives": [
+        {
+          "type": "regen",
+          "amount": 10
+        },
+        {
+          "type": "fire_resistance"
+        }
+      ],
+      "spells": [
+        {
+          "type": "breath_fire",
+          "name": "Fire Breath",
+          "cast_chance": 50,
+          "range": 6,
+          "damage_dice": 6,
+          "damage_sides": 6,
+          "damage_bonus": 0,
+          "save_dc": 13
+        }
+      ],
+      "battle_scale": 2,
+      "difficulty": "boss"
+    },
+    "Hydra": {
+      "description": "A many-headed serpent whose every strike lands again and again.",
+      "hp": 110,
+      "ac": 15,
+      "attack_bonus": 6,
+      "damage_dice": 3,
+      "damage_sides": 8,
+      "damage_bonus": 2,
+      "xp_reward": 190,
+      "gold_min": 40,
+      "gold_max": 120,
+      "color": [
+        40,
+        140,
+        60
+      ],
+      "spawn_weight": 5,
+      "tile": "monsters/man_thing_f2",
+      "terrain": "land",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": [
+        {
+          "type": "fire_resistance"
+        }
+      ],
+      "battle_scale": 1,
+      "undead": false,
+      "humanoid": false,
+      "difficulty": "deadly"
+    },
+    "Mind Flayer": {
+      "description": "A tentacled aberration whose mere presence weighs upon the mind.",
+      "hp": 50,
+      "ac": 15,
+      "attack_bonus": 6,
+      "damage_dice": 1,
+      "damage_sides": 6,
+      "damage_bonus": 0,
+      "xp_reward": 140,
+      "gold_min": 25,
+      "gold_max": 90,
+      "color": [
+        120,
+        60,
+        160
+      ],
+      "spawn_weight": 6,
+      "tile": "monsters/daemon_f1",
+      "terrain": "land",
+      "move_range": 3,
+      "post_attack_move": 0,
+      "spells": [
+        {
+          "type": "sleep",
+          "name": "Mind Blank",
+          "save_dc": 18,
+          "duration": 5,
+          "max_target_hp": 70,
+          "cast_chance": 45,
+          "range": 9
+        },
+        {
+          "type": "curse",
+          "name": "Psychic Crush",
+          "duration": 6,
+          "ac_penalty": 5,
+          "attack_penalty": 4,
+          "cast_chance": 40,
+          "range": 9
+        },
+        {
+          "type": "magic_dart",
+          "name": "Mind Lash",
+          "range": 9,
+          "cast_chance": 45,
+          "damage_dice": 2,
+          "damage_sides": 4,
+          "damage_bonus": 2
+        },
+        {
+          "type": "poison",
+          "name": "Cerebral Toxin",
+          "range": 6,
+          "cast_chance": 30,
+          "save_dc": 14,
+          "damage_per_turn": 3,
+          "duration": 4
+        }
+      ],
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "undead": false,
+      "humanoid": false,
+      "difficulty": "deadly"
+    },
+    "Stone Golem": {
+      "description": "A hulking construct of living stone, immune to poison and resistant to fire.",
+      "hp": 110,
+      "ac": 18,
+      "attack_bonus": 6,
+      "damage_dice": 2,
+      "damage_sides": 12,
+      "damage_bonus": 0,
+      "xp_reward": 205,
+      "gold_min": 30,
+      "gold_max": 80,
+      "color": [
+        120,
+        120,
+        120
+      ],
+      "spawn_weight": 8,
+      "tile": "monsters/paladin_f1",
+      "terrain": "land",
+      "move_range": 1,
+      "post_attack_move": 0,
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": [
+        {
+          "type": "fire_resistance"
+        },
+        {
+          "type": "poison_immunity"
+        }
+      ],
+      "battle_scale": 1,
+      "undead": false,
+      "humanoid": false,
+      "difficulty": "deadly"
+    },
+    "Vampire Lord": {
+      "description": "An ancient nobleman of the night who drains the very life of those he strikes.",
+      "hp": 60,
+      "ac": 16,
+      "attack_bonus": 7,
+      "damage_dice": 1,
+      "damage_sides": 10,
+      "damage_bonus": 0,
+      "xp_reward": 160,
+      "gold_min": 50,
+      "gold_max": 150,
+      "color": [
+        80,
+        0,
+        30
+      ],
+      "spawn_weight": 6,
+      "tile": "monsters/npcs_vga_evil_mage",
+      "terrain": "land",
+      "move_range": 4,
+      "post_attack_move": 1,
+      "spells": [
+        {
+          "type": "sleep",
+          "name": "Hypnotic Gaze",
+          "save_dc": 18,
+          "duration": 5,
+          "max_target_hp": 70,
+          "cast_chance": 45,
+          "range": 9
+        },
+        {
+          "type": "curse",
+          "name": "Nightblood Curse",
+          "duration": 6,
+          "ac_penalty": 5,
+          "attack_penalty": 4,
+          "cast_chance": 40,
+          "range": 9
+        }
+      ],
+      "on_hit_effects": [
+        {
+          "type": "drain",
+          "chance": 50,
+          "amount": 8
+        }
+      ],
+      "passives": [
+        {
+          "type": "regen",
+          "amount": 4
+        }
+      ],
+      "battle_scale": 1,
+      "undead": true,
+      "humanoid": true,
+      "difficulty": "deadly"
+    }
+  },
+  "spawn_tables": {
+    "overworld": [
+      "Giant Rat",
+      "Orc",
+      "Wolf",
+      "Goblin"
+    ],
+    "dungeon": [
+      "Giant Rat",
+      "Skeleton",
+      "Skeleton Archer",
+      "Orc",
+      "Orc Shaman",
+      "Goblin",
+      "Zombie",
+      "Wolf",
+      "Dark Mage",
+      "Troll"
+    ]
+  }
+}

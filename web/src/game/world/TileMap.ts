@@ -227,8 +227,17 @@ export function tileMapFromOverview(raw: unknown): TileMap {
   });
 }
 
-/** Fetch and parse the bundled overworld map at /data/overworld.json. */
-export async function loadTileMap(url = "/data/overworld.json"): Promise<TileMap> {
+import { modulePath } from "./Module";
+
+/**
+ * Fetch and parse the active module's overview map.
+ *
+ * Path follows the Python project's convention exactly:
+ * `modules/<name>/overview_map.json`. The web port mirrors that
+ * folder verbatim under `web/public/modules/`, so the same module
+ * directory works for both the Python game and the web build.
+ */
+export async function loadTileMap(url = modulePath("overview_map.json")): Promise<TileMap> {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to load ${url}: ${res.status} ${res.statusText}`);

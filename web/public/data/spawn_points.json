@@ -1,0 +1,150 @@
+{
+  "_comment": "Monster spawn point definitions. Keyed by tile ID.",
+  "spawn_points": {
+    "66": {
+      "name": "Monster Spawn",
+      "description": "A monster lair.",
+      "spawn_monsters": [
+        "Giant Rat",
+        "Wolf",
+        "Goblin",
+        "Orc",
+        "Lich"
+      ],
+      "spawn_chance": 5,
+      "spawn_radius": 5,
+      "max_spawned": 2,
+      "boss_monster": "Goblin",
+      "boss_monsters": [
+        "Goblin"
+      ],
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [
+        "+2 Chain",
+        "Arrows"
+      ],
+      "background_tile": 0
+    },
+    "67": {
+      "name": "Campfire Spawn",
+      "description": "A smoldering campfire attracts wandering creatures.",
+      "spawn_monsters": [
+        "Orc",
+        "Orc Shaman",
+        "Orc",
+        "Goblin",
+        "Goblin"
+      ],
+      "spawn_chance": 5,
+      "spawn_radius": 4,
+      "max_spawned": 3,
+      "boss_monster": "Goblin",
+      "boss_monsters": [
+        "Goblin",
+        "Goblin",
+        "Goblin",
+        "Goblin",
+        "Dark Mage",
+        "Orc Shaman",
+        "Orc"
+      ],
+      "xp_reward": 60,
+      "gold_reward": 30,
+      "loot": [
+        "Torch",
+        "Arrows"
+      ],
+      "background_tile": 0
+    },
+    "68": {
+      "name": "Graveyard Spawn",
+      "description": "Restless spirits rise from ancient graves.",
+      "spawn_monsters": [
+        "Skeleton",
+        "Zombie"
+      ],
+      "spawn_chance": 5,
+      "spawn_radius": 3,
+      "max_spawned": 4,
+      "boss_monster": "Skeleton",
+      "boss_monsters": [
+        "Skeleton",
+        "Skeleton",
+        "Zombie",
+        "Zombie",
+        "Zombie",
+        "Zombie",
+        "Skeleton Archer",
+        "Super Zombie"
+      ],
+      "xp_reward": 70,
+      "gold_reward": 20,
+      "loot": [
+        "Bones",
+        "Ancient Shield"
+      ],
+      "background_tile": 0
+    },
+    "69": {
+      "name": "Dragon",
+      "description": "A monster lair.",
+      "spawn_monsters": [
+        "Dragon"
+      ],
+      "spawn_chance": 2,
+      "spawn_radius": 3,
+      "max_spawned": 2,
+      "boss_monster": "",
+      "boss_monsters": [
+        "Dragon",
+        "Dark Mage"
+      ],
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [],
+      "background_tile": 0
+    },
+    "71": {
+      "name": "Wyvern",
+      "description": "A monster lair.",
+      "spawn_monsters": [
+        "Wyvern"
+      ],
+      "spawn_chance": 20,
+      "spawn_radius": 3,
+      "max_spawned": 2,
+      "boss_monster": "",
+      "boss_monsters": [
+        "Wyvern",
+        "Wyvern",
+        "Dark Mage"
+      ],
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [],
+      "background_tile": 0
+    },
+    "75": {
+      "name": "Man Eater Spawn",
+      "description": "An unsettling rustling sound comes from a thick bed of plants",
+      "spawn_monsters": [
+        "Man Eater",
+        "Man Eater"
+      ],
+      "spawn_chance": 20,
+      "spawn_radius": 3,
+      "max_spawned": 2,
+      "boss_monster": "",
+      "boss_monsters": [
+        "Man Eater",
+        "Man Eater",
+        "Man Eater"
+      ],
+      "xp_reward": 50,
+      "gold_reward": 25,
+      "loot": [],
+      "background_tile": 0
+    }
+  }
+}

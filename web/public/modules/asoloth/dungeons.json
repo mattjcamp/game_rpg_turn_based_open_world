@@ -1,0 +1,480 @@
+[
+  {
+    "name": "Goblin Stronghold",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 5,
+    "difficulty": "easy",
+    "level_size": "medium",
+    "torch_density": "abundant",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Derelict Caves",
+    "description": "Old ruins, who can say what they were used for? Who can say what now lies below?",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 3,
+    "difficulty": "normal",
+    "level_size": "medium",
+    "torch_density": "sparse",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Orc Headquarters",
+    "description": "The sounds of dark industry rush up from below. The orcs are here.",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 6,
+    "difficulty": "normal",
+    "level_size": "medium",
+    "torch_density": "moderate",
+    "locked_doors": "on",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Caves",
+    "description": "A system of natural caves",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 4,
+    "difficulty": "normal",
+    "level_size": "small",
+    "torch_density": "none",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Caves II",
+    "description": "A cave system, known for it's dangerous inhabinates.",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 4,
+    "difficulty": "hard",
+    "level_size": "medium",
+    "torch_density": "none",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Citadel of the Sun",
+    "description": "An old ruined temple. Rumored to hold an artifact of profound danger.",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 8,
+    "difficulty": "hard",
+    "level_size": "medium",
+    "torch_density": "moderate",
+    "locked_doors": "on",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Dragon's Lair",
+    "description": "A shattered keep clings to the cliffs of the far northeastern isle. The wind carries the smell of old smoke. Something immense sleeps below \u2014 and the ground is warm beneath thy feet.",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 10,
+    "difficulty": "hard",
+    "level_size": "medium",
+    "torch_density": "sparse",
+    "locked_doors": "on",
+    "levels": [
+      {
+        "name": "Shattered Gatehouse",
+        "size": "medium",
+        "torch_density": "moderate",
+        "random_encounters": true,
+        "encounters": [
+          {
+            "monsters": [
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Zombie",
+              "Zombie"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Collapsed Cloister",
+        "size": "medium",
+        "torch_density": "sparse",
+        "random_encounters": true,
+        "encounters": [
+          {
+            "monsters": [
+              "Dark Mage",
+              "Skeleton",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Skeleton Archer",
+              "Skeleton Archer",
+              "Skeleton"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Cultist Warrens",
+        "size": "medium",
+        "torch_density": "sparse",
+        "random_encounters": true,
+        "encounters": [
+          {
+            "monsters": [
+              "Dark Mage",
+              "Dark Mage",
+              "Skeleton"
+            ]
+          },
+          {
+            "monsters": [
+              "Orc",
+              "Orc",
+              "Dark Mage"
+            ]
+          },
+          {
+            "monsters": [
+              "Orc Shaman",
+              "Skeleton Archer",
+              "Skeleton Archer"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Smoldering Galleries",
+        "size": "medium",
+        "torch_density": "moderate",
+        "random_encounters": true,
+        "encounters": [
+          {
+            "monsters": [
+              "Wyvern"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Orc"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Lava Caverns",
+        "size": "medium",
+        "torch_density": "abundant",
+        "random_encounters": false,
+        "encounters": [
+          {
+            "monsters": [
+              "Wyvern",
+              "Wyvern"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Wyvern"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Troll"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Orc Shaman"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Obsidian Bridge",
+        "size": "medium",
+        "torch_density": "sparse",
+        "random_encounters": false,
+        "encounters": [
+          {
+            "monsters": [
+              "Wyvern",
+              "Wyvern",
+              "Troll"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Troll",
+              "Orc Shaman"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Dark Mage"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Bone Pit",
+        "size": "medium",
+        "torch_density": "none",
+        "random_encounters": false,
+        "encounters": [
+          {
+            "monsters": [
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer",
+              "Zombie",
+              "Zombie"
+            ]
+          },
+          {
+            "monsters": [
+              "Skeleton Archer",
+              "Skeleton Archer",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Zombie",
+              "Zombie",
+              "Zombie",
+              "Skeleton"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Ossuary of the Wyrm",
+        "size": "medium",
+        "torch_density": "sparse",
+        "random_encounters": false,
+        "encounters": [
+          {
+            "monsters": [
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer",
+              "Skeleton Archer",
+              "Zombie",
+              "Zombie"
+            ]
+          },
+          {
+            "monsters": [
+              "Dark Mage",
+              "Skeleton",
+              "Skeleton",
+              "Skeleton Archer",
+              "Skeleton Archer"
+            ]
+          },
+          {
+            "monsters": [
+              "Zombie",
+              "Zombie",
+              "Zombie",
+              "Zombie"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Dragon's Antechamber",
+        "size": "medium",
+        "torch_density": "moderate",
+        "random_encounters": false,
+        "encounters": [
+          {
+            "monsters": [
+              "Dark Mage",
+              "Dark Mage",
+              "Troll",
+              "Orc Shaman"
+            ]
+          },
+          {
+            "monsters": [
+              "Troll",
+              "Troll",
+              "Orc Shaman",
+              "Dark Mage"
+            ]
+          },
+          {
+            "monsters": [
+              "Wyvern",
+              "Wyvern",
+              "Dark Mage"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "The Wyrm's Hoard",
+        "size": "large",
+        "torch_density": "abundant",
+        "random_encounters": false,
+        "encounters": [
+          {
+            "monsters": [
+              "Dragon"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Old Building",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "ruins",
+    "num_levels": 1,
+    "difficulty": "easy",
+    "level_size": "small",
+    "torch_density": "sparse",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Creepy Forest",
+    "description": "The light appears stolen from this dark forest... Do you dare enter?",
+    "mode": "procedural",
+    "dungeon_style": "forest",
+    "num_levels": 3,
+    "difficulty": "normal",
+    "level_size": "medium",
+    "torch_density": "moderate",
+    "locked_doors": "off",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  },
+  {
+    "name": "Very Dark Cave",
+    "description": "",
+    "mode": "procedural",
+    "dungeon_style": "cave",
+    "num_levels": 4,
+    "difficulty": "deadly",
+    "level_size": "large",
+    "torch_density": "sparse",
+    "locked_doors": "on",
+    "levels": [
+      {
+        "name": "Level 1",
+        "width": 20,
+        "height": 20,
+        "entry_col": 0,
+        "entry_row": 0,
+        "tiles": {},
+        "encounters": []
+      }
+    ]
+  }
+]

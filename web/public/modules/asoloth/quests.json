@@ -1,0 +1,283 @@
+[
+  {
+    "name": "Rat Infestation",
+    "description": "Hollis, keeper of the General Shop, has a rodent problem in the basement \u2014 and perhaps a worse problem than that.",
+    "giver_npc": "Hollis the Shopkeep",
+    "giver_sprite": "src/assets/game/npcs/vga_evil_mage.png",
+    "giver_location": "town:Larian",
+    "giver_dialogue": "Hail, traveler. Thou hast the look of one who can handle trouble, and I am up to my ears in it. I own the General Shop here in Larian. Some months back I let a goblin lodge in my cellar in exchange for a small favor \u2014 the details are not important now. He has since let the place fall to ruin. Rats have overrun the basement, and the goblin himself grows bolder by the day. Clear them all out and I shall see thee well rewarded.",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "reward_items": [
+      "Camping Supplies",
+      "Arrows"
+    ],
+    "steps": [
+      {
+        "description": "Clear rats from the General Shop",
+        "step_type": "kill",
+        "encounter": "Cellar Rats",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Larian/General Shop",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      },
+      {
+        "description": "Hunt the deeper nests in the basement",
+        "step_type": "kill",
+        "encounter": "Cellar Rats",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Larian/Shop Basement",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      },
+      {
+        "description": "Evict the goblin squatter",
+        "step_type": "kill",
+        "encounter": "Goblin Ambush",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "interior:Larian/Shop Basement",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 8,
+    "giver_row": 16
+  },
+  {
+    "name": "Destroy the Goblin Horde",
+    "description": "The goblins of the northern stronghold have been raiding Larian's roads. Put an end to them before they put an end to the town.",
+    "giver_npc": "Lardo the Bardo",
+    "giver_sprite": "src/assets/game/npcs/u4_villager_male.png",
+    "giver_location": "town:Larian",
+    "giver_dialogue": "Listen well, friend, for I sing of more than pretty tales these days. The goblin horde has taken the old stronghold to the north, and scarce a week passes without a caravan lost upon the road. If thou hast the steel for it, break their ranks at the source. Larian will remember the deed \u2014 and I shall make the reward worth thy while.",
+    "reward_xp": 100,
+    "reward_gold": 50,
+    "reward_items": [
+      "Crossbow",
+      "Bolts"
+    ],
+    "steps": [
+      {
+        "description": "Break the goblin warbands in the stronghold",
+        "step_type": "kill",
+        "encounter": "Goblin Raiding Party",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Goblin Stronghold",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 4,
+    "giver_row": 16
+  },
+  {
+    "name": "Wolfman Puck",
+    "description": "Giant wolves prowl the fields around Larian. Huntsman Puck suspects an orc shaman stirs them up \u2014 and wants the beast ended.",
+    "giver_npc": "Huntsman Puck",
+    "giver_sprite": "src/assets/game/characters/fighter.png",
+    "giver_location": "town:Larian",
+    "giver_dialogue": "The realm is overrun with giant wolves, and no natural pack moves like these do. An orc hand guides them, I'd wager my last arrow on it. Thin the packs first \u2014 then find the brute pulling their strings. Do us this dastardly favor and I'll keep thy quiver full for a season.",
+    "reward_xp": 200,
+    "reward_gold": 200,
+    "reward_items": [
+      "Arrows"
+    ],
+    "steps": [
+      {
+        "description": "Cull the wolf packs in the wilds",
+        "step_type": "kill",
+        "encounter": "Wolf Pack",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "overview",
+        "target": "",
+        "target_count": 10,
+        "optional": "no"
+      },
+      {
+        "description": "Find and slay the orc driving them",
+        "step_type": "kill",
+        "encounter": "Orc Scouts",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "overview",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 9,
+    "giver_row": 12
+  },
+  {
+    "name": "I Lost My Stuff!",
+    "description": "Roland ventured too boldly into the Derelict Caves and left his Scroll of Fire behind. He'd very much like it back.",
+    "giver_npc": "Roland",
+    "giver_sprite": "src/assets/game/characters/fighter.png",
+    "giver_location": "overview",
+    "giver_dialogue": "Canst thou help a fellow out? I was poking about those ruins to the north \u2014 the Derelict Caves \u2014 when something big and hungry came up the stairs. I dropped my Scroll of Fire on the way out. Normally I'd fetch it myself, but whatever is down there... well, it wants more firepower than I've got left. Bring it back and it's thine to keep the reward.",
+    "reward_xp": 100,
+    "reward_gold": 100,
+    "reward_items": [],
+    "steps": [
+      {
+        "description": "Recover Roland's Scroll of Fire",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "Scroll of Fire",
+        "has_guardian": "yes",
+        "guardian_encounter": "Wailing Spirit",
+        "spawn_location": "dungeon:Derelict Caves",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 33,
+    "giver_row": 15
+  },
+  {
+    "name": "Destroy the Orc Stronghold",
+    "description": "A hooded mage suspects that the ruins south of town are no simple cave \u2014 they are an orc headquarters, and something darker commands it.",
+    "giver_npc": "Morvain the Grey",
+    "giver_sprite": "src/assets/game/npcs/vga_mage.png",
+    "giver_location": "overview",
+    "giver_dialogue": "Those ruins are no orc warren alone, friend. I feel a colder hand working beneath the stone \u2014 a necromancer, unless my bones lie to me. I'll not approach alone, but if thou hast the fire for it, break the orcs and cut the strings of whatever pulls them. I'll see thee armed for the work.",
+    "reward_xp": 200,
+    "reward_gold": 200,
+    "reward_items": [
+      "Iron Sword"
+    ],
+    "steps": [
+      {
+        "description": "Break the orc warchief's guard",
+        "step_type": "kill",
+        "encounter": "Orc Warchief's Guard",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Orc Headquarters",
+        "target": "",
+        "target_count": 4,
+        "optional": "no"
+      },
+      {
+        "description": "Slay the dark mage behind it all",
+        "step_type": "kill",
+        "encounter": "Necromancer's Guard",
+        "collect_item": "",
+        "has_guardian": "no",
+        "guardian_encounter": "",
+        "spawn_location": "dungeon:Orc Headquarters",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 26,
+    "giver_row": 6
+  },
+  {
+    "name": "Retrieve the Sun Sword",
+    "description": "Laird the Lord whispers of a blade hidden in a temple on a far island \u2014 the Sun Sword, said to carry the light that ancient wyrms fear.",
+    "giver_npc": "Laird the Lord",
+    "giver_sprite": "src/assets/game/npcs/vga_rogue.png",
+    "giver_location": "town:Realm Keep",
+    "giver_dialogue": "I'll be plain with thee, sellsword. There is an old temple called the Citadel of the Sun upon an island far to the east. Within it sleeps a blade forged in daylight \u2014 the Sun Sword. Find a boat, brave the deep, and bring it back. If what I fear wakes, this blade may be our only salvation.",
+    "reward_xp": 500,
+    "reward_gold": 500,
+    "reward_items": [
+      "Sun Sword"
+    ],
+    "steps": [
+      {
+        "description": "Retrieve the Sun Sword from the Citadel",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "Sun Sword",
+        "has_guardian": "yes",
+        "guardian_encounter": "Necromancer's Guard",
+        "spawn_location": "dungeon:Citadel of the Sun",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 26,
+    "giver_row": 51
+  },
+  {
+    "name": "Slay the Dragon of Asoloth",
+    "description": "Sage Veylin of Larian has traced the shadow over Asoloth to a single source: an ancient wyrm that slumbers beneath a ruined keep on the far northeastern island. Descend into the lair, end the dragon, and bring its heart to the shrine.",
+    "giver_npc": "Sage Veylin",
+    "giver_sprite": "src/assets/game/npcs/vga_mage.png",
+    "giver_location": "town:Realm Keep",
+    "giver_dialogue": "Sit, traveler. What I tell thee now leaves this room with thee alone. The unrest in these lands \u2014 the wolves, the orcs, the dead that will not lie \u2014 they are not the sickness, only its fever. The true blight is an ancient wyrm, older than Larian, older than any scroll I have read. It sleeps beneath a shattered keep on the far northeastern island, and as it stirs the land darkens. Arm thyself well. Take the Sun Sword if thou hast the arm for it. Descend through the broken halls, past the lava that feeds its breath, past the bones of those who tried before. End the wyrm. Cut out its heart and bring it to the shrine \u2014 only there may it be undone. Do this, and Asoloth yet has a morning.",
+    "reward_xp": 2500,
+    "reward_gold": 1500,
+    "reward_items": [
+      "Mystic Sword",
+      "+2 Plate"
+    ],
+    "steps": [
+      {
+        "description": "Slay the Ancient Dragon in its lair",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "Dragonheart",
+        "has_guardian": "yes",
+        "guardian_encounter": "Ancient Dragon",
+        "spawn_location": "dungeon:Dragon's Lair",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 14,
+    "giver_row": 11
+  },
+  {
+    "name": "Retreive the Dark Light",
+    "description": "",
+    "giver_npc": "Raistlan",
+    "giver_sprite": "src/assets/game/npcs/vga_evil_mage.png",
+    "giver_location": "overview",
+    "giver_dialogue": "",
+    "reward_xp": 1000,
+    "reward_gold": 1000,
+    "reward_items": [
+      "Silver Bow"
+    ],
+    "steps": [
+      {
+        "description": "Retrieve the Dark Light",
+        "step_type": "collect",
+        "encounter": "",
+        "collect_item": "Crystal",
+        "has_guardian": "yes",
+        "guardian_encounter": "Ancient Hydra",
+        "spawn_location": "dungeon:Very Dark Cave",
+        "target": "",
+        "target_count": 1,
+        "optional": "no"
+      }
+    ],
+    "giver_col": 34,
+    "giver_row": 19
+  }
+]

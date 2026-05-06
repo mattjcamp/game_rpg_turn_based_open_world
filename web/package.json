@@ -4,6 +4,10 @@
   "private": true,
   "description": "TypeScript / Next.js / Phaser port of the Realm of Shadow RPG. Experimental.",
   "scripts": {
+    "sync-modules": "node scripts/sync-modules.mjs",
+    "predev": "node scripts/sync-modules.mjs",
+    "prebuild": "node scripts/sync-modules.mjs",
+    "pretest": "node scripts/sync-modules.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "id": "the_dragon_of_dagorn",
+    "name": "The Dragon of Hargorn",
+    "author": "hyperbolic",
+    "description": "A thousand years ago the Conclave of Suns bound the dragon Hargorn beneath the western sea, sealing the realm with three Sealstones. Now one of their own \u2014 Vorkhaal the Inverted \u2014 has fed on those wards to extend his life, and the first seal he broke has woken the dragon. The coast burns nightly. The dead will not stay buried. Recover the Sun Sword from the drowned shrine, gather the binding rite from Vorkhaal's coven, and end Hargorn before its long shadow swallows the realm.",
+    "version": "0.1.0"
+  },
+  "settings": {
+    "tile_size": 32,
+    "map_width": 64,
+    "map_height": 48,
+    "viewport_cols": 30,
+    "viewport_rows": 26,
+    "max_party_size": 4,
+    "max_roster_size": 20,
+    "start_time": {
+      "year": 1,
+      "month": 6,
+      "day": 1,
+      "hour": 12,
+      "minute": 0
+    }
+  },
+  "data": {},
+  "unique_tiles": {
+    "moongate": {
+      "name": "Moongate",
+      "description": "A shimmering ring of blue light hovers above the ground. The air crackles with energy. Where it leads, none can say.",
+      "base_tile": "grass"
+    },
+    "whispering_stones": {
+      "name": "Whispering Stones",
+      "description": "Three tall standing stones arranged in a triangle. When the wind blows through them, you can almost hear words.",
+      "base_tile": "grass"
+    }
+  },
+  "world": {
+    "overworld": "overworld.json",
+    "towns": [
+      {
+        "id": "thorndale",
+        "name": "Thorndale",
+        "description": "A fortified settlement perched on a rocky bluff overlooking the valley."
+      }
+    ],
+    "dungeons": []
+  },
+  "progression": {
+    "win_condition": {
+      "type": "collect_keys",
+      "total_keys": 1,
+      "deliver_to": "town_altar"
+    },
+    "starting_quests": [
+      "restore"
+    ],
+    "key_dungeons": [
+      {
+        "id": "dungeon_key_1",
+        "name": "Rotting Barrow",
+        "key_name": "Iron Key",
+        "dungeon_number": 1,
+        "landmark_id": "dungeon_1",
+        "description": "The air around Rotting Barrow shimmers with faint heat. Strange runes glow along the doorframe.",
+        "quest_type": "retrieve",
+        "quest_objective": "Descend into Rotting Barrow and find the Iron Key",
+        "quest_hint": "The passage grows more treacherous with every floor.",
+        "kill_target": "",
+        "kill_count": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "Paladin",
+  "_comment": "Paladin (Fighter + Cleric). Heavy fighter with priest healing. Can use all weapons and up to plate armor. Gains Turn Undead at level 5.",
+  "allowed_weapons": "all",
+  "allowed_armor": [
+    "cloth",
+    "leather",
+    "chain",
+    "plate"
+  ],
+  "hp_per_level": 10,
+  "mp_per_level": 5,
+  "range": 4,
+  "exp_per_level": 1500,
+  "allowed_races": [
+    "human",
+    "dwarf",
+    "halfling",
+    "elf",
+    "gnome"
+  ],
+  "spell_type": "priest",
+  "mp_source": {
+    "ability": "wisdom",
+    "percentage": 50
+  },
+  "class_abilities": [
+    {
+      "name": "Turn Undead",
+      "min_level": 5,
+      "description": "From level 5, a Paladin can channel holy energy to Turn Undead: every undead on the battlefield must make a Wisdom save or be destroyed; those that succeed still take 50% of their HP in radiant damage."
+    }
+  ]
+}

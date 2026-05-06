@@ -1,0 +1,51 @@
+{
+  "name": "Ranger",
+  "_comment": "A woodsman who can use any bow, light armor, and a range of melee weapons. Knows healing magic. Herbalism training makes them adept at finding reagents in the wild. Starting at level 3, Rangers gain rogue-like Pick Locks and Detect Traps abilities.",
+  "allowed_weapons": [
+    "fists",
+    "dagger",
+    "club",
+    "sling",
+    "short_bow",
+    "long_bow",
+    "crossbow",
+    "sword"
+  ],
+  "allowed_armor": [
+    "cloth",
+    "leather",
+    "chain"
+  ],
+  "hp_per_level": 10,
+  "mp_per_level": 3,
+  "range": 6,
+  "exp_per_level": 1500,
+  "allowed_races": [
+    "human",
+    "dwarf",
+    "halfling",
+    "elf",
+    "gnome"
+  ],
+  "spell_type": "priest",
+  "mp_source": {
+    "ability": "wisdom",
+    "percentage": 50
+  },
+  "class_abilities": [
+    {
+      "name": "Herbalism",
+      "description": "Keen knowledge of flora lets Rangers spot reagents in the wild. When the party presses E to examine a tile, each Ranger rolls an INT saving throw (d20 + INT mod vs DC 13) \u2014 success identifies a potion reagent."
+    },
+    {
+      "name": "Pick Locks",
+      "min_level": 3,
+      "description": "From level 3, a Ranger can pick locked doors and chests (d20 + DEX mod vs DC 12), consuming one lockpick per attempt \u2014 same mechanic as a Thief."
+    },
+    {
+      "name": "Detect Traps",
+      "min_level": 3,
+      "description": "From level 3, a Ranger's woodcraft reveals hidden traps before the party steps on them."
+    }
+  ]
+}

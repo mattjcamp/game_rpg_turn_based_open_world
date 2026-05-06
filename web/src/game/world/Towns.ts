@@ -13,6 +13,7 @@
  */
 
 import { TileMap, type TileLink } from "./TileMap";
+import { modulePath } from "./Module";
 
 /** Tile id 36 = TILE_VOID per `src/settings.py`. Non-walkable, black. */
 const TILE_VOID = 36;
@@ -177,8 +178,12 @@ export function tileMapForTown(town: Town): TileMap {
 
 let _townCache: Town[] | null = null;
 
-/** Fetch and parse the bundled towns.json. Result is cached. */
-export async function loadTowns(url = "/data/towns.json"): Promise<Town[]> {
+/**
+ * Fetch and parse the active module's towns.json. Result is cached.
+ *
+ * Path matches the Python project: `modules/<name>/towns.json`.
+ */
+export async function loadTowns(url = modulePath("towns.json")): Promise<Town[]> {
   if (_townCache) return _townCache;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
