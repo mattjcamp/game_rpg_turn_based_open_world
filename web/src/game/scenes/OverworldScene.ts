@@ -364,15 +364,43 @@ export class OverworldScene extends Phaser.Scene {
     if (!isEncounterTrigger(id)) return;
     const key = triggerKey(col, row);
     if (gameState.consumedTriggers.has(key)) return;
-    // Hand off to CombatScene with metadata it can use to mark the
-    // trigger consumed on victory.
+    // Find a representative terrain tile — the trigger itself is a
+    // marker glyph (campfire / graveyard / spawn), the surrounding
+    // grass / forest / sand / path is what the arena should render.
+    const terrainTileId = this.sampleNeighborTerrain(col, row);
     this.cameras.main.fadeOut(220, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("CombatScene", {
         fromWorld: true,
         triggerKey: key,
+        terrainTileId,
       });
     });
+  }
+
+  /**
+   * Pick the most common walkable, non-trigger tile id in the 8
+   * tiles surrounding (col, row). Falls back to the trigger tile's
+   * own id when nothing useful is around (very rare — most map tiles
+   * are surrounded by terrain).
+   */
+  private sampleNeighborTerrain(col: number, row: number): number {
+    const counts = new Map<number, number>();
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dc === 0 && dr === 0) continue;
+        const t = this.tileMap.getTile(col + dc, row + dr);
+        if (t < 0 || isEncounterTrigger(t)) continue;
+        counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+    }
+    if (counts.size === 0) return this.tileMap.getTile(col, row);
+    let best = -1;
+    let bestN = -1;
+    for (const [t, n] of counts) {
+      if (n > bestN) { best = t; bestN = n; }
+    }
+    return best;
   }
 
   private openParty(): void {

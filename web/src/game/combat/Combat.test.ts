@@ -81,10 +81,13 @@ describe("Combat — attack flow", () => {
     );
     // Force the active to be the party member by spinning the cursor.
     while (c.current.id !== "p1") c.endTurn();
+    const baseLines = c.log.length;       // opening banner + initial turn line
     const result = c.attack("e1");
     expect(result.hit).toBe(true);
     expect(c.byId("e1").hp).toBe(10 - result.damage);
-    expect(c.log.length).toBe(1);
+    // attack adds exactly one new line (the dice/result detail)
+    expect(c.log.length).toBe(baseLines + 1);
+    expect(c.log[c.log.length - 1]).toMatch(/d20:\d+/);
   });
 
   it("clamps HP at 0 and marks killed when the blow is fatal", () => {
@@ -153,25 +156,29 @@ describe("Combat — turn advancement", () => {
 // ── Tactical layer ───────────────────────────────────────────────────
 
 describe("Combat — initial grid layout", () => {
-  it("places party on the right side of the arena", () => {
+  it("places the party near the bottom of the arena", () => {
     const c = new Combat(
       [make("p1", "party"), make("p2", "party")],
       [make("e1", "enemies")],
       mulberry32(1)
     );
+    // Party should sit on a row in the lower half of the arena and
+    // strictly above the bottom wall.
     for (const p of c.alive("party")) {
-      expect(p.position.col).toBeGreaterThan(ARENA_COLS / 2);
+      expect(p.position.row).toBeGreaterThan(ARENA_ROWS / 2);
+      expect(p.position.row).toBeLessThan(ARENA_ROWS - 1);
     }
   });
 
-  it("places enemies on the left side of the arena", () => {
+  it("places enemies near the top of the arena", () => {
     const c = new Combat(
       [make("p1", "party")],
       [make("e1", "enemies"), make("e2", "enemies")],
       mulberry32(1)
     );
     for (const e of c.alive("enemies")) {
-      expect(e.position.col).toBeLessThan(ARENA_COLS / 2);
+      expect(e.position.row).toBeLessThan(ARENA_ROWS / 2);
+      expect(e.position.row).toBeGreaterThan(0);
     }
   });
 

@@ -84,23 +84,34 @@ export class Combat {
     this.initiativeOrder = rolls;
     this.advanceToAlive();
     this.refillMovePoints();
+
+    // Opening banner — mirrors the Python game's "Party vs N enemies!"
+    // intro lines so the bottom log opens with context.
+    const enemyNames = enemies.map((e) => e.name).join(", ");
+    this.log.push(`--- Party vs ${enemies.length} enemies! ---`);
+    if (enemyNames) this.log.push(`(${enemyNames})`);
+    this.log.push(`${party.length} party members engage!`);
+    this.log.push(`-- ${this.current.name}'s turn --`);
   }
 
   /**
-   * Place party on the right edge of the arena, enemies on the left.
-   * Stacked vertically around the arena's middle row. The exact layout
-   * doesn't matter much — just keeps them apart so the player has
-   * tactical decisions to make.
+   * Place party on the bottom of the arena, enemies at the top —
+   * matches the Python game's combat layout (the U3-style "your
+   * heroes line up at the foot of the screen, the foe stands at the
+   * top"). Centred horizontally so a small or large party still
+   * spans the middle of the row.
    */
   private layoutFormations(party: Combatant[], enemies: Combatant[]): void {
-    const partyCol = ARENA_COLS - 3; // col 15
-    const enemyCol = 2;
-    const midRow = Math.floor(ARENA_ROWS / 2); // row 10
+    const partyRow = ARENA_ROWS - 3;        // row 18 of 21 — second from the bottom
+    const enemyRow = 2;                     // row 2 — second from the top
+    const midCol = Math.floor(ARENA_COLS / 2);
+    const startCol = (n: number): number =>
+      midCol - Math.floor(n / 2);
     party.forEach((c, i) => {
-      c.position = { col: partyCol, row: midRow - Math.floor(party.length / 2) + i };
+      c.position = { col: startCol(party.length) + i, row: partyRow };
     });
     enemies.forEach((c, i) => {
-      c.position = { col: enemyCol, row: midRow - Math.floor(enemies.length / 2) + i };
+      c.position = { col: startCol(enemies.length) + i, row: enemyRow };
     });
   }
 
@@ -205,10 +216,15 @@ export class Combat {
       target.hp = Math.max(0, target.hp - damage);
     }
     const killed = target.hp === 0 && roll.hit;
+    // Detailed log line — mirrors the Python game's "(d20:N+M=T vs ACX)"
+    // format so the player can see the math behind each swing.
+    const bonus = attacker.attackBonus;
+    const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
+    const dice = `d20:${roll.roll}${bonusStr}=${roll.total} vs AC${target.ac}`;
     this.log.push(
       roll.hit
-        ? `${attacker.name} ${roll.critical ? "crits" : "hits"} ${target.name} for ${damage}${killed ? " — defeated!" : "."}`
-        : `${attacker.name} swings at ${target.name} and misses.`
+        ? `${attacker.name} ${roll.critical ? "crits" : "hits"} ${target.name} (${dice}) — ${damage} dmg${killed ? ", defeated!" : "."}`
+        : `${attacker.name} swings at ${target.name} (${dice}) — miss.`
     );
     return {
       attackerId: attacker.id,
@@ -301,6 +317,7 @@ export class Combat {
       this.cursor = (this.cursor + 1) % this.initiativeOrder.length;
       if (this.byId(this.initiativeOrder[this.cursor].combatantId).hp > 0) {
         this.refillMovePoints();
+        this.log.push(`-- ${this.current.name}'s turn --`);
         return;
       }
     }
