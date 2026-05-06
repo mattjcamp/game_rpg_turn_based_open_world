@@ -18,6 +18,7 @@ interface MonsterSpec {
   damage: { dice: number; sides: number; bonus: number };
   dexMod: number;
   color: [number, number, number];
+  sprite: string;
   /** Tiles per turn. Mirrors `move_range` in the Python data files. */
   baseMoveRange: number;
 }
@@ -31,6 +32,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 4, bonus: 0 },
     dexMod: 2,
     color: [140, 100, 80],
+    sprite: "/assets/monsters/giant_rat.png",
     baseMoveRange: 5,
   },
   Goblin: {
@@ -41,6 +43,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 4, bonus: 0 },
     dexMod: 2,
     color: [100, 160, 60],
+    sprite: "/assets/monsters/goblin.png",
     baseMoveRange: 4,
   },
   Skeleton: {
@@ -51,6 +54,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 6, bonus: 1 },
     dexMod: 1,
     color: [220, 220, 200],
+    sprite: "/assets/monsters/skeleton.png",
     baseMoveRange: 3,
   },
   Orc: {
@@ -61,6 +65,7 @@ const SPECS: Record<string, MonsterSpec> = {
     damage: { dice: 1, sides: 8, bonus: 2 },
     dexMod: 0,
     color: [80, 130, 70],
+    sprite: "/assets/monsters/orc.png",
     baseMoveRange: 3,
   },
 };
@@ -78,6 +83,7 @@ export function makeMonster(name: keyof typeof SPECS, idSuffix = ""): Combatant 
     damage: spec.damage,
     dexMod: spec.dexMod,
     color: spec.color,
+    sprite: spec.sprite,
     baseMoveRange: spec.baseMoveRange,
     position: { col: 0, row: 0 }, // overwritten by Combat
   };
@@ -91,3 +97,6 @@ export function makeSampleEncounter(): Combatant[] {
     makeMonster("Skeleton"),
   ];
 }
+
+/** Sprite paths the monster preloader needs. Includes every monster we ship. */
+export const MONSTER_SPRITES: string[] = Object.values(SPECS).map((s) => s.sprite);

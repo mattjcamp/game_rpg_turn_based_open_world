@@ -25,8 +25,14 @@ export interface Combatant {
   damage: DamageRoll;
   /** D&D ability modifier for DEX, used for initiative. */
   dexMod: number;
-  /** Visual hint for the placeholder portrait colour (RGB 0-255). */
+  /** Fallback portrait colour (RGB 0-255) if no sprite is loaded. */
   color: [number, number, number];
+  /**
+   * Optional path to a 32×32 sprite under `/assets/`. When present the
+   * combat scene draws the image; when absent it falls back to the
+   * coloured rectangle. Test fixtures omit this freely.
+   */
+  sprite?: string;
   /**
    * Tile movement budget per turn. Refreshed at the start of every turn
    * by the Combat controller. For party members this comes from the

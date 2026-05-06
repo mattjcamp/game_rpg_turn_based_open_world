@@ -3,31 +3,29 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
-// Phaser touches `window` at import time, so the canvas component must only
-// load on the client. `ssr: false` tells Next not to attempt server-render.
 const GameCanvas = dynamic(() => import("@/components/GameCanvas"), {
   ssr: false,
   loading: () => (
     <div className="flex aspect-[4/3] w-full max-w-[960px] items-center justify-center text-parchment/60">
-      Loading combat&hellip;
+      Loading the world&hellip;
     </div>
   ),
 });
 
-export default function CombatPage() {
+export default function WorldPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center px-4 py-8">
       <div className="mb-4 flex w-full items-center justify-between">
         <Link href="/" className="text-sm text-parchment/60 hover:text-parchment">
           &larr; Back
         </Link>
-        <h1 className="font-display text-2xl text-parchment">Combat Demo</h1>
+        <h1 className="font-display text-2xl text-parchment">Overworld</h1>
         <span className="w-16" /> {/* spacer */}
       </div>
-      <GameCanvas startScene="CombatScene" />
-      <p className="mt-4 text-xs text-parchment/40">
-        Standalone combat demo. WASD/arrows or tap an adjacent tile to move;
-        bumping an enemy attacks them.
+      <GameCanvas startScene="OverworldScene" />
+      <p className="mt-4 max-w-[960px] text-center text-xs text-parchment/40">
+        Walk around with WASD / arrow keys, or tap a tile next to you. Stepping
+        on a glowing ✦ tile triggers an encounter — defeat the enemies to clear it.
       </p>
     </main>
   );

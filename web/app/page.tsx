@@ -8,15 +8,24 @@ export default function HomePage() {
         Experimental web build. Same combat math as the desktop version,
         rebuilt in TypeScript so you can play in the browser.
       </p>
-      <Link
-        href="/combat"
-        className="mt-10 rounded-md border border-ember bg-ember/20 px-6 py-3 text-lg text-parchment transition hover:bg-ember/40"
-      >
-        Enter Combat &rarr;
-      </Link>
-      <p className="mt-12 text-xs text-parchment/40">
-        Tagged release of the original Pygame project remains in the repo
-        root. This build lives under <code>web/</code>.
+      <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+        <Link
+          href="/world"
+          className="rounded-md border border-ember bg-ember/20 px-6 py-3 text-lg text-parchment transition hover:bg-ember/40"
+        >
+          Enter the World &rarr;
+        </Link>
+        <Link
+          href="/combat"
+          className="rounded-md border border-parchment/30 px-6 py-3 text-lg text-parchment/80 transition hover:bg-parchment/10"
+        >
+          Combat-only Demo
+        </Link>
+      </div>
+      <p className="mt-12 max-w-md text-xs text-parchment/40">
+        World mode loads the bundled overworld map and lets the party wander.
+        Stepping on a glowing tile starts a turn-based fight using the ported
+        combat engine. Combat-only mode skips straight to a fixed encounter.
       </p>
     </main>
   );

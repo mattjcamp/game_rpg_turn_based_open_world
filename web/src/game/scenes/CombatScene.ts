@@ -25,18 +25,26 @@ import {
   isWall,
   type Direction,
 } from "../combat/Arena";
-import { makeSampleParty } from "../data/fighters";
-import { makeSampleEncounter } from "../data/monsters";
+import { makeSampleParty, PARTY_SPRITES } from "../data/fighters";
+import { makeSampleEncounter, MONSTER_SPRITES } from "../data/monsters";
+import { gameState } from "../state";
 import type { Combatant, AttackResult } from "../types";
 
-const TILE = 22;
+interface CombatSceneData {
+  /** True when launched from the overworld; false for the /combat demo. */
+  fromWorld?: boolean;
+  /** The "col,row" key of the trigger tile that started this fight. */
+  triggerKey?: string;
+}
+
+const TILE = 32; // matches the source PNGs' native size
 const ARENA_X = 20;
 const ARENA_Y = 20;
-const ARENA_W = ARENA_COLS * TILE; // 396
-const ARENA_H = ARENA_ROWS * TILE; // 462
+const ARENA_W = ARENA_COLS * TILE; // 576
+const ARENA_H = ARENA_ROWS * TILE; // 672
 
-const HUD_X = ARENA_X + ARENA_W + 24; // 440
-const HUD_W = 960 - HUD_X - 20; // 500
+const HUD_X = ARENA_X + ARENA_W + 24; // 620
+const HUD_W = 960 - HUD_X - 20;       // 320
 
 const COLOR_FLOOR = 0x1f1f33;
 const COLOR_FLOOR_ALT = 0x232340;
@@ -48,9 +56,12 @@ const COLOR_MOVE_HINT = 0x44648a;
 export class CombatScene extends Phaser.Scene {
   private combat!: Combat;
 
-  // Sprite handles keyed by combatant id.
-  private bodies = new Map<string, Phaser.GameObjects.Rectangle>();
-  private nameTexts = new Map<string, Phaser.GameObjects.Text>();
+  // Sprite handles keyed by combatant id. `bodies` are the combatant
+  // images (or fallback rectangles when no sprite is set). `selRings`
+  // are the ember halo behind each combatant — visible only on the
+  // active actor's turn.
+  private bodies = new Map<string, Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle>();
+  private selRings = new Map<string, Phaser.GameObjects.Rectangle>();
   // HUD widgets per combatant
   private rosterHpBars = new Map<string, Phaser.GameObjects.Rectangle>();
   private rosterHpTexts = new Map<string, Phaser.GameObjects.Text>();
@@ -65,13 +76,48 @@ export class CombatScene extends Phaser.Scene {
   private busy = false;
   private ended = false;
 
+  // ── Scene-launch context ────────────────────────────────────────
+  private fromWorld = false;
+  private triggerKey: string | null = null;
+
   constructor() {
     super({ key: "CombatScene" });
   }
 
+  init(data?: CombatSceneData): void {
+    this.fromWorld = !!data?.fromWorld;
+    this.triggerKey = data?.triggerKey ?? null;
+    // Reset transient flags so a re-entered scene starts clean.
+    this.busy = false;
+    this.ended = false;
+    this.bodies.clear();
+    this.selRings.clear();
+    this.rosterHpBars.clear();
+    this.rosterHpTexts.clear();
+    this.moveHintRects.length = 0;
+  }
+
+  preload(): void {
+    // Use the path itself as the cache key so `add.image(x, y, path)`
+    // works without a second lookup.
+    for (const path of [...PARTY_SPRITES, ...MONSTER_SPRITES]) {
+      this.load.image(path, path);
+    }
+    // Crisp pixel art when scaled.
+    this.textures.on("addtexture", (key: string) => {
+      const tex = this.textures.get(key);
+      if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    });
+  }
+
   create(): void {
-    this.combat = new Combat(makeSampleParty(), makeSampleEncounter());
+    // Pick party source: shared gameState when launched from the
+    // overworld so HP carries over; a fresh sample party for the
+    // standalone /combat demo.
+    const party = this.fromWorld ? gameState.party : makeSampleParty();
+    this.combat = new Combat(party, makeSampleEncounter());
     this.cameras.main.setBackgroundColor("#0f0f1a");
+    this.cameras.main.fadeIn(220, 0, 0, 0);
 
     this.drawArenaGrid();
     this.drawHud();
@@ -208,22 +254,31 @@ export class CombatScene extends Phaser.Scene {
 
   private drawCombatants(): void {
     for (const c of this.combat.combatants) {
-      const colorHex = Phaser.Display.Color.GetColor(...c.color);
-      const body = this.add
-        .rectangle(this.tileX(c.position.col), this.tileY(c.position.row),
-          TILE - 4, TILE - 4, colorHex)
-        .setStrokeStyle(2, 0x0a0a14);
-      this.bodies.set(c.id, body);
+      const x = this.tileX(c.position.col);
+      const y = this.tileY(c.position.row);
 
-      // Single-letter sigil so combatants are recognizable on the grid.
-      const sigil = c.name.slice(0, 1).toUpperCase();
-      const text = this.add.text(body.x, body.y, sigil, {
-        fontFamily: "Georgia, serif",
-        fontSize: "14px",
-        color: "#1a1a2e",
-        fontStyle: "bold",
-      }).setOrigin(0.5);
-      this.nameTexts.set(c.id, text);
+      // Selection ring sits behind the sprite so an active-actor halo
+      // can be toggled per turn without redrawing.
+      const ring = this.add
+        .rectangle(x, y, TILE, TILE, COLOR_HIGHLIGHT, 0)
+        .setStrokeStyle(2, COLOR_HIGHLIGHT)
+        .setVisible(false);
+      this.selRings.set(c.id, ring);
+
+      let body: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      if (c.sprite && this.textures.exists(c.sprite)) {
+        // 32×32 native sprite drawn at native size now that TILE matches.
+        body = this.add.image(x, y, c.sprite);
+      } else {
+        // Fallback for combatants without a sprite (e.g. test fixtures
+        // built from `make()` in vitest — the renderer should still
+        // render *something* visible).
+        const colorHex = Phaser.Display.Color.GetColor(...c.color);
+        body = this.add
+          .rectangle(x, y, TILE - 4, TILE - 4, colorHex)
+          .setStrokeStyle(2, 0x0a0a14);
+      }
+      this.bodies.set(c.id, body);
     }
   }
 
@@ -382,11 +437,11 @@ export class CombatScene extends Phaser.Scene {
     void from; // current sprite is at `from`; tween targets `to`.
     return new Promise((resolve) => {
       const body = this.bodies.get(actor.id)!;
-      const text = this.nameTexts.get(actor.id)!;
+      const ring = this.selRings.get(actor.id)!;
       const x = this.tileX(to.col);
       const y = this.tileY(to.row);
       this.tweens.add({
-        targets: [body, text],
+        targets: [body, ring],
         x,
         y,
         duration: 120,
@@ -402,7 +457,7 @@ export class CombatScene extends Phaser.Scene {
   ): Promise<void> {
     return new Promise((resolve) => {
       const body = this.bodies.get(actor.id)!;
-      const text = this.nameTexts.get(actor.id)!;
+      const ring = this.selRings.get(actor.id)!;
       const startX = this.tileX(from.col);
       const startY = this.tileY(from.row);
       const targetX = this.tileX(target.col);
@@ -411,7 +466,7 @@ export class CombatScene extends Phaser.Scene {
       const midX = startX + (targetX - startX) * 0.4;
       const midY = startY + (targetY - startY) * 0.4;
       this.tweens.add({
-        targets: [body, text],
+        targets: [body, ring],
         x: midX,
         y: midY,
         duration: 90,
@@ -424,11 +479,11 @@ export class CombatScene extends Phaser.Scene {
   private animateBlocked(actor: Combatant, dir: Direction): Promise<void> {
     return new Promise((resolve) => {
       const body = this.bodies.get(actor.id)!;
-      const text = this.nameTexts.get(actor.id)!;
+      const ring = this.selRings.get(actor.id)!;
       const dx = dir === "e" ? 4 : dir === "w" ? -4 : 0;
       const dy = dir === "s" ? 4 : dir === "n" ? -4 : 0;
       this.tweens.add({
-        targets: [body, text],
+        targets: [body, ring],
         x: body.x + dx,
         y: body.y + dy,
         duration: 50,
@@ -496,9 +551,13 @@ export class CombatScene extends Phaser.Scene {
     if (txt) txt.setText(`${c.hp}/${c.maxHp}`);
     if (c.hp <= 0) {
       const body = this.bodies.get(c.id);
-      const t = this.nameTexts.get(c.id);
-      if (body) body.setFillStyle(0x2a2a3a).setStrokeStyle(1, 0x444466);
-      if (t) t.setColor("#666688");
+      if (body instanceof Phaser.GameObjects.Image) {
+        body.setTint(0x444466).setAlpha(0.4);
+      } else if (body) {
+        body.setFillStyle(0x2a2a3a).setStrokeStyle(1, 0x444466);
+      }
+      // Hide the selection ring permanently for downed combatants.
+      this.selRings.get(c.id)?.setVisible(false);
     }
   }
 
@@ -507,11 +566,11 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private highlightActiveActor(): void {
+    const activeId = this.combat.current.id;
     for (const c of this.combat.combatants) {
-      const body = this.bodies.get(c.id);
-      if (!body || c.hp <= 0) continue;
-      const isActive = c.id === this.combat.current.id;
-      body.setStrokeStyle(isActive ? 3 : 2, isActive ? COLOR_HIGHLIGHT : 0x0a0a14);
+      const ring = this.selRings.get(c.id);
+      if (!ring) continue;
+      ring.setVisible(c.id === activeId && c.hp > 0);
     }
   }
 
@@ -548,10 +607,28 @@ export class CombatScene extends Phaser.Scene {
     if (this.ended) return;
     this.ended = true;
     this.clearMoveHints();
-    if (this.combat.winner === "party") {
-      this.showOverlay("Victory!", "#a3d9a5");
-    } else if (this.combat.winner === "enemies") {
-      this.showOverlay("Defeat…", "#ff6b6b");
+
+    const winner = this.combat.winner;
+    if (winner === "party") this.showOverlay("Victory!", "#a3d9a5");
+    else if (winner === "enemies") this.showOverlay("Defeat…", "#ff6b6b");
+
+    // When launched from the overworld, return after a beat so the
+    // player can read the result. Mark the trigger consumed on victory
+    // so the same tile doesn't fight forever; flag defeat so the
+    // overworld can render its game-over state.
+    if (this.fromWorld) {
+      if (winner === "party" && this.triggerKey) {
+        gameState.consumedTriggers.add(this.triggerKey);
+      }
+      if (winner === "enemies") {
+        gameState.defeated = true;
+      }
+      this.time.delayedCall(1400, () => {
+        this.cameras.main.fadeOut(220, 0, 0, 0);
+        this.cameras.main.once("camerafadeoutcomplete", () => {
+          this.scene.start("OverworldScene");
+        });
+      });
     }
   }
 
