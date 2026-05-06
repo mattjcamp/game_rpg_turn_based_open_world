@@ -102,8 +102,8 @@ export class Combat {
    * spans the middle of the row.
    */
   private layoutFormations(party: Combatant[], enemies: Combatant[]): void {
-    const partyRow = ARENA_ROWS - 3;        // row 18 of 21 — second from the bottom
-    const enemyRow = 2;                     // row 2 — second from the top
+    const partyRow = ARENA_ROWS - 3;        // 2nd from bottom
+    const enemyRow = 2;                     // 2nd from top
     const midCol = Math.floor(ARENA_COLS / 2);
     const startCol = (n: number): number =>
       midCol - Math.floor(n / 2);

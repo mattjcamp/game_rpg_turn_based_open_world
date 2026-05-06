@@ -164,7 +164,7 @@ export class TownScene extends Phaser.Scene {
     // duplicates are no-ops.
     for (const f of [
       "alchemist", "barbarian", "cleric", "fighter",
-      "illusionist", "paladin", "ranger", "wizard",
+      "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
       const path = `/assets/characters/${f}.png`;
       this.load.image(path, path);

@@ -8,8 +8,12 @@
  * else here.
  */
 
+// Sized so 18×16 at the engine's native 32px tile fits inside the
+// 960×720 web canvas with room for a ~32px header bar and a ~120px
+// bottom log. The Python game uses 18×21 — we trim two rows off
+// each end to fit; the formation layout still has room to manoeuvre.
 export const ARENA_COLS = 18;
-export const ARENA_ROWS = 21;
+export const ARENA_ROWS = 16;
 
 export type Direction = "n" | "s" | "e" | "w";
 

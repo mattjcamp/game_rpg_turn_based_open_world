@@ -40,7 +40,14 @@ import { makeSampleParty, PARTY_SPRITES } from "../data/fighters";
 import { makeSampleEncounter, MONSTER_SPRITES } from "../data/monsters";
 import { gameState } from "../state";
 import { tileSpriteKey, populateRuntimeDefs, spriteManifest } from "../world/Tiles";
+import { loadItems, type Item } from "../world/Items";
+import { loadSpells, type Spell } from "../world/Spells";
+import { loadParty } from "../world/Party";
+import { defaultRng } from "../rng";
+import { resolveThrow, isThrowable, spellIsCombatCastable, resolveDamageSpell, resolveHealSpell } from "../combat/CombatActions";
+import { combatantsFromParty, syncCombatHpBack } from "../combat/CombatBridge";
 import type { Combatant, AttackResult } from "../types";
+import type { PartyMember } from "../world/Party";
 
 interface CombatSceneData {
   /** True when launched from the overworld; false for the /combat demo. */
@@ -56,20 +63,23 @@ interface CombatSceneData {
 }
 
 // ── Layout (canvas is 960×720) ────────────────────────────────────
-const TILE = 26;
+// TILE matches the rest of the engine (overworld + town interiors)
+// so monster / character sprites — which ship as native 32×32 PNGs
+// — render at their native size, not stretched.
+const TILE = 32;
 const HEADER_H = 32;
 const ARENA_X = 12;
 const ARENA_Y = HEADER_H + 8;             // 40
-const ARENA_W = ARENA_COLS * TILE;        // 18 × 26 = 468
-const ARENA_H = ARENA_ROWS * TILE;        // 21 × 26 = 546
-const HUD_X = ARENA_X + ARENA_W + 12;     // 492
-const HUD_W = 960 - HUD_X - 12;           // 456
+const ARENA_W = ARENA_COLS * TILE;        // 18 × 32 = 576
+const ARENA_H = ARENA_ROWS * TILE;        // 16 × 32 = 512
+const HUD_X = ARENA_X + ARENA_W + 12;     // 600
+const HUD_W = 960 - HUD_X - 12;           // 348
 const HUD_Y = ARENA_Y;
 const HUD_H = ARENA_H;
 const LOG_X = 12;
-const LOG_Y = ARENA_Y + ARENA_H + 8;      // 594
+const LOG_Y = ARENA_Y + ARENA_H + 8;      // 560
 const LOG_W = 960 - 24;                   // 936
-const LOG_H = 720 - LOG_Y - 12;           // 114
+const LOG_H = 720 - LOG_Y - 12;           // 148
 
 // ── Web-app theme palette (matches PartyScene + TownScene) ────────
 const C = {
@@ -96,22 +106,35 @@ const FONT_BODY  = (color: number = C.body) => ({ fontFamily: "Georgia, serif", 
 const FONT_MONO  = (color: number = C.dim)  => ({ fontFamily: "monospace",     fontSize: "12px", color: hex(color) });
 
 /** Action menu — what the active party member can do this turn. */
-type ActionId = "attack" | "end" | "flee" | "throw" | "defend";
+type ActionId = "attack" | "throw" | "cast" | "end" | "flee";
 
 interface ActionEntry {
   id: ActionId;
   label: string;
-  /** When false the row renders dim and Enter shows a "coming soon" line. */
-  enabled: boolean;
 }
 
 const PARTY_ACTIONS: ActionEntry[] = [
-  { id: "attack", label: "Attack",  enabled: true  },
-  { id: "end",    label: "End Turn", enabled: true },
-  { id: "flee",   label: "Flee",    enabled: true  },
-  { id: "throw",  label: "Throw",   enabled: false },
-  { id: "defend", label: "Defend",  enabled: false },
+  { id: "attack", label: "Attack"   },
+  { id: "throw",  label: "Throw"    },
+  { id: "cast",   label: "Cast"     },
+  { id: "end",    label: "End Turn" },
+  { id: "flee",   label: "Flee"     },
 ];
+
+/**
+ * Sub-modes the scene can be in:
+ *   - default:        action menu has focus, arrows move the avatar
+ *   - pick-throw:     player is choosing which item to throw
+ *   - pick-spell:     player is choosing which spell to cast
+ *   - pick-target:    player is choosing the enemy/ally for the staged
+ *                     action (numbered 1..N on the arena)
+ */
+type SceneMode = "default" | "pick-throw" | "pick-spell" | "pick-target";
+
+/** What to do once a target is picked. */
+type PendingAction =
+  | { kind: "throw"; item: Item }
+  | { kind: "cast"; spell: Spell };
 
 export class CombatScene extends Phaser.Scene {
   private combat!: Combat;
@@ -135,6 +158,20 @@ export class CombatScene extends Phaser.Scene {
   private actionRowHandles: Phaser.GameObjects.Rectangle[] = [];
   private actionCursor = 0;
 
+  // Sub-mode + picker state
+  private mode: SceneMode = "default";
+  private pendingAction: PendingAction | null = null;
+  /** Items the user can pick to throw — populated when entering pick-throw mode. */
+  private throwOptions: Array<{ item: Item; source: "personal" | "stash"; index: number }> = [];
+  private spellOptions: Spell[] = [];
+  /** Per-target arena badges shown during pick-target mode. */
+  private targetBadges: Phaser.GameObjects.Text[] = [];
+  /** Items + Spells data, loaded lazily. */
+  private items: Map<string, Item> = new Map();
+  private spells: Spell[] = [];
+  /** Picker overlay objects (cleared on mode transition). */
+  private pickerObjects: Phaser.GameObjects.GameObject[] = [];
+
   private busy = false;
   private ended = false;
   private overlayText?: Phaser.GameObjects.Text;
@@ -156,10 +193,27 @@ export class CombatScene extends Phaser.Scene {
     this.partyCards.clear();
     this.actionTexts.length = 0;
     this.actionRowHandles.length = 0;
+    this.mode = "default";
+    this.pendingAction = null;
+    this.throwOptions = [];
+    this.spellOptions = [];
+    this.targetBadges = [];
+    this.pickerObjects = [];
   }
 
   preload(): void {
     for (const path of [...PARTY_SPRITES, ...MONSTER_SPRITES]) {
+      this.load.image(path, path);
+    }
+    // The active party (when launched from the world) is built from
+    // data/party.json, so we don't know which class sprites we'll
+    // need until create() runs. Preload the whole shipped set so any
+    // PartyMember.sprite path resolves immediately when drawn.
+    for (const f of [
+      "alchemist", "barbarian", "cleric", "fighter",
+      "illusionist", "paladin", "ranger", "thief", "wizard",
+    ]) {
+      const path = `/assets/characters/${f}.png`;
       this.load.image(path, path);
     }
     // Tile sprites for the arena floor — load the full tile manifest
@@ -178,8 +232,31 @@ export class CombatScene extends Phaser.Scene {
     });
   }
 
-  create(): void {
-    const party = this.fromWorld ? gameState.party : makeSampleParty();
+  async create(): Promise<void> {
+    // Items + spells back the action sub-menus and the
+    // party-bridge's stat derivation, so load them up-front before
+    // we build Combat.
+    try {
+      this.items = await loadItems();
+      this.spells = await loadSpells();
+      // Make sure partyData is loaded too — the world scenes load it
+      // lazily but combat may be entered before any party screen has
+      // been opened.
+      if (!gameState.partyData) gameState.partyData = await loadParty();
+    } catch {
+      // Combat is still playable with melee only; just skip the
+      // data-driven rows.
+    }
+
+    // Use the real roster when launched from the world. The /combat
+    // demo route still uses the hand-built sample party so it's
+    // self-contained for testing.
+    let party: Combatant[];
+    if (this.fromWorld && gameState.partyData) {
+      party = combatantsFromParty(gameState.partyData, this.items);
+    } else {
+      party = makeSampleParty();
+    }
     this.combat = new Combat(party, makeSampleEncounter());
     this.cameras.main.setBackgroundColor("#0c0c14");
     this.cameras.main.fadeIn(220, 0, 0, 0);
@@ -192,6 +269,25 @@ export class CombatScene extends Phaser.Scene {
     this.installInput();
 
     this.refreshAll();
+    // If an enemy won initiative the encounter opens on their turn —
+    // hand control straight to the AI loop. Without this the screen
+    // freezes on "GOBLIN'S TURN" with the action menu dimmed because
+    // the player can't act and nothing schedules the monster turn.
+    this.kickOffCurrentTurn();
+  }
+
+  /**
+   * If the current actor is on the enemy side, schedule the monster
+   * AI loop after a short pause. Used both at scene-create (in case
+   * an enemy won initiative) and after every endTurn so consecutive
+   * enemy turns chain cleanly.
+   */
+  private kickOffCurrentTurn(): void {
+    if (this.combat.isOver || this.ended) return;
+    if (this.combat.current.side === "enemies") {
+      this.busy = true;
+      this.time.delayedCall(450, () => void this.runMonsterTurn());
+    }
   }
 
   // ── Static panels ───────────────────────────────────────────────
@@ -231,9 +327,10 @@ export class CombatScene extends Phaser.Scene {
         }
         // Open floor — terrain sprite if available, otherwise a
         // moody dark green that reads as "field" without leaning on
-        // U3 styling.
+        // U3 styling. Tile sprites are native 32×32 so we don't
+        // force-resize.
         if (terrainKey && this.textures.exists(terrainKey)) {
-          this.add.image(x, y, terrainKey).setOrigin(0).setDisplaySize(TILE, TILE);
+          this.add.image(x, y, terrainKey).setOrigin(0);
         } else {
           this.add
             .rectangle(x, y, TILE, TILE, 0x14241a, 1)
@@ -286,7 +383,9 @@ export class CombatScene extends Phaser.Scene {
         .setOrigin(0)
         .setInteractive({ useHandCursor: true });
       handle.on("pointerdown", () => {
-        if (!a.enabled) return;
+        // refreshActionMenu has the canonical enable check — re-use
+        // it by setting cursor + activating; activate() bails if the
+        // row is disabled at that moment.
         this.actionCursor = i;
         this.activateAction();
       });
@@ -356,8 +455,9 @@ export class CombatScene extends Phaser.Scene {
       this.selRings.set(c.id, ring);
       let body: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
       if (c.sprite && this.textures.exists(c.sprite)) {
+        // Sprites are native 32×32 — render unscaled so transparency
+        // holds and the pixel art stays crisp.
         body = this.add.image(x, y, c.sprite);
-        body.setDisplaySize(TILE, TILE);
       } else {
         const colorHex = Phaser.Display.Color.GetColor(...c.color);
         body = this.add
@@ -382,6 +482,49 @@ export class CombatScene extends Phaser.Scene {
     });
     k.on("keydown-ENTER", () => this.activateAction());
     k.on("keydown-SPACE", () => this.activateAction());
+    k.on("keydown-ESC",   () => this.cancelSubMode());
+    // Number keys 1..9 dispatch through pick-throw / pick-spell /
+    // pick-target sub-modes. We register a handler per digit since
+    // Phaser keys are individual.
+    for (let i = 1; i <= 9; i++) {
+      k.on(`keydown-${["ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE"][i-1]}`, () => this.onDigit(i));
+    }
+  }
+
+  /** ESC backs out of any sub-mode, or does nothing in default mode. */
+  private cancelSubMode(): void {
+    if (this.mode === "default") return;
+    this.mode = "default";
+    this.pendingAction = null;
+    this.throwOptions = [];
+    this.spellOptions = [];
+    this.clearPicker();
+    this.clearTargetBadges();
+    this.refreshAll();
+  }
+
+  /** Number-key dispatch — meaning depends on current sub-mode. */
+  private onDigit(n: number): void {
+    if (this.mode === "pick-throw") {
+      const opt = this.throwOptions[n - 1];
+      if (!opt) return;
+      this.startTargetingFor({ kind: "throw", item: opt.item }, "enemies");
+      this.consumeThrowItem(opt);
+      return;
+    }
+    if (this.mode === "pick-spell") {
+      const spell = this.spellOptions[n - 1];
+      if (!spell) return;
+      const allyTarget = spell.effect_type === "heal" || spell.effect_type === "major_heal";
+      this.startTargetingFor({ kind: "cast", spell }, allyTarget ? "party" : "enemies");
+      return;
+    }
+    if (this.mode === "pick-target") {
+      const targets = this.currentTargetList();
+      const target = targets[n - 1];
+      if (target) this.resolveTarget(target);
+      return;
+    }
   }
 
   /**
@@ -406,26 +549,37 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private moveActionCursor(delta: number): void {
-    const enabled = PARTY_ACTIONS.map((a, i) => (a.enabled ? i : -1)).filter((i) => i >= 0);
-    if (enabled.length === 0) return;
-    const cur = enabled.indexOf(this.actionCursor);
-    const next = (cur + delta + enabled.length) % enabled.length;
-    this.actionCursor = enabled[next];
+    if (this.mode !== "default") return;
+    const member = this.memberForCurrent();
+    const canThrow = !!member && this.partyHasThrowable();
+    const canCast =
+      !!member && member.maxMp != null &&
+      this.spells.some(
+        (s) =>
+          spellIsCombatCastable(s, member.class) &&
+          (member.mp ?? 0) >= s.mp_cost
+      );
+    const enabledIdx = PARTY_ACTIONS
+      .map((a, i) => {
+        if (a.id === "throw" && !canThrow) return -1;
+        if (a.id === "cast"  && !canCast)  return -1;
+        return i;
+      })
+      .filter((i) => i >= 0);
+    if (enabledIdx.length === 0) return;
+    let cur = enabledIdx.indexOf(this.actionCursor);
+    if (cur < 0) cur = 0;
+    const next = (cur + delta + enabledIdx.length) % enabledIdx.length;
+    this.actionCursor = enabledIdx[next];
     this.refreshActionMenu();
   }
 
   private activateAction(): void {
     if (!this.canTakePlayerInput()) return;
+    if (this.mode !== "default") return; // sub-modes use number keys
     const a = PARTY_ACTIONS[this.actionCursor];
     if (!a) return;
-    if (!a.enabled) {
-      this.combat.log.push(`(${a.label} is not implemented yet.)`);
-      this.refreshLog();
-      return;
-    }
     if (a.id === "attack") {
-      // Find an adjacent enemy and bump-attack. If none, the action
-      // does nothing visible — the log records the attempt.
       const me = this.combat.current;
       const dirs: Direction[] = ["n", "s", "e", "w"];
       const offsets: Record<Direction, [number, number]> = {
@@ -443,8 +597,227 @@ export class CombatScene extends Phaser.Scene {
       this.refreshLog();
       return;
     }
+    if (a.id === "throw") return this.openThrowPicker();
+    if (a.id === "cast")  return this.openSpellPicker();
     if (a.id === "end")  return this.onEndTurnClicked();
     if (a.id === "flee") return this.onFleeClicked();
+  }
+
+  // ── Throw / Cast / Target sub-modes ──────────────────────────────
+
+  /** PartyMember matched to the active combatant by name (best-effort). */
+  private memberForCurrent(): PartyMember | null {
+    const c = this.combat.current;
+    if (c.side !== "party") return null;
+    const data = gameState.partyData;
+    if (!data) return null;
+    return data.roster.find((m) => m.name === c.name) ?? null;
+  }
+
+  private openThrowPicker(): void {
+    const member = this.memberForCurrent();
+    const party = gameState.partyData;
+    const opts: typeof this.throwOptions = [];
+    // Personal inventory first, then shared stash. Filter to throwables.
+    if (member) {
+      member.inventory.forEach((it, idx) => {
+        const def = this.items.get(it.item);
+        if (def && isThrowable(def)) {
+          opts.push({ item: def, source: "personal", index: idx });
+        }
+      });
+    }
+    if (party) {
+      party.inventory.forEach((it, idx) => {
+        const def = this.items.get(it.item);
+        if (def && isThrowable(def)) {
+          opts.push({ item: def, source: "stash", index: idx });
+        }
+      });
+    }
+    if (opts.length === 0) {
+      this.combat.log.push(`${this.combat.current.name} has nothing to throw.`);
+      this.refreshLog();
+      return;
+    }
+    this.throwOptions = opts.slice(0, 9); // cap at 9 (digit keys)
+    this.mode = "pick-throw";
+    this.renderPicker(
+      "PICK ITEM TO THROW",
+      this.throwOptions.map((o, i) => `[${i + 1}] ${o.item.name} (pwr ${o.item.power ?? 1})`)
+    );
+  }
+
+  private openSpellPicker(): void {
+    const member = this.memberForCurrent();
+    if (!member) return;
+    const opts = this.spells.filter(
+      (s) =>
+        spellIsCombatCastable(s, member.class) &&
+        member.maxMp != null &&
+        (member.mp ?? 0) >= s.mp_cost
+    );
+    if (opts.length === 0) {
+      this.combat.log.push(`${this.combat.current.name} has no spell to cast.`);
+      this.refreshLog();
+      return;
+    }
+    this.spellOptions = opts.slice(0, 9);
+    this.mode = "pick-spell";
+    this.renderPicker(
+      "PICK SPELL",
+      this.spellOptions.map(
+        (s, i) => `[${i + 1}] ${s.name}  (${s.mp_cost} MP)`
+      )
+    );
+  }
+
+  /** Splice the picked throw item out of its source list now (so the
+   *  player can't pick it again if the throw misses). */
+  private consumeThrowItem(opt: typeof this.throwOptions[number]): void {
+    const member = this.memberForCurrent();
+    const party = gameState.partyData;
+    if (opt.source === "personal" && member) {
+      member.inventory.splice(opt.index, 1);
+    } else if (opt.source === "stash" && party) {
+      party.inventory.splice(opt.index, 1);
+    }
+  }
+
+  private startTargetingFor(action: PendingAction, side: "party" | "enemies"): void {
+    this.pendingAction = action;
+    this.mode = "pick-target";
+    this.clearPicker();
+    this.drawTargetBadges(side);
+  }
+
+  private currentTargetList(): Combatant[] {
+    if (!this.pendingAction) return [];
+    const side = this.pendingAction.kind === "cast" &&
+                 (this.pendingAction.spell.effect_type === "heal" ||
+                  this.pendingAction.spell.effect_type === "major_heal")
+      ? "party" : "enemies";
+    return this.combat.combatants
+      .filter((c) => c.side === side && c.hp > 0)
+      .slice(0, 9);
+  }
+
+  private async resolveTarget(target: Combatant): Promise<void> {
+    const action = this.pendingAction;
+    if (!action) return;
+    const me = this.combat.current;
+    this.busy = true;
+    this.clearTargetBadges();
+    this.mode = "default";
+    try {
+      if (action.kind === "throw") {
+        const result = resolveThrow(me, target, action.item, defaultRng);
+        this.combat.log.push(
+          result.hit
+            ? `${me.name} throws ${action.item.name} at ${target.name} (d20:${result.roll}=${result.total} vs AC${target.ac}) — ${result.damage} dmg${result.killed ? ", defeated!" : "."}`
+            : `${me.name} throws ${action.item.name} at ${target.name} — miss.`
+        );
+        await this.animateBump(me, me.position, target.position);
+        await this.animateHit(target, result);
+        this.refreshHp(target);
+      } else if (action.kind === "cast") {
+        const spell = action.spell;
+        const member = this.memberForCurrent();
+        if (member && member.maxMp != null) {
+          member.mp = Math.max(0, (member.mp ?? 0) - spell.mp_cost);
+        }
+        if (spell.effect_type === "heal" || spell.effect_type === "major_heal") {
+          const r = resolveHealSpell(me, target, spell, defaultRng);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — heals ${r.heal} HP.`
+          );
+          this.refreshHp(target);
+        } else {
+          const r = resolveDamageSpell(me, target, spell, defaultRng);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
+          );
+          await this.animateHit(target, r);
+          this.refreshHp(target);
+        }
+      }
+      // Throw / cast each consume the rest of the turn.
+      this.combat.movePoints = 0;
+      this.refreshAll();
+      if (this.combat.isOver) return this.endEncounter();
+      this.endActorTurn();
+    } finally {
+      this.pendingAction = null;
+      this.busy = false;
+    }
+  }
+
+  // ── Picker / target overlays ─────────────────────────────────────
+
+  private renderPicker(title: string, lines: string[]): void {
+    this.clearPicker();
+    // Overlay panel inside the right HUD — sits over the action menu.
+    const x = HUD_X + 6, y = HUD_Y + HUD_H - 6 - (lines.length + 3) * 18 - 12;
+    const w = HUD_W - 12, h = (lines.length + 3) * 18 + 16;
+    const bg = this.add
+      .rectangle(x, y, w, h, 0x10101a, 0.98)
+      .setOrigin(0)
+      .setStrokeStyle(2, C.accent);
+    this.pickerObjects.push(bg);
+    this.pickerObjects.push(
+      this.add.text(x + 10, y + 6, title, FONT_HEAD(C.accent))
+    );
+    lines.forEach((line, i) => {
+      this.pickerObjects.push(
+        this.add.text(x + 10, y + 28 + i * 18, line, FONT_BODY())
+      );
+    });
+    this.pickerObjects.push(
+      this.add.text(x + 10, y + h - 18, "[ESC] cancel", FONT_MONO(C.faint))
+    );
+  }
+
+  private clearPicker(): void {
+    for (const o of this.pickerObjects) o.destroy();
+    this.pickerObjects = [];
+  }
+
+  /** Draw 1..N badges over each valid target on the arena. */
+  private drawTargetBadges(side: "party" | "enemies"): void {
+    this.clearTargetBadges();
+    const targets = this.combat.combatants
+      .filter((c) => c.side === side && c.hp > 0)
+      .slice(0, 9);
+    targets.forEach((t, i) => {
+      const x = this.tileX(t.position.col);
+      const y = this.tileY(t.position.row) - TILE / 2 - 4;
+      const badge = this.add
+        .text(x, y, `${i + 1}`, {
+          fontFamily: "Georgia, serif",
+          fontSize: "16px",
+          color: hex(C.gold),
+          stroke: "#1a1a2e",
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 1);
+      this.targetBadges.push(badge);
+      // Click target sprite directly to confirm.
+      const body = this.bodies.get(t.id);
+      if (body) {
+        body.setInteractive({ useHandCursor: true });
+        body.once("pointerdown", () => this.resolveTarget(t));
+      }
+    });
+  }
+
+  private clearTargetBadges(): void {
+    for (const b of this.targetBadges) b.destroy();
+    this.targetBadges = [];
+    // Drop the one-shot listeners we attached.
+    for (const c of this.combat.combatants) {
+      const body = this.bodies.get(c.id);
+      if (body) body.off("pointerdown");
+    }
   }
 
   private onTileClicked(col: number, row: number): void {
@@ -512,10 +885,7 @@ export class CombatScene extends Phaser.Scene {
     this.combat.endTurn();
     this.refreshAll();
     if (this.combat.isOver) return this.endEncounter();
-    if (this.combat.current.side === "enemies") {
-      this.busy = true;
-      this.time.delayedCall(450, () => void this.runMonsterTurn());
-    }
+    this.kickOffCurrentTurn();
   }
 
   private async runMonsterTurn(): Promise<void> {
@@ -671,22 +1041,50 @@ export class CombatScene extends Phaser.Scene {
 
   private refreshActionMenu(): void {
     const playerTurn = this.combat.current.side === "party";
+    const member = this.memberForCurrent();
+    // Per-action enable state — dynamic based on the active member.
+    const canThrow = !!member && this.partyHasThrowable();
+    const canCast =
+      !!member &&
+      member.maxMp != null &&
+      this.spells.some(
+        (s) =>
+          spellIsCombatCastable(s, member.class) &&
+          (member.mp ?? 0) >= s.mp_cost
+      );
+    const isEnabled = (id: ActionId): boolean => {
+      if (!playerTurn) return false;
+      if (id === "throw") return canThrow;
+      if (id === "cast")  return canCast;
+      return true;
+    };
     for (let i = 0; i < PARTY_ACTIONS.length; i++) {
       const a = PARTY_ACTIONS[i];
       const text = this.actionTexts[i];
       const handle = this.actionRowHandles[i];
+      const enabled = isEnabled(a.id);
       const cursor = playerTurn && i === this.actionCursor;
-      const color = !playerTurn || !a.enabled ? C.faint
-                  : cursor ? C.body : C.dim;
+      const color = !enabled ? C.faint : cursor ? C.body : C.dim;
       text.setStyle(FONT_BODY(color));
       const prefix = cursor ? "> " : "  ";
-      text.setText(`${prefix}${a.label}${a.enabled ? "" : "  (coming soon)"}`);
-      handle.setFillStyle(C.selectBg, cursor ? 1 : 0);
-      // Cursor accent bar on the left edge
-      if (cursor) {
-        handle.setStrokeStyle(0);
-      }
+      const suffix = enabled ? "" : "  —";
+      text.setText(`${prefix}${a.label}${suffix}`);
+      handle.setFillStyle(C.selectBg, cursor && enabled ? 1 : 0);
     }
+  }
+
+  /** True when active member or shared stash has at least one item
+   *  the items catalog flags as throwable / ranged. */
+  private partyHasThrowable(): boolean {
+    const member = this.memberForCurrent();
+    const party = gameState.partyData;
+    const check = (name: string) => {
+      const def = this.items.get(name);
+      return !!def && isThrowable(def);
+    };
+    if (member && member.inventory.some((it) => check(it.item))) return true;
+    if (party && party.inventory.some((it) => check(it.item))) return true;
+    return false;
   }
 
   private refreshHp(c: Combatant): void {
@@ -760,6 +1158,13 @@ export class CombatScene extends Phaser.Scene {
       }
       if (winner === "enemies") {
         gameState.defeated = true;
+      }
+      // Carry HP back to the live roster so wounds persist across
+      // encounters. Pretty important now that combat reads the real
+      // party — without this, every encounter would refresh HP from
+      // the (frozen) party.json values.
+      if (gameState.partyData) {
+        syncCombatHpBack(gameState.partyData, this.combat.combatants);
       }
       this.time.delayedCall(1400, () => {
         this.cameras.main.fadeOut(220, 0, 0, 0);

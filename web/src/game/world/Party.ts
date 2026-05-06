@@ -100,7 +100,7 @@ interface RawParty {
  */
 const SHIPPED_CHARACTER_SPRITES = new Set([
   "alchemist", "barbarian", "cleric", "fighter",
-  "illusionist", "paladin", "ranger", "wizard",
+  "illusionist", "paladin", "ranger", "thief", "wizard",
 ]);
 
 export function spriteForMember(rawSprite: string | undefined, klass: string): string {

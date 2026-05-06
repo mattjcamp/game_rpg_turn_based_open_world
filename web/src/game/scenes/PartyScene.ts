@@ -205,7 +205,7 @@ export class PartyScene extends Phaser.Scene {
   preload(): void {
     for (const f of [
       "alchemist", "barbarian", "cleric", "fighter",
-      "illusionist", "paladin", "ranger", "wizard",
+      "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
       const path = `/assets/characters/${f}.png`;
       this.load.image(path, path);

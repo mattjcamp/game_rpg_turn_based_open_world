@@ -11,39 +11,46 @@
       "class": "Fighter",
       "race": "Dwarf",
       "gender": "Male",
-      "hp": 20,
+      "hp": 60,
       "strength": 18,
       "dexterity": 14,
       "intelligence": 9,
       "wisdom": 9,
-      "level": 1,
+      "level": 10,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Sword",
         "left_hand": null,
-        "body": "Cloth",
+        "body": "Chain",
         "head": null
       },
-      "inventory": [],
-      "sprite": "src/assets/game/npcs/shopkeep.png"
+      "inventory": [
+        { "item": "Crossbow" },
+        { "item": "Bolts", "charges": 15 }
+      ],
+      "sprite": "src/assets/game/characters/fighter.png"
     },
     {
       "name": "Merry",
       "class": "Thief",
       "race": "Halfling",
       "gender": "Male",
-      "hp": 20,
+      "hp": 45,
+      "mp": 0,
       "strength": 12,
       "dexterity": 18,
       "intelligence": 10,
       "wisdom": 10,
-      "level": 1,
+      "level": 10,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Dagger",
         "left_hand": null,
-        "body": "Cloth",
+        "body": "Leather",
         "head": null
       },
-      "inventory": [],
+      "inventory": [
+        { "item": "Short Bow" },
+        { "item": "Arrows", "charges": 20 }
+      ],
       "sprite": "src/assets/game/characters/thief.png"
     },
     {
@@ -51,36 +58,38 @@
       "class": "Wizard",
       "race": "Elf",
       "gender": "Male",
-      "hp": 20,
+      "hp": 35,
+      "mp": 40,
       "strength": 9,
       "dexterity": 11,
       "intelligence": 18,
       "wisdom": 12,
-      "level": 1,
+      "level": 10,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Dagger",
         "left_hand": null,
         "body": "Cloth",
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/npcs/vga_evil_mage.png"
+      "sprite": "src/assets/game/characters/wizard.png"
     },
     {
       "name": "Selina",
       "class": "Cleric",
       "race": "Human",
       "gender": "Female",
-      "hp": 20,
+      "hp": 45,
+      "mp": 38,
       "strength": 10,
       "dexterity": 12,
       "intelligence": 10,
       "wisdom": 18,
-      "level": 1,
+      "level": 10,
       "equipped": {
-        "right_hand": "Fists",
+        "right_hand": "Mace",
         "left_hand": null,
-        "body": "Cloth",
+        "body": "Chain",
         "head": null
       },
       "inventory": [],
