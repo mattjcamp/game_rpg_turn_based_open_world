@@ -61,6 +61,11 @@ import {
   equipItemFromInventory,
   equipItemIntoSlot,
   unequipSlot,
+  hasClass,
+  hasRace,
+  brewPotion,
+  pickpocket,
+  tinker,
 } from "../world/PartyActions";
 import {
   loadItems,
@@ -96,7 +101,18 @@ const FONT_BODY  = (color: number = C.body) => ({ fontFamily: "Georgia, serif", 
 const FONT_MONO  = (color: number = C.dim)  => ({ fontFamily: "monospace",     fontSize: "12px", color: hex(color) });
 const FONT_HINT  = (color: number = C.dim)  => ({ fontFamily: "monospace",     fontSize: "12px", color: hex(color) });
 
-interface PartySceneData { from?: string }
+interface PartySceneData {
+  /** Scene key to resume on close. */
+  from?: string;
+  /**
+   * Number of NPCs adjacent to the party in the launching scene. Used
+   * to gate the PICKPOCKET action — the Python game requires at least
+   * one adjacent NPC. The launching scene computes this in 8 directions
+   * around the player before launching the overlay; OverworldScene
+   * passes 0.
+   */
+  nearbyNpcCount?: number;
+}
 
 /**
  * Sub-modes the screen can be in:
@@ -117,6 +133,9 @@ type Mode = "inventory" | "spell-list" | "spell-target" | "give-item" | "detail"
 type ListRow =
   | { kind: "effect"; effect: Effect; equipped: boolean; available: boolean }
   | { kind: "cast" }
+  | { kind: "brew" }
+  | { kind: "pickpocket" }
+  | { kind: "tinker" }
   | { kind: "header"; label: string }
   | { kind: "item"; index: number; name: string; charges?: number };
 
@@ -126,6 +145,8 @@ type SpellRow = { spell: Spell; castable: boolean };
 
 export class PartyScene extends Phaser.Scene {
   private from = "OverworldScene";
+  /** NPCs within 1 tile (8-direction) of the party in the launching scene. */
+  private nearbyNpcCount = 0;
   private party: Party | null = null;
   private effects: Effect[] = [];
   private spells: Spell[] = [];
@@ -166,6 +187,7 @@ export class PartyScene extends Phaser.Scene {
 
   init(data?: PartySceneData): void {
     this.from = data?.from ?? "OverworldScene";
+    this.nearbyNpcCount = data?.nearbyNpcCount ?? 0;
     this.mode = "inventory";
     this.cursor = 0;
     this.detailIndex = 0;
@@ -224,6 +246,15 @@ export class PartyScene extends Phaser.Scene {
     }
     rows.push({ kind: "header", label: "" });
     rows.push({ kind: "cast" });
+
+    // Conditional ability rows — show only when the appropriate
+    // class / race is alive in the active party. Mirrors the Python
+    // game's gating in inventory_mixin._can_pickpocket / _can_tinker
+    // / _has_alchemist.
+    if (hasClass(members, "Alchemist"))  rows.push({ kind: "brew" });
+    if (hasRace(members,  "Halfling"))   rows.push({ kind: "pickpocket" });
+    if (hasRace(members,  "Gnome"))      rows.push({ kind: "tinker" });
+
     rows.push({ kind: "header", label: "" });
     rows.push({ kind: "header", label: `SHARED STASH  (${this.party.inventory.length} items)` });
     this.party.inventory.forEach((it, i) => {
@@ -434,6 +465,38 @@ export class PartyScene extends Phaser.Scene {
 
     if (row.kind === "cast") {
       this.openSpellList();
+      return;
+    }
+
+    if (row.kind === "brew") {
+      const r = brewPotion(this.party, members);
+      this.feedback = r.message;
+      this.buildRows();
+      this.render();
+      return;
+    }
+    if (row.kind === "pickpocket") {
+      // The Python game requires at least one NPC adjacent (8-dir) to
+      // the party in town. If we were launched from a scene with no
+      // adjacent NPCs (overworld, or an empty patch of town), refuse
+      // here — the underlying loot roll only fires once a target is
+      // in reach.
+      if (this.nearbyNpcCount === 0) {
+        this.feedback = "No one nearby to pickpocket.";
+        this.render();
+        return;
+      }
+      const r = pickpocket(this.party, members);
+      this.feedback = r.message;
+      this.buildRows();
+      this.render();
+      return;
+    }
+    if (row.kind === "tinker") {
+      const r = tinker(this.party, members);
+      this.feedback = r.message;
+      this.buildRows();
+      this.render();
       return;
     }
 
@@ -761,6 +824,18 @@ export class PartyScene extends Phaser.Scene {
       } else if (r.kind === "cast") {
         this.text(x + padX, ry + 2, "CAST SPELL", FONT_BODY(C.body));
         this.text(x + w - padX, ry + 2, "ENTER", FONT_MONO(C.gold), [1, 0]);
+      } else if (r.kind === "brew") {
+        // Class-coloured row hints (mirror the Python palette: a
+        // soft purple for brew, gold for pickpocket, leafy green
+        // for tinker).
+        this.text(x + padX, ry + 2, "BREW POTIONS", FONT_BODY(0xc8a0ff));
+        this.text(x + w - padX, ry + 2, "ALCHEMIST", FONT_MONO(C.dim), [1, 0]);
+      } else if (r.kind === "pickpocket") {
+        this.text(x + padX, ry + 2, "PICKPOCKET", FONT_BODY(0xe6c878));
+        this.text(x + w - padX, ry + 2, "HALFLING", FONT_MONO(C.dim), [1, 0]);
+      } else if (r.kind === "tinker") {
+        this.text(x + padX, ry + 2, "TINKER", FONT_BODY(0x9cd49c));
+        this.text(x + w - padX, ry + 2, "GNOME", FONT_MONO(C.dim), [1, 0]);
       } else if (r.kind === "item") {
         const charges = r.charges != null ? `  (${r.charges})` : "";
         this.text(x + padX, ry + 2, r.name + charges, FONT_BODY(C.body));
@@ -1005,6 +1080,44 @@ export class PartyScene extends Phaser.Scene {
                 "Open the spell list — pick any spell a caster in the party can use right now.",
                 FONT_BODY(C.dim), [0, 0], w);
       this.text(x, y + h - 18, "Enter to open the spell list", FONT_MONO(C.gold));
+      return;
+    }
+    if (row.kind === "brew") {
+      this.text(x, y, "BREW POTIONS", FONT_HEAD());
+      this.text(x, y + 24,
+                "Your Alchemist mixes a random potion (Healing, Mana, Antidote, "
+                + "or one of the Elixirs) into the shared stash.",
+                FONT_BODY(C.dim), [0, 0], w);
+      this.text(x, y + h - 18, "Enter to brew", FONT_MONO(C.gold));
+      return;
+    }
+    if (row.kind === "pickpocket") {
+      const ready = this.nearbyNpcCount > 0;
+      this.text(x, y, "PICKPOCKET", FONT_HEAD(ready ? C.gold : C.faint));
+      this.text(x, y + 24,
+                "Your Halfling lifts something useful from a nearby NPC. "
+                + "Could be coins, herbs, arrows, even a Dagger.",
+                FONT_BODY(C.dim), [0, 0], w);
+      // Status line — "Ready" when the launching scene reported at least
+      // one adjacent NPC, otherwise an instruction.
+      this.text(x, y + h - 38,
+                ready
+                  ? `${this.nearbyNpcCount} target${this.nearbyNpcCount === 1 ? "" : "s"} within reach.`
+                  : "Stand next to an NPC in a town, then re-open this menu.",
+                FONT_MONO(ready ? C.gold : C.faint), [0, 0], w);
+      this.text(x, y + h - 18,
+                ready ? "Enter to attempt a pickpocket"
+                      : "No target — Enter has no effect",
+                FONT_MONO(ready ? C.gold : C.faint));
+      return;
+    }
+    if (row.kind === "tinker") {
+      this.text(x, y, "TINKER", FONT_HEAD());
+      this.text(x, y + 24,
+                "Your Gnome cobbles together a utility item — a lockpick, "
+                + "torch, arrows, bolts, or camping supplies.",
+                FONT_BODY(C.dim), [0, 0], w);
+      this.text(x, y + h - 18, "Enter to tinker", FONT_MONO(C.gold));
       return;
     }
     if (row.kind === "item") {

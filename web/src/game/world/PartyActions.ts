@@ -51,6 +51,92 @@ export interface ActionResult {
   message: string;
 }
 
+// ── Party composition helpers ──────────────────────────────────────
+// Used to gate the conditional ability rows (BREW / PICKPOCKET /
+// TINKER) on the Party Inventory screen.
+
+/** True iff at least one alive member belongs to the given class. */
+export function hasClass(members: PartyMember[], klass: string): boolean {
+  const k = klass.toLowerCase();
+  return members.some((m) => m.hp > 0 && m.class.toLowerCase() === k);
+}
+
+/** True iff at least one alive member belongs to the given race. */
+export function hasRace(members: PartyMember[], race: string): boolean {
+  const r = race.toLowerCase();
+  return members.some((m) => m.hp > 0 && m.race.toLowerCase() === r);
+}
+
+/** Find the first alive member matching a class (case-insensitive). */
+export function findClass(
+  members: PartyMember[], klass: string,
+): PartyMember | null {
+  const k = klass.toLowerCase();
+  return members.find((m) => m.hp > 0 && m.class.toLowerCase() === k) ?? null;
+}
+
+/** Find the first alive member matching a race (case-insensitive). */
+export function findRace(
+  members: PartyMember[], race: string,
+): PartyMember | null {
+  const r = race.toLowerCase();
+  return members.find((m) => m.hp > 0 && m.race.toLowerCase() === r) ?? null;
+}
+
+// ── Active-effect predicates / lighting boosts ─────────────────────
+
+/** True when the party currently has the named effect equipped. */
+export function partyHasEffect(party: Party, effectId: string): boolean {
+  for (const v of Object.values(party.partyEffects)) {
+    if (v === effectId) return true;
+  }
+  return false;
+}
+
+/**
+ * The party's effective light radius (in tiles) for the lighting
+ * overlay. Mirrors the Python game's "party has light" predicate
+ * (`interior_lighting.party_has_light`) — Infravision and
+ * Galadriel's Light each act as a light source carried by the
+ * party. Returns the larger of the boost and the supplied default.
+ *
+ * Numbers picked to roughly match the look of the pygame version:
+ *   - Infravision: 8 tiles (effectively floods a small interior)
+ *   - Galadriel's Light: 5 tiles (warm, more local pool)
+ *   - default: whatever the caller passed in
+ */
+export function partyLightRadius(party: Party, defaultRadius: number): number {
+  if (partyHasEffect(party, "infravision")) return Math.max(defaultRadius, 8);
+  if (partyHasEffect(party, "galadriels_light")) return Math.max(defaultRadius, 5);
+  return defaultRadius;
+}
+
+/**
+ * Post-processing tint for the party light. Mirrors the pygame
+ * tints: Infravision shifts the visible area to red ("infrared"),
+ * Galadriel's Light to a cool, washed-out blue ("moonlight").
+ *
+ * Returns the colour and an alpha scaling factor — callers multiply
+ * the scale by the per-cell brightness so the tint fades with the
+ * party light's range. Returns null when no tinting effect is
+ * equipped.
+ */
+export interface PartyTint {
+  color: number;
+  alphaScale: number;
+}
+export function partyLightTint(party: Party): PartyTint | null {
+  // Infravision wins when both are equipped — same precedence the
+  // Python renderer uses (`if has_infravision and not has_equipped_light`).
+  if (partyHasEffect(party, "infravision")) {
+    return { color: 0xc02020, alphaScale: 0.55 };
+  }
+  if (partyHasEffect(party, "galadriels_light")) {
+    return { color: 0x9bb6e0, alphaScale: 0.45 };
+  }
+  return null;
+}
+
 // ── Effects ────────────────────────────────────────────────────────
 
 /**
@@ -280,6 +366,131 @@ export function unequipSlot(
     ok: true,
     message: `${member.name} unequips ${current}.`,
   };
+}
+
+// ── Race / class abilities (BREW / PICKPOCKET / TINKER) ────────────
+//
+// These three rows live between CAST SPELL and SHARED STASH on the
+// Party Inventory screen, conditional on the right party member
+// being present:
+//   BREW POTIONS — when an Alchemist is in the party (class).
+//   PICKPOCKET   — when a Halfling is in the party (race).
+//   TINKER       — when a Gnome is in the party (race).
+//
+// V1 implementation: each press picks a random item from a small
+// table and adds it to the shared stash. Once-per-day gating, the
+// in-town adjacent-NPC requirement for pickpocket, and the bigger
+// dice/skill-check workflow can layer on later — these stubs just
+// surface the actions and prove the gating works.
+
+/**
+ * Pick one element from a weight × value list. `[weight, value][]`.
+ */
+function pickWeighted<T>(
+  table: ReadonlyArray<readonly [number, T]>,
+  rng: () => number = Math.random,
+): T {
+  const total = table.reduce((s, [w]) => s + w, 0);
+  let roll = rng() * total;
+  for (const [w, v] of table) {
+    roll -= w;
+    if (roll <= 0) return v;
+  }
+  return table[table.length - 1][1];
+}
+
+/** Mirror of `_PICKPOCKET_LOOT` in the Python inventory_mixin. */
+const PICKPOCKET_LOOT: ReadonlyArray<readonly [number, string]> = [
+  [25, "Gold"],            // special-cased below — adds gold instead of an item
+  [20, "Healing Herb"],
+  [12, "Torch"],
+  [10, "Arrows"],
+  [10, "Antidote"],
+  [8,  "Lockpick"],
+  [5,  "Dagger"],
+  [4,  "Mana Potion"],
+  [3,  "Stones"],
+  [2,  "Smoke Bomb"],
+  [1,  "Holy Water"],
+];
+
+/**
+ * A Halfling tries to pickpocket. Picks a random reward from the
+ * loot table, adding either gold or an item to the shared stash.
+ * Returns a feedback line.
+ *
+ * The Python game gates this on an adjacent NPC + a DEX skill check;
+ * we elide both for the menu-cast version (the screen has no notion
+ * of which NPC is adjacent today). A later slice can wire in the
+ * scene-context to do the proper check.
+ */
+export function pickpocket(
+  party: Party,
+  members: PartyMember[],
+  rng: () => number = Math.random,
+): ActionResult {
+  const halfling = findRace(members, "Halfling");
+  if (!halfling) {
+    return { ok: false, message: "No Halfling in the party." };
+  }
+  const reward = pickWeighted(PICKPOCKET_LOOT, rng);
+  if (reward === "Gold") {
+    const amount = 3 + Math.floor(rng() * 13); // 3–15 inclusive
+    party.gold += amount;
+    return { ok: true, message: `${halfling.name} pilfers ${amount} gold.` };
+  }
+  party.inventory.push({ item: reward });
+  return { ok: true, message: `${halfling.name} swipes a ${reward}.` };
+}
+
+/** Small set of recipes an Alchemist can brew on the fly. */
+const BREW_RECIPES: ReadonlyArray<readonly [number, string]> = [
+  [40, "Healing Potion"],
+  [25, "Mana Potion"],
+  [15, "Antidote"],
+  [10, "Elixir of Strength"],
+  [10, "Elixir of Warding"],
+];
+
+/**
+ * An Alchemist brews a random potion. Drops it in the shared stash.
+ */
+export function brewPotion(
+  party: Party,
+  members: PartyMember[],
+  rng: () => number = Math.random,
+): ActionResult {
+  const alchemist = findClass(members, "Alchemist");
+  if (!alchemist) {
+    return { ok: false, message: "No Alchemist in the party." };
+  }
+  const item = pickWeighted(BREW_RECIPES, rng);
+  party.inventory.push({ item });
+  return { ok: true, message: `${alchemist.name} brews a ${item}.` };
+}
+
+/** Items a Gnome can tinker together. */
+const TINKER_RECIPES: ReadonlyArray<readonly [number, string]> = [
+  [30, "Lockpick"],
+  [25, "Torch"],
+  [20, "Arrows"],
+  [15, "Bolts"],
+  [10, "Camping Supplies"],
+];
+
+/** A Gnome tinkers a random utility item into existence. */
+export function tinker(
+  party: Party,
+  members: PartyMember[],
+  rng: () => number = Math.random,
+): ActionResult {
+  const gnome = findRace(members, "Gnome");
+  if (!gnome) {
+    return { ok: false, message: "No Gnome in the party." };
+  }
+  const item = pickWeighted(TINKER_RECIPES, rng);
+  party.inventory.push({ item });
+  return { ok: true, message: `${gnome.name} tinkers up a ${item}.` };
 }
 
 // ── Spell casting (menu / out-of-combat) ───────────────────────────

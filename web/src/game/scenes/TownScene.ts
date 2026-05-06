@@ -54,8 +54,10 @@ import {
   collectLightSources,
   brightnessAt,
   mapIsDark,
+  PARTY_LIGHT_RADIUS,
   type LightSource,
 } from "../world/Lighting";
+import { partyLightRadius, partyLightTint } from "../world/PartyActions";
 import { decorationFor } from "../world/Decorations";
 import { gameState } from "../state";
 
@@ -83,6 +85,9 @@ export class TownScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   /** Set of darkness rectangles drawn one per tile, indexed by `${col},${row}`. */
   private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
+  /** Per-tile tint rectangles for active party-light effects (Infravision /
+   *  Galadriel's Light). Drawn above darkness, below the player. */
+  private tintRects = new Map<string, Phaser.GameObjects.Rectangle>();
   /** Light sources collected once per scene from map + tile_defs.
    *  Named `mapLights` to avoid colliding with Phaser.Scene's built-in
    *  `lights: LightsManager`. */
@@ -122,6 +127,7 @@ export class TownScene extends Phaser.Scene {
     this.npcs = [];
     this.dialog = undefined;
     this.darkness = new Map();
+    this.tintRects = new Map();
     this.mapLights = [];
     this.dark = false;
   }
@@ -225,6 +231,13 @@ export class TownScene extends Phaser.Scene {
     this.drawNpcs();
     this.drawPlayer();
     this.drawHud();
+    // When the Party screen is opened on top, this scene is paused.
+    // Toggling Infravision / Galadriel's Light there changes the
+    // party's effective light radius — so on resume we repaint the
+    // darkness to reflect the new state.
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      if (this.dark) this.refreshDarkness();
+    });
     this.installCamera();
     this.installInput();
     this.refreshHud();
@@ -284,17 +297,25 @@ export class TownScene extends Phaser.Scene {
         .setDepth(7);
     }
 
-    // Pre-create one darkness rectangle per cell at depth 9 so it
-    // sits above tiles + NPCs but below the player marker. Visibility
-    // alpha is set per-frame in refreshDarkness().
+    // Pre-create one darkness rectangle per cell at depth 9 + a tint
+    // rectangle per cell at depth 9.5. Both sit above tiles + NPCs
+    // but below the player marker. Per-cell alpha is updated in
+    // refreshDarkness; the tint stays invisible until an active
+    // party-light effect (Infravision / Galadriel's Light) supplies
+    // a colour.
     if (this.dark) {
       for (let row = 0; row < this.town.height; row++) {
         for (let col = 0; col < this.town.width; col++) {
-          const r = this.add
+          const d = this.add
             .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0.85)
             .setOrigin(0)
             .setDepth(9);
-          this.darkness.set(`${col},${row}`, r);
+          this.darkness.set(`${col},${row}`, d);
+          const t = this.add
+            .rectangle(col * TILE, row * TILE, TILE, TILE, 0xffffff, 0)
+            .setOrigin(0)
+            .setDepth(9.5);
+          this.tintRects.set(`${col},${row}`, t);
         }
       }
     }
@@ -308,17 +329,41 @@ export class TownScene extends Phaser.Scene {
   private refreshDarkness(): void {
     if (!this.dark) return;
     const party = { col: this.playerCol, row: this.playerRow };
+    // Active party effects (Infravision, Galadriel's Light) act as a
+    // party-carried light source — they bump the radius up from the
+    // default 2 tiles to 8/5 respectively, and they also paint a
+    // colour tint over visible tiles (red for infrared, pale blue
+    // for moonlight). The Python game wires the same predicate via
+    // `interior_lighting.party_has_light` and the matching tint via
+    // the `TintEffect` enum in `lighting.py`.
+    const partyData = gameState.partyData;
+    const radius = partyData
+      ? partyLightRadius(partyData, PARTY_LIGHT_RADIUS)
+      : PARTY_LIGHT_RADIUS;
+    const tint = partyData ? partyLightTint(partyData) : null;
     for (let row = 0; row < this.town.height; row++) {
       for (let col = 0; col < this.town.width; col++) {
         const rect = this.darkness.get(`${col},${row}`);
         if (!rect) continue;
-        const b = brightnessAt(col, row, this.mapLights, party);
+        const b = brightnessAt(col, row, this.mapLights, party, radius);
         // Darkness alpha is the inverse of brightness, with a small
         // ambient floor so even fully-lit tiles read as warm rather
         // than 100% transparent. Cap at 0.92 so the player can still
         // make out tile shapes in the gloom.
         const alpha = Math.max(0, Math.min(0.92, (1 - b) * 0.92));
         rect.setFillStyle(0x000000, alpha);
+        // Tint layer — coloured rect above the darkness, alpha
+        // proportional to brightness so the colour wash fades to
+        // nothing at the edge of the party's range. No tint when
+        // no effect is equipped (alpha 0).
+        const tintRect = this.tintRects.get(`${col},${row}`);
+        if (tintRect) {
+          if (tint && b > 0) {
+            tintRect.setFillStyle(tint.color, b * tint.alphaScale);
+          } else {
+            tintRect.setFillStyle(0xffffff, 0);
+          }
+        }
       }
     }
   }
@@ -564,8 +609,20 @@ export class TownScene extends Phaser.Scene {
     // Don't open the party screen while a dialog is up — let the
     // player finish the conversation first.
     if (this.dialog) return;
+    // Count NPCs in the 8 cells around the player so the Party screen
+    // can gate PICKPOCKET on having a target in reach (mirrors
+    // inventory_mixin._get_adjacent_npc in the Python game).
+    let nearby = 0;
+    for (const { def } of this.npcs) {
+      const dc = Math.abs(def.col - this.playerCol);
+      const dr = Math.abs(def.row - this.playerRow);
+      if (dc <= 1 && dr <= 1 && (dc + dr) > 0) nearby += 1;
+    }
     this.scene.pause();
-    this.scene.launch("PartyScene", { from: "TownScene" });
+    this.scene.launch("PartyScene", {
+      from: "TownScene",
+      nearbyNpcCount: nearby,
+    });
   }
 
   // ── Dialog ───────────────────────────────────────────────────────

@@ -12,7 +12,18 @@ import {
   equipItemFromInventory,
   equipItemIntoSlot,
   unequipSlot,
+  hasClass,
+  hasRace,
+  findClass,
+  findRace,
+  brewPotion,
+  pickpocket,
+  tinker,
+  partyHasEffect,
+  partyLightRadius,
+  partyLightTint,
 } from "./PartyActions";
+import { memberFromRaw } from "./Party";
 import { partyFromRaw, type Party, activeMembers } from "./Party";
 import type { Effect } from "./Effects";
 import { spellFromRaw, type Spell } from "./Spells";
@@ -382,6 +393,176 @@ describe("equipItemFromInventory / unequipSlot", () => {
     fighter.inventory.push({ item: "Healing Herb" });
     const r = equipItemIntoSlot(fighter, 0, "right_hand", items());
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("party-comp helpers", () => {
+  const members = [
+    memberFromRaw({ name: "Gimli",  class: "Fighter",   race: "Dwarf",   level: 1, hp: 20 }),
+    memberFromRaw({ name: "Merry",  class: "Thief",     race: "Halfling",level: 1, hp: 18 }),
+    memberFromRaw({ name: "Glim",   class: "Alchemist", race: "Gnome",   level: 1, hp: 16 }),
+    memberFromRaw({ name: "Selina", class: "Cleric",    race: "Human",   level: 1, hp: 18 }),
+  ];
+
+  it("hasClass / hasRace are case-insensitive", () => {
+    expect(hasClass(members, "alchemist")).toBe(true);
+    expect(hasClass(members, "ALCHEMIST")).toBe(true);
+    expect(hasRace(members,  "Halfling")).toBe(true);
+    expect(hasClass(members, "Druid")).toBe(false);
+    expect(hasRace(members,  "Orc")).toBe(false);
+  });
+
+  it("ignores dead members", () => {
+    members[2].hp = 0; // Glim the Gnome Alchemist is down
+    expect(hasClass(members, "Alchemist")).toBe(false);
+    expect(hasRace(members,  "Gnome")).toBe(false);
+    members[2].hp = 16; // restore
+  });
+
+  it("findClass / findRace return the first matching live member", () => {
+    expect(findClass(members, "Cleric")?.name).toBe("Selina");
+    expect(findRace(members,  "Halfling")?.name).toBe("Merry");
+    expect(findClass(members, "Druid")).toBeNull();
+  });
+});
+
+describe("brewPotion / pickpocket / tinker", () => {
+  it("brewPotion adds a potion to the stash when an Alchemist is present", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    members[0].class = "Alchemist"; // make Gimli an Alchemist for the test
+    const before = p.inventory.length;
+    // rng = 0 always picks the first weighted entry → Healing Potion
+    const r = brewPotion(p, members, () => 0);
+    expect(r.ok).toBe(true);
+    expect(r.message).toContain("Healing Potion");
+    expect(p.inventory.length).toBe(before + 1);
+  });
+
+  it("brewPotion refuses when no Alchemist is present", () => {
+    const p = makeParty();
+    const r = brewPotion(p, activeMembers(p), () => 0);
+    expect(r.ok).toBe(false);
+  });
+
+  it("pickpocket either drops gold or pushes an item, depending on the roll", () => {
+    const p = makeParty(); // Merry the Halfling is already in the active party
+    const members = activeMembers(p);
+
+    // rng=0 → first row of the loot table (Gold)
+    const beforeGold = p.gold;
+    const r1 = pickpocket(p, members, () => 0);
+    expect(r1.ok).toBe(true);
+    expect(r1.message.toLowerCase()).toContain("gold");
+    expect(p.gold).toBeGreaterThan(beforeGold);
+
+    // rng nudged so the weighted-pick lands on a non-Gold row.
+    // Calls: pickWeighted uses one rng() call. Easiest: feed 0.99
+    // which should land on the last row (Holy Water).
+    const beforeInv = p.inventory.length;
+    const r2 = pickpocket(p, members, () => 0.99);
+    expect(r2.ok).toBe(true);
+    expect(p.inventory.length).toBeGreaterThan(beforeInv);
+  });
+
+  it("pickpocket refuses when no Halfling is present", () => {
+    const p = makeParty();
+    p.activeParty = [0, 2, 3]; // drop Merry from the active four
+    const r = pickpocket(p, activeMembers(p));
+    expect(r.ok).toBe(false);
+  });
+
+  it("tinker adds an item to the stash when a Gnome is present", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    members[0].race = "Gnome";
+    const before = p.inventory.length;
+    const r = tinker(p, members, () => 0); // Lockpick (first entry)
+    expect(r.ok).toBe(true);
+    expect(r.message).toContain("Lockpick");
+    expect(p.inventory.length).toBe(before + 1);
+  });
+
+  it("tinker refuses when no Gnome is present", () => {
+    const p = makeParty();
+    const r = tinker(p, activeMembers(p), () => 0);
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("partyHasEffect / partyLightRadius", () => {
+  it("partyHasEffect inspects the effect_N slots", () => {
+    const p = makeParty();
+    expect(partyHasEffect(p, "infravision")).toBe(false);
+    p.partyEffects.effect_2 = "infravision";
+    expect(partyHasEffect(p, "infravision")).toBe(true);
+  });
+
+  it("partyLightRadius bumps for Infravision", () => {
+    const p = makeParty();
+    expect(partyLightRadius(p, 2)).toBe(2);
+    p.partyEffects.effect_1 = "infravision";
+    expect(partyLightRadius(p, 2)).toBe(8);
+  });
+
+  it("partyLightRadius bumps less for Galadriel's Light", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light";
+    expect(partyLightRadius(p, 2)).toBe(5);
+  });
+
+  it("Infravision wins over Galadriel's Light when both are equipped", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light";
+    p.partyEffects.effect_2 = "infravision";
+    expect(partyLightRadius(p, 2)).toBe(8);
+  });
+
+  it("never shrinks below the supplied default radius", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light"; // boost = 5
+    expect(partyLightRadius(p, 9)).toBe(9);       // already brighter, keep it
+  });
+
+  it("partyLightTint returns null when no tint effect is active", () => {
+    const p = makeParty();
+    expect(partyLightTint(p)).toBeNull();
+    p.partyEffects.effect_1 = "detect_traps"; // not a tint effect
+    expect(partyLightTint(p)).toBeNull();
+  });
+
+  it("partyLightTint returns the infrared red for Infravision", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "infravision";
+    const t = partyLightTint(p);
+    expect(t?.color).toBe(0xc02020);
+    expect(t?.alphaScale).toBeGreaterThan(0);
+  });
+
+  it("partyLightTint returns the moonlight blue for Galadriel's Light", () => {
+    const p = makeParty();
+    p.partyEffects.effect_2 = "galadriels_light";
+    const t = partyLightTint(p);
+    expect(t?.color).toBe(0x9bb6e0);
+  });
+
+  it("Infravision wins over Galadriel's Light when both are equipped", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light";
+    p.partyEffects.effect_2 = "infravision";
+    expect(partyLightTint(p)?.color).toBe(0xc02020);
+  });
+});
+
+describe("pickpocket gating (NPC adjacency lives in the scene)", () => {
+  it("pickpocket helper itself does NOT check adjacency", () => {
+    // The adjacency rule is enforced by the scene before the helper
+    // is even called — when it IS called we expect it to do its
+    // weighted roll regardless. The scene's own test covers the
+    // refusal path.
+    const p = makeParty();
+    const r = pickpocket(p, activeMembers(p), () => 0.5);
+    expect(r.ok).toBe(true);
   });
 });
 
