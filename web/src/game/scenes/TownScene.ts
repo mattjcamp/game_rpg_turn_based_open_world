@@ -34,6 +34,7 @@ import {
   resolveTownOrInterior,
   tileMapForTown,
   resolveNpcSprite,
+  wanderTownNpcs,
   NPC_SPRITE_MANIFEST,
   type Town,
   type NpcDef,
@@ -494,7 +495,7 @@ export class TownScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.hint = this.add
-      .text(960 - 16, 18, "WASD / arrows / tap to move  ·  tap an NPC to talk", {
+      .text(960 - 16, 18, "WASD / arrows / tap to move  ·  Space = wait  ·  tap an NPC to talk", {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#bdb38a",
@@ -609,6 +610,10 @@ export class TownScene extends Phaser.Scene {
     if (this.shop)   return this.confirmShopBuy();
     if (this.temple) return this.confirmTempleService();
     if (this.dialog) return this.advanceDialog();
+    // Nothing modal is open — Space skips the party's turn so
+    // wandering NPCs and Galadriel/torch timers tick without forcing
+    // the player to take a step.
+    this.skipTurn();
   }
 
   /** Single ESC handler — closes whichever modal is active. */
@@ -685,11 +690,56 @@ export class TownScene extends Phaser.Scene {
         if (gameState.partyData) {
           tickGaladrielsLight(gameState.partyData);
         }
+        this.tickNpcWander();
         this.refreshHud();
         this.refreshDarkness();
         this.checkExit(nc, nr);
       },
     });
+  }
+
+  /**
+   * Skip the player's turn — wandering NPCs still get to step, the
+   * Galadriel counter still ticks, and torch steps still burn (only
+   * in dark scenes, matching tryStep's rule). Used by the Space-bar
+   * shortcut when no dialog/shop/temple is open.
+   */
+  private skipTurn(): void {
+    if (this.busy || this.dialog || this.shop || this.temple) return;
+    if (this.dark && gameState.partyData && gameState.partyData.torchSteps > 0) {
+      gameState.partyData.torchSteps -= 1;
+    }
+    if (gameState.partyData) {
+      tickGaladrielsLight(gameState.partyData);
+    }
+    this.tickNpcWander();
+    this.refreshHud();
+    this.refreshDarkness();
+  }
+
+  /**
+   * Move every wandering town NPC at most one tile and tween the
+   * sprites of any that actually moved. Stationary NPC types stay put.
+   */
+  private tickNpcWander(): void {
+    const defs = this.npcs.map((n) => n.def);
+    const moved = wanderTownNpcs(
+      defs,
+      this.playerCol,
+      this.playerRow,
+      (c, r) => this.tileMap.isWalkable(c, r),
+    );
+    if (moved.length === 0) return;
+    const movedSet = new Set(moved);
+    for (const { def, sprite } of this.npcs) {
+      if (!movedSet.has(def)) continue;
+      this.tweens.add({
+        targets: sprite,
+        x: this.tileX(def.col),
+        y: this.tileY(def.row),
+        duration: 110,
+      });
+    }
   }
 
   private checkExit(col: number, row: number): void {

@@ -75,8 +75,8 @@ import {
   tinker,
   getItemMaxDurability,
   getSlotDurability,
-  useCampingSupplies,
-  useTorch,
+  consumeCampingSupplies,
+  consumeTorch,
 } from "../world/PartyActions";
 import {
   loadItems,
@@ -642,7 +642,7 @@ export class PartyScene extends Phaser.Scene {
       // Sfx and a one-line feedback string keep things lightweight —
       // a fancier "USED!" toast is a future polish step.
       if (row.name === "Camping Supplies") {
-        const r = useCampingSupplies(this.party);
+        const r = consumeCampingSupplies(this.party);
         if (r.ok) Sfx.play("heal");
         this.feedback = r.message;
         this.buildRows();
@@ -650,7 +650,7 @@ export class PartyScene extends Phaser.Scene {
         return;
       }
       if (row.name === "Torch") {
-        const r = useTorch(this.party);
+        const r = consumeTorch(this.party);
         if (r.ok) Sfx.play("chirp");
         this.feedback = r.message;
         this.buildRows();

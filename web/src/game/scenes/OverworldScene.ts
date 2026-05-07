@@ -318,7 +318,7 @@ export class OverworldScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.hint = this.add
-      .text(960 - 16, 18, "WASD / arrows / tap to move  ·  ✦ = encounter", {
+      .text(960 - 16, 18, "WASD / arrows / tap to move  ·  Space = wait  ·  ✦ = encounter", {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#bdb38a",
@@ -351,6 +351,10 @@ export class OverworldScene extends Phaser.Scene {
       for (const [key, delta] of Object.entries(map)) {
         k.on(`keydown-${key}`, () => this.tryStep(delta[0], delta[1]));
       }
+      // SPACE — skip this turn. The party stays put but spawn / roamer
+      // / Galadriel timers all tick, so the player can wait out a
+      // monster or burn down a buffed effect deliberately.
+      k.on("keydown-SPACE", () => this.skipTurn());
       // 'P' opens the party screen as an overlay. We pause this scene
       // so its keyboard handlers don't fire while the overlay is up.
       k.on("keydown-P", () => this.openParty());
@@ -365,6 +369,28 @@ export class OverworldScene extends Phaser.Scene {
       if (Math.abs(dc) + Math.abs(dr) !== 1) return;
       this.tryStep(dc, dr);
     });
+  }
+
+  /**
+   * Skip the party's turn. Runs the same end-of-turn bookkeeping a
+   * successful step does — Galadriel's Light tick, spawn/roamer
+   * advance, encounter check — without moving the avatar.
+   */
+  private skipTurn(): void {
+    if (this.busy || gameState.defeated) return;
+    if (gameState.partyData) {
+      tickGaladrielsLight(gameState.partyData);
+    }
+    this.refreshHud();
+    this.refreshDarkness();
+    const engaged = this.tickSpawnsAndRoamers();
+    this.renderRoamers();
+    if (engaged) {
+      this.engageRoamer(engaged);
+      return;
+    }
+    const { col, row } = gameState.playerPos;
+    this.checkEncounter(col, row);
   }
 
   private tryStep(dc: number, dr: number): void {

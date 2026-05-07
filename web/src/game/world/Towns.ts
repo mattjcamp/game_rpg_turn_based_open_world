@@ -26,6 +26,12 @@ export interface NpcDef {
   sprite: string;
   col: number;
   row: number;
+  /** Anchor position the NPC wanders around — set to the NPC's initial
+   *  col/row at load time. Wandering NPCs must stay within
+   *  `wanderRange` Manhattan tiles of this point, matching the Python
+   *  game's `npc.home_col`/`npc.home_row`. */
+  homeCol: number;
+  homeRow: number;
   /** Either a single line or a list of lines the NPC speaks. */
   dialogue: string[];
   godName?: string;
@@ -239,21 +245,27 @@ export function townFromRaw(raw: RawTown): Town {
   const h = raw.height ?? 0;
   if (!w || !h) throw new Error(`Town '${raw.name ?? "?"}' missing width/height`);
   const tiles = normalizeTownTiles(raw.tiles, w, h);
-  const npcs: NpcDef[] = (raw.npcs ?? []).map((n) => ({
-    name: n.name ?? "?",
-    npcType: n.npc_type ?? "villager",
-    sprite: normalizeSpritePath(n.sprite ?? ""),
-    col: n.col ?? 0,
-    row: n.row ?? 0,
-    dialogue: Array.isArray(n.dialogue)
-      ? n.dialogue.map(String)
-      : n.dialogue
-        ? [String(n.dialogue)]
-        : [],
-    godName: n.god_name,
-    wanderRange: n.wander_range,
-    shopType: n.shop_type,
-  }));
+  const npcs: NpcDef[] = (raw.npcs ?? []).map((n) => {
+    const col = n.col ?? 0;
+    const row = n.row ?? 0;
+    return {
+      name: n.name ?? "?",
+      npcType: n.npc_type ?? "villager",
+      sprite: normalizeSpritePath(n.sprite ?? ""),
+      col,
+      row,
+      homeCol: col,
+      homeRow: row,
+      dialogue: Array.isArray(n.dialogue)
+        ? n.dialogue.map(String)
+        : n.dialogue
+          ? [String(n.dialogue)]
+          : [],
+      godName: n.god_name,
+      wanderRange: n.wander_range,
+      shopType: n.shop_type,
+    };
+  });
   // Interiors are structurally identical to towns — recurse with the
   // same parser and treat them as nested Town objects. We don't allow
   // interiors-of-interiors today (none in the data); a too-deep nest
@@ -269,6 +281,84 @@ export function townFromRaw(raw: RawTown): Town {
     tileProperties: (raw.tile_properties ?? {}) as Record<string, unknown>,
     interiors,
   };
+}
+
+/**
+ * NPC types that never wander — shopkeeps stay behind the counter,
+ * priests stay at the altar, etc. Mirrors the Python game's
+ * `NPC.STATIONARY_TYPES` (in `town_generator.py`).
+ */
+export const STATIONARY_NPC_TYPES: ReadonlySet<string> = new Set([
+  "shopkeep", "innkeeper", "priest", "quest_item",
+]);
+
+/** Default Manhattan distance an NPC may stray from `homeCol`/`homeRow`
+ *  when their entry omits `wander_range`. Matches `NPC_WANDER_RANGE` in
+ *  `src/settings.py` (= 3). */
+export const DEFAULT_NPC_WANDER_RANGE = 3;
+
+/**
+ * Per-turn probability that a non-stationary NPC actually attempts a
+ * step. The Python game uses real-time random timers (1.5–4 sec); in
+ * a turn-based port this maps to a fraction-per-turn. 0.5 keeps the
+ * town feeling alive without making it visually noisy.
+ */
+const NPC_STEP_CHANCE = 0.5;
+
+/**
+ * Step every wandering town NPC at most one tile in a random cardinal
+ * direction. Mutates each `NpcDef`'s `col`/`row` in place. Skips
+ * stationary types, candidates that fail the per-turn dice roll, and
+ * any move that would leave the NPC's wander range, hit a non-walkable
+ * tile, or collide with another NPC or the player.
+ *
+ * The `playerCol`/`playerRow` block keeps NPCs from stepping onto the
+ * party — same rule the Python `_update_npc_wandering` follows. Returns
+ * the list of NPCs whose position actually changed, so the scene can
+ * tween only those sprites.
+ */
+export function wanderTownNpcs(
+  npcs: NpcDef[],
+  playerCol: number,
+  playerRow: number,
+  isWalkable: (col: number, row: number) => boolean,
+  rng: () => number = Math.random,
+): NpcDef[] {
+  const occupied = new Set<string>();
+  for (const n of npcs) occupied.add(`${n.col},${n.row}`);
+  occupied.add(`${playerCol},${playerRow}`);
+
+  const moved: NpcDef[] = [];
+  for (const npc of npcs) {
+    if (STATIONARY_NPC_TYPES.has(npc.npcType)) continue;
+    if (rng() >= NPC_STEP_CHANCE) continue;
+
+    const range = npc.wanderRange ?? DEFAULT_NPC_WANDER_RANGE;
+    const dirs: Array<[number, number]> = [
+      [0, -1], [0, 1], [-1, 0], [1, 0],
+    ];
+    // Fisher-Yates shuffle so direction preference doesn't bias.
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+
+    for (const [dc, dr] of dirs) {
+      const nc = npc.col + dc;
+      const nr = npc.row + dr;
+      if (Math.abs(nc - npc.homeCol) > range) continue;
+      if (Math.abs(nr - npc.homeRow) > range) continue;
+      if (!isWalkable(nc, nr)) continue;
+      if (occupied.has(`${nc},${nr}`)) continue;
+      occupied.delete(`${npc.col},${npc.row}`);
+      npc.col = nc;
+      npc.row = nr;
+      occupied.add(`${nc},${nr}`);
+      moved.push(npc);
+      break;
+    }
+  }
+  return moved;
 }
 
 /** Build a TileMap from a Town so existing walkability/link helpers apply. */

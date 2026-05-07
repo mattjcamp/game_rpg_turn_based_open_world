@@ -12,6 +12,9 @@ import {
   getInteriorByPath,
   resolveTownOrInterior,
   parentTownName,
+  wanderTownNpcs,
+  STATIONARY_NPC_TYPES,
+  type NpcDef,
 } from "./Towns";
 
 describe("normalizeSpritePath", () => {
@@ -248,5 +251,104 @@ describe("interior parsing & resolution", () => {
   it("parentTownName extracts the town segment from interior paths", () => {
     expect(parentTownName("Plainstown/General Shop Interior")).toBe("Plainstown");
     expect(parentTownName("Plainstown")).toBeNull();
+  });
+});
+
+describe("wanderTownNpcs", () => {
+  function npc(over: Partial<NpcDef> = {}): NpcDef {
+    return {
+      name: "X", npcType: "villager", sprite: "",
+      col: 5, row: 5, homeCol: 5, homeRow: 5,
+      dialogue: [], wanderRange: 2,
+      ...over,
+    };
+  }
+  // Always-walkable open arena.
+  const openMap = () => true;
+  // RNG that yields 0 for every call — passes the per-turn dice roll
+  // (0 < 0.5) and picks index 0 on every Fisher-Yates swap, leaving
+  // the dirs array in its declared order [up, down, left, right].
+  const rngZero = () => 0;
+
+  it("townFromRaw seeds homeCol/homeRow from the NPC's initial col/row", () => {
+    const t = townFromRaw({
+      name: "T", width: 2, height: 2, tiles: {},
+      npcs: [{ name: "Pip", npc_type: "villager", col: 1, row: 0, dialogue: [] }],
+    });
+    expect(t.npcs[0].homeCol).toBe(1);
+    expect(t.npcs[0].homeRow).toBe(0);
+  });
+
+  it("STATIONARY_NPC_TYPES includes the four Python types", () => {
+    expect(STATIONARY_NPC_TYPES.has("shopkeep")).toBe(true);
+    expect(STATIONARY_NPC_TYPES.has("innkeeper")).toBe(true);
+    expect(STATIONARY_NPC_TYPES.has("priest")).toBe(true);
+    expect(STATIONARY_NPC_TYPES.has("quest_item")).toBe(true);
+    expect(STATIONARY_NPC_TYPES.has("villager")).toBe(false);
+  });
+
+  it("does not move stationary NPC types", () => {
+    const npcs = [npc({ npcType: "shopkeep" }), npc({ npcType: "priest" })];
+    const moved = wanderTownNpcs(npcs, 0, 0, openMap, rngZero);
+    expect(moved).toEqual([]);
+    expect(npcs[0].col).toBe(5);
+    expect(npcs[1].col).toBe(5);
+  });
+
+  it("steps a wandering villager one cardinal tile when nothing blocks", () => {
+    const npcs = [npc()];
+    const moved = wanderTownNpcs(npcs, 0, 0, openMap, rngZero);
+    expect(moved).toHaveLength(1);
+    // With rng=0 the Fisher-Yates pass leaves dirs = [down, left, right, up];
+    // first attempted dir is "down" (0,+1).
+    expect(npcs[0].col).toBe(5);
+    expect(npcs[0].row).toBe(6);
+  });
+
+  it("respects wanderRange — won't step past the home anchor's range", () => {
+    // Range 1 with NPC already at the north edge of its leash.
+    const stuck = npc({ row: 4, homeRow: 5, wanderRange: 1 });
+    const npcs = [stuck];
+    wanderTownNpcs(npcs, 0, 0, openMap, rngZero);
+    // Up would push to row 3 (range 2 from home) — skip. Next dir
+    // tried is down (row 5). That's allowed.
+    expect(npcs[0].row).toBe(5);
+  });
+
+  it("won't step onto the player's tile", () => {
+    const onlyPath = npc({ col: 5, row: 5, homeCol: 5, homeRow: 5 });
+    const npcs = [onlyPath];
+    // Player is directly above; first direction tried is up — must skip.
+    wanderTownNpcs(npcs, 5, 4, openMap, rngZero);
+    // Falls through to down (row 6).
+    expect(npcs[0].row).toBe(6);
+  });
+
+  it("won't step onto a non-walkable tile", () => {
+    const npcs = [npc()];
+    // Block the entire upper row — first dir tried is up, must skip
+    // and fall through to down.
+    const wall = (_c: number, r: number) => r !== 4;
+    wanderTownNpcs(npcs, 0, 0, wall, rngZero);
+    expect(npcs[0].row).toBe(6);
+  });
+
+  it("won't pile two NPCs onto the same tile", () => {
+    // A and B — A wants to step into B's tile; the collision check
+    // must redirect or skip A.
+    const a = npc({ name: "A", col: 5, row: 5, homeCol: 5, homeRow: 5 });
+    const b = npc({ name: "B", col: 5, row: 4, homeCol: 5, homeRow: 4 });
+    // rng=0 picks dir up first for each. A wants (5,4) which B holds.
+    wanderTownNpcs([a, b], 0, 0, openMap, rngZero);
+    // A should NOT have landed on B's tile.
+    expect(a.col === b.col && a.row === b.row).toBe(false);
+  });
+
+  it("respects the per-turn dice roll — high rng skips the move entirely", () => {
+    const npcs = [npc()];
+    // rng() returns 0.99 ≥ 0.5 NPC_STEP_CHANCE → skip.
+    wanderTownNpcs(npcs, 0, 0, openMap, () => 0.99);
+    expect(npcs[0].col).toBe(5);
+    expect(npcs[0].row).toBe(5);
   });
 });

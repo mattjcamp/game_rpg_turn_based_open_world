@@ -861,7 +861,7 @@ function findStashIndex(party: Party, itemName: string): number {
  * advances the in-game clock; we don't have a clock in the web port
  * yet.
  */
-export function useCampingSupplies(party: Party): UseItemResult {
+export function consumeCampingSupplies(party: Party): UseItemResult {
   const idx = findStashIndex(party, "Camping Supplies");
   if (idx < 0) {
     return { ok: false, message: "No camping supplies in the stash." };
@@ -913,7 +913,7 @@ export function useCampingSupplies(party: Party): UseItemResult {
  * the counter back up rather than starting a fresh one. (Same effect
  * either way for the player; simpler to reason about.)
  */
-export function useTorch(party: Party): UseItemResult {
+export function consumeTorch(party: Party): UseItemResult {
   const idx = findStashIndex(party, "Torch");
   if (idx < 0) {
     return { ok: false, message: "No torches in the stash." };

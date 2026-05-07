@@ -82,7 +82,7 @@ export interface Party {
   /** Stash — items shared across the party. */
   inventory: InventoryItem[];
   /** Remaining steps the currently-burning torch lights for. Increased
-   *  by `useTorch`; decremented one per move in dark scenes. Mirrors the
+   *  by `consumeTorch`; decremented one per move in dark scenes. Mirrors the
    *  Python game's `DungeonState.torch_steps` but kept on the party so
    *  it survives transitions in this port. */
   torchSteps: number;

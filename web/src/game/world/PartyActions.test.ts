@@ -27,8 +27,8 @@ import {
   getSlotDurability,
   isIndestructible,
   useEquippedDurability,
-  useCampingSupplies,
-  useTorch,
+  consumeCampingSupplies,
+  consumeTorch,
 } from "./PartyActions";
 import { memberFromRaw } from "./Party";
 import { partyFromRaw, type Party, activeMembers } from "./Party";
@@ -853,7 +853,7 @@ describe("rollDice / statMod", () => {
   });
 });
 
-describe("useCampingSupplies", () => {
+describe("consumeCampingSupplies", () => {
   function woundedParty(): Party {
     const p = makeParty();
     // Wound everyone, drain the casters' MP.
@@ -868,14 +868,14 @@ describe("useCampingSupplies", () => {
   it("fails cleanly when there are no camping supplies in the stash", () => {
     const p = makeParty();
     p.inventory = [{ item: "Healing Herb" }];
-    const r = useCampingSupplies(p);
+    const r = consumeCampingSupplies(p);
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/no camping/i);
   });
 
   it("heals every alive member to full HP and refills MP", () => {
     const p = woundedParty();
-    const r = useCampingSupplies(p);
+    const r = consumeCampingSupplies(p);
     expect(r.ok).toBe(true);
     for (const m of p.roster) {
       expect(m.hp).toBe(m.maxHp);
@@ -885,16 +885,16 @@ describe("useCampingSupplies", () => {
 
   it("decrements the entry's charges and removes it on the last charge", () => {
     const p = woundedParty(); // charges: 2
-    useCampingSupplies(p);
+    consumeCampingSupplies(p);
     expect(p.inventory[0].charges).toBe(1);
-    useCampingSupplies(p);
+    consumeCampingSupplies(p);
     expect(p.inventory).toHaveLength(0);
   });
 
   it("seeds charges from the catalog default when the entry has none", () => {
     const p = woundedParty();
     p.inventory = [{ item: "Camping Supplies" }]; // no charges
-    useCampingSupplies(p);
+    consumeCampingSupplies(p);
     // Default is 3 → after one use, 2 remain.
     expect(p.inventory[0].charges).toBe(2);
   });
@@ -902,7 +902,7 @@ describe("useCampingSupplies", () => {
   it("skips downed members", () => {
     const p = woundedParty();
     p.roster[0].hp = 0; // Gimli is down
-    useCampingSupplies(p);
+    consumeCampingSupplies(p);
     expect(p.roster[0].hp).toBe(0);
     expect(p.roster[1].hp).toBe(p.roster[1].maxHp);
   });
@@ -910,17 +910,17 @@ describe("useCampingSupplies", () => {
   it("reports a no-op when the party is already at full health", () => {
     const p = makeParty();
     p.inventory = [{ item: "Camping Supplies", charges: 1 }];
-    const r = useCampingSupplies(p);
+    const r = consumeCampingSupplies(p);
     expect(r.ok).toBe(true);
     expect(r.message).toMatch(/already whole/i);
   });
 });
 
-describe("useTorch", () => {
+describe("consumeTorch", () => {
   it("fails cleanly when there are no torches in the stash", () => {
     const p = makeParty();
     p.inventory = [{ item: "Healing Herb" }];
-    const r = useTorch(p);
+    const r = consumeTorch(p);
     expect(r.ok).toBe(false);
   });
 
@@ -928,7 +928,7 @@ describe("useTorch", () => {
     const p = makeParty();
     p.inventory = [{ item: "Torch" }];
     p.torchSteps = 0;
-    const r = useTorch(p);
+    const r = consumeTorch(p);
     expect(r.ok).toBe(true);
     expect(p.torchSteps).toBe(150);
     expect(p.inventory.find((it) => it.item === "Torch")).toBeUndefined();
@@ -938,7 +938,7 @@ describe("useTorch", () => {
     const p = makeParty();
     p.inventory = [{ item: "Torch" }];
     p.torchSteps = 25;
-    useTorch(p);
+    consumeTorch(p);
     expect(p.torchSteps).toBe(175);
   });
 
@@ -946,7 +946,7 @@ describe("useTorch", () => {
     const p = makeParty();
     p.inventory = [{ item: "Torch", charges: 40 }];
     p.torchSteps = 0;
-    useTorch(p);
+    consumeTorch(p);
     expect(p.torchSteps).toBe(40);
   });
 });
