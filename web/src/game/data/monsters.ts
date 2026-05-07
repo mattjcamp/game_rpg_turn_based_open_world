@@ -28,6 +28,12 @@ export interface MonsterSpec {
   sprite: string;
   baseMoveRange: number;
   undead?: boolean;
+  /** Flat XP awarded on kill (Python: monsters.json `xp_reward`). */
+  xpReward?: number;
+  /** Inclusive bounds for the gold roll on death (Python:
+   *  `gold_min` / `gold_max`); rolled per spawn in makeMonsterByName. */
+  goldMin?: number;
+  goldMax?: number;
 }
 
 interface RawMonster {
@@ -41,6 +47,9 @@ interface RawMonster {
   tile?: string;
   move_range?: number;
   undead?: boolean;
+  xp_reward?: number;
+  gold_min?: number;
+  gold_max?: number;
 }
 
 /**
@@ -118,6 +127,9 @@ export function specFromRaw(name: string, raw: RawMonster): MonsterSpec {
     sprite: spritePathFromTile(raw.tile),
     baseMoveRange: raw.move_range ?? 3,
     undead: !!raw.undead,
+    xpReward: raw.xp_reward,
+    goldMin: raw.gold_min,
+    goldMax: raw.gold_max,
   };
 }
 
@@ -159,6 +171,13 @@ export function makeMonsterByName(name: string, idSuffix = ""): Combatant {
       color: [180, 80, 80] as [number, number, number],
       sprite: "/assets/monsters/goblin.png", baseMoveRange: 3,
     };
+  // Roll gold per-spawn so two Goblins in the same fight may carry
+  // different purses (matches the Python game). Inclusive on both ends.
+  const goldMin = spec.goldMin ?? 0;
+  const goldMax = spec.goldMax ?? goldMin;
+  const goldReward = goldMax > goldMin
+    ? goldMin + Math.floor(Math.random() * (goldMax - goldMin + 1))
+    : goldMin;
   return {
     id: `${name.toLowerCase().replace(/\s+/g, "-")}${idSuffix}`,
     name: spec.name,
@@ -174,6 +193,8 @@ export function makeMonsterByName(name: string, idSuffix = ""): Combatant {
     baseMoveRange: spec.baseMoveRange,
     position: { col: 0, row: 0 }, // overwritten by Combat
     undead: spec.undead,
+    xpReward: spec.xpReward,
+    goldReward,
   };
 }
 

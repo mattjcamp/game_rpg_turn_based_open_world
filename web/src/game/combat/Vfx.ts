@@ -142,6 +142,141 @@ export function lightningZigzag(
 }
 
 /**
+ * Magic Dart: a fast arcane orb streaking straight from caster to
+ * target with a trail of fading sparkles behind it and a small white
+ * impact flash at the endpoint. Distinct from the gentle bowed
+ * `projectileLine` so directional dart casts read as "magic missile",
+ * not "thrown rock".
+ */
+export function magicDart(
+  scene: Phaser.Scene,
+  from: Pt, to: Pt,
+  color = COLOURS.arcane,
+  durationMs = 240,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    // Lead orb + soft halo travel together.
+    const orb  = scene.add.circle(from.x, from.y, 5, color, 1).setDepth(60);
+    const halo = scene.add.circle(from.x, from.y, 11, color, 0.35).setDepth(59);
+
+    // Sparkle trail dropped along the flight path. Phaser tweens'
+    // onUpdate fires every frame, but spawning per-frame would be
+    // wasteful — sample 8 evenly-spaced points instead.
+    const trailCount = 8;
+    const interval = durationMs / trailCount;
+    for (let i = 0; i < trailCount; i++) {
+      scene.time.delayedCall(i * interval, () => {
+        const t = (i + 0.5) / trailCount;
+        const sx = from.x + (to.x - from.x) * t;
+        const sy = from.y + (to.y - from.y) * t;
+        const spark = scene.add
+          .circle(sx, sy, 2.5 + Math.random(), color, 0.8)
+          .setDepth(58);
+        scene.tweens.add({
+          targets: spark,
+          alpha: 0,
+          radius: 0.5,
+          duration: 320,
+          onComplete: () => spark.destroy(),
+        });
+      });
+    }
+
+    scene.tweens.add({
+      targets: [orb, halo],
+      x: to.x, y: to.y,
+      duration: durationMs,
+      ease: "Quad.Out",
+      onComplete: () => {
+        orb.destroy();
+        halo.destroy();
+        // Bright impact pop — ring + brief white flash.
+        const flash = scene.add.circle(to.x, to.y, 4, COLOURS.white, 1).setDepth(62);
+        const ring  = scene.add.circle(to.x, to.y, 6, color, 0).setDepth(61)
+          .setStrokeStyle(2, color, 0.9);
+        scene.tweens.add({
+          targets: flash, radius: 14, alpha: 0,
+          duration: 220,
+          onComplete: () => flash.destroy(),
+        });
+        scene.tweens.add({
+          targets: ring, radius: 22, alpha: 0,
+          duration: 280,
+          onComplete: () => { ring.destroy(); resolve(); },
+        });
+        // Suppress unused lint on `angle` while keeping the symbol
+        // available if a future tweak wants to rotate the impact.
+        void angle;
+      },
+    });
+  });
+}
+
+/**
+ * Magic Arrow: an elongated glowing shaft with a brighter tip and a
+ * sparkle trail. Aimed at a specific target (no arc, fast linear
+ * flight) — visually distinct from a regular bow shot so casters
+ * reading the arena can tell magic from mundane.
+ */
+export function magicArrow(
+  scene: Phaser.Scene,
+  from: Pt, to: Pt,
+  color = COLOURS.lightning,
+  durationMs = 280,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const shaft = scene.add.rectangle(from.x, from.y, 18, 3, color, 1).setDepth(60);
+    shaft.rotation = angle;
+    const tip = scene.add.circle(from.x, from.y, 3.5, COLOURS.white, 1).setDepth(61);
+
+    const trailCount = 7;
+    const interval = durationMs / trailCount;
+    for (let i = 0; i < trailCount; i++) {
+      scene.time.delayedCall(i * interval, () => {
+        const t = (i + 0.5) / trailCount;
+        const sx = from.x + (to.x - from.x) * t;
+        const sy = from.y + (to.y - from.y) * t;
+        const spark = scene.add
+          .circle(sx, sy, 2, color, 0.85)
+          .setDepth(58);
+        scene.tweens.add({
+          targets: spark, alpha: 0,
+          duration: 360,
+          onComplete: () => spark.destroy(),
+        });
+      });
+    }
+
+    scene.tweens.add({
+      targets: [shaft, tip],
+      x: to.x, y: to.y,
+      duration: durationMs,
+      ease: "Quad.In",
+      onComplete: () => {
+        shaft.destroy();
+        tip.destroy();
+        // Impact: 6 spark fragments fanning outward + a centre flash.
+        const sparks = 6;
+        for (let i = 0; i < sparks; i++) {
+          const a = (i / sparks) * Math.PI * 2;
+          const tx = to.x + Math.cos(a) * 14;
+          const ty = to.y + Math.sin(a) * 14;
+          const frag = scene.add.rectangle(to.x, to.y, 3, 3, COLOURS.white, 1).setDepth(62);
+          scene.tweens.add({
+            targets: frag, x: tx, y: ty, alpha: 0,
+            duration: 280,
+            onComplete: () => frag.destroy(),
+          });
+        }
+        scene.time.delayedCall(280, () => resolve());
+      },
+    });
+  });
+}
+
+/**
  * Radial burst — used for Fireball / Turn Undead. Paints an expanding
  * filled circle plus a ring of dots that scatter outward.
  */

@@ -48,6 +48,10 @@ export interface PartyMember {
   intelligence: number;
   wisdom: number;
   level: number;
+  /** Cumulative experience points across the member's life. Used by
+   *  the leveling system to decide when level-ups fire — see
+   *  Leveling.ts. Mirrors the Python `Fighter.exp` field. */
+  exp: number;
   equipped: EquipmentSlots;
   /**
    * Per-slot remaining durability for the items currently equipped.
@@ -98,6 +102,7 @@ interface RawMember {
   intelligence?: number;
   wisdom?: number;
   level?: number;
+  exp?: number;
   equipped?: RawEquipped;
   inventory?: InventoryItem[];
   sprite?: string;
@@ -151,6 +156,7 @@ export function memberFromRaw(raw: RawMember): PartyMember {
     intelligence: raw.intelligence ?? 10,
     wisdom: raw.wisdom ?? 10,
     level: raw.level ?? 1,
+    exp: raw.exp ?? 0,
     equipped: {
       rightHand: raw.equipped?.right_hand ?? null,
       leftHand: raw.equipped?.left_hand ?? null,

@@ -51,6 +51,13 @@ export interface Combatant {
    * spell only affects creatures it's supposed to.
    */
   undead?: boolean;
+  /** XP awarded to each surviving party member when this enemy dies.
+   *  Summed across all defeated enemies on victory and shared with
+   *  every alive party member (matches the Python game). */
+  xpReward?: number;
+  /** Gold this enemy drops on death. Rolled once at spawn so it stays
+   *  stable for the encounter; summed across kills on victory. */
+  goldReward?: number;
   /**
    * When true, the Combat controller / scene drive this actor through
    * the monster-AI loop instead of the player input UI. Defaults to

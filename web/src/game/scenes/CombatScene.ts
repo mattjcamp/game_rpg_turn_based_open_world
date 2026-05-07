@@ -51,6 +51,8 @@ import { assetUrl, dataPath } from "../world/Module";
 import { loadItems, type Item } from "../world/Items";
 import { loadSpells, type Spell } from "../world/Spells";
 import { loadParty } from "../world/Party";
+import { loadClass, loadRaces, type ClassTemplate } from "../world/Classes";
+import { awardXp, type LevelUpEvent } from "../world/Leveling";
 import { defaultRng } from "../rng";
 import {
   resolveThrow,
@@ -79,6 +81,8 @@ import {
   screenShake,
   floatingX,
   shatterEffect,
+  magicDart,
+  magicArrow,
   VFX_COLOURS,
 } from "../combat/Vfx";
 import { Sfx } from "../audio/Sfx";
@@ -215,10 +219,24 @@ export class CombatScene extends Phaser.Scene {
   private bodies = new Map<string, Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle>();
   private selRings = new Map<string, Phaser.GameObjects.Rectangle>();
   private moveHintRects: Phaser.GameObjects.Rectangle[] = [];
-  /** Per-party-member HP/MP card UI, kept so we can refresh in place. */
+  /** Per-party-member card UI, kept so we can refresh in place. The MP
+   *  fields are absent for non-casters (Fighter / Thief / etc.). */
   private partyCards = new Map<string, {
     hpBar: Phaser.GameObjects.Rectangle;
     hpText: Phaser.GameObjects.Text;
+    mpBar?: Phaser.GameObjects.Rectangle;
+    mpText?: Phaser.GameObjects.Text;
+    /** Inner-fill width when the bar is full — used to scale by HP/MP %. */
+    fullBarW: number;
+  }>();
+  /** Floating HP bar above each enemy's body sprite. Position is
+   *  re-synced from the body during move / bump tweens via onUpdate. */
+  private monsterHpBars = new Map<string, {
+    bg: Phaser.GameObjects.Rectangle;
+    bar: Phaser.GameObjects.Rectangle;
+    fullW: number;
+    /** Pixels above the body sprite centre to anchor the bar. */
+    offsetY: number;
   }>();
 
   private logText!: Phaser.GameObjects.Text;
@@ -273,6 +291,7 @@ export class CombatScene extends Phaser.Scene {
     this.selRings.clear();
     this.moveHintRects.length = 0;
     this.partyCards.clear();
+    this.monsterHpBars.clear();
     this.actionTexts.length = 0;
     this.actionRowHandles.length = 0;
     this.mode = "default";
@@ -534,20 +553,43 @@ export class CombatScene extends Phaser.Scene {
       this.add.rectangle(x + 8, y + 8, avatar, avatar, colorHex).setOrigin(0);
     }
     const tx = x + avatar + 16;
-    this.add.text(tx, y + 6, c.name, FONT_BODY());
-    // HP bar
+    this.add.text(tx, y + 4, c.name, FONT_BODY());
+
+    // HP bar (always present). Inner fill width = barW - 2 to leave a
+    // 1px panel-edge frame on either side. Stored as fullBarW so
+    // refreshHp can recompute from %.
     const barW = w - (tx - x) - 12;
-    const barY = y + h - 18;
-    this.add.rectangle(tx, barY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
+    const fullBarW = barW - 2;
+    const hpBarY = y + 22;
+    this.add.rectangle(tx, hpBarY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
       .setStrokeStyle(1, C.panelEdge);
     const hpBar = this.add
-      .rectangle(tx + 1, barY + 1, barW - 2, 6, C.hpFull, 1)
+      .rectangle(tx + 1, hpBarY + 1, fullBarW, 6, C.hpFull, 1)
       .setOrigin(0);
     const hpText = this.add
-      .text(tx + barW - 2, y + 6, `${c.hp}/${c.maxHp}`,
+      .text(tx + barW - 2, hpBarY - 14, `${c.hp}/${c.maxHp}`,
             FONT_MONO(C.dim))
       .setOrigin(1, 0);
-    this.partyCards.set(c.id, { hpBar, hpText });
+
+    // MP bar — drawn only for casters (members with maxMp set). Combat
+    // doesn't carry MP on Combatant; we read the live PartyMember.
+    let mpBar: Phaser.GameObjects.Rectangle | undefined;
+    let mpText: Phaser.GameObjects.Text | undefined;
+    const member = this.memberByCombatantId(c.id);
+    if (member && member.maxMp != null) {
+      const mpBarY = y + 44;
+      this.add.rectangle(tx, mpBarY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
+        .setStrokeStyle(1, C.panelEdge);
+      mpBar = this.add
+        .rectangle(tx + 1, mpBarY + 1, fullBarW, 6, C.mp, 1)
+        .setOrigin(0);
+      mpText = this.add
+        .text(tx + barW - 2, mpBarY - 14, `${member.mp ?? 0}/${member.maxMp}`,
+              FONT_MONO(C.dim))
+        .setOrigin(1, 0);
+    }
+
+    this.partyCards.set(c.id, { hpBar, hpText, mpBar, mpText, fullBarW });
   }
 
   private drawLog(): void {
@@ -587,6 +629,23 @@ export class CombatScene extends Phaser.Scene {
           .setStrokeStyle(2, 0x0a0a14);
       }
       this.bodies.set(c.id, body);
+
+      // Floating HP bar above each enemy. The party gets full HP/MP
+      // cards in the HUD, so we keep the arena uncluttered for them.
+      if (c.side === "enemies") {
+        const fullW = 26;
+        const offsetY = 20;
+        const bg = this.add
+          .rectangle(x, y - offsetY, 30, 5, 0x10101a, 0.85)
+          .setOrigin(0.5, 0.5)
+          .setStrokeStyle(1, C.panelEdge)
+          .setDepth(15);
+        const bar = this.add
+          .rectangle(x - fullW / 2, y - offsetY, fullW, 3, C.hpFull, 1)
+          .setOrigin(0, 0.5)
+          .setDepth(16);
+        this.monsterHpBars.set(c.id, { bg, bar, fullW, offsetY });
+      }
     }
   }
 
@@ -1294,8 +1353,15 @@ export class CombatScene extends Phaser.Scene {
         } else if (
           e === "damage" || e === "undead_damage"
         ) {
-          // Damage spell: projectile arc from caster → target, then hit.
-          await this.flyProjectile(me, target, VFX_COLOURS.arcane);
+          // Damage spell: projectile from caster → target, then hit.
+          // Magic Arrow gets its own glowing-shaft VFX so it reads
+          // distinct from a mundane bow shot; other damage spells
+          // keep the generic bowed projectile.
+          if (spell.id === "magic_arrow") {
+            await magicArrow(this, this.bodyXY(me), this.bodyXY(target));
+          } else {
+            await this.flyProjectile(me, target, VFX_COLOURS.arcane);
+          }
           const r = resolveDamageSpell(me, target, spell, defaultRng);
           this.combat.log.push(
             `${me.name} casts ${spell.name} on ${target.name} — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
@@ -1680,13 +1746,24 @@ export class CombatScene extends Phaser.Scene {
     this.castGlowFor(me, this.colorForSpell(spell.effect_type));
     try {
       // Animate the projectile from caster → endpoint regardless of
-      // whether anything was hit, so the player sees the dart fly.
+      // whether anything was hit, so the player sees the cast resolve.
+      // Per-spell VFX:
+      //   - lightning_bolt → jagged zigzag
+      //   - Magic Dart (id "fireball" in the data — it isn't, just a
+      //     legacy id) → arcane orb with sparkle trail
+      //   - everything else → the generic bowed projectile
       const start = this.bodyXY(me);
       const endPx = {
         x: this.tileX(trace.endCol),
         y: this.tileY(trace.endRow),
       };
-      await projectileLine(this, start, endPx, VFX_COLOURS.arcane, 220);
+      if (spell.effect_type === "lightning_bolt") {
+        await lightningZigzag(this, start, endPx);
+      } else if (spell.id === "fireball" /* Magic Dart */) {
+        await magicDart(this, start, endPx, VFX_COLOURS.arcane);
+      } else {
+        await projectileLine(this, start, endPx, VFX_COLOURS.arcane, 220);
+      }
 
       if (trace.hitId) {
         const target = this.combat.byId(trace.hitId);
@@ -2091,7 +2168,11 @@ export class CombatScene extends Phaser.Scene {
         x: this.tileX(to.col),
         y: this.tileY(to.row),
         duration: 110,
-        onComplete: () => resolve(),
+        onUpdate: () => this.syncMonsterBar(actor.id),
+        onComplete: () => {
+          this.syncMonsterBar(actor.id);
+          resolve();
+        },
       });
     });
   }
@@ -2194,7 +2275,11 @@ export class CombatScene extends Phaser.Scene {
         targets: [body, ring],
         x: midX, y: midY,
         duration: 90, yoyo: true,
-        onComplete: () => resolve(),
+        onUpdate: () => this.syncMonsterBar(actor.id),
+        onComplete: () => {
+          this.syncMonsterBar(actor.id);
+          resolve();
+        },
       });
     });
   }
@@ -2209,6 +2294,7 @@ export class CombatScene extends Phaser.Scene {
         targets: [body, ring],
         x: body.x + dx, y: body.y + dy,
         duration: 50, yoyo: true,
+        onUpdate: () => this.syncMonsterBar(actor.id),
         onComplete: () => resolve(),
       });
     });
@@ -2343,10 +2429,33 @@ export class CombatScene extends Phaser.Scene {
       const card = this.partyCards.get(c.id);
       if (card) {
         const pct = Math.max(0, c.hp / Math.max(1, c.maxHp));
-        const fullW = (HUD_W - 24) - (44 + 16) - 12 - 2;
-        card.hpBar.width = Math.max(0, fullW * pct);
+        card.hpBar.width = Math.max(0, card.fullBarW * pct);
         card.hpBar.setFillStyle(pct <= 0.3 ? C.hpLow : C.hpFull, 1);
         card.hpText.setText(`${c.hp}/${c.maxHp}`);
+        // Casters: re-read MP from the live PartyMember and resize bar.
+        if (card.mpBar && card.mpText) {
+          const member = this.memberByCombatantId(c.id);
+          if (member && member.maxMp != null) {
+            const mpPct = Math.max(0, (member.mp ?? 0) / Math.max(1, member.maxMp));
+            card.mpBar.width = Math.max(0, card.fullBarW * mpPct);
+            card.mpText.setText(`${member.mp ?? 0}/${member.maxMp}`);
+          }
+        }
+      }
+    }
+    if (c.side === "enemies") {
+      // Update the floating HP bar above the monster sprite. Hidden
+      // entirely once the creature drops to 0 HP so the corpse doesn't
+      // keep advertising a full bar.
+      const bars = this.monsterHpBars.get(c.id);
+      if (bars) {
+        const pct = Math.max(0, c.hp / Math.max(1, c.maxHp));
+        bars.bar.width = Math.max(0, bars.fullW * pct);
+        bars.bar.setFillStyle(pct <= 0.3 ? C.hpLow : C.hpFull, 1);
+        if (c.hp <= 0) {
+          bars.bg.setVisible(false);
+          bars.bar.setVisible(false);
+        }
       }
     }
     if (c.hp <= 0) {
@@ -2355,6 +2464,19 @@ export class CombatScene extends Phaser.Scene {
       else if (body) body.setFillStyle(0x2a2a3a).setStrokeStyle(1, 0x444466);
       this.selRings.get(c.id)?.setVisible(false);
     }
+  }
+
+  /** Re-sync a monster's floating HP bar to its body's current x/y.
+   *  Called from move / bump tween onUpdate so the bar tracks the
+   *  sprite mid-animation. */
+  private syncMonsterBar(actorId: string): void {
+    const bars = this.monsterHpBars.get(actorId);
+    const body = this.bodies.get(actorId);
+    if (!bars || !body) return;
+    bars.bg.x = body.x;
+    bars.bg.y = body.y - bars.offsetY;
+    bars.bar.x = body.x - bars.fullW / 2;
+    bars.bar.y = body.y - bars.offsetY;
   }
 
   private refreshLog(): void {
@@ -2429,6 +2551,12 @@ export class CombatScene extends Phaser.Scene {
             (m) => m.id !== this.roamerId,
           );
         }
+        // XP + gold: sum from defeated enemies, share with all alive
+        // party members, run level-up, then refresh the HUD bars so
+        // any HP/MP gains show before we fade out. awardRewards is
+        // fire-and-forget here — fade waits on its own timer so a
+        // slow class-template fetch doesn't stall the transition.
+        void this.awardRewards();
       }
       if (winner === "enemies") {
         gameState.defeated = true;
@@ -2440,13 +2568,95 @@ export class CombatScene extends Phaser.Scene {
       if (gameState.partyData) {
         syncCombatHpBack(gameState.partyData, this.combat.combatants);
       }
-      this.time.delayedCall(1400, () => {
+      this.time.delayedCall(2400, () => {
         this.cameras.main.fadeOut(220, 0, 0, 0);
         this.cameras.main.once("camerafadeoutcomplete", () => {
           this.scene.start("OverworldScene");
         });
       });
     }
+  }
+
+  /**
+   * Compute and apply victory rewards: sum XP + rolled gold from every
+   * defeated enemy, hand each to all *alive* party members, then run
+   * the level-up loop per member. Drops a brief panel beneath the
+   * "Victory!" overlay summarising what was earned.
+   *
+   * Class templates are fetched lazily; if the fetch fails we silently
+   * skip the level-up step rather than blocking the post-combat
+   * transition. XP is still added to the member's `exp` either way.
+   */
+  private async awardRewards(): Promise<void> {
+    const enemies = this.combat.combatants.filter((c) => c.side === "enemies");
+    const totalXp   = enemies.reduce((s, m) => s + (m.xpReward   ?? 0), 0);
+    const totalGold = enemies.reduce((s, m) => s + (m.goldReward ?? 0), 0);
+    const party = gameState.partyData;
+    if (!party) {
+      this.showRewardSummary(totalXp, totalGold, []);
+      return;
+    }
+    party.gold += totalGold;
+    const aliveMembers: PartyMember[] = [];
+    for (const c of this.combat.combatants) {
+      if (c.side !== "party" || c.hp <= 0) continue;
+      const m = party.roster.find((r) => r.name === c.name);
+      if (m) aliveMembers.push(m);
+    }
+    const levelUps: LevelUpEvent[] = [];
+    if (totalXp > 0 && aliveMembers.length > 0) {
+      const races = await loadRaces().catch(() => null);
+      for (const m of aliveMembers) {
+        let tpl: ClassTemplate | null = null;
+        try { tpl = await loadClass(m.class); } catch { /* skip leveling */ }
+        if (!tpl) {
+          // Still credit the raw XP so the bar fills next time the
+          // class file loads — saves the player some grinding.
+          m.exp += totalXp;
+          continue;
+        }
+        const race = races ? races.get(m.race) ?? null : null;
+        levelUps.push(...awardXp(m, totalXp, tpl, race));
+      }
+      for (const ev of levelUps) Sfx.play("victory");
+      // Refresh the HUD so HP/MP bars catch any gains.
+      for (const c of this.combat.combatants) this.refreshHp(c);
+    }
+    this.showRewardSummary(totalXp, totalGold, levelUps);
+  }
+
+  /** Stack a short reward-summary panel under the "Victory!" overlay
+   *  so the player can see XP / gold gained and any level-ups before
+   *  we fade back to the overworld. */
+  private showRewardSummary(
+    xp: number, gold: number, events: LevelUpEvent[],
+  ): void {
+    const lines: string[] = [];
+    if (xp > 0)   lines.push(`+${xp} XP`);
+    if (gold > 0) lines.push(`+${gold} gold`);
+    for (const ev of events) lines.push(ev.message);
+    if (lines.length === 0) return;
+    const text = lines.join("\n");
+    const t = this.add.text(
+      ARENA_X + ARENA_W / 2,
+      ARENA_Y + ARENA_H / 2 + 56,
+      text,
+      {
+        fontFamily: "Georgia, serif",
+        fontSize: "18px",
+        color: "#ffd470",
+        align: "center",
+        stroke: "#1a1a2e",
+        strokeThickness: 4,
+        lineSpacing: 4,
+      },
+    ).setOrigin(0.5).setDepth(120);
+    // Fade in a beat after the "Victory!" headline so the eye reads
+    // them in order, then leave it on screen until the scene fades.
+    t.setAlpha(0);
+    this.tweens.add({
+      targets: t, alpha: 1, duration: 300, delay: 350,
+    });
   }
 
   private showOverlay(label: string, color: string): void {

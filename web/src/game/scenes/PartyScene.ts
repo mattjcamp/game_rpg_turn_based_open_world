@@ -40,6 +40,13 @@ import {
   type PartyMember,
 } from "../world/Party";
 import {
+  loadClass,
+  loadRaces,
+  type ClassTemplate,
+  type RaceInfo,
+} from "../world/Classes";
+import { xpForNextLevel } from "../world/Leveling";
+import {
   loadEffects,
   canEquip,
   type Effect,
@@ -159,6 +166,20 @@ export class PartyScene extends Phaser.Scene {
   private effects: Effect[] = [];
   private spells: Spell[] = [];
   private items: Map<string, Item> = new Map();
+  /** Class templates keyed by lowercase class name. Loaded once in
+   *  create() so the XP-to-next-level lookup stays synchronous. */
+  private classTemplates = new Map<string, ClassTemplate>();
+  private races = new Map<string, RaceInfo>();
+
+  /** Pre-compute "current XP / threshold" for a member if we have the
+   *  class template loaded. Returns null when the template is missing
+   *  so the renderer can fall back to a bare "EXP <n>" display. */
+  private xpRowFor(m: PartyMember): { exp: number; need: number } | null {
+    const tpl = this.classTemplates.get(m.class.toLowerCase());
+    if (!tpl) return null;
+    const race = this.races.get(m.race) ?? null;
+    return { exp: m.exp, need: xpForNextLevel(m, tpl, race) };
+  }
   private rows: ListRow[] = [];
   private selectable: number[] = []; // indices into rows[] that the cursor visits
   private cursor = 0;                 // index into selectable[]
@@ -240,6 +261,17 @@ export class PartyScene extends Phaser.Scene {
       this.effects = await loadEffects();
       this.spells = await loadSpells();
       this.items = await loadItems();
+      // Class & race templates back the XP-to-next-level display.
+      // Per-class fetches in parallel; a missing file is non-fatal —
+      // the row falls back to "EXP <n>" without the threshold.
+      try { this.races = await loadRaces(); } catch { /* keep empty */ }
+      const klasses = new Set(activeMembers(this.party).map((m) => m.class));
+      await Promise.all(
+        [...klasses].map(async (k) => {
+          try { this.classTemplates.set(k.toLowerCase(), await loadClass(k)); }
+          catch { /* leave missing — display falls back gracefully */ }
+        }),
+      );
     } catch (err) {
       this.track(this.add.text(20, 20, `Failed to load party: ${(err as Error).message}`, FONT_BODY(C.hpLow)));
       return;
@@ -1224,7 +1256,9 @@ export class PartyScene extends Phaser.Scene {
     this.text(tx, y + 6, `${idx + 1}  ${m.name}`, FONT_BODY(dead ? C.hpLow : C.body));
     this.text(tx, y + 22, `${m.class}  ${m.race}  ${m.gender}`, FONT_MONO(C.dim));
     const mpStr = m.maxMp != null ? `MP ${m.mp}/${m.maxMp}` : "MP —";
-    this.text(tx, y + 38, `LVL ${m.level}   HP ${m.hp}/${m.maxHp}   ${mpStr}`, FONT_MONO(C.dim));
+    const xpRow = this.xpRowFor(m);
+    const xpStr = xpRow ? `XP ${xpRow.exp}/${xpRow.need}` : `XP ${m.exp}`;
+    this.text(tx, y + 38, `LVL ${m.level}   HP ${m.hp}/${m.maxHp}   ${mpStr}   ${xpStr}`, FONT_MONO(C.dim));
 
     // HP / MP bars
     const barW = w - (tx - x) - 12;
@@ -1389,7 +1423,11 @@ export class PartyScene extends Phaser.Scene {
     const tx = x + padX + sz + 16;
     this.text(tx, cy, m.name, FONT_TITLE());
     this.text(tx, cy + 30, `${m.class}  •  ${m.race}  •  ${m.gender}`, FONT_BODY(C.dim));
-    this.text(tx, cy + 52, `Level ${m.level}`, FONT_BODY(C.body));
+    const xpRow = this.xpRowFor(m);
+    const levelLine = xpRow
+      ? `Level ${m.level}   •   EXP ${xpRow.exp} / ${xpRow.need}`
+      : `Level ${m.level}   •   EXP ${m.exp}`;
+    this.text(tx, cy + 52, levelLine, FONT_BODY(C.body));
 
     cy += sz + 12;
 
