@@ -1,3 +1,8 @@
+cd /Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/web
+npm run dev
+
+python3 main.py
+
 ## Polish
 
 ## Bugs
