@@ -45,6 +45,20 @@ export interface Combatant {
    * formations and overwrites whatever the caller passed.
    */
   position: { col: number; row: number };
+  /**
+   * True for undead monsters (skeletons, zombies, liches, …). Mirrors
+   * the `undead` flag in monsters.json. Read by Turn Undead so the
+   * spell only affects creatures it's supposed to.
+   */
+  undead?: boolean;
+  /**
+   * When true, the Combat controller / scene drive this actor through
+   * the monster-AI loop instead of the player input UI. Defaults to
+   * false for party members and true for enemies. Summoned allies
+   * (Animate Dead) live on `side: "party"` but with this flag set so
+   * they fight on their own without the player picking actions.
+   */
+  aiControlled?: boolean;
 }
 
 /**

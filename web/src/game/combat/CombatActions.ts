@@ -287,3 +287,128 @@ export function maxRangeFor(item: Item): number {
       return item.ranged ? 8 : 1;
   }
 }
+
+/**
+ * Per-target outcome for Turn Undead — the scene needs both the dice
+ * detail (for the log) and the resulting damage so it can flash/animate
+ * the right combatant.
+ */
+export interface TurnUndeadOutcome {
+  targetId: string;
+  /** Raw d20. */
+  saveRoll: number;
+  /** d20 + saveBonus. */
+  saveTotal: number;
+  /** Computed difficulty class for this cast. */
+  saveDc: number;
+  /** False → destroyed completely; true → seared for hp_percent. */
+  saved: boolean;
+  damage: number;
+  killed: boolean;
+}
+
+export interface TurnUndeadResult {
+  /** Empty when there were no undead enemies on the field. */
+  outcomes: TurnUndeadOutcome[];
+  /** True iff the spell found at least one undead target. */
+  hadTargets: boolean;
+}
+
+/**
+ * Build a Combatant for a summoned skeleton from an Animate Dead-style
+ * spell. Reads the `skeleton_*` keys out of `spell.effect_value` and
+ * falls back to sensible Skeleton-monster defaults when fields are
+ * missing — mirrors src/states/combat.py::_cast_animate_dead.
+ *
+ * `id` is the unique combat id (the scene generates it); `casterName`
+ * is just used to flavour the combatant's display name. The position
+ * comes from the tile picker and is stamped on by Combat.addCombatant
+ * later, so we leave a placeholder here.
+ */
+export function makeSummonedSkeleton(
+  spell: Spell,
+  id: string,
+  casterName: string,
+): Combatant {
+  const ev = (spell.effect_value ?? {}) as Record<string, unknown>;
+  const num = (k: string, dflt: number): number =>
+    typeof ev[k] === "number" ? (ev[k] as number) : dflt;
+  return {
+    id,
+    name: `${casterName}'s Skeleton`,
+    side: "party",
+    maxHp:        num("skeleton_hp", 30),
+    hp:           num("skeleton_hp", 30),
+    ac:           num("skeleton_ac", 14),
+    attackBonus:  num("skeleton_attack", 6),
+    damage: {
+      dice:  num("skeleton_dmg_dice", 2),
+      sides: num("skeleton_dmg_sides", 6),
+      bonus: num("skeleton_dmg_bonus", 3),
+    },
+    dexMod: 1,
+    color: [200, 200, 180],
+    sprite: "/assets/monsters/skeleton.png",
+    baseMoveRange: 3,
+    position: { col: 0, row: 0 }, // overwritten by Combat.addCombatant
+    undead: true,
+    aiControlled: true,
+  };
+}
+
+/**
+ * Turn Undead resolution — Cleric/Paladin holy blast.
+ *
+ * Mirrors src/states/combat.py::_cast_turn_undead:
+ *   - Filters monsters to those flagged `undead: true` in the data.
+ *   - Each undead rolls d20 + max(0, attackBonus-2) vs save_dc
+ *     (`save_dc_base + caster wisdom modifier`, default Wisdom).
+ *   - Failure → HP set to 0 (destroyed completely).
+ *   - Success → max(1, floor(maxHp * hp_percent)) damage.
+ *
+ * Returns per-target dice + damage so the scene can log and animate.
+ * The `casterWisMod` argument lets the caller pre-compute the modifier
+ * from PartyMember's wisdom score (or pass 0 for monster casters).
+ */
+export function resolveTurnUndead(
+  enemies: Combatant[],
+  spell: Spell,
+  casterWisMod: number,
+  rng: RNG,
+): TurnUndeadResult {
+  const ev = (spell.effect_value ?? {}) as Record<string, unknown>;
+  const hpPct = typeof ev.hp_percent === "number" ? (ev.hp_percent as number) : 0.5;
+  const dcBase = typeof ev.save_dc_base === "number" ? (ev.save_dc_base as number) : 10;
+  const dcStat = typeof ev.save_dc_stat === "string" ? (ev.save_dc_stat as string) : "wisdom";
+
+  const undeadTargets = enemies.filter((m) => m.hp > 0 && m.undead);
+  if (undeadTargets.length === 0) {
+    return { outcomes: [], hadTargets: false };
+  }
+
+  // Default to Wisdom — the data only ships wisdom/intelligence today.
+  const saveDc = dcBase + (dcStat === "intelligence" ? 0 : casterWisMod);
+
+  const outcomes: TurnUndeadOutcome[] = [];
+  for (const t of undeadTargets) {
+    const saveRoll = Math.floor(rng() * 20) + 1;
+    const saveBonus = Math.max(0, t.attackBonus - 2);
+    const saveTotal = saveRoll + saveBonus;
+    if (saveTotal < saveDc) {
+      const damage = t.hp;
+      t.hp = 0;
+      outcomes.push({
+        targetId: t.id, saveRoll, saveTotal, saveDc,
+        saved: false, damage, killed: true,
+      });
+    } else {
+      const damage = Math.max(1, Math.floor(t.maxHp * hpPct));
+      t.hp = Math.max(0, t.hp - damage);
+      outcomes.push({
+        targetId: t.id, saveRoll, saveTotal, saveDc,
+        saved: true, damage, killed: t.hp === 0,
+      });
+    }
+  }
+  return { outcomes, hadTargets: true };
+}

@@ -29,7 +29,7 @@
  */
 
 import Phaser from "phaser";
-import { Combat } from "../combat/Combat";
+import { Combat, isAiControlled } from "../combat/Combat";
 import {
   ARENA_COLS,
   ARENA_ROWS,
@@ -54,8 +54,10 @@ import {
   describeStatusCast,
   resolveDamageSpell,
   resolveHealSpell,
+  resolveTurnUndead,
+  makeSummonedSkeleton,
 } from "../combat/CombatActions";
-import { combatantsFromParty, syncCombatHpBack } from "../combat/CombatBridge";
+import { combatantsFromParty, syncCombatHpBack, abilityMod } from "../combat/CombatBridge";
 import {
   flashTarget,
   castGlow,
@@ -326,7 +328,7 @@ export class CombatScene extends Phaser.Scene {
    */
   private kickOffCurrentTurn(): void {
     if (this.combat.isOver || this.ended) return;
-    if (this.combat.current.side === "enemies") {
+    if (isAiControlled(this.combat.current)) {
       this.busy = true;
       this.time.delayedCall(450, () => void this.runMonsterTurn());
     }
@@ -807,6 +809,24 @@ export class CombatScene extends Phaser.Scene {
       this.startTilePicking(spell);
       return;
     }
+    // Pre-flight for Turn Undead: if there are no undead enemies on
+    // the field the spell fizzles. Mirrors the Python game — the
+    // caster keeps both the MP and their turn, and just gets a clear
+    // log line so they can pick another action.
+    if (spell.effect_type === "undead_damage") {
+      const anyUndead = this.combat.combatants.some(
+        (c) => c.side === "enemies" && c.hp > 0 && c.undead,
+      );
+      if (!anyUndead) {
+        this.clearPicker();
+        this.mode = "default";
+        this.combat.log.push(
+          `${this.combat.current.name} channels ${spell.name} — no undead here, the holy energy has no effect.`
+        );
+        this.refreshLog();
+        return;
+      }
+    }
     // The remaining kinds resolve immediately. Spend MP, log, and
     // end the turn — same as a finished single-target cast would.
     if (member.maxMp != null) {
@@ -890,39 +910,52 @@ export class CombatScene extends Phaser.Scene {
         );
       }
     } else if (kind === "mass-enemy") {
-      // Turn Undead (the canonical mass-enemy spell) deals % HP
-      // damage. resolveDamageSpell handles dice; for HP-percent
-      // effects we apply directly so the log reads cleanly.
-      let total = 0;
-      let i = 0;
-      const ev = spell.effect_value ?? {};
-      for (const foe of this.combat.combatants) {
-        if (foe.side !== "enemies" || foe.hp <= 0) continue;
-        let dmg = 0;
-        if (typeof (ev as Record<string, unknown>).hp_percent === "number") {
-          const pct = (ev as { hp_percent: number }).hp_percent;
-          dmg = Math.max(1, Math.floor(foe.maxHp * pct));
-        } else {
+      if (spell.effect_type === "undead_damage") {
+        // Turn Undead: each undead saves vs DC = save_dc_base + caster
+        // wisMod. Failure → destroyed completely; success → seared for
+        // hp_percent of maxHp. Non-undead are untouched (the pre-flight
+        // already covered the no-undead case).
+        const enemies = this.combat.combatants.filter((c) => c.side === "enemies");
+        const wisMod = abilityMod(member.wisdom);
+        const result = resolveTurnUndead(enemies, spell, wisMod, defaultRng);
+        this.combat.log.push(`${me.name} channels ${spell.name}!`);
+        let i = 0;
+        for (const o of result.outcomes) {
+          const target = this.combat.byId(o.targetId);
+          this.combat.log.push(
+            o.saved
+              ? `${target.name} resists (${o.saveRoll}+${Math.max(0, target.attackBonus - 2)}=${o.saveTotal} vs DC ${o.saveDc}) — seared for ${o.damage} damage!`
+              : `${target.name} fails its save (${o.saveRoll}+${Math.max(0, target.attackBonus - 2)}=${o.saveTotal} vs DC ${o.saveDc}) — DESTROYED!`
+          );
+          const body = this.bodies.get(target.id);
+          if (body) {
+            const radius = o.saved ? 38 : 56;
+            this.time.delayedCall(i * 80, () => {
+              flashTarget(this, body, VFX_COLOURS.buff);
+              void radialBurst(this, { x: body.x, y: body.y },
+                                VFX_COLOURS.buff, VFX_COLOURS.white, radius);
+            });
+          }
+          i += 1;
+          this.refreshHp(target);
+        }
+        if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
+      } else {
+        // Generic mass-enemy fallback (no other spells use this
+        // classifier today, but the branch keeps options open for
+        // future "blast every foe" effects without dropping into
+        // the unsupported message).
+        let total = 0;
+        for (const foe of this.combat.combatants) {
+          if (foe.side !== "enemies" || foe.hp <= 0) continue;
           const r = resolveDamageSpell(me, foe, spell, defaultRng);
-          dmg = r.damage;
+          total += r.damage;
+          this.refreshHp(foe);
         }
-        foe.hp = Math.max(0, foe.hp - dmg);
-        total += dmg;
-        const body = this.bodies.get(foe.id);
-        if (body) {
-          this.time.delayedCall(i * 70, () => {
-            flashTarget(this, body, VFX_COLOURS.buff);
-            void radialBurst(this, { x: body.x, y: body.y },
-                              VFX_COLOURS.buff, VFX_COLOURS.white, 38);
-          });
-        }
-        i += 1;
-        this.refreshHp(foe);
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} — enemies take ${total} HP total.`
+        );
       }
-      if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
-      this.combat.log.push(
-        `${me.name} casts ${spell.name} — enemies take ${total} HP total.`
-      );
     } else {
       // unsupported — needs a tile picker we haven't built.
       this.combat.log.push(
@@ -1436,12 +1469,7 @@ export class CombatScene extends Phaser.Scene {
       } else if (e === "teleport") {
         await this.resolveTeleport(me, spell, this.tileCursorPos);
       } else if (e === "summon_skeleton") {
-        // Summon mechanics need a full new-combatant pipeline (turn
-        // order, sprite preloading). Log clearly and end the turn so
-        // the player knows the spell registered.
-        this.combat.log.push(
-          `${me.name} casts ${spell.name} — summons not yet implemented in combat.`
-        );
+        await this.resolveSummonSkeleton(me, spell, this.tileCursorPos);
       } else {
         this.combat.log.push(
           `${me.name} casts ${spell.name} on a tile — no effect yet.`
@@ -1552,6 +1580,73 @@ export class CombatScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Animate Dead — raise a skeleton ally on the chosen tile that fights
+   * for the party for `spell.duration` turns, then crumbles to dust.
+   *
+   * Refuses if the destination is a wall or already occupied. The new
+   * combatant is built via `makeSummonedSkeleton` (reads stats out of
+   * `effect_value`), then handed to `combat.addCombatant` which seeds
+   * its initiative slot and tracks the summon timer. The scene
+   * separately wires up its body sprite + selection ring so the right
+   * HUD and the arena pick the new actor up immediately.
+   */
+  private async resolveSummonSkeleton(
+    caster: Combatant, spell: Spell, dest: { col: number; row: number },
+  ): Promise<void> {
+    if (isWall(dest.col, dest.row)) {
+      this.combat.log.push(`${caster.name} can't raise the dead in a wall.`);
+      return;
+    }
+    if (this.combat.combatantAt(dest.col, dest.row)) {
+      this.combat.log.push(`${caster.name} can't summon onto another combatant.`);
+      return;
+    }
+    const id = `summon-${caster.id}-${this.combat.combatants.length}`;
+    const skeleton = makeSummonedSkeleton(spell, id, caster.name);
+    const turns = typeof spell.duration === "number" ? spell.duration : 5;
+    this.combat.addCombatant(skeleton, dest, turns);
+
+    // Build the matching scene visuals: selection ring + body sprite
+    // at the destination tile so the new combatant slots into the
+    // arena immediately. Mirrors the loop in drawCombatants() so the
+    // entry behaves like one that was there from create().
+    const x = this.tileX(dest.col);
+    const y = this.tileY(dest.row);
+    const ring = this.add
+      .rectangle(x, y, TILE, TILE, C.cursor, 0)
+      .setStrokeStyle(2, C.cursor)
+      .setVisible(false);
+    this.selRings.set(id, ring);
+    let body: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+    if (skeleton.sprite && this.textures.exists(skeleton.sprite)) {
+      body = this.add.image(x, y, skeleton.sprite);
+    } else {
+      const colorHex = Phaser.Display.Color.GetColor(...skeleton.color);
+      body = this.add
+        .rectangle(x, y, TILE - 4, TILE - 4, colorHex)
+        .setStrokeStyle(2, 0x0a0a14);
+    }
+    this.bodies.set(id, body);
+
+    // "Claws its way out of the ground" VFX — purple/bone burst at
+    // the spawn tile, then a quick scale-up on the body so the entry
+    // reads as a summoning rather than a warp-in.
+    void radialBurst(this, { x, y }, VFX_COLOURS.curse, VFX_COLOURS.white, 42);
+    body.setScale(0.2);
+    this.tweens.add({
+      targets: body, scale: 1,
+      duration: 320, ease: "Back.Out",
+    });
+
+    this.combat.log.push(
+      `${caster.name} casts ${spell.name}!`
+    );
+    this.combat.log.push(
+      `A skeleton claws its way out of the ground! (${turns} turns)`
+    );
+  }
+
   private onTileClicked(col: number, row: number): void {
     if (!this.canTakePlayerInput()) return;
     const actor = this.combat.current;
@@ -1573,7 +1668,11 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private canTakePlayerInput(): boolean {
-    return !this.busy && !this.ended && this.combat.current.side === "party";
+    // Player input is only valid when the active actor is a real
+    // party member, not an AI-controlled summon on the party side.
+    return !this.busy && !this.ended &&
+           this.combat.current.side === "party" &&
+           !isAiControlled(this.combat.current);
   }
 
   // ── Turn flow ────────────────────────────────────────────────────
@@ -1615,7 +1714,7 @@ export class CombatScene extends Phaser.Scene {
     try {
       while (
         !this.combat.isOver &&
-        this.combat.current.side === "enemies" &&
+        isAiControlled(this.combat.current) &&
         this.combat.movePoints > 0
       ) {
         const intent = this.combat.decideMonsterIntent();
@@ -1840,7 +1939,11 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private refreshActionMenu(): void {
-    const playerTurn = this.combat.current.side === "party";
+    // Player can act only on real party members, not on AI summons
+    // that share the party side.
+    const playerTurn =
+      this.combat.current.side === "party" &&
+      !isAiControlled(this.combat.current);
     const member = this.memberForCurrent();
     // Per-action enable state — dynamic based on the active member.
     const canThrow = !!member && this.partyHasThrowable();

@@ -51,6 +51,14 @@ import type {
   Side,
 } from "../types";
 
+/** True when this combatant's turns are run by the monster-AI loop. */
+export function isAiControlled(c: Combatant): boolean {
+  // Honour an explicit flag first (summons set it true on the party
+  // side); otherwise default to "enemies are AI, party are player".
+  if (typeof c.aiControlled === "boolean") return c.aiControlled;
+  return c.side === "enemies";
+}
+
 export type MoveResult =
   | { kind: "moved"; from: GridPos; to: GridPos; pointsLeft: number }
   | { kind: "attacked"; result: AttackResult }
@@ -75,6 +83,12 @@ export class Combat {
    * unified into one structure. See `./Buffs.ts` for kinds.
    */
   private buffs = new Map<string, Buff[]>();
+  /**
+   * Per-combatant summon timer (in rounds). Animate Dead and similar
+   * spells push an entry here; tickSummons() decrements at end of
+   * round and crumbles the summon to dust when it expires.
+   */
+  private summons = new Map<string, number>();
   /** Counts cursor advances; we tick buffs once per full round
    *  (equal to combatants.length advances). */
   private turnsAdvanced = 0;
@@ -162,6 +176,42 @@ export class Combat {
   get winner(): Side | null {
     if (!this.isOver) return null;
     return this.alive("party").length > 0 ? "party" : "enemies";
+  }
+
+  // ── Mid-fight roster changes ─────────────────────────────────────
+  //
+  // The constructor seeds the roster from `(party, enemies)`; spells
+  // like Animate Dead need to bring new actors in mid-encounter. These
+  // helpers keep `combatants` and `initiativeOrder` in sync so the
+  // scene's existing turn loop just picks the new entry up.
+
+  /**
+   * Add a combatant mid-fight. Rolls initiative for them, splices the
+   * roll into the existing order so they get a turn this round (after
+   * the current actor), and stamps their position on the grid.
+   *
+   * If `summonTurns` is provided, the combatant is tracked as a summon
+   * — at the end of each full round its timer ticks down, and when it
+   * hits zero the combatant crumbles to dust (HP = 0).
+   */
+  addCombatant(
+    c: Combatant,
+    position: { col: number; row: number },
+    summonTurns?: number,
+  ): void {
+    c.position = { ...position };
+    this.combatants.push(c);
+    const { total, raw } = rollInitiative(c.dexMod, this.rng);
+    // Insert the roll just after the current cursor so the new actor
+    // takes their turn before the round wraps. Splicing here also
+    // keeps `initiativeOrder.length === combatants.length`, which the
+    // round-tick math depends on.
+    this.initiativeOrder.splice(this.cursor + 1, 0, {
+      combatantId: c.id, total, raw,
+    });
+    if (typeof summonTurns === "number" && summonTurns > 0) {
+      this.summons.set(c.id, summonTurns);
+    }
   }
 
   // ── Buffs / debuffs ──────────────────────────────────────────────
@@ -304,10 +354,15 @@ export class Combat {
    */
   decideMonsterIntent(): MonsterIntent {
     const actor = this.current;
-    if (actor.side !== "enemies") return { kind: "wait" };
+    // Generalised: any AI-controlled combatant runs this loop. Enemies
+    // are AI-driven by default; summoned allies (Animate Dead) live on
+    // the party side but flip aiControlled so they fight on their own.
+    if (!isAiControlled(actor)) return { kind: "wait" };
     if (this.movePoints <= 0) return { kind: "wait" };
 
-    const targets = this.alive("party");
+    // Hostile to whichever side the actor isn't on.
+    const enemySide: Side = actor.side === "enemies" ? "party" : "enemies";
+    const targets = this.alive(enemySide);
     if (targets.length === 0) return { kind: "wait" };
 
     // Adjacent? Attack the weakest.
@@ -371,6 +426,7 @@ export class Combat {
       // Tick all buff durations down once and log expirations.
       if (this.turnsAdvanced % this.combatants.length === 0) {
         this.tickAllBuffs();
+        this.tickSummons();
       }
       if (this.byId(this.initiativeOrder[this.cursor].combatantId).hp > 0) {
         this.refillMovePoints();
@@ -389,6 +445,28 @@ export class Combat {
         const c = this.combatants.find((x) => x.id === id);
         if (!c || c.hp <= 0) continue;
         this.log.push(describeExpire(c.name, b.source));
+      }
+    }
+  }
+
+  /**
+   * Round-end tick for active summons. Decrements each timer and, when
+   * one hits zero, sets the summon's HP to zero with a flavour log
+   * line ("X crumbles to dust!"). Mirrors the Python summon_buffs
+   * expiration in `_tick_summon_buffs`.
+   */
+  private tickSummons(): void {
+    for (const [id, turnsLeft] of this.summons) {
+      const next = turnsLeft - 1;
+      if (next <= 0) {
+        this.summons.delete(id);
+        const c = this.combatants.find((x) => x.id === id);
+        if (c && c.hp > 0) {
+          c.hp = 0;
+          this.log.push(`${c.name} crumbles to dust!`);
+        }
+      } else {
+        this.summons.set(id, next);
       }
     }
   }

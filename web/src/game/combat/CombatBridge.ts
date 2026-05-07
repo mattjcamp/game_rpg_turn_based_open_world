@@ -20,9 +20,12 @@ import { activeMembers } from "../world/Party";
 const DEFAULT_DAMAGE = { dice: 1, sides: 6, bonus: 0 } as const;
 
 /** D&D-style modifier (10 = 0, 18 = +4, 8 = -1, …). */
-function mod(stat: number): number {
+export function abilityMod(stat: number): number {
   return Math.floor((stat - 10) / 2);
 }
+
+/** Internal alias kept short for the bridge's existing callers. */
+function mod(stat: number): number { return abilityMod(stat); }
 
 /** Pick the best ability modifier for hit rolls — STR for melee
  *  and unarmed, DEX for ranged / thrown. */

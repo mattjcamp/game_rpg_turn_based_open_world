@@ -21,6 +21,9 @@ interface MonsterSpec {
   sprite: string;
   /** Tiles per turn. Mirrors `move_range` in the Python data files. */
   baseMoveRange: number;
+  /** Mirrors monsters.json's `undead` flag — only undead are affected
+   *  by Turn Undead and Holy Water. */
+  undead?: boolean;
 }
 
 const SPECS: Record<string, MonsterSpec> = {
@@ -56,6 +59,7 @@ const SPECS: Record<string, MonsterSpec> = {
     color: [220, 220, 200],
     sprite: "/assets/monsters/skeleton.png",
     baseMoveRange: 3,
+    undead: true,
   },
   Orc: {
     name: "Orc",
@@ -86,6 +90,7 @@ export function makeMonster(name: keyof typeof SPECS, idSuffix = ""): Combatant 
     sprite: spec.sprite,
     baseMoveRange: spec.baseMoveRange,
     position: { col: 0, row: 0 }, // overwritten by Combat
+    undead: spec.undead,
   };
 }
 

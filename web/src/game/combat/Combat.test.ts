@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { Combat } from "./Combat";
+import { Combat, isAiControlled } from "./Combat";
 import { mulberry32 } from "../rng";
 import { ARENA_COLS, ARENA_ROWS } from "./Arena";
 import type { Combatant } from "../types";
@@ -427,6 +427,96 @@ describe("Combat — buff registry", () => {
     expect(c.sumBuff("p1", "attack_bonus")).toBe(0);
     // Some expire-line was logged for p1.
     expect(c.log.some((l) => /blessing fades/i.test(l))).toBe(true);
+  });
+
+  it("isAiControlled defaults: enemies = AI, party = player", () => {
+    const p1 = make("p1", "party");
+    const e1 = make("e1", "enemies");
+    expect(isAiControlled(p1)).toBe(false);
+    expect(isAiControlled(e1)).toBe(true);
+  });
+
+  it("isAiControlled honours an explicit aiControlled override", () => {
+    // A summon: party-side but AI-driven.
+    const summon = make("s1", "party", { aiControlled: true });
+    expect(isAiControlled(summon)).toBe(true);
+    // An NPC ally: enemies-side but the player drives them. Hypothetical
+    // — the override must respect both directions.
+    const charmed = make("c1", "enemies", { aiControlled: false });
+    expect(isAiControlled(charmed)).toBe(false);
+  });
+
+  it("addCombatant inserts into combatants and initiative order", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(1),
+    );
+    expect(c.combatants).toHaveLength(2);
+    expect(c.initiativeOrder).toHaveLength(2);
+
+    const summon = make("sum", "party", { aiControlled: true });
+    c.addCombatant(summon, { col: 4, row: 4 }, 5);
+
+    expect(c.combatants).toHaveLength(3);
+    expect(c.initiativeOrder).toHaveLength(3);
+    // The new combatant exists in the order.
+    expect(c.initiativeOrder.map((r) => r.combatantId)).toContain("sum");
+    // Position was stamped on by addCombatant.
+    expect(summon.position).toEqual({ col: 4, row: 4 });
+  });
+
+  it("summon timer ticks each round and crumbles to dust on expiry", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(2),
+    );
+    const summon = make("sum", "party", {
+      aiControlled: true, hp: 30, maxHp: 30,
+    });
+    c.addCombatant(summon, { col: 5, row: 5 }, /*summonTurns*/ 1);
+    expect(summon.hp).toBe(30);
+
+    // Cycle one full round (combatants.length = 3 with the summon).
+    const rounds = c.combatants.length;
+    for (let i = 0; i < rounds; i++) c.endTurn();
+
+    // Timer was 1 → ticks to 0 → crumbles.
+    expect(summon.hp).toBe(0);
+    expect(c.log.some((l) => /crumbles to dust/i.test(l))).toBe(true);
+  });
+
+  it("non-summon entries are unaffected by tickSummons", () => {
+    const c = new Combat(
+      [make("p1", "party", { hp: 20, maxHp: 20 })],
+      [make("e1", "enemies", { hp: 20, maxHp: 20 })],
+      mulberry32(3),
+    );
+    const before = c.byId("p1").hp;
+    // Step a few rounds — neither side has a summon timer.
+    for (let i = 0; i < c.combatants.length * 3; i++) c.endTurn();
+    expect(c.byId("p1").hp).toBe(before);
+  });
+
+  it("AI-controlled party-side actor's intent targets enemies", () => {
+    // Summon with high dexMod so it gets first turn; place it next to
+    // an enemy so it picks an attack instead of moving.
+    const c = new Combat(
+      [make("p1", "party"),
+       make("sum", "party", { aiControlled: true, dexMod: 10 })],
+      [make("e1", "enemies", { dexMod: -10 })],
+      mulberry32(11),
+    );
+    // Force position adjacency by placing the enemy and the summon
+    // diagonally next to each other.
+    c.byId("sum").position = { col: 5, row: 5 };
+    c.byId("e1").position  = { col: 6, row: 5 };
+    // Wind the cursor to the summon.
+    while (c.current.id !== "sum") c.endTurn();
+    const intent = c.decideMonsterIntent();
+    expect(intent.kind).toBe("attack");
+    if (intent.kind === "attack") expect(intent.targetId).toBe("e1");
   });
 
   it("range_bonus buffs extend the next refilled movePoints", () => {

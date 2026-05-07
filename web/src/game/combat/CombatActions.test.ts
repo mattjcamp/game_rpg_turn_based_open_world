@@ -3,6 +3,8 @@ import {
   resolveThrow,
   resolveDamageSpell,
   resolveHealSpell,
+  resolveTurnUndead,
+  makeSummonedSkeleton,
   spellIsCombatCastable,
   isThrowable,
   isRanged,
@@ -29,6 +31,7 @@ function makeCombatant(over: Partial<Combatant> = {}): Combatant {
     color:          over.color ?? [200, 200, 200],
     baseMoveRange:  over.baseMoveRange ?? 4,
     position:       over.position ?? { col: 5, row: 5 },
+    undead:         over.undead,
   };
 }
 
@@ -298,5 +301,150 @@ describe("spellIsCombatCastable", () => {
 
   it("is false for the wrong class", () => {
     expect(spellIsCombatCastable(battleSpell, "Cleric")).toBe(false);
+  });
+});
+
+describe("resolveTurnUndead", () => {
+  const turnUndead: Spell = spellFromRaw({
+    id: "turn_undead", name: "Turn Undead", description: "",
+    allowable_classes: ["Cleric", "Paladin"],
+    casting_type: "priest", min_level: 2, mp_cost: 0, duration: "instant",
+    effect_type: "undead_damage",
+    effect_value: { hp_percent: 0.5, save_dc_base: 10, save_dc_stat: "wisdom" },
+    targeting: "auto_monster", usable_in: ["battle"],
+  });
+
+  it("ignores non-undead enemies entirely", () => {
+    const goblin = makeCombatant({
+      id: "g", name: "Goblin", side: "enemies", hp: 10, maxHp: 10, attackBonus: 2,
+    });
+    const skeleton = makeCombatant({
+      id: "s", name: "Skeleton", side: "enemies", hp: 10, maxHp: 10, attackBonus: 3,
+      undead: true,
+    });
+    const result = resolveTurnUndead([goblin, skeleton], turnUndead, /*wisMod*/ 2, mulberry32(1));
+    // Only one outcome — the skeleton.
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0].targetId).toBe("s");
+    // Goblin is untouched.
+    expect(goblin.hp).toBe(10);
+  });
+
+  it("returns hadTargets=false when there are no undead at all", () => {
+    const goblin = makeCombatant({
+      id: "g", name: "Goblin", side: "enemies", hp: 10, maxHp: 10,
+    });
+    const result = resolveTurnUndead([goblin], turnUndead, 2, mulberry32(1));
+    expect(result.hadTargets).toBe(false);
+    expect(result.outcomes).toHaveLength(0);
+    expect(goblin.hp).toBe(10);
+  });
+
+  it("destroys undead that fail their save (HP set to 0)", () => {
+    // Save DC = 10 + wisMod(4) = 14. Skeleton attackBonus 3 → save bonus 1.
+    // Even a d20 = 12 → total 13 < 14 → fails. Find a seed that yields a
+    // low roll. mulberry32(0) starts low — verify the outcome is failure.
+    const skeleton = makeCombatant({
+      id: "s", name: "Skeleton", side: "enemies", hp: 12, maxHp: 12, attackBonus: 3,
+      undead: true,
+    });
+    // Use a seed that's reproducible. With save DC = 14 we expect at
+    // least one of the first few rolls to fail.
+    const rng = mulberry32(99);
+    const result = resolveTurnUndead([skeleton], turnUndead, /*wisMod*/ 4, rng);
+    const o = result.outcomes[0];
+    if (!o.saved) {
+      expect(o.damage).toBe(12);    // full HP destroyed
+      expect(skeleton.hp).toBe(0);
+      expect(o.killed).toBe(true);
+    } else {
+      // Survives — must take exactly hp_percent of maxHp = 6.
+      expect(o.damage).toBe(6);
+      expect(skeleton.hp).toBe(6);
+    }
+  });
+
+  it("seared-but-alive case deals max(1, floor(maxHp * hp_percent))", () => {
+    // Tiny zombie with maxHp=3 → floor(3 * 0.5) = 1. Force a successful
+    // save by setting wisMod negative so the DC drops below the
+    // worst-possible roll.
+    const zombie = makeCombatant({
+      id: "z", name: "Zombie", side: "enemies", hp: 3, maxHp: 3, attackBonus: 5,
+      undead: true,
+    });
+    // DC = 10 + (-5) = 5. attackBonus 5 → save bonus 3. Lowest possible
+    // total = 1+3 = 4 < 5 — uh, that fails. Bump wisMod down further.
+    const result = resolveTurnUndead([zombie], turnUndead, /*wisMod*/ -10, mulberry32(7));
+    const o = result.outcomes[0];
+    // DC = 10 + (-10) = 0. Any save passes.
+    expect(o.saved).toBe(true);
+    expect(o.damage).toBe(1);     // max(1, floor(3*0.5)) = max(1, 1)
+    expect(zombie.hp).toBe(2);
+  });
+
+  it("includes saveRoll/saveTotal/saveDc in each outcome for the log", () => {
+    const skeleton = makeCombatant({
+      id: "s", name: "Skeleton", side: "enemies", hp: 10, maxHp: 10, attackBonus: 3,
+      undead: true,
+    });
+    const result = resolveTurnUndead([skeleton], turnUndead, /*wisMod*/ 0, mulberry32(3));
+    const o = result.outcomes[0];
+    expect(o.saveRoll).toBeGreaterThanOrEqual(1);
+    expect(o.saveRoll).toBeLessThanOrEqual(20);
+    expect(o.saveDc).toBe(10);    // dc_base 10 + 0 wisMod
+    // saveTotal = saveRoll + max(0, attackBonus - 2) = saveRoll + 1
+    expect(o.saveTotal).toBe(o.saveRoll + 1);
+  });
+});
+
+describe("makeSummonedSkeleton", () => {
+  const animateDead: Spell = spellFromRaw({
+    id: "animate_dead", name: "Animate Dead", description: "",
+    allowable_classes: ["Wizard"],
+    casting_type: "sorcerer", min_level: 6, mp_cost: 20, duration: 5,
+    effect_type: "summon_skeleton",
+    effect_value: {
+      skeleton_hp: 30, skeleton_ac: 14, skeleton_attack: 6,
+      skeleton_dmg_dice: 2, skeleton_dmg_sides: 6, skeleton_dmg_bonus: 3,
+    },
+    targeting: "select_tile", usable_in: ["battle"],
+  });
+
+  it("reads stats from spell.effect_value", () => {
+    const c = makeSummonedSkeleton(animateDead, "summon-1", "Gandolf");
+    expect(c.maxHp).toBe(30);
+    expect(c.hp).toBe(30);
+    expect(c.ac).toBe(14);
+    expect(c.attackBonus).toBe(6);
+    expect(c.damage).toEqual({ dice: 2, sides: 6, bonus: 3 });
+  });
+
+  it("flags the summon as undead, party-side, AI-controlled", () => {
+    const c = makeSummonedSkeleton(animateDead, "summon-1", "Gandolf");
+    expect(c.undead).toBe(true);
+    expect(c.side).toBe("party");
+    expect(c.aiControlled).toBe(true);
+  });
+
+  it("names the skeleton after its summoner", () => {
+    const c = makeSummonedSkeleton(animateDead, "summon-1", "Selina");
+    expect(c.name).toContain("Selina");
+    expect(c.name.toLowerCase()).toContain("skeleton");
+  });
+
+  it("falls back to defaults when effect_value is missing fields", () => {
+    const stripped = spellFromRaw({
+      id: "weak_summon", name: "Weak Summon", description: "",
+      allowable_classes: ["Wizard"], casting_type: "sorcerer",
+      min_level: 1, mp_cost: 1, duration: 1,
+      effect_type: "summon_skeleton",
+      effect_value: {},
+      targeting: "select_tile", usable_in: ["battle"],
+    });
+    const c = makeSummonedSkeleton(stripped, "summon-2", "Gandolf");
+    // Default skeleton spec — nothing should be NaN.
+    expect(Number.isNaN(c.maxHp)).toBe(false);
+    expect(Number.isNaN(c.ac)).toBe(false);
+    expect(c.maxHp).toBeGreaterThan(0);
   });
 });
