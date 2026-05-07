@@ -180,6 +180,7 @@ export function spellIsCombatCastable(
  */
 export type CombatCastKind =
   | "self" | "pick-ally" | "pick-enemy" | "pick-tile"
+  | "pick-direction"
   | "mass-ally" | "mass-enemy" | "unsupported";
 
 export function classifyCombatCast(spell: Spell): CombatCastKind {
@@ -207,7 +208,12 @@ export function classifyCombatCast(spell: Spell): CombatCastKind {
 
   // Picker-driven targeting.
   if (t === "select_ally" || t === "select_ally_or_self") return "pick-ally";
-  if (t === "select_enemy" || t === "directional_projectile") return "pick-enemy";
+  if (t === "select_enemy") return "pick-enemy";
+  // Directional projectiles (Magic Dart-style): the player picks a
+  // cardinal direction and the spell flies in a straight line until
+  // it hits the first creature, a wall, or its `range` cap. Distinct
+  // from pick-enemy (Magic Arrow) which lets the player click any foe.
+  if (t === "directional_projectile") return "pick-direction";
 
   // Fallback by effect_type when targeting is missing or odd.
   if (e === "heal" || e === "major_heal" || e === "ac_buff" || e === "bless"
@@ -312,6 +318,65 @@ export interface TurnUndeadResult {
   outcomes: TurnUndeadOutcome[];
   /** True iff the spell found at least one undead target. */
   hadTargets: boolean;
+}
+
+/**
+ * Result of tracing a directional projectile (Magic Dart, Fireball-
+ * direction) along a cardinal ray. Mirrors the Python game's
+ * `_fire_fireball` ray walk:
+ *
+ *   - Step from origin in (dCol, dRow) up to `range` tiles.
+ *   - Stop on the first wall (spell fizzles a tile short of the wall).
+ *   - Stop on the first combatant (`hitId` is set; the caller decides
+ *     friend or foe).
+ *   - If nothing is in range, `fizzled` is true and `endCol/endRow`
+ *     points to the last cell traversed.
+ */
+export interface DirectionalTrace {
+  endCol: number;
+  endRow: number;
+  /** Combatant id of the first creature on the ray, or null. */
+  hitId: string | null;
+  /** True when the ray ran the full range without hitting anything. */
+  fizzled: boolean;
+}
+
+/**
+ * Walk one tile at a time from `origin` in `(dCol, dRow)` for up to
+ * `range` steps. `isWallAt(c, r)` and `combatantAt(c, r)` are passed
+ * in so this stays a pure function — the scene can wire it to the
+ * arena helpers it already uses.
+ */
+export function traceDirectionalRay(
+  origin: { col: number; row: number },
+  delta: { dCol: number; dRow: number },
+  range: number,
+  isWallAt: (col: number, row: number) => boolean,
+  combatantAt: (col: number, row: number) => Combatant | null,
+): DirectionalTrace {
+  let tc = origin.col + delta.dCol;
+  let tr = origin.row + delta.dRow;
+  let endCol = origin.col;
+  let endRow = origin.row;
+  for (let steps = 0; steps < range; steps++) {
+    if (isWallAt(tc, tr)) {
+      // Spell stops one tile short of the wall (stays on the last
+      // open tile in the ray). If we hit a wall on the very first
+      // step the ray didn't really travel — return the wall tile so
+      // the projectile visual still has somewhere to land.
+      return { endCol, endRow, hitId: null, fizzled: true };
+    }
+    const occ = combatantAt(tc, tr);
+    if (occ) {
+      return { endCol: tc, endRow: tr, hitId: occ.id, fizzled: false };
+    }
+    endCol = tc;
+    endRow = tr;
+    tc += delta.dCol;
+    tr += delta.dRow;
+  }
+  // Ran out of range with nothing hit.
+  return { endCol, endRow, hitId: null, fizzled: true };
 }
 
 /**

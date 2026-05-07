@@ -5,6 +5,7 @@ import {
   resolveHealSpell,
   resolveTurnUndead,
   makeSummonedSkeleton,
+  traceDirectionalRay,
   spellIsCombatCastable,
   isThrowable,
   isRanged,
@@ -243,10 +244,20 @@ describe("classifyCombatCast", () => {
     expect(classifyCombatCast(spell({ effect_type: "cure_poison", targeting: "select_ally" }))).toBe("pick-ally");
   });
 
-  it("pick-enemy for select_enemy / directional_projectile / damage spells", () => {
-    expect(classifyCombatCast(spell({ effect_type: "damage", targeting: "directional_projectile" }))).toBe("pick-enemy");
+  it("pick-enemy for select_enemy / damage spells", () => {
     expect(classifyCombatCast(spell({ effect_type: "sleep",  targeting: "select_enemy" }))).toBe("pick-enemy");
     expect(classifyCombatCast(spell({ effect_type: "curse",  targeting: "select_enemy" }))).toBe("pick-enemy");
+  });
+
+  it("pick-direction for directional_projectile (Magic Dart)", () => {
+    expect(classifyCombatCast(spell({ effect_type: "damage", targeting: "directional_projectile" }))).toBe("pick-direction");
+  });
+
+  it("Magic Arrow (select_enemy) is pick-enemy, NOT pick-direction", () => {
+    // Magic Arrow's data uses select_enemy + range:99 — the
+    // classifier must distinguish it from Magic Dart's directional
+    // flow even though both share effect_type=damage.
+    expect(classifyCombatCast(spell({ effect_type: "damage", targeting: "select_enemy" }))).toBe("pick-enemy");
   });
 
   it("tile-targeted spells classify as pick-tile", () => {
@@ -446,5 +457,79 @@ describe("makeSummonedSkeleton", () => {
     expect(Number.isNaN(c.maxHp)).toBe(false);
     expect(Number.isNaN(c.ac)).toBe(false);
     expect(c.maxHp).toBeGreaterThan(0);
+  });
+});
+
+describe("traceDirectionalRay", () => {
+  // No walls in these tests — we explicitly stub isWallAt to false.
+  const noWalls = (): boolean => false;
+  const noOne = (): Combatant | null => null;
+
+  it("returns the first combatant in the path as hitId", () => {
+    const goblin = makeCombatant({
+      id: "g", name: "Goblin", side: "enemies", position: { col: 5, row: 2 },
+    });
+    const at = (c: number, r: number): Combatant | null =>
+      (c === goblin.position.col && r === goblin.position.row) ? goblin : null;
+    // Caster at (5,5), firing north (dRow = -1). Goblin is at (5,2).
+    const trace = traceDirectionalRay(
+      { col: 5, row: 5 }, { dCol: 0, dRow: -1 }, /*range*/ 10, noWalls, at,
+    );
+    expect(trace.hitId).toBe("g");
+    expect(trace.endCol).toBe(5);
+    expect(trace.endRow).toBe(2);
+    expect(trace.fizzled).toBe(false);
+  });
+
+  it("stops one tile short of a wall and reports fizzled", () => {
+    const wallAt = (c: number, r: number): boolean => (c === 5 && r === 2);
+    const trace = traceDirectionalRay(
+      { col: 5, row: 5 }, { dCol: 0, dRow: -1 }, 10, wallAt, noOne,
+    );
+    expect(trace.hitId).toBe(null);
+    expect(trace.fizzled).toBe(true);
+    // Last open tile reached before the wall.
+    expect(trace.endRow).toBe(3);
+  });
+
+  it("respects the spell range cap", () => {
+    // Range 3 tiles — caster at (5,5) firing south stops at row 8.
+    const trace = traceDirectionalRay(
+      { col: 5, row: 5 }, { dCol: 0, dRow: 1 }, 3, noWalls, noOne,
+    );
+    expect(trace.hitId).toBe(null);
+    expect(trace.fizzled).toBe(true);
+    expect(trace.endCol).toBe(5);
+    expect(trace.endRow).toBe(8);
+  });
+
+  it("stops at the closer of two enemies", () => {
+    const near = makeCombatant({
+      id: "near", side: "enemies", position: { col: 5, row: 3 },
+    });
+    const far  = makeCombatant({
+      id: "far",  side: "enemies", position: { col: 5, row: 1 },
+    });
+    const at = (c: number, r: number): Combatant | null =>
+      (c === near.position.col && r === near.position.row) ? near :
+      (c === far.position.col  && r === far.position.row)  ? far  : null;
+    const trace = traceDirectionalRay(
+      { col: 5, row: 5 }, { dCol: 0, dRow: -1 }, 10, noWalls, at,
+    );
+    expect(trace.hitId).toBe("near");
+    expect(trace.endRow).toBe(3);
+  });
+
+  it("works for east/west and other cardinals", () => {
+    const target = makeCombatant({
+      id: "e", side: "enemies", position: { col: 9, row: 5 },
+    });
+    const at = (c: number, r: number): Combatant | null =>
+      (c === target.position.col && r === target.position.row) ? target : null;
+    const trace = traceDirectionalRay(
+      { col: 5, row: 5 }, { dCol: 1, dRow: 0 }, 10, noWalls, at,
+    );
+    expect(trace.hitId).toBe("e");
+    expect(trace.endCol).toBe(9);
   });
 });

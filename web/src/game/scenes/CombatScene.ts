@@ -34,6 +34,7 @@ import {
   ARENA_COLS,
   ARENA_ROWS,
   isWall,
+  DIR_DELTAS,
   type Direction,
 } from "../combat/Arena";
 import { makeSampleParty, PARTY_SPRITES } from "../data/fighters";
@@ -56,6 +57,7 @@ import {
   resolveHealSpell,
   resolveTurnUndead,
   makeSummonedSkeleton,
+  traceDirectionalRay,
 } from "../combat/CombatActions";
 import { combatantsFromParty, syncCombatHpBack, abilityMod } from "../combat/CombatBridge";
 import {
@@ -141,11 +143,11 @@ interface ActionEntry {
 }
 
 const PARTY_ACTIONS: ActionEntry[] = [
-  { id: "attack", label: "Attack"   },
-  { id: "range",  label: "Range"    },
-  { id: "throw",  label: "Throw"    },
-  { id: "cast",   label: "Cast"     },
-  { id: "end",    label: "End Turn" },
+  { id: "attack", label: "Attack"          },
+  { id: "range",  label: "Range"           },
+  { id: "throw",  label: "Throw"           },
+  { id: "cast",   label: "Cast"            },
+  { id: "end",    label: "End Turn  [SPACE]" },
 ];
 
 /**
@@ -157,7 +159,10 @@ const PARTY_ACTIONS: ActionEntry[] = [
  *                     action (numbered 1..N on the arena)
  */
 type SceneMode =
-  | "default" | "pick-throw" | "pick-spell" | "pick-target" | "pick-tile";
+  | "default" | "pick-throw" | "pick-spell" | "pick-target" | "pick-tile"
+  /** Magic Dart-style spells: player presses an arrow key to fire
+   *  along that cardinal direction up to the spell's range. */
+  | "pick-direction";
 
 /** What to do once a target is picked. */
 type PendingAction =
@@ -165,7 +170,9 @@ type PendingAction =
   | { kind: "range"; weapon: Item }
   | { kind: "cast"; spell: Spell }
   /** Tile-targeted spell — resolution branches by effect_type. */
-  | { kind: "tile"; spell: Spell };
+  | { kind: "tile"; spell: Spell }
+  /** Directional spell — resolution waits on an arrow-key press. */
+  | { kind: "direction"; spell: Spell };
 
 export class CombatScene extends Phaser.Scene {
   private combat!: Combat;
@@ -525,7 +532,11 @@ export class CombatScene extends Phaser.Scene {
       k.on(`keydown-${key}`, () => this.onArrowKey(key, dir));
     });
     k.on("keydown-ENTER", () => this.activateAction());
-    k.on("keydown-SPACE", () => this.activateAction());
+    // SPACE is a quick "end turn" shortcut from the main action menu —
+    // skips having to navigate the cursor down to "End Turn". Inside
+    // any picker sub-mode it still activates the cursored row, so the
+    // keyboard flow there isn't disrupted.
+    k.on("keydown-SPACE", () => this.onSpacePressed());
     k.on("keydown-ESC",   () => this.cancelSubMode());
     // Number keys 1..9 dispatch through pick-throw / pick-spell /
     // pick-target sub-modes. We register a handler per digit since
@@ -616,6 +627,11 @@ export class CombatScene extends Phaser.Scene {
       if (dir === "e") return this.moveTileCursor(1, 0);
       return;
     }
+    // Direction-pick mode: ANY of the four arrows fires the spell.
+    if (this.mode === "pick-direction") {
+      void this.fireDirectionalSpell(dir);
+      return;
+    }
     if (key === "UP")    return this.moveActionCursor(-1);
     if (key === "DOWN")  return this.moveActionCursor(1);
     if (key === "LEFT" || key === "RIGHT") return;
@@ -664,6 +680,22 @@ export class CombatScene extends Phaser.Scene {
     const next = (cur + delta + enabledIdx.length) % enabledIdx.length;
     this.actionCursor = enabledIdx[next];
     this.refreshActionMenu();
+  }
+
+  /**
+   * SPACE is a shortcut for "end this character's turn" from the main
+   * action menu — saves the player navigating the cursor down to End
+   * Turn. Inside any picker sub-mode (throw, spell, tile, target) it
+   * falls through to `activateAction` so the cursor's row still fires,
+   * preserving the existing keyboard ergonomics there.
+   */
+  private onSpacePressed(): void {
+    if (!this.canTakePlayerInput()) return;
+    if (this.mode === "default") {
+      this.onEndTurnClicked();
+      return;
+    }
+    this.activateAction();
   }
 
   private activateAction(): void {
@@ -809,6 +841,10 @@ export class CombatScene extends Phaser.Scene {
       this.startTilePicking(spell);
       return;
     }
+    if (kind === "pick-direction") {
+      this.startDirectionPicking(spell);
+      return;
+    }
     // Pre-flight for Turn Undead: if there are no undead enemies on
     // the field the spell fizzles. Mirrors the Python game — the
     // caster keeps both the MP and their turn, and just gets a clear
@@ -845,10 +881,11 @@ export class CombatScene extends Phaser.Scene {
         void this.healTargetVfx(me);
         this.refreshHp(me);
       } else if (spell.effect_type === "invisibility") {
-        // Caster fades from view — model as a hefty AC bonus while
-        // it lasts (the Python game flips an `is_invisible` flag and
-        // clamps incoming hits, but a +6 AC buff approximates that
-        // through the existing dice math without touching attack().
+        // Caster fades from view: an "Invisibility"-tagged AC buff
+        // hardens them to attacks, and the scene picks up the matching
+        // buff source via refreshVisibility() to actually drop their
+        // sprite alpha for the spell's full duration. Reappears
+        // automatically when the buff ticks down.
         const turns = typeof spell.duration === "number" ? spell.duration : 3;
         this.combat.addBuff(me.id, {
           kind: "ac_bonus",
@@ -856,7 +893,6 @@ export class CombatScene extends Phaser.Scene {
           turnsLeft: turns,
           source: "Invisibility",
         });
-        this.fadeCaster(me);
         this.combat.log.push(
           `${me.name} casts ${spell.name} — fades from view (+6 AC for ${turns} turns).`
         );
@@ -1415,6 +1451,122 @@ export class CombatScene extends Phaser.Scene {
     this.tileCursorObjects = [];
   }
 
+  // ── Directional projectiles (Magic Dart, etc.) ──────────────────
+  //
+  // The player presses one of the four arrow keys; the spell flies
+  // along that cardinal line until it hits the first creature, runs
+  // out of `spell.range` tiles, or smacks a wall. Mirrors Python's
+  // _fire_fireball ray-walk.
+
+  /** Enter direction-pick mode for a directional_projectile spell. */
+  private startDirectionPicking(spell: Spell): void {
+    this.pendingAction = { kind: "direction", spell };
+    this.mode = "pick-direction";
+    this.clearPicker();
+    this.renderDirectionPickerHint(spell);
+  }
+
+  /** Bottom-of-HUD prompt explaining the direction controls. */
+  private renderDirectionPickerHint(spell: Spell): void {
+    const range = typeof spell.range === "number" ? spell.range : 99;
+    const lines = [
+      `Casting: ${spell.name}`,
+      `Range: ${range} tiles`,
+      "[↑↓←→] choose direction",
+      "[ESC]   cancel",
+    ];
+    const w = HUD_W - 12, h = lines.length * 18 + 28;
+    const x = HUD_X + 6, y = HUD_Y + HUD_H - 6 - h;
+    this.pickerObjects.push(
+      this.add.rectangle(x, y, w, h, 0x10101a, 0.98)
+        .setOrigin(0)
+        .setStrokeStyle(2, C.accent)
+    );
+    this.pickerObjects.push(
+      this.add.text(x + 10, y + 8, "PICK A DIRECTION", FONT_HEAD(C.accent))
+    );
+    lines.forEach((line, i) => {
+      this.pickerObjects.push(
+        this.add.text(x + 10, y + 30 + i * 18, line, FONT_BODY())
+      );
+    });
+  }
+
+  /**
+   * Resolve a direction-locked spell by tracing a ray from the caster
+   * in the chosen cardinal direction. Spends MP, plays the cast SFX
+   * + projectile VFX, applies damage on the first enemy hit, or logs
+   * a fizzle if the ray hits nothing.
+   */
+  private async fireDirectionalSpell(dir: Direction): Promise<void> {
+    const action = this.pendingAction;
+    if (!action || action.kind !== "direction") return;
+    const me = this.combat.current;
+    const spell = action.spell;
+    const member = this.memberForCurrent();
+    if (member && member.maxMp != null) {
+      member.mp = Math.max(0, (member.mp ?? 0) - spell.mp_cost);
+    }
+    this.busy = true;
+    this.mode = "default";
+    this.pendingAction = null;
+    this.clearPicker();
+
+    const [dCol, dRow] = DIR_DELTAS[dir];
+    const range = typeof spell.range === "number" ? spell.range : 99;
+    const trace = traceDirectionalRay(
+      me.position,
+      { dCol, dRow },
+      range,
+      (c, r) => isWall(c, r),
+      (c, r) => this.combat.combatantAt(c, r),
+    );
+
+    Sfx.play(spell.sfx);
+    this.castGlowFor(me, this.colorForSpell(spell.effect_type));
+    try {
+      // Animate the projectile from caster → endpoint regardless of
+      // whether anything was hit, so the player sees the dart fly.
+      const start = this.bodyXY(me);
+      const endPx = {
+        x: this.tileX(trace.endCol),
+        y: this.tileY(trace.endRow),
+      };
+      await projectileLine(this, start, endPx, VFX_COLOURS.arcane, 220);
+
+      if (trace.hitId) {
+        const target = this.combat.byId(trace.hitId);
+        if (target.side === me.side) {
+          // Friendly fire isn't supported by the spell flow today —
+          // log clearly and refund the cast.
+          this.combat.log.push(
+            `${me.name}'s ${spell.name} fizzles against an ally — clear the line first!`
+          );
+        } else {
+          const r = resolveDamageSpell(me, target, spell, defaultRng);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} → ${target.name} (${dir.toUpperCase()}) — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
+          );
+          if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
+          await this.animateHit(target, r);
+          this.refreshHp(target);
+        }
+      } else {
+        this.combat.log.push(
+          `${me.name}'s ${spell.name} flies ${dir.toUpperCase()} — fizzles, nothing in range.`
+        );
+      }
+      // Cast consumes the rest of the turn whether or not the dart
+      // connected, mirroring how throw / cast already behave.
+      this.combat.movePoints = 0;
+      this.refreshAll();
+      if (this.combat.isOver) return this.endEncounter();
+      this.endActorTurn();
+    } finally {
+      this.busy = false;
+    }
+  }
+
   /** Tiny prompt sitting where the picker overlay used to. */
   private renderTilePickerHint(spell: Spell): void {
     this.clearPicker();
@@ -1826,14 +1978,32 @@ export class CombatScene extends Phaser.Scene {
     return healingSparkles(this, this.bodyXY(c));
   }
 
-  /** Invisibility — fade the caster body to 30% alpha briefly. */
-  private fadeCaster(c: Combatant): void {
-    const body = this.bodies.get(c.id);
-    if (!body) return;
-    this.tweens.add({
-      targets: body, alpha: 0.3,
-      duration: 220, yoyo: true, repeat: 1,
-    });
+  /**
+   * Refresh sprite alpha for every combatant based on their state:
+   *
+   *   - Active "Invisibility" buff → 0.2 (caster is visually faded
+   *     out for the spell's full duration; a thin silhouette remains
+   *     so the player can still tell where their hero is on the
+   *     grid). Returns to 1.0 the moment the buff expires.
+   *   - HP <= 0 → 0.4 (existing dim state for downed combatants).
+   *   - Otherwise → 1.0.
+   *
+   * Called from refreshAll so cast / endTurn / animations all keep
+   * the visuals in sync without per-call wiring.
+   */
+  private refreshVisibility(): void {
+    for (const c of this.combat.combatants) {
+      const body = this.bodies.get(c.id);
+      if (!body) continue;
+      let alpha = 1;
+      if (c.hp <= 0) alpha = 0.4;
+      else if (this.combat.hasBuffFromSource(c.id, "Invisibility")) alpha = 0.2;
+      // Skip if a tween is in flight on this body so we don't
+      // stomp the brief hit-flash yoyo.
+      const tweens = this.tweens.getTweensOf(body);
+      if (tweens.length > 0) continue;
+      body.alpha = alpha;
+    }
   }
 
   private animateBump(
@@ -1928,6 +2098,7 @@ export class CombatScene extends Phaser.Scene {
     for (const x of this.combat.combatants) this.refreshHp(x);
     this.highlightActiveActor();
     this.drawMoveHints();
+    this.refreshVisibility();
   }
 
   private refreshTurnHeader(): void {

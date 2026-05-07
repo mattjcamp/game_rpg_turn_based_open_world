@@ -381,6 +381,32 @@ describe("Combat — monster AI", () => {
 });
 
 describe("Combat — buff registry", () => {
+  it("hasBuffFromSource matches case-insensitively and only on that source", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(1),
+    );
+    c.addBuff("p1", { kind: "ac_bonus", value: 6, turnsLeft: 3, source: "Invisibility" });
+    expect(c.hasBuffFromSource("p1", "Invisibility")).toBe(true);
+    expect(c.hasBuffFromSource("p1", "invisibility")).toBe(true);  // case-insensitive
+    expect(c.hasBuffFromSource("p1", "Bless")).toBe(false);
+    expect(c.hasBuffFromSource("e1", "Invisibility")).toBe(false);
+  });
+
+  it("hasBuffFromSource flips to false the round the source expires", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(2),
+    );
+    c.addBuff("p1", { kind: "ac_bonus", value: 6, turnsLeft: 1, source: "Invisibility" });
+    expect(c.hasBuffFromSource("p1", "Invisibility")).toBe(true);
+    // Cycle one full round so tickAllBuffs decrements + expires it.
+    for (let i = 0; i < c.combatants.length; i++) c.endTurn();
+    expect(c.hasBuffFromSource("p1", "Invisibility")).toBe(false);
+  });
+
   it("addBuff stores a buff on the right combatant and sumBuff sums it", () => {
     const c = new Combat(
       [make("p1", "party")],

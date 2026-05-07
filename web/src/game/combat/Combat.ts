@@ -229,6 +229,19 @@ export class Combat {
     return sumBuff(this.buffs.get(combatantId), kind);
   }
 
+  /**
+   * True if this combatant has any active buff with the given source
+   * tag (case-insensitive). Used by the scene to drive source-keyed
+   * visuals — e.g. holding the caster at low alpha while their
+   * "Invisibility" buff is in effect.
+   */
+  hasBuffFromSource(combatantId: string, source: string): boolean {
+    const list = this.buffs.get(combatantId);
+    if (!list) return false;
+    const tag = source.toLowerCase();
+    return list.some((b) => b.source.toLowerCase() === tag);
+  }
+
   /** Hit-roll bonus = base attackBonus + active attack_bonus buffs
    *  − active attack_penalty buffs. */
   effectiveAttackBonus(c: Combatant): number {

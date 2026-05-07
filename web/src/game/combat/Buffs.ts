@@ -66,9 +66,10 @@ export function tickBuffs(buffs: Buff[]): Buff[] {
 /** Per-source flavour line for the round-end expire log. */
 export function describeExpire(name: string, source: string): string {
   const tag = source.toLowerCase();
-  if (tag === "bless")        return `${name}'s blessing fades.`;
-  if (tag === "curse")        return `${name}'s curse lifts.`;
-  if (tag === "shield")       return `${name}'s magical shield fades.`;
-  if (tag === "long shanks")  return `${name}'s hastened legs slow.`;
+  if (tag === "bless")         return `${name}'s blessing fades.`;
+  if (tag === "curse")         return `${name}'s curse lifts.`;
+  if (tag === "shield")        return `${name}'s magical shield fades.`;
+  if (tag === "long shanks")   return `${name}'s hastened legs slow.`;
+  if (tag === "invisibility")  return `${name} reappears!`;
   return `${name}'s ${source} ends.`;
 }

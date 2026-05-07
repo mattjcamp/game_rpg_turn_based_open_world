@@ -54,10 +54,11 @@ describe("Buffs.tickBuffs", () => {
 
 describe("Buffs.describeExpire", () => {
   it("uses the spell-specific phrasing where available", () => {
-    expect(describeExpire("Selina", "Bless")).toContain("blessing fades");
-    expect(describeExpire("Goblin", "Curse")).toContain("curse lifts");
+    expect(describeExpire("Selina",  "Bless")).toContain("blessing fades");
+    expect(describeExpire("Goblin",  "Curse")).toContain("curse lifts");
     expect(describeExpire("Gandolf", "Shield")).toContain("magical shield fades");
-    expect(describeExpire("Merry", "Long Shanks")).toContain("hastened legs slow");
+    expect(describeExpire("Merry",   "Long Shanks")).toContain("hastened legs slow");
+    expect(describeExpire("Gandolf", "Invisibility")).toContain("reappears");
   });
 
   it("falls back to a generic message for unknown sources", () => {
