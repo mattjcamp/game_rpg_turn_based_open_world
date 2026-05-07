@@ -75,6 +75,7 @@ import {
 } from "../world/Lighting";
 import { partyLightRadius, partyLightTint } from "../world/PartyActions";
 import { decorationFor } from "../world/Decorations";
+import { withBase } from "../world/Module";
 import { gameState } from "../state";
 
 const TILE = 32;
@@ -210,7 +211,7 @@ export class TownScene extends Phaser.Scene {
       "alchemist", "barbarian", "cleric", "fighter",
       "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
-      const path = `/assets/characters/${f}.png`;
+      const path = withBase(`/assets/characters/${f}.png`);
       this.load.image(path, path);
     }
     for (const path of NPC_SPRITE_MANIFEST) {

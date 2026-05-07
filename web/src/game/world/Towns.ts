@@ -13,7 +13,7 @@
  */
 
 import { TileMap, type TileLink } from "./TileMap";
-import { modulePath } from "./Module";
+import { modulePath, withBase } from "./Module";
 
 /** Tile id 36 = TILE_VOID per `src/settings.py`. Non-walkable, black. */
 const TILE_VOID = 36;
@@ -93,14 +93,14 @@ interface RawTown {
  */
 export function normalizeSpritePath(path: string): string {
   if (!path) return "";
-  if (path.startsWith("/assets/")) return path;
+  if (path.startsWith("/assets/")) return withBase(path);
   // Capture the tail after `assets/[game/]`. Both source layouts hit this:
   //   src/assets/game/characters/cleric.png → characters/cleric.png
   //   assets/characters/cleric.png          → characters/cleric.png
   const m = path.match(/assets\/(?:game\/)?(.+)$/);
-  if (m) return "/assets/" + m[1];
+  if (m) return withBase("/assets/" + m[1]);
   // Fallback for un-prefixed paths: assume a relative web path.
-  return "/assets/" + path.replace(/^\/+/, "");
+  return withBase("/assets/" + path.replace(/^\/+/, ""));
 }
 
 // ── NPC sprite resolution ─────────────────────────────────────────
@@ -127,28 +127,28 @@ export function normalizeSpritePath(path: string): string {
  * keeps it.
  */
 const NPC_ROLE_SPRITES: Record<string, string> = {
-  shopkeep:  "/assets/npcs/shopkeep.png",
-  innkeeper: "/assets/npcs/innkeeper.png",
-  elder:     "/assets/npcs/elder.png",
+  shopkeep:  withBase("/assets/npcs/shopkeep.png"),
+  innkeeper: withBase("/assets/npcs/innkeeper.png"),
+  elder:     withBase("/assets/npcs/elder.png"),
   // Type aliases the source data uses but the manifest doesn't ship a
   // unique sprite for — fall back to the closest character class so
   // priests look like clerics, mages like wizards, etc.
-  priest:    "/assets/characters/cleric.png",
-  cleric:    "/assets/characters/cleric.png",
-  mage:      "/assets/characters/wizard.png",
-  wizard:    "/assets/characters/wizard.png",
-  guard:     "/assets/npcs/villager_guard.png",
-  bard:      "/assets/npcs/villager_bard.png",
+  priest:    withBase("/assets/characters/cleric.png"),
+  cleric:    withBase("/assets/characters/cleric.png"),
+  mage:      withBase("/assets/characters/wizard.png"),
+  wizard:    withBase("/assets/characters/wizard.png"),
+  guard:     withBase("/assets/npcs/villager_guard.png"),
+  bard:      withBase("/assets/npcs/villager_bard.png"),
 };
 
 /** The six villager fallbacks, indexed by hash(name) % 6. */
 const VILLAGER_SPRITES = [
-  "/assets/npcs/villager_citizen.png",
-  "/assets/npcs/villager_shepherd.png",
-  "/assets/npcs/villager_bard.png",
-  "/assets/npcs/villager_guard.png",
-  "/assets/npcs/villager_beggar.png",
-  "/assets/npcs/villager_child.png",
+  withBase("/assets/npcs/villager_citizen.png"),
+  withBase("/assets/npcs/villager_shepherd.png"),
+  withBase("/assets/npcs/villager_bard.png"),
+  withBase("/assets/npcs/villager_guard.png"),
+  withBase("/assets/npcs/villager_beggar.png"),
+  withBase("/assets/npcs/villager_child.png"),
 ];
 
 /** Tiny stable hash so the same NPC name always picks the same villager. */
