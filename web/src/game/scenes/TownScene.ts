@@ -33,15 +33,30 @@ import {
   loadTowns,
   resolveTownOrInterior,
   tileMapForTown,
+  resolveNpcSprite,
+  NPC_SPRITE_MANIFEST,
   type Town,
   type NpcDef,
 } from "../world/Towns";
+import {
+  loadCounters,
+  type Counter,
+  type CounterService,
+} from "../world/Counters";
+import {
+  buyItem,
+  buyPriceOf,
+  sellItem,
+  sellPriceOf,
+  performTempleService,
+} from "../world/TownActions";
+import { loadItems, type Item } from "../world/Items";
+import { loadParty } from "../world/Party";
 import {
   loadBuildings,
   getBuildingSpace,
   parseBuildingPath,
 } from "../world/Buildings";
-import { dataPath, assetUrl } from "../world/Module";
 import { TileMap } from "../world/TileMap";
 import {
   tileDef,
@@ -113,6 +128,33 @@ export class TownScene extends Phaser.Scene {
     lineIdx: number;
   };
 
+  /** Loaded counter catalog (counters.json). */
+  private counters: Map<string, Counter> = new Map();
+  /** Loaded item catalog — needed for buy/sell prices. */
+  private itemCatalog: Map<string, Item> = new Map();
+
+  /** Shop sub-mode state (kind === undefined / regular shop). Tracks
+   *  separate cursors for buy and sell so toggling with TAB feels
+   *  natural — the player resumes where they were on each side. */
+  private shop?: {
+    npc: NpcDef;
+    counter: Counter;
+    mode: "buy" | "sell";
+    buyCursor: number;
+    sellCursor: number;
+    objects: Phaser.GameObjects.GameObject[];
+    message: string;
+  };
+
+  /** Temple service sub-mode state. */
+  private temple?: {
+    npc: NpcDef;
+    counter: Counter;
+    cursor: number;
+    objects: Phaser.GameObjects.GameObject[];
+    message: string;
+  };
+
   constructor() {
     super({ key: "TownScene" });
   }
@@ -144,7 +186,7 @@ export class TownScene extends Phaser.Scene {
     // Phaser keeps preload going for any files added inside this
     // listener, so create() only fires once the full sprite set
     // (overworld + town + dungeon tiles) is in cache.
-    this.load.json("tile_defs", dataPath("tile_defs.json"));
+    this.load.json("tile_defs", "/data/tile_defs.json");
     this.load.once("filecomplete-json-tile_defs", () => {
       const raw = this.cache.json.get("tile_defs");
       if (raw) populateRuntimeDefs(raw);
@@ -161,13 +203,17 @@ export class TownScene extends Phaser.Scene {
     this.load.image(PLAYER_SPRITE, PLAYER_SPRITE);
 
     // We don't yet know which NPC sprites the chosen town uses, so
-    // preload the full character set we ship. Phaser caches by key —
-    // duplicates are no-ops.
+    // preload the full character set we ship plus every role + villager
+    // sprite the resolver might fall back to. Phaser caches by key,
+    // so duplicates across this list are no-ops.
     for (const f of [
       "alchemist", "barbarian", "cleric", "fighter",
       "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
-      const path = assetUrl(`/assets/characters/${f}.png`);
+      const path = `/assets/characters/${f}.png`;
+      this.load.image(path, path);
+    }
+    for (const path of NPC_SPRITE_MANIFEST) {
       this.load.image(path, path);
     }
   }
@@ -228,6 +274,20 @@ export class TownScene extends Phaser.Scene {
     const isIndoor =
       this.townName.startsWith("building:") || this.townName.includes("/");
     this.dark = isIndoor && mapIsDark(this.mapLights);
+    // Counters + items catalogs power the shop / temple service menus.
+    // Lazy-loaded; cached after first load. Errors degrade silently
+    // (NPCs fall back to dialogue if the data isn't available).
+    // Party data is eager-loaded so the very first shop / temple
+    // interaction can read gold + roster without the player having
+    // to detour through the Party screen first.
+    try {
+      this.counters = await loadCounters();
+      this.itemCatalog = await loadItems();
+      if (!gameState.partyData) gameState.partyData = await loadParty();
+    } catch {
+      /* keep empty maps */
+    }
+
     this.drawMap();
     this.drawNpcs();
     this.drawPlayer();
@@ -373,11 +433,13 @@ export class TownScene extends Phaser.Scene {
     for (const npc of this.town.npcs) {
       const x = this.tileX(npc.col);
       const y = this.tileY(npc.row);
-      // npc.sprite is already a normalised /assets/... path. Fall back
-      // to a coloured rectangle if the texture didn't get preloaded
-      // (unrecognised character sprite).
-      const sprite = npc.sprite && this.textures.exists(npc.sprite)
-        ? this.add.image(x, y, npc.sprite).setDepth(8)
+      // Sprite resolution chain: explicit sprite → npc_type role →
+      // hash-by-name villager. Mirrors the Python renderer so towns
+      // populated with copy-paste "fighter.png" entries still come
+      // out looking like a varied crowd.
+      const path = resolveNpcSprite(npc, (p) => this.textures.exists(p));
+      const sprite = this.textures.exists(path)
+        ? this.add.image(x, y, path).setDepth(8)
         : (this.add
             .rectangle(x, y, TILE - 4, TILE - 4, 0xc8a060)
             .setStrokeStyle(2, 0x1a1a2e) as unknown as Phaser.GameObjects.Image);
@@ -468,6 +530,19 @@ export class TownScene extends Phaser.Scene {
   private installInput(): void {
     const k = this.input.keyboard;
     if (k) {
+      // Capture every key we listen for so the browser's default action
+      // doesn't fire alongside our handler. This matters most for TAB
+      // (which would otherwise move focus to the page header's "← Back"
+      // link and let the very next ENTER navigate away from /world —
+      // looking exactly like "the game crashed back to the intro
+      // screen") but SPACE / ENTER / arrows can also trigger scroll or
+      // link activation when focus drifts off the canvas, so we capture
+      // the whole set.
+      k.addCapture([
+        "TAB", "ENTER", "SPACE", "ESC",
+        "UP", "DOWN", "LEFT", "RIGHT",
+        "W", "A", "S", "D", "P",
+      ]);
       const map: Record<string, [number, number]> = {
         W: [0, -1], UP: [0, -1],
         S: [0, 1], DOWN: [0, 1],
@@ -475,13 +550,25 @@ export class TownScene extends Phaser.Scene {
         D: [1, 0], RIGHT: [1, 0],
       };
       for (const [key, delta] of Object.entries(map)) {
-        k.on(`keydown-${key}`, () => this.tryStep(delta[0], delta[1]));
+        k.on(`keydown-${key}`, () => this.onMoveKey(key, delta[0], delta[1]));
       }
-      k.on("keydown-ESC", () => this.closeDialog());
-      k.on("keydown-P", () => this.openParty());
+      k.on("keydown-ENTER", () => this.onConfirmKey());
+      k.on("keydown-SPACE", () => this.onConfirmKey());
+      k.on("keydown-TAB", () => {
+        // TAB toggles the shop's buy/sell mode. No-op outside shop.
+        if (this.shop) this.toggleShopMode();
+      });
+      k.on("keydown-ESC", () => this.onEscape());
+      k.on("keydown-P", () => {
+        if (this.shop || this.temple) return;
+        this.openParty();
+      });
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      // Shop / temple eat ALL background clicks — the menus are
+      // keyboard-driven and a misplaced tap shouldn't move the avatar.
+      if (this.shop || this.temple) return;
       // If a dialog is open, ANY background click advances it.
       if (this.dialog) {
         this.advanceDialog();
@@ -497,6 +584,38 @@ export class TownScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Single arrow-key handler that knows about every modal sub-mode.
+   * Shop / temple intercept up/down to walk the cursor; movement
+   * keys fall through only when no menu is open.
+   */
+  private onMoveKey(key: string, dc: number, dr: number): void {
+    if (this.shop) {
+      if (key === "UP" || key === "W")   return this.moveShopCursor(-1);
+      if (key === "DOWN" || key === "S") return this.moveShopCursor(1);
+      return;
+    }
+    if (this.temple) {
+      if (key === "UP" || key === "W")   return this.moveTempleCursor(-1);
+      if (key === "DOWN" || key === "S") return this.moveTempleCursor(1);
+      return;
+    }
+    this.tryStep(dc, dr);
+  }
+
+  private onConfirmKey(): void {
+    if (this.shop)   return this.confirmShopBuy();
+    if (this.temple) return this.confirmTempleService();
+    if (this.dialog) return this.advanceDialog();
+  }
+
+  /** Single ESC handler — closes whichever modal is active. */
+  private onEscape(): void {
+    if (this.shop)   return this.closeShop();
+    if (this.temple) return this.closeTemple();
+    if (this.dialog) return this.closeDialog();
+  }
+
   private npcAt(col: number, row: number): NpcDef | null {
     for (const { def } of this.npcs) {
       if (def.col === col && def.row === row) return def;
@@ -505,7 +624,7 @@ export class TownScene extends Phaser.Scene {
   }
 
   private tryStep(dc: number, dr: number): void {
-    if (this.busy || this.dialog) return;
+    if (this.busy || this.dialog || this.shop || this.temple) return;
     const nc = this.playerCol + dc;
     const nr = this.playerRow + dr;
 
@@ -515,27 +634,7 @@ export class TownScene extends Phaser.Scene {
       this.openDialog(npc);
       return;
     }
-
-    // Counter tiles fire when the party walks INTO them, regardless of
-    // walkability. Two flavours, mirroring `tile_defs.json`:
-    //
-    //   - Non-walkable counter (id 12 Counter, id 61 Healing): bump the
-    //     bench, open the UI, party stays put. Same as the Python
-    //     game's `_try_tile_interaction` bump path.
-    //   - Walkable counter (Weapon / Armor / Magic Shop): step onto
-    //     the tile and open the UI as the step lands.
-    const counterKey = this.tileMap.getCounterKey(nc, nr);
-    const targetWalkable = this.tileMap.isWalkable(nc, nr);
-    if (counterKey && !targetWalkable) {
-      // No bump tween — `openCounter` pauses the scene before any
-      // tween could run, which would leave `busy` stuck true (paused
-      // tweens don't fire `onComplete`). The user sees the overlay
-      // open instead of the bump animation.
-      this.openCounter(counterKey);
-      return;
-    }
-
-    if (!targetWalkable) {
+    if (!this.tileMap.isWalkable(nc, nr)) {
       this.busy = true;
       this.tweens.add({
         targets: this.player,
@@ -560,24 +659,8 @@ export class TownScene extends Phaser.Scene {
         this.busy = false;
         this.refreshHud();
         this.refreshDarkness();
-        // Step-onto counter (walkable counter tiles): open the UI
-        // once the step has landed. checkExit gets a fresh look
-        // first so a tile that's both linked and a counter still
-        // honours its link if any.
         this.checkExit(nc, nr);
-        if (counterKey && targetWalkable) {
-          this.openCounter(counterKey);
-        }
       },
-    });
-  }
-
-  private openCounter(counterKey: string): void {
-    if (this.dialog) return;
-    this.scene.pause();
-    this.scene.launch("CounterScene", {
-      counterKey,
-      from: "TownScene",
     });
   }
 
@@ -665,7 +748,20 @@ export class TownScene extends Phaser.Scene {
   // ── Dialog ───────────────────────────────────────────────────────
 
   private openDialog(npc: NpcDef): void {
-    if (this.dialog) return;
+    if (this.dialog || this.shop || this.temple) return;
+    // Role dispatch — mirrors the Python game's _start_dialogue
+    // branching. Shopkeeps open the buy/sell UI; priests open the
+    // temple service menu. Everyone else (villager, elder, quest_giver,
+    // …) falls through to the regular dialogue popup.
+    const t = (npc.npcType ?? "").toLowerCase();
+    if (t === "shopkeep") {
+      void this.openShop(npc);
+      return;
+    }
+    if (t === "priest") {
+      void this.openTemple(npc);
+      return;
+    }
     if (npc.dialogue.length === 0) return;
     const W = 640;
     const H = 140;
@@ -738,5 +834,409 @@ export class TownScene extends Phaser.Scene {
     bodyText.destroy();
     advanceHint.destroy();
     this.dialog = undefined;
+  }
+
+  // ── Shop sub-mode ─────────────────────────────────────────────────
+
+  /**
+   * Open the buy menu for a shopkeeper. Looks up the shop's catalog
+   * by `npc.shopType` (defaults to "general"), then renders a list
+   * the player can navigate with up/down + enter to buy. ESC closes.
+   *
+   * Service counters (e.g. healing) take a different path — those
+   * are dispatched to openTemple instead.
+   */
+  private async openShop(npc: NpcDef): Promise<void> {
+    const shopType = npc.shopType ?? "general";
+    const counter = this.counters.get(shopType);
+    if (!counter) {
+      // Falls back to dialogue if we can't resolve the catalog —
+      // better than a silent black screen.
+      this.openDialogFallback(npc, [
+        `${npc.name} is open for business, but the shop hasn't arrived yet.`,
+      ]);
+      return;
+    }
+    if (counter.kind === "service") {
+      void this.openTemple(npc, counter);
+      return;
+    }
+    this.shop = {
+      npc, counter,
+      mode: "buy",
+      buyCursor: 0,
+      sellCursor: 0,
+      objects: [],
+      message: "",
+    };
+    this.renderShop();
+  }
+
+  private renderShop(): void {
+    if (!this.shop) return;
+    const shop = this.shop; // local alias keeps TS narrowing in nested closures
+    for (const o of shop.objects) o.destroy();
+    shop.objects = [];
+    const { npc, counter, mode, message } = shop;
+    const W = 720, H = 420;
+    const X = (960 - W) / 2;
+    const Y = 80;
+    const gold = gameState.partyData?.gold ?? 0;
+    const stash = gameState.partyData?.inventory ?? [];
+    const buyItems = counter.items;
+
+    const bg = this.add
+      .rectangle(X, Y, W, H, 0x161629, 0.98)
+      .setOrigin(0).setScrollFactor(0)
+      .setStrokeStyle(2, 0xc8553d)
+      .setDepth(50);
+    shop.objects.push(bg);
+    shop.objects.push(this.add
+      .text(X + 16, Y + 12, `${npc.name} — ${counter.name}`, {
+        fontFamily: "Georgia, serif", fontSize: "18px", color: "#ffd470",
+      }).setScrollFactor(0).setDepth(51));
+    shop.objects.push(this.add
+      .text(X + W - 16, Y + 14, `Party Gold: ${gold}g`, {
+        fontFamily: "monospace", fontSize: "14px", color: "#ddc05c",
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(51));
+
+    // Mode tabs — visually highlight whichever side is active.
+    const tabY = Y + 40;
+    const tabW = 100;
+    const buyTabColor  = mode === "buy"  ? "#ffd470" : "#bdb38a";
+    const sellTabColor = mode === "sell" ? "#ffd470" : "#bdb38a";
+    shop.objects.push(this.add
+      .rectangle(X + 16, tabY, tabW, 22,
+                 mode === "buy" ? 0x3a2a22 : 0x161629,
+                 mode === "buy" ? 1 : 0)
+      .setOrigin(0).setStrokeStyle(1, 0xc8553d).setScrollFactor(0).setDepth(51));
+    shop.objects.push(this.add
+      .text(X + 16 + tabW / 2, tabY + 4, "BUY", {
+        fontFamily: "Georgia, serif", fontSize: "14px", color: buyTabColor,
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(52));
+    shop.objects.push(this.add
+      .rectangle(X + 16 + tabW + 4, tabY, tabW, 22,
+                 mode === "sell" ? 0x3a2a22 : 0x161629,
+                 mode === "sell" ? 1 : 0)
+      .setOrigin(0).setStrokeStyle(1, 0xc8553d).setScrollFactor(0).setDepth(51));
+    shop.objects.push(this.add
+      .text(X + 16 + tabW + 4 + tabW / 2, tabY + 4, "SELL", {
+        fontFamily: "Georgia, serif", fontSize: "14px", color: sellTabColor,
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(52));
+
+    // Description below the tabs (buy mode only — keeps the sell list
+    // tighter when the stash is long).
+    if (mode === "buy") {
+      shop.objects.push(this.add
+        .text(X + 16, Y + 70, counter.description, {
+          fontFamily: "Georgia, serif", fontSize: "12px", color: "#bdb38a",
+          wordWrap: { width: W - 32 },
+        }).setScrollFactor(0).setDepth(51));
+    }
+
+    // List body — scrollable window so a 20-item stash doesn't bleed
+    // past the panel. Compute scroll-top so the cursor stays visible.
+    const listX = X + 16;
+    const listY = Y + (mode === "buy" ? 110 : 80);
+    const rowH = 22;
+    const VISIBLE_ROWS = 11;
+    const total = mode === "buy" ? buyItems.length : stash.length;
+    const cursor = mode === "buy" ? shop.buyCursor : shop.sellCursor;
+    let topRow = 0;
+    if (total > VISIBLE_ROWS) {
+      const half = Math.floor(VISIBLE_ROWS / 2);
+      topRow = Math.max(0, Math.min(total - VISIBLE_ROWS, cursor - half));
+    }
+    const visibleCount = Math.min(VISIBLE_ROWS, total);
+
+    // Up / down scroll indicators when rows are off-screen.
+    if (topRow > 0) {
+      shop.objects.push(this.add
+        .text(listX + (W - 32) / 2, listY - 12, "▲", {
+          fontFamily: "monospace", fontSize: "12px", color: "#bdb38a",
+        }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(52));
+    }
+    if (topRow + visibleCount < total) {
+      shop.objects.push(this.add
+        .text(listX + (W - 32) / 2, listY + visibleCount * rowH, "▼", {
+          fontFamily: "monospace", fontSize: "12px", color: "#bdb38a",
+        }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(52));
+    }
+
+    if (mode === "buy") {
+      for (let i = 0; i < visibleCount; i++) {
+        const idx = topRow + i;
+        const name = buyItems[idx];
+        const price = buyPriceOf(name, this.itemCatalog);
+        const rowY = listY + i * rowH;
+        const isCursor = idx === shop.buyCursor;
+        const bgRow = this.add
+          .rectangle(listX, rowY, W - 32, rowH - 2,
+                     isCursor ? 0x3a2a22 : 0x161629, isCursor ? 1 : 0)
+          .setOrigin(0).setScrollFactor(0).setDepth(51);
+        shop.objects.push(bgRow);
+        const prefix = isCursor ? "> " : "  ";
+        const priceLabel = price > 0
+          ? `${price}g${gold < price ? "  — short" : ""}`
+          : "—";
+        shop.objects.push(this.add
+          .text(listX + 8, rowY + 2, `${prefix}${name}`, {
+            fontFamily: "Georgia, serif", fontSize: "14px",
+            color: isCursor ? "#ffd470" : "#f6efd6",
+          }).setScrollFactor(0).setDepth(52));
+        shop.objects.push(this.add
+          .text(listX + W - 32 - 12, rowY + 2, priceLabel, {
+            fontFamily: "monospace", fontSize: "13px",
+            color: gold < price && price > 0 ? "#d86a4a" : "#bdb38a",
+          }).setOrigin(1, 0).setScrollFactor(0).setDepth(52));
+      }
+    } else {
+      // SELL mode — list entries from the shared stash with their
+      // sellPriceOf prices. Items shops won't take get a "—" label
+      // and the row is dimmed.
+      if (stash.length === 0) {
+        shop.objects.push(this.add
+          .text(listX + 8, listY + 4, "Your stash is empty.", {
+            fontFamily: "Georgia, serif", fontSize: "14px", color: "#bdb38a",
+          }).setScrollFactor(0).setDepth(52));
+      }
+      for (let i = 0; i < visibleCount; i++) {
+        const idx = topRow + i;
+        const entry = stash[idx];
+        const price = sellPriceOf(entry.item, this.itemCatalog);
+        const rowY = listY + i * rowH;
+        const isCursor = idx === shop.sellCursor;
+        const bgRow = this.add
+          .rectangle(listX, rowY, W - 32, rowH - 2,
+                     isCursor ? 0x3a2a22 : 0x161629, isCursor ? 1 : 0)
+          .setOrigin(0).setScrollFactor(0).setDepth(51);
+        shop.objects.push(bgRow);
+        const prefix = isCursor ? "> " : "  ";
+        const priceLabel = price > 0 ? `${price}g` : "—";
+        shop.objects.push(this.add
+          .text(listX + 8, rowY + 2, `${prefix}${entry.item}`, {
+            fontFamily: "Georgia, serif", fontSize: "14px",
+            color: isCursor ? "#ffd470"
+                 : price > 0 ? "#f6efd6" : "#7e7e7e",
+          }).setScrollFactor(0).setDepth(52));
+        shop.objects.push(this.add
+          .text(listX + W - 32 - 12, rowY + 2, priceLabel, {
+            fontFamily: "monospace", fontSize: "13px", color: "#bdb38a",
+          }).setOrigin(1, 0).setScrollFactor(0).setDepth(52));
+      }
+    }
+
+    // Footer message + hint.
+    if (message) {
+      shop.objects.push(this.add
+        .text(X + 16, Y + H - 36, message, {
+          fontFamily: "Georgia, serif", fontSize: "13px", color: "#a3d9a5",
+        }).setScrollFactor(0).setDepth(51));
+    }
+    const hint = mode === "buy"
+      ? "[↑↓] choose   [Enter] buy   [Tab] sell   [ESC] leave"
+      : "[↑↓] choose   [Enter] sell   [Tab] buy   [ESC] leave";
+    shop.objects.push(this.add
+      .text(X + 16, Y + H - 18, hint, {
+        fontFamily: "monospace", fontSize: "12px", color: "#bdb38a",
+      }).setScrollFactor(0).setDepth(51));
+  }
+
+  /** TAB swaps buy ↔ sell mode. Cursor remembered separately per side. */
+  private toggleShopMode(): void {
+    if (!this.shop) return;
+    this.shop.mode = this.shop.mode === "buy" ? "sell" : "buy";
+    this.shop.message = "";
+    this.renderShop();
+  }
+
+  private moveShopCursor(delta: number): void {
+    if (!this.shop) return;
+    if (this.shop.mode === "buy") {
+      const n = this.shop.counter.items.length;
+      if (n === 0) return;
+      this.shop.buyCursor = (this.shop.buyCursor + delta + n) % n;
+    } else {
+      const n = (gameState.partyData?.inventory ?? []).length;
+      if (n === 0) return;
+      this.shop.sellCursor = (this.shop.sellCursor + delta + n) % n;
+    }
+    this.renderShop();
+  }
+
+  /** Buy or sell, depending on which mode is active. */
+  private confirmShopBuy(): void {
+    if (!this.shop) return;
+    const party = gameState.partyData;
+    if (!party) {
+      this.shop.message = "Party data isn't loaded.";
+      this.renderShop();
+      return;
+    }
+    if (this.shop.mode === "buy") {
+      const items = this.shop.counter.items;
+      if (items.length === 0) return;
+      const itemName = items[this.shop.buyCursor];
+      const r = buyItem(party, itemName, this.itemCatalog);
+      this.shop.message = r.message;
+    } else {
+      if (party.inventory.length === 0) {
+        this.shop.message = "Nothing in the stash to sell.";
+      } else {
+        const idx = Math.max(0, Math.min(party.inventory.length - 1, this.shop.sellCursor));
+        const r = sellItem(party, idx, this.itemCatalog);
+        this.shop.message = r.message;
+        // Clamp the cursor in case the stash shrank.
+        if (this.shop.sellCursor >= party.inventory.length) {
+          this.shop.sellCursor = Math.max(0, party.inventory.length - 1);
+        }
+      }
+    }
+    this.renderShop();
+  }
+
+  private closeShop(): void {
+    if (!this.shop) return;
+    for (const o of this.shop.objects) o.destroy();
+    this.shop = undefined;
+  }
+
+  // ── Temple service sub-mode ───────────────────────────────────────
+
+  /**
+   * Open the temple service menu for a priest. Pulls services from
+   * counters.json's "healing" entry (heal-all-hp / restore-mp /
+   * cure-poisons / raise-dead). Up/down to choose, Enter to buy,
+   * ESC to leave.
+   */
+  private async openTemple(npc: NpcDef, counterOverride?: Counter): Promise<void> {
+    const counter = counterOverride ?? this.counters.get("healing");
+    if (!counter || counter.kind !== "service" || !counter.services?.length) {
+      this.openDialogFallback(npc, [
+        `${npc.name} blesses you, but the temple services aren't ready yet.`,
+      ]);
+      return;
+    }
+    this.temple = {
+      npc, counter,
+      cursor: 0,
+      objects: [],
+      message: "",
+    };
+    this.renderTemple();
+  }
+
+  private renderTemple(): void {
+    if (!this.temple) return;
+    const temple = this.temple; // local alias keeps TS narrowing in nested closures
+    for (const o of temple.objects) o.destroy();
+    temple.objects = [];
+    const { npc, counter, cursor, message } = temple;
+    const services = counter.services ?? [];
+    const W = 640, H = 320;
+    const X = (960 - W) / 2;
+    const Y = 100;
+    const gold = gameState.partyData?.gold ?? 0;
+
+    const bg = this.add
+      .rectangle(X, Y, W, H, 0x161629, 0.98)
+      .setOrigin(0).setScrollFactor(0)
+      .setStrokeStyle(2, 0xc8553d)
+      .setDepth(50);
+    temple.objects.push(bg);
+    const godSuffix = npc.godName ? ` of ${npc.godName}` : "";
+    temple.objects.push(this.add
+      .text(X + 16, Y + 12, `${npc.name} — Temple${godSuffix}`, {
+        fontFamily: "Georgia, serif", fontSize: "18px", color: "#ffd470",
+      }).setScrollFactor(0).setDepth(51));
+    temple.objects.push(this.add
+      .text(X + W - 16, Y + 14, `Party Gold: ${gold}g`, {
+        fontFamily: "monospace", fontSize: "14px", color: "#ddc05c",
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(51));
+
+    const listX = X + 16;
+    const listY = Y + 56;
+    const rowH = 48;
+    services.forEach((svc, i) => {
+      const rowY = listY + i * rowH;
+      const isCursor = i === cursor;
+      const canAfford = gold >= svc.cost;
+      const bgRow = this.add
+        .rectangle(listX, rowY, W - 32, rowH - 4,
+                   isCursor ? 0x3a2a22 : 0x161629, isCursor ? 1 : 0)
+        .setOrigin(0).setScrollFactor(0).setDepth(51);
+      temple.objects.push(bgRow);
+      const prefix = isCursor ? "> " : "  ";
+      temple.objects.push(this.add
+        .text(listX + 8, rowY + 4, `${prefix}${svc.name}`, {
+          fontFamily: "Georgia, serif", fontSize: "15px",
+          color: isCursor ? "#ffd470" : "#f6efd6",
+        }).setScrollFactor(0).setDepth(52));
+      temple.objects.push(this.add
+        .text(listX + W - 32 - 12, rowY + 4, `${svc.cost}g${canAfford ? "" : " — short"}`, {
+          fontFamily: "monospace", fontSize: "13px",
+          color: canAfford ? "#bdb38a" : "#d86a4a",
+        }).setOrigin(1, 0).setScrollFactor(0).setDepth(52));
+      temple.objects.push(this.add
+        .text(listX + 8, rowY + 22, svc.description, {
+          fontFamily: "Georgia, serif", fontSize: "12px", color: "#bdb38a",
+          wordWrap: { width: W - 48 },
+        }).setScrollFactor(0).setDepth(52));
+    });
+
+    if (message) {
+      temple.objects.push(this.add
+        .text(X + 16, Y + H - 36, message, {
+          fontFamily: "Georgia, serif", fontSize: "13px", color: "#a3d9a5",
+        }).setScrollFactor(0).setDepth(51));
+    }
+    temple.objects.push(this.add
+      .text(X + 16, Y + H - 18, "[↑↓] choose   [Enter] purchase   [ESC] leave", {
+        fontFamily: "monospace", fontSize: "12px", color: "#bdb38a",
+      }).setScrollFactor(0).setDepth(51));
+  }
+
+  private moveTempleCursor(delta: number): void {
+    if (!this.temple) return;
+    const n = (this.temple.counter.services ?? []).length;
+    if (n === 0) return;
+    this.temple.cursor = (this.temple.cursor + delta + n) % n;
+    this.renderTemple();
+  }
+
+  private confirmTempleService(): void {
+    if (!this.temple) return;
+    const party = gameState.partyData;
+    if (!party) {
+      this.temple.message = "Party data isn't loaded.";
+      this.renderTemple();
+      return;
+    }
+    const services = this.temple.counter.services ?? [];
+    if (services.length === 0) return;
+    const svc: CounterService = services[this.temple.cursor];
+    const r = performTempleService(party, svc);
+    this.temple.message = r.message;
+    this.renderTemple();
+  }
+
+  private closeTemple(): void {
+    if (!this.temple) return;
+    for (const o of this.temple.objects) o.destroy();
+    this.temple = undefined;
+  }
+
+  /**
+   * Helper used when role-based dispatch can't open the proper UI
+   * (counter data missing, etc.). Falls back to the regular dialogue
+   * popup with a single explanatory line.
+   */
+  private openDialogFallback(npc: NpcDef, lines: string[]): void {
+    const stub: NpcDef = { ...npc, dialogue: lines };
+    // Bypass the role re-dispatch by going straight to the dialog
+    // builder code that openDialog used to inline. Easier to just
+    // call openDialog with a temporarily neutered npc_type.
+    const neutered: NpcDef = { ...stub, npcType: "villager" };
+    this.openDialog(neutered);
   }
 }

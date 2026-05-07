@@ -13,7 +13,7 @@
  */
 
 import { TileMap, type TileLink } from "./TileMap";
-import { BASE_PATH, modulePath } from "./Module";
+import { modulePath } from "./Module";
 
 /** Tile id 36 = TILE_VOID per `src/settings.py`. Non-walkable, black. */
 const TILE_VOID = 36;
@@ -30,6 +30,13 @@ export interface NpcDef {
   dialogue: string[];
   godName?: string;
   wanderRange?: number;
+  /**
+   * For shopkeep NPCs only — keys into counters.json
+   * (general/weapon/armor/magic/reagent/inn/guild). Tells the shop UI
+   * which catalog to display. Priests use the "healing" counter
+   * implicitly so this field is unused for them.
+   */
+  shopType?: string;
 }
 
 export interface Town {
@@ -61,6 +68,7 @@ interface RawNpc {
   dialogue?: string | string[];
   god_name?: string;
   wander_range?: number;
+  shop_type?: string;
 }
 
 interface RawTown {
@@ -85,17 +93,109 @@ interface RawTown {
  */
 export function normalizeSpritePath(path: string): string {
   if (!path) return "";
-  // Already a runtime URL (any base prefix already applied) — leave alone.
-  if (BASE_PATH && path.startsWith(`${BASE_PATH}/assets/`)) return path;
-  if (!BASE_PATH && path.startsWith("/assets/")) return path;
+  if (path.startsWith("/assets/")) return path;
   // Capture the tail after `assets/[game/]`. Both source layouts hit this:
   //   src/assets/game/characters/cleric.png → characters/cleric.png
   //   assets/characters/cleric.png          → characters/cleric.png
   const m = path.match(/assets\/(?:game\/)?(.+)$/);
-  if (m) return `${BASE_PATH}/assets/` + m[1];
+  if (m) return "/assets/" + m[1];
   // Fallback for un-prefixed paths: assume a relative web path.
-  return `${BASE_PATH}/assets/` + path.replace(/^\/+/, "");
+  return "/assets/" + path.replace(/^\/+/, "");
 }
+
+// ── NPC sprite resolution ─────────────────────────────────────────
+//
+// Slightly stricter than the Python renderer's chain: we let the
+// `npc_type` field outrank the data file's explicit `sprite` path
+// when the type is a known role (shopkeep, innkeeper, elder, priest,
+// mage, etc.). The `sprite` field in the shipped towns.json is
+// often a copy-paste placeholder (every Shanty Town NPC literally
+// points at fighter.png), so honouring `npc_type` first is what
+// makes a town read as a town.
+//
+//   1. If npc_type is in NPC_ROLE_SPRITES, use that sprite.
+//   2. Otherwise honour the explicit `sprite` path when its texture
+//      is loaded (Lonny the alchemist-villager keeps his portrait).
+//   3. Otherwise hash the NPC name into one of six villager variants
+//      so crowds of plain villagers visually differ.
+
+/**
+ * Sprite map for known NPC roles. Keys are npc_type values that
+ * carry strong visual intent — those win over whatever the data file
+ * has in the `sprite` field. Plain `villager` is intentionally NOT
+ * in this map so that a villager with a custom sprite (Lonny → Alchemist)
+ * keeps it.
+ */
+const NPC_ROLE_SPRITES: Record<string, string> = {
+  shopkeep:  "/assets/npcs/shopkeep.png",
+  innkeeper: "/assets/npcs/innkeeper.png",
+  elder:     "/assets/npcs/elder.png",
+  // Type aliases the source data uses but the manifest doesn't ship a
+  // unique sprite for — fall back to the closest character class so
+  // priests look like clerics, mages like wizards, etc.
+  priest:    "/assets/characters/cleric.png",
+  cleric:    "/assets/characters/cleric.png",
+  mage:      "/assets/characters/wizard.png",
+  wizard:    "/assets/characters/wizard.png",
+  guard:     "/assets/npcs/villager_guard.png",
+  bard:      "/assets/npcs/villager_bard.png",
+};
+
+/** The six villager fallbacks, indexed by hash(name) % 6. */
+const VILLAGER_SPRITES = [
+  "/assets/npcs/villager_citizen.png",
+  "/assets/npcs/villager_shepherd.png",
+  "/assets/npcs/villager_bard.png",
+  "/assets/npcs/villager_guard.png",
+  "/assets/npcs/villager_beggar.png",
+  "/assets/npcs/villager_child.png",
+];
+
+/** Tiny stable hash so the same NPC name always picks the same villager. */
+function hashName(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Resolve a sprite path for an NPC. `textureExists` is a predicate
+ * the scene supplies (Phaser's `this.textures.exists`); when omitted
+ * (tests / preload paths) we assume any path resolves so the chain
+ * still picks the most specific entry.
+ *
+ * Priority:
+ *   1. Known role npc_type (shopkeep / innkeeper / elder / priest / …)
+ *      → role sprite. Wins over the data file's explicit `sprite`,
+ *      which is often a generic placeholder.
+ *   2. Explicit `sprite` field, when its texture is loaded.
+ *   3. Hash-by-name into one of six villager variants.
+ */
+export function resolveNpcSprite(
+  npc: { name: string; npcType?: string; sprite?: string },
+  textureExists?: (path: string) => boolean,
+): string {
+  // 1. Role-based mapping — the strongest signal the data carries.
+  const t = (npc.npcType ?? "").toLowerCase();
+  const role = NPC_ROLE_SPRITES[t];
+  if (role && (!textureExists || textureExists(role))) return role;
+  // 2. Explicit custom sprite, when its texture exists.
+  if (npc.sprite && (!textureExists || textureExists(npc.sprite))) {
+    return npc.sprite;
+  }
+  // 3. Hash-by-name → one of six villager variants.
+  return VILLAGER_SPRITES[hashName(npc.name) % VILLAGER_SPRITES.length];
+}
+
+/** Every sprite path the resolver may hand back — used by preloaders. */
+export const NPC_SPRITE_MANIFEST: string[] = [
+  ...new Set<string>([
+    ...Object.values(NPC_ROLE_SPRITES),
+    ...VILLAGER_SPRITES,
+  ]),
+];
 
 /** Convert a "col,row"-keyed dict of rich tile entries into a 2D grid. */
 export function normalizeTownTiles(
@@ -152,6 +252,7 @@ export function townFromRaw(raw: RawTown): Town {
         : [],
     godName: n.god_name,
     wanderRange: n.wander_range,
+    shopType: n.shop_type,
   }));
   // Interiors are structurally identical to towns — recurse with the
   // same parser and treat them as nested Town objects. We don't allow

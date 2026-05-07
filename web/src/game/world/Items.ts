@@ -39,9 +39,9 @@ export interface Item {
   evasion?: number;
   durability?: number;
   itemType?: string;
-  /** Shop price the player pays. 0 / undefined = unique / not for sale. */
+  /** Buy price at shops (gold). 0 / missing = not for sale. */
   buy?: number;
-  /** Shop price the player receives when selling. */
+  /** Sell price (gold) at shops. 0 / missing = nobody will buy it. */
   sell?: number;
 }
 
@@ -93,42 +93,9 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     evasion: r.evasion,
     durability: r.durability,
     itemType: r.item_type,
-    buy: typeof r.buy === "number" ? r.buy : undefined,
-    sell: typeof r.sell === "number" ? r.sell : undefined,
+    buy: r.buy,
+    sell: r.sell,
   };
-}
-
-/**
- * Shop price the party pays at a counter, or `null` for items the
- * counter can't actually sell (no `buy` price in items.json).
- *
- * Mirrors `_derive_buy_price` in the Python game: weapons & armor that
- * lack an explicit price get one derived from their stats so a counter
- * always has a price to display, while general items with no price
- * (quest items, unique drops) stay `null` so the counter can hide them.
- */
-export function getBuyPrice(item: Item | null | undefined): number | null {
-  if (!item) return null;
-  if (typeof item.buy === "number" && item.buy > 0) return item.buy;
-  if (item.category === "armors" && typeof item.evasion === "number") {
-    return Math.max(10, item.evasion * 15);
-  }
-  if (item.category === "weapons" && typeof item.power === "number") {
-    return Math.max(10, item.power * 8);
-  }
-  return null;
-}
-
-/**
- * Sell-back price. Falls back to half the buy price (rounded down) when
- * items.json doesn't carry an explicit `sell` value, matching the
- * Python game's `get_sell_price`.
- */
-export function getSellPrice(item: Item | null | undefined): number {
-  if (!item) return 0;
-  if (typeof item.sell === "number" && item.sell > 0) return item.sell;
-  const buy = getBuyPrice(item);
-  return buy != null ? Math.floor(buy / 2) : 0;
 }
 
 export async function loadItems(url = dataPath("items.json")): Promise<Map<string, Item>> {
