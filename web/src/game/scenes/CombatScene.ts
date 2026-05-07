@@ -347,9 +347,21 @@ export class CombatScene extends Phaser.Scene {
           this.load.start();
         });
       }
-    } catch {
+    } catch (err) {
       // Combat is still playable with melee only; just skip the
-      // data-driven rows.
+      // data-driven rows. But surface the failure — a silent swallow
+      // here used to leave Range / Throw / Cast permanently disabled
+      // on the second battle with no signal to the player or developer.
+      console.error("CombatScene: data load failed (Range/Throw/Cast may be disabled)", err);
+    }
+    if (this.items.size === 0) {
+      console.warn("CombatScene: items catalog is empty — Range / Throw will be disabled");
+    }
+    if (this.spells.length === 0) {
+      console.warn("CombatScene: spells catalog is empty — Cast will be disabled");
+    }
+    if (this.fromWorld && !gameState.partyData) {
+      console.warn("CombatScene: gameState.partyData missing — Range / Throw / Cast will be disabled");
     }
 
     // Use the real roster when launched from the world. The /combat
