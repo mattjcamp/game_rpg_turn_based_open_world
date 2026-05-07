@@ -871,6 +871,7 @@ export class CombatScene extends Phaser.Scene {
     ];
     for (const [slot, field] of slotsToTry) {
       if (!member.equipped[field]) continue;
+      // eslint-disable-next-line react-hooks/rules-of-hooks -- `useEquippedDurability` is a plain helper, not a React hook
       const r = useEquippedDurability(member, slot, this.items);
       if (r.kind === "broke") {
         this.combat.log.push(`*** ${member.name}'s ${r.itemName} shatters! ***`);
@@ -890,6 +891,7 @@ export class CombatScene extends Phaser.Scene {
     const member = this.memberByCombatantId(targetId);
     if (!member) return;
     if (!member.equipped.body) return;
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- `useEquippedDurability` is a plain helper, not a React hook
     const r = useEquippedDurability(member, "body", this.items);
     if (r.kind === "broke") {
       this.combat.log.push(`*** ${member.name}'s ${r.itemName} is destroyed! ***`);
