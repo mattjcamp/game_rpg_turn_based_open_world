@@ -66,6 +66,8 @@ import {
   brewPotion,
   pickpocket,
   tinker,
+  getItemMaxDurability,
+  getSlotDurability,
 } from "../world/PartyActions";
 import {
   loadItems,
@@ -124,7 +126,12 @@ interface PartySceneData {
  *   - equip-slot:   detail → Enter on a multi-slot item; waiting for
  *                   1-N to choose the destination slot
  */
-type Mode = "inventory" | "spell-list" | "spell-target" | "give-item" | "detail" | "equip-slot";
+type Mode =
+  | "inventory" | "spell-list" | "spell-target" | "give-item"
+  | "detail" | "equip-slot"
+  /** Modal popup over detail/inventory: shows description + durability
+   *  bar for the row the cursor was on. ESC/E/Enter dismisses. */
+  | "examine";
 
 /**
  * One entry in the left-side list. Effects, the CAST SPELL row, and
@@ -171,6 +178,19 @@ export class PartyScene extends Phaser.Scene {
 
   // Give-item state — stash index of the item awaiting a recipient.
   private pendingGiveStashIndex: number | null = null;
+
+  /**
+   * Examine-popup state. `examineRow` describes what the player asked
+   * to inspect — either an equipped slot on the current detail member
+   * or an entry in their personal inventory. `examineFromMode` is the
+   * mode to restore when the popup is dismissed.
+   */
+  private examineRow:
+    | { kind: "slot"; slot: EquipSlot; itemName: string }
+    | { kind: "personal"; index: number; entry: { item: string; durability?: number } }
+    | { kind: "stash"; index: number; entry: { item: string; durability?: number } }
+    | null = null;
+  private examineFromMode: Mode | null = null;
 
   // Equip-slot state — when an item with 2+ candidate slots is picked,
   // we hold the personal-inventory index here while the player chooses
@@ -284,6 +304,7 @@ export class PartyScene extends Phaser.Scene {
     k.on("keydown-ENTER", () => this.activate());
     k.on("keydown-SPACE", () => this.activate());
     k.on("keydown-R",     () => this.returnSelected());
+    k.on("keydown-E",     () => this.examineSelected());
     k.on("keydown-ESC",   () => this.escape());
     k.on("keydown-P",     () => this.close());
   }
@@ -338,6 +359,14 @@ export class PartyScene extends Phaser.Scene {
    */
   private activate(): void {
     if (!this.party) return;
+    if (this.mode === "examine") {
+      // Enter dismisses the popup, just like ESC and E.
+      this.mode = this.examineFromMode ?? "inventory";
+      this.examineFromMode = null;
+      this.examineRow = null;
+      this.render();
+      return;
+    }
     if (this.mode === "inventory") return this.activateInventoryRow();
     if (this.mode === "spell-list") return this.activateSpellRow();
     if (this.mode === "detail") return this.activateDetailRow();
@@ -359,7 +388,7 @@ export class PartyScene extends Phaser.Scene {
     if (!m) return;
     const sel = this.detailCursorKind(m);
     if (sel.kind === "slot") {
-      const r = unequipSlot(m, sel.slot);
+      const r = unequipSlot(m, sel.slot, this.items);
       this.feedback = r.message;
       this.clampDetailCursor(m);
       this.render();
@@ -422,7 +451,7 @@ export class PartyScene extends Phaser.Scene {
     if (sel.kind === "slot") {
       // Unequip into inventory then move that fresh inventory entry
       // (last index) into the shared stash.
-      const u = unequipSlot(m, sel.slot);
+      const u = unequipSlot(m, sel.slot, this.items);
       if (!u.ok || m.inventory.length === 0) {
         this.feedback = u.message;
         this.render();
@@ -438,6 +467,76 @@ export class PartyScene extends Phaser.Scene {
     }
     this.clampDetailCursor(m);
     this.render();
+  }
+
+  /**
+   * E key — open the inspect popup for whatever the cursor is on.
+   *
+   * Works in three contexts:
+   *   - examine mode itself: dismiss (toggle off).
+   *   - detail mode: inspect the equipped slot or personal-inventory
+   *     entry the detailCursor points at.
+   *   - inventory mode: inspect a stash item the main cursor is on
+   *     (skips effects / spell rows / ability rows — those don't have
+   *     durability state to show).
+   */
+  private examineSelected(): void {
+    if (this.mode === "examine") {
+      // Toggle dismiss.
+      this.mode = this.examineFromMode ?? "inventory";
+      this.examineFromMode = null;
+      this.examineRow = null;
+      this.render();
+      return;
+    }
+    if (this.mode === "detail" && this.party) {
+      const m = this.currentDetailMember();
+      if (!m) return;
+      const sel = this.detailCursorKind(m);
+      if (sel.kind === "slot") {
+        const itemName = (() => {
+          const SLOT_TO_FIELD = {
+            right_hand: "rightHand",
+            left_hand:  "leftHand",
+            body:       "body",
+            head:       "head",
+          } as const;
+          return m.equipped[SLOT_TO_FIELD[sel.slot]];
+        })();
+        if (!itemName) {
+          this.feedback = "Slot is empty.";
+          this.render();
+          return;
+        }
+        this.examineFromMode = this.mode;
+        this.examineRow = { kind: "slot", slot: sel.slot, itemName };
+        this.mode = "examine";
+        this.render();
+        return;
+      }
+      const entry = m.inventory[sel.index];
+      if (!entry) return;
+      this.examineFromMode = this.mode;
+      this.examineRow = { kind: "personal", index: sel.index, entry };
+      this.mode = "examine";
+      this.render();
+      return;
+    }
+    if (this.mode === "inventory" && this.party) {
+      const row = this.rows[this.selectable[this.cursor] ?? -1];
+      if (!row || row.kind !== "item") {
+        this.feedback = "Press E on an item to inspect it.";
+        this.render();
+        return;
+      }
+      const entry = this.party.inventory[row.index];
+      if (!entry) return;
+      this.examineFromMode = this.mode;
+      this.examineRow = { kind: "stash", index: row.index, entry };
+      this.mode = "examine";
+      this.render();
+      return;
+    }
   }
 
   private clampDetailCursor(m: PartyMember): void {
@@ -610,6 +709,16 @@ export class PartyScene extends Phaser.Scene {
   }
 
   private escape(): void {
+    if (this.mode === "examine") {
+      // Dismiss the popup; restore whatever mode we came from. We
+      // stash the prior mode on `examineFromMode` when opening.
+      this.mode = this.examineFromMode ?? "inventory";
+      this.examineFromMode = null;
+      this.examineRow = null;
+      this.feedback = "";
+      this.render();
+      return;
+    }
     if (this.mode === "spell-target") {
       this.pendingSpell = null;
       this.mode = "spell-list";
@@ -720,7 +829,101 @@ export class PartyScene extends Phaser.Scene {
       this.renderDetail();
       return;
     }
+    if (this.mode === "examine") {
+      // Draw the underlying screen first so the popup floats over it.
+      if (this.examineFromMode === "detail") this.renderDetail();
+      else this.renderInventory();
+      this.renderExamine();
+      return;
+    }
     this.renderInventory();
+  }
+
+  /**
+   * Floating popup with item description + durability bar. Reads
+   * durability live from the equippedDurability tracker (slot rows)
+   * or InventoryItem.durability (stash / personal entries).
+   */
+  private renderExamine(): void {
+    if (!this.party || !this.examineRow) return;
+    const itemName = this.examineRow.kind === "slot"
+      ? this.examineRow.itemName
+      : this.examineRow.entry.item;
+    const def = this.items.get(itemName);
+
+    // Resolve current/max durability.
+    let cur: number | null = null;
+    let max: number | null = null;
+    if (this.examineRow.kind === "slot") {
+      const m = this.currentDetailMember();
+      if (m) {
+        const d = getSlotDurability(m, this.examineRow.slot, this.items);
+        if (d) { cur = d.current; max = d.max; }
+      }
+    } else {
+      max = getItemMaxDurability(itemName, this.items);
+      if (max != null) {
+        cur = this.examineRow.entry.durability ?? max;
+        if (cur > max) cur = max;
+      }
+    }
+
+    const w = 420, h = 240;
+    const x = (W - w) / 2;
+    const y = (H - h) / 2;
+    this.track(this.add.rectangle(x, y, w, h, 0x10101a, 0.98)
+      .setOrigin(0)
+      .setStrokeStyle(2, C.accent));
+    this.track(this.add.text(x + 14, y + 10, "INSPECT", FONT_HEAD(C.accent)));
+
+    // Item name.
+    this.track(this.add.text(x + 14, y + 40, itemName, FONT_HEAD(C.gold)));
+
+    // Slot list.
+    const slots = def?.slots ?? [];
+    const slotsLine = slots.length
+      ? `Slots: ${slots.map((s) => s.replace("_", " ")).join(", ")}`
+      : "Slots: —";
+    this.track(this.add.text(x + 14, y + 64, slotsLine, FONT_MONO(C.dim)));
+
+    // Description (wrap by hand — the existing scene's text helpers
+    // don't expose wordWrap).
+    const desc = def?.description ?? "(No description.)";
+    this.track(this.add.text(x + 14, y + 88, desc, {
+      ...FONT_BODY(),
+      wordWrap: { width: w - 28 },
+    }));
+
+    // Durability bar.
+    const barX = x + 14;
+    const barY = y + h - 56;
+    const barW = w - 28;
+    const barH = 14;
+    this.track(this.add.text(barX, barY - 18, "Durability", FONT_MONO(C.dim)));
+    if (max == null) {
+      this.track(this.add.text(barX, barY, "Indestructible", FONT_MONO(C.gold)));
+    } else if (cur == null) {
+      this.track(this.add.text(barX, barY, `${max} / ${max}`, FONT_MONO()));
+    } else {
+      // Background frame.
+      this.track(this.add.rectangle(barX, barY, barW, barH, 0x1c1c2a, 1)
+        .setOrigin(0)
+        .setStrokeStyle(1, C.panelEdge));
+      // Filled portion, colour by remaining %.
+      const pct = Math.max(0, Math.min(1, cur / max));
+      const col = pct > 0.66 ? 0x6dbf60 : pct > 0.33 ? 0xddc05c : 0xd86a4a;
+      this.track(this.add.rectangle(barX + 1, barY + 1,
+                                    Math.max(0, (barW - 2) * pct), barH - 2,
+                                    col, 1).setOrigin(0));
+      this.track(this.add.text(barX + barW, barY + barH + 2,
+                               `${cur} / ${max}`,
+                               FONT_MONO(C.dim)).setOrigin(1, 0));
+    }
+
+    // Footer hint.
+    this.track(this.add.text(x + 14, y + h - 22,
+                             "[E] / [ESC] / [Enter] close",
+                             FONT_MONO(C.dim)));
   }
 
   // ── Inventory mode ───────────────────────────────────────────────

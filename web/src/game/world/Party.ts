@@ -21,6 +21,14 @@ export interface InventoryItem {
   item: string;
   /** Charges remaining for stacked / consumable items. Absent for gear. */
   charges?: number;
+  /**
+   * Current remaining durability for worn gear. Absent means the item
+   * has never been used (start at the catalog max when equipped) or is
+   * indestructible. The field travels with the entry so two copies of
+   * the same item in the stash can wear independently — exactly like
+   * the Python game's per-entry durability dict.
+   */
+  durability?: number;
 }
 
 export interface PartyMember {
@@ -41,6 +49,18 @@ export interface PartyMember {
   wisdom: number;
   level: number;
   equipped: EquipmentSlots;
+  /**
+   * Per-slot remaining durability for the items currently equipped.
+   * `null` means the slot's item is indestructible (or there's nothing
+   * equipped). When an item is unequipped, its current value moves
+   * onto the receiving InventoryItem.durability so wear isn't lost.
+   */
+  equippedDurability: {
+    right_hand: number | null;
+    left_hand: number | null;
+    body: number | null;
+    head: number | null;
+  };
   inventory: InventoryItem[];
   /** Resolved /assets/... path. Source path is normalised on load. */
   sprite: string;
@@ -136,6 +156,16 @@ export function memberFromRaw(raw: RawMember): PartyMember {
       leftHand: raw.equipped?.left_hand ?? null,
       body: raw.equipped?.body ?? null,
       head: raw.equipped?.head ?? null,
+    },
+    // Durability trackers default to "uninitialised" — the first time
+    // an item is equipped (or use_durability runs against it) the
+    // helper seeds it from the catalog max. Mirrors the Python game's
+    // lazy initialisation in equipped_durability.
+    equippedDurability: {
+      right_hand: null,
+      left_hand: null,
+      body: null,
+      head: null,
     },
     inventory: raw.inventory ?? [],
     sprite: spriteForMember(raw.sprite, klass),

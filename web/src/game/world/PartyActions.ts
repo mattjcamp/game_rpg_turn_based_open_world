@@ -10,7 +10,7 @@
  * caller wants the same effect (e.g., a future save/load layer).
  */
 
-import type { Party, PartyMember, EquipmentSlots } from "./Party";
+import type { Party, PartyMember, EquipmentSlots, InventoryItem } from "./Party";
 import type { Effect } from "./Effects";
 import { canEquip } from "./Effects";
 import type { Spell } from "./Spells";
@@ -231,6 +231,144 @@ export function returnItemToStash(
   return { ok: true, message: `${item.item} returned to stash.` };
 }
 
+// ── Durability ─────────────────────────────────────────────────────
+//
+// Mirrors the Python game's per-slot durability tracker
+// (`equipped_durability`) plus the per-inventory-entry durability
+// field. Items in items.json carry a `durability` value that's the
+// MAX uses; `0` (or missing) means indestructible. When an item is
+// equipped, the slot tracker holds the *current* value; when it's
+// unequipped or swapped, that value rides along with the item back
+// into the inventory entry so wear travels with the object.
+
+/**
+ * Look up an item's max durability from the catalog. Returns `null`
+ * when the item is indestructible (no durability set, or 0) or when
+ * the catalog doesn't recognise the item.
+ */
+export function getItemMaxDurability(
+  itemName: string,
+  items: Map<string, Item>,
+): number | null {
+  const def = items.get(itemName);
+  if (!def) return null;
+  const dur = def.durability ?? 0;
+  return dur > 0 ? dur : null;
+}
+
+/** True if the catalog flags the item as indestructible. */
+export function isIndestructible(
+  itemName: string,
+  items: Map<string, Item>,
+): boolean {
+  return getItemMaxDurability(itemName, items) == null;
+}
+
+/**
+ * Outcome of decrementing the wear on a slot's equipped item.
+ *   - `kind: "ok"` — durability ticked down; item is still usable.
+ *   - `kind: "broke"` — durability hit zero; the slot has been cleared
+ *     and the item is destroyed (no inventory return).
+ *   - `kind: "indestructible"` — nothing to do.
+ *   - `kind: "empty"` — slot is empty / item not in catalog.
+ */
+export type DurabilityResult =
+  | { kind: "ok"; current: number; max: number }
+  | { kind: "broke"; itemName: string }
+  | { kind: "indestructible" }
+  | { kind: "empty" };
+
+/**
+ * Decrement durability for the item in `slot` by one. Initialises the
+ * tracker to max on first use (the Python game does the same lazy
+ * seed). When durability reaches zero the slot is cleared and the
+ * item is removed from play.
+ */
+export function useEquippedDurability(
+  member: PartyMember,
+  slot: EquipSlot,
+  items: Map<string, Item>,
+): DurabilityResult {
+  const itemName = readSlot(member, slot);
+  if (!itemName) return { kind: "empty" };
+  const max = getItemMaxDurability(itemName, items);
+  if (max == null) return { kind: "indestructible" };
+  let current = member.equippedDurability[slot];
+  if (current == null) current = max;
+  if (current > max) current = max;     // editor-changed-max guard
+  current -= 1;
+  if (current <= 0) {
+    // Snap the slot — the item shatters out of existence.
+    writeSlot(member, slot, null);
+    member.equippedDurability[slot] = null;
+    return { kind: "broke", itemName };
+  }
+  member.equippedDurability[slot] = current;
+  return { kind: "ok", current, max };
+}
+
+/**
+ * Read the current/max durability pair for an equipped slot. Returns
+ * `null` for indestructible items, empty slots, or unknown items.
+ * Used by the inspect/examine popup to render the progress bar.
+ */
+export function getSlotDurability(
+  member: PartyMember,
+  slot: EquipSlot,
+  items: Map<string, Item>,
+): { current: number; max: number } | null {
+  const itemName = readSlot(member, slot);
+  if (!itemName) return null;
+  const max = getItemMaxDurability(itemName, items);
+  if (max == null) return null;
+  let current = member.equippedDurability[slot];
+  if (current == null) current = max;
+  if (current > max) current = max;
+  return { current, max };
+}
+
+/**
+ * Move an inventory entry's wear into the slot tracker on equip.
+ * Indestructible items get `null`; destructible items use the entry's
+ * stored value (or seed to max when this is the first use).
+ */
+function seedSlotFromEntry(
+  member: PartyMember,
+  slot: EquipSlot,
+  itemName: string,
+  itemDur: number | undefined,
+  items: Map<string, Item>,
+): void {
+  const max = getItemMaxDurability(itemName, items);
+  if (max == null) {
+    member.equippedDurability[slot] = null;
+    return;
+  }
+  if (typeof itemDur === "number") {
+    member.equippedDurability[slot] = Math.max(0, Math.min(max, itemDur));
+  } else {
+    member.equippedDurability[slot] = max;
+  }
+}
+
+/**
+ * Build an InventoryItem entry for an item being unequipped (or
+ * displaced by a swap), copying the slot's current durability across
+ * so wear isn't lost.
+ */
+function entryForSlot(
+  member: PartyMember,
+  slot: EquipSlot,
+  itemName: string,
+  items: Map<string, Item>,
+): InventoryItem {
+  const max = getItemMaxDurability(itemName, items);
+  if (max == null) return { item: itemName };
+  const cur = member.equippedDurability[slot];
+  if (cur == null) return { item: itemName };
+  return { item: itemName, durability: cur };
+}
+
 // ── Equip / unequip ────────────────────────────────────────────────
 
 /**
@@ -276,9 +414,12 @@ export function equipItemFromInventory(
     chosen = def.slots[0];
     const previous = readSlot(member, chosen)!;
     // Move displaced item back into inventory at the same index so
-    // the player's view stays stable.
-    member.inventory[itemIndex] = { item: previous };
+    // the player's view stays stable. Carry its current durability
+    // across so the swapped-out item doesn't reset to full wear.
+    const displaced = entryForSlot(member, chosen, previous, items);
+    member.inventory[itemIndex] = displaced;
     writeSlot(member, chosen, inv.item);
+    seedSlotFromEntry(member, chosen, inv.item, inv.durability, items);
     return {
       ok: true,
       message: `${member.name} equips ${inv.item} (replaces ${previous}).`,
@@ -288,6 +429,7 @@ export function equipItemFromInventory(
   // Empty slot — just move the item.
   member.inventory.splice(itemIndex, 1);
   writeSlot(member, chosen, inv.item);
+  seedSlotFromEntry(member, chosen, inv.item, inv.durability, items);
   return {
     ok: true,
     message: `${member.name} equips ${inv.item} as ${SLOT_LABEL[chosen]}.`,
@@ -334,14 +476,19 @@ export function equipItemIntoSlot(
   if (previous == null) {
     member.inventory.splice(itemIndex, 1);
     writeSlot(member, slot, inv.item);
+    seedSlotFromEntry(member, slot, inv.item, inv.durability, items);
     return {
       ok: true,
       message: `${member.name} equips ${inv.item} as ${SLOT_LABEL[slot]}.`,
     };
   }
-  // Swap with the existing occupant.
-  member.inventory[itemIndex] = { item: previous };
+  // Swap with the existing occupant. The displaced item carries its
+  // current durability into the inventory entry; the new item picks
+  // up whatever wear was stored on its inventory entry.
+  const displaced = entryForSlot(member, slot, previous, items);
+  member.inventory[itemIndex] = displaced;
   writeSlot(member, slot, inv.item);
+  seedSlotFromEntry(member, slot, inv.item, inv.durability, items);
   return {
     ok: true,
     message: `${member.name} equips ${inv.item} (replaces ${previous}).`,
@@ -351,17 +498,27 @@ export function equipItemIntoSlot(
 /**
  * Unequip whatever sits in a slot — the item drops into the member's
  * personal inventory. No-op success when the slot is already empty.
+ *
+ * `items` is optional so legacy callers keep working, but passing it
+ * is strongly recommended: with the catalog we can move the slot's
+ * current durability onto the new InventoryItem entry, preserving wear
+ * across the unequip → equip cycle just like the Python game.
  */
 export function unequipSlot(
   member: PartyMember,
   slot: EquipSlot,
+  items?: Map<string, Item>,
 ): ActionResult {
   const current = readSlot(member, slot);
   if (current == null) {
     return { ok: true, message: `${SLOT_LABEL[slot][0].toUpperCase() + SLOT_LABEL[slot].slice(1)} slot is already empty.` };
   }
+  const entry: InventoryItem = items
+    ? entryForSlot(member, slot, current, items)
+    : { item: current };
   writeSlot(member, slot, null);
-  member.inventory.push({ item: current });
+  member.equippedDurability[slot] = null;
+  member.inventory.push(entry);
   return {
     ok: true,
     message: `${member.name} unequips ${current}.`,

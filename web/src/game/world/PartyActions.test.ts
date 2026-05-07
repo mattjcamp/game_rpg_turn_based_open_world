@@ -22,6 +22,10 @@ import {
   partyHasEffect,
   partyLightRadius,
   partyLightTint,
+  getItemMaxDurability,
+  getSlotDurability,
+  isIndestructible,
+  useEquippedDurability,
 } from "./PartyActions";
 import { memberFromRaw } from "./Party";
 import { partyFromRaw, type Party, activeMembers } from "./Party";
@@ -393,6 +397,223 @@ describe("equipItemFromInventory / unequipSlot", () => {
     fighter.inventory.push({ item: "Healing Herb" });
     const r = equipItemIntoSlot(fighter, 0, "right_hand", items());
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("durability — read helpers", () => {
+  function items(): Map<string, Item> {
+    const m = new Map<string, Item>();
+    m.set("Dagger", {
+      name: "Dagger", category: "weapons", description: "",
+      slots: ["right_hand", "left_hand"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,
+      durability: 20,
+    });
+    m.set("Fists", {
+      name: "Fists", category: "weapons", description: "",
+      slots: ["right_hand"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,
+      durability: 0,                    // 0 → indestructible
+    });
+    m.set("Cloth", {
+      name: "Cloth", category: "armors", description: "",
+      slots: ["body"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,      // missing durability → indestructible
+    });
+    return m;
+  }
+
+  it("getItemMaxDurability reads the catalog max", () => {
+    expect(getItemMaxDurability("Dagger", items())).toBe(20);
+  });
+
+  it("getItemMaxDurability returns null for indestructible items", () => {
+    expect(getItemMaxDurability("Fists", items())).toBeNull();
+    expect(getItemMaxDurability("Cloth", items())).toBeNull();
+  });
+
+  it("getItemMaxDurability returns null for unknown items", () => {
+    expect(getItemMaxDurability("Mythril Plate", items())).toBeNull();
+  });
+
+  it("isIndestructible matches the catalog", () => {
+    expect(isIndestructible("Dagger", items())).toBe(false);
+    expect(isIndestructible("Fists", items())).toBe(true);
+    expect(isIndestructible("Cloth", items())).toBe(true);
+  });
+});
+
+describe("durability — useEquippedDurability + break", () => {
+  function items(): Map<string, Item> {
+    const m = new Map<string, Item>();
+    m.set("Dagger", {
+      name: "Dagger", category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,
+      durability: 3,
+    });
+    m.set("Fists", {
+      name: "Fists", category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,
+      durability: 0,
+    });
+    return m;
+  }
+
+  it("decrements once per call, reporting current/max", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Dagger";
+    m.equippedDurability.right_hand = 3;
+    const r1 = useEquippedDurability(m, "right_hand", items());
+    expect(r1.kind).toBe("ok");
+    if (r1.kind === "ok") {
+      expect(r1.current).toBe(2);
+      expect(r1.max).toBe(3);
+    }
+    expect(m.equippedDurability.right_hand).toBe(2);
+  });
+
+  it("returns indestructible for items with durability 0", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Fists";
+    const r = useEquippedDurability(m, "right_hand", items());
+    expect(r.kind).toBe("indestructible");
+  });
+
+  it("breaks the item when durability reaches 0 and clears the slot", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Dagger";
+    m.equippedDurability.right_hand = 1;
+    const r = useEquippedDurability(m, "right_hand", items());
+    expect(r.kind).toBe("broke");
+    if (r.kind === "broke") expect(r.itemName).toBe("Dagger");
+    expect(m.equipped.rightHand).toBeNull();
+    expect(m.equippedDurability.right_hand).toBeNull();
+    // Broken item is destroyed — does NOT return to inventory.
+    expect(m.inventory.find((it) => it.item === "Dagger")).toBeUndefined();
+  });
+
+  it("seeds durability lazily on first use", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Dagger";
+    // No tracker entry yet — first use should seed to max-1 (it
+    // initialises and then ticks the same call).
+    expect(m.equippedDurability.right_hand).toBeNull();
+    const r = useEquippedDurability(m, "right_hand", items());
+    expect(r.kind).toBe("ok");
+    expect(m.equippedDurability.right_hand).toBe(2); // 3 - 1
+  });
+});
+
+describe("durability — equip / unequip preserves wear", () => {
+  function items(): Map<string, Item> {
+    const m = new Map<string, Item>();
+    m.set("Dagger", {
+      name: "Dagger", category: "weapons", description: "",
+      slots: ["right_hand", "left_hand"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,
+      durability: 20,
+    });
+    m.set("Sword", {
+      name: "Sword", category: "weapons", description: "",
+      slots: ["right_hand"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null,
+      durability: 30,
+    });
+    return m;
+  }
+
+  it("equip seeds the slot durability from the inventory entry's value", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = null;
+    m.inventory.push({ item: "Dagger", durability: 7 });
+    const r = equipItemFromInventory(m, 0, items());
+    expect(r.ok).toBe(true);
+    expect(m.equippedDurability.right_hand).toBe(7);
+  });
+
+  it("equip seeds to max when the inventory entry has no durability set", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = null;
+    m.inventory.push({ item: "Dagger" });
+    equipItemFromInventory(m, 0, items());
+    expect(m.equippedDurability.right_hand).toBe(20);
+  });
+
+  it("unequip carries the current durability onto the new inventory entry", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Dagger";
+    m.equippedDurability.right_hand = 5;
+    const r = unequipSlot(m, "right_hand", items());
+    expect(r.ok).toBe(true);
+    const moved = m.inventory.find((it) => it.item === "Dagger");
+    expect(moved?.durability).toBe(5);
+    // Slot tracker is cleared after unequip.
+    expect(m.equippedDurability.right_hand).toBeNull();
+  });
+
+  it("swap preserves the displaced item's durability into inventory", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Sword";
+    m.equippedDurability.right_hand = 12;
+    m.inventory.push({ item: "Dagger", durability: 8 });
+    const r = equipItemIntoSlot(m, 0, "right_hand", items());
+    expect(r.ok).toBe(true);
+    expect(m.equipped.rightHand).toBe("Dagger");
+    expect(m.equippedDurability.right_hand).toBe(8);
+    // Displaced sword now in the inventory at the same index, with
+    // its 12-uses-remaining wear preserved.
+    const sword = m.inventory.find((it) => it.item === "Sword");
+    expect(sword?.durability).toBe(12);
+  });
+
+  it("durability survives a full equip → use → unequip round-trip", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = null;
+    m.inventory.push({ item: "Dagger", durability: 10 });
+    equipItemFromInventory(m, 0, items());
+    expect(m.equippedDurability.right_hand).toBe(10);
+    // Use it three times.
+    useEquippedDurability(m, "right_hand", items());
+    useEquippedDurability(m, "right_hand", items());
+    useEquippedDurability(m, "right_hand", items());
+    expect(m.equippedDurability.right_hand).toBe(7);
+    unequipSlot(m, "right_hand", items());
+    const back = m.inventory.find((it) => it.item === "Dagger");
+    expect(back?.durability).toBe(7);
+    // And re-equipping respects that tracked wear.
+    const idx = m.inventory.findIndex((it) => it.item === "Dagger");
+    equipItemFromInventory(m, idx, items());
+    expect(m.equippedDurability.right_hand).toBe(7);
+  });
+
+  it("getSlotDurability reflects current/max for an equipped slot", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.rightHand = "Dagger";
+    m.equippedDurability.right_hand = 11;
+    expect(getSlotDurability(m, "right_hand", items())).toEqual({ current: 11, max: 20 });
+  });
+
+  it("getSlotDurability returns null for indestructible / empty slots", () => {
+    const p = makeParty();
+    const m = p.roster[0];
+    m.equipped.body = null;
+    expect(getSlotDurability(m, "body", items())).toBeNull();
   });
 });
 

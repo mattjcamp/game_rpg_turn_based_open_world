@@ -60,6 +60,7 @@ import {
   traceDirectionalRay,
 } from "../combat/CombatActions";
 import { combatantsFromParty, syncCombatHpBack, abilityMod } from "../combat/CombatBridge";
+import { useEquippedDurability } from "../world/PartyActions";
 import {
   flashTarget,
   castGlow,
@@ -773,11 +774,69 @@ export class CombatScene extends Phaser.Scene {
 
   /** PartyMember matched to the active combatant by name (best-effort). */
   private memberForCurrent(): PartyMember | null {
-    const c = this.combat.current;
-    if (c.side !== "party") return null;
+    return this.memberByCombatantId(this.combat.current.id);
+  }
+
+  /**
+   * PartyMember matched to a combatant id (party-side only). Used by
+   * the durability hooks that need to apply wear to whichever fighter
+   * landed (or absorbed) the hit, not just the active turn-taker.
+   * Summons share `side: "party"` but have no PartyMember row, so
+   * the lookup returns null for them — durability simply skips.
+   */
+  private memberByCombatantId(id: string): PartyMember | null {
+    const c = this.combat.combatants.find((x) => x.id === id);
+    if (!c || c.side !== "party") return null;
     const data = gameState.partyData;
     if (!data) return null;
     return data.roster.find((m) => m.name === c.name) ?? null;
+  }
+
+  /**
+   * Decrement durability for the weapon a party member just hit with.
+   * Called after every successful melee bump or ranged shot. Iterates
+   * the hand slots so dual-wield setups still wear the right item, and
+   * logs a "X's Y shatters!" line if the weapon breaks.
+   *
+   * Skips silently for monsters and summons — they don't carry the
+   * PartyMember durability tracker.
+   */
+  private applyWeaponDurability(attackerId: string): void {
+    const member = this.memberByCombatantId(attackerId);
+    if (!member) return;
+    // Try right hand first (the common case); only the slot whose
+    // item actually exists gets decremented. Both slots have to be
+    // tried because a thief's off-hand dagger lives in left_hand.
+    const slotsToTry: Array<["right_hand" | "left_hand", "rightHand" | "leftHand"]> = [
+      ["right_hand", "rightHand"],
+      ["left_hand",  "leftHand"],
+    ];
+    for (const [slot, field] of slotsToTry) {
+      if (!member.equipped[field]) continue;
+      const r = useEquippedDurability(member, slot, this.items);
+      if (r.kind === "broke") {
+        this.combat.log.push(`${member.name}'s ${r.itemName} shatters!`);
+        Sfx.play("critical");
+      }
+      return; // only the first hand the attack came from
+    }
+  }
+
+  /**
+   * Decrement body-armor durability when a party member is hit. The
+   * Python game has the same hook in `_apply_armor_durability`; here
+   * we mirror only the body slot — head/hand armor wear isn't tracked
+   * yet because no shipped pieces define durability for those slots.
+   */
+  private applyArmorDurability(targetId: string): void {
+    const member = this.memberByCombatantId(targetId);
+    if (!member) return;
+    if (!member.equipped.body) return;
+    const r = useEquippedDurability(member, "body", this.items);
+    if (r.kind === "broke") {
+      this.combat.log.push(`${member.name}'s ${r.itemName} is destroyed!`);
+      Sfx.play("critical");
+    }
   }
 
   private openThrowPicker(): void {
@@ -1119,6 +1178,10 @@ export class CombatScene extends Phaser.Scene {
         await this.flyProjectile(me, target, VFX_COLOURS.white);
         await this.animateHit(target, result);
         this.refreshHp(target);
+        if (result.hit) {
+          this.applyWeaponDurability(me.id);
+          this.applyArmorDurability(target.id);
+        }
       } else if (action.kind === "cast") {
         const spell = action.spell;
         const member = this.memberForCurrent();
@@ -1843,6 +1906,10 @@ export class CombatScene extends Phaser.Scene {
         await this.animateBump(actor, before, target.position);
         await this.animateHit(target, result.result);
         this.refreshHp(target);
+        if (result.result.hit) {
+          this.applyWeaponDurability(actor.id);
+          this.applyArmorDurability(target.id);
+        }
       } else {
         await this.animateBlocked(actor, dir);
       }
@@ -1872,12 +1939,20 @@ export class CombatScene extends Phaser.Scene {
         const intent = this.combat.decideMonsterIntent();
         if (intent.kind === "wait") break;
         if (intent.kind === "attack") {
+          const attackerId = this.combat.current.id;
           const result = this.combat.attack(intent.targetId);
           this.combat.movePoints = 0;
           const target = this.combat.byId(result.targetId);
           await this.animateBump(this.combat.current, this.combat.current.position, target.position);
           await this.animateHit(target, result);
           this.refreshHp(target);
+          if (result.hit) {
+            // attacker is enemy → applyWeaponDurability is a no-op; the
+            // call still runs so charmed/summoned attackers wear their
+            // weapons too. Target may be a party member — armor wear.
+            this.applyWeaponDurability(attackerId);
+            this.applyArmorDurability(target.id);
+          }
           this.refreshLog();
           break;
         }
@@ -1891,6 +1966,10 @@ export class CombatScene extends Phaser.Scene {
           await this.animateBump(actor, before, target.position);
           await this.animateHit(target, moveResult.result);
           this.refreshHp(target);
+          if (moveResult.result.hit) {
+            this.applyWeaponDurability(actor.id);
+            this.applyArmorDurability(target.id);
+          }
           this.refreshLog();
           break;
         } else {
