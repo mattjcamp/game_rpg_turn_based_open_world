@@ -75,6 +75,8 @@ import {
   tinker,
   getItemMaxDurability,
   getSlotDurability,
+  useCampingSupplies,
+  useTorch,
 } from "../world/PartyActions";
 import {
   loadItems,
@@ -82,6 +84,7 @@ import {
   type EquipSlot,
 } from "../world/Items";
 import { assetUrl } from "../world/Module";
+import { Sfx } from "../audio/Sfx";
 
 // Canvas
 const W = 960;
@@ -633,6 +636,27 @@ export class PartyScene extends Phaser.Scene {
     }
 
     if (row.kind === "item") {
+      // Party-wide consumables short-circuit the give-item flow:
+      // pressing Enter on Camping Supplies / Torch uses them on the
+      // whole party rather than handing them to a single character.
+      // Sfx and a one-line feedback string keep things lightweight —
+      // a fancier "USED!" toast is a future polish step.
+      if (row.name === "Camping Supplies") {
+        const r = useCampingSupplies(this.party);
+        if (r.ok) Sfx.play("heal");
+        this.feedback = r.message;
+        this.buildRows();
+        this.render();
+        return;
+      }
+      if (row.name === "Torch") {
+        const r = useTorch(this.party);
+        if (r.ok) Sfx.play("chirp");
+        this.feedback = r.message;
+        this.buildRows();
+        this.render();
+        return;
+      }
       this.pendingGiveStashIndex = row.index;
       this.mode = "give-item";
       this.render();

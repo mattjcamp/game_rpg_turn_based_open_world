@@ -81,6 +81,11 @@ export interface Party {
   partyEffects: Record<string, string | null>;
   /** Stash — items shared across the party. */
   inventory: InventoryItem[];
+  /** Remaining steps the currently-burning torch lights for. Increased
+   *  by `useTorch`; decremented one per move in dark scenes. Mirrors the
+   *  Python game's `DungeonState.torch_steps` but kept on the party so
+   *  it survives transitions in this port. */
+  torchSteps: number;
 }
 
 interface RawEquipped {
@@ -115,6 +120,7 @@ interface RawParty {
   active_party?: number[];
   party_effects?: Record<string, string | null>;
   inventory?: InventoryItem[];
+  torch_steps?: number;
 }
 
 /**
@@ -191,6 +197,7 @@ export function partyFromRaw(raw: RawParty): Party {
       effect_1: null, effect_2: null, effect_3: null, effect_4: null,
     },
     inventory: raw.inventory ?? [],
+    torchSteps: raw.torch_steps ?? 0,
   };
 }
 

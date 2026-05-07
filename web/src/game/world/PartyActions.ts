@@ -103,11 +103,13 @@ export function partyHasEffect(party: Party, effectId: string): boolean {
  * Numbers picked to roughly match the look of the pygame version:
  *   - Infravision: 8 tiles (effectively floods a small interior)
  *   - Galadriel's Light: 5 tiles (warm, more local pool)
+ *   - Lit torch: 3 tiles (small, flickering pool — burns down with steps)
  *   - default: whatever the caller passed in
  */
 export function partyLightRadius(party: Party, defaultRadius: number): number {
   if (partyHasEffect(party, "infravision")) return Math.max(defaultRadius, 8);
   if (partyHasEffect(party, "galadriels_light")) return Math.max(defaultRadius, 5);
+  if (party.torchSteps > 0) return Math.max(defaultRadius, 3);
   return defaultRadius;
 }
 
@@ -133,6 +135,11 @@ export function partyLightTint(party: Party): PartyTint | null {
   }
   if (partyHasEffect(party, "galadriels_light")) {
     return { color: 0x9bb6e0, alphaScale: 0.45 };
+  }
+  if (party.torchSteps > 0) {
+    // Warm orange flicker — much smaller alpha than Galadriel's so it
+    // reads as a candle pool, not a magical glow.
+    return { color: 0xff9a3c, alphaScale: 0.30 };
   }
   return null;
 }
@@ -794,4 +801,100 @@ export function classifyMenuCast(spell: Spell): MenuCastKind {
   // Other utility spells (knock, magic_light, etc.) need world-state
   // hooks (unlock door, light tile) we haven't built yet.
   return "unsupported";
+}
+
+// ── Party-wide consumables ────────────────────────────────────────
+
+/** Default torch burn-time when a torch entry doesn't carry an
+ *  explicit `charges` field — matches `data/items.json` ("Torch": 150). */
+const TORCH_DEFAULT_STEPS = 150;
+
+export interface UseItemResult {
+  ok: boolean;
+  message: string;
+}
+
+function findStashIndex(party: Party, itemName: string): number {
+  return party.inventory.findIndex((it) => it.item === itemName);
+}
+
+/**
+ * Consume one Camping Supplies charge: heal every alive party member
+ * to full HP and (for casters) restore MP to max. When the charges on
+ * the entry hit 0, the entry itself is removed from the stash.
+ *
+ * Mirrors the spirit of the Python "rest" effect, but simplified to
+ * full restore — the user-facing rule we want is "camping makes you
+ * whole again". The Python version is partial (35% / 30%) and also
+ * advances the in-game clock; we don't have a clock in the web port
+ * yet.
+ */
+export function useCampingSupplies(party: Party): UseItemResult {
+  const idx = findStashIndex(party, "Camping Supplies");
+  if (idx < 0) {
+    return { ok: false, message: "No camping supplies in the stash." };
+  }
+  const entry = party.inventory[idx];
+  // Camping supplies in the wild ship with charges already set; if a
+  // bare entry shows up (e.g. from an editor-saved party), seed it
+  // from the catalog default of 3 so a single use doesn't burn the
+  // whole pack.
+  const charges = (entry.charges ?? 3) - 1;
+  let totalHp = 0;
+  let totalMp = 0;
+  for (const m of party.roster) {
+    if (m.hp <= 0) continue;
+    const hpHeal = m.maxHp - m.hp;
+    if (hpHeal > 0) {
+      m.hp = m.maxHp;
+      totalHp += hpHeal;
+    }
+    if (m.maxMp != null) {
+      const mpHeal = m.maxMp - (m.mp ?? 0);
+      if (mpHeal > 0) {
+        m.mp = m.maxMp;
+        totalMp += mpHeal;
+      }
+    }
+  }
+  if (charges <= 0) {
+    party.inventory.splice(idx, 1);
+  } else {
+    party.inventory[idx] = { ...entry, charges };
+  }
+  if (totalHp === 0 && totalMp === 0) {
+    return { ok: true, message: "The party rests, but everyone was already whole." };
+  }
+  return {
+    ok: true,
+    message: `The party rests. Restored ${totalHp} HP and ${totalMp} MP.`,
+  };
+}
+
+/**
+ * Consume one Torch from the stash and add 150 light-steps to the
+ * party's torch counter. Steps tick down inside dark scenes (town
+ * interiors / future dungeons); while they're > 0 the party emits a
+ * 3-tile warm pool via `partyLightRadius` / `partyLightTint`.
+ *
+ * Stacks with an already-burning torch — using a second torch tops
+ * the counter back up rather than starting a fresh one. (Same effect
+ * either way for the player; simpler to reason about.)
+ */
+export function useTorch(party: Party): UseItemResult {
+  const idx = findStashIndex(party, "Torch");
+  if (idx < 0) {
+    return { ok: false, message: "No torches in the stash." };
+  }
+  const entry = party.inventory[idx];
+  // Each Torch entry represents one whole torch. If it carries a
+  // partial `charges` value (an editor or save-state may set one),
+  // honour that as the steps remaining; otherwise default to 150.
+  const steps = entry.charges ?? TORCH_DEFAULT_STEPS;
+  party.torchSteps = Math.max(party.torchSteps, 0) + steps;
+  party.inventory.splice(idx, 1);
+  return {
+    ok: true,
+    message: `Torch lit. ${steps} steps of light.`,
+  };
 }

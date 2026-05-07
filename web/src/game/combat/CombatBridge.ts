@@ -15,9 +15,15 @@
 import type { Combatant } from "../types";
 import type { PartyMember, Party } from "../world/Party";
 import type { Item } from "../world/Items";
+import type { ClassTemplate } from "../world/Classes";
 import { activeMembers } from "../world/Party";
 
 const DEFAULT_DAMAGE = { dice: 1, sides: 6, bonus: 0 } as const;
+/** Fall-back tile movement budget when no class template is available
+ *  (tests that don't pass a classes map, or a class file failed to
+ *  load). Picked to match the prior hardcoded value so callers that
+ *  don't opt in see no behaviour change. */
+const DEFAULT_MOVE_RANGE = 4;
 
 /** D&D-style modifier (10 = 0, 18 = +4, 8 = -1, …). */
 export function abilityMod(stat: number): number {
@@ -44,10 +50,14 @@ function bestAttackMod(member: PartyMember, weapon: Item | null): number {
  *   wearing without trivialising fights).
  * - attack bonus: floor(level/2) + best-stat mod + 1 proficiency.
  * - damage: 1d6 + weapon.power. Unarmed → bare 1d6.
+ * - move range: from the member's class template (Wizards 2,
+ *   Fighters 4, Thieves 6 in the shipped data). Falls back to 4 when
+ *   `classes` isn't supplied or the class file failed to load.
  */
 export function combatantFromMember(
   member: PartyMember,
   items: Map<string, Item>,
+  classes?: Map<string, ClassTemplate>,
 ): Combatant {
   const weapon = member.equipped.rightHand
     ? items.get(member.equipped.rightHand) ?? null
@@ -65,6 +75,8 @@ export function combatantFromMember(
   const damage = weapon && typeof weapon.power === "number"
     ? { dice: 1, sides: 6, bonus: weapon.power }
     : { ...DEFAULT_DAMAGE };
+  const tpl = classes?.get(member.class.toLowerCase());
+  const baseMoveRange = tpl ? tpl.range : DEFAULT_MOVE_RANGE;
   return {
     id: `pm:${member.name}`,
     name: member.name,
@@ -77,18 +89,21 @@ export function combatantFromMember(
     dexMod,
     color: [200, 200, 200],
     sprite: member.sprite,
-    baseMoveRange: 4,
+    baseMoveRange,
     position: { col: 0, row: 0 },
   };
 }
 
 /** Convert the active four PartyMembers into Combatants for the
- *  combat engine. */
+ *  combat engine. Pass `classes` (lowercased class name → template)
+ *  to honour per-class movement ranges; without it everyone defaults
+ *  to the legacy 4-tile budget. */
 export function combatantsFromParty(
   party: Party,
   items: Map<string, Item>,
+  classes?: Map<string, ClassTemplate>,
 ): Combatant[] {
-  return activeMembers(party).map((m) => combatantFromMember(m, items));
+  return activeMembers(party).map((m) => combatantFromMember(m, items, classes));
 }
 
 /**

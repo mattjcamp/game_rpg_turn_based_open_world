@@ -265,11 +265,19 @@ export class CombatScene extends Phaser.Scene {
   /** Items + Spells data, loaded lazily. */
   private items: Map<string, Item> = new Map();
   private spells: Spell[] = [];
+  /** Class templates keyed by lowercased class name (e.g. "wizard").
+   *  Loaded eagerly in create() so combatantsFromParty can read each
+   *  class's per-turn movement budget. */
+  private classTemplates: Map<string, ClassTemplate> = new Map();
   /** Picker overlay objects (cleared on mode transition). */
   private pickerObjects: Phaser.GameObjects.GameObject[] = [];
 
   private busy = false;
   private ended = false;
+  /** Turn Undead is one-shot per encounter — the undead get used to
+   *  the holy symbol after the first channel. Reset in init() when a
+   *  fresh combat starts. */
+  private turnUndeadUsed = false;
   private overlayText?: Phaser.GameObjects.Text;
 
   constructor() {
@@ -286,6 +294,8 @@ export class CombatScene extends Phaser.Scene {
     this.roamerId = data?.roamerId ?? null;
     this.busy = false;
     this.ended = false;
+    this.turnUndeadUsed = false;
+    this.classTemplates.clear();
     this.actionCursor = 0;
     this.bodies.clear();
     this.selRings.clear();
@@ -347,6 +357,16 @@ export class CombatScene extends Phaser.Scene {
       // lazily but combat may be entered before any party screen has
       // been opened.
       if (!gameState.partyData) gameState.partyData = await loadParty();
+      // Class templates back per-class movement ranges (Wizard 2,
+      // Fighter 4, Thief 6, …). Per-class fetches in parallel; a
+      // missing file falls back to the default in CombatBridge.
+      if (gameState.partyData) {
+        const klasses = new Set(gameState.partyData.roster.map((m) => m.class));
+        await Promise.all([...klasses].map(async (k) => {
+          try { this.classTemplates.set(k.toLowerCase(), await loadClass(k)); }
+          catch { /* keep going — DEFAULT_MOVE_RANGE applies */ }
+        }));
+      }
       // Spawn-tile fights use catalog names; warm the loader so
       // makeMonsterByName resolves stats / sprites correctly.
       await loadMonsters();
@@ -388,7 +408,7 @@ export class CombatScene extends Phaser.Scene {
     // self-contained for testing.
     let party: Combatant[];
     if (this.fromWorld && gameState.partyData) {
-      party = combatantsFromParty(gameState.partyData, this.items);
+      party = combatantsFromParty(gameState.partyData, this.items, this.classTemplates);
     } else {
       party = makeSampleParty();
     }
@@ -1055,10 +1075,21 @@ export class CombatScene extends Phaser.Scene {
       return;
     }
     // Pre-flight for Turn Undead: if there are no undead enemies on
-    // the field the spell fizzles. Mirrors the Python game — the
-    // caster keeps both the MP and their turn, and just gets a clear
-    // log line so they can pick another action.
+    // the field the spell fizzles. The same fizzle path catches a
+    // second cast in the same encounter — the undead get used to
+    // the holy symbol after the first channel and shrug it off.
+    // Caster keeps both the MP and their turn so they can pick
+    // another action instead.
     if (spell.effect_type === "undead_damage") {
+      if (this.turnUndeadUsed) {
+        this.clearPicker();
+        this.mode = "default";
+        this.combat.log.push(
+          `${this.combat.current.name} channels ${spell.name} — the undead here are already cowed; the holy energy has no further effect.`
+        );
+        this.refreshLog();
+        return;
+      }
       const anyUndead = this.combat.combatants.some(
         (c) => c.side === "enemies" && c.hp > 0 && c.undead,
       );
@@ -1160,6 +1191,9 @@ export class CombatScene extends Phaser.Scene {
         // wisMod. Failure → destroyed completely; success → seared for
         // hp_percent of maxHp. Non-undead are untouched (the pre-flight
         // already covered the no-undead case).
+        // Mark "used this encounter" so further casts hit the
+        // already-cowed branch in the pre-flight above.
+        this.turnUndeadUsed = true;
         const enemies = this.combat.combatants.filter((c) => c.side === "enemies");
         const wisMod = abilityMod(member.wisdom);
         const result = resolveTurnUndead(enemies, spell, wisMod, defaultRng);
@@ -1767,21 +1801,17 @@ export class CombatScene extends Phaser.Scene {
 
       if (trace.hitId) {
         const target = this.combat.byId(trace.hitId);
-        if (target.side === me.side) {
-          // Friendly fire isn't supported by the spell flow today —
-          // log clearly and refund the cast.
-          this.combat.log.push(
-            `${me.name}'s ${spell.name} fizzles against an ally — clear the line first!`
-          );
-        } else {
-          const r = resolveDamageSpell(me, target, spell, defaultRng);
-          this.combat.log.push(
-            `${me.name} casts ${spell.name} → ${target.name} (${dir.toUpperCase()}) — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
-          );
-          if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
-          await this.animateHit(target, r);
-          this.refreshHp(target);
-        }
+        // Directional spells don't discriminate — the bolt smacks the
+        // first creature in its path, friend or foe. Aim carefully.
+        const r = resolveDamageSpell(me, target, spell, defaultRng);
+        const friendly = target.side === me.side;
+        const tag = friendly ? " — FRIENDLY FIRE!" : "";
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} → ${target.name} (${dir.toUpperCase()})${tag} — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
+        );
+        if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
+        await this.animateHit(target, r);
+        this.refreshHp(target);
       } else {
         this.combat.log.push(
           `${me.name}'s ${spell.name} flies ${dir.toUpperCase()} — fizzles, nothing in range.`
@@ -1868,8 +1898,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   /**
-   * Fireball-style AOE: every alive enemy within `radius` Chebyshev
-   * tiles of the chosen cell takes the spell's dice damage.
+   * Fireball-style AOE: every alive creature within `radius` Chebyshev
+   * tiles of the chosen cell takes the spell's dice damage. Includes
+   * party members caught in the blast — friendly fire is real, aim
+   * the cursor away from your front line.
    */
   private async resolveAoeFireball(
     caster: Combatant, spell: Spell, centre: { col: number; row: number },
@@ -1879,7 +1911,7 @@ export class CombatScene extends Phaser.Scene {
       ? (ev as { radius: number }).radius
       : 3;
     const victims = this.combat.combatants.filter(
-      (c) => c.side === "enemies" && c.hp > 0 &&
+      (c) => c.hp > 0 &&
              Math.max(
                Math.abs(c.position.col - centre.col),
                Math.abs(c.position.row - centre.row),
@@ -1903,14 +1935,19 @@ export class CombatScene extends Phaser.Scene {
       return;
     }
     let total = 0;
+    let allies = 0;
     for (const v of victims) {
       const r = resolveDamageSpell(caster, v, spell, defaultRng);
       total += r.damage;
+      if (v.side === caster.side) allies += 1;
       this.refreshHp(v);
       void this.animateHit(v, r);
     }
+    const enemies = victims.length - allies;
+    const parts = [`${enemies} foe${enemies === 1 ? "" : "s"}`];
+    if (allies > 0) parts.push(`${allies} all${allies === 1 ? "y" : "ies"} (FRIENDLY FIRE)`);
     this.combat.log.push(
-      `${caster.name} casts ${spell.name} — ${victims.length} foe${victims.length === 1 ? "" : "s"} hit, ${total} dmg total.`
+      `${caster.name} casts ${spell.name} — ${parts.join(", ")} hit, ${total} dmg total.`
     );
   }
 
@@ -2530,111 +2567,120 @@ export class CombatScene extends Phaser.Scene {
       Sfx.play("defeat");
       this.showOverlay("Defeat…", "#ff6b6b");
     }
-    if (this.fromWorld) {
-      if (winner === "party" && this.triggerKey) {
-        gameState.consumedTriggers.add(this.triggerKey);
+    if (!this.fromWorld) return;
+
+    if (winner === "party" && this.triggerKey) {
+      gameState.consumedTriggers.add(this.triggerKey);
+    }
+    if (winner === "party") {
+      // Spawn-tile boss fight: mark the tile as destroyed so the
+      // overworld will rewrite it to grass and stop spawning from it.
+      if (this.destroySpawnKey) {
+        gameState.destroyedSpawns.add(this.destroySpawnKey);
+        // Any roamers tied to this destroyed spawn vanish too —
+        // their lair is gone.
+        gameState.roamingMonsters = gameState.roamingMonsters.filter(
+          (m) => m.sourceKey !== this.destroySpawnKey,
+        );
       }
-      if (winner === "party") {
-        // Spawn-tile boss fight: mark the tile as destroyed so the
-        // overworld will rewrite it to grass and stop spawning from it.
-        if (this.destroySpawnKey) {
-          gameState.destroyedSpawns.add(this.destroySpawnKey);
-          // Any roamers tied to this destroyed spawn vanish too —
-          // their lair is gone.
-          gameState.roamingMonsters = gameState.roamingMonsters.filter(
-            (m) => m.sourceKey !== this.destroySpawnKey,
-          );
-        }
-        // Roamer engagement: just remove that one entry.
-        if (this.roamerId) {
-          gameState.roamingMonsters = gameState.roamingMonsters.filter(
-            (m) => m.id !== this.roamerId,
-          );
-        }
-        // XP + gold: sum from defeated enemies, share with all alive
-        // party members, run level-up, then refresh the HUD bars so
-        // any HP/MP gains show before we fade out. awardRewards is
-        // fire-and-forget here — fade waits on its own timer so a
-        // slow class-template fetch doesn't stall the transition.
-        void this.awardRewards();
+      // Roamer engagement: just remove that one entry.
+      if (this.roamerId) {
+        gameState.roamingMonsters = gameState.roamingMonsters.filter(
+          (m) => m.id !== this.roamerId,
+        );
       }
-      if (winner === "enemies") {
-        gameState.defeated = true;
-      }
-      // Carry HP back to the live roster so wounds persist across
-      // encounters. Pretty important now that combat reads the real
-      // party — without this, every encounter would refresh HP from
-      // the (frozen) party.json values.
-      if (gameState.partyData) {
-        syncCombatHpBack(gameState.partyData, this.combat.combatants);
-      }
-      this.time.delayedCall(2400, () => {
-        this.cameras.main.fadeOut(220, 0, 0, 0);
-        this.cameras.main.once("camerafadeoutcomplete", () => {
-          this.scene.start("OverworldScene");
-        });
-      });
+    }
+    if (winner === "enemies") {
+      gameState.defeated = true;
+    }
+    // Carry HP back to the live roster so wounds persist across
+    // encounters. Pretty important now that combat reads the real
+    // party — without this, every encounter would refresh HP from
+    // the (frozen) party.json values.
+    if (gameState.partyData) {
+      syncCombatHpBack(gameState.partyData, this.combat.combatants);
+    }
+
+    // Victory pacing: rewards summary fades in, then the level-up
+    // dialog (if any) blocks the exit until the player dismisses it.
+    // Defeat just holds the "Defeat…" overlay for a beat.
+    if (winner === "party") {
+      void this.awardRewardsThenExit();
+    } else {
+      this.scheduleExit(2000);
     }
   }
 
+  private scheduleExit(delayMs: number): void {
+    this.time.delayedCall(delayMs, () => {
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.scene.start("OverworldScene");
+      });
+    });
+  }
+
   /**
-   * Compute and apply victory rewards: sum XP + rolled gold from every
-   * defeated enemy, hand each to all *alive* party members, then run
-   * the level-up loop per member. Drops a brief panel beneath the
-   * "Victory!" overlay summarising what was earned.
+   * Compute and apply victory rewards, then trigger the post-combat
+   * exit. Sums XP + rolled gold from every defeated enemy, hands each
+   * to all *alive* party members, and runs the level-up loop per
+   * member. If any member levelled, a modal "Level Up!" dialog blocks
+   * the exit until the player presses Space / Enter.
    *
    * Class templates are fetched lazily; if the fetch fails we silently
    * skip the level-up step rather than blocking the post-combat
    * transition. XP is still added to the member's `exp` either way.
    */
-  private async awardRewards(): Promise<void> {
+  private async awardRewardsThenExit(): Promise<void> {
     const enemies = this.combat.combatants.filter((c) => c.side === "enemies");
     const totalXp   = enemies.reduce((s, m) => s + (m.xpReward   ?? 0), 0);
     const totalGold = enemies.reduce((s, m) => s + (m.goldReward ?? 0), 0);
     const party = gameState.partyData;
-    if (!party) {
-      this.showRewardSummary(totalXp, totalGold, []);
-      return;
-    }
-    party.gold += totalGold;
-    const aliveMembers: PartyMember[] = [];
-    for (const c of this.combat.combatants) {
-      if (c.side !== "party" || c.hp <= 0) continue;
-      const m = party.roster.find((r) => r.name === c.name);
-      if (m) aliveMembers.push(m);
-    }
     const levelUps: LevelUpEvent[] = [];
-    if (totalXp > 0 && aliveMembers.length > 0) {
-      const races = await loadRaces().catch(() => null);
-      for (const m of aliveMembers) {
-        let tpl: ClassTemplate | null = null;
-        try { tpl = await loadClass(m.class); } catch { /* skip leveling */ }
-        if (!tpl) {
-          // Still credit the raw XP so the bar fills next time the
-          // class file loads — saves the player some grinding.
-          m.exp += totalXp;
-          continue;
-        }
-        const race = races ? races.get(m.race) ?? null : null;
-        levelUps.push(...awardXp(m, totalXp, tpl, race));
+    if (party) {
+      party.gold += totalGold;
+      const aliveMembers: PartyMember[] = [];
+      for (const c of this.combat.combatants) {
+        if (c.side !== "party" || c.hp <= 0) continue;
+        const m = party.roster.find((r) => r.name === c.name);
+        if (m) aliveMembers.push(m);
       }
-      for (const ev of levelUps) Sfx.play("victory");
-      // Refresh the HUD so HP/MP bars catch any gains.
-      for (const c of this.combat.combatants) this.refreshHp(c);
+      if (totalXp > 0 && aliveMembers.length > 0) {
+        const races = await loadRaces().catch(() => null);
+        for (const m of aliveMembers) {
+          let tpl: ClassTemplate | null = null;
+          try { tpl = await loadClass(m.class); } catch { /* skip leveling */ }
+          if (!tpl) {
+            // Still credit the raw XP so the bar fills next time the
+            // class file loads — saves the player some grinding.
+            m.exp += totalXp;
+            continue;
+          }
+          const race = races ? races.get(m.race) ?? null : null;
+          levelUps.push(...awardXp(m, totalXp, tpl, race));
+        }
+        // Refresh the HUD so HP/MP bars catch any gains.
+        for (const c of this.combat.combatants) this.refreshHp(c);
+      }
     }
-    this.showRewardSummary(totalXp, totalGold, levelUps);
+    this.showRewardSummary(totalXp, totalGold);
+    if (levelUps.length > 0) {
+      // Let the rewards panel breathe before stacking the dialog over it.
+      await new Promise<void>((r) => this.time.delayedCall(700, () => r()));
+      await this.showLevelUpDialog(levelUps);
+      this.scheduleExit(0);
+    } else {
+      this.scheduleExit(1800);
+    }
   }
 
   /** Stack a short reward-summary panel under the "Victory!" overlay
-   *  so the player can see XP / gold gained and any level-ups before
-   *  we fade back to the overworld. */
-  private showRewardSummary(
-    xp: number, gold: number, events: LevelUpEvent[],
-  ): void {
+   *  so the player can see XP / gold gained. Level-ups land in a
+   *  separate modal — see showLevelUpDialog. */
+  private showRewardSummary(xp: number, gold: number): void {
     const lines: string[] = [];
     if (xp > 0)   lines.push(`+${xp} XP`);
     if (gold > 0) lines.push(`+${gold} gold`);
-    for (const ev of events) lines.push(ev.message);
     if (lines.length === 0) return;
     const text = lines.join("\n");
     const t = this.add.text(
@@ -2651,11 +2697,104 @@ export class CombatScene extends Phaser.Scene {
         lineSpacing: 4,
       },
     ).setOrigin(0.5).setDepth(120);
-    // Fade in a beat after the "Victory!" headline so the eye reads
-    // them in order, then leave it on screen until the scene fades.
     t.setAlpha(0);
     this.tweens.add({
       targets: t, alpha: 1, duration: 300, delay: 350,
+    });
+  }
+
+  /**
+   * Modal "Level Up!" dialog — one row per LevelUpEvent. Plays the
+   * level-up SFX, fires a gold radial-burst behind the title for
+   * punch, and waits for Space / Enter (or a tap on the dialog) to
+   * dismiss. Resolves once the dialog is gone so the caller can
+   * trigger the post-combat fade.
+   */
+  private showLevelUpDialog(events: LevelUpEvent[]): Promise<void> {
+    return new Promise((resolve) => {
+      Sfx.play("level_up");
+
+      const W = 480;
+      const H = 100 + events.length * 28;
+      const X = ARENA_X + (ARENA_W - W) / 2;
+      const Y = ARENA_Y + (ARENA_H - H) / 2;
+      const objs: Phaser.GameObjects.GameObject[] = [];
+      const bg = this.add
+        .rectangle(X, Y, W, H, 0x161629, 0.97)
+        .setOrigin(0)
+        .setDepth(150)
+        .setStrokeStyle(3, 0xffd470)
+        .setInteractive({ useHandCursor: true });
+      objs.push(bg);
+      const title = this.add
+        .text(X + W / 2, Y + 18, "★  LEVEL UP!  ★", {
+          fontFamily: "Georgia, serif",
+          fontSize: "26px",
+          color: "#ffd470",
+          stroke: "#1a1a2e",
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(151);
+      objs.push(title);
+      let cy = Y + 64;
+      for (const ev of events) {
+        objs.push(
+          this.add
+            .text(X + W / 2, cy, ev.message, {
+              fontFamily: "Georgia, serif",
+              fontSize: "16px",
+              color: "#f6efd6",
+            })
+            .setOrigin(0.5, 0)
+            .setDepth(151),
+        );
+        cy += 26;
+      }
+      objs.push(
+        this.add
+          .text(X + W / 2, Y + H - 24, "[ Space / Enter to continue ]", {
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: "#bdb38a",
+          })
+          .setOrigin(0.5, 0)
+          .setDepth(151),
+      );
+
+      // Sparkle behind the title — gold burst with embers.
+      void radialBurst(
+        this,
+        { x: X + W / 2, y: Y + 30 },
+        0xffd470,
+        0xffe48a,
+        80,
+      );
+      // Pop-in tween so the dialog lands with a little weight.
+      bg.setScale(0.85);
+      title.setScale(0.85);
+      this.tweens.add({
+        targets: [bg, title],
+        scale: 1,
+        duration: 220,
+        ease: "Back.Out",
+      });
+
+      const dismiss = (): void => {
+        if (kb) {
+          kb.off("keydown-SPACE", dismiss);
+          kb.off("keydown-ENTER", dismiss);
+        }
+        bg.off("pointerdown", dismiss);
+        for (const o of objs) o.destroy();
+        resolve();
+      };
+      const kb = this.input.keyboard;
+      if (kb) {
+        kb.on("keydown-SPACE", dismiss);
+        kb.on("keydown-ENTER", dismiss);
+      }
+      bg.on("pointerdown", dismiss);
     });
   }
 

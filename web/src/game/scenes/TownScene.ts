@@ -671,6 +671,17 @@ export class TownScene extends Phaser.Scene {
       duration: 110,
       onComplete: () => {
         this.busy = false;
+        // Burn down a torch step in dark scenes so a 150-step Torch
+        // actually expires after 150 movements. We don't tick in lit
+        // areas — the player shouldn't be punished for using a torch
+        // in a lit overworld town.
+        if (this.dark && gameState.partyData && gameState.partyData.torchSteps > 0) {
+          gameState.partyData.torchSteps -= 1;
+          if (gameState.partyData.torchSteps === 0) {
+            // Light just went out — the next refreshDarkness call below
+            // sees torchSteps === 0 and snaps the pool away.
+          }
+        }
         this.refreshHud();
         this.refreshDarkness();
         this.checkExit(nc, nr);

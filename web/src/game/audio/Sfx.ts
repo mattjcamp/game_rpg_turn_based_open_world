@@ -269,6 +269,21 @@ function genChirp(ac: AudioContext, out: AudioNode, t0: number): void {
   tone(ac, out, noteHz("A5"), t0 + 0.05, 0.07, 0.18, "square", 0.002, 0.04);
 }
 
+function genLevelUp(ac: AudioContext, out: AudioNode, t0: number): void {
+  // Bright triumphant arpeggio with a sparkle tail.
+  const seq = ["C5", "E5", "G5", "C6"];
+  for (let i = 0; i < seq.length; i++) {
+    tone(ac, out, noteHz(seq[i]), t0 + i * 0.07, 0.10, 0.22, "triangle", 0.005, 0.05);
+  }
+  // Held bright chord on top.
+  const t1 = t0 + seq.length * 0.07;
+  tone(ac, out, noteHz("C6"), t1, 0.32, 0.18, "triangle", 0.01, 0.18);
+  tone(ac, out, noteHz("E6"), t1, 0.32, 0.14, "triangle", 0.01, 0.18);
+  tone(ac, out, noteHz("G6"), t1, 0.32, 0.10, "triangle", 0.01, 0.18);
+  // High-octave shimmer at the end.
+  tone(ac, out, noteHz("C7"), t1 + 0.14, 0.18, 0.12, "triangle", 0.005, 0.18);
+}
+
 type Generator = (ac: AudioContext, out: AudioNode, t0: number) => void;
 
 const GENERATORS: Record<string, Generator> = {
@@ -293,6 +308,7 @@ const GENERATORS: Record<string, Generator> = {
   defeat:             genDefeat,
   encounter:          genEncounter,
   chirp:              genChirp,
+  level_up:           genLevelUp,
 };
 
 /** Names of all SFX known to the catalog — handy for tests. */

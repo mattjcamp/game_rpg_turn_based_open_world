@@ -2,6 +2,18 @@ import { describe, it, expect } from "vitest";
 import { combatantFromMember, combatantsFromParty, syncCombatHpBack } from "./CombatBridge";
 import { partyFromRaw, memberFromRaw } from "../world/Party";
 import type { Item } from "../world/Items";
+import type { ClassTemplate } from "../world/Classes";
+
+function classes(): Map<string, ClassTemplate> {
+  const m = new Map<string, ClassTemplate>();
+  m.set("fighter", { name: "Fighter", hpPerLevel: 15, mpPerLevel: 0, expPerLevel: 1500, range: 4 });
+  m.set("thief",   { name: "Thief",   hpPerLevel: 5,  mpPerLevel: 0, expPerLevel: 1500, range: 6 });
+  m.set("wizard",  { name: "Wizard",  hpPerLevel: 4,  mpPerLevel: 15, expPerLevel: 1500, range: 2,
+                     mpSource: { ability: "intelligence" } });
+  m.set("cleric",  { name: "Cleric",  hpPerLevel: 6,  mpPerLevel: 10, expPerLevel: 1500, range: 2,
+                     mpSource: { ability: "wisdom" } });
+  return m;
+}
 
 function items(): Map<string, Item> {
   const m = new Map<string, Item>();
@@ -111,6 +123,32 @@ describe("combatantsFromParty", () => {
     const p = partyFromRaw({ ...raw, active_party: [1, 0, 3, 2] });
     const cs = combatantsFromParty(p, items());
     expect(cs.map((c) => c.name)).toEqual(["Merry", "Gimli", "Spare2", "Spare"]);
+  });
+
+  it("falls back to the default 4-tile move range when no class map is supplied", () => {
+    const p = partyFromRaw(raw);
+    const cs = combatantsFromParty(p, items());
+    expect(cs.every((c) => c.baseMoveRange === 4)).toBe(true);
+  });
+
+  it("uses each class template's range when a map is supplied", () => {
+    const p = partyFromRaw(raw);
+    const cs = combatantsFromParty(p, items(), classes());
+    // Roster: Fighter, Thief, Cleric, Wizard
+    expect(cs[0].baseMoveRange).toBe(4); // Fighter
+    expect(cs[1].baseMoveRange).toBe(6); // Thief
+    expect(cs[2].baseMoveRange).toBe(2); // Cleric
+    expect(cs[3].baseMoveRange).toBe(2); // Wizard
+  });
+
+  it("falls back to the default for classes missing from the map", () => {
+    const p = partyFromRaw(raw);
+    const onlyFighter = new Map<string, ClassTemplate>();
+    onlyFighter.set("fighter", classes().get("fighter")!);
+    const cs = combatantsFromParty(p, items(), onlyFighter);
+    expect(cs[0].baseMoveRange).toBe(4); // explicit
+    expect(cs[1].baseMoveRange).toBe(4); // default for Thief
+    expect(cs[2].baseMoveRange).toBe(4); // default for Cleric
   });
 });
 

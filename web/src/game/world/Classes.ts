@@ -25,6 +25,9 @@ export interface ClassTemplate {
   hpPerLevel: number;
   mpPerLevel: number;
   expPerLevel: number;
+  /** Tile movement budget per combat turn — Wizards/Clerics 2,
+   *  Fighters 4, Thieves/Rangers 6 in the shipped data. */
+  range: number;
   mpSource?: MpSource;
 }
 
@@ -39,6 +42,7 @@ interface RawClass {
   hp_per_level?: number;
   mp_per_level?: number;
   exp_per_level?: number;
+  range?: number;
   mp_source?: {
     ability?: string;
     abilities?: string[];
@@ -71,6 +75,7 @@ function classFromRaw(name: string, raw: RawClass): ClassTemplate {
     hpPerLevel:  raw.hp_per_level  ?? 6,
     mpPerLevel:  raw.mp_per_level  ?? 0,
     expPerLevel: raw.exp_per_level ?? 1000,
+    range:       raw.range         ?? 4,
     mpSource,
   };
 }

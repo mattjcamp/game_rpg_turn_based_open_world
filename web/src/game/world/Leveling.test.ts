@@ -27,14 +27,14 @@ function member(overrides: Partial<PartyMember> = {}): PartyMember {
 }
 
 const fighterTpl: ClassTemplate = {
-  name: "Fighter", hpPerLevel: 15, mpPerLevel: 0, expPerLevel: 1500,
+  name: "Fighter", hpPerLevel: 15, mpPerLevel: 0, expPerLevel: 1500, range: 4,
 };
 const wizardTpl: ClassTemplate = {
-  name: "Wizard", hpPerLevel: 4, mpPerLevel: 15, expPerLevel: 1500,
+  name: "Wizard", hpPerLevel: 4, mpPerLevel: 15, expPerLevel: 1500, range: 2,
   mpSource: { ability: "intelligence" },
 };
 const druidTpl: ClassTemplate = {
-  name: "Druid", hpPerLevel: 5, mpPerLevel: 8, expPerLevel: 1500,
+  name: "Druid", hpPerLevel: 5, mpPerLevel: 8, expPerLevel: 1500, range: 2,
   mpSource: { abilities: ["intelligence", "wisdom"], mode: "average" },
 };
 const human: RaceInfo = { name: "Human", expPerLevel: 750 };
@@ -127,7 +127,7 @@ describe("awardXp", () => {
     const m = member({ level: 1, exp: 0, strength: 4, hp: 8, maxHp: 8 });
     // STR 4 → -3 mod; for a hypothetical class with hp_per_level 2, gain
     // would be max(1, 2 + -3) = 1.
-    const tpl: ClassTemplate = { name: "Tiny", hpPerLevel: 2, mpPerLevel: 0, expPerLevel: 1500 };
+    const tpl: ClassTemplate = { name: "Tiny", hpPerLevel: 2, mpPerLevel: 0, expPerLevel: 1500, range: 4 };
     const events = awardXp(m, 1500, tpl, null);
     expect(events[0].hpGain).toBe(1);
     expect(m.maxHp).toBe(9);
