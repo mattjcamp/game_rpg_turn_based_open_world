@@ -125,23 +125,50 @@ export class Combat {
   }
 
   /**
-   * Place party on the bottom of the arena, enemies at the top —
-   * matches the Python game's combat layout (the U3-style "your
-   * heroes line up at the foot of the screen, the foe stands at the
-   * top"). Centred horizontally so a small or large party still
-   * spans the middle of the row.
+   * Scatter party across the bottom band of the arena and enemies
+   * across the top band. Each side gets a 4-row band (rows 11..14 for
+   * party, rows 1..4 for enemies) with a one-column gutter against
+   * the perimeter walls. Cells are shuffled with the seeded RNG and
+   * the first N taken, so positions are random per-encounter but
+   * reproducible in tests.
+   *
+   * Replaces an earlier "everyone in one row, centred" layout that
+   * left party and enemies looking like two opposing chorus lines.
    */
   private layoutFormations(party: Combatant[], enemies: Combatant[]): void {
-    const partyRow = ARENA_ROWS - 3;        // 2nd from bottom
-    const enemyRow = 2;                     // 2nd from top
-    const midCol = Math.floor(ARENA_COLS / 2);
-    const startCol = (n: number): number =>
-      midCol - Math.floor(n / 2);
-    party.forEach((c, i) => {
-      c.position = { col: startCol(party.length) + i, row: partyRow };
-    });
-    enemies.forEach((c, i) => {
-      c.position = { col: startCol(enemies.length) + i, row: enemyRow };
+    const colMin = 2;
+    const colMax = ARENA_COLS - 3;          // inclusive, leaves a wall gutter
+    const partyRows = [ARENA_ROWS - 5, ARENA_ROWS - 4, ARENA_ROWS - 3, ARENA_ROWS - 2];
+    const enemyRows = [1, 2, 3, 4];
+    this.placeOnBand(party, colMin, colMax, partyRows);
+    this.placeOnBand(enemies, colMin, colMax, enemyRows);
+  }
+
+  /** Shuffle the (col, row) cells in the given band and assign the
+   *  first `combatants.length` to each combatant. Falls back to row 0
+   *  / centred col stacking if (somehow) the band is smaller than the
+   *  group — should never happen with the bands above. */
+  private placeOnBand(
+    combatants: Combatant[],
+    colMin: number,
+    colMax: number,
+    rows: number[],
+  ): void {
+    const cells: GridPos[] = [];
+    for (const r of rows) {
+      for (let c = colMin; c <= colMax; c++) cells.push({ col: c, row: r });
+    }
+    // Fisher-Yates with Math.random — deliberately NOT this.rng so
+    // the seeded combat RNG sequence (d20s, damage rolls, init) stays
+    // independent of formation shuffling. Tests pin combat RNG with
+    // mulberry32 and check positions only as bands, not exact cells,
+    // so non-deterministic placement is fine.
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+    combatants.forEach((c, i) => {
+      c.position = cells[i] ?? { col: colMin, row: rows[0] };
     });
   }
 

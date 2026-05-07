@@ -3131,7 +3131,7 @@
       {
         "name": "Lonny",
         "npc_type": "villager",
-        "sprite": "src/assets/game/characters/alchemist.png",
+        "sprite": "src/assets/game/characters/druid.png",
         "col": 12,
         "row": 12,
         "dialogue": [
@@ -7594,7 +7594,7 @@
         "shop_type": "general",
         "god_name": "Terran",
         "wander_range": 4,
-        "sprite": "src/assets/game/characters/fighter.png"
+        "sprite": "src/assets/game/characters/thief.png"
       },
       {
         "name": "Gruff",
@@ -7610,7 +7610,7 @@
         "shop_type": "general",
         "god_name": "The Divine",
         "wander_range": 4,
-        "sprite": "src/assets/game/characters/fighter.png"
+        "sprite": "src/assets/game/npcs/villager_citizen.png"
       },
       {
         "name": "Elder Sybil",
@@ -7626,7 +7626,7 @@
         "shop_type": "general",
         "god_name": "The Divine",
         "wander_range": 4,
-        "sprite": "src/assets/game/characters/fighter.png"
+        "sprite": "src/assets/game/npcs/u4_monk.png"
       },
       {
         "name": "Calla",
@@ -7640,7 +7640,7 @@
         "shop_type": "general",
         "god_name": "The Divine",
         "wander_range": 4,
-        "sprite": "src/assets/game/characters/fighter.png"
+        "sprite": "src/assets/game/characters/illusionist.png"
       }
     ],
     "_action_import": "Map assigned",
@@ -11132,7 +11132,7 @@
         "col": 4,
         "row": 6,
         "wander_range": 2,
-        "sprite": "src/assets/game/characters/wizard.png",
+        "sprite": "src/assets/game/characters/illusionist.png",
         "god_name": "The Divine",
         "dialogue": [
           "I am Archivist Cael. Every charter, every chronicle, every binding-rite copied since the founding rests under this roof.",
@@ -11147,7 +11147,7 @@
         "col": 20,
         "row": 6,
         "wander_range": 3,
-        "sprite": "src/assets/game/characters/illusionist.png",
+        "sprite": "src/assets/game/npcs/vga_evil_mage.png",
         "god_name": "The Divine",
         "dialogue": [
           "Court Mage Lirien, at your service. I tend what is left of the wards over the strait.",

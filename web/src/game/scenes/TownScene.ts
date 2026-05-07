@@ -138,7 +138,8 @@ export class TownScene extends Phaser.Scene {
    *  separate cursors for buy and sell so toggling with TAB feels
    *  natural — the player resumes where they were on each side. */
   private shop?: {
-    npc: NpcDef;
+    /** Header label, e.g. "Brennan — General Store" or "General Store". */
+    title: string;
     counter: Counter;
     mode: "buy" | "sell";
     buyCursor: number;
@@ -149,7 +150,7 @@ export class TownScene extends Phaser.Scene {
 
   /** Temple service sub-mode state. */
   private temple?: {
-    npc: NpcDef;
+    title: string;
     counter: Counter;
     cursor: number;
     objects: Phaser.GameObjects.GameObject[];
@@ -635,6 +636,18 @@ export class TownScene extends Phaser.Scene {
       this.openDialog(npc);
       return;
     }
+    // Walking into a counter tile (General Store / Weapons / Healing /
+    // …) opens its shop or service menu — same UI the shopkeep NPCs
+    // use, just without the NPC. Falls through to the wall-bump if the
+    // counter's catalog isn't loaded.
+    const counterKey = this.tileMap.getCounterKey(nc, nr);
+    if (counterKey) {
+      const counter = this.counters.get(counterKey);
+      if (counter) {
+        this.openShopAtCounter(counter, counter.name);
+        return;
+      }
+    }
     if (!this.tileMap.isWalkable(nc, nr)) {
       this.busy = true;
       this.tweens.add({
@@ -859,11 +872,27 @@ export class TownScene extends Phaser.Scene {
       return;
     }
     if (counter.kind === "service") {
-      void this.openTemple(npc, counter);
+      const godSuffix = npc.godName ? ` of ${npc.godName}` : "";
+      this.openTempleAtCounter(counter, `${npc.name} — Temple${godSuffix}`);
+      return;
+    }
+    this.openShopAtCounter(counter, `${npc.name} — ${counter.name}`);
+  }
+
+  /**
+   * Open the shop UI for a bare counter (no NPC). Called from tryStep
+   * when the player walks into a counter tile (a shop_type-tagged tile
+   * in the General Store, Weapons Shop, etc.). Service counters
+   * (healing) dispatch to the temple UI so the same tile can host either.
+   */
+  private openShopAtCounter(counter: Counter, title: string): void {
+    if (counter.kind === "service") {
+      this.openTempleAtCounter(counter, title);
       return;
     }
     this.shop = {
-      npc, counter,
+      title,
+      counter,
       mode: "buy",
       buyCursor: 0,
       sellCursor: 0,
@@ -878,7 +907,7 @@ export class TownScene extends Phaser.Scene {
     const shop = this.shop; // local alias keeps TS narrowing in nested closures
     for (const o of shop.objects) o.destroy();
     shop.objects = [];
-    const { npc, counter, mode, message } = shop;
+    const { title, counter, mode, message } = shop;
     const W = 720, H = 420;
     const X = (960 - W) / 2;
     const Y = 80;
@@ -893,7 +922,7 @@ export class TownScene extends Phaser.Scene {
       .setDepth(50);
     shop.objects.push(bg);
     shop.objects.push(this.add
-      .text(X + 16, Y + 12, `${npc.name} — ${counter.name}`, {
+      .text(X + 16, Y + 12, title, {
         fontFamily: "Georgia, serif", fontSize: "18px", color: "#ffd470",
       }).setScrollFactor(0).setDepth(51));
     shop.objects.push(this.add
@@ -1118,8 +1147,20 @@ export class TownScene extends Phaser.Scene {
       ]);
       return;
     }
+    const godSuffix = npc.godName ? ` of ${npc.godName}` : "";
+    this.openTempleAtCounter(counter, `${npc.name} — Temple${godSuffix}`);
+  }
+
+  /**
+   * Open the temple service UI for a bare counter (no NPC). Same role
+   * as openShopAtCounter — used when the player walks into a service-
+   * counter tile (e.g. a Healing Counter inside a shrine).
+   */
+  private openTempleAtCounter(counter: Counter, title: string): void {
+    if (counter.kind !== "service" || !counter.services?.length) return;
     this.temple = {
-      npc, counter,
+      title,
+      counter,
       cursor: 0,
       objects: [],
       message: "",
@@ -1132,7 +1173,7 @@ export class TownScene extends Phaser.Scene {
     const temple = this.temple; // local alias keeps TS narrowing in nested closures
     for (const o of temple.objects) o.destroy();
     temple.objects = [];
-    const { npc, counter, cursor, message } = temple;
+    const { title, counter, cursor, message } = temple;
     const services = counter.services ?? [];
     const W = 640, H = 320;
     const X = (960 - W) / 2;
@@ -1145,9 +1186,8 @@ export class TownScene extends Phaser.Scene {
       .setStrokeStyle(2, 0xc8553d)
       .setDepth(50);
     temple.objects.push(bg);
-    const godSuffix = npc.godName ? ` of ${npc.godName}` : "";
     temple.objects.push(this.add
-      .text(X + 16, Y + 12, `${npc.name} — Temple${godSuffix}`, {
+      .text(X + 16, Y + 12, title, {
         fontFamily: "Georgia, serif", fontSize: "18px", color: "#ffd470",
       }).setScrollFactor(0).setDepth(51));
     temple.objects.push(this.add
