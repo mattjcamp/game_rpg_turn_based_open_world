@@ -17,14 +17,12 @@ export interface DecoSpec {
   stroke?: string;
 }
 
-const EFFECTS: Record<string, DecoSpec> = {
-  fire:         { glyph: "▲", color: "#ff8e3c", stroke: "#3a1100" },
-  // Wall torches — same warm flame palette as fire but a slimmer
-  // glyph since they sit on a wall rather than in a hearth.
-  torch:        { glyph: "i", color: "#ff8e3c", stroke: "#3a1100" },
-  fairy_light:  { glyph: "✦", color: "#cfe7ff", stroke: "#1a2c4a" },
-  rising_smoke: { glyph: "≋", color: "#a0a0a0", stroke: "#1a1a2e" },
-};
+// `fire` / `torch` / `fairy_light` / `rising_smoke` are deliberately
+// absent — they're rendered as live animations by `TileEffects.ts`,
+// which subsumes the static glyphs they used to ship with. Anything
+// else an author drops in `tile_properties.effect` is unrecognised
+// and silently ignored (returns null below).
+const EFFECTS: Record<string, DecoSpec> = {};
 
 /**
  * Look up a decoration for a tile_properties entry. Returns `null`

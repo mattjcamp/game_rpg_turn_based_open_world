@@ -76,6 +76,7 @@ import {
 } from "../world/Lighting";
 import { partyLightRadius, partyLightTint, tickGaladrielsLight } from "../world/PartyActions";
 import { decorationFor } from "../world/Decorations";
+import { installTileEffects } from "../world/TileEffects";
 import { withBase } from "../world/Module";
 import { gameState } from "../state";
 
@@ -292,6 +293,8 @@ export class TownScene extends Phaser.Scene {
     }
 
     this.drawMap();
+    // Animated tile_properties.effect overlays — see TileEffects.ts.
+    installTileEffects(this, this.tileMap, TILE, 7);
     this.drawNpcs();
     this.drawPlayer();
     this.drawHud();

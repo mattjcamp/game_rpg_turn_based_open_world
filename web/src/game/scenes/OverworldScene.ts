@@ -28,6 +28,7 @@ import {
   type LightSource,
 } from "../world/Lighting";
 import { decorationFor } from "../world/Decorations";
+import { installTileEffects } from "../world/TileEffects";
 import { gameState, triggerKey } from "../state";
 import type { Combatant } from "../types";
 import {
@@ -158,6 +159,10 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     this.drawMap();
+    // Animated tile_properties.effect overlays — torches flicker, fires
+    // dance, smoke rises, fairy lights twinkle. Depth 7 puts them above
+    // tiles + decoration glyphs but below darkness (9) and player (10).
+    installTileEffects(this, this.tileMap, TILE, 7);
     this.drawPlayer();
     this.drawHud();
     this.installCamera();

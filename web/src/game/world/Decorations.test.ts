@@ -9,11 +9,13 @@ describe("decorationFor", () => {
     expect(decorationFor({ effect: "totally_made_up" })).toBeNull();
   });
 
-  it("maps known effect strings to glyph specs", () => {
-    expect(decorationFor({ effect: "fire" })?.glyph).toBe("▲");
-    expect(decorationFor({ effect: "torch" })?.glyph).toBe("i");
-    expect(decorationFor({ effect: "fairy_light" })?.glyph).toBe("✦");
-    expect(decorationFor({ effect: "rising_smoke" })?.glyph).toBe("≋");
+  it("returns null for the animated effect kinds — TileEffects.ts owns them", () => {
+    // These four used to render as static Unicode glyphs here; the
+    // live animations in TileEffects.ts replace them.
+    expect(decorationFor({ effect: "fire" })).toBeNull();
+    expect(decorationFor({ effect: "torch" })).toBeNull();
+    expect(decorationFor({ effect: "fairy_light" })).toBeNull();
+    expect(decorationFor({ effect: "rising_smoke" })).toBeNull();
   });
 
   it("renders an item star when an item is present, even without effect", () => {
