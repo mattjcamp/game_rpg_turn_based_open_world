@@ -37,6 +37,13 @@ import {
   type GridPos,
 } from "./Arena";
 import { rollAttack, rollDamage, rollInitiative } from "./engine";
+import {
+  sumBuff,
+  tickBuffs,
+  describeExpire,
+  type Buff,
+  type BuffKind,
+} from "./Buffs";
 import type {
   AttackResult,
   Combatant,
@@ -62,6 +69,15 @@ export class Combat {
   /** Tiles the current actor has left to spend this turn. */
   movePoints = 0;
   readonly log: string[] = [];
+  /**
+   * Numerical buffs / debuffs keyed by combatant id. Mirrors the
+   * Python game's bless_buffs / curse_buffs / range_buffs dicts
+   * unified into one structure. See `./Buffs.ts` for kinds.
+   */
+  private buffs = new Map<string, Buff[]>();
+  /** Counts cursor advances; we tick buffs once per full round
+   *  (equal to combatants.length advances). */
+  private turnsAdvanced = 0;
 
   private rng: RNG;
 
@@ -148,6 +164,35 @@ export class Combat {
     return this.alive("party").length > 0 ? "party" : "enemies";
   }
 
+  // ── Buffs / debuffs ──────────────────────────────────────────────
+
+  /** Add a numerical buff or debuff to a combatant. */
+  addBuff(combatantId: string, buff: Buff): void {
+    const list = this.buffs.get(combatantId) ?? [];
+    list.push(buff);
+    this.buffs.set(combatantId, list);
+  }
+
+  /** Sum every active buff of `kind` on this combatant — handy for
+   *  scenes wanting to display "+2 ATK" badges or log breakdowns. */
+  sumBuff(combatantId: string, kind: BuffKind): number {
+    return sumBuff(this.buffs.get(combatantId), kind);
+  }
+
+  /** Hit-roll bonus = base attackBonus + active attack_bonus buffs
+   *  − active attack_penalty buffs. */
+  effectiveAttackBonus(c: Combatant): number {
+    const list = this.buffs.get(c.id);
+    return c.attackBonus + sumBuff(list, "attack_bonus")
+                          - sumBuff(list, "attack_penalty");
+  }
+
+  /** Defensive AC = base ac + ac_bonus − ac_penalty. */
+  effectiveAc(c: Combatant): number {
+    const list = this.buffs.get(c.id);
+    return c.ac + sumBuff(list, "ac_bonus") - sumBuff(list, "ac_penalty");
+  }
+
   // ── Movement & bump-attack ───────────────────────────────────────
 
   /**
@@ -203,7 +248,12 @@ export class Combat {
       throw new Error(`Cannot attack ally ${target.name}`);
     }
 
-    const roll = rollAttack(attacker.attackBonus, target.ac, this.rng);
+    // Resolve hit + damage using *effective* values so buffs and
+    // debuffs (Bless +ATK, Curse -ATK / -AC, Shield +AC) flow into
+    // the math automatically.
+    const effAtk = this.effectiveAttackBonus(attacker);
+    const effAc = this.effectiveAc(target);
+    const roll = rollAttack(effAtk, effAc, this.rng);
     let damage = 0;
     if (roll.hit) {
       damage = rollDamage(
@@ -217,10 +267,11 @@ export class Combat {
     }
     const killed = target.hp === 0 && roll.hit;
     // Detailed log line — mirrors the Python game's "(d20:N+M=T vs ACX)"
-    // format so the player can see the math behind each swing.
-    const bonus = attacker.attackBonus;
-    const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
-    const dice = `d20:${roll.roll}${bonusStr}=${roll.total} vs AC${target.ac}`;
+    // format so the player can see the math behind each swing. The
+    // bonus shown is the effective one so a Blessed attacker visibly
+    // adds the +2.
+    const bonusStr = effAtk >= 0 ? `+${effAtk}` : `${effAtk}`;
+    const dice = `d20:${roll.roll}${bonusStr}=${roll.total} vs AC${effAc}`;
     this.log.push(
       roll.hit
         ? `${attacker.name} ${roll.critical ? "crits" : "hits"} ${target.name} (${dice}) — ${damage} dmg${killed ? ", defeated!" : "."}`
@@ -315,10 +366,29 @@ export class Combat {
     if (this.isOver) return;
     for (let i = 0; i < this.combatants.length; i++) {
       this.cursor = (this.cursor + 1) % this.initiativeOrder.length;
+      this.turnsAdvanced += 1;
+      // End of a round — every combatant has had a chance to act.
+      // Tick all buff durations down once and log expirations.
+      if (this.turnsAdvanced % this.combatants.length === 0) {
+        this.tickAllBuffs();
+      }
       if (this.byId(this.initiativeOrder[this.cursor].combatantId).hp > 0) {
         this.refillMovePoints();
         this.log.push(`-- ${this.current.name}'s turn --`);
         return;
+      }
+    }
+  }
+
+  /** Round-end tick. Decrements every active buff and logs expirations. */
+  private tickAllBuffs(): void {
+    for (const [id, list] of this.buffs) {
+      const expired = tickBuffs(list);
+      if (list.length === 0) this.buffs.delete(id);
+      for (const b of expired) {
+        const c = this.combatants.find((x) => x.id === id);
+        if (!c || c.hp <= 0) continue;
+        this.log.push(describeExpire(c.name, b.source));
       }
     }
   }
@@ -329,6 +399,10 @@ export class Combat {
   }
 
   private refillMovePoints(): void {
-    this.movePoints = this.current.baseMoveRange;
+    // baseMoveRange + active range_bonus buffs (Long Shanks). Mirrors
+    // the Python game's range_buffs entry being added to the per-turn
+    // movement allowance.
+    const bonus = sumBuff(this.buffs.get(this.current.id), "range_bonus");
+    this.movePoints = this.current.baseMoveRange + bonus;
   }
 }

@@ -44,8 +44,31 @@ import { loadItems, type Item } from "../world/Items";
 import { loadSpells, type Spell } from "../world/Spells";
 import { loadParty } from "../world/Party";
 import { defaultRng } from "../rng";
-import { resolveThrow, isThrowable, spellIsCombatCastable, resolveDamageSpell, resolveHealSpell } from "../combat/CombatActions";
+import {
+  resolveThrow,
+  isThrowable,
+  isRanged,
+  maxRangeFor,
+  spellIsCombatCastable,
+  classifyCombatCast,
+  describeStatusCast,
+  resolveDamageSpell,
+  resolveHealSpell,
+} from "../combat/CombatActions";
 import { combatantsFromParty, syncCombatHpBack } from "../combat/CombatBridge";
+import {
+  flashTarget,
+  castGlow,
+  projectileLine,
+  lightningZigzag,
+  radialBurst,
+  healingSparkles,
+  glowAura,
+  screenShake,
+  floatingX,
+  VFX_COLOURS,
+} from "../combat/Vfx";
+import { Sfx } from "../audio/Sfx";
 import type { Combatant, AttackResult } from "../types";
 import type { PartyMember } from "../world/Party";
 
@@ -105,8 +128,10 @@ const FONT_HEAD  = (color: number = C.gold) => ({ fontFamily: "Georgia, serif", 
 const FONT_BODY  = (color: number = C.body) => ({ fontFamily: "Georgia, serif", fontSize: "14px", color: hex(color) });
 const FONT_MONO  = (color: number = C.dim)  => ({ fontFamily: "monospace",     fontSize: "12px", color: hex(color) });
 
-/** Action menu — what the active party member can do this turn. */
-type ActionId = "attack" | "throw" | "cast" | "end" | "flee";
+/** Action menu — what the active party member can do this turn.
+ *  No "Flee" — once battle is joined, the party fights to win or
+ *  loses (matches the Python game's combat loop). */
+type ActionId = "attack" | "range" | "throw" | "cast" | "end";
 
 interface ActionEntry {
   id: ActionId;
@@ -115,10 +140,10 @@ interface ActionEntry {
 
 const PARTY_ACTIONS: ActionEntry[] = [
   { id: "attack", label: "Attack"   },
+  { id: "range",  label: "Range"    },
   { id: "throw",  label: "Throw"    },
   { id: "cast",   label: "Cast"     },
   { id: "end",    label: "End Turn" },
-  { id: "flee",   label: "Flee"     },
 ];
 
 /**
@@ -129,12 +154,16 @@ const PARTY_ACTIONS: ActionEntry[] = [
  *   - pick-target:    player is choosing the enemy/ally for the staged
  *                     action (numbered 1..N on the arena)
  */
-type SceneMode = "default" | "pick-throw" | "pick-spell" | "pick-target";
+type SceneMode =
+  | "default" | "pick-throw" | "pick-spell" | "pick-target" | "pick-tile";
 
 /** What to do once a target is picked. */
 type PendingAction =
   | { kind: "throw"; item: Item }
-  | { kind: "cast"; spell: Spell };
+  | { kind: "range"; weapon: Item }
+  | { kind: "cast"; spell: Spell }
+  /** Tile-targeted spell — resolution branches by effect_type. */
+  | { kind: "tile"; spell: Spell };
 
 export class CombatScene extends Phaser.Scene {
   private combat!: Combat;
@@ -164,8 +193,16 @@ export class CombatScene extends Phaser.Scene {
   /** Items the user can pick to throw — populated when entering pick-throw mode. */
   private throwOptions: Array<{ item: Item; source: "personal" | "stash"; index: number }> = [];
   private spellOptions: Spell[] = [];
+  /** Shared cursor for the scrollable pickers (pick-throw / pick-spell).
+   *  Index into the corresponding options array. */
+  private pickerCursor = 0;
   /** Per-target arena badges shown during pick-target mode. */
   private targetBadges: Phaser.GameObjects.Text[] = [];
+  /** Pick-tile state — current cursor position on the arena. */
+  private tileCursorPos = { col: 0, row: 0 };
+  /** Phaser objects rendered for the tile cursor + AOE preview.
+   *  Cleared on every cursor move and on mode exit. */
+  private tileCursorObjects: Phaser.GameObjects.GameObject[] = [];
   /** Items + Spells data, loaded lazily. */
   private items: Map<string, Item> = new Map();
   private spells: Spell[] = [];
@@ -197,8 +234,11 @@ export class CombatScene extends Phaser.Scene {
     this.pendingAction = null;
     this.throwOptions = [];
     this.spellOptions = [];
+    this.pickerCursor = 0;
     this.targetBadges = [];
     this.pickerObjects = [];
+    this.tileCursorPos = { col: 0, row: 0 };
+    this.tileCursorObjects = [];
   }
 
   preload(): void {
@@ -269,6 +309,8 @@ export class CombatScene extends Phaser.Scene {
     this.installInput();
 
     this.refreshAll();
+    // Encounter stinger — play once the scene has rendered.
+    Sfx.play("encounter");
     // If an enemy won initiative the encounter opens on their turn —
     // hand control straight to the AI loop. Without this the screen
     // freezes on "GOBLIN'S TURN" with the action menu dimmed because
@@ -498,25 +540,35 @@ export class CombatScene extends Phaser.Scene {
     this.pendingAction = null;
     this.throwOptions = [];
     this.spellOptions = [];
+    this.pickerCursor = 0;
     this.clearPicker();
     this.clearTargetBadges();
+    this.clearTileCursor();
     this.refreshAll();
   }
 
-  /** Number-key dispatch — meaning depends on current sub-mode. */
+  /**
+   * Number-key dispatch — meaning depends on current sub-mode.
+   *
+   * In the scrollable pickers (pick-throw / pick-spell), 1-9 picks
+   * the Nth row of the *visible window* (relative to scroll), not
+   * the Nth absolute index. This keeps the shortcut consistent with
+   * what the player sees on screen.
+   */
   private onDigit(n: number): void {
-    if (this.mode === "pick-throw") {
-      const opt = this.throwOptions[n - 1];
-      if (!opt) return;
-      this.startTargetingFor({ kind: "throw", item: opt.item }, "enemies");
-      this.consumeThrowItem(opt);
-      return;
-    }
-    if (this.mode === "pick-spell") {
-      const spell = this.spellOptions[n - 1];
-      if (!spell) return;
-      const allyTarget = spell.effect_type === "heal" || spell.effect_type === "major_heal";
-      this.startTargetingFor({ kind: "cast", spell }, allyTarget ? "party" : "enemies");
+    if (this.mode === "pick-throw" || this.mode === "pick-spell") {
+      const total =
+        this.mode === "pick-throw" ? this.throwOptions.length :
+        this.spellOptions.length;
+      if (total === 0) return;
+      const visibleMax = 12;
+      const visibleCount = Math.min(visibleMax, total);
+      const half = Math.floor(visibleCount / 2);
+      const topRow = Math.max(0, Math.min(total - visibleCount, this.pickerCursor - half));
+      const absIndex = topRow + (n - 1);
+      if (absIndex < 0 || absIndex >= total) return;
+      this.pickerCursor = absIndex;
+      this.activateAction();
       return;
     }
     if (this.mode === "pick-target") {
@@ -542,10 +594,42 @@ export class CombatScene extends Phaser.Scene {
    */
   private onArrowKey(key: string, dir: Direction): void {
     if (!this.canTakePlayerInput()) return;
+    // In a scrollable picker UP/DOWN walks the picker cursor — not
+    // the avatar.
+    if (this.mode === "pick-throw" || this.mode === "pick-spell") {
+      if (key === "UP")   return this.movePickerCursor(-1);
+      if (key === "DOWN") return this.movePickerCursor(1);
+      return; // ignore left/right in pickers
+    }
+    // In tile-pick mode all four arrows nudge the reticle.
+    if (this.mode === "pick-tile") {
+      if (key === "UP")    return this.moveTileCursor(0, -1);
+      if (key === "DOWN")  return this.moveTileCursor(0, 1);
+      if (key === "LEFT")  return this.moveTileCursor(-1, 0);
+      if (key === "RIGHT") return this.moveTileCursor(1, 0);
+      // WASD fall through to the same handler.
+      if (dir === "n") return this.moveTileCursor(0, -1);
+      if (dir === "s") return this.moveTileCursor(0, 1);
+      if (dir === "w") return this.moveTileCursor(-1, 0);
+      if (dir === "e") return this.moveTileCursor(1, 0);
+      return;
+    }
     if (key === "UP")    return this.moveActionCursor(-1);
     if (key === "DOWN")  return this.moveActionCursor(1);
-    if (key === "LEFT" || key === "RIGHT") return; // unused on the menu
+    if (key === "LEFT" || key === "RIGHT") return;
     void this.tryPlayerStep(dir);
+  }
+
+  /** Move the picker cursor through the active option list. Re-renders
+   *  the picker so the highlight + scroll window update. */
+  private movePickerCursor(delta: number): void {
+    const total =
+      this.mode === "pick-throw" ? this.throwOptions.length :
+      this.mode === "pick-spell" ? this.spellOptions.length : 0;
+    if (total === 0) return;
+    this.pickerCursor = (this.pickerCursor + delta + total) % total;
+    if (this.mode === "pick-throw") this.refreshThrowPicker();
+    else if (this.mode === "pick-spell") this.refreshSpellPicker();
   }
 
   private moveActionCursor(delta: number): void {
@@ -559,8 +643,14 @@ export class CombatScene extends Phaser.Scene {
           spellIsCombatCastable(s, member.class) &&
           (member.mp ?? 0) >= s.mp_cost
       );
+    const equippedWeapon =
+      member && member.equipped.rightHand
+        ? this.items.get(member.equipped.rightHand) ?? null
+        : null;
+    const canRange = !!equippedWeapon && isRanged(equippedWeapon);
     const enabledIdx = PARTY_ACTIONS
       .map((a, i) => {
+        if (a.id === "range" && !canRange) return -1;
         if (a.id === "throw" && !canThrow) return -1;
         if (a.id === "cast"  && !canCast)  return -1;
         return i;
@@ -576,7 +666,25 @@ export class CombatScene extends Phaser.Scene {
 
   private activateAction(): void {
     if (!this.canTakePlayerInput()) return;
-    if (this.mode !== "default") return; // sub-modes use number keys
+    // Enter inside a scrollable picker activates the cursored row.
+    if (this.mode === "pick-throw") {
+      const opt = this.throwOptions[this.pickerCursor];
+      if (!opt) return;
+      this.startTargetingFor({ kind: "throw", item: opt.item }, "enemies");
+      this.consumeThrowItem(opt);
+      return;
+    }
+    if (this.mode === "pick-spell") {
+      const spell = this.spellOptions[this.pickerCursor];
+      if (!spell) return;
+      this.dispatchSpell(spell);
+      return;
+    }
+    if (this.mode === "pick-tile") {
+      void this.resolveTileSpell();
+      return;
+    }
+    if (this.mode !== "default") return; // other sub-modes use number keys
     const a = PARTY_ACTIONS[this.actionCursor];
     if (!a) return;
     if (a.id === "attack") {
@@ -597,10 +705,34 @@ export class CombatScene extends Phaser.Scene {
       this.refreshLog();
       return;
     }
+    if (a.id === "range") return this.startRangeAttack();
     if (a.id === "throw") return this.openThrowPicker();
     if (a.id === "cast")  return this.openSpellPicker();
-    if (a.id === "end")  return this.onEndTurnClicked();
-    if (a.id === "flee") return this.onFleeClicked();
+    if (a.id === "end")   return this.onEndTurnClicked();
+  }
+
+  /**
+   * Begin a ranged attack with the currently equipped weapon —
+   * skip the item picker (the weapon is already chosen) and go
+   * straight to target select. Only valid enemies within the
+   * weapon's `maxRangeFor` distance get badges.
+   */
+  private startRangeAttack(): void {
+    const member = this.memberForCurrent();
+    if (!member) return;
+    const weaponName = member.equipped.rightHand;
+    if (!weaponName) {
+      this.combat.log.push(`${this.combat.current.name} has no weapon equipped.`);
+      this.refreshLog();
+      return;
+    }
+    const weapon = this.items.get(weaponName);
+    if (!weapon || !isRanged(weapon)) {
+      this.combat.log.push(`${this.combat.current.name}'s ${weaponName} is not a ranged weapon.`);
+      this.refreshLog();
+      return;
+    }
+    this.startTargetingFor({ kind: "range", weapon }, "enemies");
   }
 
   // ── Throw / Cast / Target sub-modes ──────────────────────────────
@@ -640,12 +772,167 @@ export class CombatScene extends Phaser.Scene {
       this.refreshLog();
       return;
     }
-    this.throwOptions = opts.slice(0, 9); // cap at 9 (digit keys)
+    this.throwOptions = opts;
+    this.pickerCursor = 0;
     this.mode = "pick-throw";
-    this.renderPicker(
-      "PICK ITEM TO THROW",
-      this.throwOptions.map((o, i) => `[${i + 1}] ${o.item.name} (pwr ${o.item.power ?? 1})`)
+    this.refreshThrowPicker();
+  }
+
+  /** Rebuild the throw picker so the cursor + scroll window update. */
+  private refreshThrowPicker(): void {
+    const lines = this.throwOptions.map(
+      (o) => `${o.item.name} (pwr ${o.item.power ?? 1})`
     );
+    this.renderPicker("PICK ITEM TO THROW", lines, this.pickerCursor);
+  }
+
+  /**
+   * Spell-pick → action dispatch. Classifies the spell, and either
+   * stages a target prompt (single-target) or casts immediately
+   * (self / mass / unsupported).
+   */
+  private dispatchSpell(spell: Spell): void {
+    const member = this.memberForCurrent();
+    if (!member) return;
+    const kind = classifyCombatCast(spell);
+    if (kind === "pick-ally") {
+      this.startTargetingFor({ kind: "cast", spell }, "party");
+      return;
+    }
+    if (kind === "pick-enemy") {
+      this.startTargetingFor({ kind: "cast", spell }, "enemies");
+      return;
+    }
+    if (kind === "pick-tile") {
+      this.startTilePicking(spell);
+      return;
+    }
+    // The remaining kinds resolve immediately. Spend MP, log, and
+    // end the turn — same as a finished single-target cast would.
+    if (member.maxMp != null) {
+      member.mp = Math.max(0, (member.mp ?? 0) - spell.mp_cost);
+    }
+    this.clearPicker();
+    this.mode = "default";
+
+    const me = this.combat.current;
+    Sfx.play(spell.sfx);
+    this.castGlowFor(me, this.colorForSpell(spell.effect_type));
+    if (kind === "self") {
+      if (spell.effect_type === "heal" || spell.effect_type === "major_heal") {
+        const r = resolveHealSpell(me, me, spell, defaultRng);
+        this.combat.log.push(`${me.name} casts ${spell.name} on self — heals ${r.heal} HP.`);
+        void this.healTargetVfx(me);
+        this.refreshHp(me);
+      } else if (spell.effect_type === "invisibility") {
+        // Caster fades from view — model as a hefty AC bonus while
+        // it lasts (the Python game flips an `is_invisible` flag and
+        // clamps incoming hits, but a +6 AC buff approximates that
+        // through the existing dice math without touching attack().
+        const turns = typeof spell.duration === "number" ? spell.duration : 3;
+        this.combat.addBuff(me.id, {
+          kind: "ac_bonus",
+          value: 6,
+          turnsLeft: turns,
+          source: "Invisibility",
+        });
+        this.fadeCaster(me);
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} — fades from view (+6 AC for ${turns} turns).`
+        );
+      } else {
+        void this.auraOn(me, VFX_COLOURS.buff);
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} — ${describeStatusCast(me, me, spell)}`
+        );
+      }
+    } else if (kind === "mass-ally") {
+      // Bless: party-wide attack-bonus buff. Mirrors the Python game's
+      // bless_buffs dict — every alive ally gets +effect_value.attack_bonus
+      // for `duration` rounds.
+      if (spell.effect_type === "bless") {
+        const ev = spell.effect_value ?? {};
+        const value = typeof ev.attack_bonus === "number" ? ev.attack_bonus : 2;
+        const turns = typeof spell.duration === "number" ? spell.duration : 4;
+        let count = 0;
+        for (const ally of this.combat.combatants) {
+          if (ally.side !== "party" || ally.hp <= 0) continue;
+          this.combat.addBuff(ally.id, {
+            kind: "attack_bonus",
+            value,
+            turnsLeft: turns,
+            source: "Bless",
+          });
+          // Stagger the per-ally aura so they sparkle in sequence
+          // rather than all flashing at once — feels more "blessing
+          // sweeping over the party".
+          this.time.delayedCall(count * 60, () => void this.auraOn(ally, VFX_COLOURS.buff));
+          count += 1;
+        }
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} — ${count} ${count === 1 ? "ally" : "allies"} gain +${value} to hit for ${turns} turns.`
+        );
+      } else {
+        let total = 0;
+        let i = 0;
+        for (const ally of this.combat.combatants) {
+          if (ally.side !== "party" || ally.hp <= 0) continue;
+          if (spell.effect_type === "mass_heal" || spell.effect_type === "heal" || spell.effect_type === "major_heal") {
+            const r = resolveHealSpell(me, ally, spell, defaultRng);
+            total += r.heal;
+            this.time.delayedCall(i * 70, () => void this.healTargetVfx(ally));
+            i += 1;
+            this.refreshHp(ally);
+          }
+        }
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} — party heals ${total} HP total.`
+        );
+      }
+    } else if (kind === "mass-enemy") {
+      // Turn Undead (the canonical mass-enemy spell) deals % HP
+      // damage. resolveDamageSpell handles dice; for HP-percent
+      // effects we apply directly so the log reads cleanly.
+      let total = 0;
+      let i = 0;
+      const ev = spell.effect_value ?? {};
+      for (const foe of this.combat.combatants) {
+        if (foe.side !== "enemies" || foe.hp <= 0) continue;
+        let dmg = 0;
+        if (typeof (ev as Record<string, unknown>).hp_percent === "number") {
+          const pct = (ev as { hp_percent: number }).hp_percent;
+          dmg = Math.max(1, Math.floor(foe.maxHp * pct));
+        } else {
+          const r = resolveDamageSpell(me, foe, spell, defaultRng);
+          dmg = r.damage;
+        }
+        foe.hp = Math.max(0, foe.hp - dmg);
+        total += dmg;
+        const body = this.bodies.get(foe.id);
+        if (body) {
+          this.time.delayedCall(i * 70, () => {
+            flashTarget(this, body, VFX_COLOURS.buff);
+            void radialBurst(this, { x: body.x, y: body.y },
+                              VFX_COLOURS.buff, VFX_COLOURS.white, 38);
+          });
+        }
+        i += 1;
+        this.refreshHp(foe);
+      }
+      if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
+      this.combat.log.push(
+        `${me.name} casts ${spell.name} — enemies take ${total} HP total.`
+      );
+    } else {
+      // unsupported — needs a tile picker we haven't built.
+      this.combat.log.push(
+        `${me.name} casts ${spell.name} — needs tile selection (not yet supported).`
+      );
+    }
+    this.combat.movePoints = 0;
+    this.refreshAll();
+    if (this.combat.isOver) return this.endEncounter();
+    this.endActorTurn();
   }
 
   private openSpellPicker(): void {
@@ -662,14 +949,27 @@ export class CombatScene extends Phaser.Scene {
       this.refreshLog();
       return;
     }
-    this.spellOptions = opts.slice(0, 9);
+    this.spellOptions = opts;
+    this.pickerCursor = 0;
     this.mode = "pick-spell";
-    this.renderPicker(
-      "PICK SPELL",
-      this.spellOptions.map(
-        (s, i) => `[${i + 1}] ${s.name}  (${s.mp_cost} MP)`
-      )
+    this.refreshSpellPicker();
+  }
+
+  /** Rebuild the spell picker so the cursor + scroll window update. */
+  private refreshSpellPicker(): void {
+    const tagFor = (s: Spell): string => {
+      const k = classifyCombatCast(s);
+      if (k === "self")        return "SELF";
+      if (k === "pick-ally")   return "ALLY";
+      if (k === "pick-enemy")  return "ENEMY";
+      if (k === "mass-ally")   return "PARTY";
+      if (k === "mass-enemy")  return "ENEMIES";
+      return "—";
+    };
+    const lines = this.spellOptions.map(
+      (s) => `${s.name.padEnd(18, " ")} ${s.mp_cost} MP   ${tagFor(s)}`
     );
+    this.renderPicker("PICK SPELL", lines, this.pickerCursor);
   }
 
   /** Splice the picked throw item out of its source list now (so the
@@ -693,13 +993,25 @@ export class CombatScene extends Phaser.Scene {
 
   private currentTargetList(): Combatant[] {
     if (!this.pendingAction) return [];
-    const side = this.pendingAction.kind === "cast" &&
-                 (this.pendingAction.spell.effect_type === "heal" ||
-                  this.pendingAction.spell.effect_type === "major_heal")
-      ? "party" : "enemies";
-    return this.combat.combatants
-      .filter((c) => c.side === side && c.hp > 0)
-      .slice(0, 9);
+    let side: "party" | "enemies" = "enemies";
+    if (this.pendingAction.kind === "cast") {
+      const kind = classifyCombatCast(this.pendingAction.spell);
+      side = kind === "pick-ally" ? "party" : "enemies";
+    }
+    let list = this.combat.combatants
+      .filter((c) => c.side === side && c.hp > 0);
+    // Range action: only show targets within the weapon's max range
+    // (Chebyshev distance from the active member).
+    if (this.pendingAction.kind === "range") {
+      const me = this.combat.current;
+      const max = maxRangeFor(this.pendingAction.weapon);
+      list = list.filter((t) => {
+        const dc = Math.abs(t.position.col - me.position.col);
+        const dr = Math.abs(t.position.row - me.position.row);
+        return Math.max(dc, dr) <= max;
+      });
+    }
+    return list.slice(0, 9);
   }
 
   private async resolveTarget(target: Combatant): Promise<void> {
@@ -717,7 +1029,25 @@ export class CombatScene extends Phaser.Scene {
             ? `${me.name} throws ${action.item.name} at ${target.name} (d20:${result.roll}=${result.total} vs AC${target.ac}) — ${result.damage} dmg${result.killed ? ", defeated!" : "."}`
             : `${me.name} throws ${action.item.name} at ${target.name} — miss.`
         );
+        // Throw whoosh + visible projectile arc from caster → target.
+        Sfx.play("chirp");
         await this.animateBump(me, me.position, target.position);
+        await this.flyProjectile(me, target, VFX_COLOURS.ember);
+        await this.animateHit(target, result);
+        this.refreshHp(target);
+      } else if (action.kind === "range") {
+        // Same dice resolution as Throw — fire-and-forget projectile.
+        // The weapon stays equipped (no consume) since it's reusable.
+        const result = resolveThrow(me, target, action.weapon, defaultRng);
+        this.combat.log.push(
+          result.hit
+            ? `${me.name} fires ${action.weapon.name} at ${target.name} (d20:${result.roll}=${result.total} vs AC${target.ac}) — ${result.damage} dmg${result.killed ? ", defeated!" : "."}`
+            : `${me.name} fires ${action.weapon.name} at ${target.name} — miss.`
+        );
+        // Bow / crossbow / sling whistle and projectile streak.
+        Sfx.play("arrow");
+        await this.animateBump(me, me.position, target.position);
+        await this.flyProjectile(me, target, VFX_COLOURS.white);
         await this.animateHit(target, result);
         this.refreshHp(target);
       } else if (action.kind === "cast") {
@@ -726,19 +1056,104 @@ export class CombatScene extends Phaser.Scene {
         if (member && member.maxMp != null) {
           member.mp = Math.max(0, (member.mp ?? 0) - spell.mp_cost);
         }
-        if (spell.effect_type === "heal" || spell.effect_type === "major_heal") {
+        // Cast SFX + caster glow up-front; the per-effect branch below
+        // adds the spell-specific VFX and (where present) the impact SFX.
+        Sfx.play(spell.sfx);
+        this.castGlowFor(me, this.colorForSpell(spell.effect_type));
+        const e = spell.effect_type;
+        if (e === "heal" || e === "major_heal") {
           const r = resolveHealSpell(me, target, spell, defaultRng);
           this.combat.log.push(
             `${me.name} casts ${spell.name} on ${target.name} — heals ${r.heal} HP.`
           );
+          await this.healTargetVfx(target);
           this.refreshHp(target);
-        } else {
+        } else if (
+          e === "damage" || e === "undead_damage"
+        ) {
+          // Damage spell: projectile arc from caster → target, then hit.
+          await this.flyProjectile(me, target, VFX_COLOURS.arcane);
           const r = resolveDamageSpell(me, target, spell, defaultRng);
           this.combat.log.push(
             `${me.name} casts ${spell.name} on ${target.name} — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
           );
+          if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
           await this.animateHit(target, r);
           this.refreshHp(target);
+        } else if (e === "lightning_bolt") {
+          // Branch out a zigzag bolt from caster to target.
+          await this.lightningTo(me, target);
+          const r = resolveDamageSpell(me, target, spell, defaultRng);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — ${r.damage} dmg${r.killed ? ", defeated!" : "."}`
+          );
+          if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
+          await this.animateHit(target, r);
+          this.refreshHp(target);
+        } else if (e === "ac_buff") {
+          // Shield — single ally gains +AC for spell.duration rounds.
+          const ev = spell.effect_value ?? {};
+          const value = typeof ev.ac_bonus === "number" ? ev.ac_bonus : 1;
+          const turns = typeof spell.duration === "number" ? spell.duration : 3;
+          this.combat.addBuff(target.id, {
+            kind: "ac_bonus",
+            value,
+            turnsLeft: turns,
+            source: "Shield",
+          });
+          await this.auraOn(target, VFX_COLOURS.shield);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — +${value} AC for ${turns} turns.`
+          );
+        } else if (e === "curse") {
+          // Curse — single enemy: -ATK to its hit rolls and -AC to
+          // its defence (i.e. easier to hit). Mirrors the Python
+          // game's curse_buffs which stores both penalties.
+          const ev = spell.effect_value ?? {};
+          const atk = typeof ev.attack_penalty === "number" ? ev.attack_penalty : 2;
+          const acP = typeof ev.ac_penalty === "number" ? ev.ac_penalty : 2;
+          const turns = typeof spell.duration === "number" ? spell.duration : 4;
+          this.combat.addBuff(target.id, {
+            kind: "attack_penalty",
+            value: atk,
+            turnsLeft: turns,
+            source: "Curse",
+          });
+          this.combat.addBuff(target.id, {
+            kind: "ac_penalty",
+            value: acP,
+            turnsLeft: turns,
+            source: "Curse",
+          });
+          await this.auraOn(target, VFX_COLOURS.curse);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — -${atk} ATK / -${acP} AC for ${turns} turns.`
+          );
+        } else if (e === "range_buff") {
+          // Long Shanks — single ally gains extra movement range.
+          const ev = spell.effect_value ?? {};
+          const value = typeof ev.range_bonus === "number" ? ev.range_bonus : 4;
+          const turns = typeof spell.duration === "number" ? spell.duration : 3;
+          this.combat.addBuff(target.id, {
+            kind: "range_bonus",
+            value,
+            turnsLeft: turns,
+            source: "Long Shanks",
+          });
+          await this.auraOn(target, VFX_COLOURS.heal);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — +${value} move for ${turns} turns.`
+          );
+        } else {
+          // Status / debuff effects we don't have full mechanics for
+          // yet (sleep / charm / cure_poison / restore — these need
+          // status models the buff engine doesn't cover). Spell still
+          // resolves visibly so the player gets feedback.
+          const isAlly = target.side === me.side;
+          await this.auraOn(target, isAlly ? VFX_COLOURS.buff : VFX_COLOURS.curse);
+          this.combat.log.push(
+            `${me.name} casts ${spell.name} on ${target.name} — ${describeStatusCast(me, target, spell)}`
+          );
         }
       }
       // Throw / cast each consume the rest of the turn.
@@ -754,11 +1169,38 @@ export class CombatScene extends Phaser.Scene {
 
   // ── Picker / target overlays ─────────────────────────────────────
 
-  private renderPicker(title: string, lines: string[]): void {
+  /**
+   * Picker overlay over the right HUD. Lines longer than the visible
+   * window scroll; the active row is highlighted with the rust accent
+   * stripe and a "> " prefix. Number keys 1..N still pick the Nth
+   * visible row as a shortcut.
+   *
+   * `cursor` is the index into the full `lines` array — pass -1 for
+   * a static prompt with no active row (used by the older static
+   * popups before they were converted; today every caller passes a
+   * cursor).
+   */
+  private renderPicker(title: string, lines: string[], cursor = -1): void {
     this.clearPicker();
-    // Overlay panel inside the right HUD — sits over the action menu.
-    const x = HUD_X + 6, y = HUD_Y + HUD_H - 6 - (lines.length + 3) * 18 - 12;
-    const w = HUD_W - 12, h = (lines.length + 3) * 18 + 16;
+    const VISIBLE_MAX = 12;
+    const total = lines.length;
+    const visibleCount = Math.min(VISIBLE_MAX, total);
+    // Compute scroll window so `cursor` is always in view.
+    let topRow = 0;
+    if (cursor >= 0 && total > visibleCount) {
+      const half = Math.floor(visibleCount / 2);
+      topRow = Math.max(0, Math.min(total - visibleCount, cursor - half));
+    }
+    const rowH = 18;
+    const titleH = 24;
+    const hintH = 28;
+    const bodyH = visibleCount * rowH + 8;
+    const w = HUD_W - 12;
+    const h = titleH + bodyH + hintH;
+    const x = HUD_X + 6;
+    const y = HUD_Y + HUD_H - 6 - h;
+    // Backing panel with a rust accent border so it pops over the
+    // dimmer HUD background.
     const bg = this.add
       .rectangle(x, y, w, h, 0x10101a, 0.98)
       .setOrigin(0)
@@ -767,13 +1209,50 @@ export class CombatScene extends Phaser.Scene {
     this.pickerObjects.push(
       this.add.text(x + 10, y + 6, title, FONT_HEAD(C.accent))
     );
-    lines.forEach((line, i) => {
+
+    // Scroll indicator (top) — small triangle pointing up if there are
+    // hidden rows above.
+    if (topRow > 0) {
       this.pickerObjects.push(
-        this.add.text(x + 10, y + 28 + i * 18, line, FONT_BODY())
+        this.add.text(x + w - 24, y + 6, "▲", FONT_MONO(C.gold))
       );
-    });
+    }
+
+    const startY = y + titleH;
+    for (let i = 0; i < visibleCount; i++) {
+      const row = topRow + i;
+      const line = lines[row];
+      const ry = startY + i * rowH;
+      const isCursor = row === cursor;
+      if (isCursor) {
+        // Selection bar + accent stripe down the left edge.
+        this.pickerObjects.push(
+          this.add.rectangle(x + 4, ry, w - 8, rowH, C.selectBg, 1).setOrigin(0)
+        );
+        this.pickerObjects.push(
+          this.add.rectangle(x + 4, ry, 3, rowH, C.accent, 1).setOrigin(0)
+        );
+      }
+      // Number-key shortcut shows visible row number 1..VISIBLE_MAX.
+      const shortcut = i < 9 ? `[${i + 1}] ` : "    ";
+      this.pickerObjects.push(
+        this.add.text(x + 10, ry + 1, `${shortcut}${line}`,
+          FONT_BODY(isCursor ? C.body : C.dim))
+      );
+    }
+
+    // Scroll indicator (bottom).
+    if (topRow + visibleCount < total) {
+      this.pickerObjects.push(
+        this.add.text(x + w - 24, startY + bodyH - 18, "▼", FONT_MONO(C.gold))
+      );
+    }
+
+    const hintText = total > visibleCount
+      ? "[↑↓] scroll  [Enter] pick  [1-9] shortcut  [ESC] cancel"
+      : "[↑↓] move  [Enter] pick  [1-9] shortcut  [ESC] cancel";
     this.pickerObjects.push(
-      this.add.text(x + 10, y + h - 18, "[ESC] cancel", FONT_MONO(C.faint))
+      this.add.text(x + 10, y + h - 22, hintText, FONT_MONO(C.faint))
     );
   }
 
@@ -785,9 +1264,10 @@ export class CombatScene extends Phaser.Scene {
   /** Draw 1..N badges over each valid target on the arena. */
   private drawTargetBadges(side: "party" | "enemies"): void {
     this.clearTargetBadges();
-    const targets = this.combat.combatants
-      .filter((c) => c.side === side && c.hp > 0)
-      .slice(0, 9);
+    // Reuse currentTargetList so range filtering / target side is
+    // resolved in one place.
+    const targets = this.currentTargetList();
+    void side;
     targets.forEach((t, i) => {
       const x = this.tileX(t.position.col);
       const y = this.tileY(t.position.row) - TILE / 2 - 4;
@@ -820,6 +1300,258 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
+  // ── Tile picker ──────────────────────────────────────────────────
+
+  /**
+   * Begin tile selection for a spell whose targeting is `select_tile`
+   * (or whose effect_type is one of the tile-placed kinds:
+   * aoe_fireball / teleport / summon_skeleton). The cursor starts
+   * adjacent to the caster — north for ranged spells like Fireball,
+   * south for self-relocation like Misty Step.
+   */
+  private startTilePicking(spell: Spell): void {
+    const me = this.combat.current;
+    const start = {
+      col: Math.max(1, Math.min(ARENA_COLS - 2, me.position.col)),
+      row: Math.max(1, Math.min(ARENA_ROWS - 2, me.position.row - 2)),
+    };
+    this.tileCursorPos = start;
+    this.pendingAction = { kind: "tile", spell };
+    this.mode = "pick-tile";
+    this.clearPicker();
+    this.refreshTileCursor();
+    // Hint at bottom of right HUD.
+    this.renderTilePickerHint(spell);
+  }
+
+  /** Move the tile cursor by (dc, dr), clamped to the open arena. */
+  private moveTileCursor(dc: number, dr: number): void {
+    const next = {
+      col: this.tileCursorPos.col + dc,
+      row: this.tileCursorPos.row + dr,
+    };
+    // Clamp to inside the wall ring (1..N-2).
+    next.col = Math.max(1, Math.min(ARENA_COLS - 2, next.col));
+    next.row = Math.max(1, Math.min(ARENA_ROWS - 2, next.row));
+    this.tileCursorPos = next;
+    this.refreshTileCursor();
+  }
+
+  /** Re-render the tile cursor reticle + AOE preview if applicable. */
+  private refreshTileCursor(): void {
+    this.clearTileCursor();
+    if (this.mode !== "pick-tile") return;
+    const action = this.pendingAction;
+    if (!action || action.kind !== "tile") return;
+    const { col, row } = this.tileCursorPos;
+    // Optional radius preview for aoe_fireball-style spells.
+    const ev = action.spell.effect_value ?? {};
+    const radius = typeof (ev as Record<string, unknown>).radius === "number"
+      ? (ev as { radius: number }).radius
+      : 0;
+    if (radius > 0) {
+      for (let dr = -radius; dr <= radius; dr++) {
+        for (let dc = -radius; dc <= radius; dc++) {
+          const c = col + dc;
+          const r = row + dr;
+          if (c < 1 || c >= ARENA_COLS - 1 || r < 1 || r >= ARENA_ROWS - 1) continue;
+          if (Math.max(Math.abs(dc), Math.abs(dr)) > radius) continue;
+          if (dc === 0 && dr === 0) continue; // centre handled below
+          const aoe = this.add
+            .rectangle(ARENA_X + c * TILE, ARENA_Y + r * TILE, TILE, TILE,
+                       0xff8e3c, 0.18)
+            .setOrigin(0)
+            .setStrokeStyle(1, 0xff8e3c, 0.35)
+            .setDepth(15);
+          this.tileCursorObjects.push(aoe);
+        }
+      }
+    }
+    // Centre reticle — solid rust-red border.
+    const cursor = this.add
+      .rectangle(ARENA_X + col * TILE, ARENA_Y + row * TILE, TILE, TILE,
+                 C.cursor, 0)
+      .setOrigin(0)
+      .setStrokeStyle(2, C.cursor)
+      .setDepth(16);
+    this.tileCursorObjects.push(cursor);
+  }
+
+  private clearTileCursor(): void {
+    for (const o of this.tileCursorObjects) o.destroy();
+    this.tileCursorObjects = [];
+  }
+
+  /** Tiny prompt sitting where the picker overlay used to. */
+  private renderTilePickerHint(spell: Spell): void {
+    this.clearPicker();
+    const lines = [
+      `Casting: ${spell.name}`,
+      "[↑↓←→] move reticle",
+      "[Enter] confirm",
+      "[ESC]   cancel",
+    ];
+    const w = HUD_W - 12, h = lines.length * 18 + 28;
+    const x = HUD_X + 6, y = HUD_Y + HUD_H - 6 - h;
+    this.pickerObjects.push(
+      this.add.rectangle(x, y, w, h, 0x10101a, 0.98)
+        .setOrigin(0)
+        .setStrokeStyle(2, C.accent)
+    );
+    this.pickerObjects.push(
+      this.add.text(x + 10, y + 8, "PICK A TILE", FONT_HEAD(C.accent))
+    );
+    lines.forEach((line, i) => {
+      this.pickerObjects.push(
+        this.add.text(x + 10, y + 30 + i * 18, line, FONT_BODY())
+      );
+    });
+  }
+
+  /**
+   * Resolve whatever tile-targeted spell the player just confirmed.
+   * Branches by effect_type: AOE damage, teleport, summon (stub).
+   */
+  private async resolveTileSpell(): Promise<void> {
+    const action = this.pendingAction;
+    if (!action || action.kind !== "tile") return;
+    const me = this.combat.current;
+    const spell = action.spell;
+    const member = this.memberForCurrent();
+    if (member && member.maxMp != null) {
+      member.mp = Math.max(0, (member.mp ?? 0) - spell.mp_cost);
+    }
+    this.busy = true;
+    this.mode = "default";
+    this.pendingAction = null;
+    this.clearTileCursor();
+    this.clearPicker();
+    // Cast SFX + caster glow before the per-effect VFX kicks in.
+    Sfx.play(spell.sfx);
+    this.castGlowFor(me, this.colorForSpell(spell.effect_type));
+    try {
+      const e = spell.effect_type;
+      if (e === "aoe_fireball") {
+        await this.resolveAoeFireball(me, spell, this.tileCursorPos);
+      } else if (e === "teleport") {
+        await this.resolveTeleport(me, spell, this.tileCursorPos);
+      } else if (e === "summon_skeleton") {
+        // Summon mechanics need a full new-combatant pipeline (turn
+        // order, sprite preloading). Log clearly and end the turn so
+        // the player knows the spell registered.
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} — summons not yet implemented in combat.`
+        );
+      } else {
+        this.combat.log.push(
+          `${me.name} casts ${spell.name} on a tile — no effect yet.`
+        );
+      }
+      this.combat.movePoints = 0;
+      this.refreshAll();
+      if (this.combat.isOver) return this.endEncounter();
+      this.endActorTurn();
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /**
+   * Fireball-style AOE: every alive enemy within `radius` Chebyshev
+   * tiles of the chosen cell takes the spell's dice damage.
+   */
+  private async resolveAoeFireball(
+    caster: Combatant, spell: Spell, centre: { col: number; row: number },
+  ): Promise<void> {
+    const ev = spell.effect_value ?? {};
+    const radius = typeof (ev as Record<string, unknown>).radius === "number"
+      ? (ev as { radius: number }).radius
+      : 3;
+    const victims = this.combat.combatants.filter(
+      (c) => c.side === "enemies" && c.hp > 0 &&
+             Math.max(
+               Math.abs(c.position.col - centre.col),
+               Math.abs(c.position.row - centre.row),
+             ) <= radius
+    );
+    // Aim a fireball orb at the centre tile, then explode there.
+    const burstAt = { x: this.tileX(centre.col), y: this.tileY(centre.row) };
+    await projectileLine(
+      this,
+      { x: this.tileX(caster.position.col), y: this.tileY(caster.position.row) },
+      burstAt,
+      VFX_COLOURS.fire, 280,
+    );
+    if (spell.hit_sfx) Sfx.play(spell.hit_sfx);
+    screenShake(this, 0.008, 240);
+    void radialBurst(this, burstAt, VFX_COLOURS.fire, VFX_COLOURS.ember, 64);
+    if (victims.length === 0) {
+      this.combat.log.push(
+        `${caster.name} casts ${spell.name} at (${centre.col},${centre.row}) — caught nothing.`
+      );
+      return;
+    }
+    let total = 0;
+    for (const v of victims) {
+      const r = resolveDamageSpell(caster, v, spell, defaultRng);
+      total += r.damage;
+      this.refreshHp(v);
+      void this.animateHit(v, r);
+    }
+    this.combat.log.push(
+      `${caster.name} casts ${spell.name} — ${victims.length} foe${victims.length === 1 ? "" : "s"} hit, ${total} dmg total.`
+    );
+  }
+
+  /**
+   * Misty Step / similar — relocate the caster to the chosen tile.
+   * Refuses if the tile is a wall or already occupied.
+   */
+  private async resolveTeleport(
+    caster: Combatant, spell: Spell, dest: { col: number; row: number },
+  ): Promise<void> {
+    if (isWall(dest.col, dest.row)) {
+      this.combat.log.push(`${caster.name} can't teleport into a wall.`);
+      return;
+    }
+    if (this.combat.combatantAt(dest.col, dest.row)) {
+      this.combat.log.push(`${caster.name} can't teleport onto another combatant.`);
+      return;
+    }
+    caster.position = { ...dest };
+    // Snap the sprite + selection ring to the new tile, with a fade
+    // out / fade in pair so the relocation reads visually.
+    const body = this.bodies.get(caster.id);
+    const ring = this.selRings.get(caster.id);
+    const x = this.tileX(dest.col);
+    const y = this.tileY(dest.row);
+    if (body) {
+      void radialBurst(this, { x: body.x, y: body.y }, VFX_COLOURS.arcane, VFX_COLOURS.white, 30);
+      await new Promise<void>((res) => {
+        this.tweens.add({
+          targets: body, alpha: 0,
+          duration: 140,
+          onComplete: () => res(),
+        });
+      });
+      body.x = x; body.y = y;
+      if (ring) { ring.x = x; ring.y = y; }
+      void radialBurst(this, { x, y }, VFX_COLOURS.arcane, VFX_COLOURS.white, 30);
+      await new Promise<void>((res) => {
+        this.tweens.add({
+          targets: body, alpha: 1,
+          duration: 140,
+          onComplete: () => res(),
+        });
+      });
+    } else if (ring) {
+      ring.x = x; ring.y = y;
+    }
+    this.combat.log.push(
+      `${caster.name} casts ${spell.name} — vanishes and reappears at (${dest.col},${dest.row}).`
+    );
+  }
+
   private onTileClicked(col: number, row: number): void {
     if (!this.canTakePlayerInput()) return;
     const actor = this.combat.current;
@@ -838,15 +1570,6 @@ export class CombatScene extends Phaser.Scene {
     if (!this.canTakePlayerInput()) return;
     this.combat.log.push(`${this.combat.current.name} ends their turn.`);
     this.endActorTurn();
-  }
-
-  private onFleeClicked(): void {
-    if (this.ended || this.busy) return;
-    if (this.combat.current.side !== "party") return;
-    this.combat.log.push(`${this.combat.current.name} flees the encounter.`);
-    this.refreshLog();
-    this.ended = true;
-    this.showOverlay("You escaped.", "#bdb38a");
   }
 
   private canTakePlayerInput(): boolean {
@@ -952,6 +1675,68 @@ export class CombatScene extends Phaser.Scene {
     });
   }
 
+  // ── VFX shortcuts ────────────────────────────────────────────────
+  //
+  // Thin wrappers that look up the actor's body sprite for screen
+  // coordinates and call into web/src/game/combat/Vfx.ts. Keeping the
+  // coordinate math here lets the Vfx module stay scene-agnostic.
+
+  private bodyXY(c: Combatant): { x: number; y: number } {
+    const body = this.bodies.get(c.id);
+    if (body) return { x: body.x, y: body.y };
+    return { x: this.tileX(c.position.col), y: this.tileY(c.position.row) };
+  }
+
+  /** Pick a thematic VFX colour for a given spell effect_type. */
+  private colorForSpell(effect: string): number {
+    if (effect === "heal" || effect === "major_heal" || effect === "mass_heal" ||
+        effect === "cure_poison" || effect === "restore") return VFX_COLOURS.heal;
+    if (effect === "bless" || effect === "ac_buff" || effect === "range_buff" ||
+        effect === "invisibility") return VFX_COLOURS.buff;
+    if (effect === "curse") return VFX_COLOURS.curse;
+    if (effect === "aoe_fireball") return VFX_COLOURS.fire;
+    if (effect === "lightning_bolt") return VFX_COLOURS.lightning;
+    if (effect === "undead_damage") return VFX_COLOURS.buff;
+    if (effect === "teleport") return VFX_COLOURS.arcane;
+    return VFX_COLOURS.arcane;
+  }
+
+  /** Caster glow used at the start of every cast. */
+  private castGlowFor(c: Combatant, color: number): void {
+    const body = this.bodies.get(c.id);
+    if (body) castGlow(this, body, color);
+  }
+
+  /** Fly a projectile arc from `from` → `to` in screen coords. */
+  private flyProjectile(from: Combatant, to: Combatant, color: number): Promise<void> {
+    return projectileLine(this, this.bodyXY(from), this.bodyXY(to), color, 240);
+  }
+
+  /** Lightning zigzag from caster to target. */
+  private lightningTo(from: Combatant, to: Combatant): Promise<void> {
+    return lightningZigzag(this, this.bodyXY(from), this.bodyXY(to));
+  }
+
+  /** Coloured aura ring around a target — buff/debuff status visual. */
+  private auraOn(c: Combatant, color: number): Promise<void> {
+    return glowAura(this, this.bodyXY(c), color);
+  }
+
+  /** Healing sparkle column rising over a target. */
+  private healTargetVfx(c: Combatant): Promise<void> {
+    return healingSparkles(this, this.bodyXY(c));
+  }
+
+  /** Invisibility — fade the caster body to 30% alpha briefly. */
+  private fadeCaster(c: Combatant): void {
+    const body = this.bodies.get(c.id);
+    if (!body) return;
+    this.tweens.add({
+      targets: body, alpha: 0.3,
+      duration: 220, yoyo: true, repeat: 1,
+    });
+  }
+
   private animateBump(
     actor: Combatant,
     from: { col: number; row: number },
@@ -998,6 +1783,21 @@ export class CombatScene extends Phaser.Scene {
         ? result.critical ? `CRIT! -${result.damage}` : `-${result.damage}`
         : "miss";
       const color = result.hit ? (result.critical ? "#ffd470" : "#ff6b6b") : "#bdb38a";
+      // SFX + flash. Critical hits play the louder fanfare and shake
+      // the camera; misses get the rising "whoosh"; ordinary hits use
+      // the side-appropriate hurt SFX so the player can hear who took it.
+      if (result.hit) {
+        if (result.critical) {
+          Sfx.play("critical");
+          screenShake(this, 0.006, 220);
+        } else {
+          Sfx.play(target.side === "party" ? "player_hurt" : "monster_hit");
+        }
+        flashTarget(this, body, VFX_COLOURS.blood);
+      } else {
+        Sfx.play("miss");
+        floatingX(this, { x: body.x, y: body.y });
+      }
       const t = this.add.text(body.x, body.y - 12, label, {
         fontFamily: "Georgia, serif",
         fontSize: "14px",
@@ -1052,8 +1852,15 @@ export class CombatScene extends Phaser.Scene {
           spellIsCombatCastable(s, member.class) &&
           (member.mp ?? 0) >= s.mp_cost
       );
+    // Range is enabled when the equipped weapon has ranged: true.
+    const equippedWeapon =
+      member && member.equipped.rightHand
+        ? this.items.get(member.equipped.rightHand) ?? null
+        : null;
+    const canRange = !!equippedWeapon && isRanged(equippedWeapon);
     const isEnabled = (id: ActionId): boolean => {
       if (!playerTurn) return false;
+      if (id === "range") return canRange;
       if (id === "throw") return canThrow;
       if (id === "cast")  return canCast;
       return true;
@@ -1150,8 +1957,13 @@ export class CombatScene extends Phaser.Scene {
     this.ended = true;
     this.clearMoveHints();
     const winner = this.combat.winner;
-    if (winner === "party") this.showOverlay("Victory!", "#a3d9a5");
-    else if (winner === "enemies") this.showOverlay("Defeat…", "#ff6b6b");
+    if (winner === "party") {
+      Sfx.play("victory");
+      this.showOverlay("Victory!", "#a3d9a5");
+    } else if (winner === "enemies") {
+      Sfx.play("defeat");
+      this.showOverlay("Defeat…", "#ff6b6b");
+    }
     if (this.fromWorld) {
       if (winner === "party" && this.triggerKey) {
         gameState.consumedTriggers.add(this.triggerKey);

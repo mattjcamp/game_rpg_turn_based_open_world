@@ -37,11 +37,17 @@ export default function GameCanvas({
     };
   }, [startScene]);
 
+  // The canvas is 960×720 inside Phaser; the wrapper enforces a 4:3
+  // aspect ratio plus an explicit max width AND max height, so a tall
+  // wrapper still keeps the canvas at the same aspect (no letterbox
+  // stretching) and a short wrapper shrinks it without overflowing.
+  // Phaser.Scale.FIT inside the game does the actual canvas scaling.
   return (
     <div
       id="phaser-container"
       ref={containerRef}
-      className="aspect-[4/3] w-full max-w-[960px] overflow-hidden rounded-md border border-parchment/20 shadow-lg"
+      className="aspect-[4/3] max-h-full w-auto max-w-[960px] overflow-hidden rounded-md border border-parchment/20 shadow-lg"
+      style={{ aspectRatio: "4 / 3" }}
     />
   );
 }

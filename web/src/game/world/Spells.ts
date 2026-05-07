@@ -18,6 +18,12 @@ export interface SpellEffectValue {
   min_damage?: number;
   ac_bonus?: number;
   range_bonus?: number;
+  /** Bless bumps every ally's d20 hit roll by this amount. */
+  attack_bonus?: number;
+  /** Curse subtracts this from the target's AC. */
+  ac_penalty?: number;
+  /** Curse subtracts this from the target's d20 hit roll. */
+  attack_penalty?: number;
   max_target_hp?: number;
   save_dc_stat?: string;
   save_dc_base?: number;
@@ -45,6 +51,10 @@ export interface Spell {
   /** Where the spell may be cast: any of "battle"/"overworld"/"town"/"dungeon". */
   usable_in: string[];
   icon?: string;
+  /** SFX name played when the spell is cast (matches Sfx catalog). */
+  sfx?: string;
+  /** SFX name played when the spell hits/lands (matches Sfx catalog). */
+  hit_sfx?: string | null;
 }
 
 interface RawSpell {
@@ -63,6 +73,8 @@ interface RawSpell {
   targeting?: string;
   usable_in?: string[] | string;
   icon?: string;
+  sfx?: string;
+  hit_sfx?: string | null;
 }
 
 let _cache: Spell[] | null = null;
@@ -98,6 +110,8 @@ export function spellFromRaw(s: RawSpell): Spell {
     targeting: s.targeting,
     usable_in: usable,
     icon: s.icon,
+    sfx: s.sfx,
+    hit_sfx: s.hit_sfx,
   };
 }
 

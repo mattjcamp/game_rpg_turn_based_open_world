@@ -164,6 +164,90 @@ export function spellIsCombatCastable(
 }
 
 /**
+ * Combat-side cast classification — drives the targeting flow.
+ *
+ *   - self        — applies to the caster; no picker
+ *   - pick-ally   — choose a single party member
+ *   - pick-enemy  — choose a single enemy
+ *   - pick-tile   — place an effect at a chosen arena tile
+ *                   (Fireball / Misty Step / Animate Dead)
+ *   - mass-ally   — every alive ally (no picker)
+ *   - mass-enemy  — every alive enemy (no picker)
+ *   - unsupported — known effect but no resolution wired yet
+ *
+ * Combines `effect_type` with `targeting`; the data uses both, and
+ * we honour the more specific one when available.
+ */
+export type CombatCastKind =
+  | "self" | "pick-ally" | "pick-enemy" | "pick-tile"
+  | "mass-ally" | "mass-enemy" | "unsupported";
+
+export function classifyCombatCast(spell: Spell): CombatCastKind {
+  const t = (spell.targeting ?? "").toLowerCase();
+  const e = spell.effect_type;
+
+  // Tile-targeted spells get a dedicated arena picker.
+  if (t === "select_tile") return "pick-tile";
+  if (e === "aoe_fireball" || e === "teleport" || e === "summon_skeleton") {
+    return "pick-tile";
+  }
+
+  // Mass-effect spells with self targeting: Mass Heal, Restore.
+  if (e === "mass_heal") return "mass-ally";
+  // Bless is "self" in the data but the Python game applies it
+  // party-wide — treat it as mass-ally so every alive ally gets the
+  // attack-bonus buff.
+  if (e === "bless") return "mass-ally";
+
+  // Auto-against-all-enemies: Turn Undead's auto_monster targeting.
+  if (e === "undead_damage" || t === "auto_monster") return "mass-enemy";
+
+  // Self-only buffs and recoveries.
+  if (t === "self") return "self";
+
+  // Picker-driven targeting.
+  if (t === "select_ally" || t === "select_ally_or_self") return "pick-ally";
+  if (t === "select_enemy" || t === "directional_projectile") return "pick-enemy";
+
+  // Fallback by effect_type when targeting is missing or odd.
+  if (e === "heal" || e === "major_heal" || e === "ac_buff" || e === "bless"
+      || e === "range_buff" || e === "cure_poison" || e === "invisibility") {
+    return "pick-ally";
+  }
+  if (e === "damage" || e === "lightning_bolt" || e === "sleep" || e === "charm"
+      || e === "curse") {
+    return "pick-enemy";
+  }
+  return "unsupported";
+}
+
+// ── Spell side-effects we don't (yet) model with a status engine ──
+//
+// Sleep / charm / curse / bless / ac_buff / range_buff /
+// invisibility / cure_poison / restore all want a per-combatant
+// "for N turns" effect tracker, which we haven't built. For now the
+// cast resolves with a clean log line so the spell flow is visibly
+// wired end-to-end — when the status-effect system lands these will
+// pick up actual mechanics without touching the scene.
+//
+// Returns the human-readable verb that ends up in the log.
+export function describeStatusCast(
+  caster: Combatant, target: Combatant, spell: Spell,
+): string {
+  const e = spell.effect_type;
+  if (e === "sleep")        return `${target.name} drifts into a magical sleep.`;
+  if (e === "charm")        return `${target.name} is charmed by ${caster.name}.`;
+  if (e === "curse")        return `${target.name} is cursed.`;
+  if (e === "bless")        return `${caster.name} is blessed (+attack).`;
+  if (e === "ac_buff")      return `${target.name} gains a magical shield.`;
+  if (e === "range_buff")   return `${target.name}'s movement is hastened.`;
+  if (e === "invisibility") return `${caster.name} fades from view.`;
+  if (e === "cure_poison")  return `${target.name} is purged of poison.`;
+  if (e === "restore")      return `${caster.name} is fully restored.`;
+  return `${spell.name} has no visible effect.`;
+}
+
+/**
  * Strictly filter a flat catalog of items for "throwable in combat".
  * Mirrors the items.json `throwable` flag — daggers, rocks, fire
  * oils, poison vials. Ranged weapons (bows, crossbows, slings) have
@@ -172,4 +256,34 @@ export function spellIsCombatCastable(
  */
 export function isThrowable(item: Item): boolean {
   return !!item.throwable;
+}
+
+/**
+ * True when the item is a fire-and-forget ranged weapon — bows,
+ * crossbows, slings. `Rock` is both throwable AND ranged; we treat
+ * it as ranged here (the Throw menu still picks it up via
+ * isThrowable, so authors can use either action).
+ */
+export function isRanged(item: Item): boolean {
+  return !!item.ranged;
+}
+
+/**
+ * Max attack range (in tiles) for a ranged weapon. Mirrors what the
+ * Python game's combat tables use — long bows reach further than
+ * short bows, crossbows are mid-range, slings + rocks are short.
+ *
+ * Falls back to 8 for ranged items the catalog doesn't recognise so
+ * the action stays usable when new weapon types are added.
+ */
+export function maxRangeFor(item: Item): number {
+  switch (item.itemType) {
+    case "long_bow":  return 10;
+    case "crossbow":  return 8;
+    case "short_bow": return 6;
+    case "sling":     return 6;
+    case "rock":      return 4;
+    default:
+      return item.ranged ? 8 : 1;
+  }
 }

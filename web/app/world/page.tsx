@@ -13,17 +13,23 @@ const GameCanvas = dynamic(() => import("@/components/GameCanvas"), {
 });
 
 export default function WorldPage() {
+  // h-screen + overflow-hidden prevents the page from scrolling when the
+  // viewport is shorter than 720px + chrome. The canvas wrapper is
+  // `flex-1` + `min-h-0` so it auto-shrinks to fill remaining space, and
+  // Phaser's Scale.FIT scales the 960×720 canvas to whatever room it has.
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center px-4 py-8">
-      <div className="mb-4 flex w-full items-center justify-between">
+    <main className="mx-auto flex h-screen max-w-5xl flex-col items-center overflow-hidden px-4 py-2">
+      <div className="mb-1 flex w-full shrink-0 items-center justify-between">
         <Link href="/" className="text-sm text-parchment/60 hover:text-parchment">
           &larr; Back
         </Link>
-        <h1 className="font-display text-2xl text-parchment">Overworld</h1>
+        <h1 className="font-display text-xl text-parchment">Overworld</h1>
         <span className="w-16" /> {/* spacer */}
       </div>
-      <GameCanvas startScene="OverworldScene" />
-      <p className="mt-4 max-w-[960px] text-center text-xs text-parchment/40">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <GameCanvas startScene="OverworldScene" />
+      </div>
+      <p className="mt-1 max-w-[960px] shrink-0 text-center text-xs text-parchment/40">
         Walk around with WASD / arrow keys, or tap a tile next to you. Stepping
         on a glowing ✦ tile triggers an encounter — defeat the enemies to clear it.
       </p>

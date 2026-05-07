@@ -379,3 +379,73 @@ describe("Combat — monster AI", () => {
     }
   });
 });
+
+describe("Combat — buff registry", () => {
+  it("addBuff stores a buff on the right combatant and sumBuff sums it", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(1),
+    );
+    c.addBuff("p1", { kind: "attack_bonus", value: 2, turnsLeft: 4, source: "Bless" });
+    c.addBuff("p1", { kind: "attack_bonus", value: 1, turnsLeft: 4, source: "Other" });
+    expect(c.sumBuff("p1", "attack_bonus")).toBe(3);
+    expect(c.sumBuff("p1", "ac_bonus")).toBe(0);
+    expect(c.sumBuff("e1", "attack_bonus")).toBe(0);
+  });
+
+  it("effectiveAttackBonus and effectiveAc fold buffs and penalties into the base stat", () => {
+    const c = new Combat(
+      [make("p1", "party", { attackBonus: 4, ac: 12 })],
+      [make("e1", "enemies", { attackBonus: 3, ac: 11 })],
+      mulberry32(1),
+    );
+    c.addBuff("p1", { kind: "attack_bonus", value: 2, turnsLeft: 4, source: "Bless" });
+    c.addBuff("e1", { kind: "ac_penalty",  value: 2, turnsLeft: 4, source: "Curse" });
+    c.addBuff("e1", { kind: "attack_penalty", value: 2, turnsLeft: 4, source: "Curse" });
+
+    expect(c.effectiveAttackBonus(c.byId("p1"))).toBe(6);  // 4 + 2
+    expect(c.effectiveAc(c.byId("e1"))).toBe(9);            // 11 - 2
+    expect(c.effectiveAttackBonus(c.byId("e1"))).toBe(1);   // 3 - 2
+  });
+
+  it("ticks every buff once per round and logs an expire line", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(7),
+    );
+    // 1-turn buff so it expires on the very next round-tick.
+    c.addBuff("p1", { kind: "attack_bonus", value: 2, turnsLeft: 1, source: "Bless" });
+    expect(c.sumBuff("p1", "attack_bonus")).toBe(2);
+
+    // Step through one full round: combatants.length end-turns trigger
+    // exactly one tick.
+    const rounds = c.combatants.length;
+    for (let i = 0; i < rounds; i++) c.endTurn();
+
+    expect(c.sumBuff("p1", "attack_bonus")).toBe(0);
+    // Some expire-line was logged for p1.
+    expect(c.log.some((l) => /blessing fades/i.test(l))).toBe(true);
+  });
+
+  it("range_bonus buffs extend the next refilled movePoints", () => {
+    // Force initiative so p1 acts first by giving them a high dexMod.
+    const c = new Combat(
+      [make("p1", "party", { baseMoveRange: 4, dexMod: 10 })],
+      [make("e1", "enemies", { dexMod: -10 })],
+      mulberry32(2),
+    );
+    // Walk the turn cursor until p1 is current.
+    while (c.current.id !== "p1") c.endTurn();
+    expect(c.movePoints).toBe(4);
+
+    // Now buff and roll forward a full loop to refill on p1's next turn.
+    c.addBuff("p1", { kind: "range_bonus", value: 3, turnsLeft: 5, source: "Long Shanks" });
+    const loopSize = c.combatants.length;
+    for (let i = 0; i < loopSize; i++) c.endTurn();
+    expect(c.current.id).toBe("p1");
+    expect(c.movePoints).toBe(7);  // 4 + 3
+  });
+});
+

@@ -5,6 +5,10 @@ import {
   resolveHealSpell,
   spellIsCombatCastable,
   isThrowable,
+  isRanged,
+  maxRangeFor,
+  classifyCombatCast,
+  describeStatusCast,
 } from "./CombatActions";
 import { spellFromRaw, type Spell } from "../world/Spells";
 import { mulberry32 } from "../rng";
@@ -57,6 +61,41 @@ describe("isThrowable", () => {
   });
   it("rejects non-equippable consumables", () => {
     expect(isThrowable(healingHerb)).toBe(false);
+  });
+});
+
+describe("isRanged + maxRangeFor", () => {
+  it("isRanged is true for bows / crossbows", () => {
+    expect(isRanged(longBow)).toBe(true);
+  });
+  it("isRanged is false for melee-only weapons", () => {
+    expect(isRanged(dagger)).toBe(false);
+  });
+
+  it("maxRangeFor returns sensible defaults per item_type", () => {
+    const make = (item_type: string): Item => ({
+      name: item_type, category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, ranged: true, itemType: item_type,
+    });
+    expect(maxRangeFor(make("long_bow"))).toBe(10);
+    expect(maxRangeFor(make("crossbow"))).toBe(8);
+    expect(maxRangeFor(make("short_bow"))).toBe(6);
+    expect(maxRangeFor(make("sling"))).toBe(6);
+    expect(maxRangeFor(make("rock"))).toBe(4);
+  });
+
+  it("maxRangeFor falls back to 8 for unknown ranged item_types", () => {
+    const oddBow: Item = {
+      name: "Glaive Launcher", category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, ranged: true, itemType: "glaive_launcher",
+    };
+    expect(maxRangeFor(oddBow)).toBe(8);
+  });
+
+  it("maxRangeFor returns 1 for non-ranged items", () => {
+    expect(maxRangeFor(dagger)).toBe(1);
   });
 });
 
@@ -157,6 +196,83 @@ describe("resolveHealSpell", () => {
     const target = makeCombatant({ id: "t", side: "party", hp: 19, maxHp: 20 });
     resolveHealSpell(caster, target, heal, mulberry32(1));
     expect(target.hp).toBe(20);
+  });
+});
+
+function spell(over: Partial<Spell>): Spell {
+  return spellFromRaw({
+    id: over.id ?? "x",
+    name: over.name ?? "X",
+    description: "",
+    allowable_classes: over.allowable_classes ?? ["Wizard"],
+    casting_type: "sorcerer",
+    min_level: 1,
+    mp_cost: over.mp_cost ?? 4,
+    duration: "instant",
+    effect_type: over.effect_type ?? "damage",
+    effect_value: over.effect_value,
+    targeting: over.targeting,
+    usable_in: over.usable_in ?? ["battle"],
+  });
+}
+
+describe("classifyCombatCast", () => {
+  it("self-targeted recovery / utility spells", () => {
+    expect(classifyCombatCast(spell({ effect_type: "invisibility", targeting: "self" }))).toBe("self");
+    expect(classifyCombatCast(spell({ effect_type: "restore",      targeting: "self" }))).toBe("self");
+  });
+
+  it("Bless is mass-ally even though the data tags it self (party-wide buff)", () => {
+    expect(classifyCombatCast(spell({ effect_type: "bless", targeting: "self" }))).toBe("mass-ally");
+  });
+
+  it("mass-ally for mass_heal", () => {
+    expect(classifyCombatCast(spell({ effect_type: "mass_heal", targeting: "self" }))).toBe("mass-ally");
+  });
+
+  it("mass-enemy for undead_damage / auto_monster", () => {
+    expect(classifyCombatCast(spell({ effect_type: "undead_damage", targeting: "auto_monster" }))).toBe("mass-enemy");
+  });
+
+  it("pick-ally for select_ally / select_ally_or_self / heals", () => {
+    expect(classifyCombatCast(spell({ effect_type: "ac_buff",  targeting: "select_ally" }))).toBe("pick-ally");
+    expect(classifyCombatCast(spell({ effect_type: "heal",     targeting: "select_ally_or_self" }))).toBe("pick-ally");
+    expect(classifyCombatCast(spell({ effect_type: "cure_poison", targeting: "select_ally" }))).toBe("pick-ally");
+  });
+
+  it("pick-enemy for select_enemy / directional_projectile / damage spells", () => {
+    expect(classifyCombatCast(spell({ effect_type: "damage", targeting: "directional_projectile" }))).toBe("pick-enemy");
+    expect(classifyCombatCast(spell({ effect_type: "sleep",  targeting: "select_enemy" }))).toBe("pick-enemy");
+    expect(classifyCombatCast(spell({ effect_type: "curse",  targeting: "select_enemy" }))).toBe("pick-enemy");
+  });
+
+  it("tile-targeted spells classify as pick-tile", () => {
+    expect(classifyCombatCast(spell({ effect_type: "aoe_fireball",   targeting: "select_tile" }))).toBe("pick-tile");
+    expect(classifyCombatCast(spell({ effect_type: "teleport",       targeting: "select_tile" }))).toBe("pick-tile");
+    expect(classifyCombatCast(spell({ effect_type: "summon_skeleton",targeting: "select_tile" }))).toBe("pick-tile");
+  });
+
+  it("aoe / teleport / summon classify as pick-tile even when targeting is missing", () => {
+    expect(classifyCombatCast(spell({ effect_type: "aoe_fireball" }))).toBe("pick-tile");
+    expect(classifyCombatCast(spell({ effect_type: "teleport" }))).toBe("pick-tile");
+    expect(classifyCombatCast(spell({ effect_type: "summon_skeleton" }))).toBe("pick-tile");
+  });
+});
+
+describe("describeStatusCast", () => {
+  const caster = { id: "c", name: "Gandolf" } as Combatant;
+  const target = { id: "t", name: "Wolf" } as Combatant;
+  it("renders a flavour line per status effect", () => {
+    expect(describeStatusCast(caster, target, spell({ effect_type: "sleep" })))
+      .toMatch(/sleep/i);
+    expect(describeStatusCast(caster, target, spell({ effect_type: "charm" })))
+      .toMatch(/charmed/i);
+    expect(describeStatusCast(caster, target, spell({ effect_type: "ac_buff" })))
+      .toMatch(/shield/i);
+    expect(describeStatusCast(caster, caster, spell({ effect_type: "bless" })))
+      .toMatch(/blessed/i);
+    expect(describeStatusCast(caster, caster, spell({ effect_type: "invisibility" })))
+      .toMatch(/fades/i);
   });
 });
 

@@ -16,16 +16,18 @@ const GameCanvas = dynamic(() => import("@/components/GameCanvas"), {
 
 export default function CombatPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center px-4 py-8">
-      <div className="mb-4 flex w-full items-center justify-between">
+    <main className="mx-auto flex h-screen max-w-5xl flex-col items-center overflow-hidden px-4 py-2">
+      <div className="mb-1 flex w-full shrink-0 items-center justify-between">
         <Link href="/" className="text-sm text-parchment/60 hover:text-parchment">
           &larr; Back
         </Link>
-        <h1 className="font-display text-2xl text-parchment">Combat Demo</h1>
+        <h1 className="font-display text-xl text-parchment">Combat Demo</h1>
         <span className="w-16" /> {/* spacer */}
       </div>
-      <GameCanvas startScene="CombatScene" />
-      <p className="mt-4 text-xs text-parchment/40">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <GameCanvas startScene="CombatScene" />
+      </div>
+      <p className="mt-1 shrink-0 text-xs text-parchment/40">
         Standalone combat demo. WASD/arrows or tap an adjacent tile to move;
         bumping an enemy attacks them.
       </p>
