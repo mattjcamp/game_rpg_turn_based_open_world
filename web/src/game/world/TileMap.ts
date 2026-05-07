@@ -166,6 +166,35 @@ export class TileMap {
    * string for kind-only links so callers like TownScene's exit check
    * can still see `link.kind === "overworld"`.
    */
+  /**
+   * Resolve the counter key (from `data/counters.json`) attached to a
+   * cell, or null. Two paths are checked, in order:
+   *
+   *   1. Per-cell override: `tile_properties["col,row"].shop_type`.
+   *      Authors set this to point any tile at any counter without
+   *      needing a dedicated counter-tile id.
+   *   2. Tile-id default: `tile_defs.json` carries
+   *      `interaction_type === "shop"` plus `interaction_data` on the
+   *      Counter / Weapon Counter / Armor Counter / Magic Shop /
+   *      Healing Counter tile ids. Stepping into one of those tiles
+   *      uses its declared counter key.
+   *
+   * The override beats the default — a Magic Shop tile re-purposed
+   * with `shop_type: "weapon"` becomes a weapon counter without losing
+   * its sprite.
+   */
+  getCounterKey(col: number, row: number): string | null {
+    const props = this.tileProperties[`${col},${row}`];
+    const override = props?.shop_type;
+    if (typeof override === "string" && override.length > 0) return override;
+    const id = this.getTile(col, row);
+    const def = tileDef(id);
+    if (def.interactionType !== "shop") return null;
+    return def.interactionData && def.interactionData.length > 0
+      ? def.interactionData
+      : null;
+  }
+
   getTileLink(col: number, row: number): TileLink | null {
     const props = this.tileProperties[`${col},${row}`];
     if (!props) return null;

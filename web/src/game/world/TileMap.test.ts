@@ -16,6 +16,8 @@ import {
   TILE_PATH,
   TILE_SPAWN_CAMPFIRE,
   isEncounterTrigger,
+  populateRuntimeDefs,
+  _clearRuntimeTileDefs,
 } from "./Tiles";
 
 function tinyMap(): TileMap {
@@ -284,5 +286,60 @@ describe("TileMap — getTileLink", () => {
     expect(link?.name).toBe("");
     expect(link?.x).toBe(10);
     expect(link?.y).toBe(14);
+  });
+});
+
+// ── Counter resolution ──────────────────────────────────────────────
+
+describe("TileMap — getCounterKey", () => {
+  // Tile id 12 = Counter (general) per `data/tile_defs.json`. We pull
+  // its interaction_data into the runtime cache so the lookup matches
+  // what the live game sees after `loadTileDefs` resolves.
+  const TILE_COUNTER_GENERAL = 12;
+  function withRuntimeCounterDef<T>(fn: () => T): T {
+    populateRuntimeDefs({
+      [String(TILE_COUNTER_GENERAL)]: {
+        name: "Counter",
+        walkable: false,
+        sprite: "town/counter",
+        interaction_type: "shop",
+        interaction_data: "general",
+      },
+    });
+    try {
+      return fn();
+    } finally {
+      _clearRuntimeTileDefs();
+    }
+  }
+
+  it("returns null for a plain grass tile with no counter data", () => {
+    const m = new TileMap(1, 1, [[TILE_GRASS]]);
+    expect(m.getCounterKey(0, 0)).toBeNull();
+  });
+
+  it("returns the tile-id default when interaction_type is 'shop'", () => {
+    withRuntimeCounterDef(() => {
+      const m = new TileMap(1, 1, [[TILE_COUNTER_GENERAL]]);
+      expect(m.getCounterKey(0, 0)).toBe("general");
+    });
+  });
+
+  it("per-cell shop_type override beats the tile-id default", () => {
+    withRuntimeCounterDef(() => {
+      const m = new TileMap(1, 1, [[TILE_COUNTER_GENERAL]], {
+        tileProperties: { "0,0": { shop_type: "weapon" } },
+      });
+      expect(m.getCounterKey(0, 0)).toBe("weapon");
+    });
+  });
+
+  it("a per-cell shop_type on a non-counter tile still resolves", () => {
+    // Authors point a plain interior tile (e.g. brick wall) at a
+    // counter via tile_properties without changing the tile id.
+    const m = new TileMap(1, 1, [[TILE_GRASS]], {
+      tileProperties: { "0,0": { shop_type: "healing" } },
+    });
+    expect(m.getCounterKey(0, 0)).toBe("healing");
   });
 });

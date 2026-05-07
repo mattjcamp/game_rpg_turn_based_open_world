@@ -41,6 +41,7 @@ import {
   getBuildingSpace,
   parseBuildingPath,
 } from "../world/Buildings";
+import { dataPath, assetUrl } from "../world/Module";
 import { TileMap } from "../world/TileMap";
 import {
   tileDef,
@@ -143,7 +144,7 @@ export class TownScene extends Phaser.Scene {
     // Phaser keeps preload going for any files added inside this
     // listener, so create() only fires once the full sprite set
     // (overworld + town + dungeon tiles) is in cache.
-    this.load.json("tile_defs", "/data/tile_defs.json");
+    this.load.json("tile_defs", dataPath("tile_defs.json"));
     this.load.once("filecomplete-json-tile_defs", () => {
       const raw = this.cache.json.get("tile_defs");
       if (raw) populateRuntimeDefs(raw);
@@ -166,7 +167,7 @@ export class TownScene extends Phaser.Scene {
       "alchemist", "barbarian", "cleric", "fighter",
       "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
-      const path = `/assets/characters/${f}.png`;
+      const path = assetUrl(`/assets/characters/${f}.png`);
       this.load.image(path, path);
     }
   }
@@ -514,7 +515,27 @@ export class TownScene extends Phaser.Scene {
       this.openDialog(npc);
       return;
     }
-    if (!this.tileMap.isWalkable(nc, nr)) {
+
+    // Counter tiles fire when the party walks INTO them, regardless of
+    // walkability. Two flavours, mirroring `tile_defs.json`:
+    //
+    //   - Non-walkable counter (id 12 Counter, id 61 Healing): bump the
+    //     bench, open the UI, party stays put. Same as the Python
+    //     game's `_try_tile_interaction` bump path.
+    //   - Walkable counter (Weapon / Armor / Magic Shop): step onto
+    //     the tile and open the UI as the step lands.
+    const counterKey = this.tileMap.getCounterKey(nc, nr);
+    const targetWalkable = this.tileMap.isWalkable(nc, nr);
+    if (counterKey && !targetWalkable) {
+      // No bump tween — `openCounter` pauses the scene before any
+      // tween could run, which would leave `busy` stuck true (paused
+      // tweens don't fire `onComplete`). The user sees the overlay
+      // open instead of the bump animation.
+      this.openCounter(counterKey);
+      return;
+    }
+
+    if (!targetWalkable) {
       this.busy = true;
       this.tweens.add({
         targets: this.player,
@@ -539,8 +560,24 @@ export class TownScene extends Phaser.Scene {
         this.busy = false;
         this.refreshHud();
         this.refreshDarkness();
+        // Step-onto counter (walkable counter tiles): open the UI
+        // once the step has landed. checkExit gets a fresh look
+        // first so a tile that's both linked and a counter still
+        // honours its link if any.
         this.checkExit(nc, nr);
+        if (counterKey && targetWalkable) {
+          this.openCounter(counterKey);
+        }
       },
+    });
+  }
+
+  private openCounter(counterKey: string): void {
+    if (this.dialog) return;
+    this.scene.pause();
+    this.scene.launch("CounterScene", {
+      counterKey,
+      from: "TownScene",
     });
   }
 

@@ -18,6 +18,8 @@
  * No edits required here.
  */
 
+import { BASE_PATH, dataPath } from "./Module";
+
 // ── Overworld tiles ─────────────────────────────────────────────
 export const TILE_GRASS = 0;
 export const TILE_WATER = 1;
@@ -110,6 +112,20 @@ export interface TileDef {
   sprite?: string;
   /** Optional per-tile-id flag block from tile_defs.json. */
   flags?: TileFlags;
+  /**
+   * Interaction kind from tile_defs.json. Today's values: `"shop"`
+   * (counter — opens a buy/sell or service screen), `"sign"` (shows a
+   * message), `"spawn"` (overworld monster spawner). Anything else is
+   * passed through unchanged for future expansion.
+   */
+  interactionType?: string;
+  /**
+   * Companion data field for the interaction. For `"shop"` this is a
+   * counter key from counters.json (`general` / `weapon` / `healing` …);
+   * for `"sign"` it's the message text; for `"spawn"` it identifies the
+   * spawn template.
+   */
+  interactionData?: string;
 }
 
 const FALLBACK: TileDef = { color: [60, 60, 60], walkable: false, name: "Unknown" };
@@ -130,25 +146,25 @@ const FALLBACK: TileDef = { color: [60, 60, 60], walkable: false, name: "Unknown
  */
 const DEFS: Record<number, TileDef> = {
   [TILE_GRASS]:    { color: [34, 139, 34],  walkable: true,  name: "Grass",
-                     sprite: "/assets/overworld/grass.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/grass.png` },
   [TILE_WATER]:    { color: [30, 90, 180],  walkable: false, name: "Water",
-                     sprite: "/assets/overworld/water.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/water.png` },
   [TILE_FOREST]:   { color: [0, 80, 0],     walkable: true,  name: "Forest",
-                     sprite: "/assets/overworld/forest.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/forest.png` },
   [TILE_MOUNTAIN]: { color: [130, 130, 130],walkable: false, name: "Mountain",
-                     sprite: "/assets/overworld/mountain.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/mountain.png` },
   [TILE_TOWN]:     { color: [180, 140, 80], walkable: true,  name: "Town",
-                     sprite: "/assets/overworld/town.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/town.png` },
   [TILE_DUNGEON]:  { color: [120, 40, 80],  walkable: true,  name: "Dungeon",
-                     sprite: "/assets/overworld/dungeon.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/dungeon.png` },
   [TILE_PATH]:     { color: [160, 140, 100],walkable: true,  name: "Path",
-                     sprite: "/assets/overworld/path.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/path.png` },
   [TILE_SAND]:     { color: [210, 190, 130],walkable: true,  name: "Sand",
-                     sprite: "/assets/overworld/sand.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/sand.png` },
   [TILE_BRIDGE]:   { color: [140, 100, 50], walkable: true,  name: "Bridge",
-                     sprite: "/assets/overworld/bridge.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/bridge.png` },
   [TILE_DUNGEON_CLEARED]: { color: [80, 70, 60], walkable: true, name: "Cleared Dungeon",
-                     sprite: "/assets/overworld/dungeon_cleared.png" },
+                     sprite: `${BASE_PATH}/assets/overworld/dungeon_cleared.png` },
   // Encounter triggers: rendered with a ✦ glyph overlaid on the
   // fallback colour. Sprites in /assets/items/campfire.png etc. are
   // available via tile_defs.json runtime entries if a scene wants
@@ -164,7 +180,7 @@ const DEFS: Record<number, TileDef> = {
 };
 
 /** Path to the player avatar sprite. */
-export const PLAYER_SPRITE = "/assets/overworld/party_marker.png";
+export const PLAYER_SPRITE = `${BASE_PATH}/assets/overworld/party_marker.png`;
 
 /**
  * Runtime-loaded tile defs sourced from `data/tile_defs.json`.
@@ -184,6 +200,8 @@ interface RawTileDef {
   sprite?: string;
   /** Optional flag block (lighting + transparency). */
   flags?: TileFlags;
+  interaction_type?: string;
+  interaction_data?: string;
 }
 
 /**
@@ -193,8 +211,9 @@ interface RawTileDef {
  */
 export function spriteUrlForKey(key: string | undefined): string | undefined {
   if (!key) return undefined;
-  if (key.startsWith("/assets/") || key.startsWith("http")) return key;
-  return `/assets/${key}.png`;
+  if (key.startsWith("http://") || key.startsWith("https://")) return key;
+  if (key.startsWith("/assets/")) return `${BASE_PATH}${key}`;
+  return `${BASE_PATH}/assets/${key}.png`;
 }
 
 /**
@@ -217,11 +236,13 @@ export function populateRuntimeDefs(raw: Record<string, RawTileDef>): void {
       color: (v.color ?? [60, 60, 60]) as [number, number, number],
       sprite: spriteUrlForKey(v.sprite),
       flags: v.flags,
+      interactionType: v.interaction_type,
+      interactionData: v.interaction_data,
     };
   }
 }
 
-export async function loadTileDefs(url = "/data/tile_defs.json"): Promise<void> {
+export async function loadTileDefs(url = dataPath("tile_defs.json")): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
   const raw = (await res.json()) as Record<string, RawTileDef>;
@@ -251,6 +272,8 @@ export function tileDef(id: number): TileDef {
       ...hard,
       sprite: hard.sprite ?? runtime.sprite,
       flags: hard.flags ?? runtime.flags,
+      interactionType: hard.interactionType ?? runtime.interactionType,
+      interactionData: hard.interactionData ?? runtime.interactionData,
     };
   }
   return hard ?? runtime ?? FALLBACK;

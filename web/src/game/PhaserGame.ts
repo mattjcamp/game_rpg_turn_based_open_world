@@ -12,6 +12,7 @@ import { CombatScene } from "./scenes/CombatScene";
 import { OverworldScene } from "./scenes/OverworldScene";
 import { TownScene } from "./scenes/TownScene";
 import { PartyScene } from "./scenes/PartyScene";
+import { CounterScene } from "./scenes/CounterScene";
 
 export type StartScene = "OverworldScene" | "CombatScene";
 
@@ -22,8 +23,8 @@ export function startGame(parent: HTMLElement, startScene: StartScene = "Overwor
   // PartyScene is registered too so any active scene can `scene.launch`
   // it as an overlay.
   const sceneOrder = startScene === "CombatScene"
-    ? [CombatScene, OverworldScene, TownScene, PartyScene]
-    : [OverworldScene, CombatScene, TownScene, PartyScene];
+    ? [CombatScene, OverworldScene, TownScene, PartyScene, CounterScene]
+    : [OverworldScene, CombatScene, TownScene, PartyScene, CounterScene];
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent,
