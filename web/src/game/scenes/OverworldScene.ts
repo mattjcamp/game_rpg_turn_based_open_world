@@ -73,6 +73,23 @@ export class OverworldScene extends Phaser.Scene {
     super({ key: "OverworldScene" });
   }
 
+  init(): void {
+    // Phaser reuses the same scene instance across scene.start calls,
+    // so transient state has to be reset here — otherwise a `busy=true`
+    // left behind by an arrow-key tween that was interrupted by the
+    // fade-into-combat (CombatScene takes over before the tween's
+    // onComplete fires) blocks every input on return from combat,
+    // leaving the party "frozen". The Maps also dangle stale Phaser
+    // objects that get destroyed during scene shutdown — clearing them
+    // means create() rebuilds from a clean slate.
+    this.busy = false;
+    this.dark = false;
+    this.mapLights = [];
+    this.darkness = new Map();
+    this.roamerSprites = new Map();
+    this.defeatOverlay = undefined;
+  }
+
   preload(): void {
     // Crisp pixels, no smoothing — these are 32×32 tile graphics.
     this.textures.on("addtexture", (key: string) => {
