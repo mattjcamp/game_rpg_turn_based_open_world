@@ -47,6 +47,7 @@ import {
 } from "../data/monsters";
 import { gameState } from "../state";
 import { tileSpriteKey, populateRuntimeDefs, spriteManifest } from "../world/Tiles";
+import { assetUrl, dataPath } from "../world/Module";
 import { loadItems, type Item } from "../world/Items";
 import { loadSpells, type Spell } from "../world/Spells";
 import { loadParty } from "../world/Party";
@@ -297,7 +298,7 @@ export class CombatScene extends Phaser.Scene {
       "alchemist", "barbarian", "cleric", "fighter",
       "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
-      const path = `/assets/characters/${f}.png`;
+      const path = assetUrl(`/assets/characters/${f}.png`);
       this.load.image(path, path);
     }
     // Tile sprites for the arena floor — load the full tile manifest
@@ -306,7 +307,7 @@ export class CombatScene extends Phaser.Scene {
       const tex = this.textures.get(key);
       if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
-    this.load.json("tile_defs_combat", "/data/tile_defs.json");
+    this.load.json("tile_defs_combat", dataPath("tile_defs.json"));
     this.load.once("filecomplete-json-tile_defs_combat", () => {
       const raw = this.cache.json.get("tile_defs_combat");
       if (raw) populateRuntimeDefs(raw);

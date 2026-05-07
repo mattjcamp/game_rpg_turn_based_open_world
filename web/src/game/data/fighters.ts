@@ -7,13 +7,14 @@
  */
 
 import type { Combatant } from "../types";
+import { assetUrl } from "../world/Module";
 
 /** Sprite paths the party-related preloader needs. */
 export const PARTY_SPRITES: string[] = [
-  "/assets/characters/fighter.png",
-  "/assets/characters/barbarian.png",
-  "/assets/characters/ranger.png",
-  "/assets/characters/wizard.png",
+  assetUrl("/assets/characters/fighter.png"),
+  assetUrl("/assets/characters/barbarian.png"),
+  assetUrl("/assets/characters/ranger.png"),
+  assetUrl("/assets/characters/wizard.png"),
 ];
 
 export function makeSampleParty(): Combatant[] {
@@ -29,7 +30,7 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 8, bonus: 3 }, // longsword + STR
       dexMod: 1,
       color: [180, 60, 60], // ember red
-      sprite: "/assets/characters/fighter.png",
+      sprite: assetUrl("/assets/characters/fighter.png"),
       baseMoveRange: 4,
       position: { col: 0, row: 0 }, // overwritten by Combat
     },
@@ -44,7 +45,7 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 12, bonus: 4 }, // greataxe + STR
       dexMod: 0,
       color: [200, 130, 60], // amber
-      sprite: "/assets/characters/barbarian.png",
+      sprite: assetUrl("/assets/characters/barbarian.png"),
       baseMoveRange: 3,
       position: { col: 0, row: 0 },
     },
@@ -59,7 +60,7 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 8, bonus: 3 }, // longbow + DEX
       dexMod: 3,
       color: [80, 160, 100], // forest green
-      sprite: "/assets/characters/ranger.png",
+      sprite: assetUrl("/assets/characters/ranger.png"),
       baseMoveRange: 5,
       position: { col: 0, row: 0 },
     },
@@ -74,7 +75,7 @@ export function makeSampleParty(): Combatant[] {
       damage: { dice: 1, sides: 6, bonus: 2 }, // staff or fire bolt
       dexMod: 1,
       color: [120, 100, 200], // arcane violet
-      sprite: "/assets/characters/wizard.png",
+      sprite: assetUrl("/assets/characters/wizard.png"),
       baseMoveRange: 4,
       position: { col: 0, row: 0 },
     },

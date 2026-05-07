@@ -74,6 +74,7 @@ import {
   type Item,
   type EquipSlot,
 } from "../world/Items";
+import { assetUrl } from "../world/Module";
 
 // Canvas
 const W = 960;
@@ -227,7 +228,7 @@ export class PartyScene extends Phaser.Scene {
       "alchemist", "barbarian", "cleric", "fighter",
       "illusionist", "paladin", "ranger", "thief", "wizard",
     ]) {
-      const path = `/assets/characters/${f}.png`;
+      const path = assetUrl(`/assets/characters/${f}.png`);
       this.load.image(path, path);
     }
   }

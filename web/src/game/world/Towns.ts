@@ -13,7 +13,7 @@
  */
 
 import { TileMap, type TileLink } from "./TileMap";
-import { modulePath } from "./Module";
+import { BASE_PATH, modulePath } from "./Module";
 
 /** Tile id 36 = TILE_VOID per `src/settings.py`. Non-walkable, black. */
 const TILE_VOID = 36;
@@ -85,14 +85,16 @@ interface RawTown {
  */
 export function normalizeSpritePath(path: string): string {
   if (!path) return "";
-  if (path.startsWith("/assets/")) return path;
+  // Already a runtime URL (any base prefix already applied) — leave alone.
+  if (BASE_PATH && path.startsWith(`${BASE_PATH}/assets/`)) return path;
+  if (!BASE_PATH && path.startsWith("/assets/")) return path;
   // Capture the tail after `assets/[game/]`. Both source layouts hit this:
   //   src/assets/game/characters/cleric.png → characters/cleric.png
   //   assets/characters/cleric.png          → characters/cleric.png
   const m = path.match(/assets\/(?:game\/)?(.+)$/);
-  if (m) return "/assets/" + m[1];
+  if (m) return `${BASE_PATH}/assets/` + m[1];
   // Fallback for un-prefixed paths: assume a relative web path.
-  return "/assets/" + path.replace(/^\/+/, "");
+  return `${BASE_PATH}/assets/` + path.replace(/^\/+/, "");
 }
 
 /** Convert a "col,row"-keyed dict of rich tile entries into a 2D grid. */

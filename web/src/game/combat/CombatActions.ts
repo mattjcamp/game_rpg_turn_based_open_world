@@ -17,6 +17,7 @@ import type { Item } from "../world/Items";
 import type { Spell } from "../world/Spells";
 import { rollAttack, rollDamage } from "./engine";
 import type { RNG } from "../rng";
+import { assetUrl } from "../world/Module";
 
 /**
  * Throwable / ranged attack — used by the Throw action and by ranged
@@ -413,7 +414,7 @@ export function makeSummonedSkeleton(
     },
     dexMod: 1,
     color: [200, 200, 180],
-    sprite: "/assets/monsters/skeleton.png",
+    sprite: assetUrl("/assets/monsters/skeleton.png"),
     baseMoveRange: 3,
     position: { col: 0, row: 0 }, // overwritten by Combat.addCombatant
     undead: true,

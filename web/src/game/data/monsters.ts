@@ -14,7 +14,7 @@
  */
 
 import type { Combatant } from "../types";
-import { dataPath } from "../world/Module";
+import { assetUrl, dataPath, BASE_PATH } from "../world/Module";
 
 export interface MonsterSpec {
   name: string;
@@ -52,25 +52,25 @@ const BUILTIN: Record<string, MonsterSpec> = {
   "Giant Rat": {
     name: "Giant Rat", hp: 8, ac: 12, attackBonus: 2,
     damage: { dice: 1, sides: 4, bonus: 0 }, dexMod: 2,
-    color: [140, 100, 80], sprite: "/assets/monsters/giant_rat.png",
+    color: [140, 100, 80], sprite: assetUrl("/assets/monsters/giant_rat.png"),
     baseMoveRange: 5,
   },
   Goblin: {
     name: "Goblin", hp: 6, ac: 11, attackBonus: 2,
     damage: { dice: 1, sides: 4, bonus: 0 }, dexMod: 2,
-    color: [100, 160, 60], sprite: "/assets/monsters/goblin.png",
+    color: [100, 160, 60], sprite: assetUrl("/assets/monsters/goblin.png"),
     baseMoveRange: 4,
   },
   Skeleton: {
     name: "Skeleton", hp: 12, ac: 13, attackBonus: 3,
     damage: { dice: 1, sides: 6, bonus: 1 }, dexMod: 1,
-    color: [220, 220, 200], sprite: "/assets/monsters/skeleton.png",
+    color: [220, 220, 200], sprite: assetUrl("/assets/monsters/skeleton.png"),
     baseMoveRange: 3, undead: true,
   },
   Orc: {
     name: "Orc", hp: 18, ac: 13, attackBonus: 4,
     damage: { dice: 1, sides: 8, bonus: 2 }, dexMod: 0,
-    color: [80, 130, 70], sprite: "/assets/monsters/orc.png",
+    color: [80, 130, 70], sprite: assetUrl("/assets/monsters/orc.png"),
     baseMoveRange: 3,
   },
 };
@@ -87,10 +87,15 @@ let _catalog: Map<string, MonsterSpec> | null = null;
  */
 function spritePathFromTile(tile: string | undefined): string {
   if (!tile) return "";
-  if (tile.startsWith("/assets/")) return tile;
-  let p = tile.replace(/^game\//, "");           // strip "game/" prefix
+  // Already a runtime URL (with the active base prefix already applied) — leave alone.
+  if (BASE_PATH && tile.startsWith(`${BASE_PATH}/assets/`)) return tile;
+  if (!BASE_PATH && tile.startsWith("/assets/")) return tile;
+  // Otherwise normalise the catalog form ("game/monsters/x" or
+  // "monsters/x") and prefix with the deploy base.
+  let p = tile.replace(/^\/+/, "").replace(/^assets\//, "");
+  p = p.replace(/^game\//, "");                  // strip "game/" prefix
   if (!/\.[a-z]+$/i.test(p)) p = `${p}.png`;     // add .png if missing
-  return `/assets/${p}`;
+  return assetUrl(p);
 }
 
 /** Convert one raw monster entry into the typed MonsterSpec. */

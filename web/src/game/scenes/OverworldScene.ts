@@ -43,6 +43,7 @@ import {
   type MonsterSpec,
 } from "../data/monsters";
 import { TILE_GRASS } from "../world/Tiles";
+import { dataPath } from "../world/Module";
 import { defaultRng } from "../rng";
 
 const TILE = 32; // matches the source PNGs' native size
@@ -84,7 +85,7 @@ export class OverworldScene extends Phaser.Scene {
     // Phaser keeps the loader running while new files are queued during
     // preload, so the scene's create() runs only after ALL tile sprites
     // (hardcoded + runtime) have finished loading.
-    this.load.json("tile_defs", "/data/tile_defs.json");
+    this.load.json("tile_defs", dataPath("tile_defs.json"));
     this.load.once("filecomplete-json-tile_defs", () => {
       const raw = this.cache.json.get("tile_defs");
       if (raw) populateRuntimeDefs(raw);
