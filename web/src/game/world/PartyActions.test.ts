@@ -22,6 +22,7 @@ import {
   partyHasEffect,
   partyLightRadius,
   partyLightTint,
+  tickGaladrielsLight,
   getItemMaxDurability,
   getSlotDurability,
   isIndestructible,
@@ -774,6 +775,53 @@ describe("partyHasEffect / partyLightRadius", () => {
     p.partyEffects.effect_1 = "galadriels_light";
     p.partyEffects.effect_2 = "infravision";
     expect(partyLightTint(p)?.color).toBe(0xc02020);
+  });
+});
+
+describe("Galadriel's Light step burnout", () => {
+  const galadriels: Effect = {
+    id: "galadriels_light", name: "Galadriel's Light", description: "",
+    duration: 500, requirements: { race: "Elf" },
+  };
+
+  it("seeds the step counter from the effect's duration on equip", () => {
+    const p = makeParty();
+    expect(p.galadrielsLightSteps).toBe(0);
+    const r = assignEffectToParty(p, galadriels, activeMembers(p));
+    expect(r.ok).toBe(true);
+    expect(p.galadrielsLightSteps).toBe(500);
+  });
+
+  it("clears the counter when the effect is manually removed", () => {
+    const p = makeParty();
+    assignEffectToParty(p, galadriels, activeMembers(p));
+    expect(p.galadrielsLightSteps).toBe(500);
+    removeEffectFromParty(p, galadriels);
+    expect(p.galadrielsLightSteps).toBe(0);
+    expect(partyHasEffect(p, "galadriels_light")).toBe(false);
+  });
+
+  it("ticks one step per call and clears the slot when it hits zero", () => {
+    const p = makeParty();
+    assignEffectToParty(p, galadriels, activeMembers(p));
+    // Burn 499 steps — still active.
+    for (let i = 0; i < 499; i++) {
+      expect(tickGaladrielsLight(p)).toBe(false);
+    }
+    expect(p.galadrielsLightSteps).toBe(1);
+    expect(partyHasEffect(p, "galadriels_light")).toBe(true);
+    // Final tick — fades.
+    expect(tickGaladrielsLight(p)).toBe(true);
+    expect(p.galadrielsLightSteps).toBe(0);
+    expect(partyHasEffect(p, "galadriels_light")).toBe(false);
+    // Subsequent ticks are a no-op.
+    expect(tickGaladrielsLight(p)).toBe(false);
+  });
+
+  it("does nothing when the effect isn't equipped", () => {
+    const p = makeParty();
+    expect(tickGaladrielsLight(p)).toBe(false);
+    expect(p.galadrielsLightSteps).toBe(0);
   });
 });
 

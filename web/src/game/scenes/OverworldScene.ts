@@ -45,6 +45,7 @@ import {
 import { TILE_GRASS } from "../world/Tiles";
 import { dataPath } from "../world/Module";
 import { defaultRng } from "../rng";
+import { tickGaladrielsLight } from "../world/PartyActions";
 
 const TILE = 32; // matches the source PNGs' native size
 const HUD_HEIGHT = 56;
@@ -395,6 +396,9 @@ export class OverworldScene extends Phaser.Scene {
       duration: 110,
       onComplete: () => {
         this.busy = false;
+        if (gameState.partyData) {
+          tickGaladrielsLight(gameState.partyData);
+        }
         this.refreshHud();
         this.refreshDarkness();
         // Town/dungeon links take priority over encounter triggers.

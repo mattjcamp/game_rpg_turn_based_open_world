@@ -73,7 +73,7 @@ import {
   PARTY_LIGHT_RADIUS,
   type LightSource,
 } from "../world/Lighting";
-import { partyLightRadius, partyLightTint } from "../world/PartyActions";
+import { partyLightRadius, partyLightTint, tickGaladrielsLight } from "../world/PartyActions";
 import { decorationFor } from "../world/Decorations";
 import { withBase } from "../world/Module";
 import { gameState } from "../state";
@@ -681,6 +681,9 @@ export class TownScene extends Phaser.Scene {
             // Light just went out — the next refreshDarkness call below
             // sees torchSteps === 0 and snaps the pool away.
           }
+        }
+        if (gameState.partyData) {
+          tickGaladrielsLight(gameState.partyData);
         }
         this.refreshHud();
         this.refreshDarkness();

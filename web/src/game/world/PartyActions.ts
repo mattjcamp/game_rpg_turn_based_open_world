@@ -171,6 +171,12 @@ export function assignEffectToParty(
   for (const slot of slots) {
     if (party.partyEffects[slot] == null) {
       party.partyEffects[slot] = effect.id;
+      // Galadriel's Light burns out after `duration` steps — seed the
+      // counter from effects.json so the web version matches the
+      // Python game's 500-step limit.
+      if (effect.id === "galadriels_light" && typeof effect.duration === "number") {
+        party.galadrielsLightSteps = effect.duration;
+      }
       return { ok: true, message: `${effect.name} active.` };
     }
   }
@@ -188,10 +194,36 @@ export function removeEffectFromParty(
   for (const slot of Object.keys(party.partyEffects)) {
     if (party.partyEffects[slot] === effect.id) {
       party.partyEffects[slot] = null;
+      if (effect.id === "galadriels_light") {
+        party.galadrielsLightSteps = 0;
+      }
       return { ok: true, message: `${effect.name} dispelled.` };
     }
   }
   return { ok: true, message: `${effect.name} was not active.` };
+}
+
+/**
+ * Decrement Galadriel's Light by one step. When the counter hits zero
+ * the effect is cleared from whichever slot holds it. Returns true on
+ * the step that the light fades, so callers can show a message.
+ *
+ * Mirrors the Python game's `_tick_galadriels_light` (called in
+ * overworld, town, and dungeon move handlers — every move ticks,
+ * regardless of whether the scene is dark).
+ */
+export function tickGaladrielsLight(party: Party): boolean {
+  if (!partyHasEffect(party, "galadriels_light")) return false;
+  if (party.galadrielsLightSteps <= 0) return false;
+  party.galadrielsLightSteps -= 1;
+  if (party.galadrielsLightSteps > 0) return false;
+  for (const slot of Object.keys(party.partyEffects)) {
+    if (party.partyEffects[slot] === "galadriels_light") {
+      party.partyEffects[slot] = null;
+      break;
+    }
+  }
+  return true;
 }
 
 // ── Stash ↔ personal inventory ─────────────────────────────────────

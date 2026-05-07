@@ -86,6 +86,12 @@ export interface Party {
    *  Python game's `DungeonState.torch_steps` but kept on the party so
    *  it survives transitions in this port. */
   torchSteps: number;
+  /** Remaining steps before Galadriel's Light burns out. Set when the
+   *  effect is equipped (from effects.json `duration`) and decremented
+   *  once per move in any scene. When it hits zero, the effect is
+   *  cleared from its slot — matches the Python game's
+   *  `party.galadriels_light_steps`. */
+  galadrielsLightSteps: number;
 }
 
 interface RawEquipped {
@@ -121,6 +127,7 @@ interface RawParty {
   party_effects?: Record<string, string | null>;
   inventory?: InventoryItem[];
   torch_steps?: number;
+  galadriels_light_steps?: number;
 }
 
 /**
@@ -198,6 +205,7 @@ export function partyFromRaw(raw: RawParty): Party {
     },
     inventory: raw.inventory ?? [],
     torchSteps: raw.torch_steps ?? 0,
+    galadrielsLightSteps: raw.galadriels_light_steps ?? 0,
   };
 }
 

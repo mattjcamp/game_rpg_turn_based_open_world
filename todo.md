@@ -5,7 +5,11 @@ python3 main.py
 
 ## Polish
 
+- the party should be able to skip a turn on the maps by pressing the space bar
+- the townspeople should be able to move around like monsters do in a turn based way
+
 ## Bugs
+- Again, I found in a second random monster encounter that the party did not have it's normal options appear on the right (range, cast, throw). No error appeared in the console.
 
 ## Features
 
