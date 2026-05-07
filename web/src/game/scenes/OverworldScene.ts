@@ -30,6 +30,20 @@ import {
 import { decorationFor } from "../world/Decorations";
 import { gameState, triggerKey } from "../state";
 import type { Combatant } from "../types";
+import {
+  loadSpawnPoints,
+  trySpawnMonster,
+  roamStep,
+  type SpawnPoint,
+  type RoamingMonster,
+} from "../world/SpawnPoints";
+import {
+  loadMonsters,
+  loadedMonsterSprites,
+  type MonsterSpec,
+} from "../data/monsters";
+import { TILE_GRASS } from "../world/Tiles";
+import { defaultRng } from "../rng";
 
 const TILE = 32; // matches the source PNGs' native size
 const HUD_HEIGHT = 56;
@@ -46,6 +60,13 @@ export class OverworldScene extends Phaser.Scene {
   /** Renamed from `lights` to avoid colliding with Phaser.Scene.lights. */
   private mapLights: LightSource[] = [];
   private dark = false;
+  /** Loaded spawn-tile catalog keyed by tile id. */
+  private spawnPoints: Map<number, SpawnPoint> = new Map();
+  /** Live monster catalog — used to resolve spawn-list names + sprites. */
+  private monsterCatalog: Map<string, MonsterSpec> = new Map();
+  /** Per-roamer-id sprite shown over its current tile. Rebuilt every
+   *  step so positions stay in sync with gameState.roamingMonsters. */
+  private roamerSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
 
   constructor() {
     super({ key: "OverworldScene" });
@@ -78,6 +99,13 @@ export class OverworldScene extends Phaser.Scene {
     for (const { key, path } of spriteManifest()) {
       this.load.image(key, path);
     }
+    // Monster sprites for any roamer that might appear on the map.
+    // After loadMonsters() runs once, loadedMonsterSprites() returns
+    // the full union; on cold boot we just queue the BUILTIN set.
+    for (const path of loadedMonsterSprites()) {
+      const key = `monster:${path}`;
+      this.load.image(key, path);
+    }
   }
 
   async create(): Promise<void> {
@@ -95,6 +123,21 @@ export class OverworldScene extends Phaser.Scene {
 
     this.mapLights = collectLightSources(this.tileMap);
     this.dark = mapIsDark(this.mapLights);
+
+    // Load spawn data + apply any pending tile destructions BEFORE
+    // drawMap. If we did this after, the destroyed spawn would still
+    // render with its old id — drawMap creates Phaser GameObjects from
+    // the current tile state and they don't auto-update on later
+    // setTile() calls. Doing it here means a freshly-destroyed lair
+    // shows up as plain grass the moment we return from combat.
+    try {
+      this.spawnPoints = await loadSpawnPoints();
+      this.monsterCatalog = await loadMonsters();
+      this.applyPendingSpawnDestructions();
+    } catch {
+      /* spawn data missing — degrade gracefully */
+    }
+
     this.drawMap();
     this.drawPlayer();
     this.drawHud();
@@ -102,6 +145,23 @@ export class OverworldScene extends Phaser.Scene {
     this.installInput();
     this.refreshHud();
     if (this.dark) this.refreshDarkness();
+
+    // Catalog-driven monster sprite preloads + roamer overlay both
+    // run after drawMap because they layer on top of the static map.
+    try {
+      let queued = 0;
+      for (const path of loadedMonsterSprites()) {
+        const key = `monster:${path}`;
+        if (!this.textures.exists(key)) {
+          this.load.image(key, path);
+          queued += 1;
+        }
+      }
+      if (queued > 0) this.load.start();
+      this.renderRoamers();
+    } catch {
+      /* spawn data missing — degrade gracefully */
+    }
 
     if (gameState.defeated) this.showDefeat();
   }
@@ -117,27 +177,33 @@ export class OverworldScene extends Phaser.Scene {
         const x = col * TILE;
         const y = row * TILE;
         const key = tileSpriteKey(id);
-        if (key && this.textures.exists(key)) {
-          this.add.image(x, y, key).setOrigin(0);
+        const hasSprite = !!(key && this.textures.exists(key));
+        if (hasSprite) {
+          this.add.image(x, y, key!).setOrigin(0);
         } else {
-          // Fallback: coloured rectangle for tiles without a sprite
-          // (currently the spawn / encounter markers).
+          // Fallback: coloured rectangle for tiles without a sprite.
           const def = tileDef(id);
           const colorHex = Phaser.Display.Color.GetColor(...def.color);
           this.add.rectangle(x, y, TILE, TILE, colorHex).setOrigin(0);
         }
-        // Trigger glyph drawn on top regardless of base style so the
-        // player can spot encounters at a glance.
+        // Spawn tiles get a thematic pulse on top of their sprite so
+        // they read as "active lair" without needing a glyph. Other
+        // encounter triggers (the rare TILE_ENCOUNTER without an art
+        // asset) still get the ✦ marker so the player can spot them.
         if (isEncounterTrigger(id)) {
-          this.add
-            .text(x + TILE / 2, y + TILE / 2, "✦", {
-              fontFamily: "Georgia, serif",
-              fontSize: "18px",
-              color: "#ffd470",
-              stroke: "#1a1a2e",
-              strokeThickness: 3,
-            })
-            .setOrigin(0.5);
+          if (this.spawnPoints.has(id)) {
+            this.spawnSpawnAnimation(id, x, y);
+          } else if (!hasSprite) {
+            this.add
+              .text(x + TILE / 2, y + TILE / 2, "✦", {
+                fontFamily: "Georgia, serif",
+                fontSize: "18px",
+                color: "#ffd470",
+                stroke: "#1a1a2e",
+                strokeThickness: 3,
+              })
+              .setOrigin(0.5);
+          }
         }
       }
     }
@@ -316,6 +382,16 @@ export class OverworldScene extends Phaser.Scene {
         // Town/dungeon links take priority over encounter triggers.
         // (In the dragon module they're on different tiles anyway.)
         if (this.checkLink(nc, nr)) return;
+        // Tick spawn-tile production + roamer pursuit. If a roamer
+        // closed to within one tile of the party, jump straight to
+        // combat against that creature; otherwise fall through to the
+        // normal tile-based encounter check.
+        const engaged = this.tickSpawnsAndRoamers();
+        this.renderRoamers();
+        if (engaged) {
+          this.engageRoamer(engaged);
+          return;
+        }
         this.checkEncounter(nc, nr);
       },
     });
@@ -364,9 +440,12 @@ export class OverworldScene extends Phaser.Scene {
     if (!isEncounterTrigger(id)) return;
     const key = triggerKey(col, row);
     if (gameState.consumedTriggers.has(key)) return;
-    // Find a representative terrain tile — the trigger itself is a
-    // marker glyph (campfire / graveyard / spawn), the surrounding
-    // grass / forest / sand / path is what the arena should render.
+    if (gameState.destroyedSpawns.has(key)) return;
+    // If this is a Monster Spawn tile we have data for, hand combat
+    // its boss list and ask CombatScene to destroy the tile on
+    // victory. Other trigger tiles fall back to the random sample
+    // encounter we've used since the demo combat route.
+    const sp = this.spawnPoints.get(id);
     const terrainTileId = this.sampleNeighborTerrain(col, row);
     this.cameras.main.fadeOut(220, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
@@ -374,6 +453,179 @@ export class OverworldScene extends Phaser.Scene {
         fromWorld: true,
         triggerKey: key,
         terrainTileId,
+        monsterNames: sp && sp.boss_monsters.length > 0 ? sp.boss_monsters : undefined,
+        destroySpawnKey: sp ? key : undefined,
+      });
+    });
+  }
+
+  // ── Spawn-tile system ─────────────────────────────────────────────
+  //
+  // Mirrors the Python OverworldScene's `_spawn_from_spawn_tiles` +
+  // roamer pursuit. Each player step runs one pass of:
+  //   1. Roll the spawn chance for every nearby spawn tile and try
+  //      to drop a fresh roamer.
+  //   2. Walk every existing roamer one tile toward the party
+  //      (cardinal pursuit).
+  //   3. If any roamer is now adjacent to the party, hand off to
+  //      combat with that monster's catalog name.
+
+  /**
+   * Spawn-tile animation overlay. Mirrors the Python renderer's
+   * per-spawn flicker / pulse without recreating the procedural
+   * vector art:
+   *
+   *   - TILE_SPAWN (66, generic / wall_torch art): warm orange
+   *     flicker, sin-driven scale + alpha.
+   *   - TILE_SPAWN_CAMPFIRE (67): faster, brighter flicker.
+   *   - TILE_SPAWN_GRAVEYARD (68): slow eerie green pulse.
+   *   - TILE_ENCOUNTER (69, dragon) + TILE 71 (wyvern): hot red glow.
+   *
+   * Each entry is a small filled circle layered over the sprite with
+   * a yoyo tween — Phaser handles the animation loop, so there's no
+   * per-frame cost in the scene's update().
+   */
+  private spawnSpawnAnimation(id: number, x: number, y: number): void {
+    let color = 0xff8e3c;     // default warm orange
+    let radius = 6;
+    let radiusTo = 10;
+    let alpha = 0.55;
+    let durationMs = 700;
+    if (id === 67)      { color = 0xff9a3c; radiusTo = 12; durationMs = 380; }
+    else if (id === 68) { color = 0x7be2a8; radius = 8; radiusTo = 14; alpha = 0.4; durationMs = 1100; }
+    else if (id === 69) { color = 0xff5040; radius = 8; radiusTo = 14; durationMs = 900; }
+    else if (id === 71) { color = 0xffb04a; radius = 8; radiusTo = 14; durationMs = 900; }
+    const cx = x + TILE / 2;
+    const cy = y + TILE / 2;
+    const halo = this.add
+      .circle(cx, cy, radius, color, alpha)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(6);
+    this.tweens.add({
+      targets: halo,
+      radius: radiusTo,
+      alpha: Math.max(0.15, alpha - 0.3),
+      duration: durationMs,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
+  }
+
+  private renderRoamers(): void {
+    // Wipe the previous frame's sprites and redraw from state. Cheap
+    // enough for the small numbers of roamers a single map yields.
+    for (const o of this.roamerSprites.values()) o.destroy();
+    this.roamerSprites.clear();
+    for (const m of gameState.roamingMonsters) {
+      const x = m.col * TILE + TILE / 2;
+      const y = m.row * TILE + TILE / 2;
+      const key = m.sprite ? `monster:${m.sprite}` : null;
+      let obj: Phaser.GameObjects.GameObject;
+      if (key && this.textures.exists(key)) {
+        obj = this.add.image(x, y, key).setDepth(8);
+      } else {
+        // Fallback: small red diamond. Keeps the entity visible even
+        // when a sprite isn't ready (cold boot / unknown monster).
+        obj = this.add
+          .rectangle(x, y, TILE - 8, TILE - 8, 0xb04030, 1)
+          .setStrokeStyle(2, 0x1a1a2e)
+          .setDepth(8);
+      }
+      this.roamerSprites.set(m.id, obj);
+    }
+  }
+
+  /**
+   * Apply destruction queued by combat — replace the spawn tile with
+   * grass, redraw that tile, and add it to destroyedSpawns so the
+   * spawn loop skips it from now on. Called once at scene-create so a
+   * spawn destroyed during the previous combat shows up immediately
+   * when we return to the overworld.
+   */
+  private applyPendingSpawnDestructions(): void {
+    if (gameState.destroyedSpawns.size === 0) return;
+    for (const key of gameState.destroyedSpawns) {
+      const [c, r] = key.split(",").map((s) => parseInt(s, 10));
+      if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
+      // Only rewrite if the underlying tile is still a spawn marker —
+      // a normal grass tile is already in the right state.
+      const cur = this.tileMap.getTile(c, r);
+      if (this.spawnPoints.has(cur)) {
+        this.tileMap.setTile(c, r, TILE_GRASS);
+      }
+    }
+  }
+
+  /**
+   * Step the spawn / roamer simulation by one tick. Called from
+   * tryStep right after a successful party move. Returns the roamer
+   * the party is now standing next to (if any) so the caller can
+   * fast-path into combat instead of redrawing first.
+   */
+  private tickSpawnsAndRoamers(): RoamingMonster | null {
+    if (this.spawnPoints.size === 0) return null;
+    const party = gameState.playerPos;
+    const scan = 10;
+
+    // 1. Try to spawn from nearby spawn tiles.
+    for (let dr = -scan; dr <= scan; dr++) {
+      for (let dc = -scan; dc <= scan; dc++) {
+        const c = party.col + dc;
+        const r = party.row + dr;
+        if (c < 0 || r < 0 || c >= this.tileMap.width || r >= this.tileMap.height) continue;
+        const tid = this.tileMap.getTile(c, r);
+        const sp = this.spawnPoints.get(tid);
+        if (!sp) continue;
+        const key = triggerKey(c, r);
+        if (gameState.destroyedSpawns.has(key)) continue;
+        const newMon = trySpawnMonster({
+          spawnTile: { col: c, row: r, tileId: tid },
+          point: sp,
+          party,
+          existing: gameState.roamingMonsters,
+          isWalkable: (cc, rr) => this.tileMap.isWalkable(cc, rr),
+          rng: defaultRng,
+          spriteFor: (n) => this.monsterCatalog.get(n)?.sprite,
+        });
+        if (newMon) gameState.roamingMonsters.push(newMon);
+      }
+    }
+
+    // 2. Walk every roamer one cardinal tile toward the party.
+    for (const m of gameState.roamingMonsters) {
+      const next = roamStep(
+        m, party,
+        (cc, rr) => this.tileMap.isWalkable(cc, rr),
+        // Don't pile two roamers onto the same tile; allow stepping
+        // onto the party tile (that's the engagement trigger).
+        (cc, rr) => gameState.roamingMonsters.some(
+          (o) => o !== m && o.col === cc && o.row === rr,
+        ),
+      );
+      m.col = next.col;
+      m.row = next.row;
+    }
+
+    // 3. Engagement check — first roamer within Chebyshev 1 wins.
+    const hit = gameState.roamingMonsters.find(
+      (m) => Math.max(Math.abs(m.col - party.col), Math.abs(m.row - party.row)) <= 1,
+    );
+    return hit ?? null;
+  }
+
+  /** Hand off to combat against a single roaming monster instance. */
+  private engageRoamer(m: RoamingMonster): void {
+    const terrainTileId = this.sampleNeighborTerrain(m.col, m.row);
+    this.cameras.main.fadeOut(220, 0, 0, 0);
+    this.cameras.main.once("camerafadeoutcomplete", () => {
+      this.scene.start("CombatScene", {
+        fromWorld: true,
+        // No triggerKey — this isn't a tile-anchored encounter, so
+        // we don't want consumedTriggers to mark anything.
+        terrainTileId,
+        monsterNames: [m.name],
+        roamerId: m.id,
       });
     });
   }

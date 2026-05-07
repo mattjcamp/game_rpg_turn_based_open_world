@@ -38,7 +38,13 @@ import {
   type Direction,
 } from "../combat/Arena";
 import { makeSampleParty, PARTY_SPRITES } from "../data/fighters";
-import { makeSampleEncounter, MONSTER_SPRITES } from "../data/monsters";
+import {
+  makeSampleEncounter,
+  makeMonsterByName,
+  loadMonsters,
+  loadedMonsterSprites,
+  MONSTER_SPRITES,
+} from "../data/monsters";
 import { gameState } from "../state";
 import { tileSpriteKey, populateRuntimeDefs, spriteManifest } from "../world/Tiles";
 import { loadItems, type Item } from "../world/Items";
@@ -71,6 +77,7 @@ import {
   glowAura,
   screenShake,
   floatingX,
+  shatterEffect,
   VFX_COLOURS,
 } from "../combat/Vfx";
 import { Sfx } from "../audio/Sfx";
@@ -88,6 +95,23 @@ interface CombatSceneData {
    * a coloured rectangle otherwise.
    */
   terrainTileId?: number;
+  /**
+   * When set, build the encounter from these catalog names instead
+   * of the random sample. Used by Monster Spawn boss fights and
+   * roamer engagements so the player faces the right creatures.
+   */
+  monsterNames?: string[];
+  /**
+   * "col,row" of the Monster Spawn tile that triggered this fight.
+   * On victory, OverworldScene will rewrite that tile to grass and
+   * mark it as destroyed so it never spawns again.
+   */
+  destroySpawnKey?: string;
+  /**
+   * Id of the roaming monster the party engaged. On victory the
+   * overworld removes it from gameState.roamingMonsters.
+   */
+  roamerId?: string;
 }
 
 // ── Layout (canvas is 960×720) ────────────────────────────────────
@@ -180,6 +204,12 @@ export class CombatScene extends Phaser.Scene {
   private fromWorld = false;
   private triggerKey: string | null = null;
   private terrainTileId: number | null = null;
+  /** Catalog names for this fight; null falls back to makeSampleEncounter. */
+  private monsterNames: string[] | null = null;
+  /** "col,row" of a Monster Spawn tile to destroy on victory. */
+  private destroySpawnKey: string | null = null;
+  /** Roaming monster id to remove from gameState.roamingMonsters on victory. */
+  private roamerId: string | null = null;
 
   private bodies = new Map<string, Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle>();
   private selRings = new Map<string, Phaser.GameObjects.Rectangle>();
@@ -231,6 +261,10 @@ export class CombatScene extends Phaser.Scene {
     this.fromWorld = !!data?.fromWorld;
     this.triggerKey = data?.triggerKey ?? null;
     this.terrainTileId = data?.terrainTileId ?? null;
+    this.monsterNames = data?.monsterNames && data.monsterNames.length > 0
+      ? [...data.monsterNames] : null;
+    this.destroySpawnKey = data?.destroySpawnKey ?? null;
+    this.roamerId = data?.roamerId ?? null;
     this.busy = false;
     this.ended = false;
     this.actionCursor = 0;
@@ -293,6 +327,25 @@ export class CombatScene extends Phaser.Scene {
       // lazily but combat may be entered before any party screen has
       // been opened.
       if (!gameState.partyData) gameState.partyData = await loadParty();
+      // Spawn-tile fights use catalog names; warm the loader so
+      // makeMonsterByName resolves stats / sprites correctly.
+      await loadMonsters();
+      // Make sure every monster sprite the catalog knows about is
+      // queued — spawn lists can include creatures we didn't preload
+      // in the static manifest.
+      let queued = 0;
+      for (const path of loadedMonsterSprites()) {
+        if (!this.textures.exists(path)) {
+          this.load.image(path, path);
+          queued += 1;
+        }
+      }
+      if (queued > 0) {
+        await new Promise<void>((res) => {
+          this.load.once("complete", () => res());
+          this.load.start();
+        });
+      }
     } catch {
       // Combat is still playable with melee only; just skip the
       // data-driven rows.
@@ -307,7 +360,11 @@ export class CombatScene extends Phaser.Scene {
     } else {
       party = makeSampleParty();
     }
-    this.combat = new Combat(party, makeSampleEncounter());
+    // Boss list / single-roamer name vs the legacy random sample.
+    const enemies = this.monsterNames
+      ? this.monsterNames.map((n, i) => makeMonsterByName(n, `-${i}`))
+      : makeSampleEncounter();
+    this.combat = new Combat(party, enemies);
     this.cameras.main.setBackgroundColor("#0c0c14");
     this.cameras.main.fadeIn(220, 0, 0, 0);
 
@@ -815,8 +872,8 @@ export class CombatScene extends Phaser.Scene {
       if (!member.equipped[field]) continue;
       const r = useEquippedDurability(member, slot, this.items);
       if (r.kind === "broke") {
-        this.combat.log.push(`${member.name}'s ${r.itemName} shatters!`);
-        Sfx.play("critical");
+        this.combat.log.push(`*** ${member.name}'s ${r.itemName} shatters! ***`);
+        this.spawnShatterVfx(attackerId, r.itemName, "weapon");
       }
       return; // only the first hand the attack came from
     }
@@ -834,9 +891,28 @@ export class CombatScene extends Phaser.Scene {
     if (!member.equipped.body) return;
     const r = useEquippedDurability(member, "body", this.items);
     if (r.kind === "broke") {
-      this.combat.log.push(`${member.name}'s ${r.itemName} is destroyed!`);
-      Sfx.play("critical");
+      this.combat.log.push(`*** ${member.name}'s ${r.itemName} is destroyed! ***`);
+      this.spawnShatterVfx(targetId, r.itemName, "armor");
     }
+  }
+
+  /**
+   * Trigger the shatter VFX on the combatant's body sprite, color-
+   * coded by gear type so weapons read different from armor. Plays
+   * the critical SFX in tandem so the audio + visual cue land
+   * together. No-op when the combatant is already off-screen (a
+   * downed actor whose sprite was destroyed).
+   */
+  private spawnShatterVfx(
+    combatantId: string, itemName: string, kind: "weapon" | "armor",
+  ): void {
+    const c = this.combat.combatants.find((x) => x.id === combatantId);
+    if (!c) return;
+    const at = this.bodyXY(c);
+    const color  = kind === "weapon" ? VFX_COLOURS.fire     : VFX_COLOURS.shield;
+    const accent = kind === "weapon" ? VFX_COLOURS.ember    : VFX_COLOURS.white;
+    shatterEffect(this, at, itemName, color, accent);
+    Sfx.play("critical");
   }
 
   private openThrowPicker(): void {
@@ -2320,6 +2396,24 @@ export class CombatScene extends Phaser.Scene {
     if (this.fromWorld) {
       if (winner === "party" && this.triggerKey) {
         gameState.consumedTriggers.add(this.triggerKey);
+      }
+      if (winner === "party") {
+        // Spawn-tile boss fight: mark the tile as destroyed so the
+        // overworld will rewrite it to grass and stop spawning from it.
+        if (this.destroySpawnKey) {
+          gameState.destroyedSpawns.add(this.destroySpawnKey);
+          // Any roamers tied to this destroyed spawn vanish too —
+          // their lair is gone.
+          gameState.roamingMonsters = gameState.roamingMonsters.filter(
+            (m) => m.sourceKey !== this.destroySpawnKey,
+          );
+        }
+        // Roamer engagement: just remove that one entry.
+        if (this.roamerId) {
+          gameState.roamingMonsters = gameState.roamingMonsters.filter(
+            (m) => m.id !== this.roamerId,
+          );
+        }
       }
       if (winner === "enemies") {
         gameState.defeated = true;

@@ -106,6 +106,17 @@ export class TileMap {
   }
 
   /**
+   * Replace the tile id at (col, row). Used by the spawn-tile system
+   * when the party destroys a Monster Spawn — the tile becomes plain
+   * grass so it stops producing roamers and the trigger is gone.
+   * Out-of-bounds writes are silently ignored.
+   */
+  setTile(col: number, row: number, id: number): void {
+    if (!this.inBounds(col, row)) return;
+    this.tiles[row][col] = id;
+  }
+
+  /**
    * Walkability — per-tile override beats the tile-id default.
    *
    * Authors store overrides on `tile_properties["<col>,<row>"].walkable`

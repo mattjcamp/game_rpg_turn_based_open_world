@@ -268,4 +268,72 @@ export function floatingX(
   });
 }
 
+/**
+ * Item-shatter effect — fired when a piece of equipment hits zero
+ * durability and is destroyed. Layers four pieces of feedback so the
+ * player can't miss it:
+ *
+ *   1. A bright radial burst at the wearer's body (orb + ring + sparks).
+ *   2. ~10 jagged "fragments" (small rotating rectangles) flying
+ *      outward in a ring, slowing and fading like real debris.
+ *   3. A floating "<ITEM> SHATTERED!" label that rises and fades.
+ *   4. A short camera shake — punchier than a normal crit because the
+ *      player just lost a piece of gear.
+ *
+ * `color` and `accent` let the caller tint by item type (gold/red for
+ * weapons, blue/white for armor); both default to fire-ember.
+ */
+export function shatterEffect(
+  scene: Phaser.Scene,
+  at: Pt,
+  itemName: string,
+  color = COLOURS.fire,
+  accent = COLOURS.ember,
+): void {
+  // 1. Underlying burst — re-uses the existing radial-burst helper.
+  void radialBurst(scene, at, color, accent, 50);
+
+  // 2. Debris fragments — small rotating rectangles flying outward.
+  const FRAGMENTS = 10;
+  for (let i = 0; i < FRAGMENTS; i++) {
+    const angle = (i / FRAGMENTS) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const dist = 28 + Math.random() * 28;
+    const tx = at.x + Math.cos(angle) * dist;
+    const ty = at.y + Math.sin(angle) * dist;
+    const w = 3 + Math.random() * 3;
+    const h = 5 + Math.random() * 4;
+    const c = i % 2 === 0 ? color : accent;
+    const frag = scene.add.rectangle(at.x, at.y, w, h, c, 1).setDepth(78);
+    frag.rotation = Math.random() * Math.PI * 2;
+    scene.tweens.add({
+      targets: frag,
+      x: tx, y: ty,
+      rotation: frag.rotation + (Math.random() - 0.5) * 4,
+      alpha: 0,
+      duration: 520 + Math.random() * 200,
+      ease: "Cubic.Out",
+      onComplete: () => frag.destroy(),
+    });
+  }
+
+  // 3. Floating label — rises ~28px while fading.
+  const label = scene.add.text(at.x, at.y - 12, `${itemName.toUpperCase()} SHATTERED!`, {
+    fontFamily: "Georgia, serif",
+    fontSize: "12px",
+    color: "#ffe48a",
+    stroke: "#1a1a2e",
+    strokeThickness: 4,
+  }).setOrigin(0.5, 1).setDepth(82);
+  scene.tweens.add({
+    targets: label,
+    y: label.y - 28,
+    alpha: 0,
+    duration: 900,
+    onComplete: () => label.destroy(),
+  });
+
+  // 4. Camera shake — short and sharp.
+  screenShake(scene, 0.008, 240);
+}
+
 export const VFX_COLOURS = COLOURS;

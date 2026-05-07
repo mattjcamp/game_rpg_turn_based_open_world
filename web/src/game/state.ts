@@ -16,6 +16,7 @@
 import type { Combatant } from "./types";
 import { makeSampleParty } from "./data/fighters";
 import type { Party } from "./world/Party";
+import type { RoamingMonster } from "./world/SpawnPoints";
 
 export interface GameState {
   /** Combat-layer party — slim Combatant[] used by CombatScene only.
@@ -34,6 +35,18 @@ export interface GameState {
   playerPos: { col: number; row: number };
   /** "col,row" of overworld tiles whose encounter has already been resolved. */
   consumedTriggers: Set<string>;
+  /**
+   * "col,row" of Monster Spawn tiles the party has wiped out — these
+   * tiles render as plain grass and never spawn another monster.
+   * Survives the lifetime of the session, just like consumedTriggers.
+   */
+  destroyedSpawns: Set<string>;
+  /**
+   * Live monsters wandering the overworld. Each entry was produced by
+   * a spawn tile and pursues the party one step at a time. Combat
+   * removes the engaged entry on victory.
+   */
+  roamingMonsters: RoamingMonster[];
   /** Set when the player has been wiped — overworld will refuse to step. */
   defeated: boolean;
 }
@@ -48,6 +61,8 @@ function makeFreshState(): GameState {
     // the type honest on first construction.
     playerPos: { col: 11, row: 16 },
     consumedTriggers: new Set(),
+    destroyedSpawns: new Set(),
+    roamingMonsters: [],
     defeated: false,
   };
 }
@@ -60,6 +75,8 @@ export function resetGameState(): void {
   gameState.partyData = fresh.partyData;
   gameState.playerPos = fresh.playerPos;
   gameState.consumedTriggers = fresh.consumedTriggers;
+  gameState.destroyedSpawns = fresh.destroyedSpawns;
+  gameState.roamingMonsters = fresh.roamingMonsters;
   gameState.defeated = fresh.defeated;
 }
 
