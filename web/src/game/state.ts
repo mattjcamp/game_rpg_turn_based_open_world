@@ -18,6 +18,7 @@ import { makeSampleParty } from "./data/fighters";
 import type { Party } from "./world/Party";
 import type { RoamingMonster } from "./world/SpawnPoints";
 import { makeClock, type GameClock } from "./world/GameTime";
+import type { ExamineLayout } from "./world/Examine";
 
 export interface GameState {
   /** Combat-layer party — slim Combatant[] used by CombatScene only.
@@ -63,6 +64,12 @@ export interface GameState {
    *  restarts so a boat the party left at a far shore is still there
    *  when they walk back. */
   boatPositions: Set<string>;
+  /** Cached Examine state per overworld tile, keyed by `${col},${row}`.
+   *  Each entry holds the obstacle layout, ground items, and
+   *  reagents-searched flag for one zoomed-in area. Persists across
+   *  scene transitions so a tile the party left items on still has
+   *  them when they come back. */
+  examineLayouts: Map<string, ExamineLayout>;
 }
 
 function makeFreshState(): GameState {
@@ -81,6 +88,7 @@ function makeFreshState(): GameState {
     clock: makeClock(),
     onBoat: false,
     boatPositions: new Set(),
+    examineLayouts: new Map(),
   };
 }
 
@@ -98,6 +106,7 @@ export function resetGameState(): void {
   gameState.clock = fresh.clock;
   gameState.onBoat = fresh.onBoat;
   gameState.boatPositions = fresh.boatPositions;
+  gameState.examineLayouts = fresh.examineLayouts;
 }
 
 export function triggerKey(col: number, row: number): string {

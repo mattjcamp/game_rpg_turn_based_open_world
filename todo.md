@@ -5,7 +5,6 @@ python3 main.py
 
 ## Polish
 
-- Port boat feature
 - Port Examine tile feature (including making sure rangers and alchemists can find herbs)
 - Port lockpick and knock spell feature (thiefs, rangers, spellcasters)
 - Make sure the characters in combat are correct (damage, weapons, etc)

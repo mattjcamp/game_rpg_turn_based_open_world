@@ -474,7 +474,7 @@ export class OverworldScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.hint = this.add
-      .text(960 - 16, 4, "WASD / arrows / tap to move  ·  Space = wait  ·  ✦ = encounter", {
+      .text(960 - 16, 4, "WASD / arrows · Space = wait · E = examine · ✦ = encounter", {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#bdb38a",
@@ -547,6 +547,9 @@ export class OverworldScene extends Phaser.Scene {
       // / Galadriel timers all tick, so the player can wait out a
       // monster or burn down a buffed effect deliberately.
       k.on("keydown-SPACE", () => this.skipTurn());
+      // 'E' zooms into the local Examine view of the current tile —
+      // forageable items, a Ranger/Alchemist INT save for reagents.
+      k.on("keydown-E", () => this.openExamine());
       // 'P' opens the party screen as an overlay. We pause this scene
       // so its keyboard handlers don't fire while the overlay is up.
       k.on("keydown-P", () => this.openParty());
@@ -1013,6 +1016,22 @@ export class OverworldScene extends Phaser.Scene {
     if (gameState.defeated) return;
     this.scene.pause();
     this.scene.launch("PartyScene", { from: "OverworldScene" });
+  }
+
+  /**
+   * Zoom into the Examine scene for the tile under the party. Refuses
+   * to fire while aboard a boat — the party can't forage from a
+   * deck, same constraint the Python game enforces by binding E only
+   * to walking-on-foot moves.
+   */
+  private openExamine(): void {
+    if (gameState.defeated || gameState.onBoat) return;
+    const { col, row } = gameState.playerPos;
+    const tileId = this.tileMap.getTile(col, row);
+    this.cameras.main.fadeOut(180, 0, 0, 0);
+    this.cameras.main.once("camerafadeoutcomplete", () => {
+      this.scene.start("ExamineScene", { col, row, tileId });
+    });
   }
 
   private showDefeat(): void {
