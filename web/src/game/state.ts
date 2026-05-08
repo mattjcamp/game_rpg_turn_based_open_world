@@ -19,6 +19,7 @@ import type { Party } from "./world/Party";
 import type { RoamingMonster } from "./world/SpawnPoints";
 import { makeClock, type GameClock } from "./world/GameTime";
 import type { ExamineLayout } from "./world/Examine";
+import type { DungeonLevel } from "./world/Dungeon";
 
 export interface GameState {
   /** Combat-layer party — slim Combatant[] used by CombatScene only.
@@ -76,6 +77,28 @@ export interface GameState {
    *  scene transitions so a tile the party left items on still has
    *  them when they come back. */
   examineLayouts: Map<string, ExamineLayout>;
+  /**
+   * Cached dungeon levels per overworld entrance, keyed by `${col},${row}`.
+   * Each entry is a list of `DungeonLevel` (one per floor) — generated
+   * once on first entry and reused on every re-visit so explored tiles,
+   * opened chests, triggered traps, and remaining monsters all persist.
+   * The "generate dungeons one time" requirement maps onto a cache miss
+   * triggering generation, and a hit returning the same mutable level
+   * objects the previous visit walked through. */
+  dungeonCache: Map<string, DungeonLevel[]>;
+  /**
+   * In-dungeon position (overworld entry, current floor, party tile).
+   * Set when the party enters a dungeon and read by DungeonScene on
+   * boot so a return-from-combat replays the previous tile rather than
+   * snapping to the entry stairs. Cleared on `_exitDungeon`.
+   */
+  dungeonPos: {
+    overworldCol: number;
+    overworldRow: number;
+    level: number;
+    col: number;
+    row: number;
+  } | null;
 }
 
 function makeFreshState(): GameState {
@@ -97,6 +120,8 @@ function makeFreshState(): GameState {
     onBoat: false,
     boatPositions: new Set(),
     examineLayouts: new Map(),
+    dungeonCache: new Map(),
+    dungeonPos: null,
   };
 }
 
@@ -116,6 +141,8 @@ export function resetGameState(): void {
   gameState.onBoat = fresh.onBoat;
   gameState.boatPositions = fresh.boatPositions;
   gameState.examineLayouts = fresh.examineLayouts;
+  gameState.dungeonCache = fresh.dungeonCache;
+  gameState.dungeonPos = fresh.dungeonPos;
 }
 
 export function triggerKey(col: number, row: number): string {

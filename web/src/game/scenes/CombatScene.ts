@@ -117,6 +117,20 @@ interface CombatSceneData {
    * overworld removes it from gameState.roamingMonsters.
    */
   roamerId?: string;
+  /**
+   * Scene to launch on combat exit instead of OverworldScene. The
+   * dungeon flow uses this to re-enter DungeonScene with the same
+   * (overworldCol, overworldRow) so the cached level is reloaded.
+   * `returnPayload` is forwarded as the next scene's init data.
+   */
+  returnSceneKey?: string;
+  returnPayload?: Record<string, unknown>;
+  /**
+   * Id of a dungeon monster the party engaged. On victory the
+   * dungeon removes it from `level.monsters`. Independent from
+   * `roamerId` so dungeon and overworld kill bookkeeping don't clash.
+   */
+  dungeonMonsterId?: string;
 }
 
 // ── Layout (canvas is 960×720) ────────────────────────────────────
@@ -211,6 +225,11 @@ export class CombatScene extends Phaser.Scene {
   private terrainTileId: number | null = null;
   /** Catalog names for this fight; null falls back to makeSampleEncounter. */
   private monsterNames: string[] | null = null;
+  /** Scene to launch on exit. Defaults to OverworldScene. */
+  private returnSceneKey: string = "OverworldScene";
+  private returnPayload: Record<string, unknown> | null = null;
+  /** Dungeon monster id to remove from `level.monsters` on victory. */
+  private dungeonMonsterId: string | null = null;
   /** "col,row" of a Monster Spawn tile to destroy on victory. */
   private destroySpawnKey: string | null = null;
   /** Roaming monster id to remove from gameState.roamingMonsters on victory. */
@@ -292,6 +311,9 @@ export class CombatScene extends Phaser.Scene {
       ? [...data.monsterNames] : null;
     this.destroySpawnKey = data?.destroySpawnKey ?? null;
     this.roamerId = data?.roamerId ?? null;
+    this.dungeonMonsterId = data?.dungeonMonsterId ?? null;
+    this.returnSceneKey = data?.returnSceneKey ?? "OverworldScene";
+    this.returnPayload = data?.returnPayload ?? null;
     this.busy = false;
     this.ended = false;
     this.turnUndeadUsed = false;
@@ -2738,6 +2760,16 @@ export class CombatScene extends Phaser.Scene {
           (m) => m.id !== this.roamerId,
         );
       }
+      // Dungeon engagement: drop the slain monster from the cached
+      // level so re-entering the dungeon doesn't respawn it.
+      if (this.dungeonMonsterId && gameState.dungeonPos) {
+        const { overworldCol, overworldRow, level } = gameState.dungeonPos;
+        const cached = gameState.dungeonCache.get(`${overworldCol},${overworldRow}`);
+        const lvl = cached?.[level];
+        if (lvl) {
+          lvl.monsters = lvl.monsters.filter((m) => m.id !== this.dungeonMonsterId);
+        }
+      }
     }
     if (winner === "enemies") {
       gameState.defeated = true;
@@ -2764,7 +2796,21 @@ export class CombatScene extends Phaser.Scene {
     this.time.delayedCall(delayMs, () => {
       this.cameras.main.fadeOut(220, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => {
-        this.scene.start("OverworldScene");
+        // Defeat is a special case: the dungeon flow needs to drop the
+        // party back on the overworld with `defeated=true` so the
+        // overworld's standard "you are wiped" handling runs. Returning
+        // into a dungeon scene with a dead party would re-render the
+        // dungeon under the defeat overlay, which is not the cue the
+        // player expects.
+        if (this.combat.winner === "enemies") {
+          this.scene.start("OverworldScene");
+          return;
+        }
+        if (this.returnPayload) {
+          this.scene.start(this.returnSceneKey, this.returnPayload);
+        } else {
+          this.scene.start(this.returnSceneKey);
+        }
       });
     });
   }

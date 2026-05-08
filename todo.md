@@ -5,14 +5,14 @@ python3 main.py
 
 ## Polish
 
-- Make sure that monsters with effects and spellcasting use their abilities
 - Port Dungeon feature (they only should be generated one time, we only need procedural)
 - Port Quest Feature
 - Add worflow (Return to Game, New Game)
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
-
+- Add soundtrack (only two mpg3 to keep it small)
 
 ## Bugs
+- 
 - Again, I found in a second random monster encounter that the party did not have it's normal options appear on the right (range, cast, throw). No error appeared in the console.
 
 ## Features

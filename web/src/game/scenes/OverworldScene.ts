@@ -791,8 +791,17 @@ export class OverworldScene extends Phaser.Scene {
       });
       return true;
     }
-    // Other link kinds (dungeon) aren't wired up yet — let the
-    // encounter check fire instead so play continues normally.
+    if (link.kind === "dungeon") {
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.scene.start("DungeonScene", {
+          dungeonName: link.name,
+          overworldCol: col,
+          overworldRow: row,
+        });
+      });
+      return true;
+    }
     return false;
   }
 
