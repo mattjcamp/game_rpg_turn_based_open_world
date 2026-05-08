@@ -28,6 +28,7 @@ import Phaser from "phaser";
 import { gameState } from "../state";
 import {
   tileDef,
+  loadTileDefs,
   PLAYER_SPRITE,
   spriteManifest,
   tileSpriteKey,
@@ -66,12 +67,20 @@ import {
 } from "../world/Party";
 import {
   partyLightRadius,
+  partyLightTint,
   tickGaladrielsLight,
+  consumeTorch,
 } from "../world/PartyActions";
 import {
   advanceClock,
 } from "../world/GameTime";
 import { brightnessAt, type LightSource } from "../world/Lighting";
+import { roamStep } from "../world/SpawnPoints";
+import {
+  loadMonsters,
+  loadedMonsterSprites,
+  type MonsterSpec,
+} from "../data/monsters";
 
 const TILE = 32;
 const HUD_HEIGHT = 56;
@@ -104,12 +113,18 @@ export class DungeonScene extends Phaser.Scene {
   private partyData: Party | null = null;
   private encounterTable: Record<string, EncounterTemplate[]> | null = null;
   private dungeonDef: DungeonDef | null = null;
+  private monsterCatalog: Map<string, MonsterSpec> = new Map();
 
   // Phaser objects
   private tileSprites: Phaser.GameObjects.GameObject[][] = [];
   private decorSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
   private monsterSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
   private darknessRects: Map<string, Phaser.GameObjects.Rectangle> = new Map();
+  /** Coloured tint layer above darkness — picks up the party-carried
+   *  light's hue (warm orange for torches, pale blue for Galadriel's,
+   *  red for Infravision) and washes lit cells with it. Mirrors the
+   *  same pair of rectangles TownScene maintains for interior darkness. */
+  private tintRects: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   private player!: Phaser.GameObjects.Image;
   private status!: Phaser.GameObjects.Text;
   private hpSummary!: Phaser.GameObjects.Text;
@@ -133,6 +148,7 @@ export class DungeonScene extends Phaser.Scene {
     this.decorSprites = new Map();
     this.monsterSprites = new Map();
     this.darknessRects = new Map();
+    this.tintRects = new Map();
     this.busy = false;
     this.message = undefined;
     this.messageTimer = undefined;
@@ -158,10 +174,28 @@ export class DungeonScene extends Phaser.Scene {
       this.load.image(key, path);
     }
     this.load.image("player", PLAYER_SPRITE);
+    // Monster sprites — loadMonsters() may not have run yet on a cold
+    // boot (e.g. /world is the first scene the user loads and they
+    // step into a dungeon before any combat). The BUILTIN set ships
+    // here regardless; the post-loadMonsters() pass in create() picks
+    // up the rest.
+    for (const path of loadedMonsterSprites()) {
+      this.load.image(`monster:${path}`, path);
+    }
   }
 
   async create(): Promise<void> {
     this.cameras.main.setBackgroundColor("#0c0c14");
+
+    // Re-entry from combat hits a Phaser texture cache where the
+    // runtime tile defs may already be populated (OverworldScene
+    // loaded them on first boot) but the `filecomplete-json-tile_defs`
+    // listener in our preload doesn't re-fire because the JSON is
+    // cached. `loadTileDefs()` has its own module-level dedupe so
+    // calling it here is a cheap idempotent guarantee that
+    // `tileDef(id).flags` is populated — which the lighting model
+    // depends on for wall-torch radiance.
+    try { await loadTileDefs(); } catch { /* tile_defs absent — leave fallback colours */ }
 
     try {
       this.partyData = await loadParty();
@@ -190,6 +224,24 @@ export class DungeonScene extends Phaser.Scene {
       this.encounterTable = await loadEncounters();
     } catch {
       this.encounterTable = null;
+    }
+
+    // Load the monster catalog and queue any sprites the BUILTIN
+    // pre-pass missed. Phaser dedupes loader keys, so a sprite already
+    // in the texture cache is a free no-op.
+    try {
+      this.monsterCatalog = await loadMonsters();
+      let queued = 0;
+      for (const path of loadedMonsterSprites()) {
+        const k = `monster:${path}`;
+        if (!this.textures.exists(k)) {
+          this.load.image(k, path);
+          queued += 1;
+        }
+      }
+      if (queued > 0) this.load.start();
+    } catch {
+      this.monsterCatalog = new Map();
     }
 
     // Cache lookup (the "generate once" guarantee). Miss → generate
@@ -239,13 +291,40 @@ export class DungeonScene extends Phaser.Scene {
     this.drawHud();
     this.installCamera();
     this.installInput();
+
+    // Auto-light a torch BEFORE the first darkness pass so the initial
+    // render shows the right party-light radius. Mirrors the Python
+    // `DungeonState.enter` flow. Returning from combat skips this so
+    // we don't burn a fresh torch on top of an already-active one or
+    // double-fire the entry message.
+    const isFreshEntry = !dpos || (dpos.col === this.level.entryCol && dpos.row === this.level.entryRow && dpos.level === 0);
+    let entryTorchMsg = "";
+    if (isFreshEntry) entryTorchMsg = this.tryAutoLightTorch();
+
     this.refreshDarkness();
     this.refreshHud();
 
-    // Show entry message on a fresh entry (not on combat-return).
-    if (!dpos || dpos.level !== this.currentLevel) {
-      this.showMessage(`You enter ${this.level.name}.`, 1800);
+    if (isFreshEntry) {
+      this.showMessage(`You enter ${this.level.name}. ${entryTorchMsg}`, 2400);
     }
+  }
+
+  /**
+   * Attempt to auto-light a torch from the party's stash on dungeon
+   * entry. Returns a short status string for the entry-message line.
+   * Skipped when the party already has Galadriel's Light, Infravision,
+   * or an active torch — no point burning a fresh torch on top of a
+   * working light source.
+   */
+  private tryAutoLightTorch(): string {
+    if (!this.partyData) return "";
+    if (this.partyData.torchSteps > 0) return "Torch lit.";
+    // partyHasEffect imports are heavy; use the same fields
+    // partyLightRadius would peek at via a cheap check.
+    const radius = partyLightRadius(this.partyData, 0);
+    if (radius >= 5) return "";  // Galadriel's Light or Infravision already up.
+    const result = consumeTorch(this.partyData);
+    return result.ok ? "Torch lit." : "No torch equipped — it's dark.";
   }
 
   // ── Rendering ───────────────────────────────────────────────────
@@ -260,6 +339,8 @@ export class DungeonScene extends Phaser.Scene {
     this.monsterSprites.clear();
     for (const r of this.darknessRects.values()) r.destroy();
     this.darknessRects.clear();
+    for (const r of this.tintRects.values()) r.destroy();
+    this.tintRects.clear();
 
     for (let row = 0; row < this.level.height; row++) {
       const rowSprites: Phaser.GameObjects.GameObject[] = [];
@@ -293,14 +374,22 @@ export class DungeonScene extends Phaser.Scene {
     for (const m of this.level.monsters) {
       this.drawMonster(m);
     }
-    // Per-cell darkness overlay (depth 9 — above monsters, below player).
+    // Per-cell darkness overlay (depth 9 — above monsters, below player)
+    // plus a tint pass at depth 9.5 that washes lit cells with the
+    // party-light colour (warm/blue/red). Both meshes always exist;
+    // refreshDarkness sets per-cell alphas every step.
     for (let row = 0; row < this.level.height; row++) {
       for (let col = 0; col < this.level.width; col++) {
-        const r = this.add
+        const d = this.add
           .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 1)
           .setOrigin(0)
           .setDepth(9);
-        this.darknessRects.set(`${col},${row}`, r);
+        this.darknessRects.set(`${col},${row}`, d);
+        const t = this.add
+          .rectangle(col * TILE, row * TILE, TILE, TILE, 0xffffff, 0)
+          .setOrigin(0)
+          .setDepth(9.5);
+        this.tintRects.set(`${col},${row}`, t);
       }
     }
   }
@@ -323,16 +412,19 @@ export class DungeonScene extends Phaser.Scene {
   private drawMonster(m: DungeonMonster): void {
     const x = m.col * TILE + TILE / 2;
     const y = m.row * TILE + TILE / 2;
-    const obj = this.add
-      .text(x, y, "✦", {
-        fontFamily: "Georgia, serif",
-        fontSize: "20px",
-        color: "#ff6b6b",
-        stroke: "#1a1a2e",
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5)
-      .setDepth(7);
+    const spec = this.monsterCatalog.get(m.name);
+    const key = spec?.sprite ? `monster:${spec.sprite}` : null;
+    let obj: Phaser.GameObjects.GameObject;
+    if (key && this.textures.exists(key)) {
+      obj = this.add.image(x, y, key).setDepth(7);
+    } else {
+      // Fallback: small red diamond, same shape OverworldScene falls
+      // back to when the catalog or sprite isn't ready.
+      obj = this.add
+        .rectangle(x, y, TILE - 8, TILE - 8, 0xb04030, 1)
+        .setStrokeStyle(2, 0x1a1a2e)
+        .setDepth(7);
+    }
     this.monsterSprites.set(m.id, obj);
   }
 
@@ -340,6 +432,11 @@ export class DungeonScene extends Phaser.Scene {
     const dp = gameState.dungeonPos!;
     const x = dp.col * TILE + TILE / 2;
     const y = dp.row * TILE + TILE / 2;
+    // Destroy any pre-existing avatar so floor changes don't leave a
+    // phantom party sprite parked on the previous floor's stairs.
+    if (this.player) {
+      this.player.destroy();
+    }
     if (this.textures.exists("player")) {
       this.player = this.add.image(x, y, "player").setDepth(10);
     } else {
@@ -411,29 +508,61 @@ export class DungeonScene extends Phaser.Scene {
 
   /**
    * Repaint the per-tile darkness overlay. Three states per cell:
+   *   - currently lit (party light OR a wall torch in range): alpha
+   *     scales with brightness so the cell is bright at the source
+   *     and fades toward the edge of the lit pool. Lit cells are
+   *     also added to `exploredTiles` so they stay revealed once the
+   *     party walks past — fog-of-war history.
+   *   - previously seen but not lit now: dim (alpha 0.55).
    *   - never seen: pitch black (alpha 1).
-   *   - seen but not lit now: dim (alpha 0.55).
-   *   - currently lit by party / wall torch: alpha = 1 - brightness.
+   *
+   * Fog-of-war is driven by light, not by a fixed step radius — that's
+   * what makes a wall torch reveal the corridor it sits in the moment
+   * the party walks into the torch's pool, exactly the way the Python
+   * dungeon renderer does it.
    */
   private refreshDarkness(): void {
     const dp = gameState.dungeonPos!;
     const partyR = this.partyData ? partyLightRadius(this.partyData, 2) : 2;
+    const tint = this.partyData ? partyLightTint(this.partyData) : null;
+    // Wall-torch radiance contribution from tile_defs.flags.light_source
+    // and the party-carried light pool are independent: the dungeon
+    // owns its torches (driven by `torch_density`), and the party adds
+    // their own pool on top. Both go through `brightnessAt`, which
+    // takes the brighter of the two contributions per cell.
     const lights = this.collectLights();
     for (let row = 0; row < this.level.height; row++) {
       for (let col = 0; col < this.level.width; col++) {
         const rect = this.darknessRects.get(`${col},${row}`);
-        if (!rect) continue;
-        const seen = this.level.exploredTiles.has(`${col},${row}`);
-        if (!seen) {
-          rect.setFillStyle(0x000000, 1);
-          continue;
-        }
+        const tintRect = this.tintRects.get(`${col},${row}`);
+        if (!rect || !tintRect) continue;
+        // ── Combined brightness ──
         const b = brightnessAt(col, row, lights, { col: dp.col, row: dp.row }, partyR);
-        if (b <= 0) {
+        // ── Party-only brightness (drives the tint wash) ──
+        // The tint is a property of what the PARTY carries, so we don't
+        // want a wall torch to look red just because the party has
+        // Infravision — the wash should only paint cells the party's
+        // light actually reaches. Compute partyB by passing an empty
+        // lights array.
+        const partyB = brightnessAt(col, row, [], { col: dp.col, row: dp.row }, partyR);
+        if (b > 0) {
+          this.level.exploredTiles.add(`${col},${row}`);
+          rect.setFillStyle(0x000000, Math.max(0, Math.min(0.92, (1 - b) * 0.92)));
+        } else if (this.level.exploredTiles.has(`${col},${row}`)) {
           rect.setFillStyle(0x000000, SEEN_DIM);
-          continue;
+        } else {
+          rect.setFillStyle(0x000000, 1);
         }
-        rect.setFillStyle(0x000000, Math.max(0, Math.min(0.92, (1 - b) * 0.92)));
+        // Tint wash: only on cells the party's own light reaches, and
+        // only when an effect that should colour the world is active
+        // (Torch / Galadriel's / Infravision). Outside the party pool
+        // the wash is fully transparent so wall-torch-lit cells keep
+        // their natural look.
+        if (tint && partyB > 0) {
+          tintRect.setFillStyle(tint.color, partyB * tint.alphaScale);
+        } else {
+          tintRect.setFillStyle(0xffffff, 0);
+        }
       }
     }
   }
@@ -454,11 +583,20 @@ export class DungeonScene extends Phaser.Scene {
 
   private installInput(): void {
     this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
+      // Party screen overlay — pause this scene so movement keys don't
+      // fire while the inventory is up. PartyScene resumes us on close.
+      if (ev.key === "p" || ev.key === "P") { this.openParty(); return; }
       if (this.busy) return;
       if (ev.key === "Escape") { this.handleEscape(); return; }
       const dir = directionForKey(ev.key);
       if (dir) this.tryMove(dir.dc, dir.dr);
     });
+  }
+
+  private openParty(): void {
+    if (gameState.defeated) return;
+    this.scene.pause();
+    this.scene.launch("PartyScene", { from: "DungeonScene" });
   }
 
   private tryMove(dc: number, dr: number): void {
@@ -485,6 +623,16 @@ export class DungeonScene extends Phaser.Scene {
     dp.row = nr;
     this.markExplored(nc, nr);
     advanceClock(gameState.clock);
+    // Burn down a torch step — dungeons are always dark, so unlike the
+    // overworld/town we tick unconditionally. When the counter hits
+    // zero the next refreshDarkness sees torchSteps === 0 and snaps
+    // the party-light pool away, making the dungeon go dark again.
+    if (this.partyData && this.partyData.torchSteps > 0) {
+      this.partyData.torchSteps -= 1;
+      if (this.partyData.torchSteps === 0) {
+        this.showMessage("Your torch burns out.", 1800);
+      }
+    }
     if (this.partyData) tickGaladrielsLight(this.partyData);
     this.busy = true;
     this.tweens.add({
@@ -494,11 +642,94 @@ export class DungeonScene extends Phaser.Scene {
       duration: 110,
       onComplete: () => {
         this.busy = false;
+        // Step every dungeon monster and redraw the sprite layer
+        // BEFORE the standing-tile handler runs. If a monster moved
+        // adjacent to the party, we engage immediately and skip the
+        // chest/trap/stairs prompt — same precedence the Python game
+        // uses (`_check_monster_contact` runs in the move handler
+        // ahead of pickup logic).
+        this.tickDungeonMonsters();
+        this.redrawMonsters();
+        const contact = this.checkMonsterContact();
+        if (contact) {
+          this.refreshDarkness();
+          this.refreshHud();
+          this.engageMonster(contact);
+          return;
+        }
         this.refreshDarkness();
         this.refreshHud();
         this.handleStandingTile();
       },
     });
+  }
+
+  /**
+   * Move every monster on the current floor one tile. Monsters that
+   * can see the party (Chebyshev <= 6) pursue via cardinal step that
+   * minimises distance; the rest wander randomly with a small "stay
+   * put" bias so the floor isn't a hive of constant motion.
+   *
+   * Mirrors `DungeonState._move_monsters` in `src/states/dungeon.py`.
+   * Skips the line-of-sight check the Python version does — we'll
+   * add it once the dungeon scene grows a wall-occlusion ray helper.
+   */
+  private tickDungeonMonsters(): void {
+    const dp = gameState.dungeonPos!;
+    const party = { col: dp.col, row: dp.row };
+    const occupied = new Set<string>();
+    for (const m of this.level.monsters) occupied.add(`${m.col},${m.row}`);
+    occupied.add(`${party.col},${party.row}`);
+    for (const m of this.level.monsters) {
+      occupied.delete(`${m.col},${m.row}`);
+      const dist = Math.max(Math.abs(m.col - party.col), Math.abs(m.row - party.row));
+      let next: { col: number; row: number } = { col: m.col, row: m.row };
+      if (dist <= 6) {
+        next = roamStep(
+          m,
+          party,
+          (c, r) => this.isWalkable(c, r),
+          (c, r) => occupied.has(`${c},${r}`),
+        );
+      } else {
+        // Random wander — 30% stay still, otherwise pick the first
+        // walkable cardinal direction from a shuffled list.
+        if (Math.random() >= 0.3) {
+          const dirs: Array<[number, number]> = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+          for (let i = dirs.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const t = dirs[i]; dirs[i] = dirs[j]; dirs[j] = t;
+          }
+          for (const [dc, dr] of dirs) {
+            const nc = m.col + dc, nr = m.row + dr;
+            if (nc < 0 || nc >= this.level.width || nr < 0 || nr >= this.level.height) continue;
+            if (!this.isWalkable(nc, nr)) continue;
+            if (occupied.has(`${nc},${nr}`)) continue;
+            next = { col: nc, row: nr };
+            break;
+          }
+        }
+      }
+      m.col = next.col;
+      m.row = next.row;
+      occupied.add(`${m.col},${m.row}`);
+    }
+  }
+
+  private redrawMonsters(): void {
+    for (const obj of this.monsterSprites.values()) obj.destroy();
+    this.monsterSprites.clear();
+    for (const m of this.level.monsters) this.drawMonster(m);
+  }
+
+  /** First monster within Chebyshev 1 of the party, or null. */
+  private checkMonsterContact(): DungeonMonster | null {
+    const dp = gameState.dungeonPos!;
+    for (const m of this.level.monsters) {
+      const d = Math.max(Math.abs(m.col - dp.col), Math.abs(m.row - dp.row));
+      if (d <= 1) return m;
+    }
+    return null;
   }
 
   /**

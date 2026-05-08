@@ -10,9 +10,11 @@ python3 main.py
 - Add worflow (Return to Game, New Game)
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
 - Add soundtrack (only two mpg3 to keep it small)
+- Lighting should not pass through walls and essentially only light based on Light of Sight and the lighting effect range
 
 ## Bugs
-- 
+- When I exit the Temple, the party ends up on a random tile, this exit should follow the linking pattern we have set up which puts them back on the temple tile in the overview map
+- The party graphics are missing in the published version
 - Again, I found in a second random monster encounter that the party did not have it's normal options appear on the right (range, cast, throw). No error appeared in the console.
 
 ## Features

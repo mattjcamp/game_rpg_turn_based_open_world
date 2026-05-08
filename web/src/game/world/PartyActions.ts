@@ -100,16 +100,17 @@ export function partyHasEffect(party: Party, effectId: string): boolean {
  * Galadriel's Light each act as a light source carried by the
  * party. Returns the larger of the boost and the supplied default.
  *
- * Numbers picked to roughly match the look of the pygame version:
+ * Numbers picked to match the pygame version:
  *   - Infravision: 8 tiles (effectively floods a small interior)
  *   - Galadriel's Light: 5 tiles (warm, more local pool)
- *   - Lit torch: 3 tiles (small, flickering pool — burns down with steps)
+ *   - Lit torch: 4 tiles (matches Python PARTY_LIT_RADIUS in
+ *                          interior_lighting.py — burns down with steps)
  *   - default: whatever the caller passed in
  */
 export function partyLightRadius(party: Party, defaultRadius: number): number {
   if (partyHasEffect(party, "infravision")) return Math.max(defaultRadius, 8);
   if (partyHasEffect(party, "galadriels_light")) return Math.max(defaultRadius, 5);
-  if (party.torchSteps > 0) return Math.max(defaultRadius, 3);
+  if (party.torchSteps > 0) return Math.max(defaultRadius, 4);
   return defaultRadius;
 }
 
