@@ -20,21 +20,28 @@ describe("spriteForMember", () => {
     ).toBe("/assets/characters/wizard.png");
   });
 
-  it("falls back to a class-based sprite when the source path isn't shipped", () => {
-    // The default party.json hands Gimli (a Fighter) a placeholder
-    // shopkeep sprite — we don't ship that NPC PNG, so fall back to
-    // the fighter class sprite.
+  it("accepts any humanoid sprite — npcs and monsters too", () => {
+    // The character creator lets the player pick an avatar from any
+    // shipped humanoid folder. Picks should round-trip through
+    // localStorage / party.json without being squashed back to a
+    // class default.
     expect(
       spriteForMember("src/assets/game/npcs/shopkeep.png", "Fighter")
-    ).toBe("/assets/characters/fighter.png");
+    ).toBe("/assets/npcs/shopkeep.png");
     expect(
-      spriteForMember("src/assets/game/npcs/vga_evil_mage.png", "Wizard")
-    ).toBe("/assets/characters/wizard.png");
+      spriteForMember("/assets/monsters/dark_mage.png", "Wizard")
+    ).toBe("/assets/monsters/dark_mage.png");
   });
 
-  it("normalises class casing for the fallback path", () => {
+  it("falls back to the class sprite when the path is in a non-humanoid folder", () => {
+    // Anything outside characters/npcs/monsters drops to the class
+    // default — bogus paths in old saves don't render as broken
+    // images on screen.
     expect(spriteForMember("nope.png", "Wizard")).toBe(
       "/assets/characters/wizard.png"
+    );
+    expect(spriteForMember("/assets/terrain/grass.png", "Cleric")).toBe(
+      "/assets/characters/cleric.png"
     );
     expect(spriteForMember(undefined, "Cleric")).toBe(
       "/assets/characters/cleric.png"

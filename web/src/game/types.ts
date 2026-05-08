@@ -32,6 +32,7 @@ export interface Combatant {
    *  Magic Arrow can read the caster's INT and Heal can read WIS. */
   strength?: number;
   dexterity?: number;
+  constitution?: number;
   intelligence?: number;
   wisdom?: number;
   /** Fallback portrait colour (RGB 0-255) if no sprite is loaded. */

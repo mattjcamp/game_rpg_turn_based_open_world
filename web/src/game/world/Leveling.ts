@@ -6,7 +6,9 @@
  *   - Required XP for the *next* level = current_level × exp_per_level.
  *     `exp_per_level` comes from the class template (default 1000), with
  *     a possible race override (Humans = 750).
- *   - Each level-up adds `hp_per_level + STR mod` HP (minimum +1).
+ *   - Each level-up adds `hp_per_level + CON mod` HP (minimum +1).
+ *     Constitution drives toughness for every class — Fighters with
+ *     high CON see bigger HP swings than wizards on the same roll.
  *   - Casters also gain `mp_per_level + casting_stat mod` MP, where the
  *     casting stat is named by `mp_source.ability` (single-stat) or
  *     derived from `mp_source.abilities + mode` (dual-stat). Non-casters
@@ -81,7 +83,7 @@ export function awardXp(
   while (member.exp >= member.level * xpPer) {
     member.level += 1;
 
-    const hpGain = Math.max(1, tpl.hpPerLevel + abilityMod(member.strength));
+    const hpGain = Math.max(1, tpl.hpPerLevel + abilityMod(member.constitution));
     member.maxHp += hpGain;
     member.hp = Math.min(member.hp + hpGain, member.maxHp);
 

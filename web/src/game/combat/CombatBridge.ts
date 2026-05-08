@@ -128,6 +128,7 @@ export function combatantFromMember(
     dexMod,
     strength: member.strength,
     dexterity: member.dexterity,
+    constitution: member.constitution,
     intelligence: member.intelligence,
     wisdom: member.wisdom,
     color: [200, 200, 200],

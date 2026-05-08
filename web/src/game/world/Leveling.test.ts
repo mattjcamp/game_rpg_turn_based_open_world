@@ -15,7 +15,7 @@ function member(overrides: Partial<PartyMember> = {}): PartyMember {
     gender: "M",
     hp: 30, maxHp: 30,
     mp: undefined, maxMp: undefined,
-    strength: 14, dexterity: 12, intelligence: 10, wisdom: 10,
+    strength: 14, dexterity: 12, constitution: 10, intelligence: 10, wisdom: 10,
     level: 1,
     exp: 0,
     equipped: { rightHand: null, leftHand: null, body: null, head: null },
@@ -65,10 +65,10 @@ describe("awardXp", () => {
     expect(m.level).toBe(1);
   });
 
-  it("levels up a fighter and bumps HP by hp_per_level + STR mod", () => {
-    const m = member({ level: 1, exp: 0, strength: 14, hp: 30, maxHp: 30 });
+  it("levels up a fighter and bumps HP by hp_per_level + CON mod", () => {
+    const m = member({ level: 1, exp: 0, constitution: 14, hp: 30, maxHp: 30 });
     const events = awardXp(m, 1500, fighterTpl, null);
-    // STR 14 → +2 mod, hp_per_level 15 → gain 17
+    // CON 14 → +2 mod, hp_per_level 15 → gain 17
     expect(m.level).toBe(2);
     expect(m.maxHp).toBe(47);
     expect(m.hp).toBe(47);
@@ -81,11 +81,11 @@ describe("awardXp", () => {
 
   it("levels up a caster with MP gains driven by the casting stat", () => {
     const m = member({
-      class: "Wizard", level: 1, exp: 0, strength: 8, intelligence: 18,
+      class: "Wizard", level: 1, exp: 0, constitution: 8, intelligence: 18,
       hp: 8, maxHp: 8, mp: 15, maxMp: 15,
     });
     const events = awardXp(m, 1500, wizardTpl, null);
-    // STR 8 → -1, hp_per_level 4 → gain max(1, 4 + -1) = 3
+    // CON 8 → -1, hp_per_level 4 → gain max(1, 4 + -1) = 3
     // INT 18 → +4, mp_per_level 15 → gain 15 + 4 = 19
     expect(m.level).toBe(2);
     expect(events[0].hpGain).toBe(3);
@@ -96,7 +96,7 @@ describe("awardXp", () => {
   });
 
   it("processes multiple level-ups in a single award", () => {
-    const m = member({ level: 1, exp: 0, strength: 14, hp: 30, maxHp: 30 });
+    const m = member({ level: 1, exp: 0, constitution: 14, hp: 30, maxHp: 30 });
     // Thresholds 1500, 3000, 4500: all three are met by 4500 XP, so the
     // member ends at level 4 with three level-up events.
     const events = awardXp(m, 4500, fighterTpl, null);
@@ -123,9 +123,9 @@ describe("awardXp", () => {
     expect(m.maxMp).toBe(18);
   });
 
-  it("never lets HP gain drop below 1 even when STR mod would cancel it", () => {
-    const m = member({ level: 1, exp: 0, strength: 4, hp: 8, maxHp: 8 });
-    // STR 4 → -3 mod; for a hypothetical class with hp_per_level 2, gain
+  it("never lets HP gain drop below 1 even when CON mod would cancel it", () => {
+    const m = member({ level: 1, exp: 0, constitution: 4, hp: 8, maxHp: 8 });
+    // CON 4 → -3 mod; for a hypothetical class with hp_per_level 2, gain
     // would be max(1, 2 + -3) = 1.
     const tpl: ClassTemplate = { name: "Tiny", hpPerLevel: 2, mpPerLevel: 0, expPerLevel: 1500, range: 4 };
     const events = awardXp(m, 1500, tpl, null);
@@ -134,9 +134,9 @@ describe("awardXp", () => {
   });
 
   it("partially heals a wounded member up to the new max HP", () => {
-    const m = member({ level: 1, exp: 0, strength: 10, hp: 20, maxHp: 30 });
+    const m = member({ level: 1, exp: 0, constitution: 10, hp: 20, maxHp: 30 });
     awardXp(m, 1500, fighterTpl, null);
-    // hp_per_level 15 + STR mod 0 → +15 to both max and current
+    // hp_per_level 15 + CON mod 0 → +15 to both max and current
     expect(m.maxHp).toBe(45);
     expect(m.hp).toBe(35);
   });

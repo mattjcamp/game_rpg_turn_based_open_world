@@ -16,6 +16,12 @@ export default function HomePage() {
           Enter the World &rarr;
         </Link>
         <Link
+          href="/party"
+          className="rounded-md border border-parchment/30 px-6 py-3 text-lg text-parchment/80 transition hover:bg-parchment/10"
+        >
+          Form Party
+        </Link>
+        <Link
           href="/combat"
           className="rounded-md border border-parchment/30 px-6 py-3 text-lg text-parchment/80 transition hover:bg-parchment/10"
         >

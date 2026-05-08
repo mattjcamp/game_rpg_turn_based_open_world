@@ -24,10 +24,16 @@
         "head": null
       },
       "inventory": [
-        { "item": "Crossbow" },
-        { "item": "Bolts", "charges": 15 }
+        {
+          "item": "Crossbow"
+        },
+        {
+          "item": "Bolts",
+          "charges": 15
+        }
       ],
-      "sprite": "src/assets/game/characters/fighter.png"
+      "sprite": "src/assets/game/characters/fighter.png",
+      "constitution": 14
     },
     {
       "name": "Merry",
@@ -48,10 +54,16 @@
         "head": null
       },
       "inventory": [
-        { "item": "Short Bow" },
-        { "item": "Arrows", "charges": 20 }
+        {
+          "item": "Short Bow"
+        },
+        {
+          "item": "Arrows",
+          "charges": 20
+        }
       ],
-      "sprite": "src/assets/game/characters/thief.png"
+      "sprite": "src/assets/game/characters/thief.png",
+      "constitution": 12
     },
     {
       "name": "Gandolf",
@@ -72,7 +84,8 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/wizard.png"
+      "sprite": "src/assets/game/characters/wizard.png",
+      "constitution": 10
     },
     {
       "name": "Selina",
@@ -93,7 +106,8 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/cleric.png"
+      "sprite": "src/assets/game/characters/cleric.png",
+      "constitution": 13
     }
   ],
   "active_party": [
