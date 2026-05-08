@@ -34,6 +34,10 @@ export interface MonsterSpec {
    *  `gold_min` / `gold_max`); rolled per spawn in makeMonsterByName. */
   goldMin?: number;
   goldMax?: number;
+  /** "land" (default) or "sea". Sea creatures can attack the party
+   *  while they're aboard a boat; land creatures cannot. Mirrors the
+   *  Python `monsters.json` `terrain` field. */
+  terrain?: "land" | "sea";
 }
 
 interface RawMonster {
@@ -50,6 +54,7 @@ interface RawMonster {
   xp_reward?: number;
   gold_min?: number;
   gold_max?: number;
+  terrain?: string;
 }
 
 /**
@@ -130,6 +135,7 @@ export function specFromRaw(name: string, raw: RawMonster): MonsterSpec {
     xpReward: raw.xp_reward,
     goldMin: raw.gold_min,
     goldMax: raw.gold_max,
+    terrain: raw.terrain === "sea" ? "sea" : "land",
   };
 }
 

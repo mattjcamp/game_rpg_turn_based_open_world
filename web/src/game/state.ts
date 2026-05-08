@@ -17,6 +17,7 @@ import type { Combatant } from "./types";
 import { makeSampleParty } from "./data/fighters";
 import type { Party } from "./world/Party";
 import type { RoamingMonster } from "./world/SpawnPoints";
+import { makeClock, type GameClock } from "./world/GameTime";
 
 export interface GameState {
   /** Combat-layer party — slim Combatant[] used by CombatScene only.
@@ -49,6 +50,19 @@ export interface GameState {
   roamingMonsters: RoamingMonster[];
   /** Set when the player has been wiped — overworld will refuse to step. */
   defeated: boolean;
+  /** Game world clock — minutes elapsed since epoch (Sun Jan 1, 12 PM).
+   *  Each overworld/town move advances 5 minutes. Drives the time-of-day
+   *  darkness overlay and the moon-phase HUD readout. */
+  clock: GameClock;
+  /** True while the party is sitting on a boat. Land monsters can't
+   *  contact the party while this is set; only sea creatures engage. */
+  onBoat: boolean;
+  /** Live overworld boat positions, keyed by `${col},${row}`. Seeded
+   *  from any TILE_BOAT cells in the source map on first load and
+   *  mutated as boats sail / are disembarked. Persists across scene
+   *  restarts so a boat the party left at a far shore is still there
+   *  when they walk back. */
+  boatPositions: Set<string>;
 }
 
 function makeFreshState(): GameState {
@@ -64,6 +78,9 @@ function makeFreshState(): GameState {
     destroyedSpawns: new Set(),
     roamingMonsters: [],
     defeated: false,
+    clock: makeClock(),
+    onBoat: false,
+    boatPositions: new Set(),
   };
 }
 
@@ -78,6 +95,9 @@ export function resetGameState(): void {
   gameState.destroyedSpawns = fresh.destroyedSpawns;
   gameState.roamingMonsters = fresh.roamingMonsters;
   gameState.defeated = fresh.defeated;
+  gameState.clock = fresh.clock;
+  gameState.onBoat = fresh.onBoat;
+  gameState.boatPositions = fresh.boatPositions;
 }
 
 export function triggerKey(col: number, row: number): string {

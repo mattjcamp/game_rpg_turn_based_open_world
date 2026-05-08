@@ -29,6 +29,16 @@ import {
 } from "../world/Lighting";
 import { decorationFor } from "../world/Decorations";
 import { installTileEffects } from "../world/TileEffects";
+import {
+  advanceClock,
+  clockDarknessParams,
+  dateStr,
+  lunarPhaseIndex,
+  lunarPhaseName,
+  timeStr,
+} from "../world/GameTime";
+import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
+import { partyLightRadius } from "../world/PartyActions";
 import { gameState, triggerKey } from "../state";
 import type { Combatant } from "../types";
 import {
@@ -43,7 +53,8 @@ import {
   loadedMonsterSprites,
   type MonsterSpec,
 } from "../data/monsters";
-import { TILE_GRASS } from "../world/Tiles";
+import { TILE_GRASS, TILE_WATER, TILE_BOAT } from "../world/Tiles";
+import { classifyBoatMove } from "../world/Boats";
 import { dataPath } from "../world/Module";
 import { defaultRng } from "../rng";
 import { tickGaladrielsLight } from "../world/PartyActions";
@@ -57,6 +68,8 @@ export class OverworldScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
   private hpSummary!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
+  private clockText!: Phaser.GameObjects.Text;
+  private moonIcon!: Phaser.GameObjects.Graphics;
   private busy = false;
   private defeatOverlay?: Phaser.GameObjects.Text;
   private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
@@ -70,6 +83,11 @@ export class OverworldScene extends Phaser.Scene {
   /** Per-roamer-id sprite shown over its current tile. Rebuilt every
    *  step so positions stay in sync with gameState.roamingMonsters. */
   private roamerSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
+  /** Boat sprites keyed by `${col},${row}` — kept in sync with
+   *  gameState.boatPositions. The aboard boat's sprite is the same
+   *  object; we just retarget the tween onto it. */
+  private boatSprites: Map<string, Phaser.GameObjects.Image> = new Map();
+  private boatBobTween?: Phaser.Tweens.Tween;
 
   constructor() {
     super({ key: "OverworldScene" });
@@ -89,6 +107,8 @@ export class OverworldScene extends Phaser.Scene {
     this.mapLights = [];
     this.darkness = new Map();
     this.roamerSprites = new Map();
+    this.boatSprites = new Map();
+    this.boatBobTween = undefined;
     this.defeatOverlay = undefined;
   }
 
@@ -158,7 +178,14 @@ export class OverworldScene extends Phaser.Scene {
       /* spawn data missing — degrade gracefully */
     }
 
+    // Lift any TILE_BOAT cells into gameState.boatPositions and
+    // overwrite the underlying data with water — boats are rendered
+    // as their own sprite layer so they can move and bob without us
+    // having to re-skin the static tile mesh.
+    this.extractBoatTiles();
+
     this.drawMap();
+    this.drawBoats();
     // Animated tile_properties.effect overlays — torches flicker, fires
     // dance, smoke rises, fairy lights twinkle. Depth 7 puts them above
     // tiles + decoration glyphs but below darkness (9) and player (10).
@@ -168,7 +195,7 @@ export class OverworldScene extends Phaser.Scene {
     this.installCamera();
     this.installInput();
     this.refreshHud();
-    if (this.dark) this.refreshDarkness();
+    this.refreshDarkness();
 
     // Catalog-driven monster sprite preloads + roamer overlay both
     // run after drawMap because they layer on top of the static map.
@@ -249,29 +276,61 @@ export class OverworldScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(7);
     }
-    if (this.dark) {
-      for (let row = 0; row < this.tileMap.height; row++) {
-        for (let col = 0; col < this.tileMap.width; col++) {
-          const r = this.add
-            .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0.85)
-            .setOrigin(0)
-            .setDepth(9);
-          this.darkness.set(`${col},${row}`, r);
-        }
+    // Always create the per-tile darkness mesh — it sits invisible
+    // (alpha=0) under broad daylight and gets repainted whenever the
+    // map is interior-dark or the clock rolls into dawn/dusk/night.
+    for (let row = 0; row < this.tileMap.height; row++) {
+      for (let col = 0; col < this.tileMap.width; col++) {
+        const r = this.add
+          .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0)
+          .setOrigin(0)
+          .setDepth(9);
+        this.darkness.set(`${col},${row}`, r);
       }
     }
   }
 
+  /**
+   * Repaint the per-tile darkness overlay. Three sources can darken
+   * the world:
+   *   1. Interior maps with baked light_source tiles ("this.dark") —
+   *      pitch-black outside soft pools around each light + party.
+   *   2. The game clock at dawn/dusk/night — colour-tinted wash.
+   *   3. Daytime with no interior darkness — all tiles cleared to
+   *      alpha=0 (broad daylight).
+   * The two sources can co-exist (e.g. a town interior at night), in
+   * which case interior darkness wins because the clock can't punch
+   * light into a windowless room.
+   */
   private refreshDarkness(): void {
-    if (!this.dark) return;
     const party = gameState.playerPos;
+    const clockParams = clockDarknessParams(gameState.clock);
+    const partyR = gameState.partyData
+      ? partyLightRadius(gameState.partyData, 2)
+      : 2;
     for (let row = 0; row < this.tileMap.height; row++) {
       for (let col = 0; col < this.tileMap.width; col++) {
         const rect = this.darkness.get(`${col},${row}`);
         if (!rect) continue;
-        const b = brightnessAt(col, row, this.mapLights, party);
-        const alpha = Math.max(0, Math.min(0.92, (1 - b) * 0.92));
-        rect.setFillStyle(0x000000, alpha);
+        if (this.dark) {
+          // Interior darkness — same logic as before.
+          const b = brightnessAt(col, row, this.mapLights, party);
+          rect.setFillStyle(0x000000, Math.max(0, Math.min(0.92, (1 - b) * 0.92)));
+          continue;
+        }
+        if (!clockParams) {
+          rect.setFillStyle(0x000000, 0);
+          continue;
+        }
+        if (clockParams.maxAlpha < 0.5) {
+          // Dawn / dusk — uniform colour wash, no party-light pool.
+          rect.setFillStyle(clockParams.tint, clockParams.maxAlpha);
+          continue;
+        }
+        // Night — full black except a soft pool around the party.
+        const b = brightnessAt(col, row, [], party, partyR);
+        const alpha = Math.max(0, Math.min(1, (1 - b) * clockParams.maxAlpha));
+        rect.setFillStyle(clockParams.tint, alpha);
       }
     }
   }
@@ -281,6 +340,98 @@ export class OverworldScene extends Phaser.Scene {
     const x = col * TILE + TILE / 2;
     const y = row * TILE + TILE / 2;
     this.player = this.add.image(x, y, "player").setDepth(10);
+    // While the party is aboard a boat, the boat sprite IS the
+    // marker — hide the avatar so the two don't visually overlap.
+    if (gameState.onBoat) {
+      this.player.setVisible(false);
+      this.startBoatBobTween();
+    }
+  }
+
+  /**
+   * Move all TILE_BOAT cells in the freshly-loaded map into the
+   * shared `gameState.boatPositions` set, replacing the underlying
+   * tile data with TILE_WATER. Boats render as their own animated
+   * sprite layer (`drawBoats`) so they can sail without us having to
+   * mutate the static tile sprite mesh on every step.
+   *
+   * Idempotent across scene restarts: returning from combat re-loads
+   * the map JSON (which still has TILE_BOAT in its source data), but
+   * `gameState.boatPositions` already remembers the live runtime
+   * positions, so we honour those instead of resetting to the JSON
+   * baseline.
+   */
+  private extractBoatTiles(): void {
+    const seenPositions = new Set<string>();
+    for (let r = 0; r < this.tileMap.height; r++) {
+      for (let c = 0; c < this.tileMap.width; c++) {
+        if (this.tileMap.getTile(c, r) === TILE_BOAT) {
+          this.tileMap.setTile(c, r, TILE_WATER);
+          seenPositions.add(`${c},${r}`);
+        }
+      }
+    }
+    if (gameState.boatPositions.size === 0) {
+      // First entry into this scene this session — seed from the JSON.
+      gameState.boatPositions = seenPositions;
+      return;
+    }
+    // Already populated (returning from combat or town): also force
+    // every gameState boat tile to water so a freshly-loaded TILE_BOAT
+    // at a position the boat already moved away from doesn't double up.
+    for (const key of gameState.boatPositions) {
+      const [c, r] = key.split(",").map((s) => parseInt(s, 10));
+      if (Number.isFinite(c) && Number.isFinite(r)) {
+        this.tileMap.setTile(c, r, TILE_WATER);
+      }
+    }
+  }
+
+  /**
+   * Render every boat in `gameState.boatPositions` as a Phaser image
+   * at depth 8 (above tiles, below the player). Called once per scene
+   * create after `drawMap`. Sailing/disembarking re-keys this map
+   * without going through here again.
+   */
+  private drawBoats(): void {
+    const key = tileSpriteKey(TILE_BOAT);
+    if (!key || !this.textures.exists(key)) return;
+    for (const k of gameState.boatPositions) {
+      const [c, r] = k.split(",").map((s) => parseInt(s, 10));
+      if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
+      const img = this.add
+        .image(c * TILE + TILE / 2, r * TILE + TILE / 2, key)
+        .setDepth(8);
+      this.boatSprites.set(k, img);
+    }
+  }
+
+  /**
+   * Start (or replace) the bob tween on the boat sprite the party is
+   * currently riding. The tween yoyos the sprite ±1px vertically every
+   * 350 ms — the same cadence the Python game uses in
+   * `OverworldState.update`.
+   */
+  private startBoatBobTween(): void {
+    this.stopBoatBobTween();
+    const key = `${gameState.playerPos.col},${gameState.playerPos.row}`;
+    const sprite = this.boatSprites.get(key);
+    if (!sprite) return;
+    this.boatBobTween = this.tweens.add({
+      targets: sprite,
+      y: sprite.y - 2,
+      duration: 350,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
+  }
+
+  private stopBoatBobTween(): void {
+    if (this.boatBobTween) {
+      this.boatBobTween.stop();
+      this.boatBobTween = undefined;
+    }
   }
 
   private installCamera(): void {
@@ -323,12 +474,28 @@ export class OverworldScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.hint = this.add
-      .text(960 - 16, 18, "WASD / arrows / tap to move  ·  Space = wait  ·  ✦ = encounter", {
+      .text(960 - 16, 4, "WASD / arrows / tap to move  ·  Space = wait  ·  ✦ = encounter", {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#bdb38a",
       })
       .setOrigin(1, 0)
+      .setScrollFactor(0);
+
+    // Game-clock + moon-phase readout, right-aligned under the hint.
+    // The Graphics moon is drawn at (960-16-iconRight) with text to its
+    // right (more readable than text-right-of-icon on narrow phrases).
+    this.clockText = this.add
+      .text(960 - 16, 22, "", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#dcdcc8",
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0);
+    this.moonIcon = this.add
+      .graphics()
+      .setDepth(1)
       .setScrollFactor(0);
   }
 
@@ -340,6 +507,26 @@ export class OverworldScene extends Phaser.Scene {
       .map((c: Combatant) => `${c.name} ${c.hp}/${c.maxHp}`)
       .join("   ");
     this.hpSummary.setText(partyText);
+    this.refreshClockHud();
+  }
+
+  /**
+   * Update the date/time + moon-phase readout in the HUD's top-right.
+   * Repaints the moon icon only when the lunar phase actually rolls
+   * over (one of eight per 28-day cycle), so per-step cost stays at
+   * a single text update.
+   */
+  private refreshClockHud(): void {
+    const c = gameState.clock;
+    const text = `${dateStr(c)} ${timeStr(c)} · ${lunarPhaseName(c)}`;
+    this.clockText.setText(text);
+    // Reposition the moon to the left of the text every refresh
+    // (text width changes as the time string ticks), and repaint its
+    // shape only when the phase index changes.
+    const r = MOON_HUD_SIZE / 2;
+    const cx = (960 - 16) - this.clockText.width - r - 6;
+    const cy = 22 + this.clockText.height / 2;
+    paintMoonPhase(this.moonIcon, cx, cy, r, lunarPhaseIndex(c));
   }
 
   // ── Input ────────────────────────────────────────────────────────
@@ -383,6 +570,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private skipTurn(): void {
     if (this.busy || gameState.defeated) return;
+    advanceClock(gameState.clock);
     if (gameState.partyData) {
       tickGaladrielsLight(gameState.partyData);
     }
@@ -398,21 +586,124 @@ export class OverworldScene extends Phaser.Scene {
     this.checkEncounter(col, row);
   }
 
+  /** Shared "bumped a wall" shake — used by tryStep and the boat
+   *  handler when they can't actually move. */
+  private bumpShake(dc: number, dr: number): void {
+    const target = gameState.onBoat
+      ? this.boatSprites.get(`${gameState.playerPos.col},${gameState.playerPos.row}`) ?? this.player
+      : this.player;
+    this.busy = true;
+    this.tweens.add({
+      targets: target,
+      x: target.x + dc * 4,
+      y: target.y + dr * 4,
+      duration: 60,
+      yoyo: true,
+      onComplete: () => (this.busy = false),
+    });
+  }
+
+  /**
+   * Apply a board / sail / disembark outcome from `classifyBoatMove`.
+   * Updates `gameState.onBoat` + `boatPositions`, retargets the boat
+   * sprite, hides/shows the player, restarts the bob tween — and runs
+   * the same end-of-turn pipeline a regular step would (clock tick,
+   * encounter check, etc.).
+   */
+  private applyBoatMove(
+    kind: "board" | "sail" | "disembark",
+    fromCol: number, fromRow: number,
+    toCol: number, toRow: number,
+  ): void {
+    this.busy = true;
+    const tileX = (c: number) => c * TILE + TILE / 2;
+    const tileY = (r: number) => r * TILE + TILE / 2;
+    const fromKey = `${fromCol},${fromRow}`;
+    const toKey = `${toCol},${toRow}`;
+
+    if (kind === "board") {
+      // Hide the player avatar; the boat sprite is the marker now.
+      this.player.setVisible(false);
+      gameState.onBoat = true;
+      gameState.playerPos = { col: toCol, row: toRow };
+      this.player.x = tileX(toCol);
+      this.player.y = tileY(toRow);
+      this.startBoatBobTween();
+    } else if (kind === "sail") {
+      // Move the boat sprite from its old tile to the new one and
+      // re-key the lookup map so future hit-tests find it there.
+      const sprite = this.boatSprites.get(fromKey);
+      if (sprite) {
+        this.boatSprites.delete(fromKey);
+        this.boatSprites.set(toKey, sprite);
+        // Stop the bob tween before tweening the position so the two
+        // tweens don't fight over `y`.
+        this.stopBoatBobTween();
+        this.tweens.add({
+          targets: sprite,
+          x: tileX(toCol),
+          y: tileY(toRow),
+          duration: 110,
+          onComplete: () => this.startBoatBobTween(),
+        });
+      }
+      gameState.boatPositions.delete(fromKey);
+      gameState.boatPositions.add(toKey);
+      gameState.playerPos = { col: toCol, row: toRow };
+      this.player.x = tileX(toCol);
+      this.player.y = tileY(toRow);
+    } else {
+      // disembark — boat stays where it is, party steps off.
+      this.stopBoatBobTween();
+      gameState.onBoat = false;
+      gameState.playerPos = { col: toCol, row: toRow };
+      this.player.setVisible(true);
+      this.player.x = tileX(toCol);
+      this.player.y = tileY(toRow);
+    }
+
+    // Mirror the end-of-turn pipeline tryStep runs after a normal move.
+    advanceClock(gameState.clock);
+    if (gameState.partyData) tickGaladrielsLight(gameState.partyData);
+    this.refreshHud();
+    this.refreshDarkness();
+    this.busy = false;
+    if (this.checkLink(toCol, toRow)) return;
+    const engaged = this.tickSpawnsAndRoamers();
+    this.renderRoamers();
+    if (engaged) {
+      this.engageRoamer(engaged);
+      return;
+    }
+    this.checkEncounter(toCol, toRow);
+  }
+
   private tryStep(dc: number, dr: number): void {
     if (this.busy || gameState.defeated) return;
-    const nc = gameState.playerPos.col + dc;
-    const nr = gameState.playerPos.row + dr;
+    const fromCol = gameState.playerPos.col;
+    const fromRow = gameState.playerPos.row;
+    const nc = fromCol + dc;
+    const nr = fromRow + dr;
+
+    // Boat-aware classification first — handles boarding, sailing, and
+    // disembarking. Returns "passthrough" if the move has nothing to do
+    // with boats and we should fall through to normal walking.
+    const boatMove = classifyBoatMove(
+      this.tileMap,
+      { onBoat: gameState.onBoat, boatPositions: gameState.boatPositions },
+      fromCol, fromRow, nc, nr,
+    );
+    if (boatMove.kind === "blocked") {
+      this.bumpShake(dc, dr);
+      return;
+    }
+    if (boatMove.kind === "board" || boatMove.kind === "sail" || boatMove.kind === "disembark") {
+      this.applyBoatMove(boatMove.kind, fromCol, fromRow, nc, nr);
+      return;
+    }
+
     if (!this.tileMap.isWalkable(nc, nr)) {
-      // Quick shake to acknowledge the attempted move.
-      this.busy = true;
-      this.tweens.add({
-        targets: this.player,
-        x: this.player.x + dc * 4,
-        y: this.player.y + dr * 4,
-        duration: 60,
-        yoyo: true,
-        onComplete: () => (this.busy = false),
-      });
+      this.bumpShake(dc, dr);
       return;
     }
 
@@ -427,6 +718,7 @@ export class OverworldScene extends Phaser.Scene {
       duration: 110,
       onComplete: () => {
         this.busy = false;
+        advanceClock(gameState.clock);
         if (gameState.partyData) {
           tickGaladrielsLight(gameState.partyData);
         }
@@ -661,9 +953,18 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     // 3. Engagement check — first roamer within Chebyshev 1 wins.
-    const hit = gameState.roamingMonsters.find(
-      (m) => Math.max(Math.abs(m.col - party.col), Math.abs(m.row - party.row)) <= 1,
-    );
+    //    While the party is aboard a boat, only sea creatures can
+    //    initiate contact: a land monster on the shore can't board
+    //    the boat. Mirrors `OverworldState._check_monster_contact`
+    //    in the Python game (`src/states/overworld.py:1493`).
+    const hit = gameState.roamingMonsters.find((m) => {
+      if (Math.max(Math.abs(m.col - party.col), Math.abs(m.row - party.row)) > 1) return false;
+      if (gameState.onBoat) {
+        const terrain = this.monsterCatalog.get(m.name)?.terrain ?? "land";
+        if (terrain !== "sea") return false;
+      }
+      return true;
+    });
     return hit ?? null;
   }
 

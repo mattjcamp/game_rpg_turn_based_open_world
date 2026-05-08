@@ -77,6 +77,15 @@ import {
 import { partyLightRadius, partyLightTint, tickGaladrielsLight } from "../world/PartyActions";
 import { decorationFor } from "../world/Decorations";
 import { installTileEffects } from "../world/TileEffects";
+import {
+  advanceClock,
+  clockDarknessParams,
+  dateStr,
+  lunarPhaseIndex,
+  lunarPhaseName,
+  timeStr,
+} from "../world/GameTime";
+import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
 import { withBase } from "../world/Module";
 import { gameState } from "../state";
 
@@ -102,6 +111,8 @@ export class TownScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
   private hpSummary!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
+  private clockText!: Phaser.GameObjects.Text;
+  private moonIcon!: Phaser.GameObjects.Graphics;
   /** Set of darkness rectangles drawn one per tile, indexed by `${col},${row}`. */
   private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
   /** Per-tile tint rectangles for active party-light effects (Infravision /
@@ -303,12 +314,12 @@ export class TownScene extends Phaser.Scene {
     // party's effective light radius — so on resume we repaint the
     // darkness to reflect the new state.
     this.events.on(Phaser.Scenes.Events.RESUME, () => {
-      if (this.dark) this.refreshDarkness();
+      this.refreshDarkness();
     });
     this.installCamera();
     this.installInput();
     this.refreshHud();
-    if (this.dark) this.refreshDarkness();
+    this.refreshDarkness();
   }
 
   // ── Coordinate helpers ───────────────────────────────────────────
@@ -366,24 +377,22 @@ export class TownScene extends Phaser.Scene {
 
     // Pre-create one darkness rectangle per cell at depth 9 + a tint
     // rectangle per cell at depth 9.5. Both sit above tiles + NPCs
-    // but below the player marker. Per-cell alpha is updated in
-    // refreshDarkness; the tint stays invisible until an active
-    // party-light effect (Infravision / Galadriel's Light) supplies
-    // a colour.
-    if (this.dark) {
-      for (let row = 0; row < this.town.height; row++) {
-        for (let col = 0; col < this.town.width; col++) {
-          const d = this.add
-            .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0.85)
-            .setOrigin(0)
-            .setDepth(9);
-          this.darkness.set(`${col},${row}`, d);
-          const t = this.add
-            .rectangle(col * TILE, row * TILE, TILE, TILE, 0xffffff, 0)
-            .setOrigin(0)
-            .setDepth(9.5);
-          this.tintRects.set(`${col},${row}`, t);
-        }
+    // but below the player marker. The mesh always exists now (so the
+    // game clock can darken outdoor towns at dusk/night even though
+    // they have no baked light_source tiles); per-cell alpha is set
+    // in refreshDarkness based on whichever darkness source is active.
+    for (let row = 0; row < this.town.height; row++) {
+      for (let col = 0; col < this.town.width; col++) {
+        const d = this.add
+          .rectangle(col * TILE, row * TILE, TILE, TILE, 0x000000, 0)
+          .setOrigin(0)
+          .setDepth(9);
+        this.darkness.set(`${col},${row}`, d);
+        const t = this.add
+          .rectangle(col * TILE, row * TILE, TILE, TILE, 0xffffff, 0)
+          .setOrigin(0)
+          .setDepth(9.5);
+        this.tintRects.set(`${col},${row}`, t);
       }
     }
   }
@@ -394,8 +403,39 @@ export class TownScene extends Phaser.Scene {
    * pool tracks them across the map.
    */
   private refreshDarkness(): void {
-    if (!this.dark) return;
     const party = { col: this.playerCol, row: this.playerRow };
+    if (!this.dark) {
+      // Outdoor / lit map. The only darkness here comes from the game
+      // clock (dawn/dusk/night). The party-light tint layer never
+      // applies outdoors — it's an interior-darkness affordance.
+      const clockParams = clockDarknessParams(gameState.clock);
+      for (let row = 0; row < this.town.height; row++) {
+        for (let col = 0; col < this.town.width; col++) {
+          const rect = this.darkness.get(`${col},${row}`);
+          if (!rect) continue;
+          const tintRect = this.tintRects.get(`${col},${row}`);
+          if (tintRect) tintRect.setFillStyle(0xffffff, 0);
+          if (!clockParams) {
+            rect.setFillStyle(0x000000, 0);
+            continue;
+          }
+          if (clockParams.maxAlpha < 0.5) {
+            // Dawn / dusk colour wash.
+            rect.setFillStyle(clockParams.tint, clockParams.maxAlpha);
+            continue;
+          }
+          // Night — full black with a soft party-light pool.
+          const partyData = gameState.partyData;
+          const radius = partyData
+            ? partyLightRadius(partyData, PARTY_LIGHT_RADIUS)
+            : PARTY_LIGHT_RADIUS;
+          const b = brightnessAt(col, row, [], party, radius);
+          const alpha = Math.max(0, Math.min(1, (1 - b) * clockParams.maxAlpha));
+          rect.setFillStyle(clockParams.tint, alpha);
+        }
+      }
+      return;
+    }
     // Active party effects (Infravision, Galadriel's Light) act as a
     // party-carried light source — they bump the radius up from the
     // default 2 tiles to 8/5 respectively, and they also paint a
@@ -498,13 +538,23 @@ export class TownScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.hint = this.add
-      .text(960 - 16, 18, "WASD / arrows / tap to move  ·  Space = wait  ·  tap an NPC to talk", {
+      .text(960 - 16, 4, "WASD / arrows / tap to move  ·  Space = wait  ·  tap an NPC to talk", {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#bdb38a",
       })
       .setOrigin(1, 0)
       .setScrollFactor(0);
+
+    this.clockText = this.add
+      .text(960 - 16, 22, "", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#dcdcc8",
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0);
+    this.moonIcon = this.add.graphics().setDepth(1).setScrollFactor(0);
   }
 
   private refreshHud(): void {
@@ -514,6 +564,17 @@ export class TownScene extends Phaser.Scene {
       .map((c) => `${c.name} ${c.hp}/${c.maxHp}`)
       .join("   ");
     this.hpSummary.setText(partyText);
+    this.refreshClockHud();
+  }
+
+  /** Mirror of OverworldScene.refreshClockHud — see that copy for notes. */
+  private refreshClockHud(): void {
+    const c = gameState.clock;
+    this.clockText.setText(`${dateStr(c)} ${timeStr(c)} · ${lunarPhaseName(c)}`);
+    const r = MOON_HUD_SIZE / 2;
+    const cx = (960 - 16) - this.clockText.width - r - 6;
+    const cy = 22 + this.clockText.height / 2;
+    paintMoonPhase(this.moonIcon, cx, cy, r, lunarPhaseIndex(c));
   }
 
   private installCamera(): void {
@@ -679,6 +740,7 @@ export class TownScene extends Phaser.Scene {
       duration: 110,
       onComplete: () => {
         this.busy = false;
+        advanceClock(gameState.clock);
         // Burn down a torch step in dark scenes so a 150-step Torch
         // actually expires after 150 movements. We don't tick in lit
         // areas — the player shouldn't be punished for using a torch
@@ -709,6 +771,7 @@ export class TownScene extends Phaser.Scene {
    */
   private skipTurn(): void {
     if (this.busy || this.dialog || this.shop || this.temple) return;
+    advanceClock(gameState.clock);
     if (this.dark && gameState.partyData && gameState.partyData.torchSteps > 0) {
       gameState.partyData.torchSteps -= 1;
     }
