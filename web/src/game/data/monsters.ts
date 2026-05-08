@@ -38,6 +38,102 @@ export interface MonsterSpec {
    *  while they're aboard a boat; land creatures cannot. Mirrors the
    *  Python `monsters.json` `terrain` field. */
   terrain?: "land" | "sea";
+  /** Multi-tile sprite scale. Default 1 (32×32). 2 → 64×64 — used by
+   *  Dragons and Man Eaters so a boss reads as a boss on the grid. */
+  battleScale?: number;
+  /** Spell-casting AI table. Each entry has a `cast_chance` (0-100)
+   *  the engine rolls against on the monster's turn; the first
+   *  passing spell with a valid target gets cast. */
+  monsterSpells?: MonsterSpell[];
+  /** Always-on effects — regen amount, fire/poison resistance, etc. */
+  passives?: MonsterPassive[];
+  /** Triggered effects on a successful melee hit: drain HP back into
+   *  the attacker, "consume" debuff that ticks damage each turn, … */
+  onHitEffects?: MonsterOnHit[];
+  /** Extra tiles of movement granted after a successful attack —
+   *  Dragons hit-and-run with `post_attack_move: 2`. Default 0. */
+  postAttackMove?: number;
+  /** Whether the creature is humanoid. Used by spells that target
+   *  only humanoids (Charm in the Python game). */
+  humanoid?: boolean;
+  /** "easy" / "moderate" / "hard" / "deadly" / "boss" — flavour tag
+   *  carried for HUD labels and possibly future scaling. */
+  difficulty?: string;
+}
+
+export type MonsterSpellType =
+  | "breath_fire"
+  | "magic_dart"
+  | "magic_arrow"
+  | "fireball"
+  | "lightning_bolt"
+  | "sleep"
+  | "curse"
+  | "poison"
+  | "heal_self"
+  | "heal_ally";
+
+export interface MonsterSpell {
+  type: MonsterSpellType;
+  name: string;
+  /** 0-100 chance to attempt the cast on the monster's turn. */
+  castChance: number;
+  /** Tile range — used both to pick targets and to gate the cast. */
+  range?: number;
+  damageDice?: number;
+  damageSides?: number;
+  damageBonus?: number;
+  healDice?: number;
+  healSides?: number;
+  healBonus?: number;
+  saveDc?: number;
+  duration?: number;
+  /** Sleep-style spells refuse targets above this HP threshold. */
+  maxTargetHp?: number;
+  acPenalty?: number;
+  attackPenalty?: number;
+  damagePerTurn?: number;
+}
+
+export type MonsterPassive =
+  | { type: "regen"; amount: number }
+  | { type: "fire_resistance" }
+  | { type: "poison_immunity" };
+
+export type MonsterOnHit =
+  | { type: "drain"; chance: number; amount: number }
+  | { type: "consume"; chance: number; damagePerTurn: number; saveDc: number };
+
+interface RawMonsterSpell {
+  type?: string;
+  name?: string;
+  cast_chance?: number;
+  range?: number;
+  damage_dice?: number;
+  damage_sides?: number;
+  damage_bonus?: number;
+  heal_dice?: number;
+  heal_sides?: number;
+  heal_bonus?: number;
+  save_dc?: number;
+  duration?: number;
+  max_target_hp?: number;
+  ac_penalty?: number;
+  attack_penalty?: number;
+  damage_per_turn?: number;
+}
+
+interface RawMonsterPassive {
+  type?: string;
+  amount?: number;
+}
+
+interface RawMonsterOnHit {
+  type?: string;
+  chance?: number;
+  amount?: number;
+  damage_per_turn?: number;
+  save_dc?: number;
 }
 
 interface RawMonster {
@@ -55,6 +151,69 @@ interface RawMonster {
   gold_min?: number;
   gold_max?: number;
   terrain?: string;
+  battle_scale?: number;
+  spells?: RawMonsterSpell[] | null;
+  passives?: RawMonsterPassive[] | null;
+  on_hit_effects?: RawMonsterOnHit[] | null;
+  post_attack_move?: number;
+  humanoid?: boolean;
+  difficulty?: string;
+}
+
+const KNOWN_SPELL_TYPES: ReadonlySet<string> = new Set([
+  "breath_fire", "magic_dart", "magic_arrow", "fireball",
+  "lightning_bolt", "sleep", "curse", "poison",
+  "heal_self", "heal_ally",
+]);
+
+function spellFromRaw(s: RawMonsterSpell): MonsterSpell | null {
+  if (!s.type || !KNOWN_SPELL_TYPES.has(s.type)) return null;
+  return {
+    type: s.type as MonsterSpellType,
+    name: s.name ?? s.type,
+    castChance: typeof s.cast_chance === "number" ? s.cast_chance : 0,
+    range: s.range,
+    damageDice: s.damage_dice,
+    damageSides: s.damage_sides,
+    damageBonus: s.damage_bonus,
+    healDice: s.heal_dice,
+    healSides: s.heal_sides,
+    healBonus: s.heal_bonus,
+    saveDc: s.save_dc,
+    duration: s.duration,
+    maxTargetHp: s.max_target_hp,
+    acPenalty: s.ac_penalty,
+    attackPenalty: s.attack_penalty,
+    damagePerTurn: s.damage_per_turn,
+  };
+}
+
+function passiveFromRaw(p: RawMonsterPassive): MonsterPassive | null {
+  if (p.type === "regen") {
+    return { type: "regen", amount: typeof p.amount === "number" ? p.amount : 1 };
+  }
+  if (p.type === "fire_resistance")  return { type: "fire_resistance" };
+  if (p.type === "poison_immunity")  return { type: "poison_immunity" };
+  return null;
+}
+
+function onHitFromRaw(h: RawMonsterOnHit): MonsterOnHit | null {
+  if (h.type === "drain") {
+    return {
+      type: "drain",
+      chance: typeof h.chance === "number" ? h.chance : 0,
+      amount: typeof h.amount === "number" ? h.amount : 0,
+    };
+  }
+  if (h.type === "consume") {
+    return {
+      type: "consume",
+      chance: typeof h.chance === "number" ? h.chance : 0,
+      damagePerTurn: typeof h.damage_per_turn === "number" ? h.damage_per_turn : 1,
+      saveDc: typeof h.save_dc === "number" ? h.save_dc : 12,
+    };
+  }
+  return null;
 }
 
 /**
@@ -136,6 +295,19 @@ export function specFromRaw(name: string, raw: RawMonster): MonsterSpec {
     goldMin: raw.gold_min,
     goldMax: raw.gold_max,
     terrain: raw.terrain === "sea" ? "sea" : "land",
+    battleScale: typeof raw.battle_scale === "number" ? raw.battle_scale : 1,
+    monsterSpells: Array.isArray(raw.spells)
+      ? raw.spells.map(spellFromRaw).filter((x): x is MonsterSpell => x !== null)
+      : undefined,
+    passives: Array.isArray(raw.passives)
+      ? raw.passives.map(passiveFromRaw).filter((x): x is MonsterPassive => x !== null)
+      : undefined,
+    onHitEffects: Array.isArray(raw.on_hit_effects)
+      ? raw.on_hit_effects.map(onHitFromRaw).filter((x): x is MonsterOnHit => x !== null)
+      : undefined,
+    postAttackMove: typeof raw.post_attack_move === "number" ? raw.post_attack_move : 0,
+    humanoid: !!raw.humanoid,
+    difficulty: raw.difficulty,
   };
 }
 
@@ -201,6 +373,12 @@ export function makeMonsterByName(name: string, idSuffix = ""): Combatant {
     undead: spec.undead,
     xpReward: spec.xpReward,
     goldReward,
+    battleScale: spec.battleScale,
+    monsterSpells: spec.monsterSpells,
+    passives: spec.passives,
+    onHitEffects: spec.onHitEffects,
+    postAttackMove: spec.postAttackMove,
+    humanoid: spec.humanoid,
   };
 }
 

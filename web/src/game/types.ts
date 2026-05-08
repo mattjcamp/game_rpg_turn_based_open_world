@@ -76,6 +76,45 @@ export interface Combatant {
    * they fight on their own without the player picking actions.
    */
   aiControlled?: boolean;
+  /**
+   * Multi-tile sprite scale (default 1). Read by CombatScene so a
+   * Dragon (`battle_scale: 2`) renders at 2× the normal tile size on
+   * the arena grid.
+   */
+  battleScale?: number;
+  /** Spell-casting AI table (Dragon's Fire Breath, Lich's Fireball,
+   *  Troll's Self Heal, …). Forwarded from `MonsterSpec` so the AI
+   *  loop can roll cast_chance without re-looking-up the catalog. */
+  monsterSpells?: import("./data/monsters").MonsterSpell[];
+  /** Always-on effects applied each round in `Combat.endTurn` —
+   *  regen, fire_resistance, poison_immunity. */
+  passives?: import("./data/monsters").MonsterPassive[];
+  /** Effects rolled on a successful melee hit — drain HP from victim,
+   *  Man Eater "consume" debuff, …. */
+  onHitEffects?: import("./data/monsters").MonsterOnHit[];
+  /** Bonus tiles after a successful attack — Dragons hit-and-run with
+   *  `post_attack_move: 2`. Default 0. */
+  postAttackMove?: number;
+  /** True for humanoid monsters (Orcs, Goblins, Trolls, Dark Mages…).
+   *  Charm-style spells filter on this. */
+  humanoid?: boolean;
+  /**
+   * Active swallow-whole debuff. Set by Man Eater's "consume" on-hit
+   * effect when its STR save fails. While set:
+   *
+   *   - The combatant's `position` is `{-1,-1}` (off the board); the
+   *     scene hides their sprite and HP bar.
+   *   - On their turn, `Combat.runConsumedAutoTurn()` rolls the STR
+   *     save again — pass spits them back out near the consumer, fail
+   *     deals `damagePerTurn` damage.
+   *   - If the consumer dies, their next turn auto-releases.
+   */
+  consumed?: {
+    damagePerTurn: number;
+    saveDc: number;
+    consumerId: string;
+    originalPosition: { col: number; row: number };
+  };
 }
 
 /**

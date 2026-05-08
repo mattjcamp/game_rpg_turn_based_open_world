@@ -21,9 +21,14 @@ function make(
   side: "party" | "enemies",
   overrides: Partial<Combatant> = {}
 ): Combatant {
+  // Cast away the literal-type narrowing from the `id` argument so
+  // tests comparing `c.current.id !== "..."` against another literal
+  // don't trip TS's "no overlap" diagnostic. At runtime the id is
+  // just a string.
+  const wideId: string = id;
   return {
-    id,
-    name: id,
+    id: wideId,
+    name: wideId,
     side,
     maxHp: 20,
     hp: 20,
@@ -80,7 +85,7 @@ describe("Combat — attack flow", () => {
       mulberry32(1)
     );
     // Force the active to be the party member by spinning the cursor.
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     const baseLines = c.log.length;       // opening banner + initial turn line
     const result = c.attack("e1");
     expect(result.hit).toBe(true);
@@ -96,7 +101,7 @@ describe("Combat — attack flow", () => {
       [make("e1", "enemies", { ac: 1, hp: 1, maxHp: 1 })],
       mulberry32(1)
     );
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     const result = c.attack("e1");
     expect(result.killed).toBe(true);
     expect(c.byId("e1").hp).toBe(0);
@@ -228,7 +233,7 @@ describe("Combat — movement", () => {
       [make("e1", "enemies")],
       mulberry32(1)
     );
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     const before = c.current.position.col;
     const result = c.tryMove("w");
     expect(result.kind).toBe("moved");
@@ -242,7 +247,7 @@ describe("Combat — movement", () => {
       [make("e1", "enemies")],
       mulberry32(1)
     );
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     // Force the actor next to the east wall: col = ARENA_COLS - 2.
     c.current.position = { col: ARENA_COLS - 2, row: 5 };
     const result = c.tryMove("e");
@@ -257,7 +262,7 @@ describe("Combat — movement", () => {
       [make("e1", "enemies")],
       mulberry32(1)
     );
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     const p1 = c.current;
     const p2 = c.combatants.find((x) => x.id === "p2")!;
     p1.position = { col: 5, row: 5 };
@@ -275,7 +280,7 @@ describe("Combat — movement", () => {
       [make("e1", "enemies")],
       mulberry32(1)
     );
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     c.current.position = { col: 8, row: 8 };
     expect(c.tryMove("w").kind).toBe("moved");
     const second = c.tryMove("w");
@@ -292,7 +297,7 @@ describe("Combat — bump-to-attack", () => {
       [make("e1", "enemies", { ac: 1, hp: 50, maxHp: 50 })],
       mulberry32(1)
     );
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     const p1 = c.current;
     const e1 = c.byId("e1");
     p1.position = { col: 8, row: 8 };
@@ -553,7 +558,7 @@ describe("Combat — buff registry", () => {
       mulberry32(2),
     );
     // Walk the turn cursor until p1 is current.
-    while (c.current.id !== "p1") c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
     expect(c.movePoints).toBe(4);
 
     // Now buff and roll forward a full loop to refill on p1's next turn.
@@ -562,6 +567,247 @@ describe("Combat — buff registry", () => {
     for (let i = 0; i < loopSize; i++) c.endTurn();
     expect(c.current.id).toBe("p1");
     expect(c.movePoints).toBe(7);  // 4 + 3
+  });
+});
+
+describe("Combat — monster passives + on-hit + spell AI", () => {
+  function endRound(c: Combat): void {
+    const n = c.combatants.length;
+    for (let i = 0; i < n; i++) c.endTurn();
+  }
+
+  it("regen passive heals the monster at the end of each round", () => {
+    const dragon = make("drag", "enemies", {
+      maxHp: 100, hp: 60,
+      passives: [{ type: "regen", amount: 10 }],
+    });
+    const c = new Combat([make("p1", "party")], [dragon], mulberry32(1));
+    endRound(c);
+    const after = c.combatants.find((x) => x.id === "drag")!;
+    expect(after.hp).toBe(70);
+    // Caps at maxHp — repeat enough times to overshoot.
+    for (let i = 0; i < 10; i++) endRound(c);
+    expect(c.combatants.find((x) => x.id === "drag")!.hp).toBe(100);
+  });
+
+  it("regen never wakes a downed monster", () => {
+    const downed = make("down", "enemies", {
+      maxHp: 50, hp: 0,
+      passives: [{ type: "regen", amount: 5 }],
+    });
+    const c = new Combat([make("p1", "party")], [downed], mulberry32(1));
+    endRound(c);
+    expect(c.combatants.find((x) => x.id === "down")!.hp).toBe(0);
+  });
+
+  it("fire_resistance halves breath_fire damage", () => {
+    // attacker with breath_fire 50/50 cast chance + fixed 10 damage dice.
+    // To make damage deterministic for the assertion, use a custom rng
+    // and a small dice spec.
+    const fireDragon = make("drag", "enemies", {
+      maxHp: 100, hp: 100,
+      monsterSpells: [{
+        // Deterministic 20 damage = 1d1 + 19. (Pure-bonus spells with
+        // no dice are treated as status-only by the engine.)
+        type: "breath_fire", name: "Fire Breath",
+        castChance: 100, range: 5,
+        damageDice: 1, damageSides: 1, damageBonus: 19,
+      }],
+    });
+    const tough = make("p1", "party", {
+      maxHp: 100, hp: 100,
+      passives: [{ type: "fire_resistance" }],
+    });
+    const wimp = make("p2", "party", { maxHp: 100, hp: 100 });
+    const c = new Combat([tough, wimp], [fireDragon], mulberry32(7));
+    // Walk to the dragon's turn.
+    while (c.current.id !== "drag") c.endTurn();
+    // Cast at the resistant target — flat 20 damage halved to 10.
+    c.castMonsterSpell(0, "p1");
+    expect(c.combatants.find((x) => x.id === "p1")!.hp).toBe(90);
+    // Cast at the unresistant target — full 20.
+    c.castMonsterSpell(0, "p2");
+    expect(c.combatants.find((x) => x.id === "p2")!.hp).toBe(80);
+  });
+
+  it("on-hit drain heals the attacker by `amount` on a successful hit", () => {
+    const leech = make("leech", "enemies", {
+      attackBonus: 100, // always hits the dummy AC 12 below
+      maxHp: 50, hp: 30,
+      damage: { dice: 0, sides: 0, bonus: 5 }, // flat 5 dmg
+      onHitEffects: [{ type: "drain", chance: 100, amount: 4 }],
+    });
+    const target = make("p1", "party", { ac: 12 });
+    const c = new Combat([target], [leech], mulberry32(11));
+    while (c.current.id !== "leech") c.endTurn();
+    // Force the attack against the party member (via the public API).
+    c.attack("p1");
+    expect(c.combatants.find((x) => x.id === "leech")!.hp).toBe(34); // 30 + 4
+  });
+
+  it("on-hit consume rolls a STR save — pass means the bite never lands the swallow", () => {
+    const eater = make("ate", "enemies", {
+      attackBonus: 100,
+      damage: { dice: 0, sides: 0, bonus: 1 },
+      onHitEffects: [{
+        type: "consume", chance: 100,
+        damagePerTurn: 6, saveDc: 5, // trivially-low DC so any save passes
+      }],
+    });
+    const burly = make("p1", "party", {
+      ac: 12, maxHp: 50, hp: 50, strength: 18, // STR mod +4
+    });
+    const c = new Combat([burly], [eater], mulberry32(11));
+    while (c.current.id !== "ate") c.endTurn();
+    c.attack("p1");
+    // STR mod +4 + any d20 ≥ 1 = at least 5 ≥ DC 5 → twists free.
+    expect(c.combatants.find((x) => x.id === "p1")!.consumed).toBeUndefined();
+  });
+
+  it("on-hit consume swallows when the STR save fails: hides the victim, ticks each of their turns, releases on a passing save", () => {
+    const eater = make("ate", "enemies", {
+      attackBonus: 100,
+      damage: { dice: 0, sides: 0, bonus: 1 },
+      onHitEffects: [{
+        type: "consume", chance: 100,
+        damagePerTurn: 6, saveDc: 30, // unreachable; failed save guaranteed
+      }],
+    });
+    const victim = make("p1", "party", {
+      ac: 12, maxHp: 50, hp: 50, strength: 10,
+    });
+    const c = new Combat([victim], [eater], mulberry32(11));
+    while (c.current.id !== "ate") c.endTurn();
+    c.attack("p1");
+    const swallowed = c.combatants.find((x) => x.id === "p1")!;
+    // Off the board: position sentinel + consumed payload + original
+    // position remembered for spit-out.
+    expect(swallowed.consumed).toBeDefined();
+    expect(swallowed.position).toEqual({ col: -1, row: -1 });
+    expect(swallowed.consumed!.originalPosition).toBeDefined();
+    // Walk to the victim's turn — auto-resolve should fire and tick
+    // their HP (with this RNG / DC 30, save will fail).
+    while ((c.current.id as string) !== "p1") c.endTurn();
+    expect(c.isCurrentConsumed()).toBe(true);
+    const beforeHp = swallowed.hp;
+    const events = c.runConsumedAutoTurn();
+    expect(events.find((e) => e.kind === "tick")).toBeDefined();
+    expect(swallowed.hp).toBe(beforeHp - 6);
+    // Lower the DC and walk to the victim's next turn — they should
+    // escape and reappear on the board.
+    swallowed.consumed!.saveDc = 1;
+    c.endTurn();
+    while ((c.current.id as string) !== "p1") c.endTurn();
+    const events2 = c.runConsumedAutoTurn();
+    expect(events2.find((e) => e.kind === "saved")).toBeDefined();
+    expect(swallowed.consumed).toBeUndefined();
+    // Position is back on a valid arena cell (not the {-1,-1} sentinel).
+    expect(swallowed.position.col).toBeGreaterThanOrEqual(0);
+    expect(swallowed.position.row).toBeGreaterThanOrEqual(0);
+  });
+
+  it("releases the victim immediately when the consumer is killed", () => {
+    // A second eater so the encounter doesn't auto-end when the
+    // first one dies — that lets us verify the release fires before
+    // initiative concludes.
+    const eaterA = make("ateA", "enemies", {
+      attackBonus: 100, damage: { dice: 0, sides: 0, bonus: 1 },
+      onHitEffects: [{
+        type: "consume", chance: 100,
+        damagePerTurn: 6, saveDc: 30,
+      }],
+      hp: 1, maxHp: 1, // one-shot kill
+    });
+    const eaterB = make("ateB", "enemies");
+    const victim = make("p1", "party", {
+      ac: 12, maxHp: 50, hp: 50, strength: 10,
+      attackBonus: 100, damage: { dice: 0, sides: 0, bonus: 100 },
+    });
+    const c = new Combat([victim], [eaterA, eaterB], mulberry32(11));
+    while (c.current.id !== "ateA") c.endTurn();
+    c.attack("p1");
+    const swallowed = c.combatants.find((x) => x.id === "p1")!;
+    expect(swallowed.consumed).toBeDefined();
+    expect(swallowed.position).toEqual({ col: -1, row: -1 });
+    // Walk to a turn we can act on (skip ateB, p1's auto-resolve).
+    // The eaterA is killed via attack from p1 — but p1 is consumed
+    // and can't act. So have eaterB attack ateA via direct hp bash.
+    // Simpler: have ateB hit ateA (we can't; same side). Cleanest:
+    // walk to p1's turn where the auto-resolver gets the consumer
+    // dead path on its own. But ateA is alive! We need to kill it.
+    //
+    // Use the public `attack` API by making ateA-the-attacker hit
+    // a friendly... that's blocked. Simplest path: skip the test of
+    // the kill-via-attack flow and just call releaseAllConsumedBy by
+    // proxy — kill ateA's HP and walk to p1's turn so the auto
+    // resolver's "consumer dead" branch runs.
+    eaterA.hp = 0;
+    while ((c.current.id as string) !== "p1") c.endTurn();
+    const events = c.runConsumedAutoTurn();
+    expect(events.find((e) => e.kind === "saved")).toBeDefined();
+    expect(swallowed.consumed).toBeUndefined();
+  });
+
+  it("releases consumed victims the moment the consumer dies via attack", () => {
+    const eater = make("ate", "enemies", {
+      attackBonus: 100, damage: { dice: 0, sides: 0, bonus: 1 },
+      onHitEffects: [{
+        type: "consume", chance: 100,
+        damagePerTurn: 6, saveDc: 30,
+      }],
+      hp: 1, maxHp: 1,
+    });
+    // Two party members so one can kill the eater while the other
+    // is being digested.
+    const v = make("v", "party", { strength: 10, ac: 12, hp: 50, maxHp: 50 });
+    const k = make("k", "party", {
+      attackBonus: 100, damage: { dice: 0, sides: 0, bonus: 100 },
+    });
+    const c = new Combat([v, k], [eater], mulberry32(11));
+    while (c.current.id !== "ate") c.endTurn();
+    c.attack("v");
+    expect(c.combatants.find((x) => x.id === "v")!.consumed).toBeDefined();
+    while ((c.current.id as string) !== "k") c.endTurn();
+    c.attack("ate"); // one-shots
+    // Killing the consumer immediately spits out the victim.
+    expect(c.combatants.find((x) => x.id === "v")!.consumed).toBeUndefined();
+    expect(c.combatants.find((x) => x.id === "v")!.position.col).toBeGreaterThanOrEqual(0);
+  });
+
+  it("spell AI returns a `spell` intent when cast_chance hits", () => {
+    const lich = make("lich", "enemies", {
+      monsterSpells: [{
+        type: "magic_dart", name: "Magic Dart",
+        castChance: 100, range: 30,  // arena is 18×18 — anyone is in range
+        damageDice: 1, damageSides: 1, damageBonus: 3,
+      }],
+    });
+    const c = new Combat([make("p1", "party")], [lich], mulberry32(3));
+    while (c.current.id !== "lich") c.endTurn();
+    const intent = c.decideMonsterIntent();
+    expect(intent.kind).toBe("spell");
+    if (intent.kind === "spell") {
+      expect(intent.targetId).toBe("p1");
+    }
+  });
+
+  it("heal_self only fires when the caster is wounded", () => {
+    const troll = make("troll", "enemies", {
+      maxHp: 50, hp: 50,
+      monsterSpells: [{
+        type: "heal_self", name: "Mend Wounds",
+        castChance: 100,
+        healDice: 0, healSides: 0, healBonus: 8,
+      }],
+    });
+    const c = new Combat([make("p1", "party")], [troll], mulberry32(5));
+    while (c.current.id !== "troll") c.endTurn();
+    // Full HP — engine should refuse the heal even though chance is 100.
+    expect(c.decideMonsterIntent().kind).not.toBe("spell");
+    // Wound the troll, then re-roll.
+    c.combatants.find((x) => x.id === "troll")!.hp = 30;
+    const intent = c.decideMonsterIntent();
+    expect(intent.kind).toBe("spell");
   });
 });
 

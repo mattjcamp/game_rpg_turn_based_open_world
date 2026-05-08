@@ -445,10 +445,36 @@ export class CombatScene extends Phaser.Scene {
    */
   private kickOffCurrentTurn(): void {
     if (this.combat.isOver || this.ended) return;
+    // If the active combatant is currently inside a Man Eater they
+    // skip their turn; the engine rolls the STR save automatically
+    // and either spits them out or ticks the per-turn damage.
+    if (this.combat.isCurrentConsumed()) {
+      this.busy = true;
+      this.time.delayedCall(450, () => void this.runConsumedTurn());
+      return;
+    }
     if (isAiControlled(this.combat.current)) {
       this.busy = true;
       this.time.delayedCall(450, () => void this.runMonsterTurn());
     }
+  }
+
+  /**
+   * Auto-resolve a consumed combatant's turn: ask the engine to roll
+   * the save, drain the resulting events so the scene can flash the
+   * outcome on screen (escape banner / damage floater / death), then
+   * end the turn so initiative moves on.
+   */
+  private async runConsumedTurn(): Promise<void> {
+    try {
+      this.combat.runConsumedAutoTurn();
+      this.flashConsumeEvents();
+      this.refreshAll();
+    } finally {
+      this.busy = false;
+    }
+    if (this.combat.isOver) return this.endEncounter();
+    this.endActorTurn();
   }
 
   // ── Static panels ───────────────────────────────────────────────
@@ -638,14 +664,23 @@ export class CombatScene extends Phaser.Scene {
         .setVisible(false);
       this.selRings.set(c.id, ring);
       let body: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      // `battleScale` is set by monsters.ts for boss-class creatures
+      // (Dragons / Man Eaters at 2 → 64×64). Default 1 keeps the
+      // existing 32×32 silhouette for everyone else.
+      const scale = c.battleScale && c.battleScale > 1 ? c.battleScale : 1;
       if (c.sprite && this.textures.exists(c.sprite)) {
         // Sprites are native 32×32 — render unscaled so transparency
         // holds and the pixel art stays crisp.
         body = this.add.image(x, y, c.sprite);
+        if (scale !== 1) {
+          body.setDisplaySize(TILE * scale, TILE * scale);
+          body.setDepth(2); // above same-tile fellows so the giant reads
+        }
       } else {
         const colorHex = Phaser.Display.Color.GetColor(...c.color);
+        const size = (TILE - 4) * scale;
         body = this.add
-          .rectangle(x, y, TILE - 4, TILE - 4, colorHex)
+          .rectangle(x, y, size, size, colorHex)
           .setStrokeStyle(2, 0x0a0a14);
       }
       this.bodies.set(c.id, body);
@@ -2089,10 +2124,13 @@ export class CombatScene extends Phaser.Scene {
 
   private canTakePlayerInput(): boolean {
     // Player input is only valid when the active actor is a real
-    // party member, not an AI-controlled summon on the party side.
+    // party member, not an AI-controlled summon on the party side,
+    // and not currently swallowed by a consume effect (their slot
+    // auto-resolves into the STR-save tick instead).
     return !this.busy && !this.ended &&
            this.combat.current.side === "party" &&
-           !isAiControlled(this.combat.current);
+           !isAiControlled(this.combat.current) &&
+           !this.combat.current.consumed;
   }
 
   // ── Turn flow ────────────────────────────────────────────────────
@@ -2130,8 +2168,89 @@ export class CombatScene extends Phaser.Scene {
     this.clearMoveHints();
     this.combat.endTurn();
     this.refreshAll();
+    this.flashConsumeEvents();
     if (this.combat.isOver) return this.endEncounter();
     this.kickOffCurrentTurn();
+  }
+
+  /**
+   * Drain any consume events the engine queued and surface them on
+   * screen. Three coordinated jobs:
+   *
+   *   - On `applied` — float "SWALLOWED!" at the victim's last cell,
+   *     then hide the body + HP bar (they're inside the consumer now).
+   *   - On `tick` — float "-N" over the consumer's body so the player
+   *     sees the per-turn damage even though the victim is invisible.
+   *   - On `saved` — show the body again at its new arena cell and
+   *     float "ESCAPED!".
+   */
+  private flashConsumeEvents(): void {
+    const events = this.combat.popConsumeEvents();
+    for (const ev of events) {
+      const target = this.combat.byId(ev.targetId);
+      const body = this.bodies.get(target.id);
+      const ring = this.selRings.get(target.id);
+      if (!body) continue;
+      if (ev.kind === "applied") {
+        // Float the banner first, THEN hide. Otherwise the floater
+        // anchors to (0,0) since the body's been moved off-board.
+        this.floatLabel(body.x, body.y - 16, "SWALLOWED!", "#ff6b6b");
+        body.setVisible(false);
+        if (ring) ring.setVisible(false);
+        const bar = this.monsterHpBars.get(target.id);
+        if (bar) { bar.bg.setVisible(false); bar.bar.setVisible(false); }
+      } else if (ev.kind === "tick" && ev.damage > 0) {
+        // Victim is invisible — float the damage on their consumer
+        // so the player can see whose belly the HP is leaving.
+        const consumer = target.consumed
+          ? this.bodies.get(target.consumed.consumerId)
+          : null;
+        const x = consumer?.x ?? 480;
+        const y = consumer?.y ?? 360;
+        this.floatLabel(x, y - 12, `${target.name} -${ev.damage}`, "#ff6b6b");
+      } else if (ev.kind === "saved") {
+        // The engine has already updated the position. Snap the body
+        // sprite to the new tile and re-show.
+        body.x = this.tileX(target.position.col);
+        body.y = this.tileY(target.position.row);
+        if (ring) {
+          ring.x = body.x;
+          ring.y = body.y;
+        }
+        body.setVisible(true);
+        const bar = this.monsterHpBars.get(target.id);
+        if (bar) { bar.bg.setVisible(true); bar.bar.setVisible(true); }
+        const label = target.hp > 0 ? "ESCAPED!" : "RECOVERED";
+        this.floatLabel(body.x, body.y - 16, label, "#7be2a8");
+      } else if (ev.kind === "released") {
+        // Consumer died with the victim still inside — engine has
+        // already placed them on a free tile.
+        body.x = this.tileX(target.position.col);
+        body.y = this.tileY(target.position.row);
+        if (ring) { ring.x = body.x; ring.y = body.y; }
+        body.setVisible(true);
+        this.floatLabel(body.x, body.y - 16, "FREE!", "#7be2a8");
+      }
+    }
+  }
+
+  /** Tiny floating-label helper used by the consume hooks (the existing
+   *  hit-flash inside `animateHit` is similar but tightly coupled to
+   *  AttackResult). Tweens up + fades for ~700ms. */
+  private floatLabel(x: number, y: number, text: string, color: string): void {
+    const t = this.add.text(x, y, text, {
+      fontFamily: "Georgia, serif",
+      fontSize: "14px",
+      color,
+      stroke: "#1a1a2e",
+      strokeThickness: 4,
+    }).setOrigin(0.5, 1).setDepth(50);
+    this.tweens.add({
+      targets: t,
+      y: t.y - 24, alpha: 0,
+      duration: 700,
+      onComplete: () => t.destroy(),
+    });
   }
 
   private async runMonsterTurn(): Promise<void> {
@@ -2158,6 +2277,23 @@ export class CombatScene extends Phaser.Scene {
             this.applyWeaponDurability(attackerId);
             this.applyArmorDurability(target.id);
           }
+          this.refreshLog();
+          break;
+        }
+        if (intent.kind === "spell") {
+          // Cast a monster spell — Dragon's Fire Breath, Lich's Fireball,
+          // Troll's Self Heal, etc. Resolves the math + state mutation,
+          // animates a hit/heal flash on the target, ends the turn.
+          const result = this.combat.castMonsterSpell(intent.spellIndex, intent.targetId);
+          this.combat.movePoints = 0;
+          const target = this.combat.byId(result.targetId);
+          await this.animateHit(target, {
+            attackerId: this.combat.current.id, targetId: target.id,
+            hit: result.damage > 0 || result.heal > 0,
+            roll: 0, total: 0, critical: false,
+            damage: result.damage, killed: result.killed,
+          });
+          this.refreshHp(target);
           this.refreshLog();
           break;
         }
@@ -2396,6 +2532,14 @@ export class CombatScene extends Phaser.Scene {
 
   private refreshTurnHeader(): void {
     const c = this.combat.current;
+    if (c.consumed) {
+      // Consumed combatants don't take a turn — the engine
+      // auto-rolls their STR save during this slot. Tell the player
+      // why nothing's happening (and why the action menu is dim).
+      this.turnText.setText(`-- ${c.name.toUpperCase()} IS SWALLOWED --`);
+      this.movePointsText.setText("(rolling escape save…)");
+      return;
+    }
     this.turnText.setText(`-- ${c.name.toUpperCase()}'S TURN --`);
     this.movePointsText.setText(
       `Moves: ${this.combat.movePoints}/${c.baseMoveRange}`
@@ -2405,9 +2549,14 @@ export class CombatScene extends Phaser.Scene {
   private refreshActionMenu(): void {
     // Player can act only on real party members, not on AI summons
     // that share the party side.
+    // A consumed party member doesn't get a player turn — their
+    // initiative slot is replaced by the engine's STR-save tick.
+    // Strip player control so the action menu greys out and the
+    // input gate (`canTakePlayerInput`) refuses keystrokes.
     const playerTurn =
       this.combat.current.side === "party" &&
-      !isAiControlled(this.combat.current);
+      !isAiControlled(this.combat.current) &&
+      !this.combat.current.consumed;
     const member = this.memberForCurrent();
     // Per-action enable state — dynamic based on the active member.
     const canThrow = !!member && this.partyHasThrowable();
