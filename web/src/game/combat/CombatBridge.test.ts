@@ -46,7 +46,7 @@ function items(): Map<string, Item> {
 }
 
 describe("combatantFromMember", () => {
-  it("derives stats from level + ability mods + equipped weapon", () => {
+  it("derives Python-style stats from ability mods + equipped weapon", () => {
     const fighter = memberFromRaw({
       name: "Gimli", class: "Fighter", race: "Dwarf",
       level: 10, hp: 60, strength: 18, dexterity: 14, intelligence: 9, wisdom: 9,
@@ -56,45 +56,111 @@ describe("combatantFromMember", () => {
     expect(c.name).toBe("Gimli");
     expect(c.maxHp).toBe(60);
     expect(c.hp).toBe(60);
-    // STR 18 → +4 mod, level 10 → +5 prof, +1 baseline → +10 attack bonus
-    expect(c.attackBonus).toBe(10);
-    // DEX 14 → +2; Chain evasion 50 → +2 armor; AC = 10+2+2 = 14
-    expect(c.ac).toBe(14);
-    // weapon.power 5 → 1d6+5
-    expect(c.damage).toEqual({ dice: 1, sides: 6, bonus: 5 });
+    // STR 18 → +4 mod (Python: `Member.get_attack_bonus(ranged=False)`).
+    expect(c.attackBonus).toBe(4);
+    // DEX 14 → +2; Chain evasion 50 → +0 armour bonus (50-50)/5; AC = 10+2+0 = 12.
+    expect(c.ac).toBe(12);
+    // Sword has power 5 → 1d6 + STR mod (+4).
+    expect(c.damage).toEqual({ dice: 1, sides: 6, bonus: 4 });
     expect(c.dexMod).toBe(2);
+    expect(c.strength).toBe(18);
+    expect(c.intelligence).toBe(9);
+    expect(c.wisdom).toBe(9);
     expect(c.sprite).toMatch(/fighter/);
   });
 
-  it("uses DEX for ranged and throwable weapons", () => {
+  it("uses DEX for ranged weapons and STR for throwable melee weapons", () => {
     const thief = memberFromRaw({
       name: "Merry", class: "Thief", race: "Halfling",
       level: 10, hp: 45, strength: 12, dexterity: 18,
       equipped: { right_hand: "Dagger", left_hand: null, body: "Cloth", head: null },
     });
-    const c = combatantFromMember(thief, items());
-    // DEX 18 → +4, level 10 → +5, +1 → 10
-    expect(c.attackBonus).toBe(10);
+    // Dagger is melee + throwable. Default is melee, so STR mod (+1).
+    const melee = combatantFromMember(thief, items());
+    expect(melee.attackBonus).toBe(1);
+    // Crossbow is ranged → DEX mod (+4) for both attack and damage.
+    const ranger = memberFromRaw({
+      name: "Syl", class: "Ranger", race: "Elf",
+      level: 5, hp: 30, strength: 10, dexterity: 18,
+      equipped: { right_hand: "Crossbow", left_hand: null, body: "Cloth", head: null },
+    });
+    const c = combatantFromMember(ranger, items());
+    expect(c.attackBonus).toBe(4);
+    // Power 7 → 1d8 + DEX mod (+4).
+    expect(c.damage).toEqual({ dice: 1, sides: 8, bonus: 4 });
   });
 
-  it("falls back to bare 1d6 when nothing is equipped", () => {
+  it("falls back to flat 1 damage when nothing is equipped", () => {
     const m = memberFromRaw({
       name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
       strength: 10, dexterity: 10, intelligence: 10, wisdom: 10,
     });
     const c = combatantFromMember(m, items());
-    expect(c.damage).toEqual({ dice: 1, sides: 6, bonus: 0 });
+    expect(c.damage).toEqual({ dice: 0, sides: 0, bonus: 1 });
+    // Empty hands: STR 10 → +0 attack, AC 10 + DEX 0 + (50-50)/5 = 10.
+    expect(c.attackBonus).toBe(0);
+    expect(c.ac).toBe(10);
   });
 
-  it("caps the armour bonus at +4 even with high evasion gear", () => {
+  it("scales AC with armour evasion the way the Python game does", () => {
+    const heavy = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 10, dexterity: 14,
+      equipped: { right_hand: null, left_hand: null, body: "Chain", head: null },
+    });
+    // Chain evasion 50 → +0 armour bonus (50-50)/5; AC = 10 + DEX 2 + 0 = 12.
+    expect(combatantFromMember(heavy, items()).ac).toBe(12);
+  });
+
+  it("rolls power-1 weapons to 1d4-1 and power-9+ to 1d10", () => {
+    const items_ = items();
+    items_.set("Club", {
+      name: "Club", category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, power: 1, ranged: false,
+    });
+    items_.set("Greataxe", {
+      name: "Greataxe", category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, power: 9, ranged: false,
+    });
+    const club = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 14, dexterity: 10,
+      equipped: { right_hand: "Club", left_hand: null, body: null, head: null },
+    });
+    // STR 14 → +2; power 1 path is 1d4 + (mod - 1) = 1d4 + 1.
+    expect(combatantFromMember(club, items_).damage)
+      .toEqual({ dice: 1, sides: 4, bonus: 1 });
+    const heavy = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 18, dexterity: 10,
+      equipped: { right_hand: "Greataxe", left_hand: null, body: null, head: null },
+    });
+    // STR 18 → +4; power 9+ path is 1d10 + STR mod.
+    expect(combatantFromMember(heavy, items_).damage)
+      .toEqual({ dice: 1, sides: 10, bonus: 4 });
+  });
+
+  it("sums the acBonus from every equipped magic item", () => {
+    const items_ = items();
+    items_.set("Bracers", {
+      name: "Bracers", category: "armors", description: "",
+      slots: ["body"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, evasion: 50, acBonus: 2,
+    });
+    items_.set("Ring", {
+      name: "Ring", category: "general", description: "",
+      slots: ["head"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, acBonus: 1,
+    });
     const m = memberFromRaw({
       name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
       strength: 10, dexterity: 10,
-      equipped: { right_hand: null, left_hand: null, body: "Chain", head: null },
+      equipped: { right_hand: null, left_hand: null, body: "Bracers", head: "Ring" },
     });
-    const c = combatantFromMember(m, items());
-    // DEX 10 → 0 mod; Chain evasion 50 → +2 armour; AC = 10+0+2 = 12
-    expect(c.ac).toBe(12);
+    // AC = 10 + DEX 0 + (50-50)/5 + (2 + 1) magic = 13.
+    expect(combatantFromMember(m, items_).ac).toBe(13);
   });
 });
 

@@ -37,6 +37,10 @@ export interface Item {
   melee?: boolean;
   throwable?: boolean;
   evasion?: number;
+  /** Magic AC bonus that stacks with armor evasion when this item is
+   *  equipped. Mirrors the Python `ac_bonus` field; weapons can carry
+   *  it too (e.g. a parrying dagger). */
+  acBonus?: number;
   durability?: number;
   itemType?: string;
   /** Buy price at shops (gold). 0 / missing = not for sale. */
@@ -57,6 +61,7 @@ interface RawItem {
   melee?: boolean;
   throwable?: boolean;
   evasion?: number;
+  ac_bonus?: number;
   durability?: number;
   item_type?: string;
   buy?: number;
@@ -91,6 +96,7 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     melee: r.melee,
     throwable: r.throwable,
     evasion: r.evasion,
+    acBonus: r.ac_bonus,
     durability: r.durability,
     itemType: r.item_type,
     buy: r.buy,

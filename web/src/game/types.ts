@@ -25,6 +25,15 @@ export interface Combatant {
   damage: DamageRoll;
   /** D&D ability modifier for DEX, used for initiative. */
   dexMod: number;
+  /** Full ability scores carried over from the PartyMember (or
+   *  monster spec). Optional because legacy fixtures and some of the
+   *  combat tests omit them — combat helpers default each to 10
+   *  (modifier +0) when they're missing. Used by spell-damage code so
+   *  Magic Arrow can read the caster's INT and Heal can read WIS. */
+  strength?: number;
+  dexterity?: number;
+  intelligence?: number;
+  wisdom?: number;
   /** Fallback portrait colour (RGB 0-255) if no sprite is loaded. */
   color: [number, number, number];
   /**

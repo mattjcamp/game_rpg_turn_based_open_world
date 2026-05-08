@@ -66,8 +66,13 @@ export function resolveThrow(
  * Single-target damage spell — used for Magic Dart, Lightning Bolt,
  * and other `effect_type: damage`/`undead_damage` spells in combat.
  *
- * Reads `effect_value.dice_count`/`dice_sides` (or parses `dice` like
- * "2d6") from the spell, plus an optional caster stat bonus.
+ * Mirrors the Python combat resolution at `src/states/combat.py:2653`:
+ *   damage = roll(dice_count d dice_sides) + caster's stat-mod bonus
+ *
+ * `effect_value.stat_bonus` names the ability ("intelligence",
+ * "wisdom", …) — Magic Arrow scales with INT, future spells can pick
+ * any stat. Without the bonus the web port shipped a flat dice roll
+ * that ignored the caster's primary attribute entirely.
  */
 export function resolveDamageSpell(
   caster: Combatant,
@@ -87,18 +92,7 @@ export function resolveDamageSpell(
   // detail yet, so we treat them as auto-hit at full power. The
   // d20 + attackBonus check stays in the result for log parity.
   const roll = rollAttack(caster.attackBonus, target.ac, rng);
-  const ev = spell.effect_value ?? {};
-  let dice = 0;
-  if (typeof ev.dice_count === "number" && typeof ev.dice_sides === "number") {
-    dice = rollDamage(ev.dice_count, ev.dice_sides, 0, false, rng);
-  } else if (typeof ev.dice === "string") {
-    const m = /^(\d+)d(\d+)$/.exec(ev.dice);
-    if (m) dice = rollDamage(parseInt(m[1], 10), parseInt(m[2], 10), 0, false, rng);
-  } else {
-    // Fallback for spells without explicit dice — small chip damage.
-    dice = rollDamage(1, 4, 0, false, rng);
-  }
-  const damage = Math.max(1, dice);
+  const damage = rollSpellDamage(spell, caster, rng);
   target.hp = Math.max(0, target.hp - damage);
   return {
     attackerId: caster.id,
@@ -114,9 +108,53 @@ export function resolveDamageSpell(
 }
 
 /**
+ * Roll dice + stat_bonus for a damage spell. Pure helper so AOE /
+ * directional / single-target paths all share one source of truth.
+ */
+export function rollSpellDamage(spell: Spell, caster: Combatant, rng: RNG): number {
+  const ev = spell.effect_value ?? {};
+  let dice = 0;
+  if (typeof ev.dice_count === "number" && typeof ev.dice_sides === "number") {
+    dice = rollDamage(ev.dice_count, ev.dice_sides, 0, false, rng);
+  } else if (typeof ev.dice === "string") {
+    const m = /^(\d+)d(\d+)$/.exec(ev.dice);
+    if (m) dice = rollDamage(parseInt(m[1], 10), parseInt(m[2], 10), 0, false, rng);
+  } else {
+    // Fallback for spells without explicit dice — small chip damage.
+    dice = rollDamage(1, 4, 0, false, rng);
+  }
+  const bonus = casterStatBonus(caster, ev.stat_bonus);
+  return Math.max(1, dice + bonus);
+}
+
+/** Read the caster's modifier for the named ability, defaulting to 0
+ *  when the spell omits a stat_bonus or the Combatant lacks the
+ *  ability score (monsters before we port their stat blocks). */
+function casterStatBonus(caster: Combatant, statName: unknown): number {
+  if (typeof statName !== "string") return 0;
+  const stat = readAbility(caster, statName);
+  if (stat === undefined) return 0;
+  return Math.floor((stat - 10) / 2);
+}
+
+function readAbility(c: Combatant, name: string): number | undefined {
+  switch (name.toLowerCase()) {
+    case "strength":     return c.strength;
+    case "dexterity":    return c.dexterity;
+    case "intelligence": return c.intelligence;
+    case "wisdom":       return c.wisdom;
+    default:             return undefined;
+  }
+}
+
+/**
  * Single-target heal — used for `heal` / `major_heal` spells cast
  * during combat. Mutates the target's HP up to maxHp. Returns a
  * shared shape with `heal: amount`.
+ *
+ * Mirrors `Member.cast_heal_in_combat` at `src/states/combat.py:2977`:
+ *   hp_amount > 0  → flat amount (overrides dice)
+ *   else           → dice + stat_bonus mod (WIS for cleric heals)
  */
 export function resolveHealSpell(
   caster: Combatant,
@@ -124,7 +162,24 @@ export function resolveHealSpell(
   spell: Spell,
   rng: RNG,
 ): { attackerId: string; targetId: string; heal: number; spell: string } {
+  const amount = rollSpellHeal(spell, caster, rng);
+  const before = target.hp;
+  target.hp = Math.min(target.maxHp, target.hp + amount);
+  return {
+    attackerId: caster.id,
+    targetId: target.id,
+    heal: target.hp - before,
+    spell: spell.name,
+  };
+}
+
+/** Roll dice + stat_bonus for a heal spell. Honours `hp_amount` as a
+ *  flat-amount override (mirrors the out-of-combat `rollHeal` at
+ *  `web/src/game/world/PartyActions.ts:718` plus the Python combat
+ *  branch). Shared between single-target and mass-heal paths. */
+export function rollSpellHeal(spell: Spell, caster: Combatant, rng: RNG): number {
   const ev = spell.effect_value ?? {};
+  if (typeof ev.hp_amount === "number") return Math.max(1, ev.hp_amount);
   let amount = 0;
   if (typeof ev.dice_count === "number" && typeof ev.dice_sides === "number") {
     amount = rollDamage(ev.dice_count, ev.dice_sides, 0, false, rng);
@@ -140,15 +195,8 @@ export function resolveHealSpell(
     const def = defaults[spell.effect_type];
     if (def) amount = rollDamage(def[0], def[1], 0, false, rng);
   }
-  amount = Math.max(1, amount);
-  const before = target.hp;
-  target.hp = Math.min(target.maxHp, target.hp + amount);
-  return {
-    attackerId: caster.id,
-    targetId: target.id,
-    heal: target.hp - before,
-    spell: spell.name,
-  };
+  const bonus = casterStatBonus(caster, ev.stat_bonus);
+  return Math.max(1, amount + bonus);
 }
 
 /**

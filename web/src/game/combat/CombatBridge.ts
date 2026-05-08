@@ -12,13 +12,12 @@
  * we port the class JSON files we can layer richer maths on top.
  */
 
-import type { Combatant } from "../types";
-import type { PartyMember, Party } from "../world/Party";
+import type { Combatant, DamageRoll } from "../types";
+import type { PartyMember, Party, EquipmentSlots } from "../world/Party";
 import type { Item } from "../world/Items";
 import type { ClassTemplate } from "../world/Classes";
 import { activeMembers } from "../world/Party";
 
-const DEFAULT_DAMAGE = { dice: 1, sides: 6, bonus: 0 } as const;
 /** Fall-back tile movement budget when no class template is available
  *  (tests that don't pass a classes map, or a class file failed to
  *  load). Picked to match the prior hardcoded value so callers that
@@ -33,23 +32,66 @@ export function abilityMod(stat: number): number {
 /** Internal alias kept short for the bridge's existing callers. */
 function mod(stat: number): number { return abilityMod(stat); }
 
-/** Pick the best ability modifier for hit rolls — STR for melee
- *  and unarmed, DEX for ranged / thrown. */
-function bestAttackMod(member: PartyMember, weapon: Item | null): number {
-  if (weapon && (weapon.ranged || weapon.throwable)) return mod(member.dexterity);
-  return mod(member.strength);
+/**
+ * Sum the `acBonus` field across every equipped item the member is
+ * currently wearing. Mundane gear has no `acBonus`, so this is a
+ * no-op for the starter party — the field is honoured for magic
+ * gear (Mystic Sword, Sun Sword, Bracers of Defence, etc.) the way
+ * the Python game's `Member.get_total_ac_bonus()` does.
+ */
+function totalAcBonus(equipped: EquipmentSlots, items: Map<string, Item>): number {
+  let total = 0;
+  const slots: Array<keyof EquipmentSlots> = ["rightHand", "leftHand", "body", "head"];
+  for (const slot of slots) {
+    const name = equipped[slot];
+    if (!name) continue;
+    const it = items.get(name);
+    if (it?.acBonus) total += it.acBonus;
+  }
+  return total;
+}
+
+/**
+ * Power-tier damage dice — direct port of `Member.get_damage_dice()`
+ * in `src/party.py:956`. Power tier sets the die size; the wielder's
+ * STR mod (or DEX mod for ranged weapons) is added as a bonus, and
+ * power-1 weapons get an extra `-1` to round to roughly d3.
+ */
+function damageForWeapon(member: PartyMember, weapon: Item | null): DamageRoll {
+  if (!weapon || typeof weapon.power !== "number") {
+    // Bare fists / no weapon — flat 1 damage, matches Python's `power 0` path.
+    return { dice: 0, sides: 0, bonus: 1 };
+  }
+  // Python keys off only `ranged` (a bow / sling / crossbow) — a
+  // throwable melee weapon (Dagger) defaults to STR until the player
+  // explicitly throws it. Matches `Member.get_damage_dice` at
+  // `src/party.py:973`.
+  const isRanged = !!weapon.ranged;
+  const statMod = isRanged ? mod(member.dexterity) : mod(member.strength);
+  const wp = weapon.power;
+  if (wp <= 0) return { dice: 0, sides: 0, bonus: 1 };
+  if (wp === 1) return { dice: 1, sides: 4, bonus: statMod - 1 };
+  if (wp <= 3)  return { dice: 1, sides: 4, bonus: statMod };
+  if (wp <= 5)  return { dice: 1, sides: 6, bonus: statMod };
+  if (wp <= 8)  return { dice: 1, sides: 8, bonus: statMod };
+  return         { dice: 1, sides: 10, bonus: statMod };
 }
 
 /**
  * Derive combat stats from a PartyMember + the catalog of items.
+ * Mirrors `Member.get_ac()`, `Member.get_attack_bonus()`, and
+ * `Member.get_damage_dice()` from `src/party.py`:
+ *
+ *   AC          = 10 + DEX_mod + (armor_evasion - 50)/5 + Σ acBonus
+ *   atk bonus   = STR_mod (melee) or DEX_mod (ranged/thrown)
+ *   damage      = power-tier dice + STR_mod (or DEX_mod for ranged)
+ *
+ * The full ability block also rides along on the Combatant so spell
+ * damage helpers can read INT (Magic Arrow) and WIS (Heal) without
+ * having to re-look-up the underlying PartyMember.
  *
  * - HP / maxHP: from the member directly so HP carries between
  *   encounters when combat finishes.
- * - AC: 10 + DEX modifier + a small armour bonus from the equipped
- *   body slot (`evasion / 25`, capped at +4 — keeps Plate worth
- *   wearing without trivialising fights).
- * - attack bonus: floor(level/2) + best-stat mod + 1 proficiency.
- * - damage: 1d6 + weapon.power. Unarmed → bare 1d6.
  * - move range: from the member's class template (Wizards 2,
  *   Fighters 4, Thieves 6 in the shipped data). Falls back to 4 when
  *   `classes` isn't supplied or the class file failed to load.
@@ -66,15 +108,12 @@ export function combatantFromMember(
     ? items.get(member.equipped.body) ?? null
     : null;
   const dexMod = mod(member.dexterity);
-  const armorBonus = armor && typeof armor.evasion === "number"
-    ? Math.min(4, Math.floor(armor.evasion / 25))
-    : 0;
-  const ac = 10 + dexMod + armorBonus;
-  const attackBonus =
-    Math.floor(member.level / 2) + bestAttackMod(member, weapon) + 1;
-  const damage = weapon && typeof weapon.power === "number"
-    ? { dice: 1, sides: 6, bonus: weapon.power }
-    : { ...DEFAULT_DAMAGE };
+  const evasion = armor && typeof armor.evasion === "number" ? armor.evasion : 50;
+  const armorBonus = Math.floor((evasion - 50) / 5);
+  const ac = 10 + dexMod + armorBonus + totalAcBonus(member.equipped, items);
+  const isRanged = !!(weapon && weapon.ranged);
+  const attackBonus = isRanged ? dexMod : mod(member.strength);
+  const damage = damageForWeapon(member, weapon);
   const tpl = classes?.get(member.class.toLowerCase());
   const baseMoveRange = tpl ? tpl.range : DEFAULT_MOVE_RANGE;
   return {
@@ -87,6 +126,10 @@ export function combatantFromMember(
     attackBonus,
     damage,
     dexMod,
+    strength: member.strength,
+    dexterity: member.dexterity,
+    intelligence: member.intelligence,
+    wisdom: member.wisdom,
     color: [200, 200, 200],
     sprite: member.sprite,
     baseMoveRange,

@@ -29,6 +29,10 @@ function makeCombatant(over: Partial<Combatant> = {}): Combatant {
     attackBonus:    over.attackBonus ?? 2,
     damage:         over.damage ?? { dice: 1, sides: 6, bonus: 0 },
     dexMod:         over.dexMod ?? 0,
+    strength:       over.strength,
+    dexterity:      over.dexterity,
+    intelligence:   over.intelligence,
+    wisdom:         over.wisdom,
     color:          over.color ?? [200, 200, 200],
     baseMoveRange:  over.baseMoveRange ?? 4,
     position:       over.position ?? { col: 5, row: 5 },
@@ -174,6 +178,44 @@ describe("resolveDamageSpell", () => {
     const r = resolveDamageSpell(caster, target, fireball, mulberry32(1));
     expect(r.damage).toBe(0);
   });
+
+  it("adds the caster's stat_bonus modifier to the dice damage", () => {
+    // Magic Arrow ships with `stat_bonus: "intelligence"` in the
+    // shipped data — mirror that here.
+    const arrow: Spell = spellFromRaw({
+      id: "magic_arrow", name: "Magic Arrow", description: "",
+      allowable_classes: ["Wizard"], casting_type: "sorcerer",
+      min_level: 1, mp_cost: 4, duration: "instant",
+      effect_type: "damage",
+      effect_value: { dice_count: 2, dice_sides: 8, stat_bonus: "intelligence" },
+      usable_in: ["battle"],
+    });
+    const wizard = makeCombatant({ id: "w", intelligence: 18 }); // +4 INT mod
+    const dummy  = makeCombatant({ id: "d", intelligence: 10 }); // +0 INT mod
+    const target1 = makeCombatant({ id: "t1", side: "enemies", hp: 99, maxHp: 99 });
+    const target2 = makeCombatant({ id: "t2", side: "enemies", hp: 99, maxHp: 99 });
+    // Same RNG seed → same dice rolls. The wizard's INT bump is the
+    // only source of difference.
+    const r1 = resolveDamageSpell(wizard, target1, arrow, mulberry32(7));
+    const r2 = resolveDamageSpell(dummy,  target2, arrow, mulberry32(7));
+    expect(r1.damage - r2.damage).toBe(4);
+  });
+
+  it("ignores stat_bonus when the caster has no ability score", () => {
+    const arrow: Spell = spellFromRaw({
+      id: "magic_arrow", name: "Magic Arrow", description: "",
+      allowable_classes: ["Wizard"], casting_type: "sorcerer",
+      min_level: 1, mp_cost: 4, duration: "instant",
+      effect_type: "damage",
+      effect_value: { dice_count: 1, dice_sides: 4, stat_bonus: "intelligence" },
+      usable_in: ["battle"],
+    });
+    // No `intelligence` field → defaults to 0 modifier.
+    const monster = makeCombatant({ id: "m" });
+    const target = makeCombatant({ id: "t", side: "party", hp: 50, maxHp: 50 });
+    const r = resolveDamageSpell(monster, target, arrow, mulberry32(7));
+    expect(r.damage).toBeGreaterThan(0); // didn't crash; minimum-1 still applies
+  });
 });
 
 describe("resolveHealSpell", () => {
@@ -200,6 +242,41 @@ describe("resolveHealSpell", () => {
     const target = makeCombatant({ id: "t", side: "party", hp: 19, maxHp: 20 });
     resolveHealSpell(caster, target, heal, mulberry32(1));
     expect(target.hp).toBe(20);
+  });
+
+  it("adds the caster's WIS modifier when stat_bonus = 'wisdom'", () => {
+    const cleric: Spell = spellFromRaw({
+      id: "heal", name: "Heal", description: "",
+      allowable_classes: ["Cleric"], casting_type: "priest",
+      min_level: 1, mp_cost: 4, duration: "instant",
+      effect_type: "heal",
+      effect_value: { dice_count: 1, dice_sides: 6, stat_bonus: "wisdom" },
+      usable_in: ["battle", "town"],
+    });
+    const wise   = makeCombatant({ id: "c", wisdom: 18 }); // +4 WIS
+    const novice = makeCombatant({ id: "c", wisdom: 10 }); // +0 WIS
+    const t1 = makeCombatant({ id: "t1", side: "party", hp: 1, maxHp: 99 });
+    const t2 = makeCombatant({ id: "t2", side: "party", hp: 1, maxHp: 99 });
+    const r1 = resolveHealSpell(wise,   t1, cleric, mulberry32(3));
+    const r2 = resolveHealSpell(novice, t2, cleric, mulberry32(3));
+    expect(r1.heal - r2.heal).toBe(4);
+  });
+
+  it("honours an `hp_amount` field as a flat heal override", () => {
+    const flat: Spell = spellFromRaw({
+      id: "potion_heal", name: "Potion Heal", description: "",
+      allowable_classes: ["Cleric"], casting_type: "priest",
+      min_level: 1, mp_cost: 4, duration: "instant",
+      effect_type: "heal",
+      effect_value: { dice_count: 99, dice_sides: 99, hp_amount: 12 },
+      usable_in: ["battle"],
+    });
+    const caster = makeCombatant({ id: "c" });
+    const target = makeCombatant({ id: "t", side: "party", hp: 5, maxHp: 50 });
+    const r = resolveHealSpell(caster, target, flat, mulberry32(9));
+    // Despite massive dice in the payload, hp_amount wins.
+    expect(r.heal).toBe(12);
+    expect(target.hp).toBe(17);
   });
 });
 
