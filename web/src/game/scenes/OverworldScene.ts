@@ -58,6 +58,29 @@ import { classifyBoatMove } from "../world/Boats";
 import { dataPath } from "../world/Module";
 import { defaultRng } from "../rng";
 import { tickGaladrielsLight } from "../world/PartyActions";
+import { activeMembers, loadParty } from "../world/Party";
+import {
+  loadQuests,
+  ensureQuestStates,
+  acceptQuest,
+  markTurnedIn,
+  findQuest,
+  type QuestDef,
+} from "../world/Quests";
+import {
+  openQuestDialog as buildQuestDialog,
+  closeQuestDialog as destroyQuestDialog,
+  flashQuestMessage,
+  openQuestLog,
+  openVictoryModal,
+  type QuestDialogHandles,
+} from "../world/QuestDialog";
+import {
+  attachPulsingGlow,
+  QUEST_GIVER_COLOR,
+  type PulsingGlowHandle,
+} from "../world/GlowEffect";
+import { normalizeSpritePath } from "../world/Towns";
 
 const TILE = 32; // matches the source PNGs' native size
 const HUD_HEIGHT = 56;
@@ -88,6 +111,24 @@ export class OverworldScene extends Phaser.Scene {
    *  object; we just retarget the tween onto it. */
   private boatSprites: Map<string, Phaser.GameObjects.Image> = new Map();
   private boatBobTween?: Phaser.Tweens.Tween;
+  /** Module quests loaded from the active module + per-name sprite
+   *  Phaser objects for any whose `giverLocation` is "overview". */
+  private questDefs: QuestDef[] = [];
+  private questGiverSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
+  /** Active quest-acceptance / turn-in overlay (shared helper). */
+  private questDialog?: QuestDialogHandles;
+  /** Read-only quest-log overlay (Q hotkey). */
+  private questLogClose?: () => void;
+  /** Halo handles for the on-map quest givers, keyed by quest name
+   *  so claiming a quest mid-session can drop the matching glow
+   *  alongside the giver sprite. */
+  private questGiverGlows: Map<string, PulsingGlowHandle> = new Map();
+  /** Runtime position of each overworld quest giver — seeded from
+   *  the quest def's `giverCol`/`giverRow` and then mutated by the
+   *  per-step wander tick. `homeCol`/`homeRow` is the anchor every
+   *  giver stays within `QUEST_GIVER_WANDER_RANGE` Manhattan tiles
+   *  of so they don't drift across the map. */
+  private questGiverPositions: Map<string, { col: number; row: number; homeCol: number; homeRow: number }> = new Map();
 
   constructor() {
     super({ key: "OverworldScene" });
@@ -110,6 +151,15 @@ export class OverworldScene extends Phaser.Scene {
     this.boatSprites = new Map();
     this.boatBobTween = undefined;
     this.defeatOverlay = undefined;
+    this.questGiverSprites = new Map();
+    this.questDialog = undefined;
+    this.questLogClose = undefined;
+    for (const g of this.questGiverGlows.values()) g.destroy();
+    this.questGiverGlows = new Map();
+    // Don't clear questGiverPositions on init — runtime coords need
+    // to survive the scene re-create that happens after every combat
+    // / town round-trip, otherwise a wandering giver would teleport
+    // back to its home tile every fight.
   }
 
   preload(): void {
@@ -197,6 +247,42 @@ export class OverworldScene extends Phaser.Scene {
     // having to re-skin the static tile mesh.
     this.extractBoatTiles();
 
+    // Module quests — load and render any "overview" quest givers.
+    // Same pattern town quest givers use, just on the overworld layer.
+    try {
+      this.questDefs = await loadQuests();
+      ensureQuestStates(this.questDefs, gameState.moduleQuestStates);
+      // The overworld is the first scene the user lands on, so a
+      // freshly-booted session may not have loaded party.json yet —
+      // do it now so quest reward delivery has a party to mutate.
+      if (!gameState.partyData) {
+        try { gameState.partyData = await loadParty(); } catch { /* defer */ }
+      }
+      // Queue quest-giver sprites — these are filed under /assets/...
+      // (the same path translation Towns.ts uses), so the loader
+      // queues them as plain image keys. We `await` the loader so
+      // the first `renderQuestGivers` call below sees the textures
+      // ready; without this the giver shows the gold-rect fallback
+      // until the player bounces through a town and back.
+      let queued = 0;
+      for (const def of this.questDefs) {
+        if (def.giverLocation !== "overview") continue;
+        const path = normalizeSpritePath(def.giverSprite);
+        if (path && !this.textures.exists(path)) {
+          this.load.image(path, path);
+          queued += 1;
+        }
+      }
+      if (queued > 0) {
+        await new Promise<void>((res) => {
+          this.load.once("complete", () => res());
+          this.load.start();
+        });
+      }
+    } catch {
+      this.questDefs = [];
+    }
+
     this.drawMap();
     this.drawBoats();
     // Animated tile_properties.effect overlays — torches flicker, fires
@@ -209,6 +295,7 @@ export class OverworldScene extends Phaser.Scene {
     this.installInput();
     this.refreshHud();
     this.refreshDarkness();
+    this.renderQuestGivers();
 
     // Catalog-driven monster sprite preloads + roamer overlay both
     // run after drawMap because they layer on top of the static map.
@@ -565,15 +652,44 @@ export class OverworldScene extends Phaser.Scene {
       k.on("keydown-E", () => this.openExamine());
       // 'P' opens the party screen as an overlay. We pause this scene
       // so its keyboard handlers don't fire while the overlay is up.
-      k.on("keydown-P", () => this.openParty());
+      k.on("keydown-P", () => {
+        if (this.questDialog) return;
+        this.openParty();
+      });
+      // Quest dialog choices — Y / Enter / Space accept (or claim),
+      // N / Escape decline.
+      k.on("keydown-Y", () => {
+        if (this.questDialog) this.confirmOverworldQuestDialog();
+      });
+      k.on("keydown-N", () => {
+        if (this.questDialog) this.closeOverworldQuestDialog();
+      });
+      k.on("keydown-ENTER", () => {
+        if (this.questDialog) this.confirmOverworldQuestDialog();
+      });
+      k.on("keydown-ESC", () => {
+        if (this.questDialog) this.closeOverworldQuestDialog();
+        else if (this.questLogClose) this.toggleOverworldQuestLog();
+      });
+      k.on("keydown-Q", () => {
+        if (this.questDialog) return;
+        this.toggleOverworldQuestLog();
+      });
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      // Quest dialog eats clicks — choices are keyboard-driven.
+      if (this.questDialog) return;
       const world = this.cameras.main.getWorldPoint(p.x, p.y);
       const col = Math.floor(world.x / TILE);
       const row = Math.floor(world.y / TILE);
+      // Tap on an adjacent quest giver opens the quest dialog.
       const dc = col - gameState.playerPos.col;
       const dr = row - gameState.playerPos.row;
+      if (Math.max(Math.abs(dc), Math.abs(dr)) <= 1) {
+        const giver = this.questGiverAt(col, row);
+        if (giver) { this.openOverworldQuestDialog(giver); return; }
+      }
       if (Math.abs(dc) + Math.abs(dr) !== 1) return;
       this.tryStep(dc, dr);
     });
@@ -592,6 +708,7 @@ export class OverworldScene extends Phaser.Scene {
     }
     this.refreshHud();
     this.refreshDarkness();
+    this.tickQuestGiverWander();
     const engaged = this.tickSpawnsAndRoamers();
     this.renderRoamers();
     if (engaged) {
@@ -696,10 +813,18 @@ export class OverworldScene extends Phaser.Scene {
 
   private tryStep(dc: number, dr: number): void {
     if (this.busy || gameState.defeated) return;
+    if (this.questDialog) return;
     const fromCol = gameState.playerPos.col;
     const fromRow = gameState.playerPos.row;
     const nc = fromCol + dc;
     const nr = fromRow + dr;
+    // Bumping into a quest giver opens their dialog instead of moving.
+    const giver = this.questGiverAt(nc, nr);
+    if (giver) {
+      this.bumpShake(dc, dr);
+      this.openOverworldQuestDialog(giver);
+      return;
+    }
 
     // Boat-aware classification first — handles boarding, sailing, and
     // disembarking. Returns "passthrough" if the move has nothing to do
@@ -740,6 +865,7 @@ export class OverworldScene extends Phaser.Scene {
         }
         this.refreshHud();
         this.refreshDarkness();
+        this.tickQuestGiverWander();
         // Town/dungeon links take priority over encounter triggers.
         // (In the dragon module they're on different tiles anyway.)
         if (this.checkLink(nc, nr)) return;
@@ -1069,5 +1195,211 @@ export class OverworldScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setScrollFactor(0);
+  }
+
+  // ── Module quest givers (overworld) ─────────────────────────────
+
+  /** Render every quest-giver NPC anchored to the overworld map.
+   *  Sprites at depth 8 — above the tile mesh and decorations, below
+   *  the darkness overlay and player marker. Re-runs when called by
+   *  scene re-create; dictionary tracks sprites by quest name so we
+   *  can despawn turned-in givers without scanning. */
+  private renderQuestGivers(): void {
+    for (const obj of this.questGiverSprites.values()) obj.destroy();
+    this.questGiverSprites.clear();
+    for (const g of this.questGiverGlows.values()) g.destroy();
+    this.questGiverGlows = new Map();
+    for (const def of this.questDefs) {
+      if (def.giverLocation !== "overview") continue;
+      const state = gameState.moduleQuestStates.get(def.name);
+      if (state?.status === "turned_in") continue;
+      // Seed runtime position on first sight of this giver. Subsequent
+      // re-renders (after combat / town visits) honour the position
+      // the wander tick last left them at.
+      let pos = this.questGiverPositions.get(def.name);
+      if (!pos) {
+        pos = { col: def.giverCol, row: def.giverRow, homeCol: def.giverCol, homeRow: def.giverRow };
+        this.questGiverPositions.set(def.name, pos);
+      }
+      const path = normalizeSpritePath(def.giverSprite);
+      const x = pos.col * TILE + TILE / 2;
+      const y = pos.row * TILE + TILE / 2;
+      let obj: Phaser.GameObjects.GameObject;
+      if (path && this.textures.exists(path)) {
+        obj = this.add.image(x, y, path).setDepth(8);
+      } else {
+        // Fallback: small gold diamond so the giver is still visible
+        // even when the sprite hasn't loaded.
+        obj = this.add
+          .rectangle(x, y, TILE - 8, TILE - 8, 0xffd470, 1)
+          .setStrokeStyle(2, 0x1a1a2e)
+          .setDepth(8);
+      }
+      this.questGiverSprites.set(def.name, obj);
+
+      // Soft pulsing halo so the giver reads as a quest hook in a
+      // crowd. Tracked per-quest so the claim path can despawn it
+      // alongside the giver sprite.
+      const sprite = obj as Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      const glow = attachPulsingGlow(this, () => sprite.x, () => sprite.y, {
+        color: QUEST_GIVER_COLOR,
+        intensity: 0.35,
+        depth: 7,
+      });
+      this.questGiverGlows.set(def.name, glow);
+    }
+  }
+
+  /** How far an overworld quest giver may roam from its anchor.
+   *  Manhattan distance, mirrors the town NPC default of 3. */
+  private static readonly QUEST_GIVER_WANDER_RANGE = 3;
+  /** Per-step probability a giver actually attempts a step. Lower
+   *  than the town NPC rate so the realm-scale overworld doesn't
+   *  feel manic. */
+  private static readonly QUEST_GIVER_STEP_CHANCE = 0.5;
+
+  /**
+   * Step every overworld quest giver at most one tile per player
+   * step. Wandering is anchored: each giver stays within
+   * `QUEST_GIVER_WANDER_RANGE` Manhattan tiles of its home (the
+   * `giver_col`/`giver_row` from quests.json) so they don't drift
+   * across the realm. Skips the move when there's no walkable
+   * candidate or the destination collides with another giver / the
+   * party.
+   */
+  private tickQuestGiverWander(): void {
+    if (this.questGiverPositions.size === 0) return;
+    const occupied = new Set<string>();
+    for (const p of this.questGiverPositions.values()) occupied.add(`${p.col},${p.row}`);
+    occupied.add(`${gameState.playerPos.col},${gameState.playerPos.row}`);
+    const dirs: Array<[number, number]> = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (const [questName, pos] of this.questGiverPositions) {
+      // Skip movement for any giver whose quest has been turned in —
+      // the sprite and glow have been despawned already, but their
+      // position entry can hang around until the scene reboots.
+      const sprite = this.questGiverSprites.get(questName);
+      if (!sprite) continue;
+      if (Math.random() >= OverworldScene.QUEST_GIVER_STEP_CHANCE) continue;
+
+      occupied.delete(`${pos.col},${pos.row}`);
+      // Shuffle directions and pick the first valid step.
+      const shuffled = [...dirs];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
+      }
+      let stepped = false;
+      for (const [dc, dr] of shuffled) {
+        const nc = pos.col + dc;
+        const nr = pos.row + dr;
+        if (!this.tileMap.inBounds(nc, nr)) continue;
+        if (!this.tileMap.isWalkable(nc, nr)) continue;
+        if (occupied.has(`${nc},${nr}`)) continue;
+        // Honour the wander leash so givers don't drift far from home.
+        const dist = Math.abs(nc - pos.homeCol) + Math.abs(nr - pos.homeRow);
+        if (dist > OverworldScene.QUEST_GIVER_WANDER_RANGE) continue;
+        pos.col = nc;
+        pos.row = nr;
+        stepped = true;
+        break;
+      }
+      occupied.add(`${pos.col},${pos.row}`);
+      if (!stepped) continue;
+      const targetX = pos.col * TILE + TILE / 2;
+      const targetY = pos.row * TILE + TILE / 2;
+      this.tweens.add({ targets: sprite, x: targetX, y: targetY, duration: 200 });
+    }
+  }
+
+  /** Find a quest-giver NPC at (col, row), if any. Used by the
+   *  pointer / step handlers to detect tap-to-talk and adjacent-step
+   *  interactions. Honours the giver's wander position rather than
+   *  the static `def.giverCol`/`Row` so the bump check tracks them. */
+  private questGiverAt(col: number, row: number): QuestDef | null {
+    for (const def of this.questDefs) {
+      if (def.giverLocation !== "overview") continue;
+      const state = gameState.moduleQuestStates.get(def.name);
+      if (state?.status === "turned_in") continue;
+      const pos = this.questGiverPositions.get(def.name) ?? { col: def.giverCol, row: def.giverRow };
+      if (pos.col === col && pos.row === row) return def;
+    }
+    return null;
+  }
+
+  /** Open the quest-giver overlay for a quest. Called from the tap
+   *  handler when the player clicks an adjacent giver, or from the
+   *  arrow-key bump path when they walk into one. */
+  private openOverworldQuestDialog(def: QuestDef): void {
+    if (this.questDialog) return;
+    const state = gameState.moduleQuestStates.get(def.name);
+    if (!state) return;
+    const handles = buildQuestDialog(this, {
+      npcName: def.giverNpc,
+      questName: def.name,
+      defs: this.questDefs,
+      state,
+    });
+    if (handles) this.questDialog = handles;
+  }
+
+  private confirmOverworldQuestDialog(): void {
+    if (!this.questDialog) return;
+    const { questName, mode } = this.questDialog;
+    if (mode === "available") {
+      acceptQuest(gameState.moduleQuestStates, questName);
+      this.closeOverworldQuestDialog();
+      return;
+    }
+    if (mode === "completed") {
+      this.claimOverworldQuestReward(questName);
+      return;
+    }
+    this.closeOverworldQuestDialog();
+  }
+
+  private closeOverworldQuestDialog(): void {
+    destroyQuestDialog(this.questDialog);
+    this.questDialog = undefined;
+  }
+
+  /** Same reward delivery as TownScene.claimQuestReward. Updates HUD
+   *  + quest sprite layer so the giver despawns on final claim. */
+  private claimOverworldQuestReward(questName: string): void {
+    const def = findQuest(this.questDefs, questName);
+    if (!def || !gameState.partyData) {
+      this.closeOverworldQuestDialog();
+      return;
+    }
+    const party = gameState.partyData;
+    if (def.rewardGold > 0) party.gold = (party.gold ?? 0) + def.rewardGold;
+    if (def.rewardXp > 0) {
+      const alive = activeMembers(party).filter((m) => m.hp > 0);
+      const recipients = alive.length > 0 ? alive : activeMembers(party);
+      const share = Math.floor(def.rewardXp / Math.max(1, recipients.length));
+      for (const m of recipients) m.exp = (m.exp ?? 0) + share;
+    }
+    for (const item of def.rewardItems) party.inventory.push({ item });
+    markTurnedIn(gameState.moduleQuestStates, questName);
+    this.closeOverworldQuestDialog();
+    // Despawn the giver sprite now that the quest is turned in.
+    const sprite = this.questGiverSprites.get(questName);
+    if (sprite) { sprite.destroy(); this.questGiverSprites.delete(questName); }
+    const glow = this.questGiverGlows.get(questName);
+    if (glow) { glow.destroy(); this.questGiverGlows.delete(questName); }
+    if (def.isFinalQuest) {
+      openVictoryModal(this, def.victoryText);
+    } else {
+      flashQuestMessage(this, `Quest "${def.name}" complete!`);
+    }
+    this.refreshHud();
+  }
+
+  private toggleOverworldQuestLog(): void {
+    if (this.questLogClose) {
+      this.questLogClose();
+      this.questLogClose = undefined;
+      return;
+    }
+    this.questLogClose = openQuestLog(this, this.questDefs, gameState.moduleQuestStates);
   }
 }

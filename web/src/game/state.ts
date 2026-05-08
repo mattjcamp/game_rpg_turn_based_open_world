@@ -20,6 +20,7 @@ import type { RoamingMonster } from "./world/SpawnPoints";
 import { makeClock, type GameClock } from "./world/GameTime";
 import type { ExamineLayout } from "./world/Examine";
 import type { DungeonLevel } from "./world/Dungeon";
+import type { QuestState } from "./world/Quests";
 
 export interface GameState {
   /** Combat-layer party — slim Combatant[] used by CombatScene only.
@@ -99,6 +100,60 @@ export interface GameState {
     col: number;
     row: number;
   } | null;
+  /**
+   * Per-quest progress, keyed by quest name. Initialized lazily by
+   * the first scene that loads `quests.json` (TownScene / OverworldScene)
+   * via `ensureQuestStates`. Persists across scene transitions so a
+   * quest accepted in one town stays active when the party walks out.
+   * The map is mutated in place by `Quests.creditKills` and
+   * `Quests.creditCollect`. */
+  moduleQuestStates: Map<string, QuestState>;
+  /**
+   * Location string passed to `creditKills` so kill credit only fires
+   * when the combat location matches a step's `spawn_location`. Set by
+   * the scene that triggered combat:
+   *   - DungeonScene: `dungeon:<name>` (or `dungeon:<name> - Floor N`
+   *     for multi-level dungeons).
+   *   - TownScene:    `town:<name>` (when town interior combat lands).
+   *   - OverworldScene: `overview`.
+   * Cleared on dungeon exit / town exit so a stale value can't credit
+   * the wrong fight.
+   */
+  combatLocation: string;
+  /**
+   * Names of monsters defeated in the most recent combat. Populated
+   * by CombatScene's victory branch and read by the scene that
+   * launched combat (DungeonScene right now) to credit quest kill
+   * steps via `Quests.creditKills`. Cleared after credit so a single
+   * fight credits steps once.
+   */
+  pendingKilledMonsters: string[];
+  /**
+   * Quest monsters placed in town interiors / building spaces. Keyed
+   * by the full path the player enters with (e.g.
+   * `"Plainstown/General Shop Interior"`). Populated lazily on first
+   * entry to an interior whose active quests have kill steps targeting
+   * it. Survives town/interior re-entries so positions + remaining-
+   * count persist mid-quest. Mirrors the Python game's
+   * `quest_interior_monsters` dict.
+   */
+  interiorMonsters: Map<string, InteriorMonster[]>;
+}
+
+export interface InteriorMonster {
+  /** Stable id — used to remove this entry on combat victory. */
+  id: string;
+  col: number;
+  row: number;
+  /** Catalog name (sprite + stats lookup). The first roster entry
+   *  doubles as the on-map sprite, matching the overworld-roamer
+   *  convention. */
+  name: string;
+  /** Encounter roster handed to CombatScene. */
+  encounterNames: string[];
+  /** Encounter template name — needed by `creditKills` so the right
+   *  quest step gets credited when this monster is defeated. */
+  encounterName: string;
 }
 
 function makeFreshState(): GameState {
@@ -122,6 +177,10 @@ function makeFreshState(): GameState {
     examineLayouts: new Map(),
     dungeonCache: new Map(),
     dungeonPos: null,
+    moduleQuestStates: new Map(),
+    combatLocation: "",
+    pendingKilledMonsters: [],
+    interiorMonsters: new Map(),
   };
 }
 
@@ -143,6 +202,10 @@ export function resetGameState(): void {
   gameState.examineLayouts = fresh.examineLayouts;
   gameState.dungeonCache = fresh.dungeonCache;
   gameState.dungeonPos = fresh.dungeonPos;
+  gameState.moduleQuestStates = fresh.moduleQuestStates;
+  gameState.combatLocation = fresh.combatLocation;
+  gameState.pendingKilledMonsters = fresh.pendingKilledMonsters;
+  gameState.interiorMonsters = fresh.interiorMonsters;
 }
 
 export function triggerKey(col: number, row: number): string {

@@ -131,6 +131,19 @@ interface CombatSceneData {
    * `roamerId` so dungeon and overworld kill bookkeeping don't clash.
    */
   dungeonMonsterId?: string;
+  /**
+   * Id of a town-interior quest monster the party engaged. On
+   * victory the matching entry in `gameState.interiorMonsters` is
+   * removed so re-entering the interior doesn't respawn it.
+   */
+  interiorMonsterId?: string;
+  /**
+   * Town/interior path the engaged monster lives on (e.g.
+   * `"Plainstown/General Shop Interior"`). Paired with
+   * `interiorMonsterId`; together they identify which list entry to
+   * remove.
+   */
+  interiorPath?: string;
 }
 
 // ── Layout (canvas is 960×720) ────────────────────────────────────
@@ -160,8 +173,17 @@ const C = {
   accent:    0xc8553d,
   gold:      0xffd470,
   body:      0xf6efd6,
-  dim:       0xbdb38a,
-  faint:     0x6f6960,
+  // dim is for "enabled but not under cursor" rows in the action
+  // menu. The previous tan (0xbdb38a) read too close to `faint` on
+  // the dark panel, making selectable actions look greyed out — see
+  // the "Range/Cast disappeared" report. Pulling it up to a soft
+  // cream restores the "yes you can pick this" cue while still
+  // keeping the cursor row visibly distinct.
+  dim:       0xe8dfb6,
+  // faint is for truly disabled rows (no ranged weapon, no
+  // throwables, etc.). Pushed darker so it contrasts cleanly with
+  // the new dim — readable but obviously off.
+  faint:     0x4d473e,
   hpFull:    0x6acf6a,
   hpLow:     0xd14a4a,
   mp:        0x7aa6ff,
@@ -230,6 +252,11 @@ export class CombatScene extends Phaser.Scene {
   private returnPayload: Record<string, unknown> | null = null;
   /** Dungeon monster id to remove from `level.monsters` on victory. */
   private dungeonMonsterId: string | null = null;
+  /** Interior monster id + town/interior path — together they
+   *  identify the entry in `gameState.interiorMonsters` to drop on
+   *  victory. */
+  private interiorMonsterId: string | null = null;
+  private interiorPath: string | null = null;
   /** "col,row" of a Monster Spawn tile to destroy on victory. */
   private destroySpawnKey: string | null = null;
   /** Roaming monster id to remove from gameState.roamingMonsters on victory. */
@@ -312,6 +339,8 @@ export class CombatScene extends Phaser.Scene {
     this.destroySpawnKey = data?.destroySpawnKey ?? null;
     this.roamerId = data?.roamerId ?? null;
     this.dungeonMonsterId = data?.dungeonMonsterId ?? null;
+    this.interiorMonsterId = data?.interiorMonsterId ?? null;
+    this.interiorPath = data?.interiorPath ?? null;
     this.returnSceneKey = data?.returnSceneKey ?? "OverworldScene";
     this.returnPayload = data?.returnPayload ?? null;
     this.busy = false;
@@ -2770,6 +2799,26 @@ export class CombatScene extends Phaser.Scene {
           lvl.monsters = lvl.monsters.filter((m) => m.id !== this.dungeonMonsterId);
         }
       }
+      // Interior engagement: same idea for town-interior quest
+      // monsters. Re-entering the interior shows the survivors only.
+      if (this.interiorMonsterId && this.interiorPath) {
+        const list = gameState.interiorMonsters.get(this.interiorPath);
+        if (list) {
+          gameState.interiorMonsters.set(
+            this.interiorPath,
+            list.filter((m) => m.id !== this.interiorMonsterId),
+          );
+        }
+      }
+      // Quest kill credit: stash the names of every defeated enemy so
+      // the scene we're returning to (DungeonScene right now) can
+      // call `Quests.creditKills`. Mirrors the Python game's
+      // `pending_killed_monsters` list. Names are catalog form —
+      // `creditKills` does its own variant fuzz to match rosters.
+      const slain = this.combat.combatants
+        .filter((c) => c.side === "enemies")
+        .map((c) => c.name);
+      gameState.pendingKilledMonsters = slain;
     }
     if (winner === "enemies") {
       gameState.defeated = true;

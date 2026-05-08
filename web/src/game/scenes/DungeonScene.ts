@@ -45,6 +45,24 @@ import {
   type EncounterTemplate,
 } from "../world/Encounters";
 import {
+  loadQuests,
+  ensureQuestStates,
+  creditKills,
+  creditCollect,
+  activeCollectStepFor,
+  type QuestDef,
+} from "../world/Quests";
+import {
+  flashQuestMessage,
+  openQuestLog,
+  showStepCompleteCallout,
+} from "../world/QuestDialog";
+import {
+  attachPulsingGlow,
+  QUEST_ITEM_COLOR,
+  type PulsingGlowHandle,
+} from "../world/GlowEffect";
+import {
   generateDungeon,
   dungeonSeed,
   styleFloorTile,
@@ -52,6 +70,7 @@ import {
   TILE_STAIRS_DOWN,
   TILE_CHEST,
   TILE_TRAP,
+  TILE_ARTIFACT,
   type DungeonLevel,
   type DungeonMonster,
 } from "../world/Dungeon";
@@ -114,6 +133,16 @@ export class DungeonScene extends Phaser.Scene {
   private encounterTable: Record<string, EncounterTemplate[]> | null = null;
   private dungeonDef: DungeonDef | null = null;
   private monsterCatalog: Map<string, MonsterSpec> = new Map();
+  /** Module quests — loaded in create() so kill / collect credit can
+   *  resolve which active quest a defeated encounter or picked-up
+   *  artifact belongs to. */
+  private questDefs: QuestDef[] = [];
+  /** Quest log overlay close handle (Q hotkey). */
+  private questLogClose?: () => void;
+  /** Pulsing-glow overlays per quest-artifact tile. Keyed by
+   *  "col,row" so we can dispose the glow when the player picks up
+   *  the artifact (which restores the floor underneath). */
+  private artifactGlows: Map<string, PulsingGlowHandle> = new Map();
 
   // Phaser objects
   private tileSprites: Phaser.GameObjects.GameObject[][] = [];
@@ -152,6 +181,9 @@ export class DungeonScene extends Phaser.Scene {
     this.busy = false;
     this.message = undefined;
     this.messageTimer = undefined;
+    for (const h of this.artifactGlows.values()) h.destroy();
+    this.artifactGlows = new Map();
+    this.questLogClose = undefined;
   }
 
   preload(): void {
@@ -244,6 +276,15 @@ export class DungeonScene extends Phaser.Scene {
       this.monsterCatalog = new Map();
     }
 
+    // Quest definitions. Failure here is non-fatal — kill/collect
+    // credit just won't fire, but the dungeon is still playable.
+    try {
+      this.questDefs = await loadQuests();
+      ensureQuestStates(this.questDefs, gameState.moduleQuestStates);
+    } catch {
+      this.questDefs = [];
+    }
+
     // Cache lookup (the "generate once" guarantee). Miss → generate
     // a fresh multi-level dungeon and store it; hit → reuse the
     // mutable level objects so explored tiles, opened chests, etc.,
@@ -265,6 +306,11 @@ export class DungeonScene extends Phaser.Scene {
       gameState.dungeonCache.set(key, cached);
     }
     this.levels = cached;
+    // Place quest collect artifact(s) on the deepest floor if an
+    // active quest's collect step targets this dungeon. Idempotent:
+    // re-entries skip placement when an artifact for the same step
+    // is already recorded on the level.
+    this.placeQuestArtifactsIfNeeded();
 
     // Resolve player position. If gameState.dungeonPos belongs to this
     // entrance, replay it (return-from-combat / re-enter). Otherwise
@@ -307,6 +353,36 @@ export class DungeonScene extends Phaser.Scene {
     if (isFreshEntry) {
       this.showMessage(`You enter ${this.level.name}. ${entryTorchMsg}`, 2400);
     }
+
+    // Credit any quest kill steps satisfied by the combat the party
+    // just returned from. The encounter table is the source of truth
+    // for "monster X is in encounter Y's roster"; both `creditKills`
+    // and the dungeon scene share the same loaded copy.
+    if (
+      gameState.pendingKilledMonsters.length > 0 &&
+      this.encounterTable &&
+      this.questDefs.length > 0
+    ) {
+      const result = creditKills(
+        this.questDefs,
+        gameState.moduleQuestStates,
+        this.encounterTable,
+        gameState.pendingKilledMonsters,
+        gameState.combatLocation,
+      );
+      // One callout per step that just completed. Progress messages
+      // (n/N kills) still go to the console; the centered banner is
+      // reserved for transitions the player needs to notice.
+      for (const c of result.callouts) {
+        showStepCompleteCallout(this, {
+          questName: c.questName,
+          description: c.description,
+          questComplete: c.questComplete,
+        });
+      }
+      for (const m of result.messages) console.log("[quest]", m);
+    }
+    gameState.pendingKilledMonsters = [];
   }
 
   /**
@@ -374,6 +450,9 @@ export class DungeonScene extends Phaser.Scene {
     for (const m of this.level.monsters) {
       this.drawMonster(m);
     }
+    // Quest-artifact halos — cyan glow over every TILE_ARTIFACT on
+    // this floor. Disposed when the player picks an artifact up.
+    this.spawnArtifactGlows();
     // Per-cell darkness overlay (depth 9 — above monsters, below player)
     // plus a tint pass at depth 9.5 that washes lit cells with the
     // party-light colour (warm/blue/red). Both meshes always exist;
@@ -586,11 +665,27 @@ export class DungeonScene extends Phaser.Scene {
       // Party screen overlay — pause this scene so movement keys don't
       // fire while the inventory is up. PartyScene resumes us on close.
       if (ev.key === "p" || ev.key === "P") { this.openParty(); return; }
+      // Q toggles the read-only quest log overlay.
+      if (ev.key === "q" || ev.key === "Q") { this.toggleQuestLog(); return; }
       if (this.busy) return;
-      if (ev.key === "Escape") { this.handleEscape(); return; }
+      if (ev.key === "Escape") {
+        if (this.questLogClose) { this.toggleQuestLog(); return; }
+        this.handleEscape();
+        return;
+      }
+      if (this.questLogClose) return;  // log overlay swallows movement
       const dir = directionForKey(ev.key);
       if (dir) this.tryMove(dir.dc, dir.dr);
     });
+  }
+
+  private toggleQuestLog(): void {
+    if (this.questLogClose) {
+      this.questLogClose();
+      this.questLogClose = undefined;
+      return;
+    }
+    this.questLogClose = openQuestLog(this, this.questDefs, gameState.moduleQuestStates);
   }
 
   private openParty(): void {
@@ -779,6 +874,10 @@ export class DungeonScene extends Phaser.Scene {
       }
       return;
     }
+    if (id === TILE_ARTIFACT) {
+      this.pickUpArtifact(dp.col, dp.row);
+      return;
+    }
     if (_ASCEND_TILES.has(id)) {
       const k = `${dp.col},${dp.row}`;
       if (this.level.overworldExits.has(k)) {
@@ -830,6 +929,149 @@ export class DungeonScene extends Phaser.Scene {
     const old = this.tileSprites[row][col];
     if (old) old.destroy();
     this.tileSprites[row][col] = this.drawTile(col, row);
+  }
+
+  // ── Quest collect artifacts ─────────────────────────────────────
+
+  /**
+   * Walk the active collect quests; for any whose `spawn_location`
+   * names this dungeon, paint a TILE_ARTIFACT on the deepest floor
+   * (the boss/treasure floor of any multi-level dungeon — Floor N for
+   * N levels, Floor 0 for single-level dungeons). Idempotent — skips
+   * if the same step already has an artifact recorded on the level.
+   *
+   * Honors the optional `spawn_col` / `spawn_row` overrides on the
+   * step. When the override coords aren't walkable or are off-map,
+   * falls back to a deterministic search of walkable floor cells.
+   */
+  private placeQuestArtifactsIfNeeded(): void {
+    if (this.questDefs.length === 0) return;
+    const target = `dungeon:${this.dungeonName}`;
+    const placement = activeCollectStepFor(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      target,
+    );
+    if (!placement) return;
+    // Drop artifacts on the deepest floor — that's where the Python
+    // game places quest artifacts (`place_artifact` flag in the
+    // generator's last-floor branch).
+    const lvl = this.levels[this.levels.length - 1];
+    // Skip if this exact step already has an artifact on the level.
+    for (const meta of Object.values(lvl.questArtifacts)) {
+      if (meta.questName === placement.questName && meta.stepIdx === placement.stepIdx) {
+        return;
+      }
+    }
+    const pos = this.pickArtifactPos(lvl, placement.step.spawnCol, placement.step.spawnRow);
+    if (!pos) {
+      console.warn(`[quest] Could not place artifact for "${placement.questName}" — no walkable cell.`);
+      return;
+    }
+    lvl.tiles[pos.row][pos.col] = TILE_ARTIFACT;
+    lvl.questArtifacts[`${pos.col},${pos.row}`] = {
+      questName: placement.questName,
+      stepIdx: placement.stepIdx,
+      itemName: placement.step.collectItem,
+    };
+  }
+
+  /** Attach a cyan pulsing halo over every artifact tile on the
+   *  current floor. Called from `drawLevel` after the tile pass so
+   *  the glow tracks the (static) cell. Disposed on pickup. */
+  private spawnArtifactGlows(): void {
+    for (const h of this.artifactGlows.values()) h.destroy();
+    this.artifactGlows = new Map();
+    for (const k of Object.keys(this.level.questArtifacts)) {
+      const [c, r] = k.split(",").map((s) => parseInt(s, 10));
+      if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
+      // Sanity: only glow if the tile is still TILE_ARTIFACT — a
+      // partially-saved level might have stale entries.
+      if (this.level.tiles[r][c] !== TILE_ARTIFACT) continue;
+      const x = c * TILE + TILE / 2;
+      const y = r * TILE + TILE / 2;
+      this.artifactGlows.set(
+        k,
+        attachPulsingGlow(this, () => x, () => y, {
+          color: QUEST_ITEM_COLOR,
+          intensity: 1.0,
+          depth: 7,
+        }),
+      );
+    }
+  }
+
+  /** Resolve an artifact spawn cell. Honors explicit override coords
+   *  when both are non-negative AND the cell is walkable; otherwise
+   *  scans the level for the first walkable floor tile that isn't a
+   *  stair / chest / trap (those tiles already have meaning). */
+  private pickArtifactPos(
+    lvl: DungeonLevel,
+    overrideCol?: number,
+    overrideRow?: number,
+  ): { col: number; row: number } | null {
+    if (typeof overrideCol === "number" && typeof overrideRow === "number"
+        && overrideCol >= 0 && overrideRow >= 0
+        && overrideCol < lvl.width && overrideRow < lvl.height) {
+      const props = lvl.tileProperties[`${overrideCol},${overrideRow}`];
+      const id = lvl.tiles[overrideRow][overrideCol];
+      const def = tileDef(id);
+      const walkable = props && typeof props.walkable === "boolean" ? props.walkable : def.walkable;
+      if (walkable) return { col: overrideCol, row: overrideRow };
+    }
+    const floor = styleFloorTile(lvl.style);
+    for (let r = 0; r < lvl.height; r++) {
+      for (let c = 0; c < lvl.width; c++) {
+        if (lvl.tiles[r][c] === floor) return { col: c, row: r };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Credit the active collect step the artifact at (col, row) belongs
+   * to, surface a flash banner, and replace the tile with the level's
+   * native floor so the cell blends back into the map.
+   */
+  private pickUpArtifact(col: number, row: number): void {
+    const k = `${col},${row}`;
+    const meta = this.level.questArtifacts[k];
+    if (!meta) {
+      // Stray artifact tile — show a generic pickup line and clear it.
+      this.showMessage("You pick up a relic.", 2000);
+    } else {
+      const result = creditCollect(
+        this.questDefs,
+        gameState.moduleQuestStates,
+        meta.questName,
+        meta.stepIdx,
+        meta.itemName,
+      );
+      if (gameState.partyData) {
+        gameState.partyData.inventory.push({ item: meta.itemName });
+      }
+      // Promote the pickup to a centered step-complete banner —
+      // mirrors the Python game's "STEP COMPLETE" / "QUEST COMPLETE"
+      // callout. Falls back to a small flash when the credit didn't
+      // produce a callout (defensive — a stale meta entry).
+      if (result.callout) {
+        showStepCompleteCallout(this, {
+          questName: result.callout.questName,
+          description: result.callout.description,
+          questComplete: result.callout.questComplete,
+        });
+      } else {
+        flashQuestMessage(this, result.message);
+      }
+      delete this.level.questArtifacts[k];
+    }
+    // Drop the cyan glow that was tracking this cell.
+    const glow = this.artifactGlows.get(k);
+    if (glow) { glow.destroy(); this.artifactGlows.delete(k); }
+    const floor = styleFloorTile(this.level.style);
+    this.level.tiles[row][col] = floor;
+    this.replaceTileSprite(col, row);
+    this.refreshHud();
   }
 
   // ── Stairs / exit ───────────────────────────────────────────────
@@ -941,6 +1183,11 @@ export class DungeonScene extends Phaser.Scene {
     // on their current cell while combat resolves. This matches the
     // Python game's bump-into-fight behaviour.
     const terrainTileId = styleFloorTile(this.level.style);
+    // Stamp the combat location BEFORE the scene transition so the
+    // post-combat creditKills pass knows whether a step's
+    // `spawn_location` matches. Use the dungeon name (no floor) —
+    // `locationMatches` strips trailing " - Floor N" from either side.
+    gameState.combatLocation = `dungeon:${this.dungeonName}`;
     this.cameras.main.fadeOut(220, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("CombatScene", {

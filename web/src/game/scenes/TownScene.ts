@@ -35,10 +35,46 @@ import {
   tileMapForTown,
   resolveNpcSprite,
   wanderTownNpcs,
+  injectTownQuestGivers,
   NPC_SPRITE_MANIFEST,
   type Town,
   type NpcDef,
 } from "../world/Towns";
+import {
+  loadQuests,
+  ensureQuestStates,
+  acceptQuest,
+  markTurnedIn,
+  findQuest,
+  activeKillStepsForLocation,
+  rosterFor,
+  creditKills,
+  type QuestDef,
+} from "../world/Quests";
+import {
+  loadEncounters,
+  type EncounterTemplate,
+} from "../world/Encounters";
+import {
+  loadMonsters,
+  loadedMonsterSprites,
+  type MonsterSpec,
+} from "../data/monsters";
+import {
+  openQuestDialog as buildQuestDialog,
+  closeQuestDialog as destroyQuestDialog,
+  flashQuestMessage,
+  openQuestLog,
+  openVictoryModal,
+  showStepCompleteCallout,
+  type QuestDialogHandles,
+} from "../world/QuestDialog";
+import {
+  attachPulsingGlow,
+  QUEST_GIVER_COLOR,
+  QUEST_MONSTER_COLOR,
+  type PulsingGlowHandle,
+} from "../world/GlowEffect";
 import {
   loadCounters,
   type Counter,
@@ -115,6 +151,24 @@ export class TownScene extends Phaser.Scene {
   private playerCol = 0;
   private playerRow = 0;
   private npcs: Array<{ def: NpcDef; sprite: Phaser.GameObjects.Image }> = [];
+  /** Quest monsters in the current interior (rats, undead, etc.).
+   *  Loaded from `gameState.interiorMonsters` keyed by `townName` so
+   *  re-entries see the remaining set rather than re-rolling spawns. */
+  private interiorMonsterSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
+  private monsterCatalog: Map<string, MonsterSpec> = new Map();
+  private encounterTable: Record<string, EncounterTemplate[]> | null = null;
+  /** True when this scene is rendering a town INTERIOR (sub-Town
+   *  reached via "Plainstown/<InteriorName>") rather than the
+   *  top-level town. Used to gate quest-monster spawning + the
+   *  combat-location stamp. */
+  private isInterior = false;
+  /** Glow handles for monsters / non-keyed overlays — flat list,
+   *  cleared on scene restart. */
+  private questOverlayHandles: PulsingGlowHandle[] = [];
+  /** Quest-giver glow handles keyed by quest name + the on-map sprite
+   *  reference. Tracked per-quest so claiming a quest mid-session can
+   *  destroy the giver's glow + sprite without scanning. */
+  private questGiverOverlays: Map<string, { glow: PulsingGlowHandle; sprite: Phaser.GameObjects.GameObject }> = new Map();
   private busy = false;
   private status!: Phaser.GameObjects.Text;
   private hpSummary!: Phaser.GameObjects.Text;
@@ -149,6 +203,13 @@ export class TownScene extends Phaser.Scene {
     npc: NpcDef;
     lineIdx: number;
   };
+  /** Module-quest acceptance / turn-in overlay. Independent from the
+   *  generic NPC dialog so the existing villager flow doesn't have to
+   *  carry choice-rendering complexity. */
+  private questDialog?: QuestDialogHandles;
+  /** Read-only quest log overlay (Q hotkey). Holds the destroy
+   *  callback returned by `openQuestLog` — null when not visible. */
+  private questLogClose?: () => void;
 
   /** Loaded counter catalog (counters.json). */
   private counters: Map<string, Counter> = new Map();
@@ -197,6 +258,10 @@ export class TownScene extends Phaser.Scene {
   /** Loaded spell catalog — used to look up the Knock spell once and
    *  hand the same record to every lock dialog. */
   private knockSpell: Spell | null = null;
+  /** Module quests loaded from the active module. Held on the scene
+   *  so the dialog branch for `module_quest_giver` can look up the
+   *  quest definition without a second round-trip to disk. */
+  private questDefs: QuestDef[] = [];
 
   constructor() {
     super({ key: "TownScene" });
@@ -213,6 +278,11 @@ export class TownScene extends Phaser.Scene {
     this.npcs = [];
     this.dialog = undefined;
     this.lock = undefined;
+    for (const h of this.questOverlayHandles) h.destroy();
+    this.questOverlayHandles = [];
+    for (const e of this.questGiverOverlays.values()) e.glow.destroy();
+    this.questGiverOverlays = new Map();
+    this.interiorMonsterSprites = new Map();
     this.darkness = new Map();
     this.tintRects = new Map();
     this.tileSprites = new Map();
@@ -337,10 +407,57 @@ export class TownScene extends Phaser.Scene {
       /* keep empty maps */
     }
 
+    // Module quest givers — load definitions, ensure state map is up
+    // to date, then splice the matching town's NPC list with any quest
+    // giver whose status is not yet `turned_in`. Errors fall through:
+    // a missing or malformed quests.json just leaves the town as-is.
+    try {
+      this.questDefs = await loadQuests();
+      ensureQuestStates(this.questDefs, gameState.moduleQuestStates);
+      injectTownQuestGivers(this.town, this.questDefs, (qname) => {
+        const s = gameState.moduleQuestStates.get(qname);
+        return !s || s.status !== "turned_in";
+      });
+    } catch {
+      this.questDefs = [];
+    }
+
+    // Detect interior maps. Top-level towns have a bare name; interiors
+    // arrive with a "Town/Interior" path. Building paths use a
+    // `building:` prefix and skip this branch — those are the
+    // shop/inn floors which don't host quest combat for v1.
+    this.isInterior = !this.townName.startsWith("building:") && this.townName.includes("/");
+
+    // Interior quest monsters — load the encounter table + monster
+    // catalog so we can spawn rosters for active kill steps that
+    // target this interior. Failure here is non-fatal; the player just
+    // sees an empty interior.
+    if (this.isInterior) {
+      try {
+        this.encounterTable = await loadEncounters();
+        this.monsterCatalog = await loadMonsters();
+        // Queue every catalog sprite so the on-map monster glyph
+        // resolves immediately. Phaser dedupes loader keys.
+        let queued = 0;
+        for (const path of loadedMonsterSprites()) {
+          const k = `monster:${path}`;
+          if (!this.textures.exists(k)) {
+            this.load.image(k, path);
+            queued += 1;
+          }
+        }
+        if (queued > 0) this.load.start();
+        this.spawnInteriorMonstersIfNeeded();
+      } catch {
+        /* keep empty */
+      }
+    }
+
     this.drawMap();
     // Animated tile_properties.effect overlays — see TileEffects.ts.
     installTileEffects(this, this.tileMap, TILE, 7);
     this.drawNpcs();
+    this.drawInteriorMonsters();
     this.drawPlayer();
     this.drawHud();
     // When the Party screen is opened on top, this scene is paused.
@@ -354,6 +471,36 @@ export class TownScene extends Phaser.Scene {
     this.installInput();
     this.refreshHud();
     this.refreshDarkness();
+
+    // Combat-return kill credit. Mirrors DungeonScene's pattern:
+    // CombatScene populates `pendingKilledMonsters` on victory, and
+    // the scene we return to runs creditKills against the encounter
+    // table + the stamped combat location. Cleared in either branch
+    // so a subsequent fight credits cleanly.
+    if (
+      gameState.pendingKilledMonsters.length > 0 &&
+      this.encounterTable &&
+      this.questDefs.length > 0
+    ) {
+      const result = creditKills(
+        this.questDefs,
+        gameState.moduleQuestStates,
+        this.encounterTable,
+        gameState.pendingKilledMonsters,
+        gameState.combatLocation,
+      );
+      // One callout per step that just completed — the renderer
+      // stacks them so multi-step turn-ins show every transition.
+      for (const c of result.callouts) {
+        showStepCompleteCallout(this, {
+          questName: c.questName,
+          description: c.description,
+          questComplete: c.questComplete,
+        });
+      }
+      for (const m of result.messages) console.log("[quest]", m);
+    }
+    gameState.pendingKilledMonsters = [];
   }
 
   // ── Coordinate helpers ───────────────────────────────────────────
@@ -541,7 +688,235 @@ export class TownScene extends Phaser.Scene {
         }
       );
       this.npcs.push({ def: npc, sprite });
+
+      // Quest-giver highlight — soft pulsing gold halo so the player
+      // can spot a giver in a crowd. Subtle on purpose: no floating
+      // status badge, low intensity so the NPC stays the focal point.
+      // The handle is tracked per-quest so claim-time can despawn it
+      // along with the NPC sprite without scanning.
+      if ((npc.npcType ?? "").toLowerCase() === "module_quest_giver" && npc._questName) {
+        const status = gameState.moduleQuestStates.get(npc._questName)?.status ?? "available";
+        if (status !== "turned_in") {
+          const glow = attachPulsingGlow(this, () => sprite.x, () => sprite.y, {
+            color: QUEST_GIVER_COLOR,
+            intensity: 0.35,
+            depth: 7,
+          });
+          this.questGiverOverlays.set(npc._questName, { glow, sprite });
+        }
+      }
     }
+  }
+
+  // ── Interior quest monsters ─────────────────────────────────────
+
+  /** Spawn quest monsters in the current interior if the active
+   *  quest list calls for them and the interior doesn't already have
+   *  a cached entry. Idempotent — once an interior's monster list
+   *  has been populated this session, re-entries reuse the same
+   *  entries (so killed monsters stay killed, surviving monsters
+   *  stay where they were). */
+  private spawnInteriorMonstersIfNeeded(): void {
+    if (!this.isInterior) return;
+    if (gameState.interiorMonsters.has(this.townName)) return;
+
+    const target = `interior:${this.townName}`;
+    const steps = activeKillStepsForLocation(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      target,
+    );
+    if (steps.length === 0) {
+      gameState.interiorMonsters.set(this.townName, []);
+      return;
+    }
+
+    // Build a pool of walkable cells the monsters can stand on. We
+    // exclude the entry tile + every NPC tile so a fresh entry
+    // doesn't drop the player onto a goblin.
+    const occupied = new Set<string>();
+    occupied.add(`${this.entryCol},${this.entryRow}`);
+    for (const npc of this.town.npcs) occupied.add(`${npc.col},${npc.row}`);
+    const walkable: Array<[number, number]> = [];
+    for (let r = 0; r < this.tileMap.height; r++) {
+      for (let c = 0; c < this.tileMap.width; c++) {
+        if (!this.tileMap.isWalkable(c, r)) continue;
+        if (occupied.has(`${c},${r}`)) continue;
+        walkable.push([c, r]);
+      }
+    }
+    const placed: import("../state").InteriorMonster[] = [];
+    let nextId = 0;
+    for (const { questName, stepIdx, step, remaining } of steps) {
+      const tmpl = this.encounterTable
+        ? rosterFor(this.encounterTable, step.encounter)
+        : null;
+      if (!tmpl || tmpl.monsters.length === 0) continue;
+      for (let n = 0; n < remaining; n++) {
+        if (walkable.length === 0) break;
+        const idx = Math.floor(Math.random() * walkable.length);
+        const [c, r] = walkable.splice(idx, 1)[0];
+        placed.push({
+          id: `q-${questName}-${stepIdx}-${nextId++}`,
+          col: c,
+          row: r,
+          name: tmpl.monsterPartyTile,
+          encounterNames: [...tmpl.monsters],
+          encounterName: tmpl.name,
+        });
+      }
+    }
+    gameState.interiorMonsters.set(this.townName, placed);
+  }
+
+  private drawInteriorMonsters(): void {
+    if (!this.isInterior) return;
+    const list = gameState.interiorMonsters.get(this.townName) ?? [];
+    for (const m of list) {
+      const x = this.tileX(m.col);
+      const y = this.tileY(m.row);
+      const spec = this.monsterCatalog.get(m.name);
+      const key = spec?.sprite ? `monster:${spec.sprite}` : null;
+      let obj: Phaser.GameObjects.GameObject;
+      if (key && this.textures.exists(key)) {
+        obj = this.add.image(x, y, key).setDepth(8);
+      } else {
+        obj = this.add
+          .rectangle(x, y, TILE - 8, TILE - 8, 0xb04030, 1)
+          .setStrokeStyle(2, 0x1a1a2e)
+          .setDepth(8);
+      }
+      this.interiorMonsterSprites.set(m.id, obj);
+
+      // Soft gold halo flags this as a quest target. Tracks the
+      // sprite each frame so wandering monsters keep their glow.
+      const sprite = obj as Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      this.questOverlayHandles.push(
+        attachPulsingGlow(
+          this,
+          () => sprite.x,
+          () => sprite.y,
+          { color: QUEST_MONSTER_COLOR, intensity: 0.5, depth: 7 },
+        ),
+      );
+    }
+  }
+
+  /**
+   * Move every quest monster on this interior one tile per player
+   * step. Pursue when within Chebyshev 6 of the party, otherwise
+   * wander randomly with a small "stay put" bias. Mirrors the
+   * dungeon's monster tick exactly. Skipped on top-level towns
+   * (no monsters there in v1).
+   */
+  private tickInteriorMonsters(): void {
+    if (!this.isInterior) return;
+    const list = gameState.interiorMonsters.get(this.townName) ?? [];
+    if (list.length === 0) return;
+    const partyCol = this.playerCol;
+    const partyRow = this.playerRow;
+    const occupied = new Set<string>();
+    for (const m of list) occupied.add(`${m.col},${m.row}`);
+    occupied.add(`${partyCol},${partyRow}`);
+    for (const m of list) {
+      occupied.delete(`${m.col},${m.row}`);
+      const dist = Math.max(Math.abs(m.col - partyCol), Math.abs(m.row - partyRow));
+      let next: { col: number; row: number } = { col: m.col, row: m.row };
+      const dirs: Array<[number, number]> = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      if (dist <= 6) {
+        // Pursue: pick the cardinal step that most reduces Chebyshev
+        // distance to the party.
+        let bestDist = dist;
+        for (const [dc, dr] of dirs) {
+          const nc = m.col + dc, nr = m.row + dr;
+          if (!this.tileMap.isWalkable(nc, nr)) continue;
+          if (occupied.has(`${nc},${nr}`)) continue;
+          const d = Math.max(Math.abs(nc - partyCol), Math.abs(nr - partyRow));
+          if (d < bestDist) { bestDist = d; next = { col: nc, row: nr }; }
+        }
+      } else {
+        // Wander — 30 % stay still, otherwise first walkable cardinal
+        // in a shuffled list.
+        if (Math.random() >= 0.3) {
+          const shuffled = [...dirs];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
+          }
+          for (const [dc, dr] of shuffled) {
+            const nc = m.col + dc, nr = m.row + dr;
+            if (!this.tileMap.isWalkable(nc, nr)) continue;
+            if (occupied.has(`${nc},${nr}`)) continue;
+            next = { col: nc, row: nr };
+            break;
+          }
+        }
+      }
+      m.col = next.col;
+      m.row = next.row;
+      occupied.add(`${m.col},${m.row}`);
+      // Tween the existing sprite to the new tile so movement reads
+      // smoothly instead of teleporting.
+      const sprite = this.interiorMonsterSprites.get(m.id);
+      if (sprite) {
+        const targetX = this.tileX(m.col);
+        const targetY = this.tileY(m.row);
+        if ("x" in sprite && "y" in sprite) {
+          this.tweens.add({
+            targets: sprite,
+            x: targetX,
+            y: targetY,
+            duration: 110,
+          });
+        }
+      }
+    }
+  }
+
+  /** Look up the monster (if any) at (col, row) in the current
+   *  interior. Returns null on a top-level town or empty cell. */
+  private interiorMonsterAt(col: number, row: number): import("../state").InteriorMonster | null {
+    if (!this.isInterior) return null;
+    const list = gameState.interiorMonsters.get(this.townName) ?? [];
+    return list.find((m) => m.col === col && m.row === row) ?? null;
+  }
+
+  /** First interior monster within Chebyshev 1 of the party. Used
+   *  by the post-move adjacency check so monsters that closed the
+   *  gap on their own turn engage immediately. */
+  private adjacentInteriorMonster(): import("../state").InteriorMonster | null {
+    if (!this.isInterior) return null;
+    const list = gameState.interiorMonsters.get(this.townName) ?? [];
+    for (const m of list) {
+      const d = Math.max(Math.abs(m.col - this.playerCol), Math.abs(m.row - this.playerRow));
+      if (d <= 1) return m;
+    }
+    return null;
+  }
+
+  /** Stamp the combat location and start CombatScene with the bumped
+   *  monster's encounter roster. Mirrors DungeonScene.engageMonster
+   *  but routes the return back to TownScene with this interior's
+   *  init data so creditKills can run on the way back. */
+  private engageInteriorMonster(m: import("../state").InteriorMonster): void {
+    gameState.combatLocation = `interior:${this.townName}`;
+    this.cameras.main.fadeOut(220, 0, 0, 0);
+    this.cameras.main.once("camerafadeoutcomplete", () => {
+      this.scene.start("CombatScene", {
+        fromWorld: true,
+        monsterNames: m.encounterNames,
+        interiorMonsterId: m.id,
+        interiorPath: this.townName,
+        returnSceneKey: "TownScene",
+        returnPayload: {
+          townName: this.townName,
+          entryCol: this.playerCol,
+          entryRow: this.playerRow,
+          returnCol: this.playerCol,
+          returnRow: this.playerRow,
+        },
+      });
+    });
   }
 
   private drawPlayer(): void {
@@ -665,16 +1040,31 @@ export class TownScene extends Phaser.Scene {
       });
       k.on("keydown-ESC", () => this.onEscape());
       k.on("keydown-P", () => {
-        if (this.shop || this.temple) return;
+        if (this.shop || this.temple || this.questDialog) return;
         this.openParty();
+      });
+      // Quest dialog choices — Y/Enter accepts (or claims), N/Escape declines.
+      k.on("keydown-Y", () => {
+        if (this.questDialog) this.confirmQuestDialog();
+      });
+      k.on("keydown-N", () => {
+        if (this.questDialog) this.declineQuestDialog();
+      });
+      // Q toggles the read-only quest log overlay. Suppressed while
+      // the quest accept dialog or any other modal is up so a
+      // misplaced press doesn't stack overlays.
+      k.on("keydown-Q", () => {
+        if (this.shop || this.temple || this.lock || this.questDialog || this.dialog) return;
+        this.toggleQuestLog();
       });
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       // Shop / temple / lock dialogs eat ALL background clicks — the
       // menus are keyboard-driven and a misplaced tap shouldn't move
-      // the avatar or break out of the lock attempt.
-      if (this.shop || this.temple || this.lock) return;
+      // the avatar or break out of the lock attempt. Quest dialog
+      // joins this list — its choices are Y/N keys, not pointer.
+      if (this.shop || this.temple || this.lock || this.questDialog) return;
       // If a dialog is open, ANY background click advances it.
       if (this.dialog) {
         this.advanceDialog();
@@ -711,6 +1101,7 @@ export class TownScene extends Phaser.Scene {
       if (key === "DOWN" || key === "S") return this.moveLockCursor(1);
       return;
     }
+    if (this.questDialog) return;
     this.tryStep(dc, dr);
   }
 
@@ -719,6 +1110,7 @@ export class TownScene extends Phaser.Scene {
     if (this.temple) return this.confirmTempleService();
     if (this.lock)   return this.confirmLockOption();
     if (this.dialog) return this.advanceDialog();
+    if (this.questDialog) return this.confirmQuestDialog();
     // Nothing modal is open — Space skips the party's turn so
     // wandering NPCs and Galadriel/torch timers tick without forcing
     // the player to take a step.
@@ -731,6 +1123,17 @@ export class TownScene extends Phaser.Scene {
     if (this.temple) return this.closeTemple();
     if (this.lock)   return this.closeLockDialog();
     if (this.dialog) return this.closeDialog();
+    if (this.questDialog) return this.declineQuestDialog();
+    if (this.questLogClose) return this.toggleQuestLog();
+  }
+
+  private toggleQuestLog(): void {
+    if (this.questLogClose) {
+      this.questLogClose();
+      this.questLogClose = undefined;
+      return;
+    }
+    this.questLogClose = openQuestLog(this, this.questDefs, gameState.moduleQuestStates);
   }
 
   private npcAt(col: number, row: number): NpcDef | null {
@@ -749,6 +1152,15 @@ export class TownScene extends Phaser.Scene {
     const npc = this.npcAt(nc, nr);
     if (npc) {
       this.openDialog(npc);
+      return;
+    }
+    // Walking into a quest monster (interior maps only) drops into
+    // combat instead of moving. Mirrors the dungeon's bump-into-fight
+    // behaviour — this is how the Rat Problem shop / tunnel encounters
+    // resolve when the party finds them.
+    const monster = this.interiorMonsterAt(nc, nr);
+    if (monster) {
+      this.engageInteriorMonster(monster);
       return;
     }
     // Walking into a counter tile (General Store / Weapons / Healing /
@@ -808,6 +1220,15 @@ export class TownScene extends Phaser.Scene {
           tickGaladrielsLight(gameState.partyData);
         }
         this.tickNpcWander();
+        this.tickInteriorMonsters();
+        // Adjacency check after monsters move — engage if any
+        // interior quest monster ended up Chebyshev <= 1 of the
+        // party. Mirrors the dungeon's bump-into-fight precedence.
+        const adjacent = this.adjacentInteriorMonster();
+        if (adjacent) {
+          this.engageInteriorMonster(adjacent);
+          return;
+        }
         this.refreshHud();
         this.refreshDarkness();
         this.checkExit(nc, nr);
@@ -944,11 +1365,12 @@ export class TownScene extends Phaser.Scene {
   // ── Dialog ───────────────────────────────────────────────────────
 
   private openDialog(npc: NpcDef): void {
-    if (this.dialog || this.shop || this.temple) return;
+    if (this.dialog || this.shop || this.temple || this.questDialog) return;
     // Role dispatch — mirrors the Python game's _start_dialogue
     // branching. Shopkeeps open the buy/sell UI; priests open the
-    // temple service menu. Everyone else (villager, elder, quest_giver,
-    // …) falls through to the regular dialogue popup.
+    // temple service menu. Module quest givers get the dedicated
+    // quest dialog. Everyone else falls through to the regular
+    // dialogue popup.
     const t = (npc.npcType ?? "").toLowerCase();
     if (t === "shopkeep") {
       void this.openShop(npc);
@@ -956,6 +1378,10 @@ export class TownScene extends Phaser.Scene {
     }
     if (t === "priest") {
       void this.openTemple(npc);
+      return;
+    }
+    if (t === "module_quest_giver" && npc._questName) {
+      this.openQuestDialog(npc, npc._questName);
       return;
     }
     if (npc.dialogue.length === 0) return;
@@ -1030,6 +1456,103 @@ export class TownScene extends Phaser.Scene {
     bodyText.destroy();
     advanceHint.destroy();
     this.dialog = undefined;
+  }
+
+  // ── Module quest dialog ───────────────────────────────────────────
+
+  /**
+   * Open the module-quest-giver overlay. UI is built by the shared
+   * `QuestDialog` helper; this scene only handles input dispatch and
+   * reward delivery.
+   */
+  private openQuestDialog(npc: NpcDef, questName: string): void {
+    const state = gameState.moduleQuestStates.get(questName);
+    if (!state) return;
+    const handles = buildQuestDialog(this, {
+      npcName: npc.name,
+      questName,
+      defs: this.questDefs,
+      state,
+    });
+    if (handles) this.questDialog = handles;
+  }
+
+  private confirmQuestDialog(): void {
+    if (!this.questDialog) return;
+    const { questName, mode } = this.questDialog;
+    if (mode === "available") {
+      acceptQuest(gameState.moduleQuestStates, questName);
+      this.closeQuestDialog();
+      return;
+    }
+    if (mode === "completed") {
+      this.claimQuestReward(questName);
+      return;
+    }
+    // mode === "active" — Y just closes.
+    this.closeQuestDialog();
+  }
+
+  private declineQuestDialog(): void {
+    this.closeQuestDialog();
+  }
+
+  private closeQuestDialog(): void {
+    destroyQuestDialog(this.questDialog);
+    this.questDialog = undefined;
+  }
+
+  /**
+   * Apply quest rewards to the live party data and mark the quest as
+   * `turned_in`. Final-quest turn-ins also pop the victory modal.
+   */
+  private claimQuestReward(questName: string): void {
+    const def = findQuest(this.questDefs, questName);
+    if (!def || !gameState.partyData) {
+      this.closeQuestDialog();
+      return;
+    }
+    const party = gameState.partyData;
+    if (def.rewardGold > 0) party.gold = (party.gold ?? 0) + def.rewardGold;
+    if (def.rewardXp > 0) {
+      // Python distributes XP to all alive members; the web port uses
+      // the same behaviour (combat XP is also split evenly).
+      const alive = activeMembers(party).filter((m) => m.hp > 0);
+      const recipients = alive.length > 0 ? alive : activeMembers(party);
+      const share = Math.floor(def.rewardXp / Math.max(1, recipients.length));
+      for (const m of recipients) m.exp = (m.exp ?? 0) + share;
+    }
+    for (const item of def.rewardItems) {
+      party.inventory.push({ item });
+    }
+    markTurnedIn(gameState.moduleQuestStates, questName);
+    // Despawn the giver — glow goes away first so a single-frame
+    // flicker doesn't paint an unparented halo when the sprite
+    // destroys, then the NPC sprite + roster entry follow. The town
+    // injection on next entry honours `turned_in` so they stay gone.
+    const overlay = this.questGiverOverlays.get(questName);
+    if (overlay) {
+      overlay.glow.destroy();
+      overlay.sprite.destroy();
+      this.questGiverOverlays.delete(questName);
+    }
+    const idx = this.npcs.findIndex(
+      (n) => (n.def as NpcDef & { _questName?: string })._questName === questName,
+    );
+    if (idx >= 0) {
+      this.npcs[idx].sprite.destroy();
+      this.npcs.splice(idx, 1);
+    }
+    const townIdx = this.town.npcs.findIndex(
+      (n) => (n as NpcDef & { _questName?: string })._questName === questName,
+    );
+    if (townIdx >= 0) this.town.npcs.splice(townIdx, 1);
+    this.closeQuestDialog();
+    if (def.isFinalQuest) {
+      openVictoryModal(this, def.victoryText);
+    } else {
+      flashQuestMessage(this, `Quest "${def.name}" complete!`);
+    }
   }
 
   // ── Pick-lock / Knock dialog ──────────────────────────────────────
@@ -1670,3 +2193,4 @@ export class TownScene extends Phaser.Scene {
     this.openDialog(neutered);
   }
 }
+

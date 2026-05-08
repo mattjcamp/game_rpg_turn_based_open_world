@@ -43,6 +43,13 @@ export interface NpcDef {
    * implicitly so this field is unused for them.
    */
   shopType?: string;
+  /**
+   * For NPCs of type `"module_quest_giver"` — the quest name from
+   * `quests.json` this NPC offers. Lets `openDialog` look up the
+   * quest state and branch between Accept / Active / Turn-in. Set
+   * by `injectTownQuestGivers` and the OverworldScene injector.
+   */
+  _questName?: string;
 }
 
 export interface Town {
@@ -291,6 +298,52 @@ export function townFromRaw(raw: RawTown): Town {
 export const STATIONARY_NPC_TYPES: ReadonlySet<string> = new Set([
   "shopkeep", "innkeeper", "priest", "quest_item",
 ]);
+
+/**
+ * Splice module quest-giver NPCs into a town. Called once per scene
+ * boot after `loadTowns()` returns. For each quest whose
+ * `giverLocation` is `"town:<this-town-name>"` and whose state is
+ * NOT `"turned_in"`, an NPC is injected at `(giverCol, giverRow)`
+ * with `npcType: "module_quest_giver"`. The dialogue body is the
+ * raw `giverDialogue`; the scene's openDialog branch reads
+ * `_questName` to decide whether to show Accept / Turn-in choices.
+ *
+ * Idempotent: if a quest-giver NPC for the same `_questName` already
+ * exists on the town, we skip it. This keeps re-entries from
+ * stacking duplicate NPCs.
+ */
+export function injectTownQuestGivers(
+  town: Town,
+  defs: Array<{
+    name: string;
+    giverNpc: string;
+    giverSprite: string;
+    giverLocation: string;
+    giverDialogue: string;
+    giverCol: number;
+    giverRow: number;
+  }>,
+  isOpen: (questName: string) => boolean,
+): void {
+  const want = `town:${town.name}`;
+  for (const def of defs) {
+    if (def.giverLocation !== want) continue;
+    if (!isOpen(def.name)) continue;
+    if (town.npcs.some((n) => (n as NpcDef & { _questName?: string })._questName === def.name)) continue;
+    const npc: NpcDef & { _questName?: string } = {
+      name: def.giverNpc || def.name,
+      npcType: "module_quest_giver",
+      sprite: normalizeSpritePath(def.giverSprite),
+      col: def.giverCol,
+      row: def.giverRow,
+      homeCol: def.giverCol,
+      homeRow: def.giverRow,
+      dialogue: def.giverDialogue ? [def.giverDialogue] : [],
+      _questName: def.name,
+    };
+    town.npcs.push(npc);
+  }
+}
 
 /** Default Manhattan distance an NPC may stray from `homeCol`/`homeRow`
  *  when their entry omits `wander_range`. Matches `NPC_WANDER_RANGE` in

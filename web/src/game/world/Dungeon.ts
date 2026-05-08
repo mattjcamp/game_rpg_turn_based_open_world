@@ -181,6 +181,13 @@ export interface DungeonLevel {
    *  rather than ascending one level (set on the bottom floor of
    *  multi-level non-forest dungeons). */
   overworldExits: Set<string>;
+  /** Quest collect-item placements keyed by "col,row". Populated by
+   *  DungeonScene on entry when an active quest's collect step
+   *  targets this dungeon — the scene paints a TILE_ARTIFACT at the
+   *  recorded coords and looks up the quest credit when the party
+   *  picks it up. Cleared per artifact on pickup so re-entry
+   *  doesn't respawn the item. */
+  questArtifacts: Record<string, { questName: string; stepIdx: number; itemName: string }>;
 }
 
 /**
@@ -960,6 +967,7 @@ export function generateDungeonLevel(opts: GenerateLevelOptions): DungeonLevel {
     triggeredTraps: new Set<string>(),
     exploredTiles: new Set<string>(),
     overworldExits,
+    questArtifacts: {},
   };
 }
 
