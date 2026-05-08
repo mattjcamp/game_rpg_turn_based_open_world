@@ -9,7 +9,7 @@
   },
   "landmarks": [
     {
-      "id": "elderdale",
+      "id": "coppermarch",
       "type": "town",
       "col": 32,
       "row": 16,
@@ -21,14 +21,6 @@
       "type": "dungeon",
       "col": 44,
       "row": 24,
-      "tile": "TILE_DUNGEON",
-      "clear_radius": 2
-    },
-    {
-      "id": "dragons_lair",
-      "type": "dungeon",
-      "col": 85,
-      "row": 6,
       "tile": "TILE_DUNGEON",
       "clear_radius": 2
     }

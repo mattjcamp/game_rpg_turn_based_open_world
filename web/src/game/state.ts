@@ -35,6 +35,12 @@ export interface GameState {
   partyData: Party | null;
   /** Where the player avatar stands on the overworld grid. */
   playerPos: { col: number; row: number };
+  /** True once OverworldScene has seeded `playerPos` from the loaded
+   *  map's `party_start` for this session. Subsequent scene re-entries
+   *  preserve whatever position the player has walked to (we don't
+   *  re-snap to the map start every time the overworld boots). Reset
+   *  by `resetGameState()` so a New Game pulls the latest map start. */
+  partyPosInitialized: boolean;
   /** "col,row" of overworld tiles whose encounter has already been resolved. */
   consumedTriggers: Set<string>;
   /**
@@ -76,11 +82,13 @@ function makeFreshState(): GameState {
   return {
     party: makeSampleParty(),
     partyData: null,
-    // The dragon overworld declares party_start { col: 11, row: 16 }.
-    // OverworldScene will overwrite this from the loaded map's
-    // party_start once it finishes loading; this default just keeps
-    // the type honest on first construction.
-    playerPos: { col: 11, row: 16 },
+    // OverworldScene seeds this from the loaded map's `party_start`
+    // on the first scene boot of the session. The hardcoded fallback
+    // here just keeps the type honest before the map has loaded —
+    // by the time anything actually renders, `partyPosInitialized`
+    // will be true and `playerPos` will reflect the map data.
+    playerPos: { col: 0, row: 0 },
+    partyPosInitialized: false,
     consumedTriggers: new Set(),
     destroyedSpawns: new Set(),
     roamingMonsters: [],
@@ -99,6 +107,7 @@ export function resetGameState(): void {
   gameState.party = fresh.party;
   gameState.partyData = fresh.partyData;
   gameState.playerPos = fresh.playerPos;
+  gameState.partyPosInitialized = fresh.partyPosInitialized;
   gameState.consumedTriggers = fresh.consumedTriggers;
   gameState.destroyedSpawns = fresh.destroyedSpawns;
   gameState.roamingMonsters = fresh.roamingMonsters;

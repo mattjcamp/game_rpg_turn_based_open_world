@@ -11,6 +11,12 @@
  * what's changed (mtime + size). The target tree is treated as a
  * mirror: extra files in the target are pruned, so removing a
  * module/file in the source removes it on the web side too.
+ *
+ * Two entry points:
+ *   - CLI (default `node scripts/sync-modules.mjs`): one-shot sync,
+ *     prints stats, exits.
+ *   - `import { syncModules, SOURCES }`: programmatic — used by the
+ *     `dev` launcher to re-sync whenever a JSON changes.
  */
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
@@ -21,7 +27,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..", "..");      // .../<repo>
 const PUBLIC = join(__dirname, "..", "public"); // .../<repo>/web/public
 
-const SOURCES = [
+export const SOURCES = [
   { src: join(REPO, "data"),    dst: join(PUBLIC, "data") },
   { src: join(REPO, "modules"), dst: join(PUBLIC, "modules") },
 ];
@@ -94,20 +100,41 @@ function pruneExtras(dstDir, keep) {
   return { removed, skipped };
 }
 
-let total = 0;
-let prunedTotal = 0;
-let skippedTotal = 0;
-for (const { src, dst } of SOURCES) {
-  if (!existsSync(src)) {
-    console.warn(`sync-modules: source missing, skipping: ${src}`);
-    continue;
+/**
+ * Run the full sync once. Returns counts so callers can log/track.
+ * `quiet` suppresses the per-source line and the prune lines — useful
+ * for the dev watcher where chatter on every keystroke is noise.
+ */
+export function syncModules({ quiet = false } = {}) {
+  let total = 0;
+  let prunedTotal = 0;
+  let skippedTotal = 0;
+  for (const { src, dst } of SOURCES) {
+    if (!existsSync(src)) {
+      if (!quiet) console.warn(`sync-modules: source missing, skipping: ${src}`);
+      continue;
+    }
+    const kept = walkAndCopy(src, dst);
+    const { removed, skipped } = pruneExtras(dst, kept);
+    total += kept.size;
+    prunedTotal += removed;
+    skippedTotal += skipped;
+    if (!quiet) {
+      console.log(
+        `sync-modules: ${relative(REPO, src)} → ${relative(REPO, dst)}  (${kept.size} files)`
+      );
+    }
   }
-  const kept = walkAndCopy(src, dst);
-  const { removed, skipped } = pruneExtras(dst, kept);
-  total += kept.size;
-  prunedTotal += removed;
-  skippedTotal += skipped;
-  console.log(`sync-modules: ${relative(REPO, src)} → ${relative(REPO, dst)}  (${kept.size} files)`);
+  if (!quiet && prunedTotal) console.log(`sync-modules: pruned ${prunedTotal} stale file(s)`);
+  if (!quiet && skippedTotal) {
+    console.log(`sync-modules: skipped pruning ${skippedTotal} file(s) (permission denied)`);
+  }
+  return { total, pruned: prunedTotal, skipped: skippedTotal };
 }
-if (prunedTotal) console.log(`sync-modules: pruned ${prunedTotal} stale file(s)`);
-if (skippedTotal) console.log(`sync-modules: skipped pruning ${skippedTotal} file(s) (permission denied)`);
+
+// CLI entry — run a one-shot sync when invoked directly.
+const isCli = (() => {
+  try { return process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]; }
+  catch { return false; }
+})();
+if (isCli) syncModules();

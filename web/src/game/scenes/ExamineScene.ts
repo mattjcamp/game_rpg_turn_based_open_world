@@ -13,6 +13,7 @@
 import Phaser from "phaser";
 import { gameState } from "../state";
 import { activeMembers } from "../world/Party";
+import { dataPath } from "../world/Module";
 import {
   tileDef,
   tileSpriteKey,
@@ -100,7 +101,7 @@ export class ExamineScene extends Phaser.Scene {
     if (!this.textures.exists(PLAYER_SPRITE)) {
       this.load.image(PLAYER_SPRITE, PLAYER_SPRITE);
     }
-    this.load.json("tile_defs_examine", "/data/tile_defs.json");
+    this.load.json("tile_defs_examine", dataPath("tile_defs.json"));
     this.load.once("filecomplete-json-tile_defs_examine", () => {
       const raw = this.cache.json.get("tile_defs_examine");
       if (raw) populateRuntimeDefs(raw);

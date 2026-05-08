@@ -31,6 +31,26 @@ export const ACTIVE_MODULE = "the_dragon_of_dagorn";
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 /**
+ * In dev, append a cache-buster query string to JSON URLs so a freshly
+ * synced `data/` or `modules/` file doesn't get masked by a stale copy
+ * sitting in the browser's HTTP cache (which is the most common reason
+ * "I edited the map but it didn't take" reports show up). Computed once
+ * at module load — same value used across every fetch in a single page
+ * session, so Phaser's internal URL-keyed cache stays consistent.
+ *
+ * Production builds (NEXT_PUBLIC_BASE_PATH set / NODE_ENV=production)
+ * skip this so static-export deploys can leverage the CDN's caching
+ * the way they're meant to.
+ */
+const IS_DEV = process.env.NODE_ENV !== "production";
+const CACHE_BUST = IS_DEV ? String(Date.now()) : "";
+
+function appendCacheBust(url: string): string {
+  if (!CACHE_BUST) return url;
+  return url.includes("?") ? `${url}&v=${CACHE_BUST}` : `${url}?v=${CACHE_BUST}`;
+}
+
+/**
  * Prepend `BASE_PATH` to any absolute URL we hand to `fetch()` or
  * Phaser's loader. No-op for already-absolute URLs (http://) and for
  * paths that don't start with "/" (which Phaser treats as relative to
@@ -45,13 +65,13 @@ export function withBase(path: string): string {
 
 /** Build a /-prefixed URL into the active module's data folder. */
 export function modulePath(file: string): string {
-  return withBase(`/modules/${ACTIVE_MODULE}/${file}`);
+  return appendCacheBust(withBase(`/modules/${ACTIVE_MODULE}/${file}`));
 }
 
 /** Build a /-prefixed URL into the shared `data/` folder (system data
  *  shared across modules: tile defs, classes, races, etc.). */
 export function dataPath(file: string): string {
-  return withBase(`/data/${file}`);
+  return appendCacheBust(withBase(`/data/${file}`));
 }
 
 /**

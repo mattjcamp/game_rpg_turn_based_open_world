@@ -75,6 +75,14 @@ import {
   type LightSource,
 } from "../world/Lighting";
 import { partyLightRadius, partyLightTint, tickGaladrielsLight } from "../world/PartyActions";
+import { activeMembers } from "../world/Party";
+import { loadSpells, type Spell } from "../world/Spells";
+import {
+  isLockedAt, unlockAt,
+  buildLockOptions, attemptLockpick, attemptKnock,
+  consumeLockpick, findLockpicker, findKnockCaster,
+  type LockOption,
+} from "../world/Lock";
 import { decorationFor } from "../world/Decorations";
 import { installTileEffects } from "../world/TileEffects";
 import {
@@ -86,7 +94,7 @@ import {
   timeStr,
 } from "../world/GameTime";
 import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
-import { withBase } from "../world/Module";
+import { withBase, dataPath } from "../world/Module";
 import { gameState } from "../state";
 
 const TILE = 32;
@@ -170,6 +178,26 @@ export class TownScene extends Phaser.Scene {
     message: string;
   };
 
+  /** Pick-lock / Knock dialog sub-mode state. Set when the party
+   *  bumps a locked tile; the host scene's normal movement and shop
+   *  inputs gate themselves on `this.lock` being undefined. */
+  private lock?: {
+    col: number;
+    row: number;
+    options: LockOption[];
+    cursor: number;
+    objects: Phaser.GameObjects.GameObject[];
+    message: string;
+  };
+
+  /** Per-tile sprite handles, keyed by `${col},${row}`. Populated by
+   *  drawMap so the lock-pick flow can swap a TILE_LOCKED_DOOR sprite
+   *  for the open-door sprite at runtime. */
+  private tileSprites: Map<string, Phaser.GameObjects.Image> = new Map();
+  /** Loaded spell catalog — used to look up the Knock spell once and
+   *  hand the same record to every lock dialog. */
+  private knockSpell: Spell | null = null;
+
   constructor() {
     super({ key: "TownScene" });
   }
@@ -184,8 +212,10 @@ export class TownScene extends Phaser.Scene {
     this.busy = false;
     this.npcs = [];
     this.dialog = undefined;
+    this.lock = undefined;
     this.darkness = new Map();
     this.tintRects = new Map();
+    this.tileSprites = new Map();
     this.mapLights = [];
     this.dark = false;
   }
@@ -201,7 +231,7 @@ export class TownScene extends Phaser.Scene {
     // Phaser keeps preload going for any files added inside this
     // listener, so create() only fires once the full sprite set
     // (overworld + town + dungeon tiles) is in cache.
-    this.load.json("tile_defs", "/data/tile_defs.json");
+    this.load.json("tile_defs", dataPath("tile_defs.json"));
     this.load.once("filecomplete-json-tile_defs", () => {
       const raw = this.cache.json.get("tile_defs");
       if (raw) populateRuntimeDefs(raw);
@@ -299,6 +329,10 @@ export class TownScene extends Phaser.Scene {
       this.counters = await loadCounters();
       this.itemCatalog = await loadItems();
       if (!gameState.partyData) gameState.partyData = await loadParty();
+      // Spell catalog is needed so the lock dialog can offer Knock.
+      // Cached after first load — cost is negligible.
+      const spells = await loadSpells();
+      this.knockSpell = spells.find((s) => s.id === "knock") ?? null;
     } catch {
       /* keep empty maps */
     }
@@ -344,7 +378,11 @@ export class TownScene extends Phaser.Scene {
         const y = row * TILE;
         const key = tileSpriteKey(id);
         if (key && this.textures.exists(key)) {
-          this.add.image(x, y, key).setOrigin(0);
+          // Track every sprite by `${col},${row}` so the lock-pick
+          // flow can swap a TILE_LOCKED_DOOR for an open-door sprite
+          // at runtime without rebuilding the whole map.
+          const img = this.add.image(x, y, key).setOrigin(0);
+          this.tileSprites.set(`${col},${row}`, img);
         } else {
           // Fallback: coloured rectangle for tile ids we don't ship a
           // sprite for. This still happens for void / unrecognised ids.
@@ -633,9 +671,10 @@ export class TownScene extends Phaser.Scene {
     }
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      // Shop / temple eat ALL background clicks — the menus are
-      // keyboard-driven and a misplaced tap shouldn't move the avatar.
-      if (this.shop || this.temple) return;
+      // Shop / temple / lock dialogs eat ALL background clicks — the
+      // menus are keyboard-driven and a misplaced tap shouldn't move
+      // the avatar or break out of the lock attempt.
+      if (this.shop || this.temple || this.lock) return;
       // If a dialog is open, ANY background click advances it.
       if (this.dialog) {
         this.advanceDialog();
@@ -667,12 +706,18 @@ export class TownScene extends Phaser.Scene {
       if (key === "DOWN" || key === "S") return this.moveTempleCursor(1);
       return;
     }
+    if (this.lock) {
+      if (key === "UP"   || key === "W") return this.moveLockCursor(-1);
+      if (key === "DOWN" || key === "S") return this.moveLockCursor(1);
+      return;
+    }
     this.tryStep(dc, dr);
   }
 
   private onConfirmKey(): void {
     if (this.shop)   return this.confirmShopBuy();
     if (this.temple) return this.confirmTempleService();
+    if (this.lock)   return this.confirmLockOption();
     if (this.dialog) return this.advanceDialog();
     // Nothing modal is open — Space skips the party's turn so
     // wandering NPCs and Galadriel/torch timers tick without forcing
@@ -684,6 +729,7 @@ export class TownScene extends Phaser.Scene {
   private onEscape(): void {
     if (this.shop)   return this.closeShop();
     if (this.temple) return this.closeTemple();
+    if (this.lock)   return this.closeLockDialog();
     if (this.dialog) return this.closeDialog();
   }
 
@@ -695,7 +741,7 @@ export class TownScene extends Phaser.Scene {
   }
 
   private tryStep(dc: number, dr: number): void {
-    if (this.busy || this.dialog || this.shop || this.temple) return;
+    if (this.busy || this.dialog || this.shop || this.temple || this.lock) return;
     const nc = this.playerCol + dc;
     const nr = this.playerRow + dr;
 
@@ -718,6 +764,12 @@ export class TownScene extends Phaser.Scene {
       }
     }
     if (!this.tileMap.isWalkable(nc, nr)) {
+      // Bumping a locked door opens the pick-lock / Knock dialog
+      // instead of the regular wall-shake.
+      if (isLockedAt(this.tileMap, nc, nr)) {
+        this.openLockDialog(nc, nr);
+        return;
+      }
       this.busy = true;
       this.tweens.add({
         targets: this.player,
@@ -978,6 +1030,213 @@ export class TownScene extends Phaser.Scene {
     bodyText.destroy();
     advanceHint.destroy();
     this.dialog = undefined;
+  }
+
+  // ── Pick-lock / Knock dialog ──────────────────────────────────────
+
+  /**
+   * Open the lock-interaction dialog at (col, row). Mirrors the
+   * Python game's `_show_lock_interact` — assembles options based on
+   * the current party + spell book, then renders a small panel.
+   */
+  private openLockDialog(col: number, row: number): void {
+    if (!gameState.partyData) return;
+    const members = activeMembers(gameState.partyData);
+    const options = buildLockOptions({
+      party: gameState.partyData,
+      members,
+      knockSpell: this.knockSpell,
+    });
+    this.lock = {
+      col, row, options, cursor: 0,
+      objects: [], message: "The door is locked.",
+    };
+    this.renderLockDialog();
+  }
+
+  private moveLockCursor(delta: number): void {
+    if (!this.lock) return;
+    const n = this.lock.options.length;
+    this.lock.cursor = ((this.lock.cursor + delta) % n + n) % n;
+    this.renderLockDialog();
+  }
+
+  private confirmLockOption(): void {
+    if (!this.lock || !gameState.partyData) return;
+    const opt = this.lock.options[this.lock.cursor];
+    const party = gameState.partyData;
+    const members = activeMembers(party);
+    const { col, row } = this.lock;
+    if (opt.id === "leave" || opt.id === "no_thief") {
+      this.closeLockDialog();
+      return;
+    }
+    if (opt.id === "no_picks") {
+      const thief = findLockpicker(members);
+      this.lock.message = `${thief?.name ?? "Thief"} has no lockpicks left!`;
+      this.renderLockDialog();
+      return;
+    }
+    if (opt.id === "no_knock_mp") {
+      const caster = this.knockSpell ? findKnockCaster(members, this.knockSpell) : null;
+      this.lock.message = `${caster?.name ?? "Caster"} doesn't have enough MP to cast Knock.`;
+      this.renderLockDialog();
+      return;
+    }
+    if (opt.id === "pick") {
+      const thief = findLockpicker(members);
+      if (!thief) {
+        this.closeLockDialog();
+        return;
+      }
+      consumeLockpick(party);
+      const result = attemptLockpick(thief);
+      if (result.success) {
+        this.lock.message =
+          `${thief.name} picked the lock! ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        this.renderLockDialog();
+        this.time.delayedCall(900, () => {
+          this.applyUnlock(col, row);
+          this.closeLockDialog();
+        });
+      } else {
+        this.lock.message =
+          `${thief.name} fumbled the lock. ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        // Rebuild options so the pick count label reflects the
+        // freshly-consumed charge (and switches to "no_picks" when
+        // the last pick is gone).
+        this.lock.options = buildLockOptions({
+          party, members, knockSpell: this.knockSpell,
+        });
+        this.lock.cursor = Math.min(this.lock.cursor, this.lock.options.length - 1);
+        this.renderLockDialog();
+      }
+      return;
+    }
+    if (opt.id === "knock") {
+      if (!this.knockSpell) return;
+      const caster = findKnockCaster(members, this.knockSpell);
+      if (!caster) {
+        this.closeLockDialog();
+        return;
+      }
+      const result = attemptKnock(caster, this.knockSpell);
+      caster.mp = Math.max(0, (caster.mp ?? 0) - result.mpCost);
+      if (result.success) {
+        this.lock.message =
+          `${caster.name} casts Knock — the lock clicks open! ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        this.renderLockDialog();
+        this.time.delayedCall(900, () => {
+          this.applyUnlock(col, row);
+          this.closeLockDialog();
+        });
+      } else {
+        this.lock.message =
+          `${caster.name}'s Knock fizzles. ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        // MP is gone whether it worked or not — rebuild the option
+        // list so the label reflects the lower MP / hides the row
+        // when the caster can't afford another attempt.
+        this.lock.options = buildLockOptions({
+          party, members, knockSpell: this.knockSpell,
+        });
+        this.lock.cursor = Math.min(this.lock.cursor, this.lock.options.length - 1);
+        this.renderLockDialog();
+      }
+      return;
+    }
+  }
+
+  private applyUnlock(col: number, row: number): void {
+    const newId = unlockAt(this.tileMap, col, row);
+    // Sprite swap when the underlying tile id changed (e.g. the
+    // legacy locked-door → open-door transition).
+    if (newId !== null) {
+      const key = `${col},${row}`;
+      const old = this.tileSprites.get(key);
+      old?.destroy();
+      const spriteKey = tileSpriteKey(newId);
+      if (spriteKey && this.textures.exists(spriteKey)) {
+        const img = this.add.image(col * TILE, row * TILE, spriteKey).setOrigin(0);
+        this.tileSprites.set(key, img);
+      } else {
+        this.tileSprites.delete(key);
+      }
+    }
+    this.refreshDarkness();
+  }
+
+  private closeLockDialog(): void {
+    if (!this.lock) return;
+    for (const obj of this.lock.objects) obj.destroy();
+    this.lock = undefined;
+  }
+
+  private renderLockDialog(): void {
+    if (!this.lock) return;
+    for (const obj of this.lock.objects) obj.destroy();
+    this.lock.objects = [];
+
+    const w = 380;
+    const rowH = 22;
+    const headerH = 38;
+    const msgH = this.lock.message ? 36 : 0;
+    const h = headerH + this.lock.options.length * rowH + msgH + 18;
+    const x = (960 - w) / 2;
+    const y = (720 - h) / 2;
+    const bg = this.add
+      .rectangle(x, y, w, h, 0x161629, 0.96)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setStrokeStyle(1, 0x4a4a8c)
+      .setDepth(50);
+    this.lock.objects.push(bg);
+
+    const title = this.add
+      .text(x + 12, y + 10, "Locked Door", {
+        fontFamily: "Georgia, serif",
+        fontSize: "16px",
+        color: "#f6efd6",
+      })
+      .setScrollFactor(0)
+      .setDepth(51);
+    this.lock.objects.push(title);
+
+    let cy = y + headerH;
+    for (let i = 0; i < this.lock.options.length; i++) {
+      const opt = this.lock.options[i];
+      const selected = i === this.lock.cursor;
+      const color = selected ? "#ffd470"
+                  : (opt.id === "leave" ? "#bdb38a"
+                  : (opt.id === "pick" || opt.id === "knock" ? "#dcdcc8" : "#7a7a96"));
+      const prefix = selected ? "▶ " : "  ";
+      const t = this.add
+        .text(x + 18, cy, `${prefix}${opt.label}`, {
+          fontFamily: "monospace",
+          fontSize: "13px",
+          color,
+        })
+        .setScrollFactor(0)
+        .setDepth(51);
+      this.lock.objects.push(t);
+      cy += rowH;
+    }
+
+    if (this.lock.message) {
+      const msg = this.add
+        .text(x + 12, cy + 6, this.lock.message, {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#bdb38a",
+          wordWrap: { width: w - 24 },
+        })
+        .setScrollFactor(0)
+        .setDepth(51);
+      this.lock.objects.push(msg);
+    }
   }
 
   // ── Shop sub-mode ─────────────────────────────────────────────────

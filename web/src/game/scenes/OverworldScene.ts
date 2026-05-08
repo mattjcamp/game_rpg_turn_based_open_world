@@ -161,6 +161,19 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
+    // Seed the party's starting position from the map's `party_start`
+    // (overview_map.json) on the first overworld boot of this session.
+    // Subsequent boots — re-entry from a town, dungeon return, etc. —
+    // keep whatever position the player has walked to; the flag stops
+    // us re-snapping to the map start every time.
+    if (!gameState.partyPosInitialized && this.tileMap.partyStart) {
+      gameState.playerPos = {
+        col: this.tileMap.partyStart.col,
+        row: this.tileMap.partyStart.row,
+      };
+      gameState.partyPosInitialized = true;
+    }
+
     this.mapLights = collectLightSources(this.tileMap);
     this.dark = mapIsDark(this.mapLights);
 

@@ -8,7 +8,7 @@
     "predev": "node scripts/sync-modules.mjs",
     "prebuild": "node scripts/sync-modules.mjs",
     "pretest": "node scripts/sync-modules.mjs",
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

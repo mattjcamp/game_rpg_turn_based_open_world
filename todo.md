@@ -5,8 +5,6 @@ python3 main.py
 
 ## Polish
 
-- Port Examine tile feature (including making sure rangers and alchemists can find herbs)
-- Port lockpick and knock spell feature (thiefs, rangers, spellcasters)
 - Make sure the characters in combat are correct (damage, weapons, etc)
 - Port Party formation workflow and add Constitution ability score as the way for all to get hit point mods
 - Make sure 2x monsters are bigger on screen and their boundries are respected

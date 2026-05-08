@@ -52,6 +52,7 @@ export const TILE_DOOR = 13;
 export const TILE_DFLOOR = 20;
 export const TILE_STAIRS_DOWN = 25;
 export const TILE_DDOOR = 26;
+export const TILE_LOCKED_DOOR = 29;
 export const TILE_WALL_TORCH = 34;
 export const TILE_BRICK = 37;
 export const TILE_SHRINE = 45;
