@@ -16,6 +16,7 @@ import { canEquip } from "./Effects";
 import type { Spell } from "./Spells";
 import { castersFor } from "./Spells";
 import type { Item, EquipSlot } from "./Items";
+import { addToStash } from "./TownActions";
 
 // ── Slot name bridge ───────────────────────────────────────────────
 // items.json uses snake_case ("right_hand"); EquipmentSlots uses
@@ -666,28 +667,83 @@ export function brewPotion(
   return { ok: true, message: `${alchemist.name} brews a ${item}.` };
 }
 
-/** Items a Gnome can tinker together. */
-const TINKER_RECIPES: ReadonlyArray<readonly [number, string]> = [
-  [30, "Lockpick"],
-  [25, "Torch"],
-  [20, "Arrows"],
-  [15, "Bolts"],
-  [10, "Camping Supplies"],
-];
-
-/** A Gnome tinkers a random utility item into existence. */
+/**
+ * A Gnome tinkers up an item the player picked from the general
+ * store stock. Gated to once per in-game day: the caller passes the
+ * current `dayIndex` from GameTime, and we refuse when it matches
+ * `party.lastTinkerDay`. Mirrors the old random-pick version's
+ * spirit ("a Gnome reaches into a cluttered pouch and pulls out
+ * something useful") but lets the player choose what they need
+ * — a torch in a dark dungeon, arrows for a ranger, an antidote
+ * after a poison fight.
+ *
+ * Refuses when:
+ *   - No Gnome is in `members` (active party).
+ *   - The party already tinkered today (`lastTinkerDay === currentDay`).
+ *   - `itemName` isn't in the supplied general-store catalog
+ *     (`generalStock`). The caller is expected to source this from
+ *     counters.json's "general" entry; we don't trust the picker
+ *     UI to forward only valid names since save data could go
+ *     stale across module updates.
+ *
+ * On success, adds the item to the shared stash via `addToStash`
+ * (so stackables like Arrows merge cleanly with existing rows) and
+ * stamps `party.lastTinkerDay = currentDay` so the gate engages
+ * until the clock rolls into tomorrow.
+ *
+ * `items` is the live items catalog (loaded from items.json) — used
+ * to drive stackable behaviour. `generalStock` is the deduped set
+ * of item names from counters.json's "general.items" array.
+ */
 export function tinker(
   party: Party,
   members: PartyMember[],
-  rng: () => number = Math.random,
+  itemName: string,
+  currentDay: number,
+  generalStock: ReadonlySet<string>,
+  items: Map<string, Item>,
 ): ActionResult {
   const gnome = findRace(members, "Gnome");
   if (!gnome) {
     return { ok: false, message: "No Gnome in the party." };
   }
-  const item = pickWeighted(TINKER_RECIPES, rng);
-  party.inventory.push({ item });
-  return { ok: true, message: `${gnome.name} tinkers up a ${item}.` };
+  if (typeof party.lastTinkerDay === "number" && party.lastTinkerDay === currentDay) {
+    return {
+      ok: false,
+      message: `${gnome.name} has already tinkered today — try again tomorrow.`,
+    };
+  }
+  if (!generalStock.has(itemName)) {
+    return {
+      ok: false,
+      message: `${itemName} isn't something a Gnome can tinker up.`,
+    };
+  }
+  // Reuse the shared "add a stackable item to the stash" helper so
+  // Arrows / Lockpicks / Torches merge with existing stacks rather
+  // than spawning a second row.
+  addToStash(party, itemName, items);
+  party.lastTinkerDay = currentDay;
+  return { ok: true, message: `${gnome.name} tinkers up a ${itemName}.` };
+}
+
+/**
+ * True when a Gnome in the active party can tinker right now. The
+ * caller (UI) uses this to grey out the row + skip the picker on
+ * an already-spent day. Also returns false when there's no Gnome
+ * — the row shouldn't even appear in that case, but defending
+ * against stale UI state is cheap.
+ */
+export function canTinker(
+  party: Party,
+  members: PartyMember[],
+  currentDay: number,
+): boolean {
+  if (!findRace(members, "Gnome")) return false;
+  if (typeof party.lastTinkerDay === "number" && party.lastTinkerDay === currentDay) {
+    return false;
+  }
+  return true;
 }
 
 // ── Spell casting (menu / out-of-combat) ───────────────────────────

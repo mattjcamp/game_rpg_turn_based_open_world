@@ -1,117 +1,110 @@
 {
-  "_comment": "Roster and party configuration for Realm of Shadow. Characters are stored in the roster; the active_party selects which 4 (by index) form the adventuring party.",
+  "_comment": "Debugging seed party — these four characters are loaded by default on every fresh `Start New Game` so playtesting starts from a known roster. Players can still create / delete / re-arm them in the /party flow; localStorage edits override this file once written.",
   "start_position": {
     "col": 14,
     "row": 16
   },
-  "gold": 25,
+  "gold": 100,
   "roster": [
     {
       "name": "Gimli",
       "class": "Fighter",
       "race": "Dwarf",
       "gender": "Male",
-      "hp": 17,
-      "strength": 18,
-      "dexterity": 14,
-      "intelligence": 9,
+      "hp": 16,
+      "strength": 20,
+      "dexterity": 10,
+      "constitution": 12,
+      "intelligence": 8,
       "wisdom": 9,
       "level": 1,
+      "exp": 0,
       "equipped": {
-        "right_hand": "Club",
+        "right_hand": null,
         "left_hand": null,
-        "body": "Cloth",
+        "body": null,
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/fighter.png",
-      "constitution": 14
+      "sprite": "/assets/npcs/villager_guard.png"
     },
     {
-      "name": "Merry",
+      "name": "Pippin",
       "class": "Thief",
       "race": "Halfling",
       "gender": "Male",
-      "hp": 6,
-      "mp": 0,
-      "strength": 12,
-      "dexterity": 18,
-      "intelligence": 10,
-      "wisdom": 10,
+      "hp": 9,
+      "strength": 6,
+      "dexterity": 20,
+      "constitution": 13,
+      "intelligence": 8,
+      "wisdom": 9,
       "level": 1,
+      "exp": 0,
       "equipped": {
-        "right_hand": "Club",
+        "right_hand": null,
         "left_hand": null,
-        "body": "Cloth",
+        "body": null,
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/thief.png",
-      "constitution": 12
+      "sprite": "/assets/npcs/villager_child.png"
     },
     {
-      "name": "Gandolf",
+      "name": "Gandalf",
       "class": "Wizard",
-      "race": "Elf",
+      "race": "Human",
       "gender": "Male",
-      "hp": 4,
+      "hp": 6,
       "mp": 19,
-      "strength": 9,
+      "strength": 8,
       "dexterity": 11,
+      "constitution": 10,
       "intelligence": 18,
-      "wisdom": 12,
+      "wisdom": 8,
       "level": 1,
+      "exp": 0,
       "equipped": {
-        "right_hand": "Club",
+        "right_hand": null,
         "left_hand": null,
-        "body": "Cloth",
+        "body": null,
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/wizard.png",
-      "constitution": 10
+      "sprite": "/assets/characters/illusionist.png"
     },
     {
-      "name": "Selina",
+      "name": "Elrond",
       "class": "Cleric",
-      "race": "Human",
-      "gender": "Female",
-      "hp": 7,
+      "race": "Gnome",
+      "gender": "Male",
+      "hp": 8,
       "mp": 14,
-      "strength": 10,
-      "dexterity": 12,
+      "strength": 7,
+      "dexterity": 10,
+      "constitution": 11,
       "intelligence": 10,
-      "wisdom": 18,
+      "wisdom": 19,
       "level": 1,
+      "exp": 0,
       "equipped": {
-        "right_hand": "Club",
+        "right_hand": null,
         "left_hand": null,
-        "body": "Cloth",
+        "body": null,
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/cleric.png",
-      "constitution": 13
+      "sprite": "/assets/characters/cleric.png"
     }
   ],
-  "active_party": [
-    0,
-    1,
-    2,
-    3
-  ],
+  "active_party": [0, 1, 2, 3],
   "party_effects": {
     "effect_1": null,
     "effect_2": null,
     "effect_3": null,
     "effect_4": null
   },
-  "inventory": [
-    { "item": "Torch" },
-    { "item": "Rock" },
-    { "item": "Rock" },
-    { "item": "Rock" },
-    { "item": "Rock" },
-    { "item": "Rock" }
-  ]
+  "inventory": [],
+  "torch_steps": 0,
+  "galadriels_light_steps": 0
 }

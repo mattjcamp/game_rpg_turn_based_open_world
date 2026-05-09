@@ -4,9 +4,9 @@
     "description": "A reeking warren of tunnels gouged into the cliffs north of Plainstown. Goblin scavengers have moved in from the deeper west, bolder now that the wards are weak.",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 4,
+    "num_levels": 2,
     "difficulty": "easy",
-    "level_size": "large",
+    "level_size": "small",
     "torch_density": "none",
     "locked_doors": "off",
     "levels": [

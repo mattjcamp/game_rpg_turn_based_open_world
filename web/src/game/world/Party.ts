@@ -98,6 +98,14 @@ export interface Party {
    *  cleared from its slot — matches the Python game's
    *  `party.galadriels_light_steps`. */
   galadrielsLightSteps: number;
+  /**
+   * `dayIndex` (from GameTime) the last time a Gnome in the party
+   * tinkered up an item. The tinker action is gated to once per
+   * in-game day; comparing this to the live clock's current day
+   * lets the UI grey out the row and refuse the call until the
+   * counter rolls over. Undefined = the party has never tinkered.
+   */
+  lastTinkerDay?: number;
 }
 
 interface RawEquipped {
@@ -135,6 +143,7 @@ interface RawParty {
   inventory?: InventoryItem[];
   torch_steps?: number;
   galadriels_light_steps?: number;
+  last_tinker_day?: number;
 }
 
 /**
@@ -237,6 +246,7 @@ export function partyFromRaw(raw: RawParty): Party {
     inventory: raw.inventory ?? [],
     torchSteps: raw.torch_steps ?? 0,
     galadrielsLightSteps: raw.galadriels_light_steps ?? 0,
+    lastTinkerDay: raw.last_tinker_day,
   };
 }
 
@@ -278,6 +288,7 @@ export function partyToRaw(p: Party): RawParty {
     inventory: p.inventory,
     torch_steps: p.torchSteps,
     galadriels_light_steps: p.galadrielsLightSteps,
+    last_tinker_day: p.lastTinkerDay,
   };
 }
 

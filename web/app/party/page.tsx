@@ -17,7 +17,6 @@ import { useEffect, useState } from "react";
 import {
   loadParty,
   saveStoredRoster,
-  clearStoredRoster,
   _clearPartyCache,
   type Party,
   type PartyMember,
@@ -118,17 +117,6 @@ export default function FormPartyPage() {
     setMessage(`${party.roster[idx].name} removed from roster.`);
   }
 
-  function resetRoster(): void {
-    if (!confirm("Discard local roster edits and reload data/party.json?")) return;
-    clearStoredRoster();
-    _clearPartyCache();
-    loadParty(dataPath("party.json")).then((p) => {
-      setParty(p);
-      setActive(new Set(p.activeParty));
-      setMessage("Roster reset to bundled defaults.");
-    });
-  }
-
   if (!party) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6">
@@ -173,9 +161,15 @@ export default function FormPartyPage() {
           />
         ))}
         {party.roster.length === 0 && (
-          <div className="col-span-full rounded border border-parchment/20 bg-parchment/5 p-6 text-center text-sm text-parchment/60">
-            No characters in the roster yet. Click <em>Create Character</em>
-            below to add one.
+          <div className="col-span-full rounded border border-ember/40 bg-ember/5 p-6 text-center text-sm text-parchment/80">
+            <div className="font-medium text-parchment">
+              Your party hasn&apos;t been formed yet.
+            </div>
+            <div className="mt-2 text-parchment/70">
+              Press <em>Create Character</em> below to roll your first
+              adventurer. You&apos;ll need at least one before you can
+              begin.
+            </div>
           </div>
         )}
       </div>
@@ -210,12 +204,6 @@ export default function FormPartyPage() {
           >
             Create Character
           </Link>
-          <button
-            onClick={resetRoster}
-            className="rounded border border-parchment/20 px-4 py-2 text-sm text-parchment/70 hover:bg-parchment/10"
-          >
-            Reset Roster
-          </button>
         </div>
         <div className="flex gap-2">
           <Link
@@ -226,13 +214,27 @@ export default function FormPartyPage() {
           </Link>
           <button
             onClick={save}
-            className="rounded border border-parchment/30 px-4 py-2 text-sm text-parchment/80 hover:bg-parchment/10"
+            disabled={party.roster.length === 0}
+            className="rounded border border-parchment/30 px-4 py-2 text-sm text-parchment/80 hover:bg-parchment/10 disabled:cursor-not-allowed disabled:border-parchment/10 disabled:text-parchment/30 disabled:hover:bg-transparent"
           >
             Save Party
           </button>
           <button
             onClick={beginAdventure}
-            className="rounded border border-ember bg-ember/40 px-5 py-2 text-sm text-parchment hover:bg-ember/60"
+            disabled={party.roster.length === 0 || active.size === 0}
+            // Render the button as visibly inert when the roster is
+            // empty (no characters to send) OR when the player has
+            // picked nobody to take along. Avoids the "click → error
+            // toast" rhythm; the caption above the button already
+            // explains what to do.
+            className="rounded border border-ember bg-ember/40 px-5 py-2 text-sm text-parchment hover:bg-ember/60 disabled:cursor-not-allowed disabled:border-parchment/20 disabled:bg-parchment/5 disabled:text-parchment/40 disabled:hover:bg-parchment/5"
+            title={
+              party.roster.length === 0
+                ? "Create at least one character first."
+                : active.size === 0
+                  ? `Select up to ${MAX_ACTIVE} adventurers to take along.`
+                  : ""
+            }
           >
             Begin Adventure &rarr;
           </button>

@@ -74,6 +74,7 @@ import {
   brewPotion,
   pickpocket,
   tinker,
+  canTinker,
   getItemMaxDurability,
   getSlotDurability,
   consumeCampingSupplies,
@@ -84,6 +85,8 @@ import {
   type Item,
   type EquipSlot,
 } from "../world/Items";
+import { loadCounters } from "../world/Counters";
+import { dayIndex } from "../world/GameTime";
 import { assetUrl } from "../world/Module";
 import { preloadPartyMemberSprites } from "../data/fighters";
 import { Sfx } from "../audio/Sfx";
@@ -144,7 +147,11 @@ type Mode =
   | "detail" | "equip-slot"
   /** Modal popup over detail/inventory: shows description + durability
    *  bar for the row the cursor was on. ESC/E/Enter dismisses. */
-  | "examine";
+  | "examine"
+  /** Gnome racial ability: shows a list of every general-store item
+   *  and lets the player pick one to tinker into the stash. Open via
+   *  the TINKER row; closes on Enter (commit) or ESC (cancel). */
+  | "tinker-picker";
 
 /**
  * One entry in the left-side list. Effects, the CAST SPELL row, and
@@ -171,6 +178,21 @@ export class PartyScene extends Phaser.Scene {
   private effects: Effect[] = [];
   private spells: Spell[] = [];
   private items: Map<string, Item> = new Map();
+  /**
+   * Deduped list of item names from counters.json's "general" entry.
+   * Loaded once in create() so the Tinker picker (Gnome ability)
+   * has a static menu to render. Kept as the array form for stable
+   * cursor ordering, and a Set for fast `tinker()` validation.
+   */
+  private generalStockList: string[] = [];
+  private generalStockSet: ReadonlySet<string> = new Set();
+  /**
+   * Tinker picker UI state. Active when `mode === "tinker-picker"`;
+   * stores the cursor row and the list of items the player can pick
+   * (same as `generalStockList`, just snapshotted at picker open so
+   * it stays stable if counters somehow reload mid-pick).
+   */
+  private tinkerPickerCursor = 0;
   /** Class templates keyed by lowercase class name. Loaded once in
    *  create() so the XP-to-next-level lookup stays synchronous. */
   private classTemplates = new Map<string, ClassTemplate>();
@@ -272,6 +294,21 @@ export class PartyScene extends Phaser.Scene {
       this.effects = await loadEffects();
       this.spells = await loadSpells();
       this.items = await loadItems();
+      // Counters back the Tinker picker — a Gnome can produce any
+      // item that normally appears in the General Store. We load
+      // and dedupe the stock once so the picker UI has a stable
+      // alphabetised list to render. A failure here just leaves
+      // the list empty; the picker will show "no items available"
+      // rather than crashing.
+      try {
+        const counters = await loadCounters();
+        const general = counters.get("general");
+        if (general) {
+          const seen = new Set<string>(general.items);
+          this.generalStockList = [...seen].sort();
+          this.generalStockSet = seen;
+        }
+      } catch { /* counters absent — picker stays empty */ }
       // Class & race templates back the XP-to-next-level display.
       // Per-class fetches in parallel; a missing file is non-fatal —
       // the row falls back to "EXP <n>" without the threshold.
@@ -375,6 +412,13 @@ export class PartyScene extends Phaser.Scene {
       this.render();
       return;
     }
+    if (this.mode === "tinker-picker") {
+      const total = this.generalStockList.length;
+      if (total === 0) return;
+      this.tinkerPickerCursor = (this.tinkerPickerCursor + delta + total) % total;
+      this.render();
+      return;
+    }
     // Other modes (target / give) have no list to scroll.
   }
 
@@ -414,8 +458,35 @@ export class PartyScene extends Phaser.Scene {
     if (this.mode === "inventory") return this.activateInventoryRow();
     if (this.mode === "spell-list") return this.activateSpellRow();
     if (this.mode === "detail") return this.activateDetailRow();
+    if (this.mode === "tinker-picker") return this.activateTinkerPick();
     // Target prompts and give-item prompts are answered with 1-4,
     // not Enter — Enter is a no-op there.
+  }
+
+  /**
+   * Commit the current tinker picker selection: hand off to the
+   * `tinker()` action, surface its message, and close the picker.
+   * Refusal cases (already tinkered, no Gnome) are caught by
+   * `canTinker` upstream — but tinker() defends against them too,
+   * so a stale UI state still shows a friendly message instead of
+   * silently dropping an extra item.
+   */
+  private activateTinkerPick(): void {
+    if (!this.party) return;
+    const itemName = this.generalStockList[this.tinkerPickerCursor];
+    if (!itemName) {
+      this.mode = "inventory";
+      this.render();
+      return;
+    }
+    const members = activeMembers(this.party);
+    const today = dayIndex(gameState.clock);
+    const r = tinker(this.party, members, itemName, today, this.generalStockSet, this.items);
+    if (r.ok) Sfx.play("chirp");
+    this.feedback = r.message;
+    this.mode = "inventory";
+    this.buildRows();
+    this.render();
   }
 
   /**
@@ -636,9 +707,25 @@ export class PartyScene extends Phaser.Scene {
       return;
     }
     if (row.kind === "tinker") {
-      const r = tinker(this.party, members);
-      this.feedback = r.message;
-      this.buildRows();
+      // Daily-gate the ability up front: if the party already
+      // tinkered today, surface the refusal here rather than
+      // making the player browse the picker for nothing.
+      const today = dayIndex(gameState.clock);
+      if (!canTinker(this.party, members, today)) {
+        const gnome = members.find((m) => m.race === "Gnome");
+        this.feedback = gnome
+          ? `${gnome.name} has already tinkered today — try again tomorrow.`
+          : "No Gnome in the party.";
+        this.render();
+        return;
+      }
+      if (this.generalStockList.length === 0) {
+        this.feedback = "Tinkering needs a general-store catalog (counters.json missing or empty).";
+        this.render();
+        return;
+      }
+      this.tinkerPickerCursor = 0;
+      this.mode = "tinker-picker";
       this.render();
       return;
     }
@@ -825,6 +912,12 @@ export class PartyScene extends Phaser.Scene {
       this.render();
       return;
     }
+    if (this.mode === "tinker-picker") {
+      this.mode = "inventory";
+      this.feedback = "";
+      this.render();
+      return;
+    }
     this.close();
   }
 
@@ -909,7 +1002,79 @@ export class PartyScene extends Phaser.Scene {
       this.renderExamine();
       return;
     }
+    if (this.mode === "tinker-picker") {
+      // Render the inventory layout underneath so the picker reads
+      // as a modal — same pattern give-item / spell-target use.
+      this.renderInventory();
+      this.renderTinkerPicker();
+      return;
+    }
     this.renderInventory();
+  }
+
+  /**
+   * Modal picker for the Gnome's daily tinker. Shows every general-
+   * store item the player can pick from, vertically-scrollable with
+   * a window-shifting cursor (matches the throw / spell pickers in
+   * CombatScene). Enter commits, ESC cancels.
+   */
+  private renderTinkerPicker(): void {
+    const W_BOX = 320;
+    const H_BOX = 360;
+    const X = (W - W_BOX) / 2;
+    const Y = (H - H_BOX) / 2;
+    // Backdrop + frame.
+    this.track(
+      this.add.rectangle(X, Y, W_BOX, H_BOX, 0x161629, 0.97).setOrigin(0)
+        .setStrokeStyle(2, C.gold),
+    );
+    this.track(this.add.text(X + 16, Y + 12, "TINKER", FONT_HEAD(C.gold)));
+    this.track(this.add.text(
+      X + 16, Y + 36,
+      "Pick one item from the general-store catalog.",
+      FONT_BODY(C.dim),
+    ));
+    // Scroll window — show ~12 rows at a time, keep cursor in view.
+    const ROW_H = 20;
+    const VISIBLE = 12;
+    const list = this.generalStockList;
+    const cursor = this.tinkerPickerCursor;
+    let scroll = Math.max(0, cursor - Math.floor(VISIBLE / 2));
+    scroll = Math.min(scroll, Math.max(0, list.length - VISIBLE));
+    const top = Y + 64;
+    for (let i = 0; i < Math.min(VISIBLE, list.length); i++) {
+      const idx = scroll + i;
+      const name = list[idx];
+      if (!name) break;
+      const isCursor = idx === cursor;
+      const rowY = top + i * ROW_H;
+      if (isCursor) {
+        this.track(
+          this.add.rectangle(X + 8, rowY - 2, W_BOX - 16, ROW_H, C.selectBg, 1).setOrigin(0),
+        );
+      }
+      const prefix = isCursor ? "> " : "  ";
+      this.track(this.add.text(
+        X + 16, rowY,
+        `${prefix}${name}`,
+        FONT_BODY(isCursor ? C.body : C.dim),
+      ));
+    }
+    // Scroll arrows when there's more above / below the window.
+    if (scroll > 0) {
+      this.track(this.add.text(X + W_BOX - 24, top - 18, "▲", FONT_MONO(C.gold)));
+    }
+    if (scroll + VISIBLE < list.length) {
+      this.track(
+        this.add.text(X + W_BOX - 24, top + VISIBLE * ROW_H + 4, "▼", FONT_MONO(C.gold)),
+      );
+    }
+    // Footer hint.
+    this.track(this.add.text(
+      X + 16, Y + H_BOX - 24,
+      "[↑↓] select   [Enter] tinker   [ESC] cancel",
+      FONT_HINT(),
+    ));
   }
 
   /**
@@ -1110,8 +1275,14 @@ export class PartyScene extends Phaser.Scene {
         this.text(x + padX, ry + 2, "PICKPOCKET", FONT_BODY(0xe6c878));
         this.text(x + w - padX, ry + 2, "HALFLING", FONT_MONO(C.dim), [1, 0]);
       } else if (r.kind === "tinker") {
-        this.text(x + padX, ry + 2, "TINKER", FONT_BODY(0x9cd49c));
-        this.text(x + w - padX, ry + 2, "GNOME", FONT_MONO(C.dim), [1, 0]);
+        const usedToday = !!this.party
+          && typeof this.party.lastTinkerDay === "number"
+          && this.party.lastTinkerDay === dayIndex(gameState.clock);
+        const titleColor = usedToday ? C.faint : 0x9cd49c;
+        const suffixColor = usedToday ? C.faint : C.dim;
+        const tag = usedToday ? "USED TODAY" : "GNOME";
+        this.text(x + padX, ry + 2, "TINKER", FONT_BODY(titleColor));
+        this.text(x + w - padX, ry + 2, tag, FONT_MONO(suffixColor), [1, 0]);
       } else if (r.kind === "item") {
         const charges = r.charges != null ? `  (${r.charges})` : "";
         this.text(x + padX, ry + 2, r.name + charges, FONT_BODY(C.body));
@@ -1390,12 +1561,25 @@ export class PartyScene extends Phaser.Scene {
       return;
     }
     if (row.kind === "tinker") {
-      this.text(x, y, "TINKER", FONT_HEAD());
+      // Show whether the daily ability is available right now so the
+      // player knows whether Enter will open the picker or just
+      // bounce off with a "tomorrow" message.
+      const today = this.party
+        ? dayIndex(gameState.clock)
+        : 0;
+      const usedToday = !!this.party
+        && typeof this.party.lastTinkerDay === "number"
+        && this.party.lastTinkerDay === today;
+      const titleColor = usedToday ? C.faint : C.gold;
+      this.text(x, y, "TINKER", FONT_HEAD(titleColor));
       this.text(x, y + 24,
-                "Your Gnome cobbles together a utility item — a lockpick, "
-                + "torch, arrows, bolts, or camping supplies.",
+                "Your Gnome cobbles together any item from the general "
+                + "store catalog — once per day.",
                 FONT_BODY(C.dim), [0, 0], w);
-      this.text(x, y + h - 18, "Enter to tinker", FONT_MONO(C.gold));
+      const hint = usedToday
+        ? "Already used today — try again tomorrow"
+        : "Enter to pick an item";
+      this.text(x, y + h - 18, hint, FONT_MONO(usedToday ? C.faint : C.gold));
       return;
     }
     if (row.kind === "item") {

@@ -696,21 +696,91 @@ describe("brewPotion / pickpocket / tinker", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("tinker adds an item to the stash when a Gnome is present", () => {
+  it("tinker adds the chosen item to the stash when a Gnome is present", () => {
     const p = makeParty();
     const members = activeMembers(p);
     members[0].race = "Gnome";
+    const stock = new Set(["Torch", "Lockpick", "Arrows"]);
+    const items = new Map<string, Item>([
+      ["Torch", { name: "Torch", category: "general" } as Item],
+    ]);
     const before = p.inventory.length;
-    const r = tinker(p, members, () => 0); // Lockpick (first entry)
+    const r = tinker(p, members, "Torch", 0, stock, items);
     expect(r.ok).toBe(true);
-    expect(r.message).toContain("Lockpick");
+    expect(r.message).toContain("Torch");
     expect(p.inventory.length).toBe(before + 1);
+    expect(p.lastTinkerDay).toBe(0);
   });
 
   it("tinker refuses when no Gnome is present", () => {
     const p = makeParty();
-    const r = tinker(p, activeMembers(p), () => 0);
+    const stock = new Set(["Torch"]);
+    const items = new Map<string, Item>([
+      ["Torch", { name: "Torch", category: "general" } as Item],
+    ]);
+    const r = tinker(p, activeMembers(p), "Torch", 0, stock, items);
     expect(r.ok).toBe(false);
+  });
+
+  it("tinker refuses a second call on the same day, then allows it the next day", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    members[0].race = "Gnome";
+    const stock = new Set(["Torch", "Lockpick"]);
+    const items = new Map<string, Item>([
+      ["Torch", { name: "Torch", category: "general" } as Item],
+      ["Lockpick", { name: "Lockpick", category: "general" } as Item],
+    ]);
+    expect(tinker(p, members, "Torch", 5, stock, items).ok).toBe(true);
+    // Same day — refused. Stash count must stay put.
+    const inventoryAfterFirst = p.inventory.length;
+    const second = tinker(p, members, "Lockpick", 5, stock, items);
+    expect(second.ok).toBe(false);
+    expect(second.message.toLowerCase()).toContain("already tinkered");
+    expect(p.inventory.length).toBe(inventoryAfterFirst);
+    // Next day — allowed again.
+    const third = tinker(p, members, "Lockpick", 6, stock, items);
+    expect(third.ok).toBe(true);
+    expect(p.lastTinkerDay).toBe(6);
+  });
+
+  it("tinker refuses items that aren't in the general-store catalog", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    members[0].race = "Gnome";
+    const stock = new Set(["Torch"]);
+    const items = new Map<string, Item>([
+      ["Torch", { name: "Torch", category: "general" } as Item],
+      ["Mystic Sword", { name: "Mystic Sword", category: "weapons" } as Item],
+    ]);
+    const r = tinker(p, members, "Mystic Sword", 0, stock, items);
+    expect(r.ok).toBe(false);
+    expect(r.message.toLowerCase()).toContain("can tinker");
+    // Day stamp must NOT advance on a refusal — the player should
+    // still get their daily attempt.
+    expect(p.lastTinkerDay).toBeUndefined();
+  });
+
+  it("tinker stacks ammo into the existing stash row instead of duplicating", () => {
+    const p = makeParty();
+    p.inventory.push({ item: "Arrows", charges: 20 });
+    const members = activeMembers(p);
+    members[0].race = "Gnome";
+    const stock = new Set(["Arrows"]);
+    const items = new Map<string, Item>([
+      ["Arrows", {
+        name: "Arrows", category: "general",
+        stackable: true, charges: 20,
+      } as Item],
+    ]);
+    const arrowsBefore = p.inventory.filter((it) => it.item === "Arrows").length;
+    const r = tinker(p, members, "Arrows", 1, stock, items);
+    expect(r.ok).toBe(true);
+    // Must NOT spawn a second "Arrows" row — addToStash should
+    // merge into the existing one, summing per-stack charges.
+    const arrowEntries = p.inventory.filter((it) => it.item === "Arrows");
+    expect(arrowEntries.length).toBe(arrowsBefore);
+    expect(arrowEntries[0].charges).toBe(40);
   });
 });
 
