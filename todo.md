@@ -3,9 +3,6 @@ npm run dev
 
 python3 main.py
 
-01 - Scepter of the Celestial Guardian.mp3
-09 - Aurelian Overture.mp3
-
 ## Polish
 
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.

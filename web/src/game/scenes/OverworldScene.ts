@@ -14,6 +14,7 @@
 
 import Phaser from "phaser";
 import { Music } from "../audio/Music";
+import { Sfx } from "../audio/Sfx";
 import { TileMap, loadTileMap } from "../world/TileMap";
 import {
   tileDef,
@@ -75,6 +76,7 @@ import {
   flashQuestMessage,
   openQuestLog,
   openVictoryModal,
+  showQuestAcceptedCallout,
   type QuestDialogHandles,
 } from "../world/QuestDialog";
 import {
@@ -1379,8 +1381,20 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.questDialog) return;
     const { questName, mode } = this.questDialog;
     if (mode === "available") {
-      acceptQuest(gameState.moduleQuestStates, questName);
+      const accepted = acceptQuest(gameState.moduleQuestStates, questName);
       this.closeOverworldQuestDialog();
+      // Mirror TownScene's accept beat — same callout helper, same
+      // SFX, so the player sees the same "QUEST ACCEPTED" treatment
+      // whether they triggered it from a town NPC or an overworld
+      // quest giver.
+      if (accepted) {
+        const def = findQuest(this.questDefs, questName);
+        showQuestAcceptedCallout(this, {
+          questName,
+          firstStep: def?.steps[0]?.description,
+        });
+        Sfx.play("chirp");
+      }
       return;
     }
     if (mode === "completed") {

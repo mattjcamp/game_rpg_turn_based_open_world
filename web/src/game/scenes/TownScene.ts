@@ -30,6 +30,7 @@
 
 import Phaser from "phaser";
 import { Music } from "../audio/Music";
+import { Sfx } from "../audio/Sfx";
 import {
   loadTowns,
   resolveTownOrInterior,
@@ -68,6 +69,7 @@ import {
   flashQuestMessage,
   openQuestLog,
   openVictoryModal,
+  showQuestAcceptedCallout,
   showStepCompleteCallout,
   type QuestDialogHandles,
 } from "../world/QuestDialog";
@@ -1565,8 +1567,21 @@ export class TownScene extends Phaser.Scene {
     if (!this.questDialog) return;
     const { questName, mode } = this.questDialog;
     if (mode === "available") {
-      acceptQuest(gameState.moduleQuestStates, questName);
+      const accepted = acceptQuest(gameState.moduleQuestStates, questName);
       this.closeQuestDialog();
+      // Surface the same callout language the player sees on step
+      // completion + quest completion, so accept → step → done all
+      // share visual vocabulary. Pull the first step's description
+      // as a "next up" cue so the banner doubles as the first-step
+      // hint without forcing the player to open the quest log.
+      if (accepted) {
+        const def = findQuest(this.questDefs, questName);
+        showQuestAcceptedCallout(this, {
+          questName,
+          firstStep: def?.steps[0]?.description,
+        });
+        Sfx.play("chirp");
+      }
       return;
     }
     if (mode === "completed") {

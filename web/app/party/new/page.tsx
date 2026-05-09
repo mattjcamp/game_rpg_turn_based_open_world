@@ -185,15 +185,42 @@ const AVATAR_GROUPS: ReadonlyArray<AvatarGroup> = [
     label: "Adventurers",
     avatars: listFromFolder("characters", [
       "fighter", "barbarian", "paladin", "ranger",
-      "thief", "cleric", "wizard", "alchemist", "illusionist",
+      "thief", "cleric", "druid", "wizard", "alchemist", "illusionist",
     ]),
   },
   {
     label: "Townsfolk",
     avatars: listFromFolder("npcs", [
-      "elder", "innkeeper", "shopkeep",
+      "elder", "innkeeper", "shopkeep", "townsfolk", "brigand",
       "villager_bard", "villager_beggar", "villager_child",
       "villager_citizen", "villager_guard", "villager_shepherd",
+    ]),
+  },
+  {
+    label: "Classic NPCs",
+    // Ultima IV-style sprites — the smaller-palette, blockier
+    // portraits that read as "older RPG" energy. Keeping them in
+    // their own group lets a player who wants a specifically
+    // retro-styled character browse them together rather than
+    // hunting through a 30-row grid.
+    avatars: listFromFolder("npcs", [
+      "u4_avatar", "u4_villager_male", "u4_villager_female",
+      "u4_citizen", "u4_beggar", "u4_child",
+      "u4_guard", "u4_guard_npc", "u4_knight",
+      "u4_healer", "u4_monk", "u4_shepherd",
+      "u4_tinker", "u4_jester",
+    ]),
+  },
+  {
+    label: "VGA Adventurers",
+    // VGA-era sprites — more detail, brighter palette, generally
+    // class-coded (mage, fighter, paladin, etc.). Useful for a
+    // player who wants their character to read clearly as a
+    // particular archetype.
+    avatars: listFromFolder("npcs", [
+      "vga_avatar", "vga_fighter", "vga_paladin", "vga_ranger",
+      "vga_rogue", "vga_mage", "vga_druid", "vga_jester",
+      "vga_evil_mage",
     ]),
   },
   {
@@ -231,7 +258,10 @@ function defaultAvatarFor(klass: ClassName): AvatarKey {
     case "Ranger":    return "ranger";
     case "Thief":     return "thief";
     case "Cleric":    return "cleric";
-    case "Druid":     return "ranger";
+    // Druid now has its own dedicated sprite (copied over from the
+    // Python game's character folder) instead of falling back to
+    // the ranger placeholder.
+    case "Druid":     return "druid";
     case "Wizard":    return "wizard";
     case "Alchemist": return "alchemist";
   }

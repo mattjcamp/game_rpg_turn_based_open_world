@@ -37,7 +37,7 @@ import {
   DIR_DELTAS,
   type Direction,
 } from "../combat/Arena";
-import { makeSampleParty, PARTY_SPRITES } from "../data/fighters";
+import { makeSampleParty, PARTY_SPRITES, preloadPartyMemberSprites } from "../data/fighters";
 import {
   makeSampleEncounter,
   makeMonsterByName,
@@ -91,6 +91,8 @@ import {
   shatterEffect,
   magicDart,
   magicArrow,
+  partyDeathSlump,
+  partyDeathBanner,
   VFX_COLOURS,
 } from "../combat/Vfx";
 import { Sfx } from "../audio/Sfx";
@@ -446,6 +448,13 @@ export class CombatScene extends Phaser.Scene {
       // lazily but combat may be entered before any party screen has
       // been opened.
       if (!gameState.partyData) gameState.partyData = await loadParty();
+      // The static class-sprite list above only covers the 9 shipped
+      // class portraits. Characters created with avatars from npcs/
+      // or monsters/ would otherwise render as a grey "missing
+      // texture" rectangle — preload whatever each live PartyMember
+      // actually points at so every avatar in the right-hand HUD and
+      // on the arena resolves to a sprite.
+      await preloadPartyMemberSprites(this, gameState.partyData);
       // Class templates back per-class movement ranges (Wizard 2,
       // Fighter 4, Thief 6, …). Per-class fetches in parallel; a
       // missing file falls back to the default in CombatBridge.
@@ -2729,6 +2738,27 @@ export class CombatScene extends Phaser.Scene {
           targets: body, alpha: 0.3,
           duration: 80, yoyo: true, repeat: 1,
         });
+        // Party-member death — the critical "your fighter just dropped"
+        // beat. The hit-flash above covers the moment of damage;
+        // here we layer the death sequence on top so the player
+        // can't miss it: a slumping body sprite, a red radial
+        // burst, a heavier camera shake, a centre-arena "X HAS
+        // FALLEN!" banner, and the defeat fanfare. Enemy deaths
+        // already get the "defeated!" suffix in the log and don't
+        // need the extra ceremony.
+        if (result.killed && target.side === "party") {
+          // Defer one tick so the hit-flash yoyo doesn't fight the
+          // slump tween for control of the sprite's alpha.
+          this.time.delayedCall(120, () => {
+            void partyDeathSlump(this, body);
+            partyDeathBanner(
+              this,
+              { x: ARENA_X, y: ARENA_Y, width: ARENA_W, height: ARENA_H },
+              target.name,
+            );
+            Sfx.play("defeat");
+          });
+        }
       }
     });
   }

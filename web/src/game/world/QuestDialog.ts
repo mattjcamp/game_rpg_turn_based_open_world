@@ -245,6 +245,115 @@ export function showStepCompleteCallout(
   });
 }
 
+/**
+ * Center-screen "QUEST ACCEPTED" callout. Mirrors
+ * `showStepCompleteCallout` so the player gets the same visual
+ * vocabulary on every quest beat (accept → step complete →
+ * quest complete), but in a parchment-amber palette and with a
+ * 200ms fade-in so the moment of accepting feels distinct from
+ * mid-encounter step credits — the player just made an active
+ * choice, the UI acknowledges it.
+ *
+ * The body line shows the quest name plus the first step's
+ * description as a "next up" cue ("Quest Name — Find the lost
+ * artifact"). When the quest has no steps (data-driven content
+ * gaps), only the quest name is shown.
+ *
+ * Auto-dismisses after ~3s. Multiple accepts queue via stacking.
+ */
+export function showQuestAcceptedCallout(
+  scene: Phaser.Scene,
+  opts: { questName: string; firstStep?: string },
+): void {
+  const W = 520;
+  const H = 88;
+  const X = (960 - W) / 2;
+  const Y = 96;
+  // Parchment-amber palette — distinct from the green step-complete
+  // / gold quest-complete banners so the player can read the beat
+  // at a glance.
+  const borderColor = 0xddb05c;
+  const titleColor  = "#f8d28a";
+
+  const bg = scene.add
+    .rectangle(X, Y, W, H, 0x1f1a10, 0.85)
+    .setOrigin(0)
+    .setStrokeStyle(3, borderColor)
+    .setScrollFactor(0)
+    .setDepth(75)
+    .setAlpha(0);
+  const title = scene.add
+    .text(X + W / 2, Y + 14, "QUEST ACCEPTED", {
+      fontFamily: "Georgia, serif",
+      fontSize: "20px",
+      color: titleColor,
+      fontStyle: "bold",
+    })
+    .setOrigin(0.5, 0)
+    .setScrollFactor(0)
+    .setDepth(76)
+    .setAlpha(0);
+  const info = opts.firstStep
+    ? `${opts.questName} — ${opts.firstStep}`
+    : opts.questName;
+  const infoText = scene.add
+    .text(X + W / 2, Y + 48, info, {
+      fontFamily: "Georgia, serif",
+      fontSize: "14px",
+      color: "#f5e6c4",
+      wordWrap: { width: W - 28 },
+      align: "center",
+    })
+    .setOrigin(0.5, 0)
+    .setScrollFactor(0)
+    .setDepth(76)
+    .setAlpha(0);
+
+  // Pulse the border between the base amber and a brighter
+  // variant so the callout reads as celebratory rather than
+  // static — same trick as the step-complete callout.
+  const pulseTween = scene.tweens.addCounter({
+    from: 0,
+    to: 1,
+    duration: 600,
+    yoyo: true,
+    repeat: -1,
+    onUpdate: (t) => {
+      const v = t.getValue();
+      const lit = Phaser.Display.Color.Interpolate.ColorWithColor(
+        Phaser.Display.Color.IntegerToColor(borderColor),
+        Phaser.Display.Color.IntegerToColor(0xffffff),
+        100,
+        Math.floor(v * 30),
+      );
+      bg.setStrokeStyle(3, Phaser.Display.Color.GetColor(lit.r, lit.g, lit.b));
+    },
+  });
+
+  const destroy = (): void => {
+    pulseTween.stop();
+    bg.destroy();
+    title.destroy();
+    infoText.destroy();
+  };
+
+  // Fade-in over 200ms — softer than the step-complete callout's
+  // hard appear since "accepted" is a calmer beat than "completed".
+  scene.tweens.add({
+    targets: [bg, title, infoText],
+    alpha: 1,
+    duration: 200,
+  });
+  // Hold ~2.4s, then fade out over 600ms.
+  scene.tweens.add({
+    targets: [bg, title, infoText],
+    alpha: 0,
+    delay: 2400,
+    duration: 600,
+    onComplete: destroy,
+  });
+}
+
 /** Build a brief on-screen banner — used by quest turn-in flashes
  *  and step-completion callouts. Auto-destroys after `durationMs`. */
 export function flashQuestMessage(scene: Phaser.Scene, text: string, durationMs = 2400): void {
@@ -267,11 +376,20 @@ export function flashQuestMessage(scene: Phaser.Scene, text: string, durationMs 
   scene.time.delayedCall(durationMs, () => { bg.destroy(); t.destroy(); });
 }
 
-/** Read-only quest log overlay. Lists every known quest grouped by
- *  status (active, completed, available). Mirrors what the Python
- *  game's quest log shows on the J / Q hotkey. Dismissed with any
- *  key. Returns the destroy function so the caller can chain it
- *  to a custom close handler if needed. */
+/** Read-only quest log overlay. Lists quests the party has actually
+ *  engaged with — active (in progress), completed (objectives met,
+ *  awaiting turn-in), and finished (turned in, historical record).
+ *
+ *  Deliberately omits the "available" status: those are quests the
+ *  player has discovered but never accepted, and surfacing them
+ *  here spoils the storyline by previewing every hook in the
+ *  module. The player still learns about an available quest the
+ *  moment they talk to its quest giver — `openQuestDialog` shows
+ *  the pitch in "available" mode at that point — but the log is
+ *  a record of what the party HAS done, not what's lurking ahead.
+ *
+ *  Dismissed with any key. Returns the destroy function so the
+ *  caller can chain it to a custom close handler if needed. */
 export function openQuestLog(
   scene: Phaser.Scene,
   defs: QuestDef[],
@@ -300,12 +418,14 @@ export function openQuestLog(
       .setScrollFactor(0)
       .setDepth(71),
   );
-  // Group quests by status. Order: active → completed → available →
-  // turned_in (the last lives at the bottom as historical record).
+  // Group quests by status. Order: active → completed → turned_in.
+  // "Available" quests (discovered but not yet started) are
+  // intentionally NOT listed here — they'd spoil the storyline by
+  // previewing every hook in the module. The player learns about
+  // them by talking to quest-giver NPCs, which is the point.
   const groups: Array<{ label: string; status: QuestState["status"] }> = [
     { label: "Active",     status: "active" },
     { label: "Completed (turn in for reward)", status: "completed" },
-    { label: "Available",  status: "available" },
     { label: "Finished",   status: "turned_in" },
   ];
   let cursorY = Y + 48;

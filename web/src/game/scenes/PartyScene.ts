@@ -85,6 +85,7 @@ import {
   type EquipSlot,
 } from "../world/Items";
 import { assetUrl } from "../world/Module";
+import { preloadPartyMemberSprites } from "../data/fighters";
 import { Sfx } from "../audio/Sfx";
 
 // Canvas
@@ -262,6 +263,12 @@ export class PartyScene extends Phaser.Scene {
     try {
       if (!gameState.partyData) gameState.partyData = await loadParty();
       this.party = gameState.partyData;
+      // The static class-sprite preload only covers the 9 shipped
+      // class portraits. Players who picked an NPC / monster avatar
+      // for their character would otherwise render as a grey
+      // "missing texture" rectangle in the formation grid and the
+      // detail panel.
+      await preloadPartyMemberSprites(this, this.party);
       this.effects = await loadEffects();
       this.spells = await loadSpells();
       this.items = await loadItems();

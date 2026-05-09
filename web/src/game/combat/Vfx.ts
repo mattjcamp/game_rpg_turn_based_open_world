@@ -471,4 +471,91 @@ export function shatterEffect(
   screenShake(scene, 0.008, 240);
 }
 
+/**
+ * Party-member death sequence — body slumps + red burst + heavy
+ * shake. Returns a Promise that resolves when the body animation
+ * finishes (~700ms) so callers can chain the next combat action
+ * after a beat.
+ *
+ * The body's rotation and alpha are mutated permanently so the
+ * sprite stays "fallen" for the rest of the encounter (the scene's
+ * `refreshVisibility` only touches alpha; rotation sticks). The
+ * caller is still expected to dim the body to its dead alpha via
+ * the usual visibility refresh — this helper just animates the
+ * transition there.
+ */
+export function partyDeathSlump(
+  scene: Phaser.Scene,
+  body: Phaser.GameObjects.GameObject & { x: number; y: number; rotation: number; alpha: number },
+): Promise<void> {
+  // Underlying red burst — feels like a wound spraying outward.
+  void radialBurst(scene, { x: body.x, y: body.y }, COLOURS.blood, COLOURS.fire, 36);
+  screenShake(scene, 0.012, 360);
+  return new Promise((resolve) => {
+    scene.tweens.add({
+      targets: body,
+      // Tilt onto the side and slide down a few pixels — reads as
+      // "knocked over" without needing a custom death sprite.
+      rotation: Math.PI / 2,
+      y: body.y + 8,
+      alpha: 0.35,
+      duration: 600,
+      ease: "Cubic.Out",
+      onComplete: () => resolve(),
+    });
+  });
+}
+
+/**
+ * Centre-arena banner announcing a party member's death. Big red
+ * text with stroke, holds for ~2.4s then fades out over 600ms so
+ * the next combat tick can move on. Returns immediately — the
+ * banner cleans itself up. Pass arena bounds so the banner sits
+ * over the playfield rather than the HUD column.
+ */
+export function partyDeathBanner(
+  scene: Phaser.Scene,
+  bounds: { x: number; y: number; width: number; height: number },
+  name: string,
+): void {
+  const cx = bounds.x + bounds.width / 2;
+  const cy = bounds.y + bounds.height / 2;
+  // Smoky backdrop — slight darkening so the bright red text reads
+  // even when the arena tile colour is similarly warm.
+  const veil = scene.add
+    .rectangle(cx, cy, bounds.width, 80, 0x000000, 0.55)
+    .setOrigin(0.5)
+    .setDepth(199)
+    .setAlpha(0);
+  const text = scene.add
+    .text(cx, cy, `${name.toUpperCase()} HAS FALLEN!`, {
+      fontFamily: "Georgia, serif",
+      fontSize: "32px",
+      color: "#ff4f4f",
+      stroke: "#1a1a2e",
+      strokeThickness: 6,
+    })
+    .setOrigin(0.5)
+    .setDepth(200)
+    .setAlpha(0);
+  // Quick fade-in (180ms) → hold (~2s) → slow fade-out (600ms).
+  // Tweening alpha rather than killing the timeline outright keeps
+  // the message readable across the transition into the next turn.
+  scene.tweens.add({
+    targets: [veil, text],
+    alpha: 1,
+    duration: 180,
+    onComplete: () => {
+      scene.time.delayedCall(2000, () => {
+        scene.tweens.add({
+          targets: [veil, text],
+          alpha: 0,
+          duration: 600,
+          onComplete: () => { veil.destroy(); text.destroy(); },
+        });
+      });
+    },
+  });
+}
+
 export const VFX_COLOURS = COLOURS;
