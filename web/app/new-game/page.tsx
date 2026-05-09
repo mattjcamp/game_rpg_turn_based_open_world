@@ -21,19 +21,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { modulePath } from "@/game/world/Module";
+
 interface ModuleMetadata {
   name?: string;
   description?: string;
 }
-
-const ACTIVE_MODULE = "the_dragon_of_dagorn";
 
 export default function NewGamePage() {
   const [meta, setMeta] = useState<ModuleMetadata | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void fetch(`/modules/${ACTIVE_MODULE}/module.json`)
+    void fetch(modulePath("module.json"))
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();

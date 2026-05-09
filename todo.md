@@ -10,7 +10,6 @@ python3 main.py
 - Lighting should not pass through walls and essentially only light based on Light of Sight and the lighting effect range
 
 ## Bugs
-- When I exit the Temple, the party ends up on a random tile, this exit should follow the linking pattern we have set up which puts them back on the temple tile in the overview map
 - The party graphics are missing in the published version
 - Again, I found in a second random monster encounter that the party did not have it's normal options appear on the right (range, cast, throw). No error appeared in the console.
 
